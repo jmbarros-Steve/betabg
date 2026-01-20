@@ -7,49 +7,79 @@ const corsHeaders = {
 
 // Fixed questions Steve asks to build the brand brief
 const BRAND_BRIEF_QUESTIONS = [
+  // PARTE 1: CONOCIENDO EL NEGOCIO (11 preguntas)
   {
     id: 'business_type',
-    question: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de la Universidad de Perros de Stanford.\n\nAntes de hacer cualquier anuncio, necesito entender tu negocio a fondo. Vamos a armar tu Brief de Marca.\n\n**Pregunta 1 de 11:** ¿A qué se dedica tu empresa? ¿Qué vendes exactamente? Dame el pitch de 30 segundos.',
+    question: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de la Universidad de Perros de Stanford.\n\nAntes de hacer cualquier anuncio, necesito entender tu negocio a fondo. Vamos a armar tu Brief de Marca.\n\n**Pregunta 1 de 18:** ¿A qué se dedica tu empresa? ¿Qué vendes exactamente? Dame el pitch de 30 segundos.',
   },
   {
     id: 'customers',
-    question: '*mueve la cola* Ok, ya olfateo el negocio...\n\n**Pregunta 2 de 11:** ¿Quiénes te compran? Dame el perfil real, no el que sueñas. Edad, género, nivel socioeconómico, ubicación. ¿Quién saca la tarjeta? 💳',
+    question: '*mueve la cola* Ok, ya olfateo el negocio...\n\n**Pregunta 2 de 18:** ¿Quiénes te compran? Dame el perfil real, no el que sueñas. Edad, género, nivel socioeconómico, ubicación. ¿Quién saca la tarjeta? 💳',
   },
   {
     id: 'sales_channels',
-    question: '*ladea la cabeza curioso*\n\n**Pregunta 3 de 11:** ¿Dónde vendes? ¿Tienda física, ecommerce, marketplace, redes sociales, todo junto? Dame los canales reales de venta. 🏪',
+    question: '*ladea la cabeza curioso*\n\n**Pregunta 3 de 18:** ¿Dónde vendes? ¿Tienda física, ecommerce, marketplace, redes sociales, todo junto? Dame los canales reales de venta. 🏪',
   },
   {
     id: 'communication_tone',
-    question: '*se rasca la oreja pensativo*\n\n**Pregunta 4 de 11:** ¿Qué idioma/tono usa tu marca para comunicarse?\n\n¿Agresivo y directo? ¿Tranquilo y cercano? ¿Formal y profesional? ¿Chistoso? Dame ejemplos si puedes. 🎤',
+    question: '*se rasca la oreja pensativo*\n\n**Pregunta 4 de 18:** ¿Qué idioma/tono usa tu marca para comunicarse?\n\n¿Agresivo y directo? ¿Tranquilo y cercano? ¿Formal y profesional? ¿Chistoso? Dame ejemplos si puedes. 🎤',
   },
   {
     id: 'pain_solved',
-    question: '*pone cara seria de doctor Stanford* 🎓\n\n**Pregunta 5 de 11:** ¿Qué dolor específico solucionas? No me digas "ayudamos a la gente"... eso es humo.\n\n¿Qué problema REAL tiene tu cliente que TÚ resuelves?',
+    question: '*pone cara seria de doctor Stanford* 🎓\n\n**Pregunta 5 de 18:** ¿Qué dolor específico solucionas? No me digas "ayudamos a la gente"... eso es humo.\n\n¿Qué problema REAL tiene tu cliente que TÚ resuelves?',
   },
   {
     id: 'supporting_data',
-    question: '*olfatea el aire buscando data*\n\n**Pregunta 6 de 11:** ¿Tienes DATA que respalde tu propuesta? Testimonios, casos de éxito, números, estadísticas...\n\n¿Qué pruebas tienes de que funciona lo que vendes? 📊',
+    question: '*olfatea el aire buscando data*\n\n**Pregunta 6 de 18:** ¿Tienes DATA que respalde tu propuesta? Testimonios, casos de éxito, números, estadísticas...\n\n¿Qué pruebas tienes de que funciona lo que vendes? 📊',
   },
   {
     id: 'competitive_advantage',
-    question: '*se para en dos patas*\n\n**Pregunta 7 de 11:** ¿Cuál es tu ventaja competitiva REAL?\n\n¿Por qué alguien te compraría a TI y no al de al lado? Y no me digas "calidad y servicio" porque eso lo dice todo el mundo. 😤',
+    question: '*se para en dos patas*\n\n**Pregunta 7 de 18:** ¿Cuál es tu ventaja competitiva REAL?\n\n¿Por qué alguien te compraría a TI y no al de al lado? Y no me digas "calidad y servicio" porque eso lo dice todo el mundo. 😤',
   },
   {
     id: 'average_ticket',
-    question: '*saca una calculadora imaginaria* 🧮\n\n**Pregunta 8 de 11:** ¿Cuál es tu ticket promedio? Es decir, ¿cuánto gasta en promedio cada cliente por compra?\n\nDame el número real, no el que quisieras.',
+    question: '*saca una calculadora imaginaria* 🧮\n\n**Pregunta 8 de 18:** ¿Cuál es tu ticket promedio? Es decir, ¿cuánto gasta en promedio cada cliente por compra?\n\nDame el número real, no el que quisieras.',
   },
   {
     id: 'margins',
-    question: '*baja la voz como si fuera secreto*\n\n**Pregunta 9 de 11:** ¿Cuáles son tus márgenes? ¿Qué porcentaje te queda después de costos?\n\nEsto es CLAVE para saber cuánto podemos gastar en ads. 💰',
+    question: '*baja la voz como si fuera secreto*\n\n**Pregunta 9 de 18:** ¿Cuáles son tus márgenes? ¿Qué porcentaje te queda después de costos?\n\nEsto es CLAVE para saber cuánto podemos gastar en ads. 💰',
   },
   {
     id: 'shipping_cost',
-    question: '*mueve la colita*\n\n**Pregunta 10 de 11:** ¿Cuánto te cuesta el despacho/envío en promedio?\n\n¿Lo cobras aparte? ¿Lo incluyes? ¿Cuánto te come del margen? 📦',
+    question: '*mueve la colita*\n\n**Pregunta 10 de 18:** ¿Cuánto te cuesta el despacho/envío en promedio?\n\n¿Lo cobras aparte? ¿Lo incluyes? ¿Cuánto te come del margen? 📦',
   },
   {
     id: 'fixed_costs',
-    question: '*se sienta formal, última pregunta*\n\n**Pregunta 11 de 11 - LA ÚLTIMA:** ¿Cuáles son tus gastos fijos mensuales principales?\n\nArriendo, sueldos, servicios, lo que sea. Necesito entender tu estructura de costos para calcular bien los números. 🏢',
+    question: '*estira las patitas*\n\n**Pregunta 11 de 18:** ¿Cuáles son tus gastos fijos mensuales principales?\n\nArriendo, sueldos, servicios, lo que sea. Necesito entender tu estructura de costos. 🏢',
+  },
+  // PARTE 2: LA OFERTA PERFECTA - SABRI SUBY (7 preguntas)
+  {
+    id: 'perceived_value',
+    question: '*se pone lentes imaginarios de profesor* 🎓\n\nAhora entramos a lo bueno... la OFERTA PERFECTA según la metodología del Padrino.\n\n**Pregunta 12 de 18 - VALOR PERCIBIDO:** ¿Cómo haces que tu cliente sienta que recibe MÁS de lo que paga?\n\n¿Tienes combos, paquetes, extras incluidos? ¿Cómo presentas el valor total vs. el precio? Dame ejemplos concretos. 💎',
+  },
+  {
+    id: 'guarantee',
+    question: '*ladra con autoridad*\n\n**Pregunta 13 de 18 - GARANTÍA:** ¿Qué garantía ofreces? ¿Devolución de dinero? ¿Garantía de resultados? ¿Cuánto tiempo?\n\nSi no tienes garantía... ¿por qué el cliente debería confiar en ti? Una garantía sólida elimina el miedo. 🛡️',
+  },
+  {
+    id: 'bonuses',
+    question: '*mueve las orejas emocionado*\n\n**Pregunta 14 de 18 - BONOS:** ¿Qué bonos o extras incluyes con tu producto/servicio?\n\n¿Ebooks, instalación gratis, consultoría, accesorios, contenido exclusivo? Los bonos hacen que la oferta sea irresistible. 🎁',
+  },
+  {
+    id: 'scarcity_urgency',
+    question: '*mira el reloj imaginario en su pata*\n\n**Pregunta 15 de 18 - ESCASEZ/URGENCIA:** ¿Usas alguna estrategia de escasez o urgencia?\n\n¿Cupos limitados? ¿Ofertas por tiempo limitado? ¿Descuentos de fin de mes? ¿Stock reducido? Esto acelera la decisión de compra. ⏰',
+  },
+  {
+    id: 'clear_results',
+    question: '*saca su diploma de Stanford*\n\n**Pregunta 16 de 18 - RESULTADOS CLAROS:** ¿Qué resultados específicos y medibles prometes?\n\nNo me digas "mejorar tu vida"... dame números. "30% más ventas en 3 meses", "5 kilos menos en 6 semanas", "ahorra 10 horas a la semana". ¿Qué resultado CONCRETO puede esperar tu cliente? 📈',
+  },
+  {
+    id: 'simple_decision',
+    question: '*ladea la cabeza*\n\n**Pregunta 17 de 18 - DECISIÓN SIMPLE:** ¿Qué tan fácil es comprarte?\n\n¿Cuántos clicks? ¿Cuántas opciones de pago? ¿Hay cuotas? ¿El proceso de compra es simple o es un laberinto? Si complicas la compra, pierdes clientes. 🛒',
+  },
+  {
+    id: 'emotional_benefits',
+    question: '*se sienta solemne, última pregunta*\n\n**Pregunta 18 de 18 - BENEFICIOS EMOCIONALES:** Más allá del producto... ¿qué EMOCIÓN vendes?\n\n¿Tranquilidad? ¿Status? ¿Libertad? ¿Seguridad? ¿Pertenencia? La gente compra con emociones y justifica con lógica. ¿Qué siente tu cliente después de comprarte? ❤️',
   },
 ];
 
@@ -75,7 +105,9 @@ CÓMO REACCIONAR:
 - Buena info con números: "¡WOOF! Eso sí es data de calidad. Me gusta."
 - Si evaden una pregunta: "No me cambies el tema, humano. Necesito esta info para ayudarte."
 
-PREGUNTAS DEL BRIEF DE MARCA (11 en total):
+PREGUNTAS DEL BRIEF DE MARCA (18 en total):
+
+PARTE 1 - CONOCIENDO EL NEGOCIO:
 1. A qué se dedica la empresa
 2. Quiénes le compran (perfil de cliente real)
 3. Dónde venden (canales)
@@ -87,6 +119,15 @@ PREGUNTAS DEL BRIEF DE MARCA (11 en total):
 9. Márgenes
 10. Costo de despacho promedio
 11. Gastos fijos
+
+PARTE 2 - LA OFERTA PERFECTA (Metodología Sabri Suby):
+12. Valor percibido alto - ¿Cómo hace sentir al cliente que recibe más de lo que paga?
+13. Garantía sólida - ¿Qué garantía ofrece? ¿Devolución? ¿Resultados?
+14. Bonos atractivos - ¿Qué extras incluye sin costo adicional?
+15. Escasez/Urgencia - ¿Usa tiempo limitado, cupos limitados, etc.?
+16. Resultados claros - ¿Qué resultados específicos y medibles promete?
+17. Decisión simple - ¿Qué tan fácil es el proceso de compra?
+18. Beneficios emocionales - ¿Qué emoción vende además del producto?
 
 INSTRUCCIONES:
 1. Mantén SIEMPRE el personaje de Steve sin filtros
