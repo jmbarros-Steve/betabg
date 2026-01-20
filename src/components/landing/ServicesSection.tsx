@@ -1,36 +1,36 @@
 import { motion } from 'framer-motion';
-import { Code2, Database, Cloud, Cog, Shield, LineChart } from 'lucide-react';
+import { Facebook, Search, Mail, ShoppingBag, Building2, TrendingUp } from 'lucide-react';
 
 const services = [
   {
-    icon: Code2,
-    title: 'Desarrollo de Software',
-    description: 'Arquitectura y desarrollo de aplicaciones modernas, escalables y mantenibles.',
+    icon: Facebook,
+    title: 'Meta Performance',
+    description: 'Campañas de alto rendimiento en Facebook e Instagram. Maximizamos tu ROAS con estrategias data-driven.',
   },
   {
-    icon: Database,
-    title: 'Gestión de Datos',
-    description: 'Diseño de bases de datos, ETL, y estrategias de gestión de información.',
+    icon: Search,
+    title: 'Google Performance',
+    description: 'Domina los resultados de búsqueda con campañas SEM optimizadas y estrategias de conversión avanzadas.',
   },
   {
-    icon: Cloud,
-    title: 'Cloud & DevOps',
-    description: 'Migración a la nube, infraestructura como código y pipelines CI/CD.',
+    icon: Mail,
+    title: 'Klaviyo Performance',
+    description: 'Email marketing automatizado que convierte. Flujos personalizados y segmentación inteligente.',
   },
   {
-    icon: Cog,
-    title: 'Automatización',
-    description: 'Automatización de procesos empresariales para maximizar eficiencia.',
+    icon: ShoppingBag,
+    title: 'Shopify Performance',
+    description: 'Optimización completa de tu tienda Shopify. CRO, velocidad y experiencia de compra impecable.',
   },
   {
-    icon: Shield,
-    title: 'Seguridad IT',
-    description: 'Auditorías de seguridad, implementación de mejores prácticas y compliance.',
+    icon: Building2,
+    title: 'Escalamiento B2B',
+    description: 'Estrategias de crecimiento para empresas B2B. Generación de leads y pipelines de ventas efectivos.',
   },
   {
-    icon: LineChart,
-    title: 'Consultoría Estratégica',
-    description: 'Asesoramiento técnico para toma de decisiones y roadmaps tecnológicos.',
+    icon: TrendingUp,
+    title: 'Estrategias de Escalamiento',
+    description: 'Planes de crecimiento personalizados. Escalamos tu negocio de forma sostenible y rentable.',
   },
 ];
 
@@ -49,7 +49,7 @@ export function ServicesSection() {
             Nuestros <span className="text-primary">Servicios</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Soluciones integrales para cada etapa de tu transformación digital
+            Soluciones de performance marketing para escalar tu negocio
           </p>
         </motion.div>
 
