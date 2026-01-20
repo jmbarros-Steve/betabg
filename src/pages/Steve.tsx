@@ -284,17 +284,23 @@ export default function Steve() {
                 </p>
 
                 <p>
-                  La Chonga siguió siendo seria. Se puso el traje de consultora corporativa (y de abogada cuando toca). 
-                  <strong className="text-foreground"> Yo me volví loco.</strong> 
-                  Me transformé en un Bulldog Francés viajero 🌍, 
-                  recorriendo el mundo aprendiendo de los mejores marketeros del planeta.
+                  <strong className="text-foreground">Lamentablemente, La Chonga ya no está con nosotros... 🕊️</strong>
+                  {" "}Se puso viejita y partió. Pero ojo, que su espíritu nos acompaña en el chat. 
+                  A veces aparece para darte consejos legales o llamarte la atención cuando escribes mal. 
+                  Fome hasta en el más allá, pero la queremos igual.
                 </p>
 
                 <p>
-                  <strong className="text-foreground">Ah, y también hago clases en la Universidad de los Perros 🎓.</strong>
-                  {" "}¿Por qué cobro? Porque si no, no como po'. Me gusta el <em>Bravery</em> premium, 
-                  andar en Mercedes y salir con las Barbies los fines de semana. 
-                  Un perro tiene sus estándares. 🚗💅
+                  <strong className="text-foreground">Yo, en cambio, estoy como tuna. 💪</strong>
+                  {" "}Me hago todos mis exámenes regulares, el veterinario dice que todo bien... 
+                  excepto que estoy un poquito gordo 🐷. Pero es que el <em>Bravery</em> premium está muy rico po'.
+                </p>
+
+                <p>
+                  <strong className="text-foreground">También hago clases en la Universidad de los Perros 🎓</strong>
+                  {" "}y cobro por estos planes porque, bueno... tengo que vivir. 
+                  El Mercedes no se paga solo, las Barbies tienen gustos caros, 
+                  y alguien tiene que financiar mis viajes por el mundo. 🚗💅🌍
                 </p>
 
                 <p className="text-foreground font-medium">
