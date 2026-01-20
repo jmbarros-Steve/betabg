@@ -36,7 +36,7 @@ const services = [
 
 export function ServicesSection() {
   return (
-    <section id="servicios" className="py-24 relative">
+    <section id="servicios" className="py-24 relative bg-card">
       <div className="container px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -45,10 +45,11 @@ export function ServicesSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Nuestros <span className="text-primary">Servicios</span>
+          <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Lo que hacemos</p>
+          <h2 className="text-3xl md:text-5xl font-light mb-4">
+            Nuestros <span className="text-primary font-medium">Servicios</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-light">
             Soluciones de performance marketing para escalar tu negocio
           </p>
         </motion.div>
@@ -61,18 +62,16 @@ export function ServicesSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1, duration: 0.5 }}
-              whileHover={{ y: -5, scale: 1.02 }}
-              className="group relative p-8 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all duration-300"
+              whileHover={{ y: -5 }}
+              className="group relative p-8 rounded-lg bg-background border border-border hover:border-primary/50 transition-all duration-300"
             >
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              
               <div className="relative">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
-                  <service.icon className="w-7 h-7 text-primary" />
+                <div className="w-12 h-12 rounded-lg border-2 border-primary/30 flex items-center justify-center mb-6 group-hover:border-primary/60 transition-colors">
+                  <service.icon className="w-6 h-6 text-primary" />
                 </div>
                 
-                <h3 className="text-xl font-semibold mb-3 text-foreground">{service.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{service.description}</p>
+                <h3 className="text-lg font-medium mb-3 text-foreground tracking-wide">{service.title}</h3>
+                <p className="text-muted-foreground leading-relaxed text-sm font-light">{service.description}</p>
               </div>
             </motion.div>
           ))}

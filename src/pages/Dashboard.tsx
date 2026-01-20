@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Clock, Users, FileText, LogOut, Terminal } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
 import { TimeEntryPanel } from '@/components/dashboard/TimeEntryPanel';
 import { InvoicesPanel } from '@/components/dashboard/InvoicesPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
+import logo from '@/assets/logo.jpg';
 
 type TabType = 'overview' | 'clients' | 'time' | 'invoices';
 
@@ -34,7 +34,7 @@ export default function Dashboard() {
   if (!user) return null;
 
   const tabs = [
-    { id: 'overview', label: 'Resumen', icon: Terminal },
+    { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'time', label: 'Horas', icon: Clock },
     { id: 'invoices', label: 'Recibos', icon: FileText },
@@ -43,19 +43,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-lg sticky top-0 z-50">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="container px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Terminal className="w-5 h-5 text-primary" />
-            </div>
-            <span className="text-xl font-bold">
-              BG<span className="text-primary">Consult</span>
-            </span>
-          </div>
+          <img src={logo} alt="Consultoría BG" className="h-10 w-auto" />
 
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
+            <span className="text-xs uppercase tracking-widest text-muted-foreground hidden sm:block">{user.email}</span>
             <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="w-5 h-5" />
             </Button>
@@ -71,7 +64,7 @@ export default function Dashboard() {
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'ghost'}
               onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 uppercase tracking-wider text-xs"
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}

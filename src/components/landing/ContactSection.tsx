@@ -12,20 +12,21 @@ export function ContactSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            <span className="text-primary">Contáctanos</span>
+          <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Hablemos</p>
+          <h2 className="text-3xl md:text-5xl font-light mb-4">
+            <span className="text-primary font-medium">Contáctanos</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Estamos listos para ayudarte a alcanzar tus objetivos tecnológicos
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-light">
+            Estamos listos para ayudarte a alcanzar tus objetivos
           </p>
         </motion.div>
 
         <div className="max-w-2xl mx-auto">
-          <div className="grid gap-6">
+          <div className="grid gap-4">
             {[
-              { icon: Mail, label: 'Email', value: 'contacto@bgconsult.com' },
+              { icon: Mail, label: 'Email', value: 'contacto@consultoriabg.com' },
               { icon: Phone, label: 'Teléfono', value: '+34 XXX XXX XXX' },
-              { icon: MapPin, label: 'Ubicación', value: 'Barcelona, España' },
+              { icon: MapPin, label: 'Ubicación', value: 'España' },
             ].map((item, index) => (
               <motion.div
                 key={index}
@@ -33,14 +34,14 @@ export function ContactSection() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-4 p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-colors"
+                className="flex items-center gap-4 p-6 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors"
               >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <item.icon className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 rounded-lg border-2 border-primary/30 flex items-center justify-center">
+                  <item.icon className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">{item.label}</p>
-                  <p className="text-lg font-medium text-foreground">{item.value}</p>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{item.label}</p>
+                  <p className="font-medium text-foreground">{item.value}</p>
                 </div>
               </motion.div>
             ))}
