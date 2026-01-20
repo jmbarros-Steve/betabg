@@ -26,14 +26,15 @@ export default function Blog() {
   }, []);
 
   const fetchPosts = async () => {
+    // Use RPC or raw query to access the public view that excludes user_id
     const { data, error } = await supabase
       .from('blog_posts')
-      .select('*')
+      .select('id, title, excerpt, content, category, created_at')
       .eq('published', true)
       .order('created_at', { ascending: false });
 
-    if (!error) {
-      setPosts(data || []);
+    if (!error && data) {
+      setPosts(data);
     }
     setLoading(false);
   };
