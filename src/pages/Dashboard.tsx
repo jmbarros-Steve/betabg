@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
 import { TimeEntryPanel } from '@/components/dashboard/TimeEntryPanel';
 import { InvoicesPanel } from '@/components/dashboard/InvoicesPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
+import { BlogPanel } from '@/components/dashboard/BlogPanel';
+import { StudyResourcesPanel } from '@/components/dashboard/StudyResourcesPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices';
+type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios';
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
@@ -38,6 +40,8 @@ export default function Dashboard() {
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'time', label: 'Horas', icon: Clock },
     { id: 'invoices', label: 'Recibos', icon: FileText },
+    { id: 'blog', label: 'Blog', icon: BookOpen },
+    { id: 'estudios', label: 'Centro Estudios', icon: GraduationCap },
   ] as const;
 
   return (
@@ -64,7 +68,7 @@ export default function Dashboard() {
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'ghost'}
               onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2 uppercase tracking-wider text-xs"
+              className="flex items-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap"
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -83,6 +87,8 @@ export default function Dashboard() {
           {activeTab === 'clients' && <ClientsPanel userId={user.id} />}
           {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
           {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
+          {activeTab === 'blog' && <BlogPanel userId={user.id} />}
+          {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}
         </motion.div>
       </div>
     </div>

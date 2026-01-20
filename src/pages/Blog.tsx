@@ -1,45 +1,43 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, User, ArrowRight } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
-const blogPosts = [
-  {
-    id: 1,
-    title: 'Cómo optimizar tus campañas de Meta Ads en 2026',
-    excerpt: 'Descubre las mejores estrategias para maximizar tu ROAS y escalar tus campañas de Facebook e Instagram.',
-    author: 'Consultoría BG',
-    date: '15 Ene 2026',
-    category: 'Meta Ads',
-  },
-  {
-    id: 2,
-    title: 'Guía completa de Klaviyo para e-commerce',
-    excerpt: 'Aprende a crear flujos de email marketing automatizados que conviertan y fidelicen a tus clientes.',
-    author: 'Consultoría BG',
-    date: '10 Ene 2026',
-    category: 'Klaviyo',
-  },
-  {
-    id: 3,
-    title: 'Shopify Performance: CRO y velocidad',
-    excerpt: 'Las claves para optimizar tu tienda Shopify y mejorar la experiencia de compra de tus usuarios.',
-    author: 'Consultoría BG',
-    date: '5 Ene 2026',
-    category: 'Shopify',
-  },
-  {
-    id: 4,
-    title: 'Estrategias de escalamiento B2B efectivas',
-    excerpt: 'Cómo generar leads cualificados y construir pipelines de ventas para empresas B2B.',
-    author: 'Consultoría BG',
-    date: '1 Ene 2026',
-    category: 'B2B',
-  },
-];
+interface BlogPost {
+  id: string;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  category: string | null;
+  created_at: string;
+}
 
 export default function Blog() {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .select('*')
+      .eq('published', true)
+      .order('created_at', { ascending: false });
+
+    if (!error) {
+      setPosts(data || []);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -72,49 +70,66 @@ export default function Blog() {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {blogPosts.map((post, index) => (
-              <motion.article
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + index * 0.1 }}
-                className="group p-8 rounded-lg bg-card border border-border hover:border-primary/50 transition-all duration-300"
-              >
-                <div className="flex items-center gap-4 mb-4">
-                  <span className="px-3 py-1 text-xs uppercase tracking-widest bg-primary/10 text-primary rounded-full">
-                    {post.category}
-                  </span>
-                </div>
-                
-                <h2 className="text-xl font-medium mb-3 text-foreground group-hover:text-primary transition-colors">
-                  {post.title}
-                </h2>
-                
-                <p className="text-muted-foreground text-sm font-light mb-6 leading-relaxed">
-                  {post.excerpt}
-                </p>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      {post.author}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {post.date}
-                    </span>
+          {loading ? (
+            <div className="grid md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="animate-pulse p-8 rounded-lg bg-card border border-border h-64" />
+              ))}
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-16 bg-card rounded-lg border border-border">
+              <p className="text-muted-foreground">No hay artículos publicados aún</p>
+              <p className="text-sm text-muted-foreground mt-1">Vuelve pronto para ver nuevo contenido</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-6">
+              {posts.map((post, index) => (
+                <motion.article
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + index * 0.1 }}
+                  className="group p-8 rounded-lg bg-card border border-border hover:border-primary/50 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    {post.category && (
+                      <span className="px-3 py-1 text-xs uppercase tracking-widest bg-primary/10 text-primary rounded-full">
+                        {post.category}
+                      </span>
+                    )}
                   </div>
                   
-                  <button className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all">
-                    Leer más
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.article>
-            ))}
-          </div>
+                  <h2 className="text-xl font-medium mb-3 text-foreground group-hover:text-primary transition-colors">
+                    {post.title}
+                  </h2>
+                  
+                  {post.excerpt && (
+                    <p className="text-muted-foreground text-sm font-light mb-6 leading-relaxed">
+                      {post.excerpt}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        Consultoría BG
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {format(new Date(post.created_at), 'd MMM yyyy', { locale: es })}
+                      </span>
+                    </div>
+                    
+                    <button className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all">
+                      Leer más
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
