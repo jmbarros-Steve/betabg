@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.klaviyo-push-emails]
 verify_jwt = false
+
+[functions.chonga-support]
+verify_jwt = false

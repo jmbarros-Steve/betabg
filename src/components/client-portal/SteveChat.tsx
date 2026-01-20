@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Send, Bot, User, Sparkles, RefreshCw } from 'lucide-react';
+import { Send, User, Sparkles, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import avatarSteve from '@/assets/avatar-steve.png';
 
 interface Message {
   id: string;
@@ -219,10 +220,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Avatar className="h-10 w-10 bg-primary">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  <Bot className="h-5 w-5" />
-                </AvatarFallback>
+              <Avatar className="h-12 w-12 border-2 border-primary/20">
+                <AvatarImage src={avatarSteve} alt="Steve" />
+                <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
               <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
             </div>
@@ -256,10 +256,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
               )}
             >
               {message.role === 'assistant' && (
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    <Bot className="h-4 w-4" />
-                  </AvatarFallback>
+                <Avatar className="h-8 w-8 flex-shrink-0 border border-primary/20">
+                  <AvatarImage src={avatarSteve} alt="Steve" />
+                  <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
                 </Avatar>
               )}
               
@@ -286,10 +285,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
           {isLoading && (
             <div className="flex gap-3 justify-start">
-              <Avatar className="h-8 w-8 flex-shrink-0">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  <Bot className="h-4 w-4" />
-                </AvatarFallback>
+              <Avatar className="h-8 w-8 flex-shrink-0 border border-primary/20">
+                <AvatarImage src={avatarSteve} alt="Steve" />
+                <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
               <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex gap-1">
