@@ -7,7 +7,7 @@ import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
 
 interface Connection {
-  platform: 'shopify' | 'meta' | 'google';
+  platform: 'shopify' | 'meta' | 'google' | 'klaviyo';
   is_active: boolean;
 }
 

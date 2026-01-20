@@ -5,11 +5,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag } from 'lucide-react';
+import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail } from 'lucide-react';
 import { ClientOnboardingSteps } from './ClientOnboardingSteps';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const SHOPIFY_CLIENT_ID = '933109488c1e95e5fd630abb7e03809e';
 const GOOGLE_CLIENT_ID = '870555860271-um4g70a5ob5bs56rpusni6eci01f77mn.apps.googleusercontent.com';
@@ -21,7 +30,7 @@ interface ClientPortalConnectionsProps {
 
 interface Connection {
   id: string;
-  platform: 'shopify' | 'meta' | 'google';
+  platform: 'shopify' | 'meta' | 'google' | 'klaviyo';
   store_name: string | null;
   store_url: string | null;
   account_id: string | null;
@@ -29,7 +38,7 @@ interface Connection {
   last_sync_at: string | null;
 }
 
-const platformConfig = {
+const platformConfig: Record<string, { name: string; logo: string | null; color: string }> = {
   shopify: {
     name: 'Shopify',
     logo: logoShopify,
@@ -45,6 +54,11 @@ const platformConfig = {
     logo: logoGoogle,
     color: 'bg-yellow-100 text-yellow-800',
   },
+  klaviyo: {
+    name: 'Klaviyo',
+    logo: null,
+    color: 'bg-purple-100 text-purple-800',
+  },
 };
 
 export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPortalConnectionsProps) {
@@ -53,6 +67,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [connectingMeta, setConnectingMeta] = useState(false);
   const [connectingShopify, setConnectingShopify] = useState(false);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [showKlaviyoDialog, setShowKlaviyoDialog] = useState(false);
+  const [klaviyoApiKey, setKlaviyoApiKey] = useState('');
+  const [connectingKlaviyo, setConnectingKlaviyo] = useState(false);
 
   useEffect(() => {
     fetchConnections();
@@ -147,6 +164,11 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   };
 
   const handleSyncConnection = async (connection: Connection) => {
+    if (connection.platform === 'klaviyo') {
+      toast.info('Klaviyo no requiere sincronización de métricas');
+      return;
+    }
+    
     try {
       toast.loading('Sincronizando...', { id: 'sync' });
 
@@ -171,6 +193,41 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     }
   };
 
+  const handleConnectKlaviyo = async () => {
+    if (!klaviyoApiKey.trim()) {
+      toast.error('Ingresa tu API Key de Klaviyo');
+      return;
+    }
+
+    setConnectingKlaviyo(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('store-klaviyo-connection', {
+        body: {
+          client_id: clientId,
+          api_key: klaviyoApiKey,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      toast.success(`Klaviyo conectado: ${data.account_name}`);
+      setShowKlaviyoDialog(false);
+      setKlaviyoApiKey('');
+      fetchConnections();
+    } catch (error) {
+      console.error('Error connecting Klaviyo:', error);
+      toast.error('Error al conectar Klaviyo');
+    } finally {
+      setConnectingKlaviyo(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -182,6 +239,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const hasMetaConnection = connections.some(c => c.platform === 'meta');
   const hasShopifyConnection = connections.some(c => c.platform === 'shopify');
   const hasGoogleConnection = connections.some(c => c.platform === 'google');
+  const hasKlaviyoConnection = connections.some(c => c.platform === 'klaviyo');
 
   return (
     <div className="space-y-6">
@@ -209,12 +267,17 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
         <div className="grid gap-4">
           {connections.map((connection) => {
             const config = platformConfig[connection.platform];
+            const isKlaviyo = connection.platform === 'klaviyo';
             return (
               <Card key={connection.id}>
                 <CardContent className="flex items-center justify-between py-4">
                   <div className="flex items-center gap-4">
-                    {config.logo && (
+                    {config.logo ? (
                       <img src={config.logo} alt={config.name} className="h-10 w-10 object-contain" />
+                    ) : (
+                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${config.color}`}>
+                        <Mail className="w-5 h-5" />
+                      </div>
                     )}
                     <div>
                       <p className="font-medium">{config.name}</p>
@@ -231,14 +294,16 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                         <><XCircle className="w-3 h-3 mr-1" /> Inactivo</>
                       )}
                     </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSyncConnection(connection)}
-                    >
-                      <RefreshCw className="w-4 h-4 mr-1" />
-                      Sincronizar
-                    </Button>
+                    {!isKlaviyo && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSyncConnection(connection)}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-1" />
+                        Sincronizar
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -331,13 +396,93 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
             </div>
           )}
 
-          {hasMetaConnection && hasShopifyConnection && hasGoogleConnection && (
+          {/* Klaviyo Connection */}
+          {!hasKlaviyoConnection && (
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-purple-100 text-purple-800">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-medium">Klaviyo</p>
+                  <p className="text-sm text-muted-foreground">
+                    Email marketing y automatizaciones
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => setShowKlaviyoDialog(true)}
+                disabled={connectingKlaviyo}
+              >
+                {connectingKlaviyo ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Key className="w-4 h-4 mr-2" />
+                )}
+                Conectar Klaviyo
+              </Button>
+            </div>
+          )}
+
+          {hasMetaConnection && hasShopifyConnection && hasGoogleConnection && hasKlaviyoConnection && (
             <p className="text-sm text-muted-foreground text-center py-4">
               Todas las plataformas disponibles están conectadas
             </p>
           )}
         </CardContent>
       </Card>
+
+      {/* Klaviyo API Key Dialog */}
+      <Dialog open={showKlaviyoDialog} onOpenChange={setShowKlaviyoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-purple-600" />
+              Conectar Klaviyo
+            </DialogTitle>
+            <DialogDescription>
+              Ingresa tu Private API Key de Klaviyo para conectar tu cuenta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="klaviyo-api-key">Private API Key</Label>
+              <Input
+                id="klaviyo-api-key"
+                type="password"
+                value={klaviyoApiKey}
+                onChange={(e) => setKlaviyoApiKey(e.target.value)}
+                placeholder="pk_..."
+                autoComplete="off"
+              />
+              <p className="text-xs text-muted-foreground">
+                Puedes obtener tu API Key en Klaviyo → Settings → API Keys
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => {
+                setShowKlaviyoDialog(false);
+                setKlaviyoApiKey('');
+              }}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleConnectKlaviyo}
+                disabled={connectingKlaviyo || !klaviyoApiKey.trim()}
+              >
+                {connectingKlaviyo ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Conectando...
+                  </>
+                ) : (
+                  'Conectar'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

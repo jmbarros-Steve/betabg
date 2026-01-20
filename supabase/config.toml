@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.generate-meta-copy]
 verify_jwt = false
+
+[functions.store-klaviyo-connection]
+verify_jwt = false
+
+[functions.klaviyo-push-emails]
+verify_jwt = false
