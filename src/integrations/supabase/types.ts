@@ -315,7 +315,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_blog_posts: {
+        Row: {
+          category: string | null
+          content: string | null
+          created_at: string | null
+          excerpt: string | null
+          id: string | null
+          published: boolean | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          content?: string | null
+          created_at?: string | null
+          excerpt?: string | null
+          id?: string | null
+          published?: boolean | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          content?: string | null
+          created_at?: string | null
+          excerpt?: string | null
+          id?: string | null
+          published?: boolean | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       decrypt_platform_token: {
