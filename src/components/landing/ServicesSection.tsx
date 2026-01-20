@@ -1,33 +1,36 @@
 import { motion } from 'framer-motion';
 import { Building2, TrendingUp } from 'lucide-react';
 
-// Brand logo components
+// Meta (Facebook) Logo - Blue "f"
 const MetaLogo = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="currentColor">
-    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 3.11 1.45 5.89 3.72 7.69-.18-1.07-.27-2.72.06-3.89.3-1.06 1.93-8.17 1.93-8.17s-.49-.98-.49-2.44c0-2.29 1.33-4 2.98-4 1.41 0 2.08 1.05 2.08 2.31 0 1.41-.89 3.51-1.36 5.46-.39 1.64.82 2.97 2.43 2.97 2.92 0 5.16-3.08 5.16-7.52 0-3.93-2.83-6.68-6.86-6.68-4.68 0-7.42 3.51-7.42 7.14 0 1.41.54 2.93 1.22 3.75.14.17.15.31.11.49-.12.51-.4 1.64-.46 1.87-.07.3-.24.36-.55.22-2.05-.95-3.33-3.96-3.33-6.38 0-5.18 3.77-9.94 10.86-9.94 5.7 0 10.13 4.07 10.13 9.5 0 5.67-3.57 10.23-8.53 10.23-1.67 0-3.23-.87-3.76-1.89l-1.02 3.91c-.37 1.42-1.37 3.21-2.04 4.29.02 0 .03 0 .05 0 5.46 0 9.91-4.45 9.91-9.91 0-5.46-4.45-9.91-9.91-9.91z"/>
+  <svg viewBox="0 0 24 24" className="w-7 h-7" fill="#1877F2">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
   </svg>
 );
 
-const GoogleLogo = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+// Google Ads Logo
+const GoogleAdsLogo = () => (
+  <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none">
+    <path d="M3.3 21.7c1.8 1.1 4.2.5 5.3-1.3L17.8 5.6c1.1-1.8.5-4.2-1.3-5.3-1.8-1.1-4.2-.5-5.3 1.3L2 16.4c-1.1 1.8-.5 4.2 1.3 5.3z" fill="#FBBC04"/>
+    <path d="M20.7 21.7c-1.8 1.1-4.2.5-5.3-1.3L6.2 5.6c-1.1-1.8-.5-4.2 1.3-5.3 1.8-1.1 4.2-.5 5.3 1.3l9.2 14.8c1.1 1.8.5 4.2-1.3 5.3z" fill="#4285F4"/>
+    <circle cx="6" cy="18" r="3.5" fill="#34A853"/>
   </svg>
 );
 
+// Klaviyo Logo - Green K
 const KlaviyoLogo = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="currentColor">
-    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+  <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none">
+    <rect width="24" height="24" rx="4" fill="#2B2B2B"/>
+    <path d="M6 18V6h2.5v5l4.5-5h3L11.5 11l5 7h-3l-3.5-5-2 2.2V18H6z" fill="#3DDB84"/>
   </svg>
 );
 
+// Shopify Logo - Green bag with S
 const ShopifyLogo = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none">
-    <path d="M15.34 3.66c-.04-.17-.19-.29-.36-.3-.17-.01-2.59-.19-2.59-.19s-2.05-2-2.26-2.21c-.21-.21-.62-.15-.78-.1-.02 0-.42.13-1.13.35-.08-.24-.2-.53-.35-.85C7.35.36 6.72 0 5.97 0c-.08 0-.16.01-.24.02C5.55-.14 5.36 0 5.17 0 3.78 0 2.7 1.47 2.34 2.96c-.72.22-1.22.38-1.28.4-.4.12-.41.13-.46.51C.56 4.21 0 8.69 0 8.69l11.61 2.18L15.34 3.66zM10.5 2.19l-2.02.62c.19-.73.57-1.45 1.02-1.93.17-.18.41-.39.69-.51.27.53.32 1.28.31 1.82zM8.29.63c.23.06.45.19.66.38-.76.36-1.58 1.27-1.92 3.09l-1.6.49c.31-1.1 1.14-3.01 2.86-3.96zM5.79.75c.1 0 .2.01.29.04-1.09.51-2.25 1.79-2.74 4.36l-1.27.39C2.57 3.49 3.77 1.38 5.79.75zM5.91 12.84l-.87-.4s.37-.99.37-2.18c0-1.27-.53-1.28-.53-1.28-.43 0-.8.45-.8.45l-.11-1.11s.58-.96 1.69-.96c1.38 0 1.7 1.46 1.7 2.04 0 1.9-1.45 3.44-1.45 3.44z" fill="#95BF47"/>
-    <path d="M14.98 3.36c-.17-.01-2.59-.19-2.59-.19s-2.05-2-2.26-2.21c-.08-.08-.18-.12-.29-.13l-1.62 16.59 8.5-1.84S15.02 3.52 14.98 3.36z" fill="#5E8E3E"/>
-    <path d="M9.98 6.97l-.99 2.95s-.87-.47-1.93-.47c-1.56 0-1.64.98-1.64 1.22 0 1.34 3.51 1.85 3.51 4.99 0 2.47-1.57 4.06-3.68 4.06-2.54 0-3.84-1.58-3.84-1.58l.68-2.24s1.34 1.15 2.47 1.15c.74 0 1.04-.58 1.04-1.01 0-1.75-2.88-1.83-2.88-4.7 0-2.42 1.73-4.76 5.24-4.76 1.35 0 2.02.39 2.02.39z" fill="#fff"/>
+  <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none">
+    <path d="M20.5 6.5c-.03-.17-.18-.28-.35-.29-.17-.01-3.65-.07-3.65-.07s-2.42-2.35-2.68-2.61c-.26-.26-.77-.18-.97-.12-.02 0-.54.17-1.38.43-.82-2.37-2.27-4.55-4.83-4.55-.07 0-.14 0-.21.01-.72-.95-1.61-1.37-2.38-1.37-5.89 0-8.69 7.37-9.57 11.11-.97.3-1.65.51-1.74.54-.54.17-.56.19-.63.7C2.04 10.72 0 26.95 0 26.95l16.34 2.83 8.83-2.21S20.54 6.67 20.5 6.5zM14.17 5.08l-2.18.67c0-.07 0-.14 0-.21 0-1.08-.15-1.95-.4-2.64 1 .19 1.67 1.26 2.08 2.18h.5zm-3.62 1.11l-3.29 1.02c.32-1.22 1.18-2.42 2.12-3.04.35-.24.85-.5 1.43-.64-.37.78-.59 1.87-.59 2.66h.33v.01-.01zm-1.99-3.85c.47 0 .87.16 1.23.48-1.35.64-2.8 2.26-3.42 5.49l-2.59.8c.72-2.45 2.44-6.77 4.78-6.77z" fill="#95BF47"/>
+    <path d="M20.15 6.21c-.17-.01-3.65-.07-3.65-.07s-2.42-2.35-2.68-2.61c-.1-.1-.23-.15-.37-.17l-1.22 25.05 8.83-2.21S20.54 6.67 20.5 6.5c-.03-.17-.18-.28-.35-.29z" fill="#5E8E3E"/>
+    <path d="M12.79 9.45l-1.24 3.69s-1.09-.58-2.42-.58c-1.96 0-2.05 1.23-2.05 1.54 0 1.69 4.4 2.34 4.4 6.3 0 3.12-1.98 5.12-4.64 5.12-3.2 0-4.84-1.99-4.84-1.99l.86-2.83s1.68 1.45 3.1 1.45c.93 0 1.31-.73 1.31-1.27 0-2.21-3.61-2.31-3.61-5.93 0-3.05 2.19-6 6.6-6 1.7 0 2.53.49 2.53.49z" fill="#fff"/>
   </svg>
 );
 
@@ -38,7 +41,7 @@ const services = [
     description: 'Campañas de alto rendimiento en Facebook e Instagram. Maximizamos tu ROAS con estrategias data-driven.',
   },
   {
-    icon: GoogleLogo,
+    icon: GoogleAdsLogo,
     title: 'Google Performance',
     description: 'Domina los resultados de búsqueda con campañas SEM optimizadas y estrategias de conversión avanzadas.',
   },
@@ -56,11 +59,13 @@ const services = [
     icon: Building2,
     title: 'Escalamiento B2B',
     description: 'Estrategias de crecimiento para empresas B2B. Generación de leads y pipelines de ventas efectivos.',
+    isLucide: true,
   },
   {
     icon: TrendingUp,
     title: 'Estrategias de Escalamiento',
     description: 'Planes de crecimiento personalizados. Escalamos tu negocio de forma sostenible y rentable.',
+    isLucide: true,
   },
 ];
 
@@ -96,8 +101,12 @@ export function ServicesSection() {
               className="group relative p-8 rounded-lg bg-background border border-border hover:border-primary/50 transition-all duration-300"
             >
               <div className="relative">
-                <div className="w-14 h-14 rounded-lg border-2 border-primary/30 flex items-center justify-center mb-6 group-hover:border-primary/60 transition-colors bg-white">
-                  <service.icon />
+                <div className={`w-14 h-14 rounded-lg border-2 border-primary/30 flex items-center justify-center mb-6 group-hover:border-primary/60 transition-colors ${service.isLucide ? '' : 'bg-white'}`}>
+                  {service.isLucide ? (
+                    <service.icon className="w-6 h-6 text-primary" />
+                  ) : (
+                    <service.icon />
+                  )}
                 </div>
                 
                 <h3 className="text-lg font-medium mb-3 text-foreground tracking-wide">{service.title}</h3>
