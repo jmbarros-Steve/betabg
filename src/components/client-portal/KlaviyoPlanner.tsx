@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
 import { KlaviyoPlanWizard } from './KlaviyoPlanWizard';
 import { KlaviyoVariables } from './KlaviyoVariables';
+import { SteveFeedbackDialog } from './SteveFeedbackDialog';
 
 interface EmailStep {
   id: string;
@@ -109,6 +110,10 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
   const [showWizard, setShowWizard] = useState(false);
   const [newPlanType, setNewPlanType] = useState<EmailPlan['flow_type'] | null>(null);
   const [showVariables, setShowVariables] = useState(false);
+  
+  // Feedback state
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [lastCreatedPlanId, setLastCreatedPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlans();
@@ -198,6 +203,11 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
       setExpandedPlan(dbData.id);
       setShowWizard(false);
       setNewPlanType(null);
+      
+      // Trigger Steve's feedback
+      setLastCreatedPlanId(dbData.id);
+      setShowFeedback(true);
+      
       toast.success('Plan creado correctamente');
     } catch (error) {
       console.error('Error creating plan:', error);
@@ -520,6 +530,16 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Steve Feedback Dialog */}
+      {showFeedback && lastCreatedPlanId && (
+        <SteveFeedbackDialog
+          clientId={clientId}
+          contentType="klaviyo_email"
+          contentId={lastCreatedPlanId}
+          onComplete={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   );
 }

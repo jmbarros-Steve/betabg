@@ -113,6 +113,10 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const [savedCopies, setSavedCopies] = useState<SavedCopy[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedCopyId, setExpandedCopyId] = useState<string | null>(null);
+  
+  // Feedback state
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [lastSavedCopyId, setLastSavedCopyId] = useState<string | null>(null);
 
   useEffect(() => {
     async function checkBrief() {
@@ -185,11 +189,11 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     setGeneratedContent(null);
   };
 
-  const saveCopyToHistory = async (content: GeneratedContent) => {
-    if (!funnelStage || !adType) return;
+  const saveCopyToHistory = async (content: GeneratedContent): Promise<string | null> => {
+    if (!funnelStage || !adType) return null;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('saved_meta_copies')
         .insert({
           client_id: clientId,
@@ -202,11 +206,15 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
           video_hooks: content.hooks || null,
           video_scripts: content.script ? [content.script] : null,
           custom_instructions: customPrompt.trim() || null,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+      return data?.id || null;
     } catch (error) {
       console.error('Error saving copy:', error);
+      return null;
     }
   };
 
@@ -232,7 +240,11 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       setStep('result');
       
       // Save to history automatically
-      await saveCopyToHistory(data);
+      const savedId = await saveCopyToHistory(data);
+      if (savedId) {
+        setLastSavedCopyId(savedId);
+        setShowFeedback(true);
+      }
       
       toast.success('¡Copies generados y guardados!');
     } catch (error) {
@@ -705,6 +717,16 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Steve Feedback Dialog */}
+      {showFeedback && lastSavedCopyId && (
+        <SteveFeedbackDialog
+          clientId={clientId}
+          contentType="meta_copy"
+          contentId={lastSavedCopyId}
+          onComplete={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   );
 }
