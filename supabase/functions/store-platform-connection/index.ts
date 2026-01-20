@@ -101,7 +101,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Insert the connection with tokens stored server-side only
+    // Encrypt the token using database function before storing
+    let encryptedToken = null;
+    if (accessToken) {
+      const { data: encryptResult, error: encryptError } = await supabaseService
+        .rpc('encrypt_platform_token', { raw_token: accessToken });
+      
+      if (encryptError) {
+        console.error('Error encrypting token:', encryptError);
+        return new Response(
+          JSON.stringify({ error: 'Error al encriptar el token' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      encryptedToken = encryptResult;
+    }
+
+    // Insert the connection with encrypted token
     const { data: connection, error: insertError } = await supabaseService
       .from('platform_connections')
       .insert({
@@ -109,7 +125,7 @@ Deno.serve(async (req) => {
         platform: platform,
         store_name: storeName || null,
         store_url: storeUrl || null,
-        access_token: accessToken || null,
+        access_token_encrypted: encryptedToken,
         account_id: accountId || null,
       })
       .select('id, platform, store_name, store_url, account_id, is_active, created_at')

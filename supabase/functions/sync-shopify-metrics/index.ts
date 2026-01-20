@@ -113,12 +113,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { store_url, access_token } = connection;
+    const { store_url, access_token_encrypted } = connection;
 
-    if (!store_url || !access_token) {
+    if (!store_url || !access_token_encrypted) {
       return new Response(
         JSON.stringify({ error: 'Store URL and Access Token are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Decrypt the access token using database function
+    const { data: decryptedToken, error: decryptError } = await supabaseService
+      .rpc('decrypt_platform_token', { encrypted_token: access_token_encrypted });
+
+    if (decryptError || !decryptedToken) {
+      console.error('Error decrypting token:', decryptError);
+      return new Response(
+        JSON.stringify({ error: 'Error al desencriptar el token' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -132,7 +144,7 @@ Deno.serve(async (req) => {
     
     const shopifyResponse = await fetch(shopifyUrl, {
       headers: {
-        'X-Shopify-Access-Token': access_token,
+        'X-Shopify-Access-Token': decryptedToken,
         'Content-Type': 'application/json',
       },
     });
