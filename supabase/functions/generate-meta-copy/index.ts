@@ -712,6 +712,43 @@ Deno.serve(async (req) => {
       throw new Error('No completed brand brief found. Please complete the brief with Steve first.');
     }
 
+    // Fetch Steve's feedback for this client to personalize generation
+    const { data: feedbackData } = await supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type, improvement_notes')
+      .eq('client_id', clientId)
+      .eq('content_type', 'meta_copy')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Build learning context from feedback
+    let learningContext = '';
+    if (feedbackData && feedbackData.length > 0) {
+      const avgRating = feedbackData.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbackData.length;
+      const negativeFeedback = feedbackData.filter(f => (f.rating || 0) <= 2 && f.feedback_text);
+      const positiveFeedback = feedbackData.filter(f => (f.rating || 0) >= 4 && f.feedback_text);
+      
+      learningContext = `
+═══════════════════════════════════════════════════════════════════════════════
+APRENDIZAJE DE STEVE: PREFERENCIAS DEL CLIENTE (Meta Ads)
+═══════════════════════════════════════════════════════════════════════════════
+Rating promedio histórico: ${avgRating.toFixed(1)}/5
+Total de generaciones evaluadas: ${feedbackData.length}
+
+${negativeFeedback.length > 0 ? `
+⚠️ LO QUE NO LE GUSTA AL CLIENTE (EVITAR ABSOLUTAMENTE):
+${negativeFeedback.map(f => `- "${f.feedback_text}"`).join('\n')}
+` : ''}
+
+${positiveFeedback.length > 0 ? `
+✅ LO QUE LE GUSTA AL CLIENTE (REPLICAR Y POTENCIAR):
+${positiveFeedback.map(f => `- "${f.feedback_text}"`).join('\n')}
+` : ''}
+
+INSTRUCCIÓN CRÍTICA: Ajusta el tono, estilo, longitud y enfoque de los copies según estas preferencias específicas del cliente.
+`;
+    }
+
     // Extract the answers from raw_data
     const rawData = briefData.raw_data || {};
     const executiveSummary = briefData.executive_summary || '';
@@ -829,7 +866,9 @@ ELEMENTOS CLAVE DEL BRIEF A USAR:
 - Gran promesa: ${briefContext.estrategiaComunicacional.granPromesa || 'No especificado'}
 - Transformación soñada: ${briefContext.personaProfunda.transformacionSonada || 'No especificado'}
 
-Genera copies que VENDAN siguiendo las metodologías combinadas.`
+${learningContext}
+
+Genera copies que VENDAN siguiendo las metodologías combinadas y las preferencias aprendidas del cliente.`
           },
         ],
         temperature: 0.85,
