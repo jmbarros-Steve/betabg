@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Mail, ShoppingCart, UserMinus, Megaphone, 
   ChevronRight, ChevronDown, Trash2, Edit2, Check, 
-  Clock, Send, Loader2, Save
+  Clock, Send, Loader2, Save, Archive, Copy, FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
 import { KlaviyoPlanWizard } from './KlaviyoPlanWizard';
+import { KlaviyoVariables } from './KlaviyoVariables';
 
 interface EmailStep {
   id: string;
@@ -103,10 +104,11 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
   const [plans, setPlans] = useState<EmailPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'flows' | 'campaigns'>('flows');
+  const [activeTab, setActiveTab] = useState<'flows' | 'campaigns' | 'archive'>('flows');
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(false);
   const [newPlanType, setNewPlanType] = useState<EmailPlan['flow_type'] | null>(null);
+  const [showVariables, setShowVariables] = useState(false);
 
   useEffect(() => {
     fetchPlans();
@@ -293,8 +295,9 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
     await updatePlan(planId, { status: 'pending_review' });
   }
 
-  const flowPlans = plans.filter(p => p.flow_type !== 'campaign');
-  const campaignPlans = plans.filter(p => p.flow_type === 'campaign');
+  const flowPlans = plans.filter(p => p.flow_type !== 'campaign' && p.status !== 'implemented');
+  const campaignPlans = plans.filter(p => p.flow_type === 'campaign' && p.status !== 'implemented');
+  const archivedPlans = plans.filter(p => p.status === 'implemented');
 
   if (loading) {
     return (
@@ -317,11 +320,31 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
             </p>
           </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowVariables(!showVariables)}
+          className="flex items-center gap-2"
+        >
+          <Copy className="w-4 h-4" />
+          Variables
+        </Button>
       </div>
 
+      {/* Klaviyo Variables Panel */}
+      {showVariables && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          <KlaviyoVariables />
+        </motion.div>
+      )}
+
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'flows' | 'campaigns')}>
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'flows' | 'campaigns' | 'archive')}>
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="flows" className="flex items-center gap-2">
             <Mail className="w-4 h-4" />
             Automatizaciones
@@ -329,6 +352,15 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
             <Megaphone className="w-4 h-4" />
             Campañas
+          </TabsTrigger>
+          <TabsTrigger value="archive" className="flex items-center gap-2">
+            <Archive className="w-4 h-4" />
+            Archivo
+            {archivedPlans.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                {archivedPlans.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -433,6 +465,34 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
                   onRemoveEmail={removeEmailFromPlan}
                   onSubmitForReview={submitForReview}
                   saving={saving}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Archive Tab */}
+        <TabsContent value="archive" className="space-y-4">
+          {archivedPlans.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Archive className="w-12 h-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">
+                  No hay planes archivados.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Los planes implementados aparecerán aquí.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {archivedPlans.map((plan) => (
+                <ArchivedPlanCard
+                  key={plan.id}
+                  plan={plan}
+                  expanded={expandedPlan === plan.id}
+                  onToggle={() => setExpandedPlan(expandedPlan === plan.id ? null : plan.id)}
                 />
               ))}
             </div>
@@ -723,6 +783,8 @@ function EmailStepCard({ email, index, isFirst, onUpdate, onRemove }: EmailStepC
                 rows={4}
               />
             </div>
+            {/* Compact variables reference */}
+            <KlaviyoVariables compact />
             {!isFirst && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -796,5 +858,171 @@ function EmailStepCard({ email, index, isFirst, onUpdate, onRemove }: EmailStepC
         </div>
       )}
     </div>
+  );
+}
+
+// Subcomponent for Archived Plan Card (read-only view)
+interface ArchivedPlanCardProps {
+  plan: EmailPlan;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+function ArchivedPlanCard({ plan, expanded, onToggle }: ArchivedPlanCardProps) {
+  const config = flowTypeConfig[plan.flow_type];
+  const Icon = config.icon;
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  async function copyEmailContent(email: EmailStep) {
+    const content = `Asunto: ${email.subject}\n\nVista previa: ${email.previewText || '(sin definir)'}\n\nContenido:\n${email.content || '(sin definir)'}`;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedEmail(email.id);
+      toast.success('Email copiado al portapapeles');
+      setTimeout(() => setCopiedEmail(null), 2000);
+    } catch (error) {
+      toast.error('Error al copiar');
+    }
+  }
+
+  async function copyAllEmails() {
+    const content = plan.emails.map((email, idx) => {
+      const delay = idx === 0 
+        ? 'Inmediato' 
+        : `${email.delayDays} días, ${email.delayHours} horas después`;
+      return `=== EMAIL ${idx + 1} ===\nTiming: ${delay}\nAsunto: ${email.subject}\nVista previa: ${email.previewText || '(sin definir)'}\nContenido:\n${email.content || '(sin definir)'}\n`;
+    }).join('\n');
+    
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success('Todos los emails copiados');
+    } catch (error) {
+      toast.error('Error al copiar');
+    }
+  }
+
+  return (
+    <Card className="opacity-90">
+      <CardHeader 
+        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={onToggle}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${config.color}`}>
+              <Icon className="w-5 h-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                {plan.name}
+                <Badge variant="secondary" className="text-xs">
+                  <Check className="w-3 h-3 mr-1" />
+                  Implementado
+                </Badge>
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2 mt-1">
+                <span>{config.label}</span>
+                <span>•</span>
+                <span>{plan.emails.length} emails</span>
+                <span>•</span>
+                <span>{new Date(plan.created_at).toLocaleDateString()}</span>
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {expanded ? (
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <CardContent className="space-y-4 border-t pt-4">
+              {/* Copy all button */}
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={copyAllEmails}>
+                  <Copy className="w-4 h-4 mr-1" />
+                  Copiar todos los emails
+                </Button>
+              </div>
+
+              {/* Email list (read-only) */}
+              <div className="space-y-2">
+                {plan.emails.map((email, index) => {
+                  const delayText = index === 0
+                    ? 'Inmediato'
+                    : email.delayDays > 0
+                    ? `${email.delayDays} día${email.delayDays > 1 ? 's' : ''} después`
+                    : `${email.delayHours} hora${email.delayHours > 1 ? 's' : ''} después`;
+
+                  return (
+                    <div
+                      key={email.id}
+                      className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg border group"
+                    >
+                      <div className="flex flex-col items-center mt-1">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                          {index + 1}
+                        </div>
+                        {index > 0 && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {delayText}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="font-medium text-sm">{email.subject}</p>
+                        {email.previewText && (
+                          <p className="text-xs text-muted-foreground">{email.previewText}</p>
+                        )}
+                        {email.content && (
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">{email.content}</p>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => copyEmailContent(email)}
+                      >
+                        {copiedEmail === email.id ? (
+                          <Check className="w-4 h-4 text-primary" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Notes */}
+              {plan.client_notes && (
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    Notas del plan:
+                  </p>
+                  <p className="text-sm whitespace-pre-wrap">{plan.client_notes}</p>
+                </div>
+              )}
+            </CardContent>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
   );
 }
