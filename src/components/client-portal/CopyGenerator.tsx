@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Copy, Check, Sparkles, Video, Image, Megaphone, FileText, ArrowRight, ArrowLeft, RotateCcw, History, Trash2, Calendar } from 'lucide-react';
+import { Loader2, Copy, Check, Sparkles, Video, Image, Megaphone, FileText, ArrowRight, ArrowLeft, RotateCcw, History, Trash2, Calendar, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { PDFDownloader } from './PDFDownloader';
+import { SteveFeedbackDialog } from './SteveFeedbackDialog';
 
 interface CopyGeneratorProps {
   clientId: string;
@@ -574,6 +576,19 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                           <span className="text-xs text-green-600 bg-green-500/10 px-2 py-1 rounded-full">
                             ✓ Guardado en historial
                           </span>
+                          <PDFDownloader
+                            type="meta_copy"
+                            title={`Meta Ads - ${FUNNEL_INFO[funnelStage].name}`}
+                            content={{
+                              funnelStage: FUNNEL_INFO[funnelStage].name,
+                              adType: AD_TYPE_INFO[adType].name,
+                              headlines: generatedContent.headlines,
+                              primaryText: generatedContent.primaryText,
+                              description: generatedContent.description,
+                              hooks: generatedContent.hooks,
+                              script: generatedContent.script,
+                            }}
+                          />
                           <Button variant="outline" size="sm" onClick={handleReset}>
                             <RotateCcw className="w-4 h-4 mr-2" />
                             Generar otros

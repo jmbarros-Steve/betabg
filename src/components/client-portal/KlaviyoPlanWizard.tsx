@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mail, ShoppingCart, UserMinus, Megaphone, 
   ChevronRight, ChevronLeft, Loader2, Percent, 
-  Package, Lightbulb, TrendingUp, Star, Check
+  Package, Lightbulb, TrendingUp, Star, Check, Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { ShopifyDiscountDialog } from './ShopifyDiscountDialog';
 
 type FlowType = 'welcome_series' | 'abandoned_cart' | 'customer_winback' | 'campaign';
 
@@ -169,6 +171,8 @@ export function KlaviyoPlanWizard({
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [hasShopifyConnection, setHasShopifyConnection] = useState(false);
+  const [showDiscountDialog, setShowDiscountDialog] = useState(false);
+  const [createdDiscountCode, setCreatedDiscountCode] = useState<string | null>(null);
   
   const [wizardData, setWizardData] = useState<WizardData>({
     name: '',
@@ -517,10 +521,49 @@ export function KlaviyoPlanWizard({
                         </p>
                       </div>
                     </div>
+
+                    {/* Create discount in Shopify button */}
+                    {hasShopifyConnection && (
+                      <div className="pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">¿Crear código en Shopify?</p>
+                            <p className="text-xs text-muted-foreground">
+                              Crea automáticamente el código de descuento en tu tienda
+                            </p>
+                          </div>
+                          {createdDiscountCode ? (
+                            <Badge variant="secondary" className="flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              {createdDiscountCode}
+                            </Badge>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowDiscountDialog(true)}
+                            >
+                              <Tag className="w-4 h-4 mr-1" />
+                              Crear en Shopify
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </div>
             )}
+
+            {/* Shopify Discount Dialog */}
+            <ShopifyDiscountDialog
+              open={showDiscountDialog}
+              onOpenChange={setShowDiscountDialog}
+              clientId={clientId}
+              suggestedCode={`WELCOME${wizardData.discountPercent}`}
+              onSuccess={(code) => setCreatedDiscountCode(code)}
+            />
 
             {/* Step 4: Products (campaigns only) */}
             {step === 4 && flowType === 'campaign' && (

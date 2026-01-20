@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Copy, Check, Sparkles, Search, Monitor, Zap, RefreshCw, ArrowRight, ArrowLeft, RotateCcw, History, Trash2, Calendar, Link2, ExternalLink } from 'lucide-react';
+import { Loader2, Copy, Check, Sparkles, Search, Monitor, Zap, RefreshCw, ArrowRight, ArrowLeft, RotateCcw, History, Trash2, Calendar, Link2, ExternalLink, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SteveFeedbackDialog } from './SteveFeedbackDialog';
+import { PDFDownloader } from './PDFDownloader';
 import logoGoogleAds from '@/assets/logo-google-ads.png';
 
 interface GoogleAdsGeneratorProps {
@@ -618,34 +619,50 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
                     </Card>
                   )}
 
-                  {/* Copy All */}
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      const allText = [
-                        '=== HEADLINES ===',
-                        ...generatedContent.headlines,
-                        '',
-                        '=== TÍTULOS LARGOS ===',
-                        ...(generatedContent.longHeadlines || []),
-                        '',
-                        '=== DESCRIPCIONES ===',
-                        ...generatedContent.descriptions,
-                        '',
-                        '=== SITELINKS ===',
-                        ...(generatedContent.sitelinks?.map(s => `${s.title}: ${s.description} (${s.suggestedUrl})`) || []),
-                      ].join('\n');
-                      copyToClipboard(allText, 'all');
-                    }}
-                  >
-                    {copiedIndex === 'all' ? (
-                      <Check className="w-4 h-4 mr-2 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4 mr-2" />
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        const allText = [
+                          '=== HEADLINES ===',
+                          ...generatedContent.headlines,
+                          '',
+                          '=== TÍTULOS LARGOS ===',
+                          ...(generatedContent.longHeadlines || []),
+                          '',
+                          '=== DESCRIPCIONES ===',
+                          ...generatedContent.descriptions,
+                          '',
+                          '=== SITELINKS ===',
+                          ...(generatedContent.sitelinks?.map(s => `${s.title}: ${s.description} (${s.suggestedUrl})`) || []),
+                        ].join('\n');
+                        copyToClipboard(allText, 'all');
+                      }}
+                    >
+                      {copiedIndex === 'all' ? (
+                        <Check className="w-4 h-4 mr-2 text-green-500" />
+                      ) : (
+                        <Copy className="w-4 h-4 mr-2" />
+                      )}
+                      Copiar Todo
+                    </Button>
+                    
+                    {campaignType && (
+                      <PDFDownloader
+                        type="google_copy"
+                        title={`Google Ads - ${CAMPAIGN_INFO[campaignType].name}`}
+                        content={{
+                          campaignType: CAMPAIGN_INFO[campaignType].name,
+                          headlines: generatedContent.headlines,
+                          longHeadlines: generatedContent.longHeadlines,
+                          descriptions: generatedContent.descriptions,
+                          sitelinks: generatedContent.sitelinks,
+                        }}
+                      />
                     )}
-                    Copiar Todo
-                  </Button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
