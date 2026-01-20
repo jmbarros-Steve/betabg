@@ -132,10 +132,8 @@ export type Database = {
       }
       platform_connections: {
         Row: {
-          access_token: string | null
           access_token_encrypted: string | null
           account_id: string | null
-          api_key: string | null
           api_key_encrypted: string | null
           client_id: string
           created_at: string
@@ -143,17 +141,14 @@ export type Database = {
           is_active: boolean
           last_sync_at: string | null
           platform: Database["public"]["Enums"]["platform_type"]
-          refresh_token: string | null
           refresh_token_encrypted: string | null
           store_name: string | null
           store_url: string | null
           updated_at: string
         }
         Insert: {
-          access_token?: string | null
           access_token_encrypted?: string | null
           account_id?: string | null
-          api_key?: string | null
           api_key_encrypted?: string | null
           client_id: string
           created_at?: string
@@ -161,17 +156,14 @@ export type Database = {
           is_active?: boolean
           last_sync_at?: string | null
           platform: Database["public"]["Enums"]["platform_type"]
-          refresh_token?: string | null
           refresh_token_encrypted?: string | null
           store_name?: string | null
           store_url?: string | null
           updated_at?: string
         }
         Update: {
-          access_token?: string | null
           access_token_encrypted?: string | null
           account_id?: string | null
-          api_key?: string | null
           api_key_encrypted?: string | null
           client_id?: string
           created_at?: string
@@ -179,7 +171,6 @@ export type Database = {
           is_active?: boolean
           last_sync_at?: string | null
           platform?: Database["public"]["Enums"]["platform_type"]
-          refresh_token?: string | null
           refresh_token_encrypted?: string | null
           store_name?: string | null
           store_url?: string | null
