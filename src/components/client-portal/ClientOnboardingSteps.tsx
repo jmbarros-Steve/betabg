@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
+import logoGoogle from '@/assets/logo-google-ads.png';
 
 interface Connection {
   platform: 'shopify' | 'meta' | 'google';
@@ -14,8 +15,10 @@ interface ClientOnboardingStepsProps {
   connections: Connection[];
   onConnectMeta: () => void;
   onConnectShopify: () => void;
+  onConnectGoogle: () => void;
   isConnectingMeta: boolean;
   isConnectingShopify: boolean;
+  isConnectingGoogle: boolean;
   isAdmin?: boolean;
 }
 
@@ -26,7 +29,6 @@ const steps = [
     title: 'Conectar Meta Ads',
     description: 'Facebook e Instagram Ads para métricas de campañas',
     logo: logoMeta,
-    adminNote: null,
   },
   {
     id: 'shopify',
@@ -34,15 +36,13 @@ const steps = [
     title: 'Conectar Shopify',
     description: 'Métricas de ventas, pedidos e ingresos',
     logo: logoShopify,
-    adminNote: null,
   },
   {
     id: 'google',
     platform: 'google' as const,
     title: 'Conectar Google Ads',
     description: 'Campañas de búsqueda y display',
-    logo: null,
-    adminNote: 'Próximamente disponible',
+    logo: logoGoogle,
   },
 ];
 
@@ -50,8 +50,10 @@ export function ClientOnboardingSteps({
   connections,
   onConnectMeta,
   onConnectShopify,
+  onConnectGoogle,
   isConnectingMeta,
   isConnectingShopify,
+  isConnectingGoogle,
   isAdmin = false,
 }: ClientOnboardingStepsProps) {
   const getConnectionStatus = (platform: string) => {
@@ -61,6 +63,32 @@ export function ClientOnboardingSteps({
 
   const completedSteps = steps.filter((step) => getConnectionStatus(step.platform)).length;
   const progress = (completedSteps / steps.length) * 100;
+
+  const getConnectHandler = (platform: string) => {
+    switch (platform) {
+      case 'meta':
+        return onConnectMeta;
+      case 'shopify':
+        return onConnectShopify;
+      case 'google':
+        return onConnectGoogle;
+      default:
+        return () => {};
+    }
+  };
+
+  const getIsConnecting = (platform: string) => {
+    switch (platform) {
+      case 'meta':
+        return isConnectingMeta;
+      case 'shopify':
+        return isConnectingShopify;
+      case 'google':
+        return isConnectingGoogle;
+      default:
+        return false;
+    }
+  };
 
   return (
     <Card className="mb-8">
@@ -88,9 +116,9 @@ export function ClientOnboardingSteps({
       <CardContent className="space-y-4">
         {steps.map((step, index) => {
           const isCompleted = getConnectionStatus(step.platform);
-          const isMetaPending = step.platform === 'meta' && !isCompleted;
-          const isShopifyPending = step.platform === 'shopify' && !isCompleted;
-          const isGooglePending = step.platform === 'google';
+          const isPending = !isCompleted;
+          const isConnecting = getIsConnecting(step.platform);
+          const handleConnect = getConnectHandler(step.platform);
 
           return (
             <div
@@ -120,11 +148,7 @@ export function ClientOnboardingSteps({
 
               {/* Platform logo */}
               <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-background border flex items-center justify-center">
-                {step.logo ? (
-                  <img src={step.logo} alt={step.title} className="w-8 h-8 object-contain" />
-                ) : (
-                  <span className="text-lg font-bold text-muted-foreground">G</span>
-                )}
+                <img src={step.logo} alt={step.title} className="w-8 h-8 object-contain" />
               </div>
 
               {/* Content */}
@@ -133,39 +157,21 @@ export function ClientOnboardingSteps({
                   {step.title}
                 </h4>
                 <p className="text-sm text-muted-foreground truncate">{step.description}</p>
-                {step.adminNote && !isCompleted && (
-                  <p className="text-xs text-muted-foreground/70 mt-1 italic">
-                    {step.adminNote}
-                  </p>
-                )}
               </div>
 
               {/* Action */}
               <div className="flex-shrink-0">
                 {isCompleted ? (
                   <span className="text-sm font-medium text-primary">Conectado</span>
-                ) : isMetaPending ? (
+                ) : isPending ? (
                   <Button
                     size="sm"
-                    onClick={onConnectMeta}
-                    disabled={isConnectingMeta}
+                    onClick={handleConnect}
+                    disabled={isConnecting}
                   >
-                    {isConnectingMeta ? 'Conectando...' : 'Conectar'}
+                    {isConnecting ? 'Conectando...' : 'Conectar'}
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
-                ) : isShopifyPending ? (
-                  <Button
-                    size="sm"
-                    onClick={onConnectShopify}
-                    disabled={isConnectingShopify}
-                  >
-                    {isConnectingShopify ? 'Conectando...' : 'Conectar'}
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                ) : isGooglePending ? (
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                    Próximamente
-                  </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
                     {isAdmin ? 'Configurar' : 'Pendiente'}
