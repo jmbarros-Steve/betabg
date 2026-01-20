@@ -133,8 +133,10 @@ export type Database = {
       platform_connections: {
         Row: {
           access_token: string | null
+          access_token_encrypted: string | null
           account_id: string | null
           api_key: string | null
+          api_key_encrypted: string | null
           client_id: string
           created_at: string
           id: string
@@ -142,14 +144,17 @@ export type Database = {
           last_sync_at: string | null
           platform: Database["public"]["Enums"]["platform_type"]
           refresh_token: string | null
+          refresh_token_encrypted: string | null
           store_name: string | null
           store_url: string | null
           updated_at: string
         }
         Insert: {
           access_token?: string | null
+          access_token_encrypted?: string | null
           account_id?: string | null
           api_key?: string | null
+          api_key_encrypted?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -157,14 +162,17 @@ export type Database = {
           last_sync_at?: string | null
           platform: Database["public"]["Enums"]["platform_type"]
           refresh_token?: string | null
+          refresh_token_encrypted?: string | null
           store_name?: string | null
           store_url?: string | null
           updated_at?: string
         }
         Update: {
           access_token?: string | null
+          access_token_encrypted?: string | null
           account_id?: string | null
           api_key?: string | null
+          api_key_encrypted?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -172,6 +180,7 @@ export type Database = {
           last_sync_at?: string | null
           platform?: Database["public"]["Enums"]["platform_type"]
           refresh_token?: string | null
+          refresh_token_encrypted?: string | null
           store_name?: string | null
           store_url?: string | null
           updated_at?: string
@@ -309,7 +318,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrypt_platform_token: {
+        Args: { encrypted_token: string }
+        Returns: string
+      }
+      encrypt_platform_token: { Args: { raw_token: string }; Returns: string }
     }
     Enums: {
       platform_type: "shopify" | "meta" | "google"
