@@ -1,0 +1,405 @@
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, RefreshCw, Store, BarChart3, TrendingUp, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import logoShopify from '@/assets/logo-shopify-clean.png';
+import logoMeta from '@/assets/logo-meta-clean.png';
+
+interface Client {
+  id: string;
+  name: string;
+  company: string | null;
+}
+
+interface PlatformConnection {
+  id: string;
+  client_id: string;
+  platform: 'shopify' | 'meta' | 'google';
+  store_name: string | null;
+  store_url: string | null;
+  account_id: string | null;
+  is_active: boolean;
+  last_sync_at: string | null;
+  created_at: string;
+  clients?: Client;
+}
+
+const platformConfig = {
+  shopify: {
+    name: 'Shopify',
+    icon: logoShopify,
+    color: 'bg-green-500/10 text-green-600',
+    fields: ['store_url', 'access_token'],
+  },
+  meta: {
+    name: 'Meta Ads',
+    icon: logoMeta,
+    color: 'bg-blue-500/10 text-blue-600',
+    fields: ['account_id', 'access_token'],
+  },
+  google: {
+    name: 'Google',
+    icon: null,
+    color: 'bg-red-500/10 text-red-600',
+    fields: ['account_id', 'access_token'],
+  },
+};
+
+export function PlatformConnectionsPanel() {
+  const { user } = useAuth();
+  const [connections, setConnections] = useState<PlatformConnection[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState<string | null>(null);
+
+  // Form state
+  const [selectedClient, setSelectedClient] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState<'shopify' | 'meta' | 'google'>('shopify');
+  const [storeName, setStoreName] = useState('');
+  const [storeUrl, setStoreUrl] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [accountId, setAccountId] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      fetchConnections();
+      fetchClients();
+    }
+  }, [user]);
+
+  const fetchConnections = async () => {
+    const { data, error } = await supabase
+      .from('platform_connections')
+      .select('*, clients(id, name, company)')
+      .order('created_at', { ascending: false });
+
+    if (!error) {
+      setConnections(data || []);
+    }
+    setLoading(false);
+  };
+
+  const fetchClients = async () => {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, name, company')
+      .order('name');
+
+    if (!error) {
+      setClients(data || []);
+    }
+  };
+
+  const handleAddConnection = async () => {
+    if (!selectedClient || !selectedPlatform) {
+      toast.error('Selecciona un cliente y plataforma');
+      return;
+    }
+
+    if (selectedPlatform === 'shopify' && (!storeUrl || !accessToken)) {
+      toast.error('Ingresa la URL de la tienda y el Access Token');
+      return;
+    }
+
+    const { error } = await supabase.from('platform_connections').insert({
+      client_id: selectedClient,
+      platform: selectedPlatform,
+      store_name: storeName || null,
+      store_url: storeUrl || null,
+      access_token: accessToken || null,
+      account_id: accountId || null,
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.error('Este cliente ya tiene una conexión con esta plataforma');
+      } else {
+        toast.error('Error al crear conexión');
+      }
+      return;
+    }
+
+    toast.success('Conexión creada exitosamente');
+    setDialogOpen(false);
+    resetForm();
+    fetchConnections();
+  };
+
+  const handleDeleteConnection = async (id: string) => {
+    const { error } = await supabase
+      .from('platform_connections')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      toast.success('Conexión eliminada');
+      fetchConnections();
+    } else {
+      toast.error('Error al eliminar conexión');
+    }
+  };
+
+  const handleSyncMetrics = async (connection: PlatformConnection) => {
+    setSyncing(connection.id);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-shopify-metrics', {
+        body: { connectionId: connection.id }
+      });
+
+      if (error) throw error;
+      
+      toast.success(`Métricas sincronizadas: ${data.ordersCount || 0} órdenes`);
+      fetchConnections();
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast.error('Error al sincronizar métricas');
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedClient('');
+    setSelectedPlatform('shopify');
+    setStoreName('');
+    setStoreUrl('');
+    setAccessToken('');
+    setAccountId('');
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="animate-pulse h-20 bg-muted rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-medium">Conexiones de Plataformas</h2>
+          <p className="text-sm text-muted-foreground">
+            Gestiona las conexiones de Shopify, Meta y Google de tus clientes
+          </p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="hero" size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Conexión
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agregar Conexión de Plataforma</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <Select value={selectedClient} onValueChange={setSelectedClient}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} {client.company && `- ${client.company}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Plataforma</Label>
+                <Select value={selectedPlatform} onValueChange={(v: 'shopify' | 'meta' | 'google') => setSelectedPlatform(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shopify">
+                      <div className="flex items-center gap-2">
+                        <img src={logoShopify} alt="Shopify" className="w-5 h-5" />
+                        Shopify
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="meta">
+                      <div className="flex items-center gap-2">
+                        <img src={logoMeta} alt="Meta" className="w-5 h-5" />
+                        Meta Ads
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="google">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-red-500" />
+                        Google
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedPlatform === 'shopify' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Nombre de la Tienda</Label>
+                    <Input
+                      value={storeName}
+                      onChange={(e) => setStoreName(e.target.value)}
+                      placeholder="Mi Tienda"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>URL de la Tienda</Label>
+                    <Input
+                      value={storeUrl}
+                      onChange={(e) => setStoreUrl(e.target.value)}
+                      placeholder="mi-tienda.myshopify.com"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Solo el dominio, sin https://
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Access Token</Label>
+                    <Input
+                      type="password"
+                      value={accessToken}
+                      onChange={(e) => setAccessToken(e.target.value)}
+                      placeholder="shpat_..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Obtén esto desde Shopify Admin → Settings → Apps → Develop apps
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {selectedPlatform === 'meta' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Ad Account ID</Label>
+                    <Input
+                      value={accountId}
+                      onChange={(e) => setAccountId(e.target.value)}
+                      placeholder="act_123456789"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Access Token</Label>
+                    <Input
+                      type="password"
+                      value={accessToken}
+                      onChange={(e) => setAccessToken(e.target.value)}
+                      placeholder="EAA..."
+                    />
+                  </div>
+                </>
+              )}
+
+              {selectedPlatform === 'google' && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    La integración con Google está en desarrollo. Próximamente disponible.
+                  </p>
+                </div>
+              )}
+
+              <Button onClick={handleAddConnection} className="w-full" disabled={selectedPlatform === 'google'}>
+                Guardar Conexión
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {connections.length === 0 ? (
+        <div className="text-center py-12 bg-card rounded-lg border border-border">
+          <Store className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">No hay conexiones configuradas</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Agrega una conexión para empezar a sincronizar métricas
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {connections.map((connection) => {
+            const config = platformConfig[connection.platform];
+            return (
+              <div
+                key={connection.id}
+                className="p-4 rounded-lg bg-card border border-border flex items-center justify-between"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-lg ${config.color}`}>
+                    {config.icon ? (
+                      <img src={config.icon} alt={config.name} className="w-6 h-6" />
+                    ) : (
+                      <TrendingUp className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {connection.clients?.name || 'Cliente'}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {config.name}
+                      </Badge>
+                      {connection.is_active ? (
+                        <Badge className="bg-green-500/10 text-green-600 text-xs">Activo</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">Inactivo</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {connection.store_url || connection.account_id || 'Sin configurar'}
+                    </p>
+                    {connection.last_sync_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Última sincronización: {new Date(connection.last_sync_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {connection.platform === 'shopify' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSyncMetrics(connection)}
+                      disabled={syncing === connection.id}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${syncing === connection.id ? 'animate-spin' : ''}`} />
+                      Sincronizar
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteConnection(connection.id)}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

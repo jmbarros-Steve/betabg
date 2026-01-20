@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
@@ -10,9 +10,10 @@ import { InvoicesPanel } from '@/components/dashboard/InvoicesPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { BlogPanel } from '@/components/dashboard/BlogPanel';
 import { StudyResourcesPanel } from '@/components/dashboard/StudyResourcesPanel';
+import { PlatformConnectionsPanel } from '@/components/dashboard/PlatformConnectionsPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios';
+type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms';
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
@@ -40,6 +41,7 @@ export default function Dashboard() {
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'time', label: 'Horas', icon: Clock },
     { id: 'invoices', label: 'Recibos', icon: FileText },
+    { id: 'platforms', label: 'Plataformas', icon: Link2 },
     { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'estudios', label: 'Centro Estudios', icon: GraduationCap },
   ] as const;
@@ -87,6 +89,7 @@ export default function Dashboard() {
           {activeTab === 'clients' && <ClientsPanel userId={user.id} />}
           {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
           {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
+          {activeTab === 'platforms' && <PlatformConnectionsPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
           {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}
         </motion.div>
