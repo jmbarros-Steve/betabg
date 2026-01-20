@@ -5,10 +5,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag } from 'lucide-react';
 import { ClientOnboardingSteps } from './ClientOnboardingSteps';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
+
+const SHOPIFY_CLIENT_ID = '933109488c1e95e5fd630abb7e03809e';
 
 interface ClientPortalConnectionsProps {
   clientId: string;
@@ -47,6 +49,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectingMeta, setConnectingMeta] = useState(false);
+  const [connectingShopify, setConnectingShopify] = useState(false);
 
   useEffect(() => {
     fetchConnections();
@@ -96,6 +99,33 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     window.location.href = authUrl;
   };
 
+  const handleConnectShopify = () => {
+    setConnectingShopify(true);
+
+    // Store client_id in sessionStorage for callback
+    sessionStorage.setItem('shopify_oauth_client_id', clientId);
+
+    // Build Shopify OAuth URL
+    const redirectUri = `${window.location.origin}/oauth/shopify/callback`;
+    const scopes = 'read_products,read_orders,read_customers,read_analytics';
+    
+    // Open a prompt to get the store name
+    const storeName = prompt('Ingresa el nombre de tu tienda Shopify (ej: mi-tienda)');
+    
+    if (!storeName) {
+      setConnectingShopify(false);
+      return;
+    }
+
+    const shopDomain = storeName.includes('.myshopify.com') 
+      ? storeName 
+      : `${storeName}.myshopify.com`;
+
+    const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${clientId}`;
+
+    window.location.href = authUrl;
+  };
+
   const handleSyncConnection = async (connection: Connection) => {
     try {
       toast.loading('Sincronizando...', { id: 'sync' });
@@ -126,8 +156,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       </div>
     );
   }
-
   const hasMetaConnection = connections.some(c => c.platform === 'meta');
+  const hasShopifyConnection = connections.some(c => c.platform === 'shopify');
 
   return (
     <div className="space-y-6">
@@ -135,7 +165,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       <ClientOnboardingSteps
         connections={connections}
         onConnectMeta={handleConnectMeta}
+        onConnectShopify={handleConnectShopify}
         isConnectingMeta={connectingMeta}
+        isConnectingShopify={connectingShopify}
         isAdmin={isAdmin}
       />
 
@@ -195,6 +227,32 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
           <CardTitle className="text-lg">Conectar Nueva Plataforma</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Shopify Connection */}
+          {!hasShopifyConnection && (
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-4">
+                <img src={logoShopify} alt="Shopify" className="h-10 w-10 object-contain" />
+                <div>
+                  <p className="font-medium">Shopify</p>
+                  <p className="text-sm text-muted-foreground">
+                    Conecta tu tienda online
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleConnectShopify}
+                disabled={connectingShopify}
+              >
+                {connectingShopify ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ShoppingBag className="w-4 h-4 mr-2" />
+                )}
+                Conectar Shopify
+              </Button>
+            </div>
+          )}
+
           {/* Meta Ads Connection */}
           {!hasMetaConnection && (
             <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -221,15 +279,11 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
             </div>
           )}
 
-          {hasMetaConnection && (
+          {hasMetaConnection && hasShopifyConnection && (
             <p className="text-sm text-muted-foreground text-center py-4">
               Todas las plataformas disponibles están conectadas
             </p>
           )}
-
-          <p className="text-xs text-muted-foreground">
-            Nota: La conexión de Shopify debe ser configurada por el administrador.
-          </p>
         </CardContent>
       </Card>
     </div>
