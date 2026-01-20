@@ -106,6 +106,42 @@ serve(async (req) => {
       );
     }
 
+    // Fetch Steve's feedback for this client to personalize generation
+    const { data: feedbackData } = await supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type, improvement_notes')
+      .eq('client_id', clientId)
+      .eq('content_type', 'google_copy')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Build learning context from feedback
+    let learningContext = '';
+    if (feedbackData && feedbackData.length > 0) {
+      const avgRating = feedbackData.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbackData.length;
+      const negativeFeedback = feedbackData.filter(f => (f.rating || 0) <= 2 && f.feedback_text);
+      const positiveFeedback = feedbackData.filter(f => (f.rating || 0) >= 4 && f.feedback_text);
+      
+      learningContext = `
+═══════════════════════════════════════════════════════════════════════════════
+APRENDIZAJE DE STEVE: PREFERENCIAS DEL CLIENTE
+═══════════════════════════════════════════════════════════════════════════════
+Rating promedio histórico: ${avgRating.toFixed(1)}/5
+
+${negativeFeedback.length > 0 ? `
+⚠️ LO QUE NO LE GUSTA AL CLIENTE (EVITAR):
+${negativeFeedback.map(f => `- "${f.feedback_text}"`).join('\n')}
+` : ''}
+
+${positiveFeedback.length > 0 ? `
+✅ LO QUE LE GUSTA AL CLIENTE (REPLICAR):
+${positiveFeedback.map(f => `- "${f.feedback_text}"`).join('\n')}
+` : ''}
+
+INSTRUCCIÓN: Usa este feedback para ajustar el tono, estilo y enfoque de los copies.
+`;
+    }
+
     const campaign = CAMPAIGN_TYPES[campaignType as keyof typeof CAMPAIGN_TYPES] || CAMPAIGN_TYPES.search;
 
     const systemPrompt = `Eres un experto en Google Ads y copywriting, entrenado en las metodologías de Sabri Suby y Russell Brunson.
@@ -124,6 +160,8 @@ Enfoque: ${campaign.focus}
 Tips: ${campaign.tips}
 
 ${customPrompt ? `INSTRUCCIONES ADICIONALES: ${customPrompt}` : ''}
+
+${learningContext}
 
 ═══════════════════════════════════════════════════════════════════════════════
 FORMATO DE RESPUESTA
@@ -162,7 +200,8 @@ REGLAS:
 - Cada descripción de sitelink: máximo 35 caracteres
 - USA el tono y vocabulario del buyer persona
 - INCLUYE números y prueba social donde sea posible
-- NO uses signos de exclamación excesivos`;
+- NO uses signos de exclamación excesivos
+- APLICA las preferencias del cliente del feedback de Steve`;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
