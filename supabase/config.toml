@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.chonga-support]
 verify_jwt = false
+
+[functions.generate-google-copy]
+verify_jwt = false

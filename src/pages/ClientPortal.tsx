@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -10,13 +10,14 @@ import { ClientPortalConnections } from '@/components/client-portal/ClientPortal
 import { SteveChat } from '@/components/client-portal/SteveChat';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
+import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
 import { KlaviyoPlanner } from '@/components/client-portal/KlaviyoPlanner';
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'connections' | 'brief' | 'steve' | 'copies' | 'klaviyo';
+type TabType = 'metrics' | 'connections' | 'brief' | 'steve' | 'copies' | 'google' | 'klaviyo';
 interface ClientInfo {
   id: string;
   name: string;
@@ -116,7 +117,8 @@ export default function ClientPortal() {
     { id: 'connections', label: 'Conexiones', icon: Link2 },
     { id: 'brief', label: 'Brief', icon: FileText },
     { id: 'steve', label: 'Steve', icon: Bot },
-    { id: 'copies', label: 'Copies', icon: Sparkles },
+    { id: 'copies', label: 'Meta Ads', icon: Sparkles },
+    { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
   ] as const;
 
@@ -203,6 +205,11 @@ export default function ClientPortal() {
           {activeTab === 'copies' && effectiveClientId && (
             <div className="max-w-4xl mx-auto">
               <CopyGenerator clientId={effectiveClientId} />
+            </div>
+          )}
+          {activeTab === 'google' && effectiveClientId && (
+            <div className="max-w-4xl mx-auto">
+              <GoogleAdsGenerator clientId={effectiveClientId} />
             </div>
           )}
           {activeTab === 'klaviyo' && effectiveClientId && (
