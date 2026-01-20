@@ -315,6 +315,50 @@ export type Database = {
           },
         ]
       }
+      saved_google_copies: {
+        Row: {
+          campaign_type: string
+          client_id: string
+          created_at: string
+          custom_instructions: string | null
+          descriptions: string[]
+          headlines: string[]
+          id: string
+          long_headlines: string[] | null
+          sitelinks: Json | null
+        }
+        Insert: {
+          campaign_type: string
+          client_id: string
+          created_at?: string
+          custom_instructions?: string | null
+          descriptions: string[]
+          headlines: string[]
+          id?: string
+          long_headlines?: string[] | null
+          sitelinks?: Json | null
+        }
+        Update: {
+          campaign_type?: string
+          client_id?: string
+          created_at?: string
+          custom_instructions?: string | null
+          descriptions?: string[]
+          headlines?: string[]
+          id?: string
+          long_headlines?: string[] | null
+          sitelinks?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_google_copies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_meta_copies: {
         Row: {
           ad_type: string
@@ -390,6 +434,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "steve_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      steve_feedback: {
+        Row: {
+          client_id: string
+          content_id: string | null
+          content_type: string
+          created_at: string
+          feedback_text: string | null
+          id: string
+          improvement_notes: string | null
+          rating: number | null
+        }
+        Insert: {
+          client_id: string
+          content_id?: string | null
+          content_type: string
+          created_at?: string
+          feedback_text?: string | null
+          id?: string
+          improvement_notes?: string | null
+          rating?: number | null
+        }
+        Update: {
+          client_id?: string
+          content_id?: string | null
+          content_type?: string
+          created_at?: string
+          feedback_text?: string | null
+          id?: string
+          improvement_notes?: string | null
+          rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "steve_feedback_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
