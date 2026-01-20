@@ -12,131 +12,175 @@ const BRAND_BRIEF_QUESTIONS = [
   // ═══════════════════════════════════════════════════════════════
   {
     id: 'business_type',
-    question: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de la Universidad de Perros de Stanford.\n\nAntes de hacer cualquier anuncio, necesito entender tu negocio a fondo. Vamos a armar tu Brief Estratégico completo.\n\n**Pregunta 1 de 28 - EL NEGOCIO:** ¿A qué se dedica tu empresa? ¿Qué vendes exactamente? Dame el pitch de 30 segundos.',
+    question: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de la Universidad de Perros de Stanford.\n\nVamos a armar tu Brief Estratégico COMPLETO. Son 40 preguntas profundas, pero al final vas a tener un documento que vale ORO para tus campañas.\n\n**Pregunta 1 de 40 - EL NEGOCIO:** ¿A qué se dedica tu empresa? ¿Qué vendes exactamente? Dame el pitch de 30 segundos.',
   },
   {
     id: 'average_ticket',
-    question: '*saca una calculadora imaginaria* 🧮\n\n**Pregunta 2 de 28 - TICKET:** ¿Cuál es tu ticket promedio? Es decir, ¿cuánto gasta en promedio cada cliente por compra?\n\nDame el número real, no el que quisieras.',
+    question: '*saca una calculadora imaginaria* 🧮\n\n**Pregunta 2 de 40 - TICKET:** ¿Cuál es tu ticket promedio? ¿Cuánto gasta en promedio cada cliente por compra?\n\nDame el número real, no el que quisieras.',
   },
   {
     id: 'margins',
-    question: '*baja la voz como si fuera secreto*\n\n**Pregunta 3 de 28 - MÁRGENES:** ¿Cuáles son tus márgenes? ¿Qué porcentaje te queda después de costos?\n\nEsto es CLAVE para saber cuánto podemos gastar en ads. 💰',
+    question: '*baja la voz como si fuera secreto*\n\n**Pregunta 3 de 40 - MÁRGENES:** ¿Cuáles son tus márgenes? ¿Qué porcentaje te queda después de costos?\n\nEsto es CLAVE para saber cuánto podemos gastar en ads. 💰',
   },
   {
     id: 'shipping_cost',
-    question: '*mueve la colita*\n\n**Pregunta 4 de 28 - ENVÍO:** ¿Cuánto te cuesta el despacho/envío en promedio?\n\n¿Lo cobras aparte? ¿Lo incluyes? ¿Cuánto te come del margen? 📦',
+    question: '*mueve la colita*\n\n**Pregunta 4 de 40 - ENVÍO:** ¿Cuánto te cuesta el despacho/envío en promedio? ¿Lo cobras aparte? ¿Lo incluyes? 📦',
   },
   {
     id: 'fixed_costs',
-    question: '*estira las patitas*\n\n**Pregunta 5 de 28 - COSTOS FIJOS:** ¿Cuáles son tus gastos fijos mensuales principales?\n\nArriendo, sueldos, servicios, lo que sea. Necesito entender tu estructura de costos. 🏢',
+    question: '*estira las patitas*\n\n**Pregunta 5 de 40 - COSTOS FIJOS:** ¿Cuáles son tus gastos fijos mensuales principales? Arriendo, sueldos, servicios. 🏢',
   },
   {
     id: 'sales_channels',
-    question: '*ladea la cabeza curioso*\n\n**Pregunta 6 de 28 - CANALES:** ¿Dónde vendes actualmente? ¿Tienda física, ecommerce, marketplace, redes sociales, todo junto?\n\nDame los canales reales donde cierras ventas. 🏪',
+    question: '*ladea la cabeza curioso*\n\n**Pregunta 6 de 40 - CANALES:** ¿Dónde vendes actualmente? ¿Tienda física, ecommerce, marketplace, redes sociales? 🏪',
   },
 
   // ═══════════════════════════════════════════════════════════════
-  // PARTE 2: BUYER PERSONA - EL CLIENTE SOÑADO (10 preguntas)
+  // PARTE 2: BUYER PERSONA PSICOGRÁFICO (15 preguntas profundas)
   // ═══════════════════════════════════════════════════════════════
   {
     id: 'persona_name',
-    question: '*se pone serio, entramos al Buyer Persona* 🎯\n\nAhora vamos a construir tu CLIENTE SOÑADO. Le vamos a poner nombre y todo.\n\n**Pregunta 7 de 28 - NOMBRE:** ¿Cómo se llamaría tu cliente ideal? Dame un nombre real, como "María la Emprendedora" o "Juan el Ejecutivo".\n\nEsto nos ayuda a humanizarlo y hablarle directo.',
+    question: '*se pone serio, entramos al BUYER PERSONA PROFUNDO* 🎯\n\nAhora vamos a construir tu CLIENTE SOÑADO. No demográficos aburridos... PSICOGRÁFICOS.\n\n**Pregunta 7 de 40 - NOMBRE:** ¿Cómo se llamaría tu cliente ideal? Dame un nombre real, como "María la Emprendedora" o "Juan el Ejecutivo".',
   },
   {
-    id: 'persona_age',
-    question: '*olfatea el aire*\n\n**Pregunta 8 de 28 - EDAD:** ¿Qué edad tiene tu cliente ideal? Dame un rango realista.\n\n¿25-35 años? ¿40-55? ¿18-25? Sé específico. 🎂',
+    id: 'persona_demographics',
+    question: '*olfatea el aire*\n\n**Pregunta 8 de 40 - DEMOGRAFÍA BÁSICA:** Dame los básicos: Edad, género, ubicación, nivel educacional, ingresos aproximados.\n\nEjemplo: "Mujer, 35-45 años, Santiago oriente, universitaria, $2-4M mensuales". 📊',
   },
   {
-    id: 'persona_gender',
-    question: '*ladea la cabeza*\n\n**Pregunta 9 de 28 - GÉNERO:** ¿Tu cliente ideal es mayoritariamente hombre, mujer, o es parejo?\n\nDame el porcentaje si puedes. Ejemplo: "70% mujeres, 30% hombres". 👫',
+    id: 'persona_3am_pain',
+    question: '*pone cara seria, ojos fijos* 😰\n\n**Pregunta 9 de 40 - DOLOR DE LAS 3 AM:** ¿Cuál es el "dolor de cabeza" que le quita el sueño a tu cliente a las 3 AM?\n\nEse pensamiento que lo tortura cuando está solo en la oscuridad. Dame el dolor REAL.',
   },
   {
-    id: 'persona_location',
-    question: '*mueve las orejas*\n\n**Pregunta 10 de 28 - UBICACIÓN:** ¿Dónde vive tu cliente ideal? ¿Ciudad específica? ¿País? ¿Región?\n\n¿Es urbano o rural? ¿Zona específica de la ciudad? 🌍',
+    id: 'persona_shame',
+    question: '*baja la voz*\n\n**Pregunta 10 de 40 - VERGÜENZA:** ¿Qué es lo que MÁS LE AVERGÜENZA de su situación actual?\n\nEjemplo: "Que su piso de lujo se vea opaco frente a las visitas". La vergüenza vende. 😳',
   },
   {
-    id: 'persona_education',
-    question: '*se rasca pensativo*\n\n**Pregunta 11 de 28 - EDUCACIÓN:** ¿Qué nivel educacional tiene tu cliente ideal?\n\n¿Universitario? ¿Técnico? ¿Postgrado? ¿Autodidacta? Esto afecta cómo le hablamos. 🎓',
+    id: 'persona_common_mistake',
+    question: '*ladea la cabeza*\n\n**Pregunta 11 de 40 - ERROR COMÚN:** ¿Cuál es el error más común que comete tu cliente ANTES de encontrarte?\n\nEjemplo: "Limpiar madera con cloro", "Contratar al más barato y arrepentirse". 🚫',
   },
   {
-    id: 'persona_income',
-    question: '*saca su libreta imaginaria*\n\n**Pregunta 12 de 28 - INGRESOS:** ¿Cuál es el nivel socioeconómico de tu cliente? ¿Qué ingresos aproximados tiene?\n\nNo necesito el número exacto, pero sí el rango. ¿ABC1? ¿C2? ¿Clase media? 💵',
+    id: 'persona_fear_not_buying',
+    question: '*mueve las orejas alerta*\n\n**Pregunta 12 de 40 - MIEDO DE NO COMPRAR:** ¿A qué le tiene MIEDO si NO compra tu producto HOY?\n\n¿Qué pasa si no actúa? ¿Qué pierde? ¿Qué empeora? 😱',
+  },
+  {
+    id: 'persona_sunday_feeling',
+    question: '*se sienta pensativo*\n\n**Pregunta 13 de 40 - SENTIMIENTO DOMINGO:** ¿Cómo se siente un domingo por la tarde cuando piensa en el problema que TÚ resuelves?\n\nDescríbeme esa emoción. ¿Frustración? ¿Ansiedad? ¿Culpa? 🌅',
+  },
+  {
+    id: 'persona_exact_words',
+    question: '*saca su libreta* 📝\n\n**Pregunta 14 de 40 - PALABRAS EXACTAS:** ¿Qué palabras EXACTAS usa tu cliente para describir su problema cuando se queja con un amigo?\n\nDame frases reales, como las diría él/ella. Esto es ORO para los copies.',
+  },
+  {
+    id: 'persona_internal_objection',
+    question: '*olfatea desconfianza*\n\n**Pregunta 15 de 40 - OBJECIÓN INTERNA:** ¿Cuál es la objeción INTERNA que tiene tu cliente para NO comprarte?\n\n¿Es muy caro? ¿No confía en que funcione? ¿Ha sido engañado antes? ¿Pereza? 🤔',
+  },
+  {
+    id: 'persona_transformation',
+    question: '*levanta las orejas, ojos brillantes* ✨\n\n**Pregunta 16 de 40 - TRANSFORMACIÓN:** ¿Cuál es su "estado de transformación" SOÑADO?\n\n¿Cómo se ve su vida DESPUÉS de usarte? Píntame el cuadro del éxito.',
+  },
+  {
+    id: 'persona_lifestyle_brands',
+    question: '*mueve la cola curioso*\n\n**Pregunta 17 de 40 - MARCAS QUE CONSUME:** ¿Qué marcas de ropa, autos o tecnología consume habitualmente?\n\nEsto define su estatus y cómo le hablamos. ¿iPhone o Android? ¿Zara o Falabella? 🛍️',
+  },
+  {
+    id: 'persona_impress_who',
+    question: '*ladra bajito*\n\n**Pregunta 18 de 40 - ¿A QUIÉN IMPRESIONA?:** ¿Quién es la persona a la que tu cliente MÁS quiere impresionar?\n\n¿Su pareja? ¿Sus padres? ¿Sus amigos? ¿Su jefe? ¿Sus vecinos? 👀',
   },
   {
     id: 'persona_channels',
-    question: '*mueve la cola curioso*\n\n**Pregunta 13 de 28 - CANALES DEL CLIENTE:** ¿Qué canales crees que USA tu cliente ideal?\n\n¿Instagram? ¿TikTok? ¿Facebook? ¿LinkedIn? ¿YouTube? ¿Email? ¿WhatsApp?\n\n¿Dónde pasa su tiempo online? 📱',
-  },
-  {
-    id: 'persona_pain',
-    question: '*pone cara seria de doctor Stanford* 🎓\n\n**Pregunta 14 de 28 - DOLOR:** ¿Qué dolor específico tiene tu cliente que TÚ resuelves?\n\nNo me digas "ayudamos a la gente"... eso es humo. ¿Qué lo mantiene despierto en la noche? ¿Qué problema REAL tiene?',
+    question: '*saca su celular imaginario*\n\n**Pregunta 19 de 40 - CANALES DEL CLIENTE:** ¿Dónde pasa su tiempo online tu cliente ideal?\n\n¿Instagram? ¿TikTok? ¿Facebook? ¿LinkedIn? ¿YouTube? ¿WhatsApp? ¿Email? 📱',
   },
   {
     id: 'persona_desires',
-    question: '*levanta las orejas*\n\n**Pregunta 15 de 28 - DESEOS:** ¿Qué SUEÑA tu cliente ideal? ¿Cuál es su estado deseado?\n\n¿Qué quiere lograr? ¿Cómo se ve su vida ideal después de comprarte? ✨',
+    question: '*se para en dos patas*\n\n**Pregunta 20 de 40 - SUEÑOS:** ¿Qué SUEÑA tu cliente ideal? ¿Cuál es su meta de vida relacionada con lo que vendes?\n\n¿Qué quiere lograr realmente? 🌟',
   },
   {
-    id: 'persona_fears',
-    question: '*baja la voz*\n\n**Pregunta 16 de 28 - MIEDOS:** ¿Cuáles son los MIEDOS de tu cliente?\n\n¿Qué le da miedo? ¿Qué le preocupa? ¿Qué objeciones tiene antes de comprarte? 😰',
-  },
-
-  // ═══════════════════════════════════════════════════════════════
-  // PARTE 3: ANÁLISIS COMPETITIVO Y OCÉANO AZUL (5 preguntas)
-  // ═══════════════════════════════════════════════════════════════
-  {
-    id: 'why_buy_from_you',
-    question: '*se para en dos patas, esto es importante* 🏆\n\nAhora entramos al ANÁLISIS COMPETITIVO. Esto define tu éxito.\n\n**Pregunta 17 de 28 - ¿POR QUÉ TÚ?:** ¿Por qué tus clientes te compran A TI y no a la competencia?\n\nPregúntales si es necesario. ¿Qué dicen ellos? Dame la razón REAL, no la que tú crees.',
-  },
-  {
-    id: 'competitors',
-    question: '*olfatea el territorio enemigo*\n\n**Pregunta 18 de 28 - COMPETENCIA:** ¿Quiénes son tus 3 principales competidores?\n\nNombres específicos. ¿Qué hacen bien ellos? ¿Qué hacen mal? 🔍',
-  },
-  {
-    id: 'differentiator',
-    question: '*ladra con autoridad*\n\n**Pregunta 19 de 28 - ATRIBUTO DIFERENCIADOR:** ¿Cuál es tu ATRIBUTO ÚNICO que nadie más tiene?\n\nNo me digas "calidad y servicio" porque eso lo dice todo el mundo. ¿Qué te hace IMPOSIBLE de copiar? 💎',
-  },
-  {
-    id: 'blue_ocean',
-    question: '*se sienta como profesor de Stanford*\n\n**Pregunta 20 de 28 - OCÉANO AZUL:** ¿Cuál es tu OCÉANO AZUL?\n\nEs decir, ¿hay algún espacio de mercado donde NO tengas competencia directa? ¿Algún nicho o segmento donde seas el único? 🌊',
-  },
-  {
-    id: 'better_than_competition',
-    question: '*saca su cuaderno de notas*\n\n**Pregunta 21 de 28 - MEJOR QUE ELLOS:** ¿En qué aspectos específicos eres MEJOR que tu competencia?\n\nDame 3-5 cosas concretas. Precio, velocidad, servicio, garantía, experiencia, etc. 📝',
+    id: 'persona_daily_frustrations',
+    question: '*gruñe levemente*\n\n**Pregunta 21 de 40 - FRUSTRACIONES DIARIAS:** ¿Cuáles son las frustraciones del DÍA A DÍA de tu cliente relacionadas con tu producto/servicio?\n\nNo el gran dolor... las molestias pequeñas y constantes. 😤',
   },
 
   // ═══════════════════════════════════════════════════════════════
-  // PARTE 4: ESTRATEGIA DE COMUNICACIÓN (3 preguntas)
+  // PARTE 3: ANÁLISIS COMPETITIVO PROFUNDO (10 preguntas)
   // ═══════════════════════════════════════════════════════════════
   {
-    id: 'communication_tone',
-    question: '*se aclara la garganta* 🎤\n\nAhora definamos tu ESTRATEGIA DE COMUNICACIÓN.\n\n**Pregunta 22 de 28 - TONO:** ¿Qué tono usa tu marca para comunicarse?\n\n¿Agresivo y directo? ¿Tranquilo y cercano? ¿Formal y profesional? ¿Chistoso y relajado? ¿Premium y elegante?\n\nDame ejemplos de cómo hablas.',
+    id: 'competitors_list',
+    question: '*olfatea el territorio enemigo* 🔍\n\nAhora entramos al ANÁLISIS COMPETITIVO PROFUNDO. Para ganarles, hay que saber dónde fallan.\n\n**Pregunta 22 de 40 - COMPETIDORES:** ¿Quiénes son tus 3 competidores DIRECTOS y qué venden exactamente?',
   },
   {
-    id: 'communication_style',
-    question: '*mueve las orejas*\n\n**Pregunta 23 de 28 - ESTILO:** ¿Cómo quieres que tu cliente SE SIENTA cuando interactúa con tu marca?\n\n¿Como un amigo? ¿Como un experto? ¿Como un mentor? ¿Como un compañero de aventuras? 🤝',
+    id: 'competitors_complaints',
+    question: '*saca lupa imaginaria* 🔎\n\n**Pregunta 23 de 40 - QUEJAS DE SUS CLIENTES:** ¿Cuál es la QUEJA NÚMERO 1 de los clientes en los reviews de tu competencia?\n\n¡Esto es ORO PURO! Ve a leer sus reviews negativos.',
   },
   {
-    id: 'supporting_data',
-    question: '*olfatea el aire buscando data*\n\n**Pregunta 24 de 28 - PRUEBA SOCIAL:** ¿Tienes DATA que respalde tu propuesta?\n\nTestimonios, casos de éxito, números, estadísticas, premios, certificaciones... ¿Qué pruebas tienes de que funciona lo que vendes? 📊',
+    id: 'competitors_false_promise',
+    question: '*gruñe con desconfianza*\n\n**Pregunta 24 de 40 - PROMESAS FALSAS:** ¿Qué beneficio prometen ELLOS que tú sabes que es MENTIRA o a medias?\n\n¿Dónde no cumplen lo que dicen? 🤥',
+  },
+  {
+    id: 'competitors_pricing',
+    question: '*saca calculadora*\n\n**Pregunta 25 de 40 - PRECIOS COMPETENCIA:** ¿Cuánto cobran ellos y cuál es su estructura de descuentos?\n\n¿Hacen ofertas? ¿Cuánto? ¿Con qué frecuencia? 💰',
+  },
+  {
+    id: 'competitors_slow_point',
+    question: '*ladea la cabeza*\n\n**Pregunta 26 de 40 - PUNTO DÉBIL:** ¿Qué aspecto de su servicio es LENTO, burocrático o "estirado"?\n\n¿Dónde hacen esperar a los clientes? ¿Qué proceso es tedioso? 🐌',
+  },
+  {
+    id: 'competitors_tone',
+    question: '*escucha atento*\n\n**Pregunta 27 de 40 - TONO COMPETENCIA:** ¿Cómo es el tono de voz de tu competencia?\n\n¿Son corporativos aburridos? ¿Agresivos por precio? ¿Premium distantes? 🎤',
+  },
+  {
+    id: 'competitors_ignored_channel',
+    question: '*mueve las orejas*\n\n**Pregunta 28 de 40 - CANAL IGNORADO:** ¿Qué canal de venta están IGNORANDO ellos?\n\nEjemplo: No tienen WhatsApp, no hacen mailing, no están en TikTok. 📵',
+  },
+  {
+    id: 'competitors_entry_offer',
+    question: '*olfatea oportunidades*\n\n**Pregunta 29 de 40 - OFERTA DE ENTRADA:** ¿Cuál es su "oferta de entrada" para captar clientes nuevos?\n\n¿Tienen prueba gratis? ¿Descuento primera compra? ¿Consulta sin costo? 🎁',
+  },
+  {
+    id: 'why_switch_to_you',
+    question: '*se para firme* 🏆\n\n**Pregunta 30 de 40 - ¿POR QUÉ CAMBIARSE?:** ¿Por qué un cliente SE CAMBIARÍA de ellos a TI? (Además del precio)\n\n¿Qué harías diferente que los haga decir "me voy con este otro"?',
+  },
+  {
+    id: 'uncopyable_advantage',
+    question: '*ladra con orgullo*\n\n**Pregunta 31 de 40 - IMPOSIBLE DE COPIAR:** ¿Qué es lo ÚNICO que tú haces que ellos JAMÁS podrán copiar rápidamente?\n\nTu "foso" competitivo. Tu ventaja injusta. 💎',
   },
 
   // ═══════════════════════════════════════════════════════════════
-  // PARTE 5: LA OFERTA PERFECTA - SABRI SUBY (4 preguntas clave)
+  // PARTE 4: ESTRATEGIA COMUNICACIONAL POTENTE (9 preguntas)
   // ═══════════════════════════════════════════════════════════════
   {
-    id: 'perceived_value',
-    question: '*se pone lentes imaginarios de profesor* 🎓\n\nFinalmente, LA OFERTA PERFECTA según la metodología del Padrino.\n\n**Pregunta 25 de 28 - VALOR PERCIBIDO:** ¿Cómo haces que tu cliente sienta que recibe MÁS de lo que paga?\n\n¿Tienes combos, paquetes, extras incluidos? ¿Cómo presentas el valor total vs. el precio? 💎',
+    id: 'purple_cow',
+    question: '*se para en dos patas, emocionado* 🐄💜\n\nAhora armamos tu ESTRATEGIA COMUNICACIONAL. La "Venta de Bodega".\n\n**Pregunta 32 de 40 - VACA PÚRPURA:** ¿Cuál es tu "Vaca Púrpura"? Lo que te hace DESTACAR visualmente de inmediato.\n\n¿Qué es lo primero que la gente nota de ti?',
   },
   {
-    id: 'guarantee',
-    question: '*ladra con autoridad*\n\n**Pregunta 26 de 28 - GARANTÍA:** ¿Qué garantía ofreces? ¿Devolución de dinero? ¿Garantía de resultados? ¿Cuánto tiempo?\n\nSi no tienes garantía... ¿por qué el cliente debería confiar en ti? Una garantía sólida elimina el miedo. 🛡️',
+    id: 'big_promise',
+    question: '*ladra con fuerza*\n\n**Pregunta 33 de 40 - GRAN PROMESA:** ¿Cuál es la "GRAN PROMESA" de tu marca en UNA SOLA FRASE?\n\nEjemplo: "Duplicamos tus ventas en 90 días o te devolvemos el dinero". 🎯',
   },
   {
-    id: 'scarcity_urgency',
-    question: '*mira el reloj imaginario en su pata*\n\n**Pregunta 27 de 28 - ESCASEZ/URGENCIA:** ¿Usas alguna estrategia de escasez o urgencia?\n\n¿Cupos limitados? ¿Ofertas por tiempo limitado? ¿Descuentos de fin de mes? ¿Stock reducido? ⏰',
+    id: 'villain',
+    question: '*gruñe*\n\n**Pregunta 34 de 40 - EL VILLANO:** ¿Cuál es el VILLANO de tu historia?\n\nEjemplo: El polvo, la ineficiencia, el dueño tacaño, el sistema anticuado, los "expertos" que cobran y no entregan. 👹',
   },
   {
-    id: 'clear_results',
-    question: '*se sienta solemne, última pregunta* 🏁\n\n**Pregunta 28 de 28 - RESULTADOS CLAROS:** ¿Qué resultados específicos y medibles prometes?\n\nNo me digas "mejorar tu vida"... dame números. "30% más ventas en 3 meses", "5 kilos menos en 6 semanas", "ahorra 10 horas a la semana".\n\n¿Qué resultado CONCRETO puede esperar tu cliente? 📈',
+    id: 'absurd_guarantee',
+    question: '*mueve la cola*\n\n**Pregunta 35 de 40 - GARANTÍA ABSURDA:** ¿Qué garantía "ABSURDA" podrías dar para eliminar TODO el riesgo del cliente?\n\nAlgo tan loco que se sientan tontos si no aprovechan. 🛡️',
+  },
+  {
+    id: 'irrefutable_proof',
+    question: '*olfatea buscando evidencia*\n\n**Pregunta 36 de 40 - PRUEBA IRREFUTABLE:** ¿Qué prueba social (testimonios/fotos/videos) tienes que sea IRREFUTABLE?\n\n¿Tienes antes/después? ¿Números concretos? ¿Clientes famosos? 📸',
+  },
+  {
+    id: 'insider_secret',
+    question: '*baja la voz, secreto*\n\n**Pregunta 37 de 40 - SECRETO DEL INSIDER:** ¿Cuál es el "Insider Trading" de tu negocio?\n\nEse secreto que solo los EXPERTOS saben y el cliente común desconoce. 🤫',
+  },
+  {
+    id: 'ideal_tone',
+    question: '*se aclara la garganta*\n\n**Pregunta 38 de 40 - TONO IDEAL:** ¿Qué tono de voz conecta MEJOR con tu cliente?\n\n¿El experto serio? ¿El amigo rebelde? ¿El mentor sabio? ¿El vecino de confianza? 🎤',
+  },
+  {
+    id: 'irresistible_offer',
+    question: '*mueve la cola emocionado*\n\n**Pregunta 39 de 40 - OFERTA IRRESISTIBLE:** ¿Cuál es la OFERTA IRRESISTIBLE que haría que el cliente se sienta TONTO si dice que no?\n\nPiensa: tanto valor que parece un error de precio. 💥',
+  },
+  {
+    id: 'urgency_reason',
+    question: '*mira el reloj, última pregunta* ⏰\n\n**Pregunta 40 de 40 - RAZÓN DE URGENCIA:** ¿Cuál es la razón de urgencia REAL para que compren HOY y no mañana?\n\n¿Stock limitado? ¿Precio que sube? ¿Bonus temporal? ¿Cupos? Dame algo REAL, no fake. 🏁',
   },
 ];
 
@@ -233,61 +277,67 @@ LOS 17 PASOS DE SABRI PARA UN BUEN COPY:
 16. Llamado a la acción
 17. Recordatorio de lo que pasa si no compra
 
-ESTRUCTURA DEL BRIEF ESTRATÉGICO (28 preguntas en 5 partes):
+ESTRUCTURA DEL BRIEF ESTRATÉGICO (40 preguntas en 4 partes):
 
 PARTE 1 - EL NEGOCIO (6 preguntas):
-1. Qué vendes (pitch)
-2. Ticket promedio
-3. Márgenes
-4. Costo de envío
-5. Gastos fijos
-6. Canales de venta actuales
+1-6: Pitch, ticket, márgenes, envío, costos fijos, canales
 
-PARTE 2 - BUYER PERSONA (10 preguntas):
+PARTE 2 - BUYER PERSONA PSICOGRÁFICO (15 preguntas profundas):
 7. Nombre del buyer persona
-8. Edad
-9. Género
-10. Ubicación
-11. Nivel educacional
-12. Nivel de ingresos
-13. Canales que USA el cliente
-14. Dolor principal
-15. Deseos y sueños
-16. Miedos y objeciones
+8. Demografía básica
+9. Dolor de las 3 AM (qué le quita el sueño)
+10. Vergüenza (qué le avergüenza de su situación)
+11. Error común que comete antes de encontrarte
+12. Miedo si NO compra hoy
+13. Sentimiento del domingo (cómo se siente pensando en el problema)
+14. Palabras exactas que usa para describir su problema
+15. Objeción interna para no comprar
+16. Estado de transformación soñado
+17. Marcas que consume (estatus)
+18. A quién quiere impresionar
+19. Canales donde pasa tiempo
+20. Sueños y deseos
+21. Frustraciones diarias
 
-PARTE 3 - ANÁLISIS COMPETITIVO Y OCÉANO AZUL (5 preguntas):
-17. Por qué te compran A TI (pregúntales a sus clientes)
-18. Quiénes son los competidores
-19. Atributo diferenciador único
-20. Océano azul (espacio sin competencia)
-21. En qué eres mejor que la competencia
+PARTE 3 - ANÁLISIS COMPETITIVO PROFUNDO (10 preguntas):
+22. 3 competidores directos
+23. Queja #1 en reviews de competencia
+24. Promesas falsas de la competencia
+25. Precios y descuentos de competencia
+26. Punto lento/burocrático de competencia
+27. Tono de voz de competencia
+28. Canal que ignoran
+29. Oferta de entrada de competencia
+30. Por qué se cambiarían a ti
+31. Lo que NO pueden copiar de ti
 
-PARTE 4 - ESTRATEGIA DE COMUNICACIÓN (3 preguntas):
-22. Tono de comunicación
-23. Estilo de relación con el cliente
-24. Prueba social y data de respaldo
-
-PARTE 5 - OFERTA PERFECTA (4 preguntas):
-25. Valor percibido
-26. Garantía
-27. Escasez/urgencia
-28. Resultados claros y medibles
+PARTE 4 - ESTRATEGIA COMUNICACIONAL POTENTE (9 preguntas):
+32. Vaca Púrpura (qué te hace destacar)
+33. Gran Promesa en una frase
+34. El Villano de tu historia
+35. Garantía absurda que elimina riesgo
+36. Prueba social irrefutable
+37. Secreto del insider
+38. Tono ideal para tu cliente
+39. Oferta irresistible
+40. Razón de urgencia real
 
 INSTRUCCIONES:
 1. Mantén SIEMPRE el personaje de Steve sin filtros
 2. Procesa cada respuesta y cuestiona lo que no tenga sentido o sea vago
-3. Para preguntas de números, INSISTE en números específicos
-4. Para el buyer persona, sé MUY específico - necesitamos un perfil completo
-5. Para la competencia, pregunta POR QUÉ les compran a ellos y no a otros
-6. Celebra cuando obtengas buena data con números claros
-7. USA TU CONOCIMIENTO DE SABRI SUBY para dar insights cuando sea relevante
-8. Si el cliente tiene gaps, DÍSELO sin filtros
-9. Al terminar las 28 preguntas, haz un RESUMEN EJECUTIVO COMPLETO que incluya:
-   - Ficha del Buyer Persona con nombre y características
-   - Análisis del Océano Azul y diferenciación
-   - Evaluación de la Oferta del Padrino (qué tiene, qué le falta)
-   - Estrategia de comunicación sugerida
-   - Recomendaciones prioritarias
+3. Para preguntas psicográficas, PROFUNDIZA. No aceptes respuestas superficiales.
+4. Para la competencia, pregunta POR QUÉ les compran a ellos y dónde FALLAN
+5. Celebra cuando obtengas buena data con números y emociones claras
+6. USA TU CONOCIMIENTO DE SABRI SUBY para dar insights cuando sea relevante
+7. Si el cliente tiene gaps, DÍSELO sin filtros
+8. Al terminar las 40 preguntas, genera un BRIEF ESTRATÉGICO COMPLETO que incluya:
+   - FICHA DEL BUYER PERSONA con nombre, demografía y psicografía
+   - MAPA DE DOLOR: 3 AM pain, vergüenza, miedos, objeciones
+   - ESTADO DE TRANSFORMACIÓN: El antes y después soñado
+   - ANÁLISIS COMPETITIVO: Debilidades a explotar, océano azul
+   - ESTRATEGIA COMUNICACIONAL: Vaca púrpura, villano, gran promesa
+   - OFERTA IRRESISTIBLE: Garantía, urgencia, prueba social
+   - RECOMENDACIONES PRIORITARIAS: Top 5 acciones inmediatas
 
 Responde SIEMPRE en español. Sé conciso, directo y con actitud.`;
 
