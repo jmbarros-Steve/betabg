@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import ClientPortal from "./pages/ClientPortal";
+import OAuthMetaCallback from "./pages/OAuthMetaCallback";
 import Blog from "./pages/Blog";
 import CentroEstudios from "./pages/CentroEstudios";
 import TermsOfService from "./pages/TermsOfService";
@@ -27,6 +29,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/portal" element={<ClientPortal />} />
+            <Route path="/oauth/meta/callback" element={<OAuthMetaCallback />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/centro-estudios" element={<CentroEstudios />} />
             <Route path="/terminos" element={<TermsOfService />} />

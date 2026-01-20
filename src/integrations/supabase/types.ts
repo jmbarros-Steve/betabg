@@ -52,6 +52,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          client_user_id: string | null
           company: string | null
           created_at: string
           email: string | null
@@ -62,6 +63,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_user_id?: string | null
           company?: string | null
           created_at?: string
           email?: string | null
@@ -72,6 +74,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_user_id?: string | null
           company?: string | null
           created_at?: string
           email?: string | null
@@ -304,6 +307,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       public_blog_posts: {
@@ -346,8 +370,16 @@ export type Database = {
         Returns: string
       }
       encrypt_platform_token: { Args: { raw_token: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "client"
       platform_type: "shopify" | "meta" | "google"
     }
     CompositeTypes: {
@@ -476,6 +508,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "client"],
       platform_type: ["shopify", "meta", "google"],
     },
   },

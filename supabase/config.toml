@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.sync-meta-metrics]
 verify_jwt = false
+
+[functions.meta-oauth-callback]
+verify_jwt = false
+
+[functions.create-client-user]
+verify_jwt = false
