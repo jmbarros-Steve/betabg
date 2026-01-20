@@ -19,6 +19,12 @@ export function Navbar() {
           <a href="#servicios" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
             Servicios
           </a>
+          <Link to="/blog" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
+            Blog
+          </Link>
+          <Link to="/centro-estudios" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
+            Centro de Estudios
+          </Link>
           <a href="#contacto" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
             Contacto
           </a>
