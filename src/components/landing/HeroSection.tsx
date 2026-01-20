@@ -146,25 +146,6 @@ export function HeroSection() {
           })}
         </motion.div>
 
-        {/* Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9, duration: 0.8 }}
-          className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto"
-        >
-          {[
-            { value: '5+', label: 'Años de experiencia' },
-            { value: '50+', label: 'Proyectos completados' },
-            { value: '100%', label: 'Clientes satisfechos' },
-            { value: '24/7', label: 'Soporte disponible' },
-          ].map((stat, index) => (
-            <div key={index} className="text-center">
-              <div className="text-3xl md:text-4xl font-light text-primary mb-1">{stat.value}</div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">{stat.label}</div>
-            </div>
-          ))}
-        </motion.div>
       </div>
     </section>
   );

@@ -1,5 +1,8 @@
 import { motion } from 'framer-motion';
-import { Building2, TrendingUp } from 'lucide-react';
+import { 
+  Building2, TrendingUp, DollarSign, Calculator, 
+  BarChart3, Users, Megaphone, Target, Rocket, PieChart
+} from 'lucide-react';
 import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoShopify from '@/assets/logo-shopify-clean.png';
@@ -13,43 +16,74 @@ const GoogleAdsLogo = () => (
   </svg>
 );
 
-const services = [
+const marketingServices = [
   {
     logo: logoMeta,
-    title: 'Meta Performance',
+    title: 'Meta Ads',
     description: 'Campañas de alto rendimiento en Facebook e Instagram. Maximizamos tu ROAS con estrategias data-driven.',
   },
   {
     logo: 'googleAds',
-    title: 'Google Performance',
+    title: 'Google Ads',
     description: 'Domina los resultados de búsqueda con campañas SEM optimizadas y estrategias de conversión avanzadas.',
   },
   {
     logo: logoKlaviyo,
-    title: 'Klaviyo Performance',
+    title: 'Klaviyo',
     description: 'Email marketing automatizado que convierte. Flujos personalizados y segmentación inteligente.',
   },
   {
     logo: logoShopify,
-    title: 'Shopify Performance',
+    title: 'Shopify',
     description: 'Optimización completa de tu tienda Shopify. CRO, velocidad y experiencia de compra impecable.',
   },
+];
+
+const consultingServices = [
   {
-    icon: Building2,
-    title: 'Escalamiento B2B',
-    description: 'Estrategias de crecimiento para empresas B2B. Generación de leads y pipelines de ventas efectivos.',
+    icon: DollarSign,
+    title: 'Pricing Estratégico',
+    description: 'Definimos precios que maximizan márgenes sin sacrificar conversión. Análisis de elasticidad y posicionamiento.',
   },
   {
-    icon: TrendingUp,
-    title: 'Estrategias de Escalamiento',
-    description: 'Planes de crecimiento personalizados. Escalamos tu negocio de forma sostenible y rentable.',
+    icon: Calculator,
+    title: 'Análisis de Costos',
+    description: 'Identificamos ineficiencias y optimizamos estructura de costos para mejorar rentabilidad operativa.',
   },
+  {
+    icon: PieChart,
+    title: 'Contabilidad de Gestión',
+    description: 'Reportes financieros accionables. Dashboards de KPIs y análisis de punto de equilibrio.',
+  },
+  {
+    icon: Rocket,
+    title: 'Escalamiento',
+    description: 'Planes de crecimiento sostenible. Automatización de procesos y expansión a nuevos mercados.',
+  },
+  {
+    icon: Users,
+    title: 'Gestión de Leads',
+    description: 'CRM optimizado, scoring de leads y pipelines de ventas que convierten prospectos en clientes.',
+  },
+  {
+    icon: Megaphone,
+    title: 'Campañas de Marketing',
+    description: 'Estrategias 360° que integran todos los canales. Branding, contenido y performance unidos.',
+  },
+];
+
+const stats = [
+  { value: '5+', label: 'Años de experiencia' },
+  { value: '50+', label: 'Proyectos completados' },
+  { value: '100%', label: 'Clientes satisfechos' },
+  { value: '24/7', label: 'Soporte disponible' },
 ];
 
 export function ServicesSection() {
   return (
     <section id="servicios" className="py-24 relative bg-card">
       <div className="container px-6">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -59,45 +93,105 @@ export function ServicesSection() {
         >
           <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Lo que hacemos</p>
           <h2 className="text-3xl md:text-5xl font-light mb-4">
-            Nuestros <span className="text-primary font-medium">Servicios</span>
+            Consultoría de <span className="text-primary font-medium">Escalamiento</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-light">
-            Soluciones de performance marketing para escalar tu negocio
+            Soluciones integrales para hacer crecer tu negocio de forma sostenible y rentable
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((service, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1, duration: 0.5 }}
-              whileHover={{ y: -5 }}
-              className="group relative p-8 rounded-lg bg-background border border-border hover:border-primary/50 transition-all duration-300"
-            >
-              <div className="relative">
-                <div className="w-16 h-16 rounded-lg border-2 border-primary/30 flex items-center justify-center mb-6 group-hover:border-primary/60 transition-colors bg-white overflow-hidden p-2">
-                  {service.logo === 'googleAds' ? (
-                    <GoogleAdsLogo />
-                  ) : service.logo ? (
-                    <img 
-                      src={service.logo} 
-                      alt={service.title} 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : service.icon ? (
-                    <service.icon className="w-7 h-7 text-primary" />
-                  ) : null}
-                </div>
-                
-                <h3 className="text-lg font-medium mb-3 text-foreground tracking-wide">{service.title}</h3>
-                <p className="text-muted-foreground leading-relaxed text-sm font-light">{service.description}</p>
-              </div>
-            </motion.div>
+        {/* Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto mb-20"
+        >
+          {stats.map((stat, index) => (
+            <div key={index} className="text-center">
+              <div className="text-3xl md:text-4xl font-light text-primary mb-1">{stat.value}</div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground">{stat.label}</div>
+            </div>
           ))}
-        </div>
+        </motion.div>
+
+        {/* Consulting Services */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mb-16"
+        >
+          <h3 className="text-xl font-medium text-center mb-8 flex items-center justify-center gap-2">
+            <Target className="w-5 h-5 text-primary" />
+            Consultoría Empresarial
+          </h3>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {consultingServices.map((service, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1, duration: 0.5 }}
+                whileHover={{ y: -5 }}
+                className="group relative p-8 rounded-lg bg-background border border-border hover:border-primary/50 transition-all duration-300"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                    <service.icon className="w-7 h-7 text-primary" />
+                  </div>
+                  <h4 className="text-lg font-medium mb-3 text-foreground tracking-wide">{service.title}</h4>
+                  <p className="text-muted-foreground leading-relaxed text-sm font-light">{service.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Marketing Services */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <h3 className="text-xl font-medium text-center mb-8 flex items-center justify-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            Marketing Digital
+          </h3>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {marketingServices.map((service, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1, duration: 0.5 }}
+                whileHover={{ y: -5 }}
+                className="group relative p-6 rounded-lg bg-background border border-border hover:border-primary/50 transition-all duration-300"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-lg border-2 border-primary/30 flex items-center justify-center mb-4 group-hover:border-primary/60 transition-colors bg-white overflow-hidden p-2">
+                    {service.logo === 'googleAds' ? (
+                      <GoogleAdsLogo />
+                    ) : (
+                      <img 
+                        src={service.logo} 
+                        alt={service.title} 
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                  <h4 className="text-base font-medium mb-2 text-foreground tracking-wide">{service.title}</h4>
+                  <p className="text-muted-foreground leading-relaxed text-sm font-light">{service.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
       </div>
     </section>
   );
