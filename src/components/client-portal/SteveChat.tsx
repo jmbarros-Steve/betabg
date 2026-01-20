@@ -10,12 +10,49 @@ import { toast } from 'sonner';
 import { Send, User, Sparkles, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import avatarSteve from '@/assets/avatar-steve.png';
+import avatarChonga from '@/assets/avatar-chonga.png';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   created_at: string;
+}
+
+// Helper to detect and parse Chonga's spirit messages
+function parseMessageWithChonga(content: string) {
+  const chongaPattern = /---\s*\n👻\s*\*\*\[ESPÍRITU DE LA CHONGA\]\:\*\*([^]*?)\*desaparece[^*]*\*\s*\n---/g;
+  const parts: Array<{ type: 'steve' | 'chonga'; content: string }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = chongaPattern.exec(content)) !== null) {
+    // Add Steve's part before Chonga
+    if (match.index > lastIndex) {
+      const stevePart = content.slice(lastIndex, match.index).trim();
+      if (stevePart) {
+        parts.push({ type: 'steve', content: stevePart });
+      }
+    }
+    // Add Chonga's part
+    parts.push({ type: 'chonga', content: match[1].trim() });
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining Steve content
+  if (lastIndex < content.length) {
+    const remaining = content.slice(lastIndex).trim();
+    if (remaining) {
+      parts.push({ type: 'steve', content: remaining });
+    }
+  }
+
+  // If no Chonga found, return the whole content as Steve
+  if (parts.length === 0) {
+    parts.push({ type: 'steve', content });
+  }
+
+  return parts;
 }
 
 interface SteveChatProps {
@@ -248,37 +285,58 @@ export function SteveChat({ clientId }: SteveChatProps) {
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                'flex gap-3',
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              )}
-            >
-              {message.role === 'assistant' && (
-                <Avatar className="h-8 w-8 flex-shrink-0 border border-primary/20">
-                  <AvatarImage src={avatarSteve} alt="Steve" />
-                  <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
-                </Avatar>
-              )}
-              
-              <div
-                className={cn(
-                  'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm',
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-br-md'
-                    : 'bg-muted rounded-bl-md'
-                )}
-              >
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              </div>
-              
-              {message.role === 'user' && (
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarFallback className="bg-secondary">
-                    <User className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
+            <div key={message.id}>
+              {message.role === 'user' ? (
+                <div className="flex gap-3 justify-end">
+                  <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-br-md">
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  </div>
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarFallback className="bg-secondary">
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              ) : (
+                // Parse assistant messages for Chonga's spirit
+                parseMessageWithChonga(message.content).map((part, partIndex) => (
+                  <div key={`${message.id}-${partIndex}`} className={cn(
+                    "flex gap-3 justify-start",
+                    partIndex > 0 && "mt-3"
+                  )}>
+                    <Avatar className={cn(
+                      "h-8 w-8 flex-shrink-0 border",
+                      part.type === 'chonga' ? "border-purple-400" : "border-primary/20"
+                    )}>
+                      {part.type === 'chonga' ? (
+                        <>
+                          <AvatarImage src={avatarChonga} alt="La Chonga" />
+                          <AvatarFallback className="bg-purple-100 text-purple-600">👻</AvatarFallback>
+                        </>
+                      ) : (
+                        <>
+                          <AvatarImage src={avatarSteve} alt="Steve" />
+                          <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
+                        </>
+                      )}
+                    </Avatar>
+                    
+                    <div className={cn(
+                      "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm rounded-bl-md",
+                      part.type === 'chonga' 
+                        ? "bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800" 
+                        : "bg-muted"
+                    )}>
+                      {part.type === 'chonga' && (
+                        <div className="flex items-center gap-1 mb-1 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                          <span>👻</span>
+                          <span>Espíritu de La Chonga</span>
+                        </div>
+                      )}
+                      <p className="whitespace-pre-wrap">{part.content}</p>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           ))}
