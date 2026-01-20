@@ -13,7 +13,9 @@ interface Connection {
 interface ClientOnboardingStepsProps {
   connections: Connection[];
   onConnectMeta: () => void;
+  onConnectShopify: () => void;
   isConnectingMeta: boolean;
+  isConnectingShopify: boolean;
   isAdmin?: boolean;
 }
 
@@ -32,7 +34,7 @@ const steps = [
     title: 'Conectar Shopify',
     description: 'Métricas de ventas, pedidos e ingresos',
     logo: logoShopify,
-    adminNote: 'Configurado por el administrador',
+    adminNote: null,
   },
   {
     id: 'google',
@@ -47,7 +49,9 @@ const steps = [
 export function ClientOnboardingSteps({
   connections,
   onConnectMeta,
+  onConnectShopify,
   isConnectingMeta,
+  isConnectingShopify,
   isAdmin = false,
 }: ClientOnboardingStepsProps) {
   const getConnectionStatus = (platform: string) => {
@@ -85,6 +89,7 @@ export function ClientOnboardingSteps({
         {steps.map((step, index) => {
           const isCompleted = getConnectionStatus(step.platform);
           const isMetaPending = step.platform === 'meta' && !isCompleted;
+          const isShopifyPending = step.platform === 'shopify' && !isCompleted;
           const isGooglePending = step.platform === 'google';
 
           return (
@@ -146,6 +151,15 @@ export function ClientOnboardingSteps({
                     disabled={isConnectingMeta}
                   >
                     {isConnectingMeta ? 'Conectando...' : 'Conectar'}
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                ) : isShopifyPending ? (
+                  <Button
+                    size="sm"
+                    onClick={onConnectShopify}
+                    disabled={isConnectingShopify}
+                  >
+                    {isConnectingShopify ? 'Conectando...' : 'Conectar'}
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 ) : isGooglePending ? (

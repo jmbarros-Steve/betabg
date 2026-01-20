@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.create-client-user]
 verify_jwt = false
+
+[functions.shopify-oauth-callback]
+verify_jwt = false

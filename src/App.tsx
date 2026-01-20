@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import ClientPortal from "./pages/ClientPortal";
 import OAuthMetaCallback from "./pages/OAuthMetaCallback";
+import OAuthShopifyCallback from "./pages/OAuthShopifyCallback";
 import Blog from "./pages/Blog";
 import CentroEstudios from "./pages/CentroEstudios";
 import TermsOfService from "./pages/TermsOfService";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/portal" element={<ClientPortal />} />
             <Route path="/portal/:clientId" element={<ClientPortal />} />
             <Route path="/oauth/meta/callback" element={<OAuthMetaCallback />} />
+            <Route path="/oauth/shopify/callback" element={<OAuthShopifyCallback />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/centro-estudios" element={<CentroEstudios />} />
             <Route path="/terminos" element={<TermsOfService />} />
