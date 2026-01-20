@@ -51,32 +51,43 @@ const QUESTION_ICONS: Record<string, React.ReactNode> = {
   shipping_cost: <Truck className="h-4 w-4" />,
   fixed_costs: <Calculator className="h-4 w-4" />,
   sales_channels: <Store className="h-4 w-4" />,
-  // Parte 2: Buyer Persona
+  // Parte 2: Buyer Persona Psicográfico
   persona_name: <Users className="h-4 w-4" />,
-  persona_age: <Users className="h-4 w-4" />,
-  persona_gender: <Users className="h-4 w-4" />,
-  persona_location: <Target className="h-4 w-4" />,
-  persona_education: <Database className="h-4 w-4" />,
-  persona_income: <DollarSign className="h-4 w-4" />,
+  persona_demographics: <Users className="h-4 w-4" />,
+  persona_3am_pain: <Target className="h-4 w-4" />,
+  persona_shame: <Heart className="h-4 w-4" />,
+  persona_common_mistake: <Target className="h-4 w-4" />,
+  persona_fear_not_buying: <Shield className="h-4 w-4" />,
+  persona_sunday_feeling: <Heart className="h-4 w-4" />,
+  persona_exact_words: <MessageSquare className="h-4 w-4" />,
+  persona_internal_objection: <Shield className="h-4 w-4" />,
+  persona_transformation: <TrendingUp className="h-4 w-4" />,
+  persona_lifestyle_brands: <Gem className="h-4 w-4" />,
+  persona_impress_who: <Users className="h-4 w-4" />,
   persona_channels: <MessageSquare className="h-4 w-4" />,
-  persona_pain: <Target className="h-4 w-4" />,
   persona_desires: <Heart className="h-4 w-4" />,
-  persona_fears: <Shield className="h-4 w-4" />,
-  // Parte 3: Competencia
-  why_buy_from_you: <Trophy className="h-4 w-4" />,
-  competitors: <Users className="h-4 w-4" />,
-  differentiator: <Gem className="h-4 w-4" />,
-  blue_ocean: <TrendingUp className="h-4 w-4" />,
-  better_than_competition: <Trophy className="h-4 w-4" />,
-  // Parte 4: Comunicación
-  communication_tone: <MessageSquare className="h-4 w-4" />,
-  communication_style: <Heart className="h-4 w-4" />,
-  supporting_data: <Database className="h-4 w-4" />,
-  // Parte 5: Oferta Perfecta
-  perceived_value: <Gem className="h-4 w-4" />,
-  guarantee: <Shield className="h-4 w-4" />,
-  scarcity_urgency: <Clock className="h-4 w-4" />,
-  clear_results: <TrendingUp className="h-4 w-4" />,
+  persona_daily_frustrations: <Target className="h-4 w-4" />,
+  // Parte 3: Análisis Competitivo
+  competitors_list: <Trophy className="h-4 w-4" />,
+  competitors_complaints: <Target className="h-4 w-4" />,
+  competitors_false_promise: <Shield className="h-4 w-4" />,
+  competitors_pricing: <DollarSign className="h-4 w-4" />,
+  competitors_slow_point: <Clock className="h-4 w-4" />,
+  competitors_tone: <MessageSquare className="h-4 w-4" />,
+  competitors_ignored_channel: <Store className="h-4 w-4" />,
+  competitors_entry_offer: <Gift className="h-4 w-4" />,
+  why_switch_to_you: <Trophy className="h-4 w-4" />,
+  uncopyable_advantage: <Gem className="h-4 w-4" />,
+  // Parte 4: Estrategia Comunicacional
+  purple_cow: <Gem className="h-4 w-4" />,
+  big_promise: <Target className="h-4 w-4" />,
+  villain: <Shield className="h-4 w-4" />,
+  absurd_guarantee: <Shield className="h-4 w-4" />,
+  irrefutable_proof: <Database className="h-4 w-4" />,
+  insider_secret: <Gem className="h-4 w-4" />,
+  ideal_tone: <MessageSquare className="h-4 w-4" />,
+  irresistible_offer: <Gift className="h-4 w-4" />,
+  urgency_reason: <Clock className="h-4 w-4" />,
 };
 
 const QUESTION_LABELS: Record<string, string> = {
@@ -89,39 +100,49 @@ const QUESTION_LABELS: Record<string, string> = {
   sales_channels: 'Canales de Venta',
   // Parte 2: Buyer Persona
   persona_name: 'Nombre del Persona',
-  persona_age: 'Edad',
-  persona_gender: 'Género',
-  persona_location: 'Ubicación',
-  persona_education: 'Nivel Educacional',
-  persona_income: 'Nivel de Ingresos',
+  persona_demographics: 'Demografía',
+  persona_3am_pain: 'Dolor de las 3 AM',
+  persona_shame: 'Vergüenza',
+  persona_common_mistake: 'Error Común',
+  persona_fear_not_buying: 'Miedo si No Compra',
+  persona_sunday_feeling: 'Sentimiento Domingo',
+  persona_exact_words: 'Palabras Exactas',
+  persona_internal_objection: 'Objeción Interna',
+  persona_transformation: 'Transformación Soñada',
+  persona_lifestyle_brands: 'Marcas que Consume',
+  persona_impress_who: '¿A Quién Impresiona?',
   persona_channels: 'Canales del Cliente',
-  persona_pain: 'Dolor Principal',
-  persona_desires: 'Deseos y Sueños',
-  persona_fears: 'Miedos y Objeciones',
+  persona_desires: 'Sueños y Deseos',
+  persona_daily_frustrations: 'Frustraciones Diarias',
   // Parte 3: Competencia
-  why_buy_from_you: '¿Por qué te Compran?',
-  competitors: 'Competidores',
-  differentiator: 'Atributo Diferenciador',
-  blue_ocean: 'Océano Azul',
-  better_than_competition: 'Mejor que la Competencia',
-  // Parte 4: Comunicación
-  communication_tone: 'Tono de Comunicación',
-  communication_style: 'Estilo de Relación',
-  supporting_data: 'Prueba Social',
-  // Parte 5: Oferta Perfecta
-  perceived_value: 'Valor Percibido',
-  guarantee: 'Garantía',
-  scarcity_urgency: 'Escasez/Urgencia',
-  clear_results: 'Resultados Claros',
+  competitors_list: 'Competidores',
+  competitors_complaints: 'Quejas de Competencia',
+  competitors_false_promise: 'Promesas Falsas',
+  competitors_pricing: 'Precios Competencia',
+  competitors_slow_point: 'Punto Débil',
+  competitors_tone: 'Tono Competencia',
+  competitors_ignored_channel: 'Canal Ignorado',
+  competitors_entry_offer: 'Oferta de Entrada',
+  why_switch_to_you: '¿Por qué Cambiarse?',
+  uncopyable_advantage: 'Imposible de Copiar',
+  // Parte 4: Estrategia Comunicacional
+  purple_cow: 'Vaca Púrpura',
+  big_promise: 'Gran Promesa',
+  villain: 'El Villano',
+  absurd_guarantee: 'Garantía Absurda',
+  irrefutable_proof: 'Prueba Irrefutable',
+  insider_secret: 'Secreto del Insider',
+  ideal_tone: 'Tono Ideal',
+  irresistible_offer: 'Oferta Irresistible',
+  urgency_reason: 'Razón de Urgencia',
 };
 
 // Question indices for each section
 const SECTION_RANGES = {
   business: { start: 0, end: 6, title: 'El Negocio', icon: Building2 },
-  persona: { start: 6, end: 16, title: 'Buyer Persona', icon: Users },
-  competition: { start: 16, end: 21, title: 'Análisis Competitivo', icon: Trophy },
-  communication: { start: 21, end: 24, title: 'Estrategia de Comunicación', icon: MessageSquare },
-  offer: { start: 24, end: 28, title: 'Oferta Perfecta', icon: Gem },
+  persona: { start: 6, end: 21, title: 'Buyer Persona', icon: Users },
+  competition: { start: 21, end: 31, title: 'Análisis Competitivo', icon: Trophy },
+  communication: { start: 31, end: 40, title: 'Estrategia Comunicacional', icon: MessageSquare },
 };
 
 export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
@@ -251,9 +272,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              Buyer Persona
+              Buyer Persona Psicográfico
             </CardTitle>
-            <CardDescription>El Cliente Soñado • Preguntas 7-16</CardDescription>
+            <CardDescription>El Cliente Soñado • Preguntas 7-21</CardDescription>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[550px] pr-4">
@@ -262,7 +283,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   <div key={questionId} className="border-b border-border pb-2 last:border-0">
                     <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
                       {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 7}`}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${SECTION_RANGES.persona.start + index + 1}`}
                     </div>
                     <p className="text-sm">
                       {responses[SECTION_RANGES.persona.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
@@ -281,16 +302,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               <Trophy className="h-5 w-5 text-primary" />
               Análisis Competitivo
             </CardTitle>
-            <CardDescription>Océano Azul • Preguntas 17-21</CardDescription>
+            <CardDescription>Debilidades a Explotar • Preguntas 22-31</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[250px] pr-4">
+            <ScrollArea className="h-[300px] pr-4">
               <div className="space-y-3">
                 {questions.slice(SECTION_RANGES.competition.start, SECTION_RANGES.competition.end).map((questionId, index) => (
                   <div key={questionId} className="border-b border-border pb-2 last:border-0">
                     <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
                       {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 17}`}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${SECTION_RANGES.competition.start + index + 1}`}
                     </div>
                     <p className="text-sm">
                       {responses[SECTION_RANGES.competition.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
@@ -307,49 +328,21 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />
-              Estrategia de Comunicación
+              Estrategia Comunicacional
             </CardTitle>
-            <CardDescription>Preguntas 22-24</CardDescription>
+            <CardDescription>Vaca Púrpura y Oferta • Preguntas 32-40</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[200px] pr-4">
+            <ScrollArea className="h-[300px] pr-4">
               <div className="space-y-3">
                 {questions.slice(SECTION_RANGES.communication.start, SECTION_RANGES.communication.end).map((questionId, index) => (
                   <div key={questionId} className="border-b border-border pb-2 last:border-0">
                     <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
                       {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 22}`}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${SECTION_RANGES.communication.start + index + 1}`}
                     </div>
                     <p className="text-sm">
                       {responses[SECTION_RANGES.communication.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Part 5: Perfect Offer */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Gem className="h-5 w-5 text-primary" />
-              La Oferta Perfecta
-            </CardTitle>
-            <CardDescription>Metodología Sabri Suby • Preguntas 25-28</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[200px] pr-4">
-              <div className="space-y-3">
-                {questions.slice(SECTION_RANGES.offer.start, SECTION_RANGES.offer.end).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 25}`}
-                    </div>
-                    <p className="text-sm">
-                      {responses[SECTION_RANGES.offer.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
                     </p>
                   </div>
                 ))}
