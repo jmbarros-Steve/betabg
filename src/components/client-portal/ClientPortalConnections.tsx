@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 
 const SHOPIFY_CLIENT_ID = '933109488c1e95e5fd630abb7e03809e';
 const GOOGLE_CLIENT_ID = '870555860271-um4g70a5ob5bs56rpusni6eci01f77mn.apps.googleusercontent.com';
+const META_APP_ID = '1994525824461583';
 
 interface ClientPortalConnectionsProps {
   clientId: string;
@@ -95,14 +96,6 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const handleConnectMeta = () => {
     setConnectingMeta(true);
     
-    // Build Meta OAuth URL
-    const metaAppId = import.meta.env.VITE_META_APP_ID;
-    if (!metaAppId) {
-      toast.error('Configuración de Meta no disponible');
-      setConnectingMeta(false);
-      return;
-    }
-
     const redirectUri = `${window.location.origin}/oauth/meta/callback`;
     const scopes = [
       'ads_read',
@@ -114,7 +107,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     // Store client_id in sessionStorage for callback
     sessionStorage.setItem('meta_oauth_client_id', clientId);
 
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}`;
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}`;
 
     window.location.href = authUrl;
   };
