@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import { Building2, TrendingUp } from 'lucide-react';
-import logoKlaviyo from '@/assets/logo-klaviyo.png';
-import logoMeta from '@/assets/logo-meta.png';
-import logoShopify from '@/assets/logo-shopify.png';
+import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
+import logoMeta from '@/assets/logo-meta-clean.png';
+import logoShopify from '@/assets/logo-shopify-clean.png';
 
 // Google Ads Logo
 const GoogleAdsLogo = () => (
