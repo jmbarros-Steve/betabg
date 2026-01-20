@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Edit2, UserPlus, Key, Copy, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, UserPlus, Key, Copy, Check, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function ClientsPanel({ userId }: Props) {
+  const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -386,6 +388,16 @@ export function ClientsPanel({ userId }: Props) {
                   €{client.hourly_rate}/h
                 </span>
                 <div className="flex gap-2">
+                  {client.client_user_id && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => navigate(`/portal/${client.id}`)}
+                      title="Ver portal del cliente"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 

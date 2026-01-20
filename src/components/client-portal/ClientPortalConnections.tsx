@@ -6,11 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { ClientOnboardingSteps } from './ClientOnboardingSteps';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 
 interface ClientPortalConnectionsProps {
   clientId: string;
+  isAdmin?: boolean;
 }
 
 interface Connection {
@@ -41,7 +43,7 @@ const platformConfig = {
   },
 };
 
-export function ClientPortalConnections({ clientId }: ClientPortalConnectionsProps) {
+export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPortalConnectionsProps) {
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectingMeta, setConnectingMeta] = useState(false);
@@ -129,14 +131,22 @@ export function ClientPortalConnections({ clientId }: ClientPortalConnectionsPro
 
   return (
     <div className="space-y-6">
+      {/* Onboarding Steps */}
+      <ClientOnboardingSteps
+        connections={connections}
+        onConnectMeta={handleConnectMeta}
+        isConnectingMeta={connectingMeta}
+        isAdmin={isAdmin}
+      />
+
       <div>
         <h2 className="text-2xl font-semibold mb-2">Mis Conexiones</h2>
         <p className="text-muted-foreground">
-          Conecta tus plataformas para sincronizar métricas automáticamente
+          Gestiona tus plataformas conectadas
         </p>
       </div>
 
-      {/* Existing Connections */}
+      {/* Existing Connections Details */}
       {connections.length > 0 && (
         <div className="grid gap-4">
           {connections.map((connection) => {
