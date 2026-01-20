@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Settings, Bot } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ClientPortalMetrics } from '@/components/client-portal/ClientPortalMetrics';
 import { ClientPortalConnections } from '@/components/client-portal/ClientPortalConnections';
 import { SteveChat } from '@/components/client-portal/SteveChat';
+import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'connections' | 'steve';
+type TabType = 'metrics' | 'connections' | 'brief' | 'steve';
 
 interface ClientInfo {
   id: string;
@@ -91,6 +92,7 @@ export default function ClientPortal() {
   const tabs = [
     { id: 'metrics', label: 'Métricas', icon: BarChart3 },
     { id: 'connections', label: 'Conexiones', icon: Link2 },
+    { id: 'brief', label: 'Brief', icon: FileText },
     { id: 'steve', label: 'Steve', icon: Bot },
   ] as const;
 
@@ -162,6 +164,12 @@ export default function ClientPortal() {
           )}
           {activeTab === 'connections' && effectiveClientId && (
             <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
+          )}
+          {activeTab === 'brief' && effectiveClientId && (
+            <BrandBriefView 
+              clientId={effectiveClientId} 
+              onEditBrief={() => setActiveTab('steve')} 
+            />
           )}
           {activeTab === 'steve' && effectiveClientId && (
             <div className="max-w-2xl mx-auto">
