@@ -9,8 +9,10 @@ import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag } fro
 import { ClientOnboardingSteps } from './ClientOnboardingSteps';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
+import logoGoogle from '@/assets/logo-google-ads.png';
 
 const SHOPIFY_CLIENT_ID = '933109488c1e95e5fd630abb7e03809e';
+const GOOGLE_CLIENT_ID = '870555860271-um4g70a5ob5bs56rpusni6eci01f77mn.apps.googleusercontent.com';
 
 interface ClientPortalConnectionsProps {
   clientId: string;
@@ -40,7 +42,7 @@ const platformConfig = {
   },
   google: {
     name: 'Google Ads',
-    logo: null,
+    logo: logoGoogle,
     color: 'bg-yellow-100 text-yellow-800',
   },
 };
@@ -50,6 +52,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectingMeta, setConnectingMeta] = useState(false);
   const [connectingShopify, setConnectingShopify] = useState(false);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
 
   useEffect(() => {
     fetchConnections();
@@ -126,13 +129,35 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     window.location.href = authUrl;
   };
 
+  const handleConnectGoogle = () => {
+    setConnectingGoogle(true);
+
+    // Store client_id in sessionStorage for callback
+    sessionStorage.setItem('google_ads_oauth_client_id', clientId);
+
+    // Build Google OAuth URL
+    const redirectUri = `${window.location.origin}/oauth/google-ads/callback`;
+    const scopes = [
+      'https://www.googleapis.com/auth/adwords',
+    ].join(' ');
+
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&access_type=offline&prompt=consent&state=${clientId}`;
+
+    window.location.href = authUrl;
+  };
+
   const handleSyncConnection = async (connection: Connection) => {
     try {
       toast.loading('Sincronizando...', { id: 'sync' });
 
-      const functionName = connection.platform === 'shopify' 
-        ? 'sync-shopify-metrics' 
-        : 'sync-meta-metrics';
+      let functionName = 'sync-shopify-metrics';
+      if (connection.platform === 'meta') {
+        functionName = 'sync-meta-metrics';
+      } else if (connection.platform === 'google') {
+        // TODO: Implement sync-google-ads-metrics function
+        toast.info('Sincronización de Google Ads próximamente disponible', { id: 'sync' });
+        return;
+      }
 
       const { error } = await supabase.functions.invoke(functionName, {
         body: { connection_id: connection.id },
@@ -158,6 +183,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   }
   const hasMetaConnection = connections.some(c => c.platform === 'meta');
   const hasShopifyConnection = connections.some(c => c.platform === 'shopify');
+  const hasGoogleConnection = connections.some(c => c.platform === 'google');
 
   return (
     <div className="space-y-6">
@@ -166,8 +192,10 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
         connections={connections}
         onConnectMeta={handleConnectMeta}
         onConnectShopify={handleConnectShopify}
+        onConnectGoogle={handleConnectGoogle}
         isConnectingMeta={connectingMeta}
         isConnectingShopify={connectingShopify}
+        isConnectingGoogle={connectingGoogle}
         isAdmin={isAdmin}
       />
 
@@ -279,7 +307,33 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
             </div>
           )}
 
-          {hasMetaConnection && hasShopifyConnection && (
+          {/* Google Ads Connection */}
+          {!hasGoogleConnection && (
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-4">
+                <img src={logoGoogle} alt="Google Ads" className="h-10 w-10 object-contain" />
+                <div>
+                  <p className="font-medium">Google Ads</p>
+                  <p className="text-sm text-muted-foreground">
+                    Campañas de búsqueda y display
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleConnectGoogle}
+                disabled={connectingGoogle}
+              >
+                {connectingGoogle ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                )}
+                Conectar con Google
+              </Button>
+            </div>
+          )}
+
+          {hasMetaConnection && hasShopifyConnection && hasGoogleConnection && (
             <p className="text-sm text-muted-foreground text-center py-4">
               Todas las plataformas disponibles están conectadas
             </p>
