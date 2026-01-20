@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2 } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
@@ -11,9 +11,10 @@ import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { BlogPanel } from '@/components/dashboard/BlogPanel';
 import { StudyResourcesPanel } from '@/components/dashboard/StudyResourcesPanel';
 import { PlatformConnectionsPanel } from '@/components/dashboard/PlatformConnectionsPanel';
+import { ClientMetricsPanel } from '@/components/dashboard/ClientMetricsPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms';
+type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics';
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
@@ -38,6 +39,7 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
+    { id: 'metrics', label: 'Métricas', icon: BarChart3 },
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'time', label: 'Horas', icon: Clock },
     { id: 'invoices', label: 'Recibos', icon: FileText },
@@ -86,6 +88,7 @@ export default function Dashboard() {
           transition={{ duration: 0.3 }}
         >
           {activeTab === 'overview' && <DashboardStats userId={user.id} />}
+          {activeTab === 'metrics' && <ClientMetricsPanel />}
           {activeTab === 'clients' && <ClientsPanel userId={user.id} />}
           {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
           {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
