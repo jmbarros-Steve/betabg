@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.store-platform-connection]
 verify_jwt = false
+
+[functions.sync-meta-metrics]
+verify_jwt = false

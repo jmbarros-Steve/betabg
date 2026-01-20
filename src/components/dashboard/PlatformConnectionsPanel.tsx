@@ -165,8 +165,15 @@ export function PlatformConnectionsPanel() {
     setSyncing(connection.id);
     
     try {
-      const { data, error } = await supabase.functions.invoke('sync-shopify-metrics', {
-        body: { connectionId: connection.id }
+      // Use appropriate sync function based on platform
+      const functionName = connection.platform === 'meta' 
+        ? 'sync-meta-metrics' 
+        : 'sync-shopify-metrics';
+      
+      const bodyKey = connection.platform === 'meta' ? 'connection_id' : 'connectionId';
+      
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { [bodyKey]: connection.id }
       });
 
       if (error) throw error;
@@ -176,7 +183,11 @@ export function PlatformConnectionsPanel() {
         return;
       }
       
-      toast.success(`Métricas sincronizadas: ${data.ordersCount || 0} órdenes`);
+      const successMessage = connection.platform === 'meta'
+        ? `Métricas sincronizadas: ${data.metrics_synced || 0} registros`
+        : `Métricas sincronizadas: ${data.ordersCount || 0} órdenes`;
+      
+      toast.success(successMessage);
       fetchConnections();
     } catch (error: any) {
       console.error('Sync error:', error);
@@ -407,7 +418,7 @@ export function PlatformConnectionsPanel() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {connection.platform === 'shopify' && (
+                  {(connection.platform === 'shopify' || connection.platform === 'meta') && (
                     <Button
                       variant="outline"
                       size="sm"
