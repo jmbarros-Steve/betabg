@@ -39,10 +39,10 @@ export function HeroSection() {
             Meta, Google, Klaviyo, Shopify y estrategias B2B.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
             <Link to="/auth">
               <Button variant="hero" size="xl" className="uppercase tracking-wider">
-                Panel de Control
+                Acceso Clientes
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
@@ -51,6 +51,11 @@ export function HeroSection() {
                 Ver Servicios
               </Button>
             </a>
+            <Link to="/centro-estudios">
+              <Button variant="heroOutline" size="xl" className="uppercase tracking-wider">
+                Centro de Estudios
+              </Button>
+            </Link>
           </div>
         </motion.div>
 
