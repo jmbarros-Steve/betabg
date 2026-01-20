@@ -19,8 +19,8 @@ const NAVIGATION_OPTIONS = [
   {
     id: 'servicios',
     title: 'Servicios Corporativos',
-    subtitle: 'Performance Marketing',
-    description: 'Meta Ads, Google Ads, Klaviyo, Shopify. Estrategias B2B y B2C para escalar tu negocio.',
+    subtitle: 'Consultoría de Escalamiento',
+    description: 'Pricing, costos, contabilidad, gestión de leads, campañas de marketing y más.',
     icon: Briefcase,
     link: '#servicios',
     color: 'from-blue-500 to-indigo-500',
