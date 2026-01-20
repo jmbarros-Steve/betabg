@@ -130,6 +130,100 @@ export type Database = {
           },
         ]
       }
+      platform_connections: {
+        Row: {
+          access_token: string | null
+          account_id: string | null
+          api_key: string | null
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_sync_at: string | null
+          platform: Database["public"]["Enums"]["platform_type"]
+          refresh_token: string | null
+          store_name: string | null
+          store_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          account_id?: string | null
+          api_key?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          platform: Database["public"]["Enums"]["platform_type"]
+          refresh_token?: string | null
+          store_name?: string | null
+          store_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          account_id?: string | null
+          api_key?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          platform?: Database["public"]["Enums"]["platform_type"]
+          refresh_token?: string | null
+          store_name?: string | null
+          store_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_connections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_metrics: {
+        Row: {
+          connection_id: string
+          created_at: string
+          currency: string | null
+          id: string
+          metric_date: string
+          metric_type: string
+          metric_value: number
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          metric_date: string
+          metric_type: string
+          metric_value?: number
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          currency?: string | null
+          id?: string
+          metric_date?: string
+          metric_type?: string
+          metric_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_metrics_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "platform_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_resources: {
         Row: {
           content: string | null
@@ -218,7 +312,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      platform_type: "shopify" | "meta" | "google"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -345,6 +439,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      platform_type: ["shopify", "meta", "google"],
+    },
   },
 } as const
