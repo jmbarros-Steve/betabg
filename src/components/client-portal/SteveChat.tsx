@@ -192,7 +192,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       await supabase.from('steve_conversations').delete().eq('id', conversationId);
     }
     
-    // Delete buyer persona
+    // Delete brand brief
     await supabase.from('buyer_personas').delete().eq('client_id', clientId);
     
     await startNewConversation();
@@ -232,7 +232,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 <Sparkles className="h-4 w-4 text-primary" />
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                {isComplete ? 'Buyer Persona completado' : 'Tu asistente de marketing'}
+                {isComplete ? 'Brief de Marca completado ✅' : 'Bulldog Francés PhD • Stanford'}
               </p>
             </div>
           </div>
@@ -307,11 +307,11 @@ export function SteveChat({ clientId }: SteveChatProps) {
         {isComplete ? (
           <div className="text-center py-2">
             <p className="text-sm text-muted-foreground mb-2">
-              ¡Tu buyer persona está listo! Ahora puedes generar anuncios.
+              🐕 ¡WOOF! Tu Brief de Marca está listo. Ahora podemos crear anuncios épicos.
             </p>
             <Button variant="outline" size="sm" onClick={handleRestart}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Crear nuevo buyer persona
+              Crear nuevo Brief
             </Button>
           </div>
         ) : (
