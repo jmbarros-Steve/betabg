@@ -9,11 +9,18 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { passwordSchema } from '@/lib/password-validation';
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter';
 import logo from '@/assets/logo.jpg';
 
-const authSchema = z.object({
+const loginSchema = z.object({
   email: z.string().trim().email('Email inválido').max(255),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').max(100),
+  password: z.string().min(1, 'La contraseña es requerida'),
+});
+
+const signupSchema = z.object({
+  email: z.string().trim().email('Email inválido').max(255),
+  password: passwordSchema,
 });
 
 export default function Auth() {
@@ -33,7 +40,10 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const validation = authSchema.safeParse({ email, password });
+    // Use different schemas for login vs signup
+    const schema = isLogin ? loginSchema : signupSchema;
+    const validation = schema.safeParse({ email, password });
+    
     if (!validation.success) {
       toast.error(validation.error.errors[0].message);
       return;
@@ -133,6 +143,12 @@ export default function Auth() {
                   required
                 />
               </div>
+              {!isLogin && <PasswordStrengthMeter password={password} />}
+              {!isLogin && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Mínimo 8 caracteres, mayúsculas, minúsculas, números y símbolos
+                </p>
+              )}
             </div>
 
             <Button type="submit" variant="hero" size="lg" className="w-full uppercase tracking-wider" disabled={loading}>

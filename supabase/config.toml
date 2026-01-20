@@ -2,3 +2,6 @@ project_id = "jnqivntlkemzcpomkvwv"
 
 [functions.sync-shopify-metrics]
 verify_jwt = false
+
+[functions.store-platform-connection]
+verify_jwt = false
