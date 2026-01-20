@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
   ShoppingCart, Users, PieChart, Bot, Target, 
-  CheckCircle2, ArrowRight, ArrowLeft, Send, ArrowUpLeft
+  CheckCircle2, ArrowRight, ArrowLeft, Send, Dog, Briefcase, GraduationCap, FileText,
+  Linkedin, Rocket, Calculator
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,13 +18,35 @@ import logoShopify from '@/assets/logo-shopify-clean.png';
 import logo from '@/assets/logo.jpg';
 
 // Google Ads Logo
-const GoogleAdsLogo = () => (
-  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none">
+const GoogleAdsLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="none">
     <path d="M3.3 21.7c1.8 1.1 4.2.5 5.3-1.3L17.8 5.6c1.1-1.8.5-4.2-1.3-5.3-1.8-1.1-4.2-.5-5.3 1.3L2 16.4c-1.1 1.8-.5 4.2 1.3 5.3z" fill="#FBBC04"/>
     <path d="M20.7 21.7c-1.8 1.1-4.2.5-5.3-1.3L6.2 5.6c-1.1-1.8-.5-4.2 1.3-5.3 1.8-1.1 4.2-.5 5.3 1.3l9.2 14.8c1.1 1.8.5 4.2-1.3 5.3z" fill="#4285F4"/>
     <circle cx="6" cy="18" r="3.5" fill="#34A853"/>
   </svg>
 );
+
+// WooCommerce Logo
+const WooCommerceLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="#96588a">
+    <path d="M2.227 4.857a1.989 1.989 0 0 0-1.736 1.04A4.158 4.158 0 0 0 0 7.635v6.56c0 .655.157 1.253.49 1.737.334.49.8.752 1.39.752h10.065c.934 0 1.63-.333 2.09-.982.27-.378.476-.86.601-1.45l1.848-8.015c.077-.322.031-.63-.146-.89a.94.94 0 0 0-.764-.407H2.227z"/>
+  </svg>
+);
+
+// Jumpseller Logo placeholder
+const JumpsellerLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="#00a0df">
+    <circle cx="12" cy="12" r="10" />
+    <text x="12" y="16" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">J</text>
+  </svg>
+);
+
+const navLinks = [
+  { name: 'Steve', to: '/auth', icon: Dog },
+  { name: 'Corporativo', to: '/servicios-corporativos', icon: Briefcase, active: true },
+  { name: 'Estudios', to: '/centro-estudios', icon: GraduationCap },
+  { name: 'Blog', to: '/blog', icon: FileText },
+];
 
 const officialPartners = [
   { name: 'Meta', logo: logoMeta },
@@ -32,15 +55,30 @@ const officialPartners = [
   { name: 'Shopify', logo: logoShopify },
 ];
 
-const ecommerceTools = ['Shopify', 'WooCommerce', 'Jumpseller'];
-const leadTools = ['Lusha', 'LinkedIn Ads', 'Waalaxy', 'Apollo', 'Bots IA'];
-const financeTools = ['Clay', 'Chipax', 'BSALE'];
+const ecommerceTools = [
+  { name: 'Shopify', logo: logoShopify },
+  { name: 'WooCommerce', logo: 'woo' },
+  { name: 'Jumpseller', logo: 'jumpseller' },
+];
+
+const leadTools = [
+  { name: 'Lusha', icon: Users },
+  { name: 'LinkedIn Ads', icon: Linkedin },
+  { name: 'Waalaxy', icon: Rocket },
+  { name: 'Apollo', icon: Target },
+  { name: 'Bots IA', icon: Bot },
+];
+
+const financeTools = [
+  { name: 'Clay', icon: PieChart },
+  { name: 'Chipax', icon: Calculator },
+  { name: 'BSALE', icon: ShoppingCart },
+];
 
 const stats = [
-  { value: '5+', label: 'Años de experiencia' },
-  { value: '50+', label: 'Proyectos completados' },
-  { value: '100%', label: 'Clientes satisfechos' },
-  { value: '24/7', label: 'Soporte disponible' },
+  { value: '10+', label: 'Años de experiencia' },
+  { value: '100+', label: 'Proyectos completados' },
+  { value: '97%', label: 'Clientes satisfechos' },
 ];
 
 const revenueRanges = [
@@ -124,10 +162,30 @@ const ServiciosCorporativos = () => {
             <img src={logo} alt="Consultoría BG" className="h-12 w-auto" />
           </Link>
 
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center gap-6">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.name}
+                  to={link.to}
+                  className={`flex items-center gap-2 text-sm uppercase tracking-widest transition-colors ${
+                    link.active 
+                      ? 'text-primary font-medium' 
+                      : 'text-muted-foreground hover:text-primary'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.name}
+                </Link>
+              );
+            })}
+          </div>
+
           <Link to="/">
             <Button variant="outline" size="sm" className="uppercase tracking-wider text-xs">
-              <ArrowUpLeft className="w-4 h-4 mr-2" />
-              Volver
+              Inicio
             </Button>
           </Link>
         </div>
@@ -142,12 +200,13 @@ const ServiciosCorporativos = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Lo que hacemos</p>
+            <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Servicios Corporativos</p>
             <h1 className="text-3xl md:text-5xl font-light mb-4">
               Consultoría de <span className="text-primary font-medium">Escalamiento</span>
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-light">
-              Soluciones integrales para hacer crecer tu negocio de forma sostenible y rentable
+              Ayudamos a empresas ambiciosas a crecer de manera inteligente. 
+              Estrategia + tecnología + ejecución = resultados reales.
             </p>
           </motion.div>
 
@@ -156,7 +215,7 @@ const ServiciosCorporativos = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto mb-16"
+            className="grid grid-cols-3 gap-8 max-w-2xl mx-auto mb-16"
           >
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
@@ -204,14 +263,28 @@ const ServiciosCorporativos = () => {
             {/* E-Commerce */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <ShoppingCart className="w-5 h-5 text-primary" />
                 </div>
-                <h4 className="font-semibold">E-Commerce</h4>
+                <div>
+                  <h4 className="font-semibold">E-Commerce</h4>
+                  <p className="text-xs text-muted-foreground">Tiendas que escalan</p>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {ecommerceTools.map((tool) => (
-                  <Badge key={tool} variant="outline">{tool}</Badge>
+                  <div key={tool.name} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                    <div className="w-8 h-8 flex items-center justify-center">
+                      {tool.logo === 'woo' ? (
+                        <WooCommerceLogo className="w-6 h-6" />
+                      ) : tool.logo === 'jumpseller' ? (
+                        <JumpsellerLogo className="w-6 h-6" />
+                      ) : (
+                        <img src={tool.logo} alt={tool.name} className="w-6 h-6 object-contain" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium">{tool.name}</span>
+                  </div>
                 ))}
               </div>
             </Card>
@@ -219,33 +292,52 @@ const ServiciosCorporativos = () => {
             {/* Lead Management */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
                 </div>
-                <h4 className="font-semibold">Gestión de Leads</h4>
+                <div>
+                  <h4 className="font-semibold">Gestión de Leads</h4>
+                  <p className="text-xs text-muted-foreground">Más prospectos, mejores conversiones</p>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {leadTools.map((tool) => (
-                  <Badge key={tool} variant="outline" className={tool === 'Bots IA' ? 'bg-primary/10 border-primary' : ''}>
-                    {tool === 'Bots IA' && <Bot className="w-3 h-3 mr-1" />}
-                    {tool}
-                  </Badge>
-                ))}
+              <div className="space-y-2">
+                {leadTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <div key={tool.name} className={`flex items-center gap-3 p-2 rounded-lg ${tool.name === 'Bots IA' ? 'bg-primary/10' : 'bg-muted/50'}`}>
+                      <div className="w-8 h-8 flex items-center justify-center">
+                        <Icon className={`w-5 h-5 ${tool.name === 'Bots IA' ? 'text-primary' : 'text-muted-foreground'}`} />
+                      </div>
+                      <span className="text-sm font-medium">{tool.name}</span>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
 
             {/* Financial Strategies */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <PieChart className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <PieChart className="w-5 h-5 text-primary" />
                 </div>
-                <h4 className="font-semibold">Estrategias Financieras</h4>
+                <div>
+                  <h4 className="font-semibold">Estrategias Financieras</h4>
+                  <p className="text-xs text-muted-foreground">Números claros, decisiones inteligentes</p>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {financeTools.map((tool) => (
-                  <Badge key={tool} variant="outline">{tool}</Badge>
-                ))}
+              <div className="space-y-2">
+                {financeTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <div key={tool.name} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                      <div className="w-8 h-8 flex items-center justify-center">
+                        <Icon className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm font-medium">{tool.name}</span>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
           </motion.div>
@@ -256,12 +348,15 @@ const ServiciosCorporativos = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="max-w-2xl mx-auto overflow-hidden">
-              <div className="bg-primary/5 p-6 border-b">
-                <h3 className="text-xl font-semibold text-center flex items-center justify-center gap-2">
-                  <Target className="w-5 h-5 text-primary" />
-                  ¿Cómo podemos ayudarte?
+            <Card className="max-w-2xl mx-auto overflow-hidden border-2 border-primary/20 shadow-lg">
+              <div className="bg-primary/10 p-8 border-b">
+                <h3 className="text-2xl font-semibold text-center flex items-center justify-center gap-3">
+                  <Target className="w-6 h-6 text-primary" />
+                  ¡Conversemos!
                 </h3>
+                <p className="text-center text-muted-foreground mt-2">
+                  Cuéntanos sobre tu negocio y te contactaremos para armar un plan a tu medida
+                </p>
               </div>
               <CardContent className="p-6">
                 <AnimatePresence mode="wait">
