@@ -32,9 +32,24 @@ export default function Auth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
+    async function redirectBasedOnRole() {
+      if (!user) return;
+
+      // Check user role to determine where to redirect
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (roleData?.role === 'client') {
+        navigate('/portal');
+      } else {
+        navigate('/dashboard');
+      }
     }
+
+    redirectBasedOnRole();
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,7 +77,7 @@ export default function Auth() {
           }
         } else {
           toast.success('¡Bienvenido de nuevo!');
-          navigate('/dashboard');
+          // Navigation handled by useEffect based on role
         }
       } else {
         const { error } = await signUp(email, password);
