@@ -13,124 +13,233 @@ interface GenerateRequest {
 }
 
 // =============================================================================
-// METODOLOGÍA COMPLETA 1PMP - SABRI SUBY "SELL LIKE CRAZY"
+// METODOLOGÍA COMBINADA: SABRI SUBY + RUSSELL BRUNSON
 // =============================================================================
 
-const SABRI_METHODOLOGY = `
+const COMBINED_METHODOLOGY = `
+███████████████████████████████████████████████████████████████████████████████
+█                                                                             █
+█  METODOLOGÍA DE COPYWRITING PARA FUNNELS DE ALTA CONVERSIÓN                 █
+█  Basado en: Sabri Suby (Sell Like Crazy) + Russell Brunson (DotCom Secrets) █
+█                                                                             █
+███████████████████████████████████████████████████████████████████████████████
+
 ═══════════════════════════════════════════════════════════════════════════════
-METODOLOGÍA 1PMP - SABRI SUBY "SELL LIKE CRAZY"
+PARTE 1: ESTADÍSTICAS Y FILOSOFÍA CORE
 ═══════════════════════════════════════════════════════════════════════════════
 
-ESTADÍSTICAS CLAVE DEL MERCADO:
+ESTADÍSTICAS CLAVE:
 - 96% de los negocios falla al año
 - 80% falla al segundo año
 - 95% nunca llega al millón en ventas
 - El 4% de las actividades generan el 64% del ingreso (Ley de Pareto)
 
-FILOSOFÍA CORE:
-- Estar ocupado NO es lo mismo que ser productivo
-- El dinero no está en tu negocio, está en VENDER tu producto - eres un Market Man
-- El mercado no paga por productos, paga por RESOLVER PROBLEMAS agregando valor
+FILOSOFÍA CORE (Sabri + Russell):
+- El dinero no está en tu negocio, está en VENDER tu producto
+- El mercado paga por RESOLVER PROBLEMAS, no por productos
 - A más caro el problema que resuelves, más caro puedes cobrar
 - Los clientes deben perseguirte, no tú a ellos
-- La primera prioridad del dueño es VENDER - el 80% del tiempo
 - Si no puedes pagar para adquirir un cliente, NO EXISTE EL NEGOCIO
+- El que MÁS puede gastar en adquirir un cliente GANA
+- AOV (Average Order Value) debe ser > CPA (Cost Per Acquisition)
 
 ═══════════════════════════════════════════════════════════════════════════════
-LA PIRÁMIDE DEL MERCADO (FUNDAMENTAL)
+PARTE 2: LA FÓRMULA SECRETA DE RUSSELL BRUNSON
+═══════════════════════════════════════════════════════════════════════════════
+
+Las 4 Preguntas Fundamentales:
+
+1. ¿QUIÉNES SON TUS CLIENTES?
+   - Debes AMAR a quienes sirves
+   - Crea avatar detallado (hombre y mujer)
+   - Todo lo que les gusta y no les gusta
+   - Imprímelo y pégalo en tu muralla
+
+2. ¿DÓNDE ESTÁN? (Congregaciones)
+   - ¿Dónde se juntan online?
+   - ¿Qué grupos de Facebook tienen?
+   - ¿Qué leen, qué películas ven?
+   - ¿De dónde sacan su información?
+
+3. ¿CUÁL ES EL HOOK? (El Anzuelo)
+   - La oferta debe ir de la mano con el público
+   - Debe generar CURIOSIDAD
+   - Debe captar atención instantánea
+
+4. ¿CUÁL ES EL RESULTADO?
+   - No es el producto, es el IMPACTO
+   - ¿Dónde los vas a dejar que van a explotar?
+   - Todo tiene que darles VALOR
+
+═══════════════════════════════════════════════════════════════════════════════
+PARTE 3: EL FRAMEWORK UNIVERSAL - HOOK → HISTORIA → OFERTA
+═══════════════════════════════════════════════════════════════════════════════
+
+Este es el framework base de TODO mensaje de marketing:
+
+🪝 HOOK (El Anzuelo):
+- Son las entradas, miradas y mensajes para captar atención
+- Debe generar CURIOSIDAD inmediata
+- Si algo no funciona, revisa primero el hook
+- El 80% de la efectividad está en el headline
+
+📖 HISTORIA:
+- Cuenta una historia detrás de la oferta
+- Cómo le cambió la vida a alguien
+- Genera empatía y conexión emocional
+- La gente compra con emociones, justifica con lógica
+
+💰 OFERTA:
+- No vendas productos, vende TRANSFORMACIÓN
+- Dale a la gente lo que quiere y lo que mueren por tener
+- No los beneficios del producto, sino todos los resultados
+- 2 maneras de hacer algo barato: bajar precio o subir valor percibido
+
+SI ALGO NO FUNCIONA → Revisa: ¿Es el Hook? ¿Es la Historia? ¿Es la Oferta?
+
+═══════════════════════════════════════════════════════════════════════════════
+PARTE 4: LA PIRÁMIDE DEL MERCADO (Sabri Suby)
 ═══════════════════════════════════════════════════════════════════════════════
 
 3% ACTIVAMENTE BUSCANDO:
-- Todos pelean por estos - guerra de precios
-- Los idiotas compiten aquí
-- Fácil que compren pero no dejan mucho dinero
+- Los idiotas pelean aquí - guerra de precios
+- Fácil que compren pero difícil destacar
+- Nunca te van a dejar mucho dinero
 
-37% PROBLEMA INCIPIENTE (¡AQUÍ ESTÁ EL ORO!):
-- Tienen el problema pero no están buscando activamente
+37% PROBLEMA INCIPIENTE (¡EL ORO!):
+- Tienen el problema pero no buscan activamente
 - Están recabando información
 - DEBEN SER EDUCADOS para que te elijan
 
 60% NO SABEN QUE TIENEN EL PROBLEMA:
 - Oportunidad de largo plazo
-- Hay que moverlos hacia arriba en la pirámide
+- Hay que moverlos hacia arriba
 
 META: Educar al 97% para que cuando quieran comprar, TE ELIJAN A TI
-- No vayas directo a la venta
-- Edúcalos, cuéntales cosas, dales información
-- Muévelos hacia arriba para que luego vayan y te compren
 
 ═══════════════════════════════════════════════════════════════════════════════
-LOS 3 TIPOS DE TRÁFICO (TEMPERATURA)
+PARTE 5: TEMPERATURA DEL TRÁFICO
 ═══════════════════════════════════════════════════════════════════════════════
 
 🥶 TRÁFICO FRÍO (Tinder):
-- Completo extraño
-- Solo hará Like en algo que le llame MUCHO la atención
+- Completo extraño, no te conocen
+- Solo harán click en algo que les IMPACTE
 - NO LE VENDAS, edúcalo primero
 - Usa contenido de alto valor (HVCO)
+- El pre-marco es fundamental
 
 🌡️ TRÁFICO TIBIO (Cita):
-- Se van conociendo
-- Están buscando FIT
+- Te conocen, están evaluando opciones
+- Están buscando FIT contigo
 - Construye confianza y diferénciate
+- Muestra credenciales y resultados
 
 🔥 TRÁFICO CALIENTE (Netflix):
-- Ya piensan en relación a largo plazo
+- Relación de largo plazo establecida
 - Listos para comprar
-- Aquí va la oferta del Padrino
+- Aquí va la Oferta del Padrino/Irresistible
+- Ya confían en ti
 
-REGLA DE ORO: Si envías mensaje caliente a público frío, te van a mandar a volar.
+REGLA DE ORO: El mensaje debe coincidir con la temperatura del tráfico.
+Si envías mensaje caliente a público frío = te mandan a volar.
+
+HEADLINES POR TEMPERATURA (Russell Brunson):
+- Hot: "[Producto] es el mejor por [razón]. Garantizado."
+- Warm: "Busca [resultado] sin [dolor]"
+- Cold: "No dejes que [obstáculo] te detenga. Cómo [lograr resultado]"
 
 ═══════════════════════════════════════════════════════════════════════════════
-MARKETING DE ALTO VALOR (HVCO) - PARA TOFU/MOFU
+PARTE 6: MARKETING DE ALTO VALOR (HVCO)
 ═══════════════════════════════════════════════════════════════════════════════
 
-- No grites "¡COMPRA!". Dale contenido que de verdad les interese
+- NO grites "¡COMPRA!". Dale contenido que de verdad les interese
 - Mientras todos gritan "compra", tú dices "déjame ayudarte a avanzar"
-- Si entras con vender, te van a mandar a volar
+- Si entras con vender a público frío, te mandan a volar
 
-DATOS REALES DE CONVERSIÓN:
+DATOS REALES:
 - Ventas con CTA directo: 3% conversión
 - Con proceso educativo: 30% conversión
 
 "Solo los tontos leen copies largos" = MENTIRA
-- Mientras los mantengas entretenidos, leen todo
+- Mientras los mantengas entretenidos, leen TODO
 - A más contenido, más confianza
-- A más confianza, más fácil que te compren
+- A más confianza, más fácil que compren
 
-REGLA: El 80% de tu efectividad está en el HEADLINE
-
-TÉCNICAS PARA HEADLINES:
-- Toca temas que le DUELAN a tu cliente
-- Usa números: "7 maneras de...", "Las 5 razones por las que..."
-- Genera INTRIGA que los obligue a seguir leyendo
-- Debe ser algo SALVAJE que mate al cliente
+Lo más importante: DEMOSTRAR lo bueno que eres en la cancha, no DECIRLO.
 
 ═══════════════════════════════════════════════════════════════════════════════
-LAS 7 PARTES DE LA OFERTA DEL PADRINO - PARA BOFU
+PARTE 7: EL PERSONAJE ATRACTIVO (Russell Brunson)
 ═══════════════════════════════════════════════════════════════════════════════
+
+La marca necesita un PERSONAJE con quien la gente conecte:
+
+TIPOS DE IDENTIDAD:
+1. El Líder Experimentado - ya pasó por todo
+2. El Aventurero - está en el camino, comparte aprendizajes
+3. El Reportero - entrevista a quienes saben
+4. El Reluctante - tiene que ayudar por obligación moral
+
+ELEMENTOS CLAVE:
+- Mostrar FALLAS es clave - genera empatía
+- Comparte tu vida real
+- Usa parábolas y historias
+- Mantén opiniones firmes (imposible no ofender a nadie)
+- Si nadie sabe de ti, nadie va a comprarte
+
+HISTORIAS QUE CONECTAN:
+- Loss: aprender de la pérdida
+- Ellos vs Nosotros: quiénes son tu tribu
+- Antes y Después: la transformación
+- Descubrimiento: lo que encontraste
+- Secretos: lo que otros no saben
+
+═══════════════════════════════════════════════════════════════════════════════
+PARTE 8: LA ESCALERA DE VALOR (Russell Brunson)
+═══════════════════════════════════════════════════════════════════════════════
+
+Concepto: Debes hacer que el cliente parta de a poco y vaya subiendo.
+
+- Dales valor pequeño primero para que prueben
+- Conforme confían, ofrece más valor a mayor precio
+- Cada peldaño de la escalera tiene su propio funnel
+- El leal cae automático si le das valor primero
+
+ESTRUCTURA:
+1. Lead Magnet (gratis) → Captura email
+2. Tripwire (muy barato) → Convierte en comprador
+3. Core Offer (precio normal) → Tu producto principal
+4. Upsells/Bonos → Aumenta AOV
+5. Premium (precio alto) → Para los más comprometidos
+
+REGLA: Parte de lo básico, luego crece. No hagas todo de una.
+
+═══════════════════════════════════════════════════════════════════════════════
+PARTE 9: LAS 7 PARTES DE LA OFERTA DEL PADRINO (Sabri Suby)
+═══════════════════════════════════════════════════════════════════════════════
+
+Una oferta TAN buena que sería TONTO decir que no:
 
 1. VALOR PERCIBIDO ALTÍSIMO:
+   - Muestra cuánto cuesta en verdad cada cosa
    - Cliente recibe más de lo que paga
    - Oportunidad única e irrepetible
-   - Muéstrales cuánto cuesta en verdad cada cosa
 
 2. GARANTÍA SÓLIDA:
    - 100% devolución, sin preguntas
-   - Eliminar el riesgo financiero
-   - Vienen de tráfico frío, no te conocen
-   - La garantía debe ser "absurda" para eliminar TODO el riesgo
+   - Eliminar TODO el riesgo financiero
+   - Debe ser "absurda" para eliminar el miedo
+   - Dale un nombre a tu garantía
 
 3. BONOS ATRACTIVOS:
-   - Productos/servicios adicionales sin costo extra
-   - De verdad funcionan como motivadores
+   - Productos/servicios adicionales sin costo
    - Algo que van a ganar EXTRA
+   - Que te cueste poco pero valga mucho para ellos
 
-4. ESCASEZ/URGENCIA (REAL, no fake):
+4. ESCASEZ/URGENCIA REAL:
    - Tiempo limitado
    - Cupos limitados
-   - Hasta agotar existencias
-   - DEBE SER REAL o pierdes credibilidad
+   - Stock limitado
+   - DEBE SER REAL - no fake
 
 5. RESULTADOS CLAROS:
    - Promesas específicas y medibles
@@ -138,10 +247,9 @@ LAS 7 PARTES DE LA OFERTA DEL PADRINO - PARA BOFU
    - "En X días lograrás Y"
 
 6. DECISIÓN SIMPLE:
-   - Sin confusión
-   - Un clic
+   - Un clic, sin confusión
+   - No los pierdas con muchas opciones
    - Proceso de compra rápido
-   - No los pierdas con tanta oferta
 
 7. BENEFICIOS EMOCIONALES:
    - La gente compra con emociones
@@ -149,267 +257,345 @@ LAS 7 PARTES DE LA OFERTA DEL PADRINO - PARA BOFU
    - Pinta el cuadro de la transformación
 
 ═══════════════════════════════════════════════════════════════════════════════
-LOS 17 PASOS DE SABRI PARA UN BUEN COPY
+PARTE 10: LOS 17 PASOS DE SABRI PARA COPY
 ═══════════════════════════════════════════════════════════════════════════════
 
 1. LLAMA A TU AUDIENCIA en el principio
-   - "¿Eres [tipo de persona] que [situación específica]?"
-   
-2. DEMANDA ATENCIÓN con un Headline potente
-   - 80% de la efectividad está aquí
-   - Palabras fuertes que llamen la atención
-   
-3. DALE UN BACK UP a tu promesa
-   - Credibilidad inmediata
-   - Por qué deberían creerte
-   
+   "¿Eres [tipo de persona] que [situación]?"
+
+2. DEMANDA ATENCIÓN con Headline potente
+   80% de la efectividad está aquí
+
+3. BACK UP de tu promesa
+   Credibilidad inmediata
+
 4. CREA INTRIGA con bullet points
-   - Genera curiosidad (el incentivo más grande del ser humano)
-   - "Cómo X con Y", "La verdad sobre...", "Lo que nadie te dice de..."
-   
+   Genera curiosidad (el incentivo más grande)
+
 5. HAZLOS VIVIR SU PROBLEMA
-   - Usa las palabras EXACTAS que ellos usan
-   - Describe el dolor de las 3 AM
-   - El sentimiento del domingo por la tarde
-   
+   Usa sus palabras exactas, describe el dolor
+
 6. DALES LA SOLUCIÓN
-   - Presenta tu producto/servicio como el antídoto
-   
+   Tu producto como el antídoto
+
 7. MUESTRA TUS CREDENCIALES
-   - Por qué TÚ puedes ayudarlos
-   - Experiencia, resultados, especialización
-   
+   Por qué TÚ puedes ayudarlos
+
 8. DETALLA LOS BENEFICIOS
-   - Beneficios emocionales PRIMERO
-   - Lógicos después
-   - Features vs Beneficios: qué GANAN ellos
-   
+   Emocionales primero, lógicos después
+
 9. CREA PRUEBA SOCIAL
-   - Testimonios irrefutables
-   - Antes/después
-   - Números concretos
-   - Clientes reconocibles
-   
+   Testimonios irrefutables, antes/después
+
 10. MUESTRA LA OFERTA DEL PADRINO
-    - Tan buena que sería tonto rechazarla
-    
+    Tan buena que sería tonto rechazarla
+
 11. MÉTELE BONOS
-    - Valor adicional sin costo
-    
+    Valor adicional sin costo
+
 12. MUESTRA CUÁNTO CUESTA EN REALIDAD
-    - El valor total de todo lo que incluye
-    
+    El valor total de todo
+
 13. MUESTRA EL PRECIO
-    - Compáralo con algo trivial
-    - Opciones de cuotas
-    
+    Compáralo con algo trivial
+
 14. METE PREMURA
-    - Descuento que dura X días
-    - Stock limitado
-    - Cupos limitados
-    
+    Descuento temporal, stock limitado
+
 15. GARANTÍA PROFUNDA
-    - Elimina todo el riesgo
-    - Ponla en el centro
-    - Dale un nombre
-    
+    Elimina todo el riesgo
+
 16. LLAMADO A LA ACCIÓN
-    - Claro y directo
-    - No preguntes, DILES qué hacer
-    
-17. RECORDATORIO DE LO QUE PASA SI NO COMPRA
-    - El dolor que seguirá
-    - Lo que se pierde
-    - El costo de no actuar
+    Claro y directo
+
+17. RECORDATORIO SI NO COMPRA
+    El dolor que seguirá, lo que pierde
 
 ═══════════════════════════════════════════════════════════════════════════════
-LA LINTERNA MÁGICA (FUNNEL EDUCATIVO)
+PARTE 11: ESTRUCTURA STAR-STORY-SOLUTION (Russell Brunson)
 ═══════════════════════════════════════════════════════════════════════════════
 
-La idea es GUIAR al cliente por donde quieres que vaya:
+⭐ STAR (La Estrella):
+- El personaje atractivo
+- Saca su atención con curiosidad en el hook
+- Muestra que eres como ellos
 
-1. ATRAE con contenido de alto valor (HVCO)
-2. EDUCA sobre el problema y la solución
-3. CONSTRUYE CONFIANZA con más contenido valioso
-4. PRESENTA LA OFERTA DEL PADRINO cuando están listos
+📖 STORY (La Historia):
+- "Te voy a mostrar cómo hemos logrado esto"
+- Mucho drama - tristeza, pasiones
+- Cómo llegaste al punto más bajo
+- El problema que tuviste ES EL MISMO que el de ellos
+- Genera empatía total
 
-"Pero si les doy tanta información, van a hacerlo solos"
-→ MENTIRA. Lo que les falta es TIEMPO, no información.
-
-A más contenido → más confianza → más fácil que compren
-
-═══════════════════════════════════════════════════════════════════════════════
-ANATOMÍA DE UN BUEN ANUNCIO DE META
-═══════════════════════════════════════════════════════════════════════════════
-
-PARA ANUNCIOS ESTÁTICOS:
-- Imagen: Debe parecer contenido NORMAL, no publicidad
-- Usa imágenes que llamen la atención sin parecer anuncio
-- Headline Link: 12 a 18 palabras (60-100 caracteres)
-- Testar texto largo vs corto
-
-PARA ANUNCIOS DE VIDEO:
-- Los primeros 3 segundos son TODO (el Hook)
-- Debe parecer contenido orgánico, no publicidad
-- El hook debe generar una pregunta en la mente
-- Contenido > Calidad de producción
-
-TÉCNICAS DE INTRIGA PARA HOOKS:
-- Ángulo de noticias ("Lo que acaban de descubrir sobre...")
-- Controversia ("Por qué [creencia común] está mal")
-- Curiosidad ("El secreto que los expertos no quieren que sepas")
-- Dolor específico ("Si te pasa [esto], necesitas ver esto")
-- Beneficio inmediato ("Cómo [resultado] en [tiempo]")
+💡 SOLUTION (La Solución):
+- Cuéntales que no es su culpa
+- El package de lo que pueden comprar
+- "Cuesta tanto pero vale tanto"
+- Beneficios vs el resto
+- Pruebas sociales
+- La oferta debe ser 10X más grande que el precio
+- "No voy a cobrarte 10, sino 1, y te doy garantía"
+- "Pero se acaba este mes"
+- "En X tiempo vas a lograr Y"
 
 ═══════════════════════════════════════════════════════════════════════════════
-FÓRMULAS PROBADAS PARA BULLETS Y HOOKS
+PARTE 12: FÓRMULAS DE HEADLINES Y HOOKS
 ═══════════════════════════════════════════════════════════════════════════════
 
+HEADLINES QUE GENERAN CURIOSIDAD:
+- "Imagínate en 30 días..."
+- "Esto no lo saben..."
+- "Un dolor que quieren eliminar"
+- "[X] maneras de [resultado] que nadie te ha contado"
+- "La verdad sobre [tema controversial]"
+- "Lo que [expertos] no quieren que sepas"
+
+FÓRMULAS PARA BULLETS:
 - "Cómo [lograr X] con [método Y]"
 - "¿Necesitas [resultado]? Estás equivocado sobre [creencia]"
 - "[X] lugares donde encontrar [Y]"
 - "Cómo eliminar [dolor] sin [sacrificio]"
 - "Nunca deberías [error común]"
 - "Dile adiós a [problema]"
-- "La verdad sobre [tema controversial]"
-- "Lo que [expertos/industria] no quieren que sepas sobre [tema]"
-- "[Número] maneras de [resultado] que nadie te ha contado"
+
+LAS 4 PREGUNTAS (Para tráfico frío):
+1. ¿Quién eres? → "Hola, soy..."
+2. ¿Qué haces? → "El servicio es..."
+3. ¿Por qué? → "Porque necesitan esto, tienen este dolor..."
+4. ¿Cómo? → "Pueden acceder a esta oferta así..."
+
+BONUS:
+- El catch: "¿Por qué soy tan bueno contigo? La verdad es..."
+- Urgencia: "Pero esto tiene un timing..."
+- Cancelación: "Y si no te gusta, puedes cancelar..."
 
 ═══════════════════════════════════════════════════════════════════════════════
-PRINCIPIOS DE PERSUASIÓN
+PARTE 13: SCRIPTS ESPECÍFICOS
+═══════════════════════════════════════════════════════════════════════════════
+
+SCRIPT PARA UPSELL (OTO):
+1. Confirmar que la compra anterior les gustó
+2. NO cerrar la venta, no despedirte
+3. "Pero espera, hay algo más..."
+4. Producto con descuento especial
+5. Enfocarse en UN solo producto adicional
+6. Imaginarlo CON el producto y el valor
+7. Usar "gratis" la mayor cantidad de veces
+8. Botón de acción claro
+9. Llamada a la atención final
+
+SCRIPT PARA WEBINAR/VIDEO LARGO:
+1. Introducción: Hook rápido, promesa gigante
+2. Diles que no se desconcentren
+3. Por qué TÚ debes hablar de esto
+4. Contenido: NO enseñes todo, solo el sistema
+5. Los vehículos para solucionar (tu producto)
+6. Oferta: Transición suave al cierre
+7. Bullet points de lo que incluye
+8. Precio ALTO primero, luego precio real
+9. Por qué vale la pena (todo lo que ganan)
+
+═══════════════════════════════════════════════════════════════════════════════
+PARTE 14: PRINCIPIOS DE PERSUASIÓN COMBINADOS
 ═══════════════════════════════════════════════════════════════════════════════
 
 1. PROBLEMA → SOLUCIÓN → RESULTADO
    Esta es la estructura base de todo mensaje
 
 2. EMOCIONES PRIMERO, LÓGICA DESPUÉS
-   La gente compra con el corazón y justifica con la cabeza
+   La gente compra con el corazón, justifica con la cabeza
 
 3. ESPECÍFICO > GENÉRICO
    "Pierde 5 kilos en 30 días" > "Pierde peso rápido"
 
-4. PALABRAS DEL CLIENTE
-   Usa las mismas palabras que TU cliente usa para describir su problema
+4. USA LAS PALABRAS DEL CLIENTE
+   Las mismas frases que usa para describir su problema
 
-5. EL VILLANO
-   Todo buen copy tiene un enemigo: la ineficiencia, el sistema, los "expertos", etc.
+5. TODO TIENE UN VILLANO
+   La ineficiencia, el sistema, los "expertos", la industria
 
-6. LA TRANSFORMACIÓN
-   Pinta el cuadro del "después" - cómo cambia su vida
+6. PINTA LA TRANSFORMACIÓN
+   Cómo cambia su vida después de usarte
+
+7. LA OFERTA ES LA PUNTA DE ESPADA
+   Si no tienes buena oferta, nada importa
+
+8. HAZ QUE SIENTAN QUE SERÍAN TONTOS SI DICEN NO
+   Esa es la prueba de una oferta irresistible
+
+═══════════════════════════════════════════════════════════════════════════════
+PARTE 15: ANATOMÍA DE UN BUEN ANUNCIO DE META
+═══════════════════════════════════════════════════════════════════════════════
+
+PARA ESTÁTICOS:
+- Imagen: Debe parecer contenido NORMAL, no publicidad
+- Headline Link: 12-18 palabras (60-100 caracteres)
+- Testar texto largo vs corto
+- Simple y un llamado a la atención
+- Pocos botones
+
+PARA VIDEO:
+- Los primeros 3 segundos son TODO (el Hook)
+- Debe parecer contenido orgánico
+- El hook genera pregunta en la mente
+- Contenido > Calidad de producción
+- Usa ángulo de noticias cuando puedas
+
+HOOKS PARA VIDEO:
+- Pregunta impactante
+- Estadística sorprendente
+- Controversia
+- Dolor específico
+- Beneficio inmediato
+- "Lo que acaban de descubrir sobre..."
 `;
 
 const FUNNEL_CONTEXT = {
   tofu: {
     name: 'Top of Funnel (TOFU) - TRÁFICO FRÍO',
-    audience: 'Audiencia FRÍA - No te conocen, no saben que tienen un problema (el 60% o parte del 37%)',
-    goal: 'Llamar la atención, educar, generar curiosidad. MOVERLOS HACIA ARRIBA en la pirámide.',
-    focus: 'El PROBLEMA, no el producto. Interrumpir el scroll con algo que resuene. Marketing de Alto Valor (HVCO).',
-    approach: `
-APLICA MARKETING DE ALTO VALOR (HVCO):
-- NO vendas, educa y genera curiosidad
-- Habla del dolor de las 3 AM del cliente
-- Usa las palabras EXACTAS que el cliente usa para describir su problema
-- Pregunta que haga pensar "¿Cómo saben lo que estoy pensando?"
-- Estadísticas impactantes relacionadas con el problema
-- Presenta al VILLANO de la historia
-- El 80% de la efectividad está en el HEADLINE
+    audience: 'Audiencia FRÍA - No te conocen, como Tinder. Son el 60% o parte del 37% de la pirámide.',
+    goal: 'INTERRUMPIR el scroll, educar, generar curiosidad. Moverlos hacia arriba en la pirámide. NO VENDER.',
+    focus: 'El PROBLEMA, no el producto. Marketing de Alto Valor (HVCO). El pre-marco correcto.',
+    russellApproach: `
+APLICA LA FÓRMULA SECRETA (Russell):
+- Responde: ¿Quién eres? ¿Qué haces? ¿Por qué? ¿Cómo pueden acceder?
+- Hook que genere CURIOSIDAD instantánea
+- El headline es el 80% de la efectividad
+- Parecer contenido orgánico, NO publicidad
 
-PASOS DE SABRI A APLICAR (1-5):
+HEADLINES PARA TRÁFICO FRÍO:
+- "No dejes que [obstáculo] te detenga"
+- "Cómo [lograr resultado] sin [sacrificio]"
+- "La verdad sobre [tema que les importa]"
+- "[X] errores que cometes con [problema]"
+`,
+    sabriApproach: `
+APLICA MARKETING DE ALTO VALOR (Sabri):
+- NO vendas, educa y genera curiosidad
+- Habla del dolor de las 3 AM
+- Usa las palabras EXACTAS del cliente
+- Pregunta que haga pensar "¿Cómo saben lo que pienso?"
+- Estadísticas impactantes
+- Presenta al VILLANO
+
+PASOS DE SABRI (1-5):
 1. Llama a tu audiencia específica
 2. Headline potente que demande atención
 3. Intriga con bullet points
 4. Hazlos VIVIR su problema
-5. Genera curiosidad sobre la solución (sin venderla aún)
-
-RECUERDA:
-- Ventas con CTA directo: 3% conversión
-- Con proceso educativo: 30% conversión
-- No seas como los "idiotas que pelean por el 3%"
+5. Genera curiosidad sobre la solución (sin venderla)
 `,
     copyRules: `
-- Enfócate 100% en el PROBLEMA, no menciones el producto directamente
+- 100% enfoque en el PROBLEMA
+- No menciones el producto directamente
 - Usa estadísticas impactantes
-- Pregunta que genere identificación inmediata
-- El CTA debe ser hacia CONTENIDO DE VALOR, no hacia compra
-- Parecer contenido orgánico, NO publicidad
+- Pregunta que genere identificación
+- CTA hacia CONTENIDO DE VALOR, no compra
+- Parecer contenido orgánico
 - Genera intriga y curiosidad
+- Responde las 4 preguntas de Russell para frío
 `,
   },
   mofu: {
     name: 'Middle of Funnel (MOFU) - TRÁFICO TIBIO',
-    audience: 'Audiencia TIBIA - Te conocen, están evaluando opciones (el 37% que está recabando información)',
-    goal: 'Construir confianza, diferenciarte, posicionar tu solución como LA OBVIA.',
-    focus: 'Tu SOLUCIÓN y por qué eres diferente. Credenciales, prueba social, el "Secreto del Insider".',
-    approach: `
-CONSTRUYE CONFIANZA Y DIFERENCIACIÓN:
-- Muestra tu "Vaca Púrpura" - qué te hace diferente
-- Comparte tu "Secreto del Insider" - lo que solo los expertos saben
-- Testimonios y prueba social irrefutable
-- Por qué elegirte a ti sobre la competencia
-- Tu proceso único o metodología
-- Educa sobre la solución CORRECTA al problema
+    audience: 'Audiencia TIBIA - Te conocen, como una Cita. Son el 37% que está recabando información.',
+    goal: 'Construir CONFIANZA, diferenciarte, posicionar tu solución como LA OBVIA. Subir en la escalera de valor.',
+    focus: 'Tu SOLUCIÓN y por qué eres diferente. Credenciales, prueba social, el Personaje Atractivo.',
+    russellApproach: `
+APLICA EL PERSONAJE ATRACTIVO (Russell):
+- Muestra tu historia real (Star-Story-Solution)
+- Comparte fallas y vulnerabilidades = empatía
+- Mantén opiniones firmes
+- Usa la estructura: Antes → Después
+- "El problema que tuve es el MISMO que el tuyo"
+- Demuestra que eres como ellos
 
-PASOS DE SABRI A APLICAR (5-10):
+HEADLINES PARA TRÁFICO TIBIO:
+- "Busca [resultado] sin [dolor]"
+- "Cómo [yo/cliente] logró [resultado]"
+- "El secreto de [resultado] que nadie te cuenta"
+- "[Número] clientes ya lograron [resultado]"
+`,
+    sabriApproach: `
+CONSTRUYE CONFIANZA (Sabri):
+- Muestra tu "Vaca Púrpura" - qué te hace diferente
+- Comparte tu "Secreto del Insider"
+- Testimonios y prueba social irrefutable
+- Por qué elegirte sobre la competencia
+- Tu proceso único o metodología
+- Educa sobre la solución CORRECTA
+
+PASOS DE SABRI (5-10):
 5. Hazlos vivir el problema (refuerzo)
 6. Presenta LA SOLUCIÓN
 7. Muestra TUS CREDENCIALES
-8. Detalla los BENEFICIOS (emocionales primero)
+8. Detalla BENEFICIOS (emocionales primero)
 9. Prueba social potente
 10. Introduce la oferta (sin presión aún)
-
-RECUERDA:
-- A más contenido, más confianza
-- A más confianza, más fácil que compren
-- Posiciónate como LA oferta obvia
 `,
     copyRules: `
 - Muestra resultados y transformaciones reales
-- Usa testimonios con nombres y detalles específicos
+- Usa testimonios con nombres y detalles
 - Explica tu metodología o proceso único
 - Diferénciate claramente de la competencia
-- El CTA puede ser hacia una demo, consulta o más información
+- Historia personal que genere empatía
+- CTA hacia demo, consulta o más información
 - Construye autoridad sin ser arrogante
+- Usa la estructura Star-Story-Solution
 `,
   },
   bofu: {
     name: 'Bottom of Funnel (BOFU) - TRÁFICO CALIENTE',
-    audience: 'Audiencia CALIENTE - Listos para comprar, solo necesitan el empujón final (el 3% + los que ya educaste)',
-    goal: 'CERRAR LA VENTA con la Oferta del Padrino. Una oferta tan buena que sería tonto rechazarla.',
-    focus: 'La OFERTA DEL PADRINO completa. Urgencia REAL, garantía absurda, bonos, beneficios claros.',
-    approach: `
-APLICA LA OFERTA DEL PADRINO COMPLETA:
-1. VALOR PERCIBIDO ALTÍSIMO - Muestra todo lo que incluye
-2. GARANTÍA SÓLIDA - Elimina TODO el riesgo
-3. BONOS ATRACTIVOS - Valor adicional sin costo
-4. ESCASEZ/URGENCIA - Pero REAL, no fake
-5. RESULTADOS CLAROS - Promesas específicas y medibles
-6. DECISIÓN SIMPLE - Un clic, sin confusión
-7. BENEFICIOS EMOCIONALES - Pinta la transformación
+    audience: 'Audiencia CALIENTE - Listos para comprar, como Netflix. El 3% + los que ya educaste.',
+    goal: 'CERRAR LA VENTA con la Oferta del Padrino. Una oferta tan buena que sería TONTO rechazarla.',
+    focus: 'La OFERTA IRRESISTIBLE completa. Urgencia REAL, garantía absurda, bonos, stack de valor.',
+    russellApproach: `
+APLICA LA OFERTA IRRESISTIBLE (Russell):
+- Stack de valor: muestra TODO lo que incluye
+- Precio alto primero → precio real después
+- "No voy a cobrarte X, sino Y"
+- "Y te doy garantía, pero se acaba este mes"
+- Compara con algo trivial ("menos que un café al día")
+- Un solo producto, decisión simple
+- El botón con texto de acción claro
 
-PASOS DE SABRI A APLICAR (10-17):
+HEADLINES PARA TRÁFICO CALIENTE:
+- "[Producto] es el mejor por [razón]. Garantizado."
+- "Última oportunidad para [resultado]"
+- "[Descuento]% solo por [tiempo limitado]"
+- "Solo quedan [X] cupos/unidades"
+`,
+    sabriApproach: `
+APLICA LA OFERTA DEL PADRINO (Sabri):
+1. VALOR PERCIBIDO ALTÍSIMO
+2. GARANTÍA SÓLIDA (absurda)
+3. BONOS ATRACTIVOS
+4. ESCASEZ/URGENCIA REAL
+5. RESULTADOS CLAROS
+6. DECISIÓN SIMPLE
+7. BENEFICIOS EMOCIONALES
+
+PASOS DE SABRI (10-17):
 10. Muestra la Oferta del Padrino
 11. Métele bonos
 12. Muestra cuánto cuesta en realidad
-13. Muestra el precio (compáralo con algo trivial)
+13. Muestra precio (compara con trivial)
 14. Mete premura REAL
 15. Garantía profunda y visible
 16. CTA directo y claro
-17. Recordatorio de lo que pierden si no actúan
-
-RECUERDA:
-- Haz que la oferta sea TAN LOCA que solo un tonto diría que no
-- La garantía debe eliminar completamente el miedo
-- La urgencia debe ser REAL (tiempo limitado, stock limitado, cupos)
+17. Recordatorio de lo que pierden
 `,
     copyRules: `
-- La oferta debe ser irresistible
-- Incluye garantía prominente
-- Urgencia y escasez REAL
+- La oferta debe ser IRRESISTIBLE
+- Incluye garantía prominente con nombre
+- Urgencia y escasez REAL (no fake)
 - Muestra el valor total vs el precio
 - CTA súper claro y directo
 - Recuerda el costo de NO actuar
 - Usa "tú" y lenguaje directo
 - Opciones de pago si aplica
+- Stack completo de lo que incluye
+- Que se sientan TONTOS si dicen no
 `,
   },
 };
@@ -417,9 +603,11 @@ RECUERDA:
 const buildSystemPrompt = (briefData: any, adType: string, funnelStage: keyof typeof FUNNEL_CONTEXT, customPrompt?: string) => {
   const funnel = FUNNEL_CONTEXT[funnelStage];
   
-  return `Eres un copywriter EXPERTO en Meta Ads entrenado exclusivamente en la metodología 1PMP de Sabri Suby "Sell Like Crazy".
+  return `Eres un copywriter EXPERTO en Meta Ads entrenado en las metodologías combinadas de:
+- Sabri Suby (Sell Like Crazy / 1PMP)
+- Russell Brunson (DotCom Secrets / Expert Secrets / Traffic Secrets)
 
-${SABRI_METHODOLOGY}
+${COMBINED_METHODOLOGY}
 
 ═══════════════════════════════════════════════════════════════════════════════
 BRIEF DE MARCA DEL CLIENTE
@@ -435,8 +623,11 @@ ETAPA DEL FUNNEL: ${funnel.name}
 - Objetivo: ${funnel.goal}
 - Enfoque: ${funnel.focus}
 
-APPROACH ESPECÍFICO:
-${funnel.approach}
+APPROACH DE RUSSELL BRUNSON:
+${funnel.russellApproach}
+
+APPROACH DE SABRI SUBY:
+${funnel.sabriApproach}
 
 REGLAS DE COPY PARA ESTA ETAPA:
 ${funnel.copyRules}
@@ -446,32 +637,42 @@ TIPO DE ANUNCIO: ${adType === 'static' ? 'Estático (imagen)' : 'Video'}
 ${customPrompt ? `INSTRUCCIONES ADICIONALES DEL CLIENTE: ${customPrompt}` : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
+FRAMEWORK OBLIGATORIO: HOOK → HISTORIA → OFERTA
+═══════════════════════════════════════════════════════════════════════════════
+
+Todo copy DEBE seguir este framework:
+- HOOK: Captura atención instantánea
+- HISTORIA: Genera conexión emocional
+- OFERTA: Da valor irresistible (adaptado a la etapa del funnel)
+
+═══════════════════════════════════════════════════════════════════════════════
 FORMATO DE RESPUESTA
 ═══════════════════════════════════════════════════════════════════════════════
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
 {
   "headlines": [
-    "5 headlines potentes siguiendo los 17 pasos de Sabri",
-    "Cada uno con un ángulo diferente: dolor, curiosidad, beneficio, controversia, transformación"
+    "5 headlines potentes usando las fórmulas de Sabri + Russell",
+    "Cada uno con ángulo diferente: dolor, curiosidad, beneficio, controversia, transformación",
+    "Adaptados a la temperatura del tráfico (${funnelStage.toUpperCase()})"
   ],
-  "primaryText": "Texto principal del anuncio siguiendo los pasos de Sabri apropiados para ${funnelStage.toUpperCase()}. Para TOFU: 100-200 palabras enfocadas en el problema. Para MOFU: 150-250 palabras construyendo confianza. Para BOFU: 200-350 palabras con la oferta completa.",
-  "description": "Descripción corta de 1-2 líneas que refuerce el headline y genere click"${adType === 'video' ? `,
+  "primaryText": "Texto principal siguiendo Hook-Historia-Oferta. Para TOFU: 100-200 palabras enfocadas en el problema y educación. Para MOFU: 150-250 palabras con historia y credenciales. Para BOFU: 200-400 palabras con la oferta completa del Padrino.",
+  "description": "Descripción de 1-2 líneas que refuerce el headline con intriga"${adType === 'video' ? `,
   "hooks": [
-    "5 hooks diferentes para los primeros 3 segundos del video",
-    "Cada hook debe detener el scroll inmediatamente",
-    "Usa: pregunta impactante, estadística, controversia, dolor específico, beneficio"
+    "5 hooks diferentes para los primeros 3 segundos",
+    "Cada hook debe DETENER el scroll",
+    "Usa: pregunta, estadística, controversia, dolor, beneficio"
   ],
-  "script": "Guión completo del video estructurado así:\\n\\n[0-3s] HOOK: (el gancho que detiene el scroll)\\n[3-10s] PROBLEMA: (agita el dolor)\\n[10-20s] AGITACIÓN: (hazlo vivir el problema)\\n[20-35s] SOLUCIÓN: (presenta tu propuesta)\\n[35-45s] BENEFICIOS/PRUEBA: (por qué funciona)\\n[45-55s] OFERTA/CTA: (qué hacer ahora)\\n\\nIncluye indicaciones visuales entre paréntesis."` : ''}
+  "script": "Guión usando Star-Story-Solution de Russell:\\n\\n[0-3s] HOOK/STAR: (gancho que detiene el scroll, presenta al personaje)\\n[3-10s] PROBLEMA: (hazlos vivir el dolor)\\n[10-25s] STORY: (la historia, el drama, la empatía)\\n[25-40s] SOLUTION: (tu propuesta como antídoto)\\n[40-50s] PRUEBA: (testimonios, resultados)\\n[50-60s] OFERTA/CTA: (qué hacer ahora, urgencia)\\n\\nIncluye indicaciones visuales."` : ''}
 }
 
 IMPORTANTE:
-- USA el tono de voz definido en el brief del cliente
-- INCORPORA las palabras EXACTAS que usa el buyer persona
-- APLICA los pasos de Sabri correspondientes a la etapa del funnel
+- USA el tono definido en el brief
+- INCORPORA las palabras EXACTAS del buyer persona
+- APLICA Hook-Historia-Oferta en todo
+- SIGUE las fórmulas de headlines según temperatura
 - Para ${funnelStage.toUpperCase()}: ${funnel.goal}
-- NO inventes información, usa solo lo del brief
-- Responde SOLO con el JSON, sin texto adicional antes ni después`;
+- Responde SOLO con JSON, sin texto adicional`;
 };
 
 Deno.serve(async (req) => {
@@ -540,7 +741,7 @@ Deno.serve(async (req) => {
         objecionesPrincipales: briefData.main_objections,
       },
       
-      // Extract specific answers if available
+      // Business info
       negocio: {
         tipoNegocio: rawData.business_type,
         ticketPromedio: rawData.average_ticket,
@@ -548,6 +749,7 @@ Deno.serve(async (req) => {
         canalesVenta: rawData.sales_channels,
       },
       
+      // Deep persona insights
       personaProfunda: {
         dolorDeLas3AM: rawData.persona_3am_pain,
         verguenza: rawData.persona_shame,
@@ -564,6 +766,7 @@ Deno.serve(async (req) => {
         frustracionesDiarias: rawData.persona_daily_frustrations,
       },
       
+      // Competitive analysis
       competencia: {
         competidores: rawData.competitors_list,
         quejasCompetencia: rawData.competitors_complaints,
@@ -577,6 +780,7 @@ Deno.serve(async (req) => {
         ventajaImposibleCopiar: rawData.uncopyable_advantage,
       },
       
+      // Communication strategy (for Hook-Story-Offer)
       estrategiaComunicacional: {
         vacaPurpura: rawData.purple_cow,
         granPromesa: rawData.big_promise,
@@ -592,7 +796,7 @@ Deno.serve(async (req) => {
 
     const systemPrompt = buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
 
-    console.log('Generating copy for:', { clientId, adType, funnelStage });
+    console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 
     // Call Lovable AI
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -609,13 +813,23 @@ Deno.serve(async (req) => {
             role: 'user', 
             content: `Genera copies profesionales para un anuncio ${adType === 'static' ? 'estático' : 'de video'} de Meta Ads para la etapa ${funnelStage.toUpperCase()} del funnel.
 
-REQUISITOS:
-1. Aplica TODOS los pasos de Sabri Suby correspondientes a esta etapa
-2. Usa la información del Brief de Marca para personalizar cada copy
-3. Incorpora las palabras EXACTAS que usa el buyer persona "${briefContext.buyerPersona.nombre || 'el cliente ideal'}"
-4. Sigue las reglas específicas para ${funnelStage.toUpperCase()}: ${FUNNEL_CONTEXT[funnelStage].goal}
+CONTEXTO DEL BUYER PERSONA: "${briefContext.buyerPersona.nombre || 'Cliente ideal'}"
 
-Genera copies que realmente VENDAN siguiendo la metodología 1PMP completa.`
+REQUISITOS OBLIGATORIOS:
+1. Aplica el framework HOOK → HISTORIA → OFERTA de Russell Brunson
+2. Sigue los pasos correspondientes de los 17 de Sabri Suby
+3. Usa las fórmulas de headlines según temperatura del tráfico
+4. Incorpora las PALABRAS EXACTAS del buyer persona
+5. Para ${funnelStage.toUpperCase()}: ${FUNNEL_CONTEXT[funnelStage].goal}
+
+ELEMENTOS CLAVE DEL BRIEF A USAR:
+- Dolor de las 3 AM: ${briefContext.personaProfunda.dolorDeLas3AM || 'No especificado'}
+- Palabras exactas del cliente: ${briefContext.personaProfunda.palabrasExactas || 'No especificado'}
+- Villano: ${briefContext.estrategiaComunicacional.villano || 'No especificado'}
+- Gran promesa: ${briefContext.estrategiaComunicacional.granPromesa || 'No especificado'}
+- Transformación soñada: ${briefContext.personaProfunda.transformacionSonada || 'No especificado'}
+
+Genera copies que VENDAN siguiendo las metodologías combinadas.`
           },
         ],
         temperature: 0.85,
@@ -650,7 +864,6 @@ Genera copies que realmente VENDAN siguiendo la metodología 1PMP completa.`
     // Parse the JSON response
     let parsedContent;
     try {
-      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsedContent = JSON.parse(jsonMatch[0]);
@@ -663,7 +876,7 @@ Genera copies que realmente VENDAN siguiendo la metodología 1PMP completa.`
       throw new Error('Failed to parse AI response');
     }
 
-    console.log('Successfully generated copy with Sabri methodology');
+    console.log('Successfully generated copy with Sabri + Russell methodology');
 
     return new Response(JSON.stringify(parsedContent), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
