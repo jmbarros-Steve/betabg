@@ -106,8 +106,20 @@ serve(async (req) => {
       );
     }
 
-    // Fetch Steve's feedback for this client to personalize generation
-    const { data: feedbackData } = await supabase
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STEVE'S LEARNING ENGINE: Dual-layer learning from ALL clients + this client
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // 1. GLOBAL LEARNING: Patterns from ALL clients
+    const { data: globalFeedback } = await supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type')
+      .eq('content_type', 'google_copy')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    // 2. CLIENT-SPECIFIC LEARNING: This client's preferences
+    const { data: clientFeedback } = await supabase
       .from('steve_feedback')
       .select('rating, feedback_text, content_type, improvement_notes')
       .eq('client_id', clientId)
@@ -115,30 +127,54 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    // Build learning context from feedback
+    // Build Steve's learning context
     let learningContext = '';
-    if (feedbackData && feedbackData.length > 0) {
-      const avgRating = feedbackData.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbackData.length;
-      const negativeFeedback = feedbackData.filter(f => (f.rating || 0) <= 2 && f.feedback_text);
-      const positiveFeedback = feedbackData.filter(f => (f.rating || 0) >= 4 && f.feedback_text);
+    
+    // Global patterns analysis
+    if (globalFeedback && globalFeedback.length > 0) {
+      const globalAvgRating = globalFeedback.reduce((sum, f) => sum + (f.rating || 0), 0) / globalFeedback.length;
+      const globalNegative = globalFeedback.filter(f => (f.rating || 0) <= 2 && f.feedback_text);
+      const globalPositive = globalFeedback.filter(f => (f.rating || 0) >= 4 && f.feedback_text);
       
-      learningContext = `
+      learningContext += `
 ═══════════════════════════════════════════════════════════════════════════════
-APRENDIZAJE DE STEVE: PREFERENCIAS DEL CLIENTE
+🧠 STEVE'S GLOBAL LEARNING - Google Ads (${globalFeedback.length} generaciones)
 ═══════════════════════════════════════════════════════════════════════════════
-Rating promedio histórico: ${avgRating.toFixed(1)}/5
+Rating promedio global: ${globalAvgRating.toFixed(1)}/5
 
-${negativeFeedback.length > 0 ? `
-⚠️ LO QUE NO LE GUSTA AL CLIENTE (EVITAR):
-${negativeFeedback.map(f => `- "${f.feedback_text}"`).join('\n')}
+${globalPositive.length > 0 ? `
+✅ PATRONES EXITOSOS EN GOOGLE ADS:
+${globalPositive.slice(0, 5).map(f => `- "${f.feedback_text}"`).join('\n')}
 ` : ''}
 
-${positiveFeedback.length > 0 ? `
-✅ LO QUE LE GUSTA AL CLIENTE (REPLICAR):
-${positiveFeedback.map(f => `- "${f.feedback_text}"`).join('\n')}
+${globalNegative.length > 0 ? `
+⚠️ ERRORES COMUNES A EVITAR:
+${globalNegative.slice(0, 5).map(f => `- "${f.feedback_text}"`).join('\n')}
+` : ''}
+`;
+    }
+
+    // Client-specific preferences
+    if (clientFeedback && clientFeedback.length > 0) {
+      const clientAvgRating = clientFeedback.reduce((sum, f) => sum + (f.rating || 0), 0) / clientFeedback.length;
+      const clientNegative = clientFeedback.filter(f => (f.rating || 0) <= 2 && f.feedback_text);
+      const clientPositive = clientFeedback.filter(f => (f.rating || 0) >= 4 && f.feedback_text);
+      
+      learningContext += `
+═══════════════════════════════════════════════════════════════════════════════
+🎯 PREFERENCIAS DE ESTE CLIENTE
+═══════════════════════════════════════════════════════════════════════════════
+Rating del cliente: ${clientAvgRating.toFixed(1)}/5
+
+${clientPositive.length > 0 ? `
+✅ LO QUE PREFIERE (PRIORIDAD):
+${clientPositive.map(f => `- "${f.feedback_text}"`).join('\n')}
 ` : ''}
 
-INSTRUCCIÓN: Usa este feedback para ajustar el tono, estilo y enfoque de los copies.
+${clientNegative.length > 0 ? `
+⛔ LO QUE RECHAZA:
+${clientNegative.map(f => `- "${f.feedback_text}"`).join('\n')}
+` : ''}
 `;
     }
 
