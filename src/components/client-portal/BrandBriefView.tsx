@@ -44,45 +44,84 @@ interface BriefData {
 }
 
 const QUESTION_ICONS: Record<string, React.ReactNode> = {
+  // Parte 1: Negocio
   business_type: <Building2 className="h-4 w-4" />,
-  customers: <Users className="h-4 w-4" />,
-  sales_channels: <Store className="h-4 w-4" />,
-  communication_tone: <MessageSquare className="h-4 w-4" />,
-  pain_solved: <Target className="h-4 w-4" />,
-  supporting_data: <Database className="h-4 w-4" />,
-  competitive_advantage: <Trophy className="h-4 w-4" />,
   average_ticket: <DollarSign className="h-4 w-4" />,
   margins: <Percent className="h-4 w-4" />,
   shipping_cost: <Truck className="h-4 w-4" />,
   fixed_costs: <Calculator className="h-4 w-4" />,
+  sales_channels: <Store className="h-4 w-4" />,
+  // Parte 2: Buyer Persona
+  persona_name: <Users className="h-4 w-4" />,
+  persona_age: <Users className="h-4 w-4" />,
+  persona_gender: <Users className="h-4 w-4" />,
+  persona_location: <Target className="h-4 w-4" />,
+  persona_education: <Database className="h-4 w-4" />,
+  persona_income: <DollarSign className="h-4 w-4" />,
+  persona_channels: <MessageSquare className="h-4 w-4" />,
+  persona_pain: <Target className="h-4 w-4" />,
+  persona_desires: <Heart className="h-4 w-4" />,
+  persona_fears: <Shield className="h-4 w-4" />,
+  // Parte 3: Competencia
+  why_buy_from_you: <Trophy className="h-4 w-4" />,
+  competitors: <Users className="h-4 w-4" />,
+  differentiator: <Gem className="h-4 w-4" />,
+  blue_ocean: <TrendingUp className="h-4 w-4" />,
+  better_than_competition: <Trophy className="h-4 w-4" />,
+  // Parte 4: Comunicación
+  communication_tone: <MessageSquare className="h-4 w-4" />,
+  communication_style: <Heart className="h-4 w-4" />,
+  supporting_data: <Database className="h-4 w-4" />,
+  // Parte 5: Oferta Perfecta
   perceived_value: <Gem className="h-4 w-4" />,
   guarantee: <Shield className="h-4 w-4" />,
-  bonuses: <Gift className="h-4 w-4" />,
   scarcity_urgency: <Clock className="h-4 w-4" />,
   clear_results: <TrendingUp className="h-4 w-4" />,
-  simple_decision: <MousePointer className="h-4 w-4" />,
-  emotional_benefits: <Heart className="h-4 w-4" />,
 };
 
 const QUESTION_LABELS: Record<string, string> = {
+  // Parte 1: Negocio
   business_type: 'Tipo de Negocio',
-  customers: 'Perfil de Clientes',
-  sales_channels: 'Canales de Venta',
-  communication_tone: 'Tono de Comunicación',
-  pain_solved: 'Dolor que Solucionan',
-  supporting_data: 'Data de Respaldo',
-  competitive_advantage: 'Ventaja Competitiva',
   average_ticket: 'Ticket Promedio',
   margins: 'Márgenes',
   shipping_cost: 'Costo de Envío',
   fixed_costs: 'Gastos Fijos',
+  sales_channels: 'Canales de Venta',
+  // Parte 2: Buyer Persona
+  persona_name: 'Nombre del Persona',
+  persona_age: 'Edad',
+  persona_gender: 'Género',
+  persona_location: 'Ubicación',
+  persona_education: 'Nivel Educacional',
+  persona_income: 'Nivel de Ingresos',
+  persona_channels: 'Canales del Cliente',
+  persona_pain: 'Dolor Principal',
+  persona_desires: 'Deseos y Sueños',
+  persona_fears: 'Miedos y Objeciones',
+  // Parte 3: Competencia
+  why_buy_from_you: '¿Por qué te Compran?',
+  competitors: 'Competidores',
+  differentiator: 'Atributo Diferenciador',
+  blue_ocean: 'Océano Azul',
+  better_than_competition: 'Mejor que la Competencia',
+  // Parte 4: Comunicación
+  communication_tone: 'Tono de Comunicación',
+  communication_style: 'Estilo de Relación',
+  supporting_data: 'Prueba Social',
+  // Parte 5: Oferta Perfecta
   perceived_value: 'Valor Percibido',
   guarantee: 'Garantía',
-  bonuses: 'Bonos',
   scarcity_urgency: 'Escasez/Urgencia',
   clear_results: 'Resultados Claros',
-  simple_decision: 'Decisión Simple',
-  emotional_benefits: 'Beneficios Emocionales',
+};
+
+// Question indices for each section
+const SECTION_RANGES = {
+  business: { start: 0, end: 6, title: 'El Negocio', icon: Building2 },
+  persona: { start: 6, end: 16, title: 'Buyer Persona', icon: Users },
+  competition: { start: 16, end: 21, title: 'Análisis Competitivo', icon: Trophy },
+  communication: { start: 21, end: 24, title: 'Estrategia de Comunicación', icon: MessageSquare },
+  offer: { start: 24, end: 28, title: 'Oferta Perfecta', icon: Gem },
 };
 
 export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
@@ -177,28 +216,28 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         </Badge>
       </div>
 
-      {/* Sections */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Part 1: Business Info */}
+      {/* All 5 Sections */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Part 1: Business */}
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Building2 className="h-5 w-5 text-primary" />
-              Conociendo el Negocio
+              El Negocio
             </CardTitle>
-            <CardDescription>Preguntas 1-11</CardDescription>
+            <CardDescription>Preguntas 1-6</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-4">
-                {questions.slice(0, 11).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-3 last:border-0">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-4 w-4" />}
+            <ScrollArea className="h-[250px] pr-4">
+              <div className="space-y-3">
+                {questions.slice(SECTION_RANGES.business.start, SECTION_RANGES.business.end).map((questionId, index) => (
+                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
                       {QUESTION_LABELS[questionId] || `Pregunta ${index + 1}`}
                     </div>
                     <p className="text-sm">
-                      {responses[index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
+                      {responses[SECTION_RANGES.business.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
                     </p>
                   </div>
                 ))}
@@ -207,26 +246,110 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           </CardContent>
         </Card>
 
-        {/* Part 2: Perfect Offer */}
+        {/* Part 2: Buyer Persona */}
+        <Card className="lg:row-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Buyer Persona
+            </CardTitle>
+            <CardDescription>El Cliente Soñado • Preguntas 7-16</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[550px] pr-4">
+              <div className="space-y-3">
+                {questions.slice(SECTION_RANGES.persona.start, SECTION_RANGES.persona.end).map((questionId, index) => (
+                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 7}`}
+                    </div>
+                    <p className="text-sm">
+                      {responses[SECTION_RANGES.persona.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Part 3: Competitive Analysis */}
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              Análisis Competitivo
+            </CardTitle>
+            <CardDescription>Océano Azul • Preguntas 17-21</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[250px] pr-4">
+              <div className="space-y-3">
+                {questions.slice(SECTION_RANGES.competition.start, SECTION_RANGES.competition.end).map((questionId, index) => (
+                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 17}`}
+                    </div>
+                    <p className="text-sm">
+                      {responses[SECTION_RANGES.competition.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Part 4: Communication Strategy */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Estrategia de Comunicación
+            </CardTitle>
+            <CardDescription>Preguntas 22-24</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[200px] pr-4">
+              <div className="space-y-3">
+                {questions.slice(SECTION_RANGES.communication.start, SECTION_RANGES.communication.end).map((questionId, index) => (
+                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 22}`}
+                    </div>
+                    <p className="text-sm">
+                      {responses[SECTION_RANGES.communication.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Part 5: Perfect Offer */}
+        <Card>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Gem className="h-5 w-5 text-primary" />
               La Oferta Perfecta
             </CardTitle>
-            <CardDescription>Metodología Sabri Suby • Preguntas 12-18</CardDescription>
+            <CardDescription>Metodología Sabri Suby • Preguntas 25-28</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-4">
-                {questions.slice(11).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-3 last:border-0">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-4 w-4" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 12}`}
+            <ScrollArea className="h-[200px] pr-4">
+              <div className="space-y-3">
+                {questions.slice(SECTION_RANGES.offer.start, SECTION_RANGES.offer.end).map((questionId, index) => (
+                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
+                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 25}`}
                     </div>
                     <p className="text-sm">
-                      {responses[index + 11] || <span className="text-muted-foreground italic">Sin respuesta</span>}
+                      {responses[SECTION_RANGES.offer.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
                     </p>
                   </div>
                 ))}
