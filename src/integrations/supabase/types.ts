@@ -582,7 +582,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "client"
-      platform_type: "shopify" | "meta" | "google"
+      platform_type: "shopify" | "meta" | "google" | "klaviyo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -711,7 +711,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "client"],
-      platform_type: ["shopify", "meta", "google"],
+      platform_type: ["shopify", "meta", "google", "klaviyo"],
     },
   },
 } as const

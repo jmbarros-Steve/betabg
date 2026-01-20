@@ -21,7 +21,7 @@ interface Client {
 interface PlatformConnection {
   id: string;
   client_id: string;
-  platform: 'shopify' | 'meta' | 'google';
+  platform: 'shopify' | 'meta' | 'google' | 'klaviyo';
   store_name: string | null;
   store_url: string | null;
   account_id: string | null;
@@ -31,7 +31,7 @@ interface PlatformConnection {
   clients?: Client;
 }
 
-const platformConfig = {
+const platformConfig: Record<string, { name: string; icon: string | null; color: string; fields: string[] }> = {
   shopify: {
     name: 'Shopify',
     icon: logoShopify,
@@ -49,6 +49,12 @@ const platformConfig = {
     icon: null,
     color: 'bg-red-500/10 text-red-600',
     fields: ['account_id', 'access_token'],
+  },
+  klaviyo: {
+    name: 'Klaviyo',
+    icon: null,
+    color: 'bg-purple-500/10 text-purple-600',
+    fields: ['api_key'],
   },
 };
 
