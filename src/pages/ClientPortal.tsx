@@ -11,6 +11,8 @@ import { SteveChat } from '@/components/client-portal/SteveChat';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
 import { KlaviyoPlanner } from '@/components/client-portal/KlaviyoPlanner';
+import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
+import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
@@ -29,6 +31,7 @@ export default function ClientPortal() {
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Admin viewing a specific client's portal
   const isAdminView = isAdmin && urlClientId;
@@ -36,6 +39,24 @@ export default function ClientPortal() {
   // Determine which client data to use
   const displayClient = isAdminView ? adminViewClient : clientData;
   const effectiveClientId = isAdminView ? urlClientId : clientData?.id;
+
+  // Check if this is first visit for onboarding
+  useEffect(() => {
+    if (user && isClient && !isAdminView) {
+      const onboardingKey = `bg_onboarding_${user.id}`;
+      const hasSeenOnboarding = localStorage.getItem(onboardingKey);
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [user, isClient, isAdminView]);
+
+  const handleCompleteOnboarding = () => {
+    if (user) {
+      localStorage.setItem(`bg_onboarding_${user.id}`, 'true');
+    }
+    setShowOnboarding(false);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -191,6 +212,19 @@ export default function ClientPortal() {
           )}
         </motion.div>
       </div>
+
+      {/* Chonga Support Bot */}
+      {effectiveClientId && (
+        <ChongaSupport clientId={effectiveClientId} />
+      )}
+
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <ClientOnboarding 
+          onComplete={handleCompleteOnboarding}
+          clientName={displayClient?.name}
+        />
+      )}
     </div>
   );
 }
