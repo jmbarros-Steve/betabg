@@ -22,7 +22,7 @@ const NAVIGATION_OPTIONS = [
     subtitle: 'Consultoría de Escalamiento',
     description: 'Pricing, costos, contabilidad, gestión de leads, campañas de marketing y más.',
     icon: Briefcase,
-    link: '#servicios',
+    link: '/servicios-corporativos',
     color: 'from-blue-500 to-indigo-500',
     bgColor: 'bg-blue-500/10 hover:bg-blue-500/20',
     iconBg: 'bg-blue-500',

@@ -13,6 +13,7 @@ import OAuthShopifyCallback from "./pages/OAuthShopifyCallback";
 import OAuthGoogleAdsCallback from "./pages/OAuthGoogleAdsCallback";
 import Blog from "./pages/Blog";
 import CentroEstudios from "./pages/CentroEstudios";
+import ServiciosCorporativos from "./pages/ServiciosCorporativos";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DataDeletion from "./pages/DataDeletion";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/oauth/google-ads/callback" element={<OAuthGoogleAdsCallback />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/centro-estudios" element={<CentroEstudios />} />
+            <Route path="/servicios-corporativos" element={<ServiciosCorporativos />} />
             <Route path="/terminos" element={<TermsOfService />} />
             <Route path="/privacidad" element={<PrivacyPolicy />} />
             <Route path="/eliminacion-datos" element={<DataDeletion />} />
