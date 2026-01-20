@@ -154,9 +154,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       if (connection.platform === 'meta') {
         functionName = 'sync-meta-metrics';
       } else if (connection.platform === 'google') {
-        // TODO: Implement sync-google-ads-metrics function
-        toast.info('Sincronización de Google Ads próximamente disponible', { id: 'sync' });
-        return;
+        functionName = 'sync-google-ads-metrics';
       }
 
       const { error } = await supabase.functions.invoke(functionName, {

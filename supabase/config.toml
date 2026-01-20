@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.google-ads-oauth-callback]
 verify_jwt = false
+
+[functions.sync-google-ads-metrics]
+verify_jwt = false
