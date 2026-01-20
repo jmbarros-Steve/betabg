@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, RefreshCw, Store, BarChart3, TrendingUp, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Store, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +59,7 @@ export function PlatformConnectionsPanel() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Form state
   const [selectedClient, setSelectedClient] = useState('');
@@ -76,9 +77,10 @@ export function PlatformConnectionsPanel() {
   }, [user]);
 
   const fetchConnections = async () => {
+    // Fetch connections without sensitive token fields
     const { data, error } = await supabase
       .from('platform_connections')
-      .select('*, clients(id, name, company)')
+      .select('id, client_id, platform, store_name, store_url, account_id, is_active, last_sync_at, created_at, clients(id, name, company)')
       .order('created_at', { ascending: false });
 
     if (!error) {
@@ -109,28 +111,40 @@ export function PlatformConnectionsPanel() {
       return;
     }
 
-    const { error } = await supabase.from('platform_connections').insert({
-      client_id: selectedClient,
-      platform: selectedPlatform,
-      store_name: storeName || null,
-      store_url: storeUrl || null,
-      access_token: accessToken || null,
-      account_id: accountId || null,
-    });
+    setSubmitting(true);
 
-    if (error) {
-      if (error.code === '23505') {
-        toast.error('Este cliente ya tiene una conexión con esta plataforma');
-      } else {
-        toast.error('Error al crear conexión');
+    try {
+      // Send tokens securely through edge function (never stored in client memory longer than needed)
+      const { data, error } = await supabase.functions.invoke('store-platform-connection', {
+        body: {
+          clientId: selectedClient,
+          platform: selectedPlatform,
+          storeName: storeName || undefined,
+          storeUrl: storeUrl || undefined,
+          accessToken: accessToken || undefined,
+          accountId: accountId || undefined,
+        }
+      });
+
+      if (error) {
+        throw error;
       }
-      return;
-    }
 
-    toast.success('Conexión creada exitosamente');
-    setDialogOpen(false);
-    resetForm();
-    fetchConnections();
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      toast.success('Conexión creada exitosamente');
+      setDialogOpen(false);
+      resetForm();
+      fetchConnections();
+    } catch (error: any) {
+      console.error('Error creating connection:', error);
+      toast.error(error.message || 'Error al crear conexión');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDeleteConnection = async (id: string) => {
@@ -157,6 +171,11 @@ export function PlatformConnectionsPanel() {
 
       if (error) throw error;
       
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+      
       toast.success(`Métricas sincronizadas: ${data.ordersCount || 0} órdenes`);
       fetchConnections();
     } catch (error: any) {
@@ -172,7 +191,7 @@ export function PlatformConnectionsPanel() {
     setSelectedPlatform('shopify');
     setStoreName('');
     setStoreUrl('');
-    setAccessToken('');
+    setAccessToken(''); // Clear token immediately
     setAccountId('');
   };
 
@@ -195,7 +214,10 @@ export function PlatformConnectionsPanel() {
             Gestiona las conexiones de Shopify, Meta y Google de tus clientes
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm(); // Clear form including tokens when closing
+        }}>
           <DialogTrigger asChild>
             <Button variant="hero" size="sm">
               <Plus className="w-4 h-4 mr-2" />
@@ -280,9 +302,10 @@ export function PlatformConnectionsPanel() {
                       value={accessToken}
                       onChange={(e) => setAccessToken(e.target.value)}
                       placeholder="shpat_..."
+                      autoComplete="off"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Obtén esto desde Shopify Admin → Settings → Apps → Develop apps
+                      El token se envía de forma segura y no se almacena en el navegador
                     </p>
                   </div>
                 </>
@@ -305,7 +328,11 @@ export function PlatformConnectionsPanel() {
                       value={accessToken}
                       onChange={(e) => setAccessToken(e.target.value)}
                       placeholder="EAA..."
+                      autoComplete="off"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      El token se envía de forma segura y no se almacena en el navegador
+                    </p>
                   </div>
                 </>
               )}
@@ -318,8 +345,12 @@ export function PlatformConnectionsPanel() {
                 </div>
               )}
 
-              <Button onClick={handleAddConnection} className="w-full" disabled={selectedPlatform === 'google'}>
-                Guardar Conexión
+              <Button 
+                onClick={handleAddConnection} 
+                className="w-full" 
+                disabled={selectedPlatform === 'google' || submitting}
+              >
+                {submitting ? 'Guardando...' : 'Guardar Conexión'}
               </Button>
             </div>
           </DialogContent>

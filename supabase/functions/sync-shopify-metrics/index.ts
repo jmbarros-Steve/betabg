@@ -21,8 +21,38 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's token for auth verification
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Validate the JWT and get user claims
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+
+    if (claimsError || !claimsData?.claims) {
+      console.error('Invalid JWT:', claimsError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log('Authenticated user:', userId);
 
     // Get the connection ID from request
     const { connectionId } = await req.json();
@@ -36,10 +66,13 @@ Deno.serve(async (req) => {
 
     console.log('Fetching connection:', connectionId);
 
-    // Get the connection details
-    const { data: connection, error: connError } = await supabase
+    // Use service role to access tokens (they should not be exposed to RLS queries)
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify user owns this connection via client ownership
+    const { data: connection, error: connError } = await supabaseService
       .from('platform_connections')
-      .select('*')
+      .select('*, clients!inner(user_id)')
       .eq('id', connectionId)
       .single();
 
@@ -51,11 +84,33 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Authorization check: verify user owns the client that owns this connection
+    if (connection.clients.user_id !== userId) {
+      console.error('User does not own this connection');
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (connection.platform !== 'shopify') {
       return new Response(
         JSON.stringify({ error: 'This endpoint only supports Shopify connections' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Rate limiting: check last sync time (minimum 5 minutes between syncs)
+    if (connection.last_sync_at) {
+      const lastSync = new Date(connection.last_sync_at);
+      const minInterval = 5 * 60 * 1000; // 5 minutes
+      if (Date.now() - lastSync.getTime() < minInterval) {
+        const waitSeconds = Math.ceil((minInterval - (Date.now() - lastSync.getTime())) / 1000);
+        return new Response(
+          JSON.stringify({ error: `Rate limit: espera ${waitSeconds} segundos antes de sincronizar de nuevo` }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const { store_url, access_token } = connection;
@@ -106,7 +161,7 @@ Deno.serve(async (req) => {
       dailyMetrics[date].orders += 1;
     }
 
-    // Upsert metrics to database
+    // Upsert metrics to database using service role
     const metricsToInsert: any[] = [];
     
     for (const [date, metrics] of Object.entries(dailyMetrics)) {
@@ -127,7 +182,7 @@ Deno.serve(async (req) => {
     }
 
     if (metricsToInsert.length > 0) {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseService
         .from('platform_metrics')
         .upsert(metricsToInsert, {
           onConflict: 'connection_id,metric_date,metric_type',
@@ -139,7 +194,7 @@ Deno.serve(async (req) => {
     }
 
     // Update last sync time
-    await supabase
+    await supabaseService
       .from('platform_connections')
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', connectionId);
