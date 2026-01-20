@@ -168,6 +168,59 @@ export type Database = {
           },
         ]
       }
+      klaviyo_email_plans: {
+        Row: {
+          admin_notes: string | null
+          campaign_date: string | null
+          campaign_subject: string | null
+          client_id: string
+          client_notes: string | null
+          created_at: string
+          emails: Json
+          flow_type: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          campaign_date?: string | null
+          campaign_subject?: string | null
+          client_id: string
+          client_notes?: string | null
+          created_at?: string
+          emails?: Json
+          flow_type: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          campaign_date?: string | null
+          campaign_subject?: string | null
+          client_id?: string
+          client_notes?: string | null
+          created_at?: string
+          emails?: Json
+          flow_type?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "klaviyo_email_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_connections: {
         Row: {
           access_token_encrypted: string | null

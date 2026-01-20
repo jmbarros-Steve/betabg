@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -10,10 +10,11 @@ import { ClientPortalConnections } from '@/components/client-portal/ClientPortal
 import { SteveChat } from '@/components/client-portal/SteveChat';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
+import { KlaviyoPlanner } from '@/components/client-portal/KlaviyoPlanner';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'connections' | 'brief' | 'steve' | 'copies';
+type TabType = 'metrics' | 'connections' | 'brief' | 'steve' | 'copies' | 'klaviyo';
 interface ClientInfo {
   id: string;
   name: string;
@@ -95,6 +96,7 @@ export default function ClientPortal() {
     { id: 'brief', label: 'Brief', icon: FileText },
     { id: 'steve', label: 'Steve', icon: Bot },
     { id: 'copies', label: 'Copies', icon: Sparkles },
+    { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
   ] as const;
 
   return (
@@ -180,6 +182,11 @@ export default function ClientPortal() {
           {activeTab === 'copies' && effectiveClientId && (
             <div className="max-w-4xl mx-auto">
               <CopyGenerator clientId={effectiveClientId} />
+            </div>
+          )}
+          {activeTab === 'klaviyo' && effectiveClientId && (
+            <div className="max-w-4xl mx-auto">
+              <KlaviyoPlanner clientId={effectiveClientId} />
             </div>
           )}
         </motion.div>
