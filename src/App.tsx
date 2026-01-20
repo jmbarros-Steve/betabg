@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Steve from "./pages/Steve";
 import Dashboard from "./pages/Dashboard";
 import ClientPortal from "./pages/ClientPortal";
 import OAuthMetaCallback from "./pages/OAuthMetaCallback";
@@ -31,6 +32,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/steve" element={<Steve />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/portal" element={<ClientPortal />} />
             <Route path="/portal/:clientId" element={<ClientPortal />} />

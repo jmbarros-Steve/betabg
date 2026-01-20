@@ -11,7 +11,7 @@ const NAVIGATION_OPTIONS = [
     subtitle: 'Tu Copiloto de Marketing',
     description: 'IA que aprende de tu marca y genera copies que venden. Metodología Sabri Suby + Russell Brunson.',
     icon: Dog,
-    link: '/auth',
+    link: '/steve',
     color: 'from-amber-500 to-orange-500',
     bgColor: 'bg-amber-500/10 hover:bg-amber-500/20',
     iconBg: 'bg-amber-500',
