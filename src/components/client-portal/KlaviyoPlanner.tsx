@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
+import { KlaviyoPlanWizard } from './KlaviyoPlanWizard';
 
 interface EmailStep {
   id: string;
@@ -104,10 +105,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'flows' | 'campaigns'>('flows');
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
-  const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [newPlanType, setNewPlanType] = useState<EmailPlan['flow_type'] | null>(null);
-  const [editingPlan, setEditingPlan] = useState<EmailPlan | null>(null);
-  const [editingEmail, setEditingEmail] = useState<{ planId: string; emailIndex: number } | null>(null);
 
   useEffect(() => {
     fetchPlans();
@@ -148,28 +147,29 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
     }
   }
 
-  async function createPlan(type: EmailPlan['flow_type'], name: string) {
+  async function createPlanFromWizard(data: {
+    name: string;
+    emails: EmailStep[];
+    notes: string;
+    campaignDate?: string;
+    selectedProducts?: string[];
+  }) {
+    if (!newPlanType) return;
+    
     try {
       setSaving(true);
-      const config = flowTypeConfig[type];
-      const defaultEmails: EmailStep[] = config.defaultEmails.map((email, idx) => ({
-        id: `email-${Date.now()}-${idx}`,
-        subject: email.subject,
-        previewText: '',
-        content: '',
-        delayDays: email.delayDays,
-        delayHours: email.delayHours,
-      }));
 
       const insertData = {
         client_id: clientId,
-        flow_type: type,
-        name,
+        flow_type: newPlanType,
+        name: data.name,
         status: 'draft',
-        emails: defaultEmails as unknown,
+        emails: data.emails as unknown,
+        client_notes: data.notes || null,
+        campaign_date: data.campaignDate || null,
       };
 
-      const { data, error } = await supabase
+      const { data: dbData, error } = await supabase
         .from('klaviyo_email_plans')
         .insert(insertData as never)
         .select()
@@ -178,30 +178,30 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
       if (error) throw error;
 
       const newPlan: EmailPlan = {
-        id: data.id,
-        client_id: data.client_id,
-        flow_type: data.flow_type as EmailPlan['flow_type'],
-        name: data.name,
-        status: data.status as EmailPlan['status'],
-        campaign_date: data.campaign_date ?? undefined,
-        campaign_subject: data.campaign_subject ?? undefined,
-        emails: defaultEmails,
-        client_notes: data.client_notes ?? undefined,
-        admin_notes: data.admin_notes ?? undefined,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
+        id: dbData.id,
+        client_id: dbData.client_id,
+        flow_type: dbData.flow_type as EmailPlan['flow_type'],
+        name: dbData.name,
+        status: dbData.status as EmailPlan['status'],
+        campaign_date: dbData.campaign_date ?? undefined,
+        campaign_subject: dbData.campaign_subject ?? undefined,
+        emails: data.emails,
+        client_notes: dbData.client_notes ?? undefined,
+        admin_notes: dbData.admin_notes ?? undefined,
+        created_at: dbData.created_at,
+        updated_at: dbData.updated_at,
       };
       
       setPlans(prev => [newPlan, ...prev]);
-      setExpandedPlan(data.id);
+      setExpandedPlan(dbData.id);
+      setShowWizard(false);
+      setNewPlanType(null);
       toast.success('Plan creado correctamente');
     } catch (error) {
       console.error('Error creating plan:', error);
       toast.error('Error al crear el plan');
     } finally {
       setSaving(false);
-      setShowNewPlanDialog(false);
-      setNewPlanType(null);
     }
   }
 
@@ -345,7 +345,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
                   size="sm"
                   onClick={() => {
                     setNewPlanType(type);
-                    setShowNewPlanDialog(true);
+                    setShowWizard(true);
                   }}
                   className="flex items-center gap-2"
                 >
@@ -397,7 +397,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
             size="sm"
             onClick={() => {
               setNewPlanType('campaign');
-              setShowNewPlanDialog(true);
+              setShowWizard(true);
             }}
             className="flex items-center gap-2"
           >
@@ -440,48 +440,24 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
         </TabsContent>
       </Tabs>
 
-      {/* New Plan Dialog */}
-      <Dialog open={showNewPlanDialog} onOpenChange={setShowNewPlanDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {newPlanType && flowTypeConfig[newPlanType].label}
-            </DialogTitle>
-            <DialogDescription>
-              {newPlanType && flowTypeConfig[newPlanType].description}
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const name = formData.get('name') as string;
-              if (newPlanType && name) {
-                createPlan(newPlanType, name);
-              }
-            }}
-          >
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre del plan</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder={newPlanType === 'campaign' ? 'Ej: Black Friday 2024' : 'Ej: Bienvenida Principal'}
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowNewPlanDialog(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Crear
-              </Button>
-            </DialogFooter>
-          </form>
+      {/* Wizard Dialog */}
+      <Dialog open={showWizard} onOpenChange={(open) => {
+        setShowWizard(open);
+        if (!open) setNewPlanType(null);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {newPlanType && (
+            <KlaviyoPlanWizard
+              flowType={newPlanType}
+              clientId={clientId}
+              onComplete={createPlanFromWizard}
+              onCancel={() => {
+                setShowWizard(false);
+                setNewPlanType(null);
+              }}
+              saving={saving}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
