@@ -30,6 +30,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/portal" element={<ClientPortal />} />
+            <Route path="/portal/:clientId" element={<ClientPortal />} />
             <Route path="/oauth/meta/callback" element={<OAuthMetaCallback />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/centro-estudios" element={<CentroEstudios />} />
