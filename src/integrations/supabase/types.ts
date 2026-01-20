@@ -262,6 +262,59 @@ export type Database = {
           },
         ]
       }
+      saved_meta_copies: {
+        Row: {
+          ad_type: string
+          client_id: string
+          created_at: string
+          custom_instructions: string | null
+          descriptions: string[]
+          funnel_stage: string
+          has_script: boolean
+          headlines: string[]
+          id: string
+          primary_texts: string[]
+          video_hooks: string[] | null
+          video_scripts: string[] | null
+        }
+        Insert: {
+          ad_type: string
+          client_id: string
+          created_at?: string
+          custom_instructions?: string | null
+          descriptions?: string[]
+          funnel_stage: string
+          has_script?: boolean
+          headlines?: string[]
+          id?: string
+          primary_texts?: string[]
+          video_hooks?: string[] | null
+          video_scripts?: string[] | null
+        }
+        Update: {
+          ad_type?: string
+          client_id?: string
+          created_at?: string
+          custom_instructions?: string | null
+          descriptions?: string[]
+          funnel_stage?: string
+          has_script?: boolean
+          headlines?: string[]
+          id?: string
+          primary_texts?: string[]
+          video_hooks?: string[] | null
+          video_scripts?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_meta_copies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       steve_conversations: {
         Row: {
           client_id: string
