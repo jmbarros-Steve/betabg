@@ -1,7 +1,14 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Dog, Briefcase, GraduationCap, FileText } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
+
+const navLinks = [
+  { name: 'Steve', to: '/steve', icon: Dog },
+  { name: 'Corporativo', to: '/servicios-corporativos', icon: Briefcase },
+  { name: 'Estudios', to: '/centro-estudios', icon: GraduationCap },
+  { name: 'Blog', to: '/blog', icon: FileText },
+];
 
 export function Navbar() {
   return (
@@ -16,24 +23,25 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
-          <a href="#servicios" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
-            Servicios
-          </a>
-          <Link to="/blog" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
-            Blog
-          </Link>
-          <Link to="/centro-estudios" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
-            Centro de Estudios
-          </Link>
-          <a href="#contacto" className="text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
-            Contacto
-          </a>
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link 
+                key={link.name}
+                to={link.to} 
+                className="flex items-center gap-2 text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Icon className="w-4 h-4" />
+                {link.name}
+              </Link>
+            );
+          })}
         </div>
 
         <Link to="/auth">
-          <Button variant="outline" size="sm" className="uppercase tracking-wider text-xs">
+          <button className="text-sm uppercase tracking-wider text-xs text-muted-foreground hover:text-primary transition-colors">
             Acceder
-          </Button>
+          </button>
         </Link>
       </div>
     </motion.nav>

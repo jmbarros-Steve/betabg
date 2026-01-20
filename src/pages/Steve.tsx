@@ -268,7 +268,8 @@ export default function Steve() {
                   <strong className="text-foreground">Plot twist:</strong> No siempre fui un perro. 
                   Hace años era un <em>Ingeniero Comercial</em> aburrido con corbata y Excel. 
                   Hasta que un día, en Puerto Varas, conocí a <strong className="text-foreground">La Chonga</strong>... 
-                  una mina seria, estructurada, que tomaba notas de todo. 🐕‍🦺
+                  una mina que después se hizo <em>abogada</em>. Sí, fome como ella sola 😴, 
+                  pero más inteligente que la chucha. 🐕‍🦺
                 </p>
                 
                 <p>
@@ -283,10 +284,17 @@ export default function Steve() {
                 </p>
 
                 <p>
-                  La Chonga siguió siendo seria. Se puso el traje de consultora corporativa. 
+                  La Chonga siguió siendo seria. Se puso el traje de consultora corporativa (y de abogada cuando toca). 
                   <strong className="text-foreground"> Yo me volví loco.</strong> 
                   Me transformé en un Bulldog Francés viajero 🌍, 
                   recorriendo el mundo aprendiendo de los mejores marketeros del planeta.
+                </p>
+
+                <p>
+                  <strong className="text-foreground">Ah, y también hago clases en la Universidad de los Perros 🎓.</strong>
+                  {" "}¿Por qué cobro? Porque si no, no como po'. Me gusta el <em>Bravery</em> premium, 
+                  andar en Mercedes y salir con las Barbies los fines de semana. 
+                  Un perro tiene sus estándares. 🚗💅
                 </p>
 
                 <p className="text-foreground font-medium">
