@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.generate-google-copy]
 verify_jwt = false
+
+[functions.create-shopify-discount]
+verify_jwt = false
