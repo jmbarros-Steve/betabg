@@ -87,15 +87,18 @@ export default function CentroEstudios() {
               
               <p className="text-muted-foreground mb-8 font-light">
                 Accede a cursos, guías y recursos exclusivos de performance marketing. 
-                Inicia sesión para ver el contenido.
+                Inicia sesión o crea una cuenta para ver el contenido.
               </p>
               
               <div className="flex flex-col gap-4">
                 <Link to="/auth">
                   <Button variant="hero" size="lg" className="w-full uppercase tracking-wider">
-                    Iniciar Sesión
+                    Iniciar Sesión / Registrarse
                   </Button>
                 </Link>
+                <p className="text-sm text-muted-foreground">
+                  ¿No tienes cuenta? Podrás crear una gratis en la siguiente página
+                </p>
                 <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   Volver al inicio
                 </Link>
