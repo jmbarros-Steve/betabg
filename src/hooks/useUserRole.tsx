@@ -32,18 +32,23 @@ export function useUserRole(): UseUserRoleReturn {
       }
 
       try {
-        // Fetch user role
-        const { data: roleData, error: roleError } = await supabase
+        // Fetch all roles (avoid maybeSingle issues when user has multiple roles)
+        const { data: roles, error: roleError } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
+          .eq('user_id', user.id);
 
         if (roleError) {
-          console.error('Error fetching role:', roleError);
+          console.error('Error fetching roles:', roleError);
         }
 
-        const userRole = (roleData?.role as AppRole) || null;
+        const roleSet = new Set((roles ?? []).map((r) => r.role as AppRole));
+        const userRole: AppRole | null = roleSet.has('admin')
+          ? 'admin'
+          : roleSet.has('client')
+            ? 'client'
+            : null;
+
         setRole(userRole);
 
         // If client, fetch client data
@@ -59,6 +64,8 @@ export function useUserRole(): UseUserRoleReturn {
           }
 
           setClientData(client);
+        } else {
+          setClientData(null);
         }
       } catch (error) {
         console.error('Error in fetchRole:', error);
