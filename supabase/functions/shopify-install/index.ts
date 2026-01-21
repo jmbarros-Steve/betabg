@@ -67,7 +67,21 @@ Deno.serve(async (req) => {
     const shopifyClientSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET')!;
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
-    console.log('Shopify install request:', { shop, hasHmac: !!hmac });
+    const paramKeys = (() => {
+      try {
+        return Array.from(url.searchParams.keys());
+      } catch {
+        return [] as string[];
+      }
+    })();
+
+    console.log('Shopify install request:', {
+      shop,
+      hasHmac: !!hmac,
+      paramKeys,
+      shopifyClientIdPrefix: shopifyClientId?.slice?.(0, 6) ?? null,
+      shopifyClientSecretLength: shopifyClientSecret?.trim?.()?.length ?? null,
+    });
 
     // Validate shop parameter
     if (!shop) {
@@ -93,6 +107,9 @@ Deno.serve(async (req) => {
       const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
       if (!isValid) {
         console.error('Invalid HMAC signature');
+
+        // Important: This endpoint only redirects to Shopify OAuth and does not mutate data.
+        // We keep rejecting when HMAC is present but invalid, to avoid abuse.
         return new Response(
           '<html><body><h1>Error</h1><p>Invalid request signature</p></body></html>',
           { status: 401, headers: { 'Content-Type': 'text/html' } }
