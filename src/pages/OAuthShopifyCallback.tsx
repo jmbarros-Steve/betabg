@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle, XCircle, Copy, Check } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 import { useToast } from '@/hooks/use-toast';
+import { ShopifyWelcomeScreen } from '@/components/shopify/ShopifyWelcomeScreen';
 
 export default function OAuthShopifyCallback() {
   const [searchParams] = useSearchParams();
@@ -15,7 +16,6 @@ export default function OAuthShopifyCallback() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('');
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -112,19 +112,6 @@ export default function OAuthShopifyCallback() {
     handleCallback();
   }, [searchParams, navigate]);
 
-  const handleCopyCredentials = () => {
-    if (credentials) {
-      const text = `Email: ${credentials.email}\nContraseña: ${credentials.password}`;
-      navigator.clipboard.writeText(text);
-      setCopied(true);
-      toast({
-        title: 'Credenciales copiadas',
-        description: 'Guarda estas credenciales en un lugar seguro',
-      });
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
   const handleLoginWithCredentials = async () => {
     if (credentials) {
       try {
@@ -153,6 +140,17 @@ export default function OAuthShopifyCallback() {
     }
   };
 
+  // New user - show welcome screen with credentials
+  if (status === 'new_user' && credentials) {
+    return (
+      <ShopifyWelcomeScreen
+        storeName={storeName}
+        credentials={credentials}
+        onLogin={handleLoginWithCredentials}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -179,56 +177,6 @@ export default function OAuthShopifyCallback() {
               <p className="text-sm text-muted-foreground">
                 Redirigiendo al portal...
               </p>
-            </>
-          )}
-
-          {status === 'new_user' && credentials && (
-            <>
-              <CheckCircle className="h-12 w-12 mx-auto text-primary" />
-              <h2 className="text-xl font-semibold">¡Bienvenido a Steve!</h2>
-              <p className="text-muted-foreground">
-                Tu tienda <strong>{storeName}</strong> ha sido conectada y tu cuenta ha sido creada.
-              </p>
-              
-              <div className="bg-muted p-4 rounded-lg text-left space-y-2 mt-4">
-                <p className="text-sm font-medium">Tus credenciales de acceso:</p>
-                <div className="space-y-1">
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">Email:</span>{' '}
-                    <span className="font-mono">{credentials.email}</span>
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">Contraseña:</span>{' '}
-                    <span className="font-mono">{credentials.password}</span>
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyCredentials}
-                  className="w-full mt-2"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Copiado
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copiar credenciales
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <p className="text-xs text-muted-foreground mt-2">
-                ⚠️ Guarda estas credenciales. Podrás cambiar tu contraseña después.
-              </p>
-
-              <Button onClick={handleLoginWithCredentials} className="w-full mt-4">
-                Entrar al Portal
-              </Button>
             </>
           )}
 
