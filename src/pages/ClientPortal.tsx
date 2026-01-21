@@ -98,10 +98,19 @@ export default function ClientPortal() {
 
   useEffect(() => {
     // Redirect regular users who aren't clients and aren't admin viewing
-    if (!roleLoading && user && !isClient && !isAdminView) {
+    if (roleLoading || !user || isAdminView) return;
+
+    // If user is admin (but not viewing a specific client), send them to dashboard
+    if (isAdmin && !isClient) {
       navigate('/dashboard');
+      return;
     }
-  }, [roleLoading, isClient, isAdminView, user, navigate]);
+
+    // If user has no client role, block portal access
+    if (!isClient) {
+      navigate('/auth');
+    }
+  }, [roleLoading, isClient, isAdmin, isAdminView, user, navigate]);
 
   if (authLoading || roleLoading || loadingClient) {
     return (
