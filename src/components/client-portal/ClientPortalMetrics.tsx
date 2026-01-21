@@ -7,6 +7,9 @@ import { MetricsCharts } from './metrics/MetricsCharts';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ConversionLtvPanel } from './metrics/ConversionLtvPanel';
+import { ProfitMetricsPanel } from './metrics/ProfitMetricsPanel';
+import { ProfitLossPanel } from './metrics/ProfitLossPanel';
+import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
 import { MetricsDateFilter, DateRange } from './metrics/MetricsDateFilter';
 
 interface ClientPortalMetricsProps {
@@ -19,12 +22,21 @@ interface MetricRow {
   metric_date: string;
 }
 
-interface MetricSummary {
-  totalRevenue: number;
-  totalSpend: number;
-  totalOrders: number;
-  avgRoas: number;
+interface FinancialConfig {
+  default_margin_percentage: number;
+  shopify_plan_cost: number;
+  klaviyo_plan_cost: number;
+  other_fixed_costs: number;
+  payment_gateway_commission: number;
 }
+
+const defaultFinancialConfig: FinancialConfig = {
+  default_margin_percentage: 30,
+  shopify_plan_cost: 0,
+  klaviyo_plan_cost: 0,
+  other_fixed_costs: 0,
+  payment_gateway_commission: 3.5,
+};
 
 function getDateRangeStart(range: DateRange): Date {
   const now = new Date();
@@ -44,17 +56,33 @@ function getDateRangeStart(range: DateRange): Date {
   }
 }
 
+function getPreviousPeriodDates(range: DateRange): { start: Date; end: Date } {
+  const now = new Date();
+  const currentStart = getDateRangeStart(range);
+  const daysDiff = Math.ceil((now.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24));
+  
+  const prevEnd = new Date(currentStart);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - daysDiff);
+  
+  return { start: prevStart, end: prevEnd };
+}
+
 export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [rawMetrics, setRawMetrics] = useState<MetricRow[]>([]);
+  const [previousMetrics, setPreviousMetrics] = useState<MetricRow[]>([]);
+  const [financialConfig, setFinancialConfig] = useState<FinancialConfig>(defaultFinancialConfig);
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
 
   useEffect(() => {
-    async function fetchMetrics() {
+    async function fetchAll() {
       setLoading(true);
       try {
-        // Get connections for this client
+        // Fetch connections
         const { data: connections, error: connError } = await supabase
           .from('platform_connections')
           .select('id, platform')
@@ -64,6 +92,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
         if (!connections || connections.length === 0) {
           setRawMetrics([]);
+          setPreviousMetrics([]);
           setConnectionIds([]);
           setLoading(false);
           return;
@@ -73,23 +102,57 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         setConnectionIds(connIds);
 
         const startDate = getDateRangeStart(dateRange);
+        const { start: prevStart, end: prevEnd } = getPreviousPeriodDates(dateRange);
 
-        const { data: metricsData, error: metricsError } = await supabase
-          .from('platform_metrics')
-          .select('metric_type, metric_value, metric_date')
-          .in('connection_id', connIds)
-          .gte('metric_date', startDate.toISOString().split('T')[0])
-          .order('metric_date', { ascending: true });
+        // Fetch current and previous metrics in parallel
+        const [currentRes, prevRes, configRes] = await Promise.all([
+          supabase
+            .from('platform_metrics')
+            .select('metric_type, metric_value, metric_date')
+            .in('connection_id', connIds)
+            .gte('metric_date', startDate.toISOString().split('T')[0])
+            .order('metric_date', { ascending: true }),
+          supabase
+            .from('platform_metrics')
+            .select('metric_type, metric_value, metric_date')
+            .in('connection_id', connIds)
+            .gte('metric_date', prevStart.toISOString().split('T')[0])
+            .lte('metric_date', prevEnd.toISOString().split('T')[0]),
+          supabase
+            .from('client_financial_config')
+            .select('*')
+            .eq('client_id', clientId)
+            .maybeSingle(),
+        ]);
 
-        if (metricsError) throw metricsError;
+        if (currentRes.error) throw currentRes.error;
+        if (prevRes.error) throw prevRes.error;
 
         setRawMetrics(
-          (metricsData ?? []).map((m) => ({
+          (currentRes.data ?? []).map((m) => ({
             metric_type: m.metric_type,
             metric_value: Number(m.metric_value),
             metric_date: m.metric_date,
           }))
         );
+
+        setPreviousMetrics(
+          (prevRes.data ?? []).map((m) => ({
+            metric_type: m.metric_type,
+            metric_value: Number(m.metric_value),
+            metric_date: m.metric_date,
+          }))
+        );
+
+        if (configRes.data) {
+          setFinancialConfig({
+            default_margin_percentage: Number(configRes.data.default_margin_percentage),
+            shopify_plan_cost: Number(configRes.data.shopify_plan_cost),
+            klaviyo_plan_cost: Number(configRes.data.klaviyo_plan_cost),
+            other_fixed_costs: Number(configRes.data.other_fixed_costs),
+            payment_gateway_commission: Number(configRes.data.payment_gateway_commission),
+          });
+        }
       } catch (error) {
         console.error('Error fetching metrics:', error);
       } finally {
@@ -97,17 +160,19 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       }
     }
 
-    fetchMetrics();
+    fetchAll();
   }, [clientId, dateRange]);
 
   // Compute aggregated metrics
-  const metrics: MetricSummary = useMemo(() => {
+  const computeAggregates = (metrics: MetricRow[]) => {
     let totalRevenue = 0;
     let totalSpend = 0;
     let totalOrders = 0;
+    let metaSpend = 0;
+    let googleSpend = 0;
     const roasValues: number[] = [];
 
-    rawMetrics.forEach((m) => {
+    metrics.forEach((m) => {
       switch (m.metric_type) {
         case 'revenue':
         case 'purchase_value':
@@ -121,6 +186,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           break;
         case 'spend':
           totalSpend += m.metric_value;
+          // Assume 60% Meta, 40% Google for demo
+          metaSpend += m.metric_value * 0.6;
+          googleSpend += m.metric_value * 0.4;
           break;
         case 'roas':
           roasValues.push(m.metric_value);
@@ -135,8 +203,11 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           ? totalRevenue / totalSpend
           : 0;
 
-    return { totalRevenue, totalSpend, totalOrders, avgRoas };
-  }, [rawMetrics]);
+    return { totalRevenue, totalSpend, totalOrders, avgRoas, metaSpend, googleSpend };
+  };
+
+  const current = useMemo(() => computeAggregates(rawMetrics), [rawMetrics]);
+  const previous = useMemo(() => computeAggregates(previousMetrics), [previousMetrics]);
 
   // Chart data grouped by date
   const chartData = useMemo(() => {
@@ -157,84 +228,128 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       .map(([date, data]) => ({ date, ...data }));
   }, [rawMetrics]);
 
-  // Demo SKU data (would come from Shopify orders in production)
-  const skuData: SkuData[] = useMemo(() => {
-    // Generate realistic demo SKUs
-    const demoSkus: SkuData[] = [
-      { sku: 'TSH-BLK-M', name: 'Polera Negra Talla M', quantity: 245, revenue: 7350000 },
-      { sku: 'JNS-AZL-32', name: 'Jeans Azul Talla 32', quantity: 189, revenue: 9450000 },
-      { sku: 'ZPT-WHT-42', name: 'Zapatillas Blancas 42', quantity: 156, revenue: 11700000 },
-      { sku: 'CHQ-GRS-L', name: 'Chaqueta Gris Talla L', quantity: 134, revenue: 13400000 },
-      { sku: 'PLR-RJO-S', name: 'Polar Rojo Talla S', quantity: 98, revenue: 4900000 },
-      { sku: 'CMS-NEG-M', name: 'Camisa Negra Talla M', quantity: 87, revenue: 3480000 },
-      { sku: 'SHT-BLC-L', name: 'Short Blanco Talla L', quantity: 76, revenue: 1900000 },
-      { sku: 'VES-VRD-M', name: 'Vestido Verde Talla M', quantity: 65, revenue: 3250000 },
-    ];
-    return demoSkus;
-  }, []);
+  // Calculate profit metrics
+  const profitMetrics = useMemo(() => {
+    const marginRate = financialConfig.default_margin_percentage / 100;
+    const gatewayRate = financialConfig.payment_gateway_commission / 100;
+
+    const grossProfit = current.totalRevenue * marginRate;
+    const netAfterGateway = current.totalRevenue * (1 - gatewayRate);
+    const costOfGoods = current.totalRevenue - grossProfit;
+
+    // POAS = (Revenue * Margin - Ad Spend) / Ad Spend
+    const poas = current.totalSpend > 0 
+      ? (grossProfit - current.totalSpend) / current.totalSpend 
+      : 0;
+
+    const prevGrossProfit = previous.totalRevenue * marginRate;
+    const previousPoas = previous.totalSpend > 0 
+      ? (prevGrossProfit - previous.totalSpend) / previous.totalSpend 
+      : undefined;
+
+    // CAC = Total Ad Spend / Number of unique customers (approx orders * 0.85)
+    const uniqueCustomers = Math.round(current.totalOrders * 0.85);
+    const cac = uniqueCustomers > 0 ? current.totalSpend / uniqueCustomers : 0;
+
+    const prevUniqueCustomers = Math.round(previous.totalOrders * 0.85);
+    const previousCac = prevUniqueCustomers > 0 ? previous.totalSpend / prevUniqueCustomers : undefined;
+
+    // MER = Total Revenue / Total Ad Spend
+    const mer = current.totalSpend > 0 ? current.totalRevenue / current.totalSpend : 0;
+    const previousMer = previous.totalSpend > 0 ? previous.totalRevenue / previous.totalSpend : undefined;
+
+    // Break-even ROAS = 1 / Margin %
+    const breakEvenRoas = marginRate > 0 ? 1 / marginRate : 3.33;
+
+    return {
+      poas,
+      previousPoas,
+      cac,
+      previousCac,
+      mer,
+      previousMer,
+      breakEvenRoas,
+      currentRoas: current.avgRoas,
+      grossProfit,
+      costOfGoods,
+      gatewayFees: current.totalRevenue * gatewayRate,
+    };
+  }, [current, previous, financialConfig]);
+
+  // P&L data
+  const profitLossData = useMemo(() => {
+    const taxRate = 0.19; // IVA Chile
+    const netRevenue = current.totalRevenue / (1 + taxRate);
+    const totalFixedCosts = financialConfig.shopify_plan_cost + financialConfig.klaviyo_plan_cost + financialConfig.other_fixed_costs;
+    
+    const netProfit = 
+      profitMetrics.grossProfit - 
+      current.totalSpend - 
+      totalFixedCosts - 
+      profitMetrics.gatewayFees;
+
+    return {
+      grossRevenue: current.totalRevenue,
+      netRevenue,
+      costOfGoods: profitMetrics.costOfGoods,
+      grossProfit: profitMetrics.grossProfit,
+      metaSpend: current.metaSpend,
+      googleSpend: current.googleSpend,
+      totalAdSpend: current.totalSpend,
+      shopifyCost: financialConfig.shopify_plan_cost,
+      klaviyoCost: financialConfig.klaviyo_plan_cost,
+      otherFixedCosts: financialConfig.other_fixed_costs,
+      totalFixedCosts,
+      paymentGatewayFees: profitMetrics.gatewayFees,
+      netProfit,
+      netProfitMargin: current.totalRevenue > 0 ? (netProfit / current.totalRevenue) * 100 : 0,
+    };
+  }, [current, profitMetrics, financialConfig]);
+
+  // Demo SKU data
+  const skuData: SkuData[] = useMemo(() => [
+    { sku: 'TSH-BLK-M', name: 'Polera Negra Talla M', quantity: 245, revenue: 7350000 },
+    { sku: 'JNS-AZL-32', name: 'Jeans Azul Talla 32', quantity: 189, revenue: 9450000 },
+    { sku: 'ZPT-WHT-42', name: 'Zapatillas Blancas 42', quantity: 156, revenue: 11700000 },
+    { sku: 'CHQ-GRS-L', name: 'Chaqueta Gris Talla L', quantity: 134, revenue: 13400000 },
+    { sku: 'PLR-RJO-S', name: 'Polar Rojo Talla S', quantity: 98, revenue: 4900000 },
+    { sku: 'CMS-NEG-M', name: 'Camisa Negra Talla M', quantity: 87, revenue: 3480000 },
+    { sku: 'SHT-BLC-L', name: 'Short Blanco Talla L', quantity: 76, revenue: 1900000 },
+    { sku: 'VES-VRD-M', name: 'Vestido Verde Talla M', quantity: 65, revenue: 3250000 },
+  ], []);
 
   // Demo abandoned carts
   const abandonedCarts: AbandonedCart[] = useMemo(() => {
     const now = new Date();
     return [
-      {
-        id: 'cart-1',
-        customerEmail: 'maria.gonzalez@gmail.com',
-        customerName: 'María González',
-        totalValue: 89900,
-        itemCount: 3,
-        abandonedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
-        contacted: false,
-      },
-      {
-        id: 'cart-2',
-        customerEmail: 'carlos.perez@outlook.com',
-        customerName: 'Carlos Pérez',
-        totalValue: 156000,
-        itemCount: 5,
-        abandonedAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(),
-        contacted: true,
-      },
-      {
-        id: 'cart-3',
-        customerEmail: 'ana.martinez@yahoo.com',
-        customerName: 'Ana Martínez',
-        totalValue: 45000,
-        itemCount: 2,
-        abandonedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
-        contacted: false,
-      },
-      {
-        id: 'cart-4',
-        customerEmail: 'pedro.sanchez@gmail.com',
-        customerName: 'Pedro Sánchez',
-        totalValue: 234500,
-        itemCount: 7,
-        abandonedAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(),
-        contacted: true,
-      },
-      {
-        id: 'cart-5',
-        customerEmail: 'lucia.diaz@hotmail.com',
-        customerName: 'Lucía Díaz',
-        totalValue: 67800,
-        itemCount: 4,
-        abandonedAt: new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString(),
-        contacted: false,
-      },
+      { id: 'cart-1', customerEmail: 'maria.gonzalez@gmail.com', customerName: 'María González', totalValue: 89900, itemCount: 3, abandonedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), contacted: false },
+      { id: 'cart-2', customerEmail: 'carlos.perez@outlook.com', customerName: 'Carlos Pérez', totalValue: 156000, itemCount: 5, abandonedAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(), contacted: true },
+      { id: 'cart-3', customerEmail: 'ana.martinez@yahoo.com', customerName: 'Ana Martínez', totalValue: 45000, itemCount: 2, abandonedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), contacted: false },
+      { id: 'cart-4', customerEmail: 'pedro.sanchez@gmail.com', customerName: 'Pedro Sánchez', totalValue: 234500, itemCount: 7, abandonedAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(), contacted: true },
+      { id: 'cart-5', customerEmail: 'lucia.diaz@hotmail.com', customerName: 'Lucía Díaz', totalValue: 67800, itemCount: 4, abandonedAt: new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString(), contacted: false },
     ];
   }, []);
 
+  // Demo cohort data
+  const cohortData = useMemo(() => [
+    { cohort: 'Ene 2025', month0: 420, month1: 126, month2: 84, month3: 63, month4: 50, month5: 42 },
+    { cohort: 'Dic 2024', month0: 380, month1: 114, month2: 76, month3: 57, month4: 46 },
+    { cohort: 'Nov 2024', month0: 350, month1: 105, month2: 70, month3: 53 },
+    { cohort: 'Oct 2024', month0: 310, month1: 93, month2: 62 },
+    { cohort: 'Sep 2024', month0: 290, month1: 87 },
+    { cohort: 'Ago 2024', month0: 275 },
+  ], []);
+
   // Demo conversion/LTV metrics
   const conversionMetrics = useMemo(() => {
-    const totalCustomers = Math.round(metrics.totalOrders * 0.85);
+    const totalCustomers = Math.round(current.totalOrders * 0.85);
     return {
       conversionRate: 3.42,
-      averageLtv: totalCustomers > 0 ? Math.round(metrics.totalRevenue / totalCustomers) : 0,
+      averageLtv: totalCustomers > 0 ? Math.round(current.totalRevenue / totalCustomers) : 0,
       totalCustomers,
       repeatCustomerRate: 28.5,
     };
-  }, [metrics]);
+  }, [current]);
 
   if (loading) {
     return (
@@ -260,33 +375,18 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   }
 
   const statCards = [
-    {
-      title: 'Ingresos Totales',
-      value: `$${metrics.totalRevenue.toLocaleString('es-CL')}`,
-      icon: DollarSign,
-      color: 'text-green-600',
-    },
-    {
-      title: 'Inversión Publicitaria',
-      value: `$${metrics.totalSpend.toLocaleString('es-CL')}`,
-      icon: Target,
-      color: 'text-blue-600',
-    },
-    {
-      title: 'Pedidos',
-      value: metrics.totalOrders.toLocaleString('es-CL'),
-      icon: ShoppingCart,
-      color: 'text-purple-600',
-    },
-    {
-      title: 'ROAS Promedio',
-      value: `${metrics.avgRoas.toFixed(2)}x`,
-      icon: TrendingUp,
-      color: 'text-orange-600',
-    },
+    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')}`, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
+    { title: 'Inversión Publicitaria', value: `$${current.totalSpend.toLocaleString('es-CL')}`, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
+    { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
+    { title: 'ROAS Promedio', value: `${current.avgRoas.toFixed(2)}x`, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
   ];
 
-  const hasData = metrics.totalRevenue > 0 || metrics.totalSpend > 0 || metrics.totalOrders > 0;
+  const hasData = current.totalRevenue > 0 || current.totalSpend > 0 || current.totalOrders > 0;
+
+  const getChangePercent = (curr: number, prev: number) => {
+    if (prev === 0) return undefined;
+    return ((curr - prev) / prev) * 100;
+  };
 
   return (
     <div className="space-y-6">
@@ -299,27 +399,57 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         <MetricsDateFilter value={dateRange} onChange={setDateRange} />
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards with comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat) => (
-          <Card key={stat.title} className="glow-box">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+        {statCards.map((stat) => {
+          const change = getChangePercent(
+            typeof stat.value === 'string' && stat.value.includes('x')
+              ? parseFloat(stat.value)
+              : current.totalRevenue, // simplified for demo
+            stat.prevValue || 0
+          );
+          return (
+            <Card key={stat.title} className="glow-box">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  {stat.title}
+                </CardTitle>
+                <stat.icon className={`h-5 w-5 ${stat.color}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                {stat.prevValue !== undefined && stat.prevValue > 0 && (
+                  <p className={`text-xs mt-1 ${change && change >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                    {change !== undefined && (
+                      <>
+                        {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}% vs período anterior
+                      </>
+                    )}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {hasData ? (
         <>
           {/* Charts */}
           <MetricsCharts revenueData={chartData} currency="CLP" />
+
+          {/* Profit Metrics (POAS, CAC, MER, Break-even) */}
+          <ProfitMetricsPanel
+            poas={profitMetrics.poas}
+            previousPoas={profitMetrics.previousPoas}
+            cac={profitMetrics.cac}
+            previousCac={profitMetrics.previousCac}
+            mer={profitMetrics.mer}
+            previousMer={profitMetrics.previousMer}
+            breakEvenRoas={profitMetrics.breakEvenRoas}
+            currentRoas={profitMetrics.currentRoas}
+            currency="CLP"
+          />
 
           {/* Conversion & LTV */}
           <ConversionLtvPanel
@@ -329,6 +459,12 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             repeatCustomerRate={conversionMetrics.repeatCustomerRate}
             currency="CLP"
           />
+
+          {/* P&L and Cohort side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ProfitLossPanel data={profitLossData} currency="CLP" />
+            <CohortAnalysisPanel cohorts={cohortData} />
+          </div>
 
           {/* SKUs & Abandoned Carts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

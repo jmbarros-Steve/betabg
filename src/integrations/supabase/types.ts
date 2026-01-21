@@ -85,6 +85,51 @@ export type Database = {
           },
         ]
       }
+      client_financial_config: {
+        Row: {
+          client_id: string
+          created_at: string
+          default_margin_percentage: number
+          id: string
+          klaviyo_plan_cost: number
+          other_fixed_costs: number
+          other_fixed_costs_description: string | null
+          payment_gateway_commission: number
+          product_margins: Json
+          shopify_plan_cost: number
+          updated_at: string
+          use_shopify_costs: boolean
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          default_margin_percentage?: number
+          id?: string
+          klaviyo_plan_cost?: number
+          other_fixed_costs?: number
+          other_fixed_costs_description?: string | null
+          payment_gateway_commission?: number
+          product_margins?: Json
+          shopify_plan_cost?: number
+          updated_at?: string
+          use_shopify_costs?: boolean
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          default_margin_percentage?: number
+          id?: string
+          klaviyo_plan_cost?: number
+          other_fixed_costs?: number
+          other_fixed_costs_description?: string | null
+          payment_gateway_commission?: number
+          product_margins?: Json
+          shopify_plan_cost?: number
+          updated_at?: string
+          use_shopify_costs?: boolean
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           client_user_id: string | null
