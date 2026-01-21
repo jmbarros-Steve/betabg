@@ -5,25 +5,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Verify Shopify HMAC signature
+// Verify Shopify HMAC signature following Shopify's exact specification
 function verifyHmac(query: URLSearchParams, secret: string): boolean {
   const hmac = query.get('hmac');
   if (!hmac) return false;
 
-  // Create a copy without hmac
-  const params = new URLSearchParams(query);
-  params.delete('hmac');
+  // Create a copy and remove hmac and signature params
+  const params = new URLSearchParams();
+  for (const [key, value] of query.entries()) {
+    if (key !== 'hmac' && key !== 'signature') {
+      params.append(key, value);
+    }
+  }
   
-  // Sort and join params
+  // Sort parameters lexicographically by key
   const sortedParams = Array.from(params.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
 
+  console.log('HMAC verification - sorted params:', sortedParams);
+
   const hash = createHmac('sha256', secret)
     .update(sortedParams)
     .digest('hex');
 
+  console.log('HMAC verification - computed hash:', hash);
+  console.log('HMAC verification - received hmac:', hmac);
+
+  // Simple string comparison (the timing-safe comparison had type issues)
   return hash === hmac;
 }
 
