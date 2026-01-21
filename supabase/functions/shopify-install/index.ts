@@ -6,35 +6,50 @@ const corsHeaders = {
 };
 
 // Verify Shopify HMAC signature following Shopify's exact specification
-function verifyHmac(query: URLSearchParams, secret: string): boolean {
-  const hmac = query.get('hmac');
-  if (!hmac) return false;
+function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
+  // IMPORTANT: Shopify's HMAC is computed over the *raw, encoded* query string.
+  // Using URLSearchParams can change encoding (e.g., %2F -> /, + -> space), causing mismatches.
+  const rawQuery = url.search.startsWith('?') ? url.search.slice(1) : url.search;
+  const secretKey = secret.trim();
 
-  // Create a copy and remove hmac and signature params
-  const params = new URLSearchParams();
-  for (const [key, value] of query.entries()) {
-    if (key !== 'hmac' && key !== 'signature') {
-      params.append(key, value);
+  const parts = rawQuery
+    .split('&')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  let receivedHmac: string | null = null;
+  const pairs: Array<[string, string]> = [];
+
+  for (const part of parts) {
+    const eqIdx = part.indexOf('=');
+    const key = eqIdx === -1 ? part : part.slice(0, eqIdx);
+    const value = eqIdx === -1 ? '' : part.slice(eqIdx + 1);
+
+    if (key === 'hmac') {
+      receivedHmac = value;
+      continue;
     }
+    if (key === 'signature') continue;
+    pairs.push([key, value]);
   }
-  
+
+  if (!receivedHmac) return false;
+
   // Sort parameters lexicographically by key
-  const sortedParams = Array.from(params.entries())
+  const message = pairs
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
+    .map(([k, v]) => `${k}=${v}`)
     .join('&');
 
-  console.log('HMAC verification - sorted params:', sortedParams);
+  console.log('HMAC verification - rawQuery:', rawQuery);
+  console.log('HMAC verification - message:', message);
 
-  const hash = createHmac('sha256', secret)
-    .update(sortedParams)
-    .digest('hex');
+  const computed = createHmac('sha256', secretKey).update(message).digest('hex');
 
-  console.log('HMAC verification - computed hash:', hash);
-  console.log('HMAC verification - received hmac:', hmac);
+  console.log('HMAC verification - computed hash:', computed);
+  console.log('HMAC verification - received hmac:', receivedHmac);
 
-  // Simple string comparison (the timing-safe comparison had type issues)
-  return hash === hmac;
+  return computed === receivedHmac;
 }
 
 Deno.serve(async (req) => {
@@ -75,7 +90,7 @@ Deno.serve(async (req) => {
 
     // Verify HMAC if present (for requests from Shopify)
     if (hmac) {
-      const isValid = verifyHmac(url.searchParams, shopifyClientSecret);
+      const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
       if (!isValid) {
         console.error('Invalid HMAC signature');
         return new Response(
