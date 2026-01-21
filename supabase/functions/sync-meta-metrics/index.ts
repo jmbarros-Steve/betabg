@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
         account_id,
         access_token_encrypted,
         client_id,
-        clients!inner(user_id)
+        clients!inner(user_id, client_user_id)
       `)
       .eq('id', connection_id)
       .eq('platform', 'meta')
@@ -88,9 +88,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify user owns this connection
-    const clientData = connection.clients as unknown as { user_id: string };
-    if (clientData.user_id !== user.id) {
+    // Verify user owns this connection (admin via user_id OR client via client_user_id)
+    const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
+    const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
+    
+    if (!isOwner) {
+      console.error('Authorization failed:', { userId: user.id, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
