@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   Dog, Briefcase, GraduationCap, FileText, Check, 
   Sparkles, Globe, BookOpen, Award, Plane, Coffee,
-  ArrowRight, Mail, Lock
+  ArrowRight, Mail, Lock, Clock, Target, TrendingUp,
+  DollarSign, BarChart3, Zap, Users, Tag, Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,61 +28,105 @@ const navLinks = [
   { name: 'Blog', to: '/blog', icon: FileText },
 ];
 
+const agencyServices = [
+  { 
+    icon: Sparkles, 
+    title: 'Copies que Venden', 
+    description: 'IA entrenada en metodologías de Sabri Suby, Allan Dib y Russell Brunson para crear textos que convierten.',
+    features: ['Meta Ads (TOFU, MOFU, BOFU)', 'Google Ads (Search & Display)', 'Video Scripts & Hooks']
+  },
+  { 
+    icon: BarChart3, 
+    title: 'Análisis de Métricas', 
+    description: 'Conecta tus plataformas y obtén insights accionables de tu rendimiento.',
+    features: ['Ventas y órdenes Shopify', 'ROAS y MER', 'CAC y Break-even']
+  },
+  { 
+    icon: Mail, 
+    title: 'Email Marketing', 
+    description: 'Planificación estratégica de flujos y campañas para Klaviyo.',
+    features: ['Secuencias automatizadas', 'Campañas estacionales', 'Recuperación de carritos']
+  },
+  { 
+    icon: DollarSign, 
+    title: 'Apoyo Financiero', 
+    description: 'Configura tus costos y márgenes para entender tu rentabilidad real.',
+    features: ['P&L estimado', 'Análisis de profit', 'Pricing óptimo']
+  },
+  { 
+    icon: Tag, 
+    title: 'Promociones', 
+    description: 'Crea descuentos directamente en Shopify sin salir de la plataforma.',
+    features: ['Códigos de descuento', 'Ofertas por tiempo', 'Bundles y packs']
+  },
+  { 
+    icon: Users, 
+    title: 'Buyer Persona', 
+    description: 'Un brief estratégico de 40 preguntas para que Steve entienda tu marca.',
+    features: ['Perfil de cliente ideal', 'Tono de comunicación', 'Propuesta de valor']
+  },
+];
+
 const plans = [
   {
     name: 'Free',
     price: 'Gratis',
-    description: 'Para conocernos',
+    priceNote: 'Para siempre',
+    description: 'Prueba el poder de Steve',
     features: [
-      'Acciones básicas',
-      'Acceso limitado a Steve',
-      'Prueba el poder del copy',
+      '2 generaciones/mes',
+      '1 conexión de plataforma',
+      'Buyer Persona básico',
+      'Copies Meta Ads',
     ],
     cta: 'Comenzar Gratis',
     popular: false,
   },
   {
-    name: 'Basic',
+    name: 'Starter',
     price: '$20.000 CLP',
-    period: '/mes',
+    priceNote: '/mes',
     description: 'Para emprendedores',
     features: [
-      '50 créditos mensuales',
-      'Generación de copies Meta & Google',
-      'Brief de marca completo',
-      'Soporte por chat',
+      '50 generaciones/mes',
+      '3 conexiones',
+      'Copies Meta + Google Ads',
+      'Métricas de Shopify',
+      'Descuentos automáticos',
     ],
-    cta: 'Elegir Basic',
+    cta: 'Elegir Starter',
     popular: false,
   },
   {
-    name: 'Avanzado',
+    name: 'Pro',
     price: '$70.000 CLP',
-    period: '/mes',
+    priceNote: '/mes',
     description: 'Para equipos en crecimiento',
     features: [
-      '150 créditos mensuales',
-      'Todo lo de Basic',
-      'Planificación de Klaviyo',
-      'Análisis de métricas',
-      'Prioridad en soporte',
+      '150 generaciones/mes',
+      '10 conexiones',
+      'Todo de Starter +',
+      'Klaviyo Planner',
+      'Análisis ROAS & Profit',
+      'Video Scripts IA',
     ],
-    cta: 'Elegir Avanzado',
+    cta: 'Elegir Pro',
     popular: true,
   },
   {
-    name: 'Premium',
+    name: 'Agency',
     price: '$100.000 CLP',
-    period: '/mes',
-    description: 'Para empresas serias',
+    priceNote: '/mes',
+    description: 'Para agencias y empresas',
     features: [
-      'Créditos infinitos 🚀',
-      'Todo lo de Avanzado',
-      'Acceso prioritario a nuevas features',
-      'Consultoría personalizada',
-      'Integración completa',
+      'Generaciones ilimitadas',
+      'Conexiones ilimitadas',
+      'Todo de Pro +',
+      'Multi-cliente',
+      'API Access',
+      'Soporte prioritario',
     ],
-    cta: 'Elegir Premium',
+    cta: 'Contactar',
     popular: false,
   },
 ];
@@ -254,70 +299,51 @@ export default function Steve() {
               className="lg:order-1"
             >
               <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
-                <Dog className="w-3 h-3 mr-1" />
-                Tu Copiloto de Marketing
+                <Clock className="w-3 h-3 mr-1" />
+                Tu Agencia de Marketing 24/7
               </Badge>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-light mb-6 leading-tight">
-                Soy <span className="text-primary font-medium">Steve</span>,
-                <br />el Bulldog que vende.
+                <span className="text-primary font-medium">Copies que venden</span>,
+                <br />métricas que importan.
               </h1>
 
               <div className="prose prose-lg text-muted-foreground mb-8 space-y-4">
                 <p>
-                  <strong className="text-foreground">Plot twist:</strong> No siempre fui un perro. 
-                  Hace años era un <em>Ingeniero Comercial</em> aburrido con corbata y Excel. 
-                  Hasta que un día, en Puerto Varas, conocí a <strong className="text-foreground">La Chonga</strong>... 
-                  una mina que después se hizo <em>abogada</em>. Sí, fome como ella sola 😴, 
-                  pero más inteligente que la chucha. 🐕‍🦺
+                  <strong className="text-foreground">Steve es tu equipo de marketing completo.</strong>{" "}
+                  Un asistente de IA entrenado con las metodologías de 
+                  <strong className="text-foreground"> Sabri Suby</strong>, 
+                  <strong className="text-foreground"> Allan Dib</strong> y 
+                  <strong className="text-foreground"> Russell Brunson</strong> que trabaja 24/7 para tu negocio.
                 </p>
                 
                 <p>
-                  Nos hicimos amigos. Estudiamos marketing juntos. Leímos TODO de 
-                  <strong className="text-foreground"> Sabri Suby</strong>, 
-                  <strong className="text-foreground"> Allan Dib</strong>, 
-                  <strong className="text-foreground"> Russell Brunson</strong>... 
-                  Hicimos un millón de cursos. Nos certificamos con 
-                  <Badge variant="outline" className="mx-1">Google</Badge>
-                  <Badge variant="outline" className="mx-1">Meta</Badge>
-                  <Badge variant="outline" className="mx-1">Klaviyo</Badge>
+                  Conecta tu tienda Shopify y Steve analizará tus ventas, generará copies optimizados 
+                  para <Badge variant="outline" className="mx-1">Meta Ads</Badge>
+                  <Badge variant="outline" className="mx-1">Google Ads</Badge>
+                  <Badge variant="outline" className="mx-1">Klaviyo</Badge>, 
+                  calculará tu rentabilidad real y te ayudará a crear promociones que convierten.
                 </p>
 
                 <p>
-                  <strong className="text-foreground">Lamentablemente, La Chonga ya no está con nosotros... 🕊️</strong>
-                  {" "}Se puso viejita y partió. Pero ojo, que su espíritu nos acompaña en el chat. 
-                  A veces aparece para darte consejos legales o llamarte la atención cuando escribes mal. 
-                  Fome hasta en el más allá, pero la queremos igual.
-                </p>
-
-                <p>
-                  <strong className="text-foreground">Yo, en cambio, estoy como tuna. 💪</strong>
-                  {" "}Me hago todos mis exámenes regulares, el veterinario dice que todo bien... 
-                  excepto que estoy un poquito gordo 🐷. Pero es que el <em>Bravery</em> premium está muy rico po'.
-                </p>
-
-                <p>
-                  <strong className="text-foreground">También hago clases en la Universidad de los Perros 🎓</strong>
-                  {" "}y cobro por estos planes porque, bueno... tengo que vivir. 
-                  El Mercedes no se paga solo, las Barbies tienen gustos caros, 
-                  y alguien tiene que financiar mis viajes por el mundo. 🚗💅🌍
+                  <strong className="text-foreground">No más agencias caras. No más esperas.</strong>{" "}
+                  Con Steve tienes acceso inmediato a copies profesionales, análisis financiero 
+                  y planificación de email marketing — todo basado en los datos reales de tu negocio.
                 </p>
 
                 <p className="text-foreground font-medium">
-                  <Plane className="w-5 h-5 inline mr-2 text-primary" />
-                  Ahora estoy aquí para ayudarte a escribir copies que VENDEN. 
-                  ¿Te animas a conocerme? Crea tu cuenta y conversemos... 
-                  <Coffee className="w-5 h-5 inline ml-1" />
+                  <Zap className="w-5 h-5 inline mr-2 text-primary" />
+                  Genera tu primer copy en menos de 5 minutos. ¿Te animas?
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-4">
                 <Button size="lg" className="uppercase tracking-wider" onClick={() => setShowAuth(true)}>
-                  Conocer a Steve
+                  Comenzar Gratis
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
                 <Button size="lg" variant="outline" className="uppercase tracking-wider" asChild>
-                  <a href="#planes">Ver Planes</a>
+                  <a href="#servicios">Ver Qué Hace Steve</a>
                 </Button>
               </div>
             </motion.div>
@@ -325,8 +351,44 @@ export default function Steve() {
         </div>
       </section>
 
-      {/* What Steve Does */}
-      <section className="py-16 bg-muted/30">
+      {/* Value Props */}
+      <section className="py-12 bg-muted/30 border-y border-border">
+        <div className="container px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <Clock className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Disponible 24/7</h3>
+              <p className="text-sm text-muted-foreground">Trabaja cuando tú lo necesites</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <Bot className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">IA Entrenada</h3>
+              <p className="text-sm text-muted-foreground">Aprende tu marca y tono</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <Target className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Multi-Plataforma</h3>
+              <p className="text-sm text-muted-foreground">Meta, Google, Klaviyo y más</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Data-Driven</h3>
+              <p className="text-sm text-muted-foreground">Basado en tus métricas reales</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Services - What Steve Does */}
+      <section id="servicios" className="py-20 bg-background">
         <div className="container px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -334,50 +396,45 @@ export default function Steve() {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
+            <Badge className="mb-4">Tu Agencia Completa</Badge>
             <h2 className="text-3xl md:text-4xl font-light mb-4">
-              ¿Qué hace <span className="text-primary font-medium">Steve</span>?
+              Todo lo que <span className="text-primary font-medium">Steve</span> hace por ti
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Un copiloto de IA entrenado con las metodologías de los mejores del mundo
+              Un equipo de marketing completo potenciado por IA, disponible cuando lo necesites
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card className="text-center p-6">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <BookOpen className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Brief de Marca</h3>
-                <p className="text-sm text-muted-foreground">
-                  40 preguntas estratégicas para entender tu negocio como nadie más
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Copies que Venden</h3>
-                <p className="text-sm text-muted-foreground">
-                  Genera anuncios para Meta, Google y emails con metodología probada
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="text-center p-6">
-              <CardContent className="pt-6">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <Award className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Mejora Continua</h3>
-                <p className="text-sm text-muted-foreground">
-                  Aprende de tu feedback para generar copies cada vez mejores
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {agencyServices.map((service, index) => (
+              <motion.div
+                key={service.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className="h-full hover:border-primary/50 transition-colors">
+                  <CardHeader className="pb-3">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+                      <service.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <CardTitle className="text-lg">{service.title}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{service.description}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      {service.features.map((feature, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm">
+                          <Check className="w-4 h-4 text-primary shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
@@ -419,7 +476,7 @@ export default function Steve() {
                     <CardTitle className="text-xl">{plan.name}</CardTitle>
                     <div className="mt-2">
                       <span className="text-3xl font-bold">{plan.price}</span>
-                      {plan.period && <span className="text-muted-foreground">{plan.period}</span>}
+                      {plan.priceNote && <span className="text-muted-foreground">{plan.priceNote}</span>}
                     </div>
                     <p className="text-sm text-muted-foreground">{plan.description}</p>
                   </CardHeader>
