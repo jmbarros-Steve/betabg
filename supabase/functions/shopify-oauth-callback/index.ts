@@ -8,7 +8,17 @@ const corsHeaders = {
 interface OAuthPayload {
   code: string;
   shop: string;
-  client_id: string;
+  client_id?: string; // Optional - for existing clients
+}
+
+// Generate a random password
+function generatePassword(length = 16): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 }
 
 Deno.serve(async (req) => {
@@ -20,50 +30,19 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const shopifyClientId = Deno.env.get('SHOPIFY_CLIENT_ID')!;
     const shopifyClientSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET')!;
 
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Create client with user's token for auth verification
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Validate the JWT and get user claims
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
-
-    if (claimsError || !claimsData?.claims) {
-      console.error('Invalid JWT:', claimsError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const userId = claimsData.claims.sub;
-    console.log('Authenticated user:', userId);
-
     // Parse request body
     const payload: OAuthPayload = await req.json();
-    const { code, shop, client_id: clientId } = payload;
+    const { code, shop, client_id: existingClientId } = payload;
 
-    console.log('Received OAuth callback:', { shop, clientId, hasCode: !!code });
+    console.log('Received OAuth callback:', { shop, existingClientId, hasCode: !!code });
 
     // Validate required fields
-    if (!code || !shop || !clientId) {
+    if (!code || !shop) {
       return new Response(
-        JSON.stringify({ error: 'Missing required parameters: code, shop, client_id' }),
+        JSON.stringify({ error: 'Missing required parameters: code, shop' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -72,31 +51,13 @@ Deno.serve(async (req) => {
     const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
     console.log('Shop domain:', shopDomain);
 
-    // Use service role for database operations
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify user owns the client
-    const { data: client, error: clientError } = await supabaseService
-      .from('clients')
-      .select('user_id, name')
-      .eq('id', clientId)
-      .single();
-
-    if (clientError || !client) {
-      console.error('Client not found:', clientError);
-      return new Response(
-        JSON.stringify({ error: 'Client not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (client.user_id !== userId) {
-      console.error('User does not own this client');
-      return new Response(
-        JSON.stringify({ error: 'Forbidden' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Use service role for all database operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Exchange authorization code for access token
     console.log('Exchanging code for access token...');
@@ -127,7 +88,7 @@ Deno.serve(async (req) => {
     const accessToken = tokenData.access_token;
     console.log('Successfully obtained access token');
 
-    // Get shop info
+    // Get shop info including email
     const shopInfoResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/shop.json`, {
       headers: {
         'X-Shopify-Access-Token': accessToken,
@@ -135,14 +96,164 @@ Deno.serve(async (req) => {
     });
 
     let storeName = shopDomain.replace('.myshopify.com', '');
+    let shopEmail = '';
+    let shopOwnerName = '';
+    
     if (shopInfoResponse.ok) {
       const shopInfo = await shopInfoResponse.json();
       storeName = shopInfo.shop?.name || storeName;
-      console.log('Shop name:', storeName);
+      shopEmail = shopInfo.shop?.email || '';
+      shopOwnerName = shopInfo.shop?.shop_owner || storeName;
+      console.log('Shop info:', { storeName, shopEmail, shopOwnerName });
+    }
+
+    if (!shopEmail) {
+      console.error('No shop email found');
+      return new Response(
+        JSON.stringify({ error: 'Could not retrieve shop email from Shopify' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user already exists with this email
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === shopEmail);
+
+    let userId: string;
+    let clientId: string;
+    let isNewUser = false;
+    let tempPassword: string | null = null;
+
+    if (existingUser) {
+      // User exists - find their client record
+      console.log('User already exists:', existingUser.id);
+      userId = existingUser.id;
+
+      // Find client where user is either owner or client_user
+      const { data: existingClient } = await supabaseAdmin
+        .from('clients')
+        .select('id')
+        .or(`user_id.eq.${userId},client_user_id.eq.${userId}`)
+        .single();
+
+      if (existingClient) {
+        clientId = existingClient.id;
+      } else {
+        // Create client for existing user
+        const { data: newClient, error: clientError } = await supabaseAdmin
+          .from('clients')
+          .insert({
+            user_id: userId,
+            client_user_id: userId,
+            name: shopOwnerName,
+            email: shopEmail,
+            company: storeName,
+          })
+          .select('id')
+          .single();
+
+        if (clientError) {
+          console.error('Error creating client for existing user:', clientError);
+          return new Response(
+            JSON.stringify({ error: 'Error creating client record' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        clientId = newClient.id;
+      }
+    } else {
+      // New user - create everything
+      isNewUser = true;
+      tempPassword = generatePassword();
+      
+      console.log('Creating new user...');
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: shopEmail,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          shop_domain: shopDomain,
+          store_name: storeName,
+        }
+      });
+
+      if (authError || !authData.user) {
+        console.error('Error creating user:', authError);
+        return new Response(
+          JSON.stringify({ error: 'Error creating user account' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      userId = authData.user.id;
+      console.log('Created new user:', userId);
+
+      // Assign client role
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          role: 'client'
+        });
+
+      if (roleError) {
+        console.error('Error assigning role:', roleError);
+        // Continue anyway - role can be fixed later
+      }
+
+      // Create client record
+      const { data: newClient, error: clientError } = await supabaseAdmin
+        .from('clients')
+        .insert({
+          user_id: userId,
+          client_user_id: userId,
+          name: shopOwnerName,
+          email: shopEmail,
+          company: storeName,
+        })
+        .select('id')
+        .single();
+
+      if (clientError || !newClient) {
+        console.error('Error creating client:', clientError);
+        return new Response(
+          JSON.stringify({ error: 'Error creating client record' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      clientId = newClient.id;
+      console.log('Created client:', clientId);
+
+      // Get Free plan and assign subscription
+      const { data: freePlan } = await supabaseAdmin
+        .from('subscription_plans')
+        .select('id')
+        .eq('slug', 'free')
+        .single();
+
+      if (freePlan) {
+        const { error: subError } = await supabaseAdmin
+          .from('user_subscriptions')
+          .insert({
+            user_id: userId,
+            plan_id: freePlan.id,
+            status: 'active',
+            credits_used: 0,
+            credits_reset_at: new Date().toISOString(),
+          });
+
+        if (subError) {
+          console.error('Error creating subscription:', subError);
+          // Continue anyway - subscription can be fixed later
+        } else {
+          console.log('Assigned Free plan to user');
+        }
+      }
     }
 
     // Encrypt the access token
-    const { data: encryptedToken, error: encryptError } = await supabaseService
+    const { data: encryptedToken, error: encryptError } = await supabaseAdmin
       .rpc('encrypt_platform_token', { raw_token: accessToken });
 
     if (encryptError) {
@@ -153,8 +264,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check for existing connection
-    const { data: existingConnection } = await supabaseService
+    // Check for existing Shopify connection for this client
+    const { data: existingConnection } = await supabaseAdmin
       .from('platform_connections')
       .select('id')
       .eq('client_id', clientId)
@@ -164,7 +275,7 @@ Deno.serve(async (req) => {
     let connection;
     if (existingConnection) {
       // Update existing connection
-      const { data: updated, error: updateError } = await supabaseService
+      const { data: updated, error: updateError } = await supabaseAdmin
         .from('platform_connections')
         .update({
           store_name: storeName,
@@ -188,7 +299,7 @@ Deno.serve(async (req) => {
       console.log('Updated existing connection:', connection.id);
     } else {
       // Insert new connection
-      const { data: inserted, error: insertError } = await supabaseService
+      const { data: inserted, error: insertError } = await supabaseAdmin
         .from('platform_connections')
         .insert({
           client_id: clientId,
@@ -212,11 +323,29 @@ Deno.serve(async (req) => {
       console.log('Created new connection:', connection.id);
     }
 
+    // Generate a magic link for auto-login (valid for 1 hour)
+    const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: shopEmail,
+      options: {
+        redirectTo: `${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app')}/portal?tab=connections`,
+      }
+    });
+
+    let loginToken: string | null = null;
+    if (!magicLinkError && magicLinkData?.properties?.hashed_token) {
+      loginToken = magicLinkData.properties.hashed_token;
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         store_name: storeName,
         connection: connection,
+        is_new_user: isNewUser,
+        user_email: shopEmail,
+        temp_password: isNewUser ? tempPassword : null,
+        magic_link_token: loginToken,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
