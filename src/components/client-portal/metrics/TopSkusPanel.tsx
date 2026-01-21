@@ -1,0 +1,67 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Package } from 'lucide-react';
+
+export interface SkuData {
+  sku: string;
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+interface TopSkusPanelProps {
+  skus: SkuData[];
+  currency?: string;
+}
+
+export function TopSkusPanel({ skus, currency = 'CLP' }: TopSkusPanelProps) {
+  const maxQuantity = Math.max(...skus.map((s) => s.quantity), 1);
+
+  return (
+    <Card className="glow-box">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <Package className="w-4 h-4" />
+          Top SKUs Vendidos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {skus.length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-6">
+            No hay datos de SKU disponibles
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {skus.slice(0, 10).map((sku, index) => (
+              <div key={sku.sku} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0 text-xs">
+                      {index + 1}
+                    </Badge>
+                    <div>
+                      <p className="font-medium text-sm line-clamp-1">{sku.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{sku.sku}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-sm">{sku.quantity.toLocaleString('es-CL')} uds</p>
+                    <p className="text-xs text-muted-foreground">
+                      ${sku.revenue.toLocaleString('es-CL')} {currency}
+                    </p>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${(sku.quantity / maxQuantity) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
