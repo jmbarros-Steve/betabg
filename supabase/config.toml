@@ -1,5 +1,8 @@
 project_id = "jnqivntlkemzcpomkvwv"
 
+[functions.shopify-oauth-callback]
+verify_jwt = false
+
 [functions.sync-shopify-metrics]
 verify_jwt = false
 
