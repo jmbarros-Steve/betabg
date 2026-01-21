@@ -47,16 +47,44 @@ export default function OAuthShopifyCallback() {
       if (success === 'true' && store) {
         setStoreName(store);
         
+        // New user - auto-login with credentials
         if (isNewUser && tempPass && email) {
-          setCredentials({ email, password: tempPass });
-          setStatus('new_user');
-        } else {
-          setStatus('success');
-          // Existing user - redirect after showing success
-          setTimeout(() => {
+          setStatus('loading'); // Keep showing loading while we auto-login
+          
+          try {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password: tempPass,
+            });
+
+            if (signInError) {
+              console.error('Auto-login failed:', signInError);
+              // Fallback: show credentials screen
+              setCredentials({ email, password: tempPass });
+              setStatus('new_user');
+              return;
+            }
+
+            // Auto-login successful - show brief success and redirect
+            toast({
+              title: '¡Bienvenido a Steve!',
+              description: `Tu tienda ${store} ha sido conectada exitosamente.`,
+            });
+            
             navigate('/portal?tab=connections');
-          }, 2500);
+          } catch (e: any) {
+            console.error('Auto-login error:', e);
+            setCredentials({ email, password: tempPass });
+            setStatus('new_user');
+          }
+          return;
         }
+        
+        // Existing user - just redirect
+        setStatus('success');
+        setTimeout(() => {
+          navigate('/portal?tab=connections');
+        }, 1500);
         return;
       }
 
@@ -91,16 +119,39 @@ export default function OAuthShopifyCallback() {
         setStoreName(data.store_name || shop);
         
         if (data.is_new_user && data.temp_password) {
-          setCredentials({
-            email: data.user_email,
-            password: data.temp_password,
-          });
-          setStatus('new_user');
+          // Auto-login for legacy flow too
+          try {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email: data.user_email,
+              password: data.temp_password,
+            });
+
+            if (signInError) {
+              setCredentials({
+                email: data.user_email,
+                password: data.temp_password,
+              });
+              setStatus('new_user');
+              return;
+            }
+
+            toast({
+              title: '¡Bienvenido a Steve!',
+              description: `Tu tienda ha sido conectada exitosamente.`,
+            });
+            navigate('/portal?tab=connections');
+          } catch {
+            setCredentials({
+              email: data.user_email,
+              password: data.temp_password,
+            });
+            setStatus('new_user');
+          }
         } else {
           setStatus('success');
           setTimeout(() => {
             navigate('/portal?tab=connections');
-          }, 2500);
+          }, 1500);
         }
       } catch (err: any) {
         console.error('Callback error:', err);
@@ -110,7 +161,7 @@ export default function OAuthShopifyCallback() {
     };
 
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, toast]);
 
   const handleLoginWithCredentials = async () => {
     if (credentials) {
@@ -160,9 +211,9 @@ export default function OAuthShopifyCallback() {
           {status === 'loading' && (
             <>
               <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-              <h2 className="text-xl font-semibold">Conectando tu tienda Shopify...</h2>
+              <h2 className="text-xl font-semibold">Configurando tu cuenta...</h2>
               <p className="text-muted-foreground">
-                Esto tomará solo unos segundos
+                Conectando tu tienda y preparando el portal
               </p>
             </>
           )}
