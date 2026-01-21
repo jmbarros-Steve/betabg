@@ -16,6 +16,7 @@ import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfig
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
+import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
@@ -229,6 +230,11 @@ export default function ClientPortal() {
           )}
         </motion.div>
       </div>
+
+      {/* Floating Discount Button */}
+      {effectiveClientId && (
+        <FloatingDiscountButton clientId={effectiveClientId} />
+      )}
 
       {/* Chonga Support Bot */}
       {effectiveClientId && (
