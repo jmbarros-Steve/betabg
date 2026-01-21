@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, TrendingUp, Zap } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, TrendingUp, Zap, Star } from 'lucide-react';
 import logoSteve from '@/assets/logo-steve.png';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -39,27 +39,42 @@ const features = [
   },
 ];
 
+const plans = [
+  {
+    name: 'Free',
+    price: '$0',
+    period: '/mes',
+    features: ['2 generaciones/mes', '1 conexión', 'Buyer Persona básico'],
+    popular: false,
+  },
+  {
+    name: 'Starter',
+    price: '$20.000',
+    period: '/mes',
+    features: ['50 generaciones/mes', '3 conexiones', 'Copy Meta Ads', 'Copy Google Ads'],
+    popular: false,
+  },
+  {
+    name: 'Pro',
+    price: '$70.000',
+    period: '/mes',
+    features: ['150 generaciones/mes', '10 conexiones', 'Klaviyo Planner', 'Métricas avanzadas'],
+    popular: true,
+  },
+  {
+    name: 'Agency',
+    price: '$100.000',
+    period: '/mes',
+    features: ['Generaciones ilimitadas', 'Conexiones ilimitadas', 'Múltiples clientes', 'Soporte prioritario'],
+    popular: false,
+  },
+];
+
 export default function ShopifyEmbedded() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
 
   const shop = searchParams.get('shop');
-
-  useEffect(() => {
-    // Detect if we're inside Shopify admin iframe
-    const inIframe = window.self !== window.top;
-
-    // If user is logged in, redirect to portal
-    if (!loading && user) {
-      if (inIframe) {
-        // Open portal in new tab when in iframe
-        window.open('https://betabg.lovable.app/portal', '_blank');
-      } else {
-        navigate('/portal');
-      }
-    }
-  }, [user, loading, navigate]);
 
   const handleGoToPortal = () => {
     window.open('https://betabg.lovable.app/portal', '_blank');
@@ -70,86 +85,101 @@ export default function ShopifyEmbedded() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-4">
-      <div className="max-w-2xl mx-auto py-8 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-4 overflow-auto">
+      <div className="max-w-4xl mx-auto py-6 space-y-6">
         {/* Header */}
-        <div className="text-center space-y-4">
-          <img src={logoSteve} alt="Steve" className="h-16 mx-auto" />
+        <div className="text-center space-y-3">
+          <img src={logoSteve} alt="Steve" className="h-14 mx-auto" />
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-xl font-bold text-foreground">
               Steve - Tu Copiloto de Marketing
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               IA que aprende de tu marca y genera copies que venden
             </p>
           </div>
         </div>
 
         {shop && (
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-primary/10 text-primary p-3 rounded-lg">
+          <div className="flex items-center justify-center gap-2 text-sm bg-primary/10 text-primary p-2 rounded-lg">
             <CheckCircle className="h-4 w-4" />
-            <span>Tienda conectada: <strong>{shop}</strong></span>
+            <span>Conectado: <strong>{shop}</strong></span>
           </div>
         )}
 
         {/* Features Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
           {features.map((feature, index) => (
             <Card key={index} className="border-border/50">
-              <CardContent className="p-4 text-center">
-                <feature.icon className="h-8 w-8 mx-auto mb-2 text-primary" />
-                <h3 className="font-semibold text-sm text-foreground">{feature.title}</h3>
-                <p className="text-xs text-muted-foreground">{feature.description}</p>
+              <CardContent className="p-3 text-center">
+                <feature.icon className="h-6 w-6 mx-auto mb-1 text-primary" />
+                <h3 className="font-medium text-xs text-foreground">{feature.title}</h3>
               </CardContent>
             </Card>
           ))}
         </div>
 
+        {/* Plans */}
+        <div>
+          <h2 className="text-center text-lg font-semibold text-foreground mb-4">Planes</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {plans.map((plan, index) => (
+              <Card 
+                key={index} 
+                className={`border-border/50 ${plan.popular ? 'border-primary ring-1 ring-primary' : ''}`}
+              >
+                <CardContent className="p-4 text-center space-y-2">
+                  {plan.popular && (
+                    <Badge className="bg-primary text-primary-foreground text-xs">
+                      <Star className="h-3 w-3 mr-1" />
+                      Popular
+                    </Badge>
+                  )}
+                  <h3 className="font-bold text-foreground">{plan.name}</h3>
+                  <div>
+                    <span className="text-xl font-bold text-foreground">{plan.price}</span>
+                    <span className="text-xs text-muted-foreground">{plan.period}</span>
+                  </div>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-center gap-1 justify-center">
+                        <CheckCircle className="h-3 w-3 text-primary flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
         {/* CTA */}
         <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-6 text-center space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Accede a todas las funciones
-            </h2>
-            
+          <CardContent className="p-4 text-center space-y-3">
             <Button 
               onClick={handleGoToPortal} 
-              className="w-full gap-2" 
+              className="w-full max-w-xs gap-2" 
               size="lg"
             >
-              Ir al Portal de Steve
+              {user ? 'Ir al Portal' : 'Comenzar Gratis'}
               <ExternalLink className="h-4 w-4" />
             </Button>
+            
+            {!user && (
+              <div className="flex items-center justify-center gap-2 text-sm">
+                <span className="text-muted-foreground">¿Ya tienes cuenta?</span>
+                <Button variant="link" onClick={handleLogin} className="p-0 h-auto">
+                  Iniciar Sesión
+                </Button>
+              </div>
+            )}
             
             <p className="text-xs text-muted-foreground">
               Se abrirá en una nueva pestaña
             </p>
           </CardContent>
         </Card>
-
-        {/* Login help */}
-        {!user && (
-          <Card className="border-border/50">
-            <CardContent className="p-4 text-center space-y-3">
-              <p className="text-sm text-muted-foreground">
-                ¿Primera vez? Revisa tu email para tus credenciales de acceso.
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={handleLogin}
-                size="sm"
-              >
-                Iniciar Sesión
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Plan info */}
-        <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>Plan Free: 2 generaciones/mes • 1 conexión • Buyer Persona básico</p>
-          <p>Actualiza tu plan en el portal para más funciones</p>
-        </div>
       </div>
     </div>
   );
