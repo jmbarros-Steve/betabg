@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -148,17 +149,29 @@ export default function Steve() {
   const [loading, setLoading] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
-  // Redirect logged-in users to portal (using useEffect to avoid render-time navigation)
+  // Redirect logged-in users to the right area (avoid render-time navigation)
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate('/portal');
-    }
-  }, [user, authLoading, navigate]);
+    if (authLoading || roleLoading || !user) return;
 
-  // Show nothing while checking auth status
-  if (authLoading) {
+    if (isClient) {
+      navigate('/portal');
+      return;
+    }
+
+    if (isAdmin) {
+      navigate('/dashboard');
+      return;
+    }
+
+    // Fallback if user has no role
+    navigate('/auth');
+  }, [user, authLoading, roleLoading, isClient, isAdmin, navigate]);
+
+  // Show nothing while checking auth/role status
+  if (authLoading || roleLoading) {
     return null;
   }
 

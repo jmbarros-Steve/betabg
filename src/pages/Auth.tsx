@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -29,29 +30,24 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function redirectBasedOnRole() {
-      if (!user) return;
+    if (authLoading || roleLoading || !user) return;
 
-      // Check user role to determine where to redirect
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (roleData?.role === 'client') {
-        navigate('/portal');
-      } else {
-        navigate('/dashboard');
-      }
+    if (isClient) {
+      navigate('/portal');
+      return;
+    }
+    if (isAdmin) {
+      navigate('/dashboard');
+      return;
     }
 
-    redirectBasedOnRole();
-  }, [user, navigate]);
+    // If user has no assigned role, keep them in auth
+  }, [user, authLoading, roleLoading, isClient, isAdmin, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
