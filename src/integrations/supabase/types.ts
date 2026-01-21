@@ -674,6 +674,104 @@ export type Database = {
           },
         ]
       }
+      steve_training_examples: {
+        Row: {
+          campaign_metrics: Json | null
+          correct_analysis: string
+          created_at: string
+          created_by: string
+          id: string
+          incorrect_analysis: string | null
+          is_active: boolean | null
+          platform: string
+          scenario_description: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_metrics?: Json | null
+          correct_analysis: string
+          created_at?: string
+          created_by: string
+          id?: string
+          incorrect_analysis?: string | null
+          is_active?: boolean | null
+          platform: string
+          scenario_description: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_metrics?: Json | null
+          correct_analysis?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          incorrect_analysis?: string | null
+          is_active?: boolean | null
+          platform?: string
+          scenario_description?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      steve_training_feedback: {
+        Row: {
+          campaign_id: string
+          campaign_metrics: Json | null
+          created_at: string
+          created_by: string
+          feedback_notes: string | null
+          feedback_rating: string
+          id: string
+          improved_recommendation: string | null
+          original_recommendation: string
+          platform: string
+          recommendation_id: string | null
+          recommendation_type: string
+        }
+        Insert: {
+          campaign_id: string
+          campaign_metrics?: Json | null
+          created_at?: string
+          created_by: string
+          feedback_notes?: string | null
+          feedback_rating: string
+          id?: string
+          improved_recommendation?: string | null
+          original_recommendation: string
+          platform: string
+          recommendation_id?: string | null
+          recommendation_type: string
+        }
+        Update: {
+          campaign_id?: string
+          campaign_metrics?: Json | null
+          created_at?: string
+          created_by?: string
+          feedback_notes?: string | null
+          feedback_rating?: string
+          id?: string
+          improved_recommendation?: string | null
+          original_recommendation?: string
+          platform?: string
+          recommendation_id?: string | null
+          recommendation_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "steve_training_feedback_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_recommendations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_resources: {
         Row: {
           content: string | null
