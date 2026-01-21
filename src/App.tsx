@@ -19,6 +19,7 @@ import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DataDeletion from "./pages/DataDeletion";
 import ShopifyApp from "./pages/ShopifyApp";
+import ShopifyEmbedded from "./pages/ShopifyEmbedded";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/privacidad" element={<PrivacyPolicy />} />
             <Route path="/eliminacion-datos" element={<DataDeletion />} />
             <Route path="/shopify-app" element={<ShopifyApp />} />
+            <Route path="/shopify" element={<ShopifyEmbedded />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
