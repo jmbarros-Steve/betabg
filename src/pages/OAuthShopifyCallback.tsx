@@ -7,14 +7,18 @@ import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 import { useToast } from '@/hooks/use-toast';
 import { ShopifyWelcomeScreen } from '@/components/shopify/ShopifyWelcomeScreen';
+import { ShopifyOnboardingTour } from '@/components/client-portal/ShopifyOnboardingTour';
+
+type ConnectionStatus = 'loading' | 'success' | 'new_user' | 'tour' | 'error';
 
 export default function OAuthShopifyCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'new_user' | 'error'>('loading');
+  const [status, setStatus] = useState<ConnectionStatus>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [storeName, setStoreName] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
 
   useEffect(() => {
@@ -49,6 +53,7 @@ export default function OAuthShopifyCallback() {
         
         // New user - auto-login with credentials
         if (isNewUser && tempPass && email) {
+          setUserEmail(email);
           setStatus('loading'); // Keep showing loading while we auto-login
           
           try {
@@ -65,13 +70,8 @@ export default function OAuthShopifyCallback() {
               return;
             }
 
-            // Auto-login successful - show brief success and redirect
-            toast({
-              title: '¡Bienvenido a Steve!',
-              description: `Tu tienda ${store} ha sido conectada exitosamente.`,
-            });
-            
-            navigate('/portal?tab=connections');
+            // Auto-login successful - show the onboarding tour
+            setStatus('tour');
           } catch (e: any) {
             console.error('Auto-login error:', e);
             setCredentials({ email, password: tempPass });
@@ -119,6 +119,7 @@ export default function OAuthShopifyCallback() {
         setStoreName(data.store_name || shop);
         
         if (data.is_new_user && data.temp_password) {
+          setUserEmail(data.user_email);
           // Auto-login for legacy flow too
           try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -135,11 +136,8 @@ export default function OAuthShopifyCallback() {
               return;
             }
 
-            toast({
-              title: '¡Bienvenido a Steve!',
-              description: `Tu tienda ha sido conectada exitosamente.`,
-            });
-            navigate('/portal?tab=connections');
+            // Show onboarding tour after successful login
+            setStatus('tour');
           } catch {
             setCredentials({
               email: data.user_email,
@@ -180,7 +178,9 @@ export default function OAuthShopifyCallback() {
           return;
         }
 
-        navigate('/portal?tab=connections');
+        // Show tour after successful manual login
+        setUserEmail(credentials.email);
+        setStatus('tour');
       } catch (e: any) {
         toast({
           title: 'Error',
@@ -191,7 +191,26 @@ export default function OAuthShopifyCallback() {
     }
   };
 
-  // New user - show welcome screen with credentials
+  const handleTourComplete = () => {
+    toast({
+      title: '¡Bienvenido a Steve!',
+      description: `Tu tienda ${storeName} está lista.`,
+    });
+    navigate('/portal?tab=metrics');
+  };
+
+  // Show onboarding tour for new users after login
+  if (status === 'tour') {
+    return (
+      <ShopifyOnboardingTour
+        storeName={storeName}
+        userEmail={userEmail}
+        onComplete={handleTourComplete}
+      />
+    );
+  }
+
+  // New user - show welcome screen with credentials (fallback)
   if (status === 'new_user' && credentials) {
     return (
       <ShopifyWelcomeScreen
