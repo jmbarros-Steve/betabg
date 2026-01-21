@@ -33,13 +33,30 @@ export default function ShopifyEmbedded() {
   const shop = searchParams.get('shop');
   const hmac = searchParams.get('hmac');
 
+  const redirectTop = (url: string) => {
+    // Shopify admin loads embedded apps in an iframe; OAuth/login pages cannot be framed.
+    // Using top-level navigation prevents "accounts.shopify.com rechazó la conexión".
+    try {
+      if (window.top && window.top !== window) {
+        window.top.location.href = url;
+        return;
+      }
+    } catch {
+      // If cross-origin frame access is blocked, fall back to opening a new tab.
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   useEffect(() => {
     const checkInstallation = async () => {
       // If we have shop + hmac, this is a fresh install request from Shopify
       if (shop && hmac) {
         console.log('Fresh install detected, redirecting to OAuth...');
         // Redirect to our install endpoint
-        window.location.href = `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${shop}&hmac=${hmac}&timestamp=${searchParams.get('timestamp') || ''}`;
+        redirectTop(
+          `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${encodeURIComponent(shop)}&hmac=${encodeURIComponent(hmac)}&timestamp=${encodeURIComponent(searchParams.get('timestamp') || '')}`
+        );
         return;
       }
 
@@ -68,7 +85,9 @@ export default function ShopifyEmbedded() {
 
   const handleInstall = () => {
     if (shop) {
-      window.location.href = `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${shop}`;
+      redirectTop(
+        `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${encodeURIComponent(shop)}`
+      );
     }
   };
 
