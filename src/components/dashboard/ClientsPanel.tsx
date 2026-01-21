@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ interface Props {
 
 export function ClientsPanel({ userId }: Props) {
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -388,12 +390,12 @@ export function ClientsPanel({ userId }: Props) {
                   €{client.hourly_rate}/h
                 </span>
                 <div className="flex gap-2">
-                  {client.client_user_id && (
+                  {(isAdmin || client.client_user_id) && (
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       onClick={() => navigate(`/portal/${client.id}`)}
-                      title="Ver portal del cliente"
+                      title={isAdmin ? 'Ver portal (vista admin)' : 'Ver portal del cliente'}
                     >
                       <Eye className="w-4 h-4" />
                     </Button>

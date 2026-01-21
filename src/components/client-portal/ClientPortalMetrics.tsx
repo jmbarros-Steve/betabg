@@ -60,10 +60,12 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           switch (m.metric_type) {
             case 'revenue':
             case 'purchase_value':
+            case 'gross_revenue':
               totalRevenue += Number(m.metric_value);
               break;
             case 'orders':
             case 'purchases':
+            case 'orders_count':
               totalOrders += Number(m.metric_value);
               break;
             case 'spend':
