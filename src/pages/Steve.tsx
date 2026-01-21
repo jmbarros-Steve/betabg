@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -147,12 +147,23 @@ export default function Steve() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // If user is logged in, redirect to portal
+  // Redirect logged-in users to portal (using useEffect to avoid render-time navigation)
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/portal');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Show nothing while checking auth status
+  if (authLoading) {
+    return null;
+  }
+
+  // If user is logged in, don't render the page (redirect is happening)
   if (user) {
-    navigate('/portal');
     return null;
   }
 
