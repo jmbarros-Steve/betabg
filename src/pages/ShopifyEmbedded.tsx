@@ -7,7 +7,7 @@ import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, TrendingUp, 
 import logoSteve from '@/assets/logo-steve.png';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-
+import { ShopifyInstallScreen } from '@/components/shopify/ShopifyInstallScreen';
 const features = [
   { icon: Sparkles, title: 'Copies con IA', description: 'Meta Ads, Google Ads y scripts de video' },
   { icon: BarChart3, title: 'Métricas', description: 'Ventas, órdenes y tendencias' },
@@ -29,6 +29,7 @@ export default function ShopifyEmbedded() {
   const { user, loading: authLoading } = useAuth();
   const [checking, setChecking] = useState(true);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [showInstallScreen, setShowInstallScreen] = useState(false);
 
   const shop = searchParams.get('shop');
   const hmac = searchParams.get('hmac');
@@ -50,13 +51,11 @@ export default function ShopifyEmbedded() {
 
   useEffect(() => {
     const checkInstallation = async () => {
-      // If we have shop + hmac, this is a fresh install request from Shopify
+      // If we have shop + hmac, this is a fresh install request - show install screen
       if (shop && hmac) {
-        console.log('Fresh install detected, redirecting to OAuth...');
-        // Redirect to our install endpoint
-        redirectTop(
-          `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${encodeURIComponent(shop)}&hmac=${encodeURIComponent(hmac)}&timestamp=${encodeURIComponent(searchParams.get('timestamp') || '')}`
-        );
+        console.log('Fresh install detected, showing install screen...');
+        setShowInstallScreen(true);
+        setChecking(false);
         return;
       }
 
@@ -86,10 +85,20 @@ export default function ShopifyEmbedded() {
   const handleInstall = () => {
     if (shop) {
       redirectTop(
-        `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${encodeURIComponent(shop)}`
+        `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${encodeURIComponent(shop)}&hmac=${encodeURIComponent(hmac || '')}&timestamp=${encodeURIComponent(searchParams.get('timestamp') || '')}`
       );
     }
   };
+
+  // Show professional install screen for fresh installs
+  if (showInstallScreen && shop) {
+    return (
+      <ShopifyInstallScreen 
+        storeName={shop.replace('.myshopify.com', '')} 
+        onConfirmInstall={handleInstall}
+      />
+    );
+  }
 
   const handleGoToPortal = () => {
     window.open('https://betabg.lovable.app/portal', '_blank');
