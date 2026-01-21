@@ -32,20 +32,20 @@ export function useUserRole(): UseUserRoleReturn {
       }
 
       try {
-        // Fetch all roles (avoid maybeSingle issues when user has multiple roles)
-        const { data: roles, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
+        // Use SECURITY DEFINER RPC to avoid RLS issues when reading roles
+        const [{ data: isAdmin, error: adminErr }, { data: isClient, error: clientErr }] =
+          await Promise.all([
+            supabase.rpc('has_role', { _role: 'admin', _user_id: user.id }),
+            supabase.rpc('has_role', { _role: 'client', _user_id: user.id }),
+          ]);
 
-        if (roleError) {
-          console.error('Error fetching roles:', roleError);
+        if (adminErr || clientErr) {
+          console.error('Error checking roles:', adminErr ?? clientErr);
         }
 
-        const roleSet = new Set((roles ?? []).map((r) => r.role as AppRole));
-        const userRole: AppRole | null = roleSet.has('admin')
+        const userRole: AppRole | null = isAdmin
           ? 'admin'
-          : roleSet.has('client')
+          : isClient
             ? 'client'
             : null;
 
