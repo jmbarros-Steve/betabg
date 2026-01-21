@@ -80,11 +80,27 @@ export default function OAuthShopifyCallback() {
           return;
         }
         
-        // Existing user - just redirect
-        setStatus('success');
-        setTimeout(() => {
-          navigate('/portal?tab=connections');
-        }, 1500);
+        // Existing user - check if they have an active session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          // Already logged in, show success and redirect
+          setStatus('success');
+          toast({
+            title: '¡Tienda reconectada!',
+            description: `${store} ha sido conectada exitosamente.`,
+          });
+          setTimeout(() => {
+            navigate('/portal?tab=connections');
+          }, 1500);
+        } else {
+          // Not logged in - redirect to auth with store info
+          toast({
+            title: '¡Tienda conectada!',
+            description: 'Inicia sesión para acceder a tu portal.',
+          });
+          navigate(`/auth?redirect=/portal?tab=connections&store=${encodeURIComponent(store)}`);
+        }
         return;
       }
 
