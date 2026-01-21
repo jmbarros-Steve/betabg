@@ -19,37 +19,60 @@ export default function OAuthShopifyCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      // Check for direct redirect params from edge function
+      const success = searchParams.get('success');
+      const error = searchParams.get('error');
+      const store = searchParams.get('store');
+      const email = searchParams.get('email');
+      const isNewUser = searchParams.get('new_user') === 'true';
+      const tempPass = searchParams.get('temp_pass');
+
+      console.log('OAuth callback params:', { success, error, store, email, isNewUser });
+
+      if (error) {
+        const errorMessages: Record<string, string> = {
+          'invalid_signature': 'Firma de solicitud inválida',
+          'missing_params': 'Parámetros de autorización inválidos',
+          'token_exchange_failed': 'Error al obtener token de Shopify',
+          'no_email': 'No se pudo obtener el email de la tienda',
+          'user_creation_failed': 'Error al crear la cuenta de usuario',
+          'client_creation_failed': 'Error al crear el registro del cliente',
+          'encryption_failed': 'Error al procesar credenciales',
+        };
+        setErrorMessage(errorMessages[error] || error);
+        setStatus('error');
+        return;
+      }
+
+      if (success === 'true' && store) {
+        setStoreName(store);
+        
+        if (isNewUser && tempPass && email) {
+          setCredentials({ email, password: tempPass });
+          setStatus('new_user');
+        } else {
+          setStatus('success');
+          // Existing user - redirect after showing success
+          setTimeout(() => {
+            navigate('/portal?tab=connections');
+          }, 2500);
+        }
+        return;
+      }
+
+      // Legacy flow: frontend calling edge function
+      const code = searchParams.get('code');
+      const shop = searchParams.get('shop');
+
+      if (!code || !shop) {
+        setErrorMessage('Parámetros de autorización inválidos');
+        setStatus('error');
+        return;
+      }
+
       try {
-        const code = searchParams.get('code');
-        const shop = searchParams.get('shop');
-        const state = searchParams.get('state');
-        const error = searchParams.get('error');
-
-        console.log('Shopify OAuth callback received:', { hasCode: !!code, shop, state, error });
-
-        if (error) {
-          setErrorMessage('Acceso denegado por el usuario');
-          setStatus('error');
-          return;
-        }
-
-        if (!code || !shop) {
-          setErrorMessage('Parámetros de autorización inválidos');
-          setStatus('error');
-          return;
-        }
-
-        // Get client_id from state or sessionStorage (for existing clients)
-        const clientId = state || sessionStorage.getItem('shopify_oauth_client_id');
-
-        // Call edge function to exchange code for token
-        // Note: We don't require auth for new users coming from Shopify App Store
         const { data, error: invokeError } = await supabase.functions.invoke('shopify-oauth-callback', {
-          body: {
-            code,
-            shop,
-            client_id: clientId || undefined,
-          },
+          body: { code, shop },
         });
 
         if (invokeError) {
@@ -65,40 +88,20 @@ export default function OAuthShopifyCallback() {
           return;
         }
 
-        // Success!
         setStoreName(data.store_name || shop);
         
-        // Clean up sessionStorage
-        sessionStorage.removeItem('shopify_oauth_client_id');
-
         if (data.is_new_user && data.temp_password) {
-          // New user - show credentials
           setCredentials({
             email: data.user_email,
             password: data.temp_password,
           });
           setStatus('new_user');
         } else {
-          // Existing user - auto-login and redirect
           setStatus('success');
-          
-          // Try to use magic link for auto-login
-          if (data.magic_link_token) {
-            try {
-              await supabase.auth.verifyOtp({
-                token_hash: data.magic_link_token,
-                type: 'magiclink',
-              });
-            } catch (e) {
-              console.log('Magic link verification failed, user may need to login manually');
-            }
-          }
-
           setTimeout(() => {
             navigate('/portal?tab=connections');
           }, 2500);
         }
-
       } catch (err: any) {
         console.error('Callback error:', err);
         setErrorMessage(err.message || 'Error inesperado');

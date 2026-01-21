@@ -1,5 +1,8 @@
 project_id = "jnqivntlkemzcpomkvwv"
 
+[functions.shopify-install]
+verify_jwt = false
+
 [functions.shopify-oauth-callback]
 verify_jwt = false
 
@@ -16,9 +19,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-client-user]
-verify_jwt = false
-
-[functions.shopify-oauth-callback]
 verify_jwt = false
 
 [functions.google-ads-oauth-callback]
