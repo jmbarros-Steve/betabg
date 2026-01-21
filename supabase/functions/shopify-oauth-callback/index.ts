@@ -17,23 +17,41 @@ function generatePassword(length = 16): string {
 }
 
 // Verify Shopify HMAC signature
-function verifyHmac(query: URLSearchParams, secret: string): boolean {
-  const hmac = query.get('hmac');
-  if (!hmac) return false;
+function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
+  // IMPORTANT: Shopify signs the raw (encoded) query string.
+  const rawQuery = url.search.startsWith('?') ? url.search.slice(1) : url.search;
+  const secretKey = secret.trim();
 
-  const params = new URLSearchParams(query);
-  params.delete('hmac');
-  
-  const sortedParams = Array.from(params.entries())
+  const parts = rawQuery
+    .split('&')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  let receivedHmac: string | null = null;
+  const pairs: Array<[string, string]> = [];
+
+  for (const part of parts) {
+    const eqIdx = part.indexOf('=');
+    const key = eqIdx === -1 ? part : part.slice(0, eqIdx);
+    const value = eqIdx === -1 ? '' : part.slice(eqIdx + 1);
+
+    if (key === 'hmac') {
+      receivedHmac = value;
+      continue;
+    }
+    if (key === 'signature') continue;
+    pairs.push([key, value]);
+  }
+
+  if (!receivedHmac) return false;
+
+  const message = pairs
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
+    .map(([k, v]) => `${k}=${v}`)
     .join('&');
 
-  const hash = createHmac('sha256', secret)
-    .update(sortedParams)
-    .digest('hex');
-
-  return hash === hmac;
+  const computed = createHmac('sha256', secretKey).update(message).digest('hex');
+  return computed === receivedHmac;
 }
 
 Deno.serve(async (req) => {
@@ -69,7 +87,7 @@ Deno.serve(async (req) => {
 
       // Verify HMAC
       if (hmac) {
-        const isValid = verifyHmac(url.searchParams, shopifyClientSecret);
+        const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
         if (!isValid) {
           console.error('Invalid HMAC signature');
           return new Response(null, {
