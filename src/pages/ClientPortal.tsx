@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -12,12 +12,13 @@ import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
 import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
 import { KlaviyoPlanner } from '@/components/client-portal/KlaviyoPlanner';
+import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfigPanel';
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'connections' | 'brief' | 'steve' | 'copies' | 'google' | 'klaviyo';
+type TabType = 'metrics' | 'connections' | 'brief' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
 interface ClientInfo {
   id: string;
   name: string;
@@ -120,6 +121,7 @@ export default function ClientPortal() {
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
+    { id: 'config', label: 'Configuración', icon: Settings },
   ] as const;
 
   return (
@@ -164,13 +166,13 @@ export default function ClientPortal() {
 
       <div className="container px-6 py-8">
         {/* Tabs */}
-        <div className="flex gap-2 mb-8">
+        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {tabs.map((tab) => (
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'ghost'}
               onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2 uppercase tracking-wider text-xs"
+              className="flex items-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap"
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -216,6 +218,9 @@ export default function ClientPortal() {
             <div className="max-w-4xl mx-auto">
               <KlaviyoPlanner clientId={effectiveClientId} />
             </div>
+          )}
+          {activeTab === 'config' && effectiveClientId && (
+            <FinancialConfigPanel clientId={effectiveClientId} />
           )}
         </motion.div>
       </div>
