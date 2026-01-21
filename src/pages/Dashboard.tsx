@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3 } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
@@ -12,9 +12,10 @@ import { BlogPanel } from '@/components/dashboard/BlogPanel';
 import { StudyResourcesPanel } from '@/components/dashboard/StudyResourcesPanel';
 import { PlatformConnectionsPanel } from '@/components/dashboard/PlatformConnectionsPanel';
 import { ClientMetricsPanel } from '@/components/dashboard/ClientMetricsPanel';
+import { SteveTrainingPanel } from '@/components/dashboard/SteveTrainingPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics';
+type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training';
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
@@ -44,6 +45,7 @@ export default function Dashboard() {
     { id: 'time', label: 'Horas', icon: Clock },
     { id: 'invoices', label: 'Recibos', icon: FileText },
     { id: 'platforms', label: 'Plataformas', icon: Link2 },
+    { id: 'training', label: 'Steve IA', icon: Brain },
     { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'estudios', label: 'Centro Estudios', icon: GraduationCap },
   ] as const;
@@ -93,6 +95,7 @@ export default function Dashboard() {
           {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
           {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
+          {activeTab === 'training' && <SteveTrainingPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
           {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}
         </motion.div>

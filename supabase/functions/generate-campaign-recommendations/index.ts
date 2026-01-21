@@ -258,18 +258,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Use AI for deeper analysis if API key available and we have significant data
-    if (lovableApiKey && campaigns.length > 0) {
-      try {
-        const aiRecommendations = await getAIRecommendations(campaigns, lovableApiKey);
-        recommendations.push(...aiRecommendations.map(r => ({
-          ...r,
-          connection_id,
-        })));
-      } catch (e) {
-        console.error('AI recommendation error:', e);
-      }
+  // Use AI for deeper analysis if API key available and we have significant data
+  if (lovableApiKey && campaigns.length > 0) {
+    try {
+      // Fetch training data for context
+      const { data: trainingExamples } = await supabase
+        .from('steve_training_examples')
+        .select('*')
+        .eq('is_active', true)
+        .limit(10);
+
+      const { data: positiveFeedback } = await supabase
+        .from('steve_training_feedback')
+        .select('original_recommendation, improved_recommendation, feedback_notes')
+        .eq('feedback_rating', 'positive')
+        .limit(10);
+
+      const { data: negativeFeedback } = await supabase
+        .from('steve_training_feedback')
+        .select('original_recommendation, improved_recommendation, feedback_notes')
+        .eq('feedback_rating', 'negative')
+        .not('improved_recommendation', 'is', null)
+        .limit(10);
+
+      const aiRecommendations = await getAIRecommendations(
+        campaigns, 
+        lovableApiKey,
+        trainingExamples || [],
+        positiveFeedback || [],
+        negativeFeedback || []
+      );
+      recommendations.push(...aiRecommendations.map(r => ({
+        ...r,
+        connection_id,
+      })));
+    } catch (e) {
+      console.error('AI recommendation error:', e);
     }
+  }
 
     // Save recommendations (clear old ones first for these campaigns)
     if (recommendations.length > 0) {
@@ -312,7 +338,10 @@ Deno.serve(async (req) => {
 
 async function getAIRecommendations(
   campaigns: CampaignData[], 
-  apiKey: string
+  apiKey: string,
+  trainingExamples: Array<{ scenario_description: string; correct_analysis: string; incorrect_analysis: string | null }>,
+  positiveFeedback: Array<{ original_recommendation: string; improved_recommendation: string | null; feedback_notes: string | null }>,
+  negativeFeedback: Array<{ original_recommendation: string; improved_recommendation: string | null; feedback_notes: string | null }>
 ): Promise<Recommendation[]> {
   const recommendations: Recommendation[] = [];
 
@@ -330,9 +359,37 @@ async function getAIRecommendations(
     roas: c.avg_roas.toFixed(2),
   }));
 
-  const prompt = `Analiza estas campañas publicitarias y da 1-2 recomendaciones estratégicas por campaña que tenga oportunidades de mejora. Enfócate en optimización de presupuesto, segmentación y creativos.
+  // Build training context
+  let trainingContext = '';
+  
+  if (trainingExamples.length > 0) {
+    trainingContext += '\n\nEJEMPLOS DE ANÁLISIS CORRECTOS:\n';
+    for (const ex of trainingExamples.slice(0, 5)) {
+      trainingContext += `- Escenario: ${ex.scenario_description}\n  Análisis correcto: ${ex.correct_analysis}\n`;
+      if (ex.incorrect_analysis) {
+        trainingContext += `  NO decir: ${ex.incorrect_analysis}\n`;
+      }
+    }
+  }
 
-Campañas:
+  if (positiveFeedback.length > 0) {
+    trainingContext += '\n\nRECOMENDACIONES QUE FUNCIONARON BIEN:\n';
+    for (const fb of positiveFeedback.slice(0, 5)) {
+      trainingContext += `- "${fb.original_recommendation}"${fb.feedback_notes ? ` (Nota: ${fb.feedback_notes})` : ''}\n`;
+    }
+  }
+
+  if (negativeFeedback.length > 0) {
+    trainingContext += '\n\nRECOMENDACIONES A MEJORAR (aprende de estos errores):\n';
+    for (const fb of negativeFeedback.slice(0, 5)) {
+      trainingContext += `- Original: "${fb.original_recommendation}"\n  Mejor versión: "${fb.improved_recommendation}"\n`;
+    }
+  }
+
+  const prompt = `Analiza estas campañas publicitarias y da 1-2 recomendaciones estratégicas por campaña que tenga oportunidades de mejora. Enfócate en optimización de presupuesto, segmentación y creativos.
+${trainingContext}
+
+Campañas actuales a analizar:
 ${JSON.stringify(campaignSummary, null, 2)}
 
 Responde SOLO con un JSON array con este formato:
