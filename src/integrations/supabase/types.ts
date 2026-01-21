@@ -85,6 +85,121 @@ export type Database = {
           },
         ]
       }
+      campaign_metrics: {
+        Row: {
+          campaign_id: string
+          campaign_name: string
+          clicks: number | null
+          connection_id: string
+          conversion_value: number | null
+          conversions: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string
+          ctr: number | null
+          currency: string | null
+          id: string
+          impressions: number | null
+          metric_date: string
+          platform: string
+          roas: number | null
+          spend: number | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          campaign_name: string
+          clicks?: number | null
+          connection_id: string
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          currency?: string | null
+          id?: string
+          impressions?: number | null
+          metric_date: string
+          platform: string
+          roas?: number | null
+          spend?: number | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          campaign_name?: string
+          clicks?: number | null
+          connection_id?: string
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          currency?: string | null
+          id?: string
+          impressions?: number | null
+          metric_date?: string
+          platform?: string
+          roas?: number | null
+          spend?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_metrics_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "platform_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_recommendations: {
+        Row: {
+          campaign_id: string
+          connection_id: string
+          created_at: string
+          id: string
+          is_dismissed: boolean | null
+          platform: string
+          priority: string | null
+          recommendation_text: string
+          recommendation_type: string
+        }
+        Insert: {
+          campaign_id: string
+          connection_id: string
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean | null
+          platform: string
+          priority?: string | null
+          recommendation_text: string
+          recommendation_type: string
+        }
+        Update: {
+          campaign_id?: string
+          connection_id?: string
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean | null
+          platform?: string
+          priority?: string | null
+          recommendation_text?: string
+          recommendation_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_recommendations_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "platform_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_financial_config: {
         Row: {
           client_id: string

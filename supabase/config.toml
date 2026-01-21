@@ -47,3 +47,9 @@ verify_jwt = false
 
 [functions.create-shopify-discount]
 verify_jwt = false
+
+[functions.sync-campaign-metrics]
+verify_jwt = false
+
+[functions.generate-campaign-recommendations]
+verify_jwt = false
