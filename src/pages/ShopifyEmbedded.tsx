@@ -1,80 +1,76 @@
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, TrendingUp, Zap, Star } from 'lucide-react';
+import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, TrendingUp, Zap, Star, Loader2 } from 'lucide-react';
 import logoSteve from '@/assets/logo-steve.png';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const features = [
-  {
-    icon: Sparkles,
-    title: 'Copies con IA',
-    description: 'Meta Ads, Google Ads y scripts de video',
-  },
-  {
-    icon: BarChart3,
-    title: 'Métricas',
-    description: 'Ventas, órdenes y tendencias',
-  },
-  {
-    icon: Mail,
-    title: 'Email Marketing',
-    description: 'Secuencias para Klaviyo',
-  },
-  {
-    icon: Tag,
-    title: 'Descuentos',
-    description: 'Códigos directo en Shopify',
-  },
-  {
-    icon: TrendingUp,
-    title: 'ROAS & Profit',
-    description: 'CAC, MER y Break-even',
-  },
-  {
-    icon: Zap,
-    title: 'Integraciones',
-    description: 'Meta, Google y Klaviyo',
-  },
+  { icon: Sparkles, title: 'Copies con IA', description: 'Meta Ads, Google Ads y scripts de video' },
+  { icon: BarChart3, title: 'Métricas', description: 'Ventas, órdenes y tendencias' },
+  { icon: Mail, title: 'Email Marketing', description: 'Secuencias para Klaviyo' },
+  { icon: Tag, title: 'Descuentos', description: 'Códigos directo en Shopify' },
+  { icon: TrendingUp, title: 'ROAS & Profit', description: 'CAC, MER y Break-even' },
+  { icon: Zap, title: 'Integraciones', description: 'Meta, Google y Klaviyo' },
 ];
 
 const plans = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: '/mes',
-    features: ['2 generaciones/mes', '1 conexión', 'Buyer Persona básico'],
-    popular: false,
-  },
-  {
-    name: 'Starter',
-    price: '$20.000',
-    period: '/mes',
-    features: ['50 generaciones/mes', '3 conexiones', 'Copy Meta Ads', 'Copy Google Ads'],
-    popular: false,
-  },
-  {
-    name: 'Pro',
-    price: '$70.000',
-    period: '/mes',
-    features: ['150 generaciones/mes', '10 conexiones', 'Klaviyo Planner', 'Métricas avanzadas'],
-    popular: true,
-  },
-  {
-    name: 'Agency',
-    price: '$100.000',
-    period: '/mes',
-    features: ['Generaciones ilimitadas', 'Conexiones ilimitadas', 'Múltiples clientes', 'Soporte prioritario'],
-    popular: false,
-  },
+  { name: 'Free', price: '$0', period: '/mes', features: ['2 generaciones/mes', '1 conexión', 'Buyer Persona básico'], popular: false },
+  { name: 'Starter', price: '$20.000', period: '/mes', features: ['50 generaciones/mes', '3 conexiones', 'Copy Meta Ads', 'Copy Google Ads'], popular: false },
+  { name: 'Pro', price: '$70.000', period: '/mes', features: ['150 generaciones/mes', '10 conexiones', 'Klaviyo Planner', 'Métricas avanzadas'], popular: true },
+  { name: 'Agency', price: '$100.000', period: '/mes', features: ['Generaciones ilimitadas', 'Conexiones ilimitadas', 'Múltiples clientes', 'Soporte prioritario'], popular: false },
 ];
 
 export default function ShopifyEmbedded() {
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [checking, setChecking] = useState(true);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const shop = searchParams.get('shop');
+  const hmac = searchParams.get('hmac');
+
+  useEffect(() => {
+    const checkInstallation = async () => {
+      // If we have shop + hmac, this is a fresh install request from Shopify
+      if (shop && hmac) {
+        console.log('Fresh install detected, redirecting to OAuth...');
+        // Redirect to our install endpoint
+        window.location.href = `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${shop}&hmac=${hmac}&timestamp=${searchParams.get('timestamp') || ''}`;
+        return;
+      }
+
+      // If we have shop but no hmac, check if already installed
+      if (shop) {
+        try {
+          const { data: connections } = await supabase
+            .from('platform_connections')
+            .select('id, store_url')
+            .eq('platform', 'shopify')
+            .ilike('store_url', `%${shop.replace('.myshopify.com', '')}%`);
+          
+          if (connections && connections.length > 0) {
+            setIsInstalled(true);
+          }
+        } catch (e) {
+          console.error('Error checking installation:', e);
+        }
+      }
+
+      setChecking(false);
+    };
+
+    checkInstallation();
+  }, [shop, hmac, searchParams]);
+
+  const handleInstall = () => {
+    if (shop) {
+      window.location.href = `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${shop}`;
+    }
+  };
 
   const handleGoToPortal = () => {
     window.open('https://betabg.lovable.app/portal', '_blank');
@@ -83,6 +79,17 @@ export default function ShopifyEmbedded() {
   const handleLogin = () => {
     window.open('https://betabg.lovable.app/auth', '_blank');
   };
+
+  if (checking || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Verificando instalación...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted p-4 overflow-auto">
@@ -100,11 +107,26 @@ export default function ShopifyEmbedded() {
           </div>
         </div>
 
-        {shop && (
+        {shop && isInstalled && (
           <div className="flex items-center justify-center gap-2 text-sm bg-primary/10 text-primary p-2 rounded-lg">
             <CheckCircle className="h-4 w-4" />
             <span>Conectado: <strong>{shop}</strong></span>
           </div>
+        )}
+
+        {shop && !isInstalled && !user && (
+          <Card className="border-warning bg-warning/10">
+            <CardContent className="p-4 text-center space-y-3">
+              <h2 className="font-semibold text-foreground">Conecta tu tienda</h2>
+              <p className="text-sm text-muted-foreground">
+                Autoriza a Steve para acceder a tu tienda <strong>{shop}</strong>
+              </p>
+              <Button onClick={handleInstall} className="gap-2">
+                Conectar Shopify
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Features Grid */}
