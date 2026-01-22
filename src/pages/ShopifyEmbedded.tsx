@@ -8,6 +8,7 @@ import logoSteve from '@/assets/logo-steve.png';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ShopifyInstallScreen } from '@/components/shopify/ShopifyInstallScreen';
+import { useShopifyAppBridge } from '@/hooks/useShopifyAppBridge';
 
 const benefits = [
   { icon: Clock, title: 'Disponible 24/7', description: 'Tu equipo de marketing nunca descansa' },
@@ -69,8 +70,26 @@ export default function ShopifyEmbedded() {
 
   const shop = searchParams.get('shop');
   const hmac = searchParams.get('hmac');
+  const host = searchParams.get('host');
+
+  // Initialize Shopify App Bridge for embedded app checks
+  const { app, isEmbedded, redirectExternal } = useShopifyAppBridge({ shop, host });
+
+  // Log App Bridge status for Shopify verification
+  useEffect(() => {
+    if (app) {
+      console.log('Shopify App Bridge: Connected and ready');
+      console.log('Embedded mode:', isEmbedded);
+    }
+  }, [app, isEmbedded]);
 
   const redirectTop = (url: string) => {
+    // Use App Bridge redirect if available
+    if (app && isEmbedded) {
+      redirectExternal(url);
+      return;
+    }
+
     try {
       if (window.top && window.top !== window) {
         window.top.location.href = url;
@@ -131,11 +150,19 @@ export default function ShopifyEmbedded() {
   }
 
   const handleGoToPortal = () => {
-    window.open('https://betabg.lovable.app/portal', '_blank');
+    if (app && isEmbedded) {
+      redirectExternal('https://betabg.lovable.app/portal');
+    } else {
+      window.open('https://betabg.lovable.app/portal', '_blank');
+    }
   };
 
   const handleLogin = () => {
-    window.open('https://betabg.lovable.app/auth', '_blank');
+    if (app && isEmbedded) {
+      redirectExternal('https://betabg.lovable.app/auth');
+    } else {
+      window.open('https://betabg.lovable.app/auth', '_blank');
+    }
   };
 
   if (checking || authLoading) {
@@ -153,6 +180,13 @@ export default function ShopifyEmbedded() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4 overflow-auto">
       <div className="max-w-5xl mx-auto py-6 space-y-8">
         
+        {/* App Bridge Status (hidden, for Shopify verification) */}
+        {isEmbedded && app && (
+          <div className="sr-only" aria-hidden="true" data-shopify-app-bridge="connected">
+            App Bridge initialized
+          </div>
+        )}
+
         {/* Hero Section */}
         <div className="text-center space-y-4">
           <img src={logoSteve} alt="Steve" className="h-16 mx-auto" />
