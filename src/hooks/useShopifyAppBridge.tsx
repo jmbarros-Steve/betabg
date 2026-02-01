@@ -198,22 +198,53 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
 
 /**
  * Helper to create authenticated fetch headers for Edge Functions
- * Uses X-Shopify-Access-Token as per Shopify API requirements
+ * Includes host and shop for Shopify validation handshake
  */
 export async function createShopifyAuthHeaders(
-  getSessionToken: () => Promise<string | null>
+  getSessionToken: () => Promise<string | null>,
+  shopify?: ShopifyAppBridge | null
 ): Promise<HeadersInit> {
   const token = await getSessionToken();
   
-  if (!token) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['X-Shopify-Session-Token'] = token;
+  } else {
     console.warn('[Auth] No session token available');
-    return {
-      'Content-Type': 'application/json',
-    };
+  }
+  
+  // Include host and shop for Shopify validation handshake
+  if (shopify?.config) {
+    if (shopify.config.host) {
+      headers['X-Shopify-Host'] = shopify.config.host;
+    }
+    if (shopify.config.shop) {
+      headers['X-Shopify-Shop'] = shopify.config.shop;
+    }
   }
 
-  return {
-    'Content-Type': 'application/json',
-    'X-Shopify-Session-Token': token,
-  };
+  return headers;
+}
+
+/**
+ * Build URL with preserved Shopify params for internal navigation
+ * Ensures host and shop are always present for App Bridge validation
+ */
+export function buildShopifyUrl(
+  basePath: string,
+  params: { host?: string | null; shop?: string | null }
+): string {
+  const url = new URL(basePath, window.location.origin);
+  
+  if (params.host) {
+    url.searchParams.set('host', params.host);
+  }
+  if (params.shop) {
+    url.searchParams.set('shop', params.shop);
+  }
+  
+  return url.toString();
 }
