@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.shopify-gdpr-webhooks]
 verify_jwt = false
 
+[functions.shopify-session-validate]
+verify_jwt = false
+
 [functions.sync-shopify-metrics]
 verify_jwt = false
 
