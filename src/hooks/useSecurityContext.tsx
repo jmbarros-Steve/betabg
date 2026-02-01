@@ -19,6 +19,7 @@ interface SecurityContextType {
   isRealAdmin: boolean; // Super admin only, not Shopify users with wrong roles
   loading: boolean;
   canAccessAdminRoutes: boolean;
+  canAccessClientPortal: boolean;
 }
 
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
@@ -72,12 +73,16 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
     fetchSecurityContext();
   }, [user]);
 
-  // A "real admin" is a super admin who is NOT a Shopify user
+  // A "real admin" is ONLY a super admin who is NOT a Shopify user
   // Shopify users should NEVER have admin access even if they somehow got admin role
   const isRealAdmin = isSuperAdmin && !isShopifyUser;
   
-  // Can access admin routes only if super admin
-  const canAccessAdminRoutes = isSuperAdmin;
+  // STRICT: Can access admin routes ONLY if explicitly super_admin in user_roles
+  // AND not a Shopify user (even if they somehow got admin role)
+  const canAccessAdminRoutes = isSuperAdmin && !isShopifyUser;
+  
+  // STRICT: Can only access client portal if has shop_domain or is client
+  const canAccessClientPortal = isShopifyUser || shopDomain !== null;
 
   return (
     <SecurityContext.Provider 
@@ -88,6 +93,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
         isRealAdmin,
         loading,
         canAccessAdminRoutes,
+        canAccessClientPortal,
       }}
     >
       {children}
