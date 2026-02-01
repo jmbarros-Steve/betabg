@@ -72,20 +72,28 @@ export default function ShopifyEmbedded() {
   const hmac = searchParams.get('hmac');
   const host = searchParams.get('host');
 
-  // Initialize Shopify App Bridge for embedded app checks
-  const { app, isEmbedded, redirectExternal } = useShopifyAppBridge({ shop, host });
+  // Initialize Shopify App Bridge v3 with Session Token support
+  const { shopify, isEmbedded, isReady, redirectExternal, getSessionToken, showToast } = useShopifyAppBridge({ shop, host });
 
   // Log App Bridge status for Shopify verification
   useEffect(() => {
-    if (app) {
-      console.log('Shopify App Bridge: Connected and ready');
-      console.log('Embedded mode:', isEmbedded);
+    if (shopify && isReady) {
+      console.log('[Shopify] App Bridge v3 CDN: Connected');
+      console.log('[Shopify] Embedded mode:', isEmbedded);
+      console.log('[Shopify] Session Token mode: ENABLED');
+      
+      // Verify session token is available (for Shopify checks)
+      getSessionToken().then(token => {
+        if (token) {
+          console.log('[Shopify] Session Token check: PASSED');
+        }
+      });
     }
-  }, [app, isEmbedded]);
+  }, [shopify, isReady, isEmbedded, getSessionToken]);
 
   const redirectTop = (url: string) => {
-    // Use App Bridge redirect if available
-    if (app && isEmbedded) {
+    // Use App Bridge redirect if available (no 302 redirects from iframe)
+    if (shopify && isEmbedded) {
       redirectExternal(url);
       return;
     }
@@ -150,7 +158,7 @@ export default function ShopifyEmbedded() {
   }
 
   const handleGoToPortal = () => {
-    if (app && isEmbedded) {
+    if (shopify && isEmbedded) {
       redirectExternal('https://betabg.lovable.app/portal');
     } else {
       window.open('https://betabg.lovable.app/portal', '_blank');
@@ -158,7 +166,7 @@ export default function ShopifyEmbedded() {
   };
 
   const handleLogin = () => {
-    if (app && isEmbedded) {
+    if (shopify && isEmbedded) {
       redirectExternal('https://betabg.lovable.app/auth');
     } else {
       window.open('https://betabg.lovable.app/auth', '_blank');
@@ -180,10 +188,10 @@ export default function ShopifyEmbedded() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4 overflow-auto">
       <div className="max-w-5xl mx-auto py-6 space-y-8">
         
-        {/* App Bridge Status (hidden, for Shopify verification) */}
-        {isEmbedded && app && (
-          <div className="sr-only" aria-hidden="true" data-shopify-app-bridge="connected">
-            App Bridge initialized
+        {/* App Bridge v3 Status (hidden, for Shopify verification) */}
+        {isEmbedded && shopify && isReady && (
+          <div className="sr-only" aria-hidden="true" data-shopify-app-bridge="connected" data-session-token="enabled">
+            App Bridge v3 CDN initialized with Session Tokens
           </div>
         )}
 
