@@ -118,9 +118,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate shop format
+    // Validate shop format and normalize
     const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
-    console.log('Shop domain:', shopDomain);
+    const normalizedShopDomain = shopDomain.toLowerCase().trim();
+    console.log('Shop domain:', normalizedShopDomain);
 
     // Use service role for all database operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -255,8 +256,9 @@ Deno.serve(async (req) => {
         password: tempPassword,
         email_confirm: true,
         user_metadata: {
-          shop_domain: shopDomain,
+          shop_domain: normalizedShopDomain,
           store_name: storeName,
+          is_shopify_user: true, // Flag to identify Shopify users
         }
       });
 
@@ -277,10 +279,16 @@ Deno.serve(async (req) => {
       userId = authData.user.id;
       console.log('Created new user:', userId);
 
-      // Assign client role
-      await supabaseAdmin.from('user_roles').insert({ user_id: userId, role: 'client' });
+      // SECURITY: Assign ONLY client role to Shopify users - NEVER admin
+      // The is_super_admin flag is manually set in DB only
+      await supabaseAdmin.from('user_roles').insert({ 
+        user_id: userId, 
+        role: 'client',
+        is_super_admin: false, // Explicitly false - only set manually in DB
+      });
+      console.log('Assigned client role to Shopify user (NOT admin)');
 
-      // Create client record
+      // Create client record WITH shop_domain for multitenancy isolation
       const { data: newClient, error: clientError } = await supabaseAdmin
         .from('clients')
         .insert({
@@ -289,6 +297,7 @@ Deno.serve(async (req) => {
           name: shopOwnerName,
           email: shopEmail,
           company: storeName,
+          shop_domain: normalizedShopDomain, // CRITICAL: Set shop_domain for RLS isolation
         })
         .select('id')
         .single();
@@ -308,7 +317,7 @@ Deno.serve(async (req) => {
       }
 
       clientId = newClient.id;
-      console.log('Created client:', clientId);
+      console.log('Created client with shop_domain:', clientId, normalizedShopDomain);
 
       // Get Free plan and assign subscription
       const { data: freePlan } = await supabaseAdmin
@@ -360,13 +369,14 @@ Deno.serve(async (req) => {
         .from('platform_connections')
         .update({
           store_name: storeName,
-          store_url: `https://${shopDomain}`,
+          store_url: `https://${normalizedShopDomain}`,
+          shop_domain: normalizedShopDomain, // CRITICAL: Set shop_domain for RLS
           access_token_encrypted: encryptedToken,
           is_active: true,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingConnection.id);
-      console.log('Updated existing connection');
+      console.log('Updated existing connection with shop_domain');
     } else {
       await supabaseAdmin
         .from('platform_connections')
@@ -374,11 +384,12 @@ Deno.serve(async (req) => {
           client_id: clientId,
           platform: 'shopify',
           store_name: storeName,
-          store_url: `https://${shopDomain}`,
+          store_url: `https://${normalizedShopDomain}`,
+          shop_domain: normalizedShopDomain, // CRITICAL: Set shop_domain for RLS
           access_token_encrypted: encryptedToken,
           is_active: true,
         });
-      console.log('Created new connection');
+      console.log('Created new connection with shop_domain');
     }
 
     // For direct redirects, redirect to frontend with params
