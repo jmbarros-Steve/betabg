@@ -103,6 +103,7 @@ export type Database = {
           metric_date: string
           platform: string
           roas: number | null
+          shop_domain: string | null
           spend: number | null
           updated_at: string
         }
@@ -123,6 +124,7 @@ export type Database = {
           metric_date: string
           platform: string
           roas?: number | null
+          shop_domain?: string | null
           spend?: number | null
           updated_at?: string
         }
@@ -143,6 +145,7 @@ export type Database = {
           metric_date?: string
           platform?: string
           roas?: number | null
+          shop_domain?: string | null
           spend?: number | null
           updated_at?: string
         }
@@ -167,6 +170,7 @@ export type Database = {
           priority: string | null
           recommendation_text: string
           recommendation_type: string
+          shop_domain: string | null
         }
         Insert: {
           campaign_id: string
@@ -178,6 +182,7 @@ export type Database = {
           priority?: string | null
           recommendation_text: string
           recommendation_type: string
+          shop_domain?: string | null
         }
         Update: {
           campaign_id?: string
@@ -189,6 +194,7 @@ export type Database = {
           priority?: string | null
           recommendation_text?: string
           recommendation_type?: string
+          shop_domain?: string | null
         }
         Relationships: [
           {
@@ -254,6 +260,7 @@ export type Database = {
           hourly_rate: number
           id: string
           name: string
+          shop_domain: string | null
           updated_at: string
           user_id: string
         }
@@ -265,6 +272,7 @@ export type Database = {
           hourly_rate?: number
           id?: string
           name: string
+          shop_domain?: string | null
           updated_at?: string
           user_id: string
         }
@@ -276,6 +284,7 @@ export type Database = {
           hourly_rate?: number
           id?: string
           name?: string
+          shop_domain?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -393,6 +402,7 @@ export type Database = {
           last_sync_at: string | null
           platform: Database["public"]["Enums"]["platform_type"]
           refresh_token_encrypted: string | null
+          shop_domain: string | null
           store_name: string | null
           store_url: string | null
           updated_at: string
@@ -408,6 +418,7 @@ export type Database = {
           last_sync_at?: string | null
           platform: Database["public"]["Enums"]["platform_type"]
           refresh_token_encrypted?: string | null
+          shop_domain?: string | null
           store_name?: string | null
           store_url?: string | null
           updated_at?: string
@@ -423,6 +434,7 @@ export type Database = {
           last_sync_at?: string | null
           platform?: Database["public"]["Enums"]["platform_type"]
           refresh_token_encrypted?: string | null
+          shop_domain?: string | null
           store_name?: string | null
           store_url?: string | null
           updated_at?: string
@@ -446,6 +458,7 @@ export type Database = {
           metric_date: string
           metric_type: string
           metric_value: number
+          shop_domain: string | null
         }
         Insert: {
           connection_id: string
@@ -455,6 +468,7 @@ export type Database = {
           metric_date: string
           metric_type: string
           metric_value?: number
+          shop_domain?: string | null
         }
         Update: {
           connection_id?: string
@@ -464,6 +478,7 @@ export type Database = {
           metric_date?: string
           metric_type?: string
           metric_value?: number
+          shop_domain?: string | null
         }
         Relationships: [
           {
@@ -889,18 +904,21 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_super_admin: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
+          is_super_admin?: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
+          is_super_admin?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -996,11 +1014,16 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_shop: {
+        Args: { _shop_domain: string; _user_id: string }
+        Returns: boolean
+      }
       decrypt_platform_token: {
         Args: { encrypted_token: string }
         Returns: string
       }
       encrypt_platform_token: { Args: { raw_token: string }; Returns: string }
+      get_user_shop_domain: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1008,6 +1031,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_shopify_user: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "client"

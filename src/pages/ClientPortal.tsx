@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -25,20 +25,22 @@ interface ClientInfo {
   id: string;
   name: string;
   company: string | null;
+  shop_domain: string | null;
 }
 
 export default function ClientPortal() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const { user, loading: authLoading, signOut } = useAuth();
-  const { isClient, isAdmin, loading: roleLoading, clientData } = useUserRole();
+  const { isClient, isAdmin, isSuperAdmin, isShopifyUser, loading: roleLoading, clientData } = useUserRole();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Admin viewing a specific client's portal
-  const isAdminView = isAdmin && urlClientId;
+  // SECURITY: Only super admins can view other clients' portals
+  // Shopify users with admin role should NOT have this access
+  const isAdminView = isSuperAdmin && urlClientId;
   
   // Determine which client data to use
   const displayClient = isAdminView ? adminViewClient : clientData;
@@ -68,16 +70,17 @@ export default function ClientPortal() {
     }
   }, [user, authLoading, navigate]);
 
-  // Fetch client data for admin view
+  // Fetch client data for admin view - ONLY for super admins
   useEffect(() => {
     async function fetchClientForAdmin() {
-      if (!isAdmin || !urlClientId) return;
+      // SECURITY: Only super admins can view other clients
+      if (!isSuperAdmin || !urlClientId) return;
       
       setLoadingClient(true);
       try {
         const { data, error } = await supabase
           .from('clients')
-          .select('id, name, company')
+          .select('id, name, company, shop_domain')
           .eq('id', urlClientId)
           .single();
 
@@ -91,26 +94,33 @@ export default function ClientPortal() {
       }
     }
 
-    if (!roleLoading && isAdmin && urlClientId) {
+    if (!roleLoading && isSuperAdmin && urlClientId) {
       fetchClientForAdmin();
     }
-  }, [isAdmin, urlClientId, roleLoading, navigate]);
+  }, [isSuperAdmin, urlClientId, roleLoading, navigate]);
 
   useEffect(() => {
-    // Redirect regular users who aren't clients and aren't admin viewing
+    // SECURITY: Redirect logic with multitenancy protection
     if (roleLoading || !user || isAdminView) return;
 
-    // If user is admin (but not viewing a specific client), send them to dashboard
-    if (isAdmin && !isClient) {
+    // SECURITY: If user is a Shopify user trying to access admin URLs, redirect to portal
+    if (isShopifyUser && urlClientId) {
+      console.warn('SECURITY: Shopify user attempted to access admin client view');
+      navigate('/portal');
+      return;
+    }
+
+    // If user is super admin (but not viewing a specific client), send them to dashboard
+    if (isSuperAdmin && !isClient) {
       navigate('/dashboard');
       return;
     }
 
-    // If user has no client role, block portal access
-    if (!isClient) {
+    // If user has no client role and isn't a super admin, block portal access
+    if (!isClient && !isSuperAdmin) {
       navigate('/auth');
     }
-  }, [roleLoading, isClient, isAdmin, isAdminView, user, navigate]);
+  }, [roleLoading, isClient, isAdmin, isSuperAdmin, isShopifyUser, isAdminView, user, urlClientId, navigate]);
 
   if (authLoading || roleLoading || loadingClient) {
     return (

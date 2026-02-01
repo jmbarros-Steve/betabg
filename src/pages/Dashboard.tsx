@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, ShieldAlert, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
 import { TimeEntryPanel } from '@/components/dashboard/TimeEntryPanel';
 import { InvoicesPanel } from '@/components/dashboard/InvoicesPanel';
@@ -18,25 +19,47 @@ import logo from '@/assets/logo.jpg';
 type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training';
 
 export default function Dashboard() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { isSuperAdmin, isShopifyUser, isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate('/auth');
+      return;
     }
-  }, [user, loading, navigate]);
+    
+    // SECURITY: Wait for role loading to complete before checking access
+    if (roleLoading || authLoading) return;
 
-  if (loading) {
+    // SECURITY: Shopify users should NEVER access dashboard
+    // Even if they somehow have admin role
+    if (isShopifyUser) {
+      console.warn('SECURITY: Shopify user attempted to access admin dashboard, redirecting to portal');
+      navigate('/portal');
+      return;
+    }
+
+    // Only super admins or real admins can access dashboard
+    if (!isSuperAdmin && !isAdmin) {
+      console.warn('SECURITY: Non-admin user attempted to access dashboard');
+      navigate('/portal');
+    }
+  }, [user, authLoading, roleLoading, isSuperAdmin, isAdmin, isShopifyUser, navigate]);
+
+  if (authLoading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!user) return null;
+  // SECURITY: Block rendering for Shopify users or non-admins
+  if (!user || isShopifyUser || (!isSuperAdmin && !isAdmin)) {
+    return null;
+  }
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
