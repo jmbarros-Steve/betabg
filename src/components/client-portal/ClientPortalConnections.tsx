@@ -11,6 +11,7 @@ import { MetaAdAccountSelector } from './MetaAdAccountSelector';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
+import { useShopifyAuthFetch } from '@/hooks/useShopifyAuthFetch';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import { Label } from '@/components/ui/label';
 const SHOPIFY_CLIENT_ID = '933109488c1e95e5fd630abb7e03809e';
 const GOOGLE_CLIENT_ID = '870555860271-um4g70a5ob5bs56rpusni6eci01f77mn.apps.googleusercontent.com';
 const META_APP_ID = '1994525824461583';
+const SUPABASE_URL = 'https://jnqivntlkemzcpomkvwv.supabase.co';
 
 interface ClientPortalConnectionsProps {
   clientId: string;
@@ -72,6 +74,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [showKlaviyoDialog, setShowKlaviyoDialog] = useState(false);
   const [klaviyoApiKey, setKlaviyoApiKey] = useState('');
   const [connectingKlaviyo, setConnectingKlaviyo] = useState(false);
+  
+  // Use Shopify auth fetch for embedded mode with Session Tokens
+  const { callEdgeFunction, isEmbedded } = useShopifyAuthFetch();
 
   useEffect(() => {
     fetchConnections();
@@ -167,25 +172,40 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       toast.loading('Sincronizando...', { id: 'sync' });
 
       let functionName = 'sync-shopify-metrics';
+      let bodyKey = 'connectionId';
+      
       if (connection.platform === 'meta') {
         functionName = 'sync-meta-metrics';
+        bodyKey = 'connection_id';
       } else if (connection.platform === 'google') {
         functionName = 'sync-google-ads-metrics';
+        bodyKey = 'connection_id';
       }
 
-      const { error } = await supabase.functions.invoke(functionName, {
-        body: { connection_id: connection.id },
-      });
-
-      if (error) throw error;
+      // Use callEdgeFunction which includes Session Token when embedded
+      if (isEmbedded) {
+        console.log(`[Sync] Using Session Token auth for ${functionName}`);
+        const { data, error } = await callEdgeFunction(functionName, {
+          body: { [bodyKey]: connection.id },
+        });
+        
+        if (error) throw new Error(error);
+      } else {
+        // Standard Supabase invoke (uses Authorization header)
+        const { error } = await supabase.functions.invoke(functionName, {
+          body: { [bodyKey]: connection.id },
+        });
+        
+        if (error) throw error;
+      }
 
       toast.success('Sincronización completada', { id: 'sync' });
       fetchConnections();
       // Notify other views (e.g., Metrics dashboard) to refresh instantly
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing:', error);
-      toast.error('Error al sincronizar', { id: 'sync' });
+      toast.error(error.message || 'Error al sincronizar', { id: 'sync' });
     }
   };
 
