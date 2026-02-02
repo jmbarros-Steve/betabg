@@ -5,12 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   RefreshCw, TrendingUp, TrendingDown, DollarSign, MousePointerClick, 
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
-  BarChart3, AlertCircle, Link2
+  BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -61,6 +62,21 @@ interface CampaignAggregate {
   aov: number;
 }
 
+interface AdSet {
+  id: string;
+  name: string;
+  status: string;
+  spend: string;
+  impressions: string;
+  clicks: string;
+  cpm: string;
+  cpc: string;
+  ctr: string;
+  conversions: number;
+  conversion_value: number;
+  roas: number;
+}
+
 interface Recommendation {
   id: string;
   campaign_id: string;
@@ -103,7 +119,9 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [syncing, setSyncing] = useState(false);
   const [generatingRecs, setGeneratingRecs] = useState(false);
   const [activeTab, setActiveTab] = useState<'campaigns' | 'recommendations'>('campaigns');
-
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [adSetsByCampaign, setAdSetsByCampaign] = useState<Record<string, AdSet[]>>({});
+  const [loadingAdSets, setLoadingAdSets] = useState<Set<string>>(new Set());
   useEffect(() => {
     fetchConnections();
   }, [clientId]);
@@ -242,6 +260,56 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       setRecommendations(prev => prev.filter(r => r.id !== id));
     } catch (error) {
       toast.error('Error al descartar');
+    }
+  }
+
+  async function toggleCampaignExpansion(campaignId: string, platform: string) {
+    const isExpanded = expandedCampaigns.has(campaignId);
+    
+    if (isExpanded) {
+      // Collapse
+      setExpandedCampaigns(prev => {
+        const next = new Set(prev);
+        next.delete(campaignId);
+        return next;
+      });
+    } else {
+      // Expand and fetch ad sets if not already loaded
+      setExpandedCampaigns(prev => new Set(prev).add(campaignId));
+      
+      if (!adSetsByCampaign[campaignId] && platform === 'meta') {
+        await fetchAdSets(campaignId, platform);
+      }
+    }
+  }
+
+  async function fetchAdSets(campaignId: string, platform: string) {
+    // Find the connection for this campaign
+    const connection = connections.find(c => c.platform === platform);
+    if (!connection) return;
+
+    setLoadingAdSets(prev => new Set(prev).add(campaignId));
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-campaign-adsets', {
+        body: { connection_id: connection.id, campaign_id: campaignId, platform }
+      });
+
+      if (error) throw error;
+
+      setAdSetsByCampaign(prev => ({
+        ...prev,
+        [campaignId]: data.ad_sets || []
+      }));
+    } catch (error) {
+      console.error('Error fetching ad sets:', error);
+      toast.error('Error al cargar Ad Sets');
+    } finally {
+      setLoadingAdSets(prev => {
+        const next = new Set(prev);
+        next.delete(campaignId);
+        return next;
+      });
     }
   }
 
@@ -497,6 +565,10 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             <div className="space-y-3">
               {aggregatedCampaigns.map((campaign, idx) => {
                 const campaignRecs = recommendations.filter(r => r.campaign_id === campaign.campaign_id);
+                const isExpanded = expandedCampaigns.has(campaign.campaign_id);
+                const adSets = adSetsByCampaign[campaign.campaign_id] || [];
+                const isLoadingAdSets = loadingAdSets.has(campaign.campaign_id);
+                const canExpand = campaign.platform === 'meta'; // Only Meta supports ad set expansion for now
                 
                 return (
                   <motion.div
@@ -505,66 +577,151 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
                   >
-                    <Card className="hover:border-primary/30 transition-colors">
-                      <CardContent className="py-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <img 
-                              src={campaign.platform === 'meta' ? logoMeta : logoGoogle}
-                              alt={campaign.platform}
-                              className="w-6 h-6"
-                            />
+                    <Collapsible open={isExpanded} onOpenChange={() => canExpand && toggleCampaignExpansion(campaign.campaign_id, campaign.platform)}>
+                      <Card className="hover:border-primary/30 transition-colors">
+                        <CardContent className="py-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              {canExpand && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4" />
+                                    )}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                              <img 
+                                src={campaign.platform === 'meta' ? logoMeta : logoGoogle}
+                                alt={campaign.platform}
+                                className="w-6 h-6"
+                              />
+                              <div>
+                                <h4 className="font-medium text-sm">{campaign.campaign_name}</h4>
+                                <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                                  {campaign.platform}
+                                  {canExpand && (
+                                    <span className="text-muted-foreground/60">• Click para ver Ad Sets</span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {campaignRecs.length > 0 && (
+                              <Badge variant="outline" className={priorityConfig[campaignRecs[0].priority].color}>
+                                {campaignRecs.length} recomendación{campaignRecs.length > 1 ? 'es' : ''}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 text-sm">
                             <div>
-                              <h4 className="font-medium text-sm">{campaign.campaign_name}</h4>
-                              <p className="text-xs text-muted-foreground capitalize">{campaign.platform}</p>
+                              <p className="text-muted-foreground text-xs">Gasto</p>
+                              <p className="font-medium">{formatCurrency(campaign.total_spend)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">Revenue</p>
+                              <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">ROAS</p>
+                              <p className={`font-medium ${campaign.avg_roas >= 3 ? 'text-green-500' : campaign.avg_roas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                {campaign.avg_roas.toFixed(2)}x
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">CPC</p>
+                              <p className="font-medium">${campaign.avg_cpc.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">CTR</p>
+                              <p className="font-medium">{formatPercent(campaign.avg_ctr)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">CPM</p>
+                              <p className="font-medium">${campaign.avg_cpm.toFixed(2)}</p>
                             </div>
                           </div>
-                          
+
+                          {/* Inline recommendation preview */}
                           {campaignRecs.length > 0 && (
-                            <Badge variant="outline" className={priorityConfig[campaignRecs[0].priority].color}>
-                              {campaignRecs.length} recomendación{campaignRecs.length > 1 ? 'es' : ''}
-                            </Badge>
+                            <div className="mt-3 pt-3 border-t border-border/50">
+                              <p className="text-xs text-muted-foreground mb-1">💡 Recomendación:</p>
+                              <p className="text-xs">{campaignRecs[0].recommendation_text}</p>
+                            </div>
                           )}
-                        </div>
 
-                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground text-xs">Gasto</p>
-                            <p className="font-medium">{formatCurrency(campaign.total_spend)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">Revenue</p>
-                            <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">ROAS</p>
-                            <p className={`font-medium ${campaign.avg_roas >= 3 ? 'text-green-500' : campaign.avg_roas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
-                              {campaign.avg_roas.toFixed(2)}x
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">CPC</p>
-                            <p className="font-medium">${campaign.avg_cpc.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">CTR</p>
-                            <p className="font-medium">{formatPercent(campaign.avg_ctr)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground text-xs">CPM</p>
-                            <p className="font-medium">${campaign.avg_cpm.toFixed(2)}</p>
-                          </div>
-                        </div>
-
-                        {/* Inline recommendation preview */}
-                        {campaignRecs.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-border/50">
-                            <p className="text-xs text-muted-foreground mb-1">💡 Recomendación:</p>
-                            <p className="text-xs">{campaignRecs[0].recommendation_text}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                          {/* Ad Sets expansion */}
+                          <CollapsibleContent className="mt-4">
+                            {isLoadingAdSets ? (
+                              <div className="flex items-center justify-center py-6">
+                                <RefreshCw className="w-5 h-5 animate-spin text-muted-foreground" />
+                                <span className="ml-2 text-sm text-muted-foreground">Cargando Ad Sets...</span>
+                              </div>
+                            ) : adSets.length === 0 ? (
+                              <div className="text-center py-4 text-sm text-muted-foreground bg-muted/30 rounded-lg">
+                                <Layers className="w-5 h-5 mx-auto mb-2 opacity-50" />
+                                No hay Ad Sets disponibles para esta campaña
+                              </div>
+                            ) : (
+                              <div className="space-y-2 pt-2 border-t border-dashed">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Layers className="w-4 h-4 text-muted-foreground" />
+                                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    Ad Sets ({adSets.length})
+                                  </span>
+                                </div>
+                                {adSets.map((adSet) => (
+                                  <div 
+                                    key={adSet.id} 
+                                    className="bg-muted/30 rounded-lg p-3 border border-border/50"
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-sm">{adSet.name}</span>
+                                        <Badge variant="outline" className="text-xs capitalize">
+                                          {adSet.status.toLowerCase()}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs">
+                                      <div>
+                                        <p className="text-muted-foreground">Gasto</p>
+                                        <p className="font-medium">{formatCurrency(parseFloat(adSet.spend))}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">Revenue</p>
+                                        <p className="font-medium">{formatCurrency(adSet.conversion_value)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">ROAS</p>
+                                        <p className={`font-medium ${adSet.roas >= 3 ? 'text-green-500' : adSet.roas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                          {adSet.roas.toFixed(2)}x
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">CPC</p>
+                                        <p className="font-medium">${parseFloat(adSet.cpc).toFixed(2)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">CTR</p>
+                                        <p className="font-medium">{parseFloat(adSet.ctr).toFixed(2)}%</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">Conversiones</p>
+                                        <p className="font-medium">{formatNumber(adSet.conversions)}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CollapsibleContent>
+                        </CardContent>
+                      </Card>
+                    </Collapsible>
                   </motion.div>
                 );
               })}
