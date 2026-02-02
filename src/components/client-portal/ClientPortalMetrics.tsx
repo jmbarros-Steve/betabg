@@ -104,8 +104,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         const startDate = getDateRangeStart(dateRange);
         const { start: prevStart, end: prevEnd } = getPreviousPeriodDates(dateRange);
 
-        // Fetch current and previous metrics in parallel
-        const [currentRes, prevRes, configRes] = await Promise.all([
+        // Fetch current and previous metrics in parallel, including campaign_metrics for ad spend
+        const [currentRes, prevRes, configRes, campaignCurrentRes, campaignPrevRes] = await Promise.all([
           supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date')
@@ -123,26 +123,72 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             .select('*')
             .eq('client_id', clientId)
             .maybeSingle(),
+          // Get ad spend from campaign_metrics (Meta + Google)
+          supabase
+            .from('campaign_metrics')
+            .select('spend, conversion_value, metric_date, platform')
+            .in('connection_id', connIds)
+            .gte('metric_date', startDate.toISOString().split('T')[0]),
+          supabase
+            .from('campaign_metrics')
+            .select('spend, conversion_value, metric_date, platform')
+            .in('connection_id', connIds)
+            .gte('metric_date', prevStart.toISOString().split('T')[0])
+            .lte('metric_date', prevEnd.toISOString().split('T')[0]),
         ]);
 
         if (currentRes.error) throw currentRes.error;
         if (prevRes.error) throw prevRes.error;
 
-        setRawMetrics(
-          (currentRes.data ?? []).map((m) => ({
-            metric_type: m.metric_type,
-            metric_value: Number(m.metric_value),
-            metric_date: m.metric_date,
-          }))
-        );
+        // Convert campaign metrics to platform_metrics format for ad spend
+        const campaignToMetricRows = (data: any[] | null): MetricRow[] => {
+          if (!data) return [];
+          // Group by date and platform to avoid duplicates
+          const byDatePlatform = new Map<string, { spend: number; platform: string }>();
+          for (const row of data) {
+            const key = `${row.metric_date}-${row.platform}`;
+            const existing = byDatePlatform.get(key) || { spend: 0, platform: row.platform };
+            existing.spend += Number(row.spend) || 0;
+            byDatePlatform.set(key, existing);
+          }
+          
+          const result: MetricRow[] = [];
+          for (const [key, value] of byDatePlatform) {
+            const [date, platform] = key.split('-');
+            result.push({
+              metric_type: platform === 'meta' ? 'meta_spend' : 'google_spend',
+              metric_value: value.spend,
+              metric_date: date,
+            });
+            result.push({
+              metric_type: 'ad_spend',
+              metric_value: value.spend,
+              metric_date: date,
+            });
+          }
+          return result;
+        };
 
-        setPreviousMetrics(
-          (prevRes.data ?? []).map((m) => ({
+        const currentCampaignMetrics = campaignToMetricRows(campaignCurrentRes.data);
+        const prevCampaignMetrics = campaignToMetricRows(campaignPrevRes.data);
+
+        setRawMetrics([
+          ...(currentRes.data ?? []).map((m) => ({
             metric_type: m.metric_type,
             metric_value: Number(m.metric_value),
             metric_date: m.metric_date,
-          }))
-        );
+          })),
+          ...currentCampaignMetrics,
+        ]);
+
+        setPreviousMetrics([
+          ...(prevRes.data ?? []).map((m) => ({
+            metric_type: m.metric_type,
+            metric_value: Number(m.metric_value),
+            metric_date: m.metric_date,
+          })),
+          ...prevCampaignMetrics,
+        ]);
 
         if (configRes.data) {
           setFinancialConfig({
@@ -184,11 +230,21 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         case 'orders_count':
           totalOrders += m.metric_value;
           break;
-        case 'spend':
+        case 'ad_spend':
+          // This comes from campaign_metrics - already aggregated
           totalSpend += m.metric_value;
-          // Assume 60% Meta, 40% Google for demo
-          metaSpend += m.metric_value * 0.6;
-          googleSpend += m.metric_value * 0.4;
+          break;
+        case 'meta_spend':
+          metaSpend += m.metric_value;
+          break;
+        case 'google_spend':
+          googleSpend += m.metric_value;
+          break;
+        case 'spend':
+          // Legacy support for platform_metrics spend
+          if (!metrics.some(x => x.metric_type === 'ad_spend')) {
+            totalSpend += m.metric_value;
+          }
           break;
         case 'roas':
           roasValues.push(m.metric_value);
@@ -209,18 +265,21 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const current = useMemo(() => computeAggregates(rawMetrics), [rawMetrics]);
   const previous = useMemo(() => computeAggregates(previousMetrics), [previousMetrics]);
 
-  // Chart data grouped by date
+  // Chart data grouped by date - now includes ad spend
   const chartData = useMemo(() => {
-    const byDate: Record<string, { revenue: number; orders: number }> = {};
+    const byDate: Record<string, { revenue: number; orders: number; spend: number }> = {};
     rawMetrics.forEach((m) => {
       if (!byDate[m.metric_date]) {
-        byDate[m.metric_date] = { revenue: 0, orders: 0 };
+        byDate[m.metric_date] = { revenue: 0, orders: 0, spend: 0 };
       }
       if (['revenue', 'gross_revenue', 'purchase_value'].includes(m.metric_type)) {
         byDate[m.metric_date].revenue += m.metric_value;
       }
       if (['orders', 'orders_count', 'purchases'].includes(m.metric_type)) {
         byDate[m.metric_date].orders += m.metric_value;
+      }
+      if (m.metric_type === 'ad_spend') {
+        byDate[m.metric_date].spend += m.metric_value;
       }
     });
     return Object.entries(byDate)

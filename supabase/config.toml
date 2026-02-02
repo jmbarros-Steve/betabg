@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.fetch-meta-ad-accounts]
 verify_jwt = false
+
+[functions.fetch-campaign-adsets]
+verify_jwt = false
