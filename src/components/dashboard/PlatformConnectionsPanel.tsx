@@ -195,6 +195,8 @@ export function PlatformConnectionsPanel() {
       
       toast.success(successMessage);
       fetchConnections();
+      // Notify other views to refresh instantly
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error: any) {
       console.error('Sync error:', error);
       toast.error('Error al sincronizar métricas');
