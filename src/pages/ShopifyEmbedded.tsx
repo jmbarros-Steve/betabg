@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, Clock, Zap, Star, Loader2, Users, Target, TrendingUp, Bot } from 'lucide-react';
+import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, Clock, Zap, Star, Loader2, Users, Target, TrendingUp, Bot, AlertCircle } from 'lucide-react';
 import logoSteve from '@/assets/logo-steve.png';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ShopifyInstallScreen } from '@/components/shopify/ShopifyInstallScreen';
 import { useShopifyAppBridge } from '@/hooks/useShopifyAppBridge';
+import { useShopifyAutoLogin } from '@/hooks/useShopifyAutoLogin';
 
 const benefits = [
   { icon: Clock, title: 'Disponible 24/7', description: 'Tu equipo de marketing nunca descansa' },
@@ -63,9 +64,8 @@ const plans = [
 
 export default function ShopifyEmbedded() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [checking, setChecking] = useState(true);
-  const [isInstalled, setIsInstalled] = useState(false);
   const [showInstallScreen, setShowInstallScreen] = useState(false);
 
   const shop = searchParams.get('shop');
@@ -73,17 +73,24 @@ export default function ShopifyEmbedded() {
   const host = searchParams.get('host');
 
   // Initialize Shopify App Bridge v3 with Session Token support
-  // CRITICAL: isInitialized = false until host+shop are confirmed
   const { 
     shopify, 
     isEmbedded, 
-    isReady, 
     isInitialized, 
     redirectExternal, 
     getSessionToken, 
-    showToast,
-    navigateSafe 
   } = useShopifyAppBridge({ shop, host });
+
+  // Auto-login using Shopify Session Token
+  const {
+    isLoading: autoLoginLoading,
+    isAuthenticated: shopifyAuthenticated,
+    isInstalled,
+    error: autoLoginError,
+    shopDomain,
+    clientId,
+    retryLogin,
+  } = useShopifyAutoLogin(shop, host);
 
   // Log App Bridge status for Shopify verification
   useEffect(() => {
@@ -94,7 +101,6 @@ export default function ShopifyEmbedded() {
       console.log('[Shopify] Host param:', host);
       console.log('[Shopify] Shop param:', shop);
       
-      // Verify session token is available (for Shopify checks)
       getSessionToken().then(token => {
         if (token) {
           console.log('[Shopify] Session Token check: PASSED');
@@ -103,44 +109,24 @@ export default function ShopifyEmbedded() {
     }
   }, [shopify, isInitialized, isEmbedded, getSessionToken, host, shop]);
 
-  // Check installation status
+  // Detect fresh install flow
   useEffect(() => {
-    const checkInstallation = async () => {
-      // Wait for App Bridge to be ready in embedded mode
-      if (isEmbedded && !isInitialized) {
-        return; // Don't check until initialized
-      }
+    if (shop && hmac && !isEmbedded) {
+      console.log('[Shopify] Fresh install detected, showing install screen...');
+      setShowInstallScreen(true);
+    }
+  }, [shop, hmac, isEmbedded]);
 
-      if (shop && hmac) {
-        console.log('Fresh install detected, showing install screen...');
-        setShowInstallScreen(true);
-        setChecking(false);
-        return;
-      }
+  // Auto-redirect to portal when authenticated
+  useEffect(() => {
+    if (isEmbedded && shopifyAuthenticated && user && !autoLoginLoading) {
+      console.log('[Shopify] User authenticated, redirecting to portal...');
+      // Use internal navigation to stay in the app
+      navigate('/portal', { replace: true });
+    }
+  }, [isEmbedded, shopifyAuthenticated, user, autoLoginLoading, navigate]);
 
-      if (shop) {
-        try {
-          const { data: connections } = await supabase
-            .from('platform_connections')
-            .select('id, store_url')
-            .eq('platform', 'shopify')
-            .ilike('store_url', `%${shop.replace('.myshopify.com', '')}%`);
-          
-          if (connections && connections.length > 0) {
-            setIsInstalled(true);
-          }
-        } catch (e) {
-          console.error('Error checking installation:', e);
-        }
-      }
-
-      setChecking(false);
-    };
-
-    checkInstallation();
-  }, [shop, hmac, isEmbedded, isInitialized]);
-
-  // Safe redirect function that uses App Bridge when available
+  // Safe redirect function
   const redirectTop = (url: string) => {
     if (shopify && isEmbedded) {
       redirectExternal(url);
@@ -153,7 +139,7 @@ export default function ShopifyEmbedded() {
         return;
       }
     } catch {
-      // If cross-origin frame access is blocked, fall back to opening a new tab.
+      // Cross-origin blocked
     }
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -168,7 +154,8 @@ export default function ShopifyEmbedded() {
 
   const handleGoToPortal = () => {
     if (shopify && isEmbedded) {
-      redirectExternal('https://betabg.lovable.app/portal');
+      // Internal navigation within the app
+      navigate('/portal');
     } else {
       window.open('https://betabg.lovable.app/portal', '_blank');
     }
@@ -182,8 +169,7 @@ export default function ShopifyEmbedded() {
     }
   };
 
-  // CRITICAL: Block all rendering until App Bridge is fully initialized with host+shop
-  // This is required for Shopify's automated validation checks
+  // CRITICAL: Block rendering until App Bridge is initialized
   if (isEmbedded && !isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -198,6 +184,7 @@ export default function ShopifyEmbedded() {
     );
   }
 
+  // Show install screen for fresh installs
   if (showInstallScreen && shop) {
     return (
       <ShopifyInstallScreen 
@@ -207,7 +194,60 @@ export default function ShopifyEmbedded() {
     );
   }
 
-  if (checking || authLoading) {
+  // Auto-login in progress - show loading state (NEVER show login form)
+  if (isEmbedded && autoLoginLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <img src={logoSteve} alt="Steve" className="h-16 mx-auto" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-lg font-medium text-foreground">Cargando tu asistente Steve...</p>
+          <p className="text-sm text-muted-foreground">
+            Validando sesión de {shop}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Auto-login error - show retry option
+  if (isEmbedded && autoLoginError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6 text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+            <h2 className="text-lg font-semibold text-foreground">Error de autenticación</h2>
+            <p className="text-sm text-muted-foreground">{autoLoginError}</p>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={retryLogin} variant="default">
+                Reintentar
+              </Button>
+              <Button onClick={handleInstall} variant="outline">
+                Reinstalar App
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Waiting for Supabase auth to sync after Shopify login
+  if (isEmbedded && shopifyAuthenticated && authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <img src={logoSteve} alt="Steve" className="h-16 mx-auto" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-lg font-medium text-foreground">Preparando tu dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Non-embedded or checking regular auth
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
