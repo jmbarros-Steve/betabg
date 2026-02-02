@@ -1,19 +1,24 @@
 import { createContext, useContext, ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-// Type declarations for Shopify App Bridge from CDN
+/**
+ * Type declarations for Shopify App Bridge from CDN
+ * CRITICAL: This uses the CDN script (https://cdn.shopify.com/shopifycloud/app-bridge.js)
+ * loaded in index.html, NOT an npm package
+ */
 declare global {
   interface Window {
     shopify?: ShopifyAppBridge;
   }
 }
 
-interface ShopifyAppBridge {
+export interface ShopifyAppBridge {
   config: {
     apiKey: string;
     host: string;
     shop: string;
   };
+  /** Get Session Token for API calls - MUST be called for each request */
   idToken: () => Promise<string>;
   toast: {
     show: (message: string, options?: { duration?: number; isError?: boolean }) => void;

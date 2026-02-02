@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-session-token, x-shopify-host, x-shopify-shop',
 };
 
 // Currency conversion utilities
@@ -43,6 +43,44 @@ async function convertToCLP(amount: number, fromCurrency: string): Promise<numbe
   }
 }
 
+// Helper to validate Shopify Session Token
+async function validateShopifySessionToken(
+  sessionToken: string,
+  supabase: any
+): Promise<{ valid: boolean; shopDomain?: string; userId?: string; error?: string }> {
+  try {
+    // Decode and validate the JWT
+    const [headerB64, payloadB64] = sessionToken.split('.');
+    if (!headerB64 || !payloadB64) {
+      return { valid: false, error: 'Invalid token format' };
+    }
+
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+    const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
+    
+    if (!shopDomain) {
+      return { valid: false, error: 'No shop domain in token' };
+    }
+
+    // Find the user associated with this shop
+    const { data: client, error } = await supabase
+      .from('clients')
+      .select('id, client_user_id, user_id')
+      .eq('shop_domain', shopDomain)
+      .single();
+
+    if (error || !client) {
+      return { valid: false, error: 'Shop not found in database' };
+    }
+
+    const userId = client.client_user_id || client.user_id;
+    return { valid: true, shopDomain, userId };
+  } catch (err: any) {
+    console.error('Session token validation error:', err);
+    return { valid: false, error: err.message };
+  }
+}
+
 interface MetaInsightsResponse {
   data: Array<{
     date_start: string;
@@ -77,21 +115,44 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify JWT and get user
+    // Check for Shopify Session Token first (embedded app)
+    const shopifySessionToken = req.headers.get('X-Shopify-Session-Token');
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !user) {
+    let userId: string | null = null;
+    let shopDomain: string | null = null;
+
+    if (shopifySessionToken) {
+      // Embedded Shopify app - validate Session Token
+      console.log('[sync-meta] Validating Shopify Session Token...');
+      const validation = await validateShopifySessionToken(shopifySessionToken, supabase);
+      
+      if (!validation.valid || !validation.userId) {
+        console.error('[sync-meta] Session token invalid:', validation.error);
+        return new Response(
+          JSON.stringify({ error: 'Invalid Shopify session', details: validation.error }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      userId = validation.userId;
+      shopDomain = validation.shopDomain || null;
+      console.log(`[sync-meta] ✓ Session token valid for shop: ${shopDomain}, user: ${userId}`);
+    } else if (authHeader) {
+      // Standard Supabase auth
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userId = user.id;
+    } else {
       return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
+        JSON.stringify({ error: 'Missing authorization' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -133,10 +194,10 @@ Deno.serve(async (req) => {
 
     // Verify user owns this connection (admin via user_id OR client via client_user_id)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
+    const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
     
     if (!isOwner) {
-      console.error('Authorization failed:', { userId: user.id, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
+      console.error('Authorization failed:', { userId, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

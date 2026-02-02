@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-session-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-session-token, x-shopify-host, x-shopify-shop',
 };
 
 // Currency conversion utilities
@@ -43,6 +43,44 @@ async function convertToCLP(amount: number, fromCurrency: string): Promise<numbe
   }
 }
 
+// Helper to validate Shopify Session Token
+async function validateShopifySessionToken(
+  sessionToken: string,
+  supabase: any
+): Promise<{ valid: boolean; shopDomain?: string; userId?: string; error?: string }> {
+  try {
+    // Decode and validate the JWT
+    const [headerB64, payloadB64] = sessionToken.split('.');
+    if (!headerB64 || !payloadB64) {
+      return { valid: false, error: 'Invalid token format' };
+    }
+
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
+    const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
+    
+    if (!shopDomain) {
+      return { valid: false, error: 'No shop domain in token' };
+    }
+
+    // Find the user associated with this shop
+    const { data: client, error } = await supabase
+      .from('clients')
+      .select('id, client_user_id, user_id')
+      .eq('shop_domain', shopDomain)
+      .single();
+
+    if (error || !client) {
+      return { valid: false, error: 'Shop not found in database' };
+    }
+
+    const userId = client.client_user_id || client.user_id;
+    return { valid: true, shopDomain, userId };
+  } catch (err: any) {
+    console.error('Session token validation error:', err);
+    return { valid: false, error: err.message };
+  }
+}
+
 interface ShopifyOrder {
   id: number;
   created_at: string;
@@ -62,34 +100,57 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Verify authentication
+    // Use service role for all DB operations
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check for Shopify Session Token first (embedded app)
+    const shopifySessionToken = req.headers.get('X-Shopify-Session-Token');
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header');
+    
+    let userId: string | null = null;
+    let shopDomain: string | null = null;
+
+    if (shopifySessionToken) {
+      // Embedded Shopify app - validate Session Token
+      console.log('[sync-shopify] Validating Shopify Session Token...');
+      const validation = await validateShopifySessionToken(shopifySessionToken, supabaseService);
+      
+      if (!validation.valid || !validation.userId) {
+        console.error('[sync-shopify] Session token invalid:', validation.error);
+        return new Response(
+          JSON.stringify({ error: 'Invalid Shopify session', details: validation.error }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      userId = validation.userId;
+      shopDomain = validation.shopDomain || null;
+      console.log(`[sync-shopify] ✓ Session token valid for shop: ${shopDomain}, user: ${userId}`);
+    } else if (authHeader?.startsWith('Bearer ')) {
+      // Standard Supabase auth
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+      if (authError || !user) {
+        console.error('Invalid JWT:', authError);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userId = user.id;
+    } else {
+      console.error('Missing authorization');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Create client with user's token for auth verification
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    // Validate the JWT and get user
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('Invalid JWT:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const userId = user.id;
     console.log('Authenticated user:', userId);
 
     // Get the connection ID from request
@@ -104,13 +165,10 @@ Deno.serve(async (req) => {
 
     console.log('Fetching connection:', connectionId);
 
-    // Use service role to access tokens (they should not be exposed to RLS queries)
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify user owns this connection via client ownership
+    // Verify user owns this connection via client ownership  
     const { data: connection, error: connError } = await supabaseService
       .from('platform_connections')
-      .select('*, clients!inner(user_id)')
+      .select('*, clients!inner(user_id, client_user_id)')
       .eq('id', connectionId)
       .single();
 
@@ -123,7 +181,10 @@ Deno.serve(async (req) => {
     }
 
     // Authorization check: verify user owns the client that owns this connection
-    if (connection.clients.user_id !== userId) {
+    const clientData = connection.clients as { user_id: string; client_user_id: string | null };
+    const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
+    
+    if (!isOwner) {
       console.error('User does not own this connection');
       return new Response(
         JSON.stringify({ error: 'Forbidden' }),
