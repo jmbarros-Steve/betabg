@@ -1,15 +1,16 @@
 /**
  * Shopify Session Token Validation & Auto-Login Endpoint
  * 
- * This edge function validates Shopify session tokens and creates
- * a Supabase session for the merchant, enabling seamless embedded app login.
+ * SECURITY: Validates Shopify Session Tokens using HMAC-SHA256
+ * This edge function validates session tokens and creates Supabase sessions
  * 
  * Flow:
- * 1. Validate Shopify Session Token (HMAC signature check)
- * 2. Extract shop_domain from token
- * 3. Find or create user account linked to shop
- * 4. Generate Supabase access token for the user
- * 5. Return tokens for client-side session establishment
+ * 1. Extract token from X-Shopify-Session-Token header
+ * 2. Validate HMAC signature using SHOPIFY_CLIENT_SECRET
+ * 3. Verify token claims (exp, nbf, aud)
+ * 4. Extract shop_domain from dest claim
+ * 5. Find or create user account
+ * 6. Return Supabase auth token
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -21,15 +22,23 @@ const corsHeaders = {
 };
 
 interface ShopifySessionTokenPayload {
-  iss: string;
-  dest: string;
-  aud: string;
-  sub: string;
-  exp: number;
-  nbf: number;
-  iat: number;
-  jti: string;
-  sid: string;
+  iss: string;  // Issuer: https://{shop}.myshopify.com/admin
+  dest: string; // Destination: https://{shop}.myshopify.com
+  aud: string;  // Audience: App API Key (Client ID)
+  sub: string;  // Subject: User ID
+  exp: number;  // Expiration time
+  nbf: number;  // Not before time
+  iat: number;  // Issued at time
+  jti: string;  // JWT ID
+  sid: string;  // Session ID
+}
+
+interface ValidationResult {
+  valid: boolean;
+  payload?: ShopifySessionTokenPayload;
+  shopDomain?: string;
+  error?: string;
+  errorCode?: 'INVALID_FORMAT' | 'INVALID_SIGNATURE' | 'TOKEN_EXPIRED' | 'TOKEN_NOT_YET_VALID' | 'INVALID_AUDIENCE' | 'PARSE_ERROR';
 }
 
 function base64UrlDecode(str: string): string {
@@ -40,6 +49,10 @@ function base64UrlDecode(str: string): string {
   return atob(base64);
 }
 
+/**
+ * Verify HMAC-SHA256 signature of Shopify JWT
+ * CRITICAL: Uses SHOPIFY_CLIENT_SECRET for signature validation
+ */
 function verifySignature(token: string, secret: string): boolean {
   const parts = token.split('.');
   if (parts.length !== 3) return false;
@@ -51,47 +64,72 @@ function verifySignature(token: string, secret: string): boolean {
     .update(signatureInput)
     .digest('base64url');
 
-  return signature === expectedSignature;
+  // Constant-time comparison to prevent timing attacks
+  if (signature.length !== expectedSignature.length) return false;
+  
+  let result = 0;
+  for (let i = 0; i < signature.length; i++) {
+    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+  }
+  return result === 0;
 }
 
-function validateSessionToken(token: string, apiKey: string, apiSecret: string): {
-  valid: boolean;
-  payload?: ShopifySessionTokenPayload;
-  shopDomain?: string;
-  error?: string;
-} {
+/**
+ * Full JWT validation with detailed error reporting
+ */
+function validateSessionToken(token: string, apiKey: string, apiSecret: string): ValidationResult {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) {
-      return { valid: false, error: 'Invalid token format' };
+      return { valid: false, error: 'Invalid token format', errorCode: 'INVALID_FORMAT' };
     }
 
+    // 1. Verify HMAC signature
     if (!verifySignature(token, apiSecret)) {
-      return { valid: false, error: 'Invalid signature' };
+      console.error('[Session Validate] Signature verification failed');
+      return { valid: false, error: 'Invalid signature - token may be tampered', errorCode: 'INVALID_SIGNATURE' };
     }
 
+    // 2. Decode and parse payload
     const payloadJson = base64UrlDecode(parts[1]);
     const payload: ShopifySessionTokenPayload = JSON.parse(payloadJson);
 
+    // 3. Validate time claims
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp < now) {
-      return { valid: false, error: 'Token expired' };
+    const clockSkew = 60; // Allow 60 seconds of clock skew
+    
+    if (payload.exp < (now - clockSkew)) {
+      console.error('[Session Validate] Token expired:', { exp: payload.exp, now });
+      return { valid: false, error: 'Token expired', errorCode: 'TOKEN_EXPIRED' };
     }
 
-    if (payload.nbf > now) {
-      return { valid: false, error: 'Token not yet valid' };
+    if (payload.nbf > (now + clockSkew)) {
+      console.error('[Session Validate] Token not yet valid:', { nbf: payload.nbf, now });
+      return { valid: false, error: 'Token not yet valid', errorCode: 'TOKEN_NOT_YET_VALID' };
     }
 
+    // 4. Validate audience (must match our App's Client ID)
     if (payload.aud !== apiKey) {
-      return { valid: false, error: 'Invalid audience' };
+      console.error('[Session Validate] Audience mismatch:', { expected: apiKey, got: payload.aud });
+      return { valid: false, error: 'Invalid audience', errorCode: 'INVALID_AUDIENCE' };
     }
 
+    // 5. Extract shop domain from dest claim (most secure method)
     const destUrl = new URL(payload.dest);
     const shopDomain = destUrl.hostname;
 
+    console.log('[Session Validate] ✓ Token validated for shop:', shopDomain);
+    console.log('[Session Validate] Token claims:', {
+      iss: payload.iss,
+      aud: payload.aud,
+      exp: new Date(payload.exp * 1000).toISOString(),
+      sub: payload.sub,
+    });
+
     return { valid: true, payload, shopDomain };
   } catch (err: any) {
-    return { valid: false, error: err.message };
+    console.error('[Session Validate] Parse error:', err);
+    return { valid: false, error: err.message, errorCode: 'PARSE_ERROR' };
   }
 }
 
@@ -101,10 +139,31 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('SHOPIFY_CLIENT_ID')!;
-    const apiSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET')!;
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const apiKey = Deno.env.get('SHOPIFY_CLIENT_ID');
+    const apiSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    // Validate required environment variables
+    if (!apiKey || !apiSecret) {
+      console.error('[Session Validate] Missing SHOPIFY_CLIENT_ID or SHOPIFY_CLIENT_SECRET');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          requiresOAuth: true,
+          oauthUrl: '/shopify-app'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[Session Validate] Missing Supabase credentials');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get session token from header
     const sessionToken = req.headers.get('X-Shopify-Session-Token');
@@ -112,24 +171,40 @@ Deno.serve(async (req) => {
     if (!sessionToken) {
       console.error('[Session Validate] No session token provided');
       return new Response(
-        JSON.stringify({ error: 'No session token provided' }),
+        JSON.stringify({ 
+          error: 'No session token provided',
+          requiresOAuth: true,
+          message: 'Please reinstall the app from your Shopify admin'
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('[Session Validate] Received token, validating...');
+    console.log('[Session Validate] Token preview:', sessionToken.substring(0, 50) + '...');
 
     // Validate the session token
     const validation = validateSessionToken(sessionToken, apiKey, apiSecret);
 
     if (!validation.valid) {
-      console.error('[Session Validate] Invalid token:', validation.error);
+      console.error('[Session Validate] Token validation failed:', validation.error, validation.errorCode);
+      
+      // Return structured error for frontend handling
       return new Response(
-        JSON.stringify({ error: validation.error }),
+        JSON.stringify({ 
+          error: validation.error,
+          errorCode: validation.errorCode,
+          requiresOAuth: validation.errorCode === 'INVALID_SIGNATURE' || validation.errorCode === 'INVALID_AUDIENCE',
+          message: validation.errorCode === 'TOKEN_EXPIRED' 
+            ? 'Your session has expired. Please refresh the page.'
+            : 'Token validation failed. Please reinstall the app.'
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const shopDomain = validation.shopDomain!;
-    console.log('[Session Validate] Valid session for shop:', shopDomain);
+    console.log('[Session Validate] ✓ Valid session for shop:', shopDomain);
 
     // Create admin client for database operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -155,7 +230,9 @@ Deno.serve(async (req) => {
           valid: true,
           shopDomain,
           installed: false,
-          message: 'Shop not connected to Steve. Please install the app first.'
+          requiresOAuth: true,
+          message: 'Shop not connected to Steve. Please install the app first.',
+          installUrl: `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${shopDomain}`
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -181,8 +258,6 @@ Deno.serve(async (req) => {
     // If the client has a user account, generate a Supabase session
     if (client.client_user_id) {
       try {
-        // Generate magic link token for the user (works without password)
-        // We use admin API to create a session directly
         const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(
           client.client_user_id
         );
@@ -202,7 +277,6 @@ Deno.serve(async (req) => {
         }
 
         // Generate a new session for the user
-        // This creates access and refresh tokens that the client can use
         const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
           email: userData.user.email!,
@@ -213,7 +287,6 @@ Deno.serve(async (req) => {
 
         if (sessionError) {
           console.error('[Session Validate] Failed to generate session:', sessionError);
-          // Fallback: return user info without session
           return new Response(
             JSON.stringify({
               valid: true,
@@ -241,7 +314,7 @@ Deno.serve(async (req) => {
         const token = magicLinkUrl.searchParams.get('token');
         const tokenType = magicLinkUrl.searchParams.get('type');
 
-        console.log('[Session Validate] Generated auth token for user:', userData.user.email);
+        console.log('[Session Validate] ✓ Generated auth token for user:', userData.user.email);
 
         return new Response(
           JSON.stringify({

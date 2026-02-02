@@ -85,9 +85,12 @@ export default function ShopifyEmbedded() {
     isAuthenticated: shopifyAuthenticated,
     isInstalled,
     error: autoLoginError,
+    errorCode: autoLoginErrorCode,
+    requiresOAuth,
     shopDomain,
     clientId,
     retryLogin,
+    redirectToOAuth,
   } = useShopifyAutoLogin(shop, host);
 
   // Log App Bridge status for Shopify verification
@@ -212,7 +215,7 @@ export default function ShopifyEmbedded() {
     );
   }
 
-  // Auto-login error - show retry option
+  // Auto-login error - show retry option with OAuth fallback
   if (isEmbedded && autoLoginError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -221,14 +224,36 @@ export default function ShopifyEmbedded() {
             <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
             <h2 className="text-lg font-semibold text-foreground">Error de autenticación</h2>
             <p className="text-sm text-muted-foreground">{autoLoginError}</p>
-            <div className="flex gap-2 justify-center">
+            
+            {autoLoginErrorCode && (
+              <p className="text-xs text-muted-foreground/60">
+                Código: {autoLoginErrorCode}
+              </p>
+            )}
+            
+            <div className="flex gap-2 justify-center flex-wrap">
               <Button onClick={retryLogin} variant="default">
                 Reintentar
               </Button>
-              <Button onClick={handleInstall} variant="outline">
-                Reinstalar App
-              </Button>
+              
+              {requiresOAuth && (
+                <Button onClick={redirectToOAuth} variant="outline">
+                  Reinstalar App
+                </Button>
+              )}
+              
+              {!requiresOAuth && (
+                <Button onClick={handleInstall} variant="outline">
+                  Ir a Instalación
+                </Button>
+              )}
             </div>
+            
+            {requiresOAuth && (
+              <p className="text-xs text-muted-foreground">
+                Serás redirigido automáticamente en unos segundos...
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
