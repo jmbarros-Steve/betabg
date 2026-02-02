@@ -33,19 +33,15 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
-  const [tokenDebug, setTokenDebug] = useState<string | null>(null);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const { isShopifyContext, shop, host } = useShopifyContext();
   const navigate = useNavigate();
 
-  // DEBUG: Capture OAuth tokens from URL hash or search params
+  // Capture OAuth tokens from URL and force session + navigation
   useEffect(() => {
     const hash = window.location.hash;
     const search = window.location.search;
-    
-    console.log('[Auth Debug] URL hash:', hash);
-    console.log('[Auth Debug] URL search:', search);
     
     // Check for access_token in hash (implicit flow)
     if (hash.includes('access_token')) {
@@ -53,23 +49,17 @@ export default function Auth() {
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
       
-      console.log('[Auth Debug] Found access_token in hash!');
-      setTokenDebug(`Token recibido en hash! access_token: ${accessToken?.substring(0, 20)}...`);
-      alert('Token recibido en hash!');
-      
-      // Force session exchange
       if (accessToken && refreshToken) {
-        console.log('[Auth Debug] Forcing setSession...');
         supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken
         }).then(({ data, error }) => {
           if (error) {
-            console.error('[Auth Debug] setSession error:', error);
+            console.error('[Auth] setSession error:', error);
             setOauthError(`Error setSession: ${error.message}`);
-          } else {
-            console.log('[Auth Debug] setSession success:', data.user?.email);
-            setTokenDebug(`Sesión establecida para: ${data.user?.email}`);
+          } else if (data.user) {
+            // Force full page reload to /portal or /dashboard
+            window.location.assign('/portal');
           }
         });
       }
@@ -82,24 +72,18 @@ export default function Auth() {
     const errorDescription = urlParams.get('error_description');
     
     if (code) {
-      console.log('[Auth Debug] Found code in search params!');
-      setTokenDebug(`Code recibido: ${code.substring(0, 20)}...`);
-      alert('Code recibido! Supabase debería intercambiarlo automáticamente.');
-      
-      // Force exchange code for session
       supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
         if (error) {
-          console.error('[Auth Debug] exchangeCodeForSession error:', error);
+          console.error('[Auth] exchangeCodeForSession error:', error);
           setOauthError(`Error exchange: ${error.message}`);
-        } else {
-          console.log('[Auth Debug] exchangeCodeForSession success:', data.user?.email);
-          setTokenDebug(`Sesión establecida para: ${data.user?.email}`);
+        } else if (data.user) {
+          // Force full page reload to /portal or /dashboard
+          window.location.assign('/portal');
         }
       });
     }
     
     if (error) {
-      console.error('[Auth Debug] OAuth error:', error, errorDescription);
       setOauthError(`OAuth Error: ${error} - ${errorDescription}`);
     }
   }, []);
@@ -378,7 +362,6 @@ export default function Auth() {
                 className="w-full"
                 onClick={async () => {
                   setOauthError(null);
-                  setTokenDebug(null);
                   try {
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'google',
@@ -426,12 +409,6 @@ export default function Auth() {
                 </div>
               )}
 
-              {/* Debug: Show token info */}
-              {tokenDebug && (
-                <div className="mt-4 p-3 bg-primary/10 border border-primary rounded-md">
-                  <p className="text-sm text-primary font-mono break-all">{tokenDebug}</p>
-                </div>
-              )}
 
               <div className="mt-6 text-center">
                 <button
