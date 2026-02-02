@@ -58,8 +58,8 @@ export default function Auth() {
             console.error('[Auth] setSession error:', error);
             setOauthError(`Error setSession: ${error.message}`);
           } else if (data.user) {
-            // Force full page reload to /portal or /dashboard
-            window.location.assign('/portal');
+            // Force full page reload to /auth so role-based routing can run safely
+            window.location.assign('/auth');
           }
         });
       }
@@ -77,8 +77,8 @@ export default function Auth() {
           console.error('[Auth] exchangeCodeForSession error:', error);
           setOauthError(`Error exchange: ${error.message}`);
         } else if (data.user) {
-          // Force full page reload to /portal or /dashboard
-          window.location.assign('/portal');
+          // Force full page reload to /auth so role-based routing can run safely
+          window.location.assign('/auth');
         }
       });
     }

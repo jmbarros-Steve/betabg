@@ -152,33 +152,9 @@ export default function Steve() {
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
-  // Redirect logged-in users to the right area (avoid render-time navigation)
-  useEffect(() => {
-    if (authLoading || roleLoading || !user) return;
-
-    if (isClient) {
-      navigate('/portal');
-      return;
-    }
-
-    if (isAdmin) {
-      navigate('/dashboard');
-      return;
-    }
-
-    // Fallback if user has no role
-    navigate('/auth');
-  }, [user, authLoading, roleLoading, isClient, isAdmin, navigate]);
-
-  // Show nothing while checking auth/role status
-  if (authLoading || roleLoading) {
-    return null;
-  }
-
-  // If user is logged in, don't render the page (redirect is happening)
-  if (user) {
-    return null;
-  }
+  // Note: This page is a public marketing page. Logged-in users should be able to view it too.
+  // We only avoid rendering while auth/role are still loading.
+  if (authLoading || roleLoading) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,9 +237,17 @@ export default function Steve() {
             variant="default" 
             size="sm" 
             className="uppercase tracking-wider text-xs"
-            onClick={() => setShowAuth(true)}
+            onClick={() => {
+              if (user) {
+                if (isAdmin) navigate('/dashboard');
+                else if (isClient) navigate('/portal');
+                else navigate('/auth');
+              } else {
+                setShowAuth(true);
+              }
+            }}
           >
-            Comenzar
+            {user ? 'Ir al panel' : 'Comenzar'}
           </Button>
         </div>
       </motion.nav>
