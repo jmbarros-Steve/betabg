@@ -5,14 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import logoMeta from '@/assets/logo-meta-clean.png';
 
 interface MetaAdAccountSelectorProps {
@@ -27,6 +29,12 @@ interface AdAccount {
   name: string;
   currency: string;
   timezone: string;
+  business_id: string | null;
+  business_name: string;
+}
+
+interface GroupedAccounts {
+  [businessName: string]: AdAccount[];
 }
 
 export function MetaAdAccountSelector({ 
@@ -35,10 +43,13 @@ export function MetaAdAccountSelector({
   onAccountSelected 
 }: MetaAdAccountSelectorProps) {
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [groupedAccounts, setGroupedAccounts] = useState<GroupedAccounts>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>(currentAccountId || '');
   const [error, setError] = useState<string | null>(null);
+  const [requiresReconnect, setRequiresReconnect] = useState(false);
+  const [missingPermissions, setMissingPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     fetchAdAccounts();
@@ -53,6 +64,8 @@ export function MetaAdAccountSelector({
   async function fetchAdAccounts() {
     setLoading(true);
     setError(null);
+    setRequiresReconnect(false);
+    setMissingPermissions([]);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('fetch-meta-ad-accounts', {
@@ -62,11 +75,16 @@ export function MetaAdAccountSelector({
       if (fnError) throw fnError;
 
       if (data?.error) {
-        setError(data.error);
+        setError(data.details || data.error);
+        if (data.requires_reconnect) {
+          setRequiresReconnect(true);
+          setMissingPermissions(data.missing_permissions || []);
+        }
         return;
       }
 
       setAccounts(data?.accounts || []);
+      setGroupedAccounts(data?.grouped || {});
     } catch (err) {
       console.error('Error fetching ad accounts:', err);
       setError('No se pudieron cargar las cuentas publicitarias');
@@ -111,9 +129,27 @@ export function MetaAdAccountSelector({
     }
   }
 
+  function handleReconnect() {
+    // Redirect to Meta OAuth with proper scopes
+    const META_APP_ID = '1994525824461583';
+    const redirectUri = `${window.location.origin}/oauth/meta/callback`;
+    const scopes = [
+      'ads_read',
+      'ads_management',
+      'business_management',
+      'read_insights',
+    ].join(',');
+
+    sessionStorage.setItem('meta_oauth_client_id', connectionId);
+    
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&auth_type=rerequest`;
+
+    window.location.href = authUrl;
+  }
+
   if (loading) {
     return (
-      <Card className="border-blue-200 bg-blue-50/30">
+      <Card className="border-primary/20 bg-primary/5">
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <Skeleton className="h-8 w-8 rounded" />
@@ -131,16 +167,38 @@ export function MetaAdAccountSelector({
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-6 w-6 text-destructive" />
+          <div className="flex items-start gap-3">
+            {requiresReconnect ? (
+              <AlertTriangle className="h-6 w-6 text-destructive mt-0.5" />
+            ) : (
+              <AlertCircle className="h-6 w-6 text-destructive mt-0.5" />
+            )}
             <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">Error al cargar cuentas</p>
-              <p className="text-xs text-destructive/80">{error}</p>
+              <p className="text-sm font-medium text-destructive">
+                {requiresReconnect ? 'Permisos insuficientes' : 'Error al cargar cuentas'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{error}</p>
+              {missingPermissions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {missingPermissions.map(perm => (
+                    <Badge key={perm} variant="outline" className="text-xs text-destructive border-destructive/30">
+                      {perm}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
-            <Button variant="outline" size="sm" onClick={fetchAdAccounts}>
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Reintentar
-            </Button>
+            {requiresReconnect ? (
+              <Button size="sm" onClick={handleReconnect}>
+                <ExternalLink className="w-4 h-4 mr-1" />
+                Reconectar Meta
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={fetchAdAccounts}>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Reintentar
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -149,16 +207,20 @@ export function MetaAdAccountSelector({
 
   if (accounts.length === 0) {
     return (
-      <Card className="border-warning/30 bg-warning/5">
+      <Card className="border-muted bg-muted/20">
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <img src={logoMeta} alt="Meta" className="h-8 w-8 object-contain" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-warning-foreground">Sin cuentas activas</p>
+              <p className="text-sm font-medium">Sin cuentas activas</p>
               <p className="text-xs text-muted-foreground">
-                No se encontraron cuentas publicitarias activas asociadas a este token.
+                No se encontraron cuentas publicitarias activas. Verifica que tengas acceso a al menos una Ad Account en Meta Business Suite.
               </p>
             </div>
+            <Button variant="outline" size="sm" onClick={fetchAdAccounts}>
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Recargar
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -166,6 +228,7 @@ export function MetaAdAccountSelector({
   }
 
   const selectedAccountData = accounts.find(a => a.account_id === selectedAccount);
+  const businessNames = Object.keys(groupedAccounts).sort();
 
   return (
     <Card className="border-primary/30 bg-primary/5">
@@ -175,7 +238,7 @@ export function MetaAdAccountSelector({
           <div>
             <CardTitle className="text-base">Cuenta Publicitaria de Meta</CardTitle>
             <CardDescription>
-              Selecciona la cuenta para sincronizar métricas
+              {accounts.length} cuenta{accounts.length !== 1 ? 's' : ''} disponible{accounts.length !== 1 ? 's' : ''}
             </CardDescription>
           </div>
         </div>
@@ -190,16 +253,23 @@ export function MetaAdAccountSelector({
             <SelectTrigger className="flex-1 bg-background">
               <SelectValue placeholder="Selecciona una cuenta publicitaria" />
             </SelectTrigger>
-            <SelectContent className="bg-popover z-50">
-              {accounts.map((account) => (
-                <SelectItem key={account.account_id} value={account.account_id}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{account.name}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {account.currency}
-                    </Badge>
-                  </div>
-                </SelectItem>
+            <SelectContent className="bg-popover z-50 max-h-80">
+              {businessNames.map((businessName) => (
+                <SelectGroup key={businessName}>
+                  <SelectLabel className="font-semibold text-xs uppercase tracking-wider text-muted-foreground px-2 py-1.5">
+                    {businessName}
+                  </SelectLabel>
+                  {groupedAccounts[businessName].map((account) => (
+                    <SelectItem key={account.account_id} value={account.account_id}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate max-w-[200px]">{account.name}</span>
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {account.currency}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
@@ -214,7 +284,11 @@ export function MetaAdAccountSelector({
         </div>
 
         {selectedAccountData && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <Badge variant="secondary" className="text-xs">
+              {selectedAccountData.business_name}
+            </Badge>
+            <span>•</span>
             <span>ID: {selectedAccountData.account_id}</span>
             <span>•</span>
             <span>{selectedAccountData.timezone}</span>
