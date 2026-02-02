@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ShopifyContextProvider } from "@/hooks/useShopifyContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Steve from "./pages/Steve";
@@ -31,27 +32,29 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/steve" element={<Steve />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/portal" element={<ClientPortal />} />
-            <Route path="/portal/:clientId" element={<ClientPortal />} />
-            <Route path="/oauth/meta/callback" element={<OAuthMetaCallback />} />
-            <Route path="/oauth/shopify/callback" element={<OAuthShopifyCallback />} />
-            <Route path="/oauth/google-ads/callback" element={<OAuthGoogleAdsCallback />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/centro-estudios" element={<CentroEstudios />} />
-            <Route path="/servicios-corporativos" element={<ServiciosCorporativos />} />
-            <Route path="/terminos" element={<TermsOfService />} />
-            <Route path="/privacidad" element={<PrivacyPolicy />} />
-            <Route path="/eliminacion-datos" element={<DataDeletion />} />
-            <Route path="/shopify-app" element={<ShopifyApp />} />
-            <Route path="/shopify" element={<ShopifyEmbedded />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <ShopifyContextProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/steve" element={<Steve />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/portal" element={<ClientPortal />} />
+              <Route path="/portal/:clientId" element={<ClientPortal />} />
+              <Route path="/oauth/meta/callback" element={<OAuthMetaCallback />} />
+              <Route path="/oauth/shopify/callback" element={<OAuthShopifyCallback />} />
+              <Route path="/oauth/google-ads/callback" element={<OAuthGoogleAdsCallback />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/centro-estudios" element={<CentroEstudios />} />
+              <Route path="/servicios-corporativos" element={<ServiciosCorporativos />} />
+              <Route path="/terminos" element={<TermsOfService />} />
+              <Route path="/privacidad" element={<PrivacyPolicy />} />
+              <Route path="/eliminacion-datos" element={<DataDeletion />} />
+              <Route path="/shopify-app" element={<ShopifyApp />} />
+              <Route path="/shopify" element={<ShopifyEmbedded />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ShopifyContextProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

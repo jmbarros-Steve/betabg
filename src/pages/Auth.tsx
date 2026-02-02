@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, ArrowLeft } from 'lucide-react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useShopifyContext } from '@/hooks/useShopifyContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ const signupSchema = z.object({
 });
 
 export default function Auth() {
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +34,19 @@ export default function Auth() {
   const [resetSent, setResetSent] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
+  const { isShopifyContext, shop, host } = useShopifyContext();
   const navigate = useNavigate();
+
+  // CRITICAL: If we're in Shopify context, redirect to /shopify for auto-login
+  // This prevents showing the manual login screen to embedded app users
+  useEffect(() => {
+    if (isShopifyContext && shop && host) {
+      console.log('[Auth] Shopify context detected, redirecting to auto-login...');
+      // Preserve all Shopify params when redirecting
+      const shopifyParams = new URLSearchParams(searchParams);
+      navigate(`/shopify?${shopifyParams.toString()}`, { replace: true });
+    }
+  }, [isShopifyContext, shop, host, searchParams, navigate]);
 
   useEffect(() => {
     if (authLoading || roleLoading || !user) return;
@@ -48,6 +62,18 @@ export default function Auth() {
 
     // If user has no assigned role, keep them in auth
   }, [user, authLoading, roleLoading, isClient, isAdmin, navigate]);
+
+  // Show loading while checking Shopify context redirect
+  if (isShopifyContext) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Redirigiendo a Shopify...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

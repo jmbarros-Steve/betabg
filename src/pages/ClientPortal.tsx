@@ -5,6 +5,7 @@ import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useShopifyContext } from '@/hooks/useShopifyContext';
 import { ClientPortalMetrics } from '@/components/client-portal/ClientPortalMetrics';
 import { ClientPortalConnections } from '@/components/client-portal/ClientPortalConnections';
 import { SteveChat } from '@/components/client-portal/SteveChat';
@@ -32,6 +33,7 @@ export default function ClientPortal() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const { user, loading: authLoading, signOut } = useAuth();
   const { isClient, isAdmin, isSuperAdmin, isShopifyUser, loading: roleLoading, clientData } = useUserRole();
+  const { shouldBypassAuth, isShopifyContext } = useShopifyContext();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
@@ -64,11 +66,14 @@ export default function ClientPortal() {
     setShowOnboarding(false);
   };
 
+  // CRITICAL: Bypass auth redirect when in Shopify context
+  // The auto-login flow will handle authentication via Session Token
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !shouldBypassAuth) {
+      // Only redirect to /auth if NOT in Shopify embedded context
       navigate('/auth');
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, shouldBypassAuth, navigate]);
 
   // Fetch client data for admin view - ONLY for super admins
   useEffect(() => {
