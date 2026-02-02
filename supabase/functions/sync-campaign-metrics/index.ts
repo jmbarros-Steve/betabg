@@ -5,6 +5,49 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Currency conversion utilities
+const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
+const FALLBACK_RATES: Record<string, number> = {
+  CLP: 950,
+  MXN: 17.5,
+  EUR: 0.92,
+  GBP: 0.79,
+};
+
+let cachedRates: Record<string, number> = {};
+
+async function getExchangeRates(): Promise<Record<string, number>> {
+  if (Object.keys(cachedRates).length > 0) return cachedRates;
+  
+  try {
+    const response = await fetch(EXCHANGE_RATE_API_URL);
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    const data = await response.json();
+    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
+    cachedRates = data.rates || FALLBACK_RATES;
+    return cachedRates;
+  } catch (error) {
+    console.error('Failed to fetch exchange rates, using fallback:', error);
+    return FALLBACK_RATES;
+  }
+}
+
+async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
+  const currency = fromCurrency.toUpperCase();
+  if (currency === 'CLP') return amount;
+
+  const rates = await getExchangeRates();
+  
+  if (currency === 'USD') {
+    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
+  } else {
+    // Convert FROM -> USD -> CLP
+    const fromRate = rates[currency] || 1;
+    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
+    return (amount / fromRate) * clpRate;
+  }
+}
+
 interface MetaCampaign {
   id: string;
   name: string;
@@ -95,7 +138,7 @@ Deno.serve(async (req) => {
         access_token_encrypted,
         refresh_token_encrypted,
         client_id,
-        clients!inner(user_id, client_user_id)
+        clients!inner(user_id, client_user_id, shop_domain)
       `)
       .eq('id', connection_id)
       .eq('platform', platform)
@@ -109,7 +152,7 @@ Deno.serve(async (req) => {
     }
 
     // Verify ownership
-    const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
+    const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null; shop_domain: string | null };
     if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -150,7 +193,10 @@ Deno.serve(async (req) => {
       cpm: number;
       roas: number;
       currency: string;
+      shop_domain: string | null;
     }> = [];
+
+    const shopDomain = clientData.shop_domain;
 
     if (platform === 'meta') {
       campaignMetrics = await syncMetaCampaigns(
@@ -158,7 +204,8 @@ Deno.serve(async (req) => {
         decryptedToken,
         connection_id,
         startDate,
-        endDate
+        endDate,
+        shopDomain
       );
     } else if (platform === 'google') {
       const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -206,11 +253,12 @@ Deno.serve(async (req) => {
         developerToken,
         connection_id,
         startDate,
-        endDate
+        endDate,
+        shopDomain
       );
     }
 
-    console.log(`Upserting ${campaignMetrics.length} campaign metric records`);
+    console.log(`Upserting ${campaignMetrics.length} campaign metric records (all in CLP)`);
 
     if (campaignMetrics.length > 0) {
       // Upsert in batches of 100
@@ -239,7 +287,8 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         campaigns_synced: new Set(campaignMetrics.map(m => m.campaign_id)).size,
-        records_synced: campaignMetrics.length
+        records_synced: campaignMetrics.length,
+        currency: 'CLP'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -258,11 +307,26 @@ async function syncMetaCampaigns(
   accessToken: string,
   connectionId: string,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  shopDomain: string | null
 ): Promise<Array<any>> {
   const metrics: Array<any> = [];
   const adAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+  // Get account currency first
+  const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency&access_token=${accessToken}`;
+  let accountCurrency = 'USD';
+  try {
+    const accountRes = await fetch(accountInfoUrl);
+    if (accountRes.ok) {
+      const accountData = await accountRes.json();
+      accountCurrency = accountData.currency || 'USD';
+    }
+  } catch (e) {
+    console.log('Could not fetch account currency, defaulting to USD');
+  }
+  console.log(`Meta account currency: ${accountCurrency}`);
 
   // Fetch campaigns with insights
   const campaignsUrl = new URL(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns`);
@@ -309,6 +373,12 @@ async function syncMetaCampaigns(
           a.action_type === 'purchase' || a.action_type === 'omni_purchase'
         );
 
+        // Convert all monetary values to CLP
+        const spendCLP = await convertToCLP(parseFloat(day.spend || '0'), accountCurrency);
+        const cpcCLP = await convertToCLP(parseFloat(day.cpc || '0'), accountCurrency);
+        const cpmCLP = await convertToCLP(parseFloat(day.cpm || '0'), accountCurrency);
+        const conversionValueCLP = await convertToCLP(parseFloat(purchaseValue?.value || '0'), accountCurrency);
+
         metrics.push({
           connection_id: connectionId,
           campaign_id: campaign.id,
@@ -317,14 +387,15 @@ async function syncMetaCampaigns(
           metric_date: day.date_start,
           impressions: parseFloat(day.impressions || '0'),
           clicks: parseFloat(day.clicks || '0'),
-          spend: parseFloat(day.spend || '0'),
+          spend: Math.round(spendCLP),
           conversions: parseFloat(purchases?.value || '0'),
-          conversion_value: parseFloat(purchaseValue?.value || '0'),
+          conversion_value: Math.round(conversionValueCLP),
           ctr: parseFloat(day.ctr || '0'),
-          cpc: parseFloat(day.cpc || '0'),
-          cpm: parseFloat(day.cpm || '0'),
+          cpc: Math.round(cpcCLP),
+          cpm: Math.round(cpmCLP),
           roas: parseFloat(roas?.value || '0'),
-          currency: 'USD'
+          currency: 'CLP',
+          shop_domain: shopDomain
         });
       }
     } catch (e) {
@@ -341,10 +412,14 @@ async function syncGoogleCampaigns(
   developerToken: string,
   connectionId: string,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  shopDomain: string | null
 ): Promise<Array<any>> {
   const metrics: Array<any> = [];
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+  // Google Ads uses USD by default, we convert to CLP
+  const sourceCurrency = 'USD';
 
   const query = `
     SELECT
@@ -405,11 +480,19 @@ async function syncGoogleCampaigns(
     console.log(`Found ${allResults.length} Google campaign day records`);
 
     for (const row of allResults) {
-      const spend = row.metrics?.costMicros ? parseInt(row.metrics.costMicros, 10) / 1000000 : 0;
+      const spendUSD = row.metrics?.costMicros ? parseInt(row.metrics.costMicros, 10) / 1000000 : 0;
       const impressions = row.metrics?.impressions ? parseInt(row.metrics.impressions, 10) : 0;
       const clicks = row.metrics?.clicks ? parseInt(row.metrics.clicks, 10) : 0;
-      const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
-      const roas = spend > 0 ? (row.metrics?.conversionsValue || 0) / spend : 0;
+      const cpmUSD = impressions > 0 ? (spendUSD / impressions) * 1000 : 0;
+      const cpcUSD = row.metrics?.averageCpc ? parseInt(row.metrics.averageCpc, 10) / 1000000 : 0;
+      const conversionValueUSD = row.metrics?.conversionsValue || 0;
+      const roas = spendUSD > 0 ? conversionValueUSD / spendUSD : 0;
+
+      // Convert all monetary values to CLP
+      const spendCLP = await convertToCLP(spendUSD, sourceCurrency);
+      const cpcCLP = await convertToCLP(cpcUSD, sourceCurrency);
+      const cpmCLP = await convertToCLP(cpmUSD, sourceCurrency);
+      const conversionValueCLP = await convertToCLP(conversionValueUSD, sourceCurrency);
 
       metrics.push({
         connection_id: connectionId,
@@ -419,14 +502,15 @@ async function syncGoogleCampaigns(
         metric_date: row.segments.date,
         impressions,
         clicks,
-        spend,
+        spend: Math.round(spendCLP),
         conversions: row.metrics?.conversions || 0,
-        conversion_value: row.metrics?.conversionsValue || 0,
+        conversion_value: Math.round(conversionValueCLP),
         ctr: row.metrics?.ctr || 0,
-        cpc: row.metrics?.averageCpc ? parseInt(row.metrics.averageCpc, 10) / 1000000 : 0,
-        cpm,
+        cpc: Math.round(cpcCLP),
+        cpm: Math.round(cpmCLP),
         roas,
-        currency: 'USD'
+        currency: 'CLP',
+        shop_domain: shopDomain
       });
     }
   } catch (e) {

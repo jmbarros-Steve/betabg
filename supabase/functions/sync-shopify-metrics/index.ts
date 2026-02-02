@@ -2,8 +2,46 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-session-token',
 };
+
+// Currency conversion utilities
+const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
+const FALLBACK_RATES: Record<string, number> = {
+  CLP: 950,
+  MXN: 17.5,
+  EUR: 0.92,
+  GBP: 0.79,
+};
+
+async function getExchangeRates(): Promise<Record<string, number>> {
+  try {
+    const response = await fetch(EXCHANGE_RATE_API_URL);
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    const data = await response.json();
+    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
+    return data.rates;
+  } catch (error) {
+    console.error('Failed to fetch exchange rates, using fallback:', error);
+    return FALLBACK_RATES;
+  }
+}
+
+async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
+  const currency = fromCurrency.toUpperCase();
+  if (currency === 'CLP') return amount;
+
+  const rates = await getExchangeRates();
+  
+  if (currency === 'USD') {
+    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
+  } else {
+    // Convert FROM -> USD -> CLP
+    const fromRate = rates[currency] || 1;
+    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
+    return (amount / fromRate) * clpRate;
+  }
+}
 
 interface ShopifyOrder {
   id: number;
@@ -39,19 +77,19 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Validate the JWT and get user claims
+    // Validate the JWT and get user
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
 
-    if (claimsError || !claimsData?.claims) {
-      console.error('Invalid JWT:', claimsError);
+    if (authError || !user) {
+      console.error('Invalid JWT:', authError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
     console.log('Authenticated user:', userId);
 
     // Get the connection ID from request
@@ -161,19 +199,31 @@ Deno.serve(async (req) => {
     const { orders } = await shopifyResponse.json() as { orders: ShopifyOrder[] };
     console.log('Fetched orders:', orders?.length || 0);
 
-    // Calculate daily metrics
-    const dailyMetrics: Record<string, { revenue: number; orders: number; currency: string }> = {};
+    // Calculate daily metrics - ALL CONVERTED TO CLP
+    const dailyMetrics: Record<string, { revenue: number; orders: number; originalCurrency: string }> = {};
 
     for (const order of orders || []) {
       const date = order.created_at.split('T')[0];
+      const orderCurrency = order.currency || 'CLP';
+      
       if (!dailyMetrics[date]) {
-        dailyMetrics[date] = { revenue: 0, orders: 0, currency: order.currency };
+        dailyMetrics[date] = { revenue: 0, orders: 0, originalCurrency: orderCurrency };
       }
-      dailyMetrics[date].revenue += parseFloat(order.total_price);
+      
+      const originalAmount = parseFloat(order.total_price);
+      const amountCLP = await convertToCLP(originalAmount, orderCurrency);
+      
+      dailyMetrics[date].revenue += amountCLP;
       dailyMetrics[date].orders += 1;
     }
 
-    // Upsert metrics to database using service role
+    // Log conversion info
+    const sampleOrder = orders?.[0];
+    if (sampleOrder) {
+      console.log(`Converting from ${sampleOrder.currency} to CLP`);
+    }
+
+    // Upsert metrics to database using service role - ALL IN CLP
     const metricsToInsert: any[] = [];
     
     for (const [date, metrics] of Object.entries(dailyMetrics)) {
@@ -181,15 +231,15 @@ Deno.serve(async (req) => {
         connection_id: connectionId,
         metric_date: date,
         metric_type: 'revenue',
-        metric_value: metrics.revenue,
-        currency: metrics.currency,
+        metric_value: Math.round(metrics.revenue), // Round to whole pesos
+        currency: 'CLP',
       });
       metricsToInsert.push({
         connection_id: connectionId,
         metric_date: date,
         metric_type: 'orders',
         metric_value: metrics.orders,
-        currency: metrics.currency,
+        currency: 'CLP',
       });
     }
 
@@ -211,13 +261,15 @@ Deno.serve(async (req) => {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', connectionId);
 
-    console.log('Sync completed successfully');
+    console.log('Sync completed successfully (all amounts in CLP)');
 
     return new Response(
       JSON.stringify({
         success: true,
         ordersCount: orders?.length || 0,
         daysProcessed: Object.keys(dailyMetrics).length,
+        currency: 'CLP',
+        source_currency: sampleOrder?.currency || 'CLP',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

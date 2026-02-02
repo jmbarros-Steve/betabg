@@ -287,61 +287,67 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
-              Costos Fijos Mensuales
+              Costos Fijos Mensuales (CLP)
             </CardTitle>
             <CardDescription>
-              Ingresa tus costos fijos para el cálculo del estado de resultados
+              Ingresa tus costos fijos en pesos chilenos para el cálculo del estado de resultados
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="shopify_cost">Plan de Shopify (USD/mes)</Label>
+              <Label htmlFor="shopify_cost">Plan de Shopify (CLP/mes)</Label>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">$</span>
                 <Input
                   id="shopify_cost"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={config.shopify_plan_cost}
                   onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, shopify_plan_cost: parseFloat(e.target.value) || 0 }))
+                    setConfig((prev) => ({ ...prev, shopify_plan_cost: parseInt(e.target.value) || 0 }))
                   }
+                  placeholder="Ej: 29000"
                 />
+                <span className="text-muted-foreground text-sm">CLP</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="klaviyo_cost">Plan de Klaviyo (USD/mes)</Label>
+              <Label htmlFor="klaviyo_cost">Plan de Klaviyo (CLP/mes)</Label>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">$</span>
                 <Input
                   id="klaviyo_cost"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={config.klaviyo_plan_cost}
                   onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, klaviyo_plan_cost: parseFloat(e.target.value) || 0 }))
+                    setConfig((prev) => ({ ...prev, klaviyo_plan_cost: parseInt(e.target.value) || 0 }))
                   }
+                  placeholder="Ej: 45000"
                 />
+                <span className="text-muted-foreground text-sm">CLP</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="other_costs">Otros costos fijos (USD/mes)</Label>
+              <Label htmlFor="other_costs">Otros costos fijos (CLP/mes)</Label>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">$</span>
                 <Input
                   id="other_costs"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={config.other_fixed_costs}
                   onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, other_fixed_costs: parseFloat(e.target.value) || 0 }))
+                    setConfig((prev) => ({ ...prev, other_fixed_costs: parseInt(e.target.value) || 0 }))
                   }
+                  placeholder="Ej: 15000"
                 />
+                <span className="text-muted-foreground text-sm">CLP</span>
               </div>
               <Input
                 placeholder="Descripción (ej: Hosting, Apps adicionales...)"
@@ -375,7 +381,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
                 <span className="text-muted-foreground">%</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Ej: Transbank 2.95%, Mercado Pago 3.49% + IVA, Stripe 2.9% + $0.30
+                Ej: Transbank 2.95%, Mercado Pago 3.49% + IVA, Stripe 2.9%
               </p>
             </div>
           </CardContent>
@@ -391,7 +397,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
               <p className="font-semibold">{config.default_margin_percentage}%</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Costos fijos totales</p>
+              <p className="text-xs text-muted-foreground">Costos fijos totales (CLP)</p>
               <p className="font-semibold">
                 ${(config.shopify_plan_cost + config.klaviyo_plan_cost + config.other_fixed_costs).toLocaleString('es-CL')}/mes
               </p>
@@ -403,6 +409,10 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
             <div>
               <p className="text-xs text-muted-foreground">SKUs con margen específico</p>
               <p className="font-semibold">{Object.keys(config.product_margins).length}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Moneda base</p>
+              <p className="font-semibold text-primary">CLP</p>
             </div>
           </div>
         </CardContent>

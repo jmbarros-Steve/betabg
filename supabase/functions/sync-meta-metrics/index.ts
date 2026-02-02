@@ -5,6 +5,44 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Currency conversion utilities
+const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
+const FALLBACK_RATES: Record<string, number> = {
+  CLP: 950,
+  MXN: 17.5,
+  EUR: 0.92,
+  GBP: 0.79,
+};
+
+async function getExchangeRates(): Promise<Record<string, number>> {
+  try {
+    const response = await fetch(EXCHANGE_RATE_API_URL);
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    const data = await response.json();
+    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
+    return data.rates;
+  } catch (error) {
+    console.error('Failed to fetch exchange rates, using fallback:', error);
+    return FALLBACK_RATES;
+  }
+}
+
+async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
+  const currency = fromCurrency.toUpperCase();
+  if (currency === 'CLP') return amount;
+
+  const rates = await getExchangeRates();
+  
+  if (currency === 'USD') {
+    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
+  } else {
+    // Convert FROM -> USD -> CLP
+    const fromRate = rates[currency] || 1;
+    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
+    return (amount / fromRate) * clpRate;
+  }
+}
+
 interface MetaInsightsResponse {
   data: Array<{
     date_start: string;
@@ -21,6 +59,11 @@ interface MetaInsightsResponse {
     cursors: { after?: string };
     next?: string;
   };
+}
+
+interface AdAccountInfo {
+  currency?: string;
+  timezone_name?: string;
 }
 
 Deno.serve(async (req) => {
@@ -119,17 +162,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Prepare ad account ID (Meta requires act_ prefix)
+    const adAccountId = connection.account_id.startsWith('act_') 
+      ? connection.account_id 
+      : `act_${connection.account_id}`;
+
+    // First, fetch the ad account currency to determine if conversion is needed
+    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
+    const accountInfoResponse = await fetch(accountInfoUrl);
+    let accountCurrency = 'USD'; // Default to USD
+
+    if (accountInfoResponse.ok) {
+      const accountInfo: AdAccountInfo = await accountInfoResponse.json();
+      accountCurrency = accountInfo.currency || 'USD';
+      console.log(`Ad account currency: ${accountCurrency}`);
+    }
+
     // Calculate date range (last 30 days)
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
 
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
-
-    // Prepare ad account ID (Meta requires act_ prefix)
-    const adAccountId = connection.account_id.startsWith('act_') 
-      ? connection.account_id 
-      : `act_${connection.account_id}`;
 
     // Fetch insights from Meta Marketing API
     const fields = [
@@ -171,7 +225,7 @@ Deno.serve(async (req) => {
     const insightsData: MetaInsightsResponse = await metaResponse.json();
     console.log(`Received ${insightsData.data?.length || 0} days of insights`);
 
-    // Process and store metrics
+    // Process and store metrics - ALWAYS CONVERT TO CLP
     const metricsToUpsert: Array<{
       connection_id: string;
       metric_date: string;
@@ -183,40 +237,46 @@ Deno.serve(async (req) => {
     for (const dayData of insightsData.data || []) {
       const metricDate = dayData.date_start;
 
-      // Ad Spend
+      // Ad Spend - Convert to CLP
       if (dayData.spend) {
+        const spendOriginal = parseFloat(dayData.spend);
+        const spendCLP = await convertToCLP(spendOriginal, accountCurrency);
+        console.log(`Spend ${dayData.date_start}: ${spendOriginal} ${accountCurrency} → ${spendCLP} CLP`);
+        
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'ad_spend',
-          metric_value: parseFloat(dayData.spend),
-          currency: 'USD'
+          metric_value: Math.round(spendCLP), // Round to whole pesos
+          currency: 'CLP'
         });
       }
 
-      // Impressions
+      // Impressions (no currency conversion needed)
       if (dayData.impressions) {
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'impressions',
           metric_value: parseFloat(dayData.impressions),
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
 
-      // CPM
+      // CPM - Convert to CLP
       if (dayData.cpm) {
+        const cpmOriginal = parseFloat(dayData.cpm);
+        const cpmCLP = await convertToCLP(cpmOriginal, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'cpm',
-          metric_value: parseFloat(dayData.cpm),
-          currency: 'USD'
+          metric_value: Math.round(cpmCLP),
+          currency: 'CLP'
         });
       }
 
-      // Purchases (from actions array)
+      // Purchases (from actions array - no conversion, it's a count)
       const purchases = dayData.actions?.find(
         a => a.action_type === 'purchase' || a.action_type === 'omni_purchase'
       );
@@ -226,39 +286,43 @@ Deno.serve(async (req) => {
           metric_date: metricDate,
           metric_type: 'purchases',
           metric_value: parseFloat(purchases.value),
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
 
-      // Purchase Value / Revenue (from action_values array)
+      // Purchase Value / Revenue - Convert to CLP
       const purchaseValue = dayData.action_values?.find(
         a => a.action_type === 'purchase' || a.action_type === 'omni_purchase'
       );
       if (purchaseValue) {
+        const valueOriginal = parseFloat(purchaseValue.value);
+        const valueCLP = await convertToCLP(valueOriginal, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'purchase_value',
-          metric_value: parseFloat(purchaseValue.value),
-          currency: 'USD'
+          metric_value: Math.round(valueCLP),
+          currency: 'CLP'
         });
       }
 
-      // Cost per Purchase
+      // Cost per Purchase - Convert to CLP
       const costPerPurchase = dayData.cost_per_action_type?.find(
         a => a.action_type === 'purchase' || a.action_type === 'omni_purchase'
       );
       if (costPerPurchase) {
+        const cppOriginal = parseFloat(costPerPurchase.value);
+        const cppCLP = await convertToCLP(cppOriginal, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'cost_per_purchase',
-          metric_value: parseFloat(costPerPurchase.value),
-          currency: 'USD'
+          metric_value: Math.round(cppCLP),
+          currency: 'CLP'
         });
       }
 
-      // ROAS
+      // ROAS (ratio, no conversion needed)
       const roas = dayData.purchase_roas?.find(
         a => a.action_type === 'purchase' || a.action_type === 'omni_purchase'
       );
@@ -268,12 +332,12 @@ Deno.serve(async (req) => {
           metric_date: metricDate,
           metric_type: 'roas',
           metric_value: parseFloat(roas.value),
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
     }
 
-    console.log(`Upserting ${metricsToUpsert.length} metrics`);
+    console.log(`Upserting ${metricsToUpsert.length} metrics (all converted to CLP)`);
 
     // Upsert metrics in batches
     if (metricsToUpsert.length > 0) {
@@ -299,13 +363,15 @@ Deno.serve(async (req) => {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', connection_id);
 
-    console.log('Meta sync completed successfully');
+    console.log('Meta sync completed successfully (all amounts in CLP)');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         metrics_synced: metricsToUpsert.length,
-        days_processed: insightsData.data?.length || 0
+        days_processed: insightsData.data?.length || 0,
+        currency: 'CLP',
+        source_currency: accountCurrency
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

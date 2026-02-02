@@ -446,8 +446,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   }
 
   const statCards = [
-    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')}`, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
-    { title: 'Inversión Publicitaria', value: `$${current.totalSpend.toLocaleString('es-CL')}`, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
+    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
+    { title: 'Inversión Publicitaria', value: `$${current.totalSpend.toLocaleString('es-CL')} CLP`, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
     { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
     { title: 'ROAS Promedio', value: `${current.avgRoas.toFixed(2)}x`, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
   ];
