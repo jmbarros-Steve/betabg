@@ -49,18 +49,25 @@ export default function Auth() {
   }, [isShopifyContext, shop, host, searchParams, navigate]);
 
   useEffect(() => {
-    if (authLoading || roleLoading || !user) return;
-
-    if (isClient) {
-      navigate('/portal');
-      return;
+    console.log('[Auth Page] State:', { authLoading, roleLoading, user: user?.email, isClient, isAdmin });
+    
+    if (authLoading || roleLoading) return;
+    
+    // If user is logged in, redirect based on role
+    if (user) {
+      if (isClient) {
+        console.log('[Auth Page] Redirecting client to /portal');
+        navigate('/portal', { replace: true });
+        return;
+      }
+      if (isAdmin) {
+        console.log('[Auth Page] Redirecting admin to /dashboard');
+        navigate('/dashboard', { replace: true });
+        return;
+      }
+      // User has no role - show message or keep on auth
+      console.log('[Auth Page] User has no assigned role');
     }
-    if (isAdmin) {
-      navigate('/dashboard');
-      return;
-    }
-
-    // If user has no assigned role, keep them in auth
   }, [user, authLoading, roleLoading, isClient, isAdmin, navigate]);
 
   // Show loading while checking Shopify context redirect
