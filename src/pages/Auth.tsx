@@ -32,10 +32,77 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [tokenDebug, setTokenDebug] = useState<string | null>(null);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const { isShopifyContext, shop, host } = useShopifyContext();
   const navigate = useNavigate();
+
+  // DEBUG: Capture OAuth tokens from URL hash or search params
+  useEffect(() => {
+    const hash = window.location.hash;
+    const search = window.location.search;
+    
+    console.log('[Auth Debug] URL hash:', hash);
+    console.log('[Auth Debug] URL search:', search);
+    
+    // Check for access_token in hash (implicit flow)
+    if (hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      
+      console.log('[Auth Debug] Found access_token in hash!');
+      setTokenDebug(`Token recibido en hash! access_token: ${accessToken?.substring(0, 20)}...`);
+      alert('Token recibido en hash!');
+      
+      // Force session exchange
+      if (accessToken && refreshToken) {
+        console.log('[Auth Debug] Forcing setSession...');
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        }).then(({ data, error }) => {
+          if (error) {
+            console.error('[Auth Debug] setSession error:', error);
+            setOauthError(`Error setSession: ${error.message}`);
+          } else {
+            console.log('[Auth Debug] setSession success:', data.user?.email);
+            setTokenDebug(`Sesión establecida para: ${data.user?.email}`);
+          }
+        });
+      }
+    }
+    
+    // Check for code in search params (authorization code flow)
+    const urlParams = new URLSearchParams(search);
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+    
+    if (code) {
+      console.log('[Auth Debug] Found code in search params!');
+      setTokenDebug(`Code recibido: ${code.substring(0, 20)}...`);
+      alert('Code recibido! Supabase debería intercambiarlo automáticamente.');
+      
+      // Force exchange code for session
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (error) {
+          console.error('[Auth Debug] exchangeCodeForSession error:', error);
+          setOauthError(`Error exchange: ${error.message}`);
+        } else {
+          console.log('[Auth Debug] exchangeCodeForSession success:', data.user?.email);
+          setTokenDebug(`Sesión establecida para: ${data.user?.email}`);
+        }
+      });
+    }
+    
+    if (error) {
+      console.error('[Auth Debug] OAuth error:', error, errorDescription);
+      setOauthError(`OAuth Error: ${error} - ${errorDescription}`);
+    }
+  }, []);
 
   // CRITICAL: If we're in Shopify context, redirect to /shopify for auto-login
   // This prevents showing the manual login screen to embedded app users
@@ -310,15 +377,24 @@ export default function Auth() {
                 size="lg"
                 className="w-full"
                 onClick={async () => {
-                  const { error } = await supabase.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: {
-                      // Redirect to /auth after OAuth, then role-based routing kicks in
-                      redirectTo: `${window.location.origin}/auth`
+                  setOauthError(null);
+                  setTokenDebug(null);
+                  try {
+                    const { error } = await supabase.auth.signInWithOAuth({
+                      provider: 'google',
+                      options: {
+                        // Redirect to /auth after OAuth, then role-based routing kicks in
+                        redirectTo: `${window.location.origin}/auth`
+                      }
+                    });
+                    if (error) {
+                      console.error('[Auth] signInWithOAuth error:', error);
+                      setOauthError(`OAuth Error: ${error.message}`);
+                      toast.error('Error al iniciar sesión con Google');
                     }
-                  });
-                  if (error) {
-                    toast.error('Error al iniciar sesión con Google');
+                  } catch (err: any) {
+                    console.error('[Auth] signInWithOAuth exception:', err);
+                    setOauthError(`Exception: ${err.message}`);
                   }
                 }}
               >
@@ -342,6 +418,20 @@ export default function Auth() {
                 </svg>
                 Continuar con Google
               </Button>
+
+              {/* Debug: Show OAuth errors */}
+              {oauthError && (
+                <div className="mt-4 p-3 bg-destructive/10 border border-destructive rounded-md">
+                  <p className="text-sm text-destructive font-mono break-all">{oauthError}</p>
+                </div>
+              )}
+
+              {/* Debug: Show token info */}
+              {tokenDebug && (
+                <div className="mt-4 p-3 bg-primary/10 border border-primary rounded-md">
+                  <p className="text-sm text-primary font-mono break-all">{tokenDebug}</p>
+                </div>
+              )}
 
               <div className="mt-6 text-center">
                 <button
