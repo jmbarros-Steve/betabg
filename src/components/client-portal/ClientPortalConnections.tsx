@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail } from 'lucide-react';
 import { ClientOnboardingSteps } from './ClientOnboardingSteps';
+import { MetaAdAccountSelector } from './MetaAdAccountSelector';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
@@ -261,45 +262,59 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
           {connections.map((connection) => {
             const config = platformConfig[connection.platform];
             const isKlaviyo = connection.platform === 'klaviyo';
+            const isMeta = connection.platform === 'meta';
+            
             return (
-              <Card key={connection.id}>
-                <CardContent className="flex items-center justify-between py-4">
-                  <div className="flex items-center gap-4">
-                    {config.logo ? (
-                      <img src={config.logo} alt={config.name} className="h-10 w-10 object-contain" />
-                    ) : (
-                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${config.color}`}>
-                        <Mail className="w-5 h-5" />
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-medium">{config.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {connection.store_name || connection.account_id || 'Conectado'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={connection.is_active ? 'default' : 'secondary'}>
-                      {connection.is_active ? (
-                        <><CheckCircle className="w-3 h-3 mr-1" /> Activo</>
+              <div key={connection.id} className="space-y-3">
+                <Card>
+                  <CardContent className="flex items-center justify-between py-4">
+                    <div className="flex items-center gap-4">
+                      {config.logo ? (
+                        <img src={config.logo} alt={config.name} className="h-10 w-10 object-contain" />
                       ) : (
-                        <><XCircle className="w-3 h-3 mr-1" /> Inactivo</>
+                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${config.color}`}>
+                          <Mail className="w-5 h-5" />
+                        </div>
                       )}
-                    </Badge>
-                    {!isKlaviyo && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSyncConnection(connection)}
-                      >
-                        <RefreshCw className="w-4 h-4 mr-1" />
-                        Sincronizar
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      <div>
+                        <p className="font-medium">{config.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {connection.store_name || connection.account_id || 'Conectado'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={connection.is_active ? 'default' : 'secondary'}>
+                        {connection.is_active ? (
+                          <><CheckCircle className="w-3 h-3 mr-1" /> Activo</>
+                        ) : (
+                          <><XCircle className="w-3 h-3 mr-1" /> Inactivo</>
+                        )}
+                      </Badge>
+                      {!isKlaviyo && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSyncConnection(connection)}
+                          disabled={isMeta && !connection.account_id}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-1" />
+                          Sincronizar
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Meta Ad Account Selector */}
+                {isMeta && (
+                  <MetaAdAccountSelector
+                    connectionId={connection.id}
+                    currentAccountId={connection.account_id}
+                    onAccountSelected={() => fetchConnections()}
+                  />
+                )}
+              </div>
             );
           })}
         </div>
