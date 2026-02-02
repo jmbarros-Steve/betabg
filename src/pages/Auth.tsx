@@ -33,7 +33,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
-  const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { signIn, signUp, signOut, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const { isShopifyContext, shop, host } = useShopifyContext();
   const navigate = useNavigate();
@@ -233,6 +233,33 @@ export default function Auth() {
           <p className="text-sm text-muted-foreground text-center mb-8">
             {mode === 'login' ? 'Ingresa tus credenciales' : mode === 'signup' ? 'Regístrate para continuar' : 'Te enviaremos un link de recuperación'}
           </p>
+
+          {/* If the user is authenticated but has no assigned role, explain why they can't proceed */}
+          {!authLoading && !roleLoading && user && !isAdmin && !isClient && (
+            <div className="mb-6 rounded-md border border-border bg-muted/30 p-4">
+              <p className="text-sm font-medium text-foreground">
+                Sesión iniciada, pero tu usuario no tiene acceso asignado.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pide que te asignen un rol (client o admin) en el backend. Tu ID de usuario es:
+              </p>
+              <p className="mt-2 text-xs font-mono text-foreground break-all">{user.id}</p>
+
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await signOut();
+                    navigate('/auth', { replace: true });
+                  }}
+                >
+                  Cerrar sesión
+                </Button>
+              </div>
+            </div>
+          )}
 
           {mode === 'forgot' ? (
             resetSent ? (
