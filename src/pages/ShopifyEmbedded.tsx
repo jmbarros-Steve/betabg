@@ -6,9 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { ExternalLink, CheckCircle, Sparkles, BarChart3, Mail, Tag, Clock, Zap, Star, Loader2, Users, Target, TrendingUp, Bot, AlertCircle } from 'lucide-react';
 import logoSteve from '@/assets/logo-steve.png';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { ShopifyInstallScreen } from '@/components/shopify/ShopifyInstallScreen';
-import { useShopifyAppBridge } from '@/hooks/useShopifyAppBridge';
+import { useAppBridge } from '@/providers/ShopifyAppBridgeProvider';
 import { useShopifyAutoLogin } from '@/hooks/useShopifyAutoLogin';
 
 const benefits = [
@@ -72,14 +71,13 @@ export default function ShopifyEmbedded() {
   const hmac = searchParams.get('hmac');
   const host = searchParams.get('host');
 
-  // Initialize Shopify App Bridge v3 with Session Token support
+  // Use global App Bridge Provider (CDN-based, Session Token enabled)
   const { 
     shopify, 
     isEmbedded, 
     isInitialized, 
-    redirectExternal, 
     getSessionToken, 
-  } = useShopifyAppBridge({ shop, host });
+  } = useAppBridge();
 
   // Auto-login using Shopify Session Token
   const {
@@ -95,15 +93,17 @@ export default function ShopifyEmbedded() {
   // Log App Bridge status for Shopify verification
   useEffect(() => {
     if (shopify && isInitialized) {
-      console.log('[Shopify] App Bridge v3 CDN: Connected');
-      console.log('[Shopify] Embedded mode:', isEmbedded);
-      console.log('[Shopify] Session Token mode: ENABLED');
+      console.log('[Shopify] ✓ App Bridge v3 CDN: Connected');
+      console.log('[Shopify] ✓ Embedded mode:', isEmbedded);
+      console.log('[Shopify] ✓ Session Token mode: ENABLED');
       console.log('[Shopify] Host param:', host);
       console.log('[Shopify] Shop param:', shop);
       
+      // Demonstrate Session Token retrieval for Shopify checks
       getSessionToken().then(token => {
         if (token) {
-          console.log('[Shopify] Session Token check: PASSED');
+          console.log('[Shopify] ✓ Session Token check: PASSED');
+          console.log('[Shopify] Token preview:', token.substring(0, 50) + '...');
         }
       });
     }
@@ -126,20 +126,18 @@ export default function ShopifyEmbedded() {
     }
   }, [isEmbedded, shopifyAuthenticated, user, autoLoginLoading, navigate]);
 
-  // Safe redirect function
+  // Safe redirect function using App Bridge patterns
   const redirectTop = (url: string) => {
     if (shopify && isEmbedded) {
-      redirectExternal(url);
-      return;
-    }
-
-    try {
-      if (window.top && window.top !== window) {
-        window.top.location.href = url;
-        return;
+      // Use top-level navigation for external URLs
+      try {
+        if (window.top && window.top !== window) {
+          window.top.location.href = url;
+          return;
+        }
+      } catch {
+        // Cross-origin blocked
       }
-    } catch {
-      // Cross-origin blocked
     }
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -153,7 +151,7 @@ export default function ShopifyEmbedded() {
   };
 
   const handleGoToPortal = () => {
-    if (shopify && isEmbedded) {
+    if (isEmbedded) {
       // Internal navigation within the app
       navigate('/portal');
     } else {
@@ -162,8 +160,12 @@ export default function ShopifyEmbedded() {
   };
 
   const handleLogin = () => {
-    if (shopify && isEmbedded) {
-      redirectExternal('https://betabg.lovable.app/auth');
+    if (isEmbedded && window.top) {
+      try {
+        window.top.location.href = 'https://betabg.lovable.app/auth';
+      } catch {
+        window.open('https://betabg.lovable.app/auth', '_blank');
+      }
     } else {
       window.open('https://betabg.lovable.app/auth', '_blank');
     }
