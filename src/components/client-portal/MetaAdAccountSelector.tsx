@@ -120,6 +120,8 @@ export function MetaAdAccountSelector({
         toast.error('Error al sincronizar métricas', { id: 'meta-sync' });
       } else {
         toast.success('Métricas sincronizadas correctamente', { id: 'meta-sync' });
+        // Notify other views (e.g., Metrics dashboard) to refresh instantly
+        window.dispatchEvent(new CustomEvent('bg:sync-complete'));
       }
     } catch (err) {
       console.error('Error saving account:', err);

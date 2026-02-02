@@ -181,6 +181,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
       toast.success('Sincronización completada', { id: 'sync' });
       fetchConnections();
+      // Notify other views (e.g., Metrics dashboard) to refresh instantly
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error) {
       console.error('Error syncing:', error);
       toast.error('Error al sincronizar', { id: 'sync' });

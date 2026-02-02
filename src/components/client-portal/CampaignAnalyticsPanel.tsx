@@ -221,6 +221,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
       toast.success('Campañas sincronizadas');
       await fetchMetrics();
+      // Notify other views (e.g., Metrics dashboard) to refresh instantly
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error) {
       toast.error('Error al sincronizar');
     } finally {

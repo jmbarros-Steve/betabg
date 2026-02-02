@@ -139,6 +139,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
         if (currentRes.error) throw currentRes.error;
         if (prevRes.error) throw prevRes.error;
+        if (campaignCurrentRes.error) throw campaignCurrentRes.error;
+        if (campaignPrevRes.error) throw campaignPrevRes.error;
 
         // Convert campaign metrics to platform_metrics format for ad spend
         const campaignToMetricRows = (data: any[] | null): MetricRow[] => {
@@ -146,7 +148,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           // Group by date and platform to avoid duplicates
           const byDatePlatform = new Map<string, { spend: number; platform: string }>();
           for (const row of data) {
-            const key = `${row.metric_date}-${row.platform}`;
+            // IMPORTANT: date has hyphens; use a safe delimiter.
+            const key = `${row.metric_date}|${row.platform}`;
             const existing = byDatePlatform.get(key) || { spend: 0, platform: row.platform };
             existing.spend += Number(row.spend) || 0;
             byDatePlatform.set(key, existing);
@@ -154,7 +157,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           
           const result: MetricRow[] = [];
           for (const [key, value] of byDatePlatform) {
-            const [date, platform] = key.split('-');
+            const [date, platform] = key.split('|');
             result.push({
               metric_type: platform === 'meta' ? 'meta_spend' : 'google_spend',
               metric_value: value.spend,
@@ -207,6 +210,15 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     }
 
     fetchAll();
+
+    // Refresh metrics instantly after any sync in other tabs
+    const handler = () => {
+      fetchAll();
+    };
+    window.addEventListener('bg:sync-complete', handler);
+    return () => {
+      window.removeEventListener('bg:sync-complete', handler);
+    };
   }, [clientId, dateRange]);
 
   // Compute aggregated metrics
