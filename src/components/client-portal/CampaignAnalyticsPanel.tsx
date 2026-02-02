@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { 
   RefreshCw, TrendingUp, TrendingDown, DollarSign, MousePointerClick, 
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
-  BarChart3
+  BarChart3, AlertCircle, Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -331,6 +331,31 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <p className="text-muted-foreground text-sm">
             Conecta Meta Ads o Google Ads para ver el análisis de campañas.
           </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Check if Meta connection exists without account_id selected
+  const metaConnectionWithoutAccount = connections.find(
+    c => c.platform === 'meta' && !c.account_id
+  );
+  const hasOnlyMetaWithoutAccount = connections.length === 1 && metaConnectionWithoutAccount;
+
+  if (hasOnlyMetaWithoutAccount) {
+    return (
+      <Card className="border-primary/30">
+        <CardContent className="py-12 text-center">
+          <AlertCircle className="w-12 h-12 mx-auto text-primary mb-4" />
+          <h3 className="text-lg font-medium mb-2">Selecciona una cuenta publicitaria</h3>
+          <p className="text-muted-foreground text-sm mb-4">
+            Para ver las métricas de tus campañas, primero debes seleccionar una cuenta publicitaria 
+            en la pestaña de <strong>Conexiones</strong>.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-sm text-primary">
+            <Link2 className="w-4 h-4" />
+            <span>Ve a Conexiones → Meta Ads → Selecciona una cuenta</span>
+          </div>
         </CardContent>
       </Card>
     );

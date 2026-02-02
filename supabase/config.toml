@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.generate-campaign-recommendations]
 verify_jwt = false
+
+[functions.fetch-meta-ad-accounts]
+verify_jwt = false
