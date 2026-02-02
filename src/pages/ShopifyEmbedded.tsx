@@ -73,14 +73,26 @@ export default function ShopifyEmbedded() {
   const host = searchParams.get('host');
 
   // Initialize Shopify App Bridge v3 with Session Token support
-  const { shopify, isEmbedded, isReady, redirectExternal, getSessionToken, showToast } = useShopifyAppBridge({ shop, host });
+  // CRITICAL: isInitialized = false until host+shop are confirmed
+  const { 
+    shopify, 
+    isEmbedded, 
+    isReady, 
+    isInitialized, 
+    redirectExternal, 
+    getSessionToken, 
+    showToast,
+    navigateSafe 
+  } = useShopifyAppBridge({ shop, host });
 
   // Log App Bridge status for Shopify verification
   useEffect(() => {
-    if (shopify && isReady) {
+    if (shopify && isInitialized) {
       console.log('[Shopify] App Bridge v3 CDN: Connected');
       console.log('[Shopify] Embedded mode:', isEmbedded);
       console.log('[Shopify] Session Token mode: ENABLED');
+      console.log('[Shopify] Host param:', host);
+      console.log('[Shopify] Shop param:', shop);
       
       // Verify session token is available (for Shopify checks)
       getSessionToken().then(token => {
@@ -89,28 +101,16 @@ export default function ShopifyEmbedded() {
         }
       });
     }
-  }, [shopify, isReady, isEmbedded, getSessionToken]);
+  }, [shopify, isInitialized, isEmbedded, getSessionToken, host, shop]);
 
-  const redirectTop = (url: string) => {
-    // Use App Bridge redirect if available (no 302 redirects from iframe)
-    if (shopify && isEmbedded) {
-      redirectExternal(url);
-      return;
-    }
-
-    try {
-      if (window.top && window.top !== window) {
-        window.top.location.href = url;
-        return;
-      }
-    } catch {
-      // If cross-origin frame access is blocked, fall back to opening a new tab.
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
+  // Check installation status
   useEffect(() => {
     const checkInstallation = async () => {
+      // Wait for App Bridge to be ready in embedded mode
+      if (isEmbedded && !isInitialized) {
+        return; // Don't check until initialized
+      }
+
       if (shop && hmac) {
         console.log('Fresh install detected, showing install screen...');
         setShowInstallScreen(true);
@@ -138,7 +138,25 @@ export default function ShopifyEmbedded() {
     };
 
     checkInstallation();
-  }, [shop, hmac, searchParams]);
+  }, [shop, hmac, isEmbedded, isInitialized]);
+
+  // Safe redirect function that uses App Bridge when available
+  const redirectTop = (url: string) => {
+    if (shopify && isEmbedded) {
+      redirectExternal(url);
+      return;
+    }
+
+    try {
+      if (window.top && window.top !== window) {
+        window.top.location.href = url;
+        return;
+      }
+    } catch {
+      // If cross-origin frame access is blocked, fall back to opening a new tab.
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const handleInstall = () => {
     if (shop) {
@@ -147,15 +165,6 @@ export default function ShopifyEmbedded() {
       );
     }
   };
-
-  if (showInstallScreen && shop) {
-    return (
-      <ShopifyInstallScreen 
-        storeName={shop.replace('.myshopify.com', '')} 
-        onConfirmInstall={handleInstall}
-      />
-    );
-  }
 
   const handleGoToPortal = () => {
     if (shopify && isEmbedded) {
@@ -173,6 +182,31 @@ export default function ShopifyEmbedded() {
     }
   };
 
+  // CRITICAL: Block all rendering until App Bridge is fully initialized with host+shop
+  // This is required for Shopify's automated validation checks
+  if (isEmbedded && !isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Inicializando App Bridge...</p>
+          <p className="text-xs text-muted-foreground/60">
+            Esperando parámetros host y shop de Shopify
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showInstallScreen && shop) {
+    return (
+      <ShopifyInstallScreen 
+        storeName={shop.replace('.myshopify.com', '')} 
+        onConfirmInstall={handleInstall}
+      />
+    );
+  }
+
   if (checking || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -189,8 +223,15 @@ export default function ShopifyEmbedded() {
       <div className="max-w-5xl mx-auto py-6 space-y-8">
         
         {/* App Bridge v3 Status (hidden, for Shopify verification) */}
-        {isEmbedded && shopify && isReady && (
-          <div className="sr-only" aria-hidden="true" data-shopify-app-bridge="connected" data-session-token="enabled">
+        {isEmbedded && shopify && isInitialized && (
+          <div 
+            className="sr-only" 
+            aria-hidden="true" 
+            data-shopify-app-bridge="connected" 
+            data-session-token="enabled"
+            data-host={host || ''}
+            data-shop={shop || ''}
+          >
             App Bridge v3 CDN initialized with Session Tokens
           </div>
         )}

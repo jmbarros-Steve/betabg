@@ -31,11 +31,13 @@ interface UseShopifyAppBridgeReturn {
   shopify: ShopifyAppBridge | null;
   isEmbedded: boolean;
   isReady: boolean;
+  isInitialized: boolean; // New: true only when host+shop are confirmed
   error: string | null;
   getSessionToken: () => Promise<string | null>;
   showToast: (message: string, isError?: boolean) => void;
   redirectExternal: (url: string) => void;
   redirectAdmin: (path: string) => void;
+  navigateSafe: (url: string) => void; // New: safe navigation within Shopify
 }
 
 /**
@@ -44,13 +46,75 @@ interface UseShopifyAppBridgeReturn {
  * Architecture: M&A Ready - No localStorage/cookies for sessions
  * Security: Session tokens obtained fresh via idToken() for each API call
  * Compliance: Uses X-Shopify-Access-Token header (not Authorization: Bearer)
+ * 
+ * CRITICAL FOR SHOPIFY CHECKS:
+ * - isInitialized = true ONLY when host + shop params are present AND App Bridge is ready
+ * - Session heartbeat runs on visibility/tab changes
+ * - All navigation goes through navigateSafe() to avoid breaking iframe
  */
 export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): UseShopifyAppBridgeReturn {
   const [shopify, setShopify] = useState<ShopifyAppBridge | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initializationAttempted = useRef(false);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Session Heartbeat: Call idToken() on visibility changes to keep session alive
+  useEffect(() => {
+    if (!shopify || !isEmbedded) return;
+
+    const performHeartbeat = async () => {
+      try {
+        const token = await shopify.idToken();
+        if (token) {
+          console.log('[App Bridge] Session heartbeat: Token refreshed');
+        }
+      } catch (err) {
+        console.warn('[App Bridge] Session heartbeat failed:', err);
+      }
+    };
+
+    // Heartbeat on tab visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[App Bridge] Tab became visible, triggering heartbeat');
+        performHeartbeat();
+      }
+    };
+
+    // Heartbeat on focus (user returns to tab)
+    const handleFocus = () => {
+      console.log('[App Bridge] Window focused, triggering heartbeat');
+      performHeartbeat();
+    };
+
+    // Heartbeat on popstate (internal navigation within app)
+    const handlePopState = () => {
+      console.log('[App Bridge] Navigation detected, triggering heartbeat');
+      performHeartbeat();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('popstate', handlePopState);
+
+    // Initial heartbeat on mount
+    performHeartbeat();
+
+    // Periodic heartbeat every 4 minutes to stay ahead of token expiry
+    heartbeatIntervalRef.current = setInterval(performHeartbeat, 4 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('popstate', handlePopState);
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+    };
+  }, [shopify, isEmbedded]);
 
   useEffect(() => {
     // Check if we're in an iframe (embedded in Shopify Admin)
@@ -60,12 +124,14 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
     if (!embedded) {
       console.log('[App Bridge] Not running in embedded mode');
       setIsReady(true);
+      setIsInitialized(true); // Non-embedded is always "initialized"
       return;
     }
 
-    if (!host) {
-      console.log('[App Bridge] Missing host parameter, cannot initialize');
-      setIsReady(true);
+    // CRITICAL: Block initialization if host OR shop are missing
+    if (!host || !shop) {
+      console.warn('[App Bridge] Missing required params - host:', !!host, 'shop:', !!shop);
+      // Don't set isReady or isInitialized - keep blocking render
       return;
     }
 
@@ -87,12 +153,24 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
             shop: window.shopify.config?.shop,
           });
           
-          setShopify(window.shopify);
-          setIsReady(true);
+          // Verify the config matches our URL params
+          const configHost = window.shopify.config?.host;
+          const configShop = window.shopify.config?.shop;
           
-          // Log successful initialization for Shopify verification
-          console.log('[App Bridge] Session Token mode: ENABLED');
-          console.log('[App Bridge] CDN Script check: PASSED');
+          if (configHost && configShop) {
+            console.log('[App Bridge] Validation PASSED: host and shop confirmed');
+            setShopify(window.shopify);
+            setIsReady(true);
+            setIsInitialized(true);
+            
+            // Log successful initialization for Shopify verification
+            console.log('[App Bridge] Session Token mode: ENABLED');
+            console.log('[App Bridge] CDN Script check: PASSED');
+            console.log('[App Bridge] Embedded initialization: COMPLETE');
+          } else {
+            console.warn('[App Bridge] Config incomplete, retrying...');
+            setTimeout(initAppBridge, 100);
+          }
         } else {
           console.warn('[App Bridge] window.shopify not available yet, retrying...');
           // Retry after a short delay
@@ -112,7 +190,7 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
       window.addEventListener('load', initAppBridge);
       return () => window.removeEventListener('load', initAppBridge);
     }
-  }, [host]);
+  }, [host, shop]);
 
   /**
    * Get a fresh Session Token from Shopify
@@ -148,6 +226,41 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
   }, [shopify]);
 
   /**
+   * Safe navigation that works within Shopify iframe
+   * CRITICAL: Never use window.location.replace directly!
+   */
+  const navigateSafe = useCallback((url: string) => {
+    if (isEmbedded && shopify) {
+      // For internal app navigation, use history.pushState
+      // This keeps us in the iframe and triggers heartbeat via popstate
+      try {
+        const urlObj = new URL(url, window.location.origin);
+        
+        // Preserve Shopify params
+        if (host && !urlObj.searchParams.has('host')) {
+          urlObj.searchParams.set('host', host);
+        }
+        if (shop && !urlObj.searchParams.has('shop')) {
+          urlObj.searchParams.set('shop', shop);
+        }
+        
+        // Use pushState for SPA navigation - safe for iframe
+        window.history.pushState({}, '', urlObj.pathname + urlObj.search);
+        // Dispatch popstate to trigger React Router and heartbeat
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        
+        console.log('[App Bridge] Safe navigation to:', urlObj.pathname);
+      } catch {
+        // Fallback: just change href without replace
+        window.location.href = url;
+      }
+    } else {
+      // Non-embedded: normal navigation
+      window.location.href = url;
+    }
+  }, [isEmbedded, shopify, host, shop]);
+
+  /**
    * Redirect to an external URL (breaks out of iframe)
    * Uses App Bridge navigation to avoid blocked popups
    */
@@ -176,8 +289,8 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
   const redirectAdmin = useCallback((path: string) => {
     if (shopify && isEmbedded && window.top) {
       try {
-        const shop = shopify.config?.shop || '';
-        window.top.location.href = `https://${shop}/admin${path}`;
+        const shopDomain = shopify.config?.shop || '';
+        window.top.location.href = `https://${shopDomain}/admin${path}`;
       } catch {
         console.error('[App Bridge] Cannot redirect to admin path');
       }
@@ -188,11 +301,13 @@ export function useShopifyAppBridge({ shop, host }: ShopifyAppBridgeConfig): Use
     shopify,
     isEmbedded,
     isReady,
+    isInitialized,
     error,
     getSessionToken,
     showToast,
     redirectExternal,
     redirectAdmin,
+    navigateSafe,
   };
 }
 
