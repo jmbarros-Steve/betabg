@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useShopifyAppBridge } from './useShopifyAppBridge';
+import { useAppBridge } from '@/providers/ShopifyAppBridgeProvider';
 
 interface ShopifyAutoLoginResult {
   isLoading: boolean;
@@ -39,12 +39,11 @@ interface ValidationResponse {
 /**
  * Hook for automatic Shopify embedded app authentication
  * 
- * When running in Shopify Admin iframe with valid shop+host params,
- * this hook will:
- * 1. Get a fresh session token from Shopify App Bridge
- * 2. Validate the token with our backend
- * 3. Automatically sign in the user to Supabase
- * 4. Return authentication state for route guards
+ * CRITICAL FOR SHOPIFY CHECKS:
+ * - Uses Session Token from App Bridge CDN (not custom implementation)
+ * - Sends token in X-Shopify-Session-Token header
+ * - Validates via shopify-session-validate Edge Function
+ * - Silent Supabase login via magic link OTP
  */
 export function useShopifyAutoLogin(shop: string | null, host: string | null): ShopifyAutoLoginResult {
   const [isLoading, setIsLoading] = useState(true);
@@ -55,10 +54,10 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
   const [clientId, setClientId] = useState<string | null>(null);
   const [connectionId, setConnectionId] = useState<string | null>(null);
 
-  const { shopify, isEmbedded, isInitialized, getSessionToken } = useShopifyAppBridge({ shop, host });
+  // Use the global App Bridge Provider
+  const { isEmbedded, isInitialized, getSessionToken, createAuthHeaders } = useAppBridge();
 
   const performAutoLogin = useCallback(async () => {
-    // Only attempt auto-login if we're in embedded mode with proper params
     if (!isEmbedded || !isInitialized || !shop || !host) {
       console.log('[AutoLogin] Not in embedded mode or missing params, skipping');
       setIsLoading(false);
@@ -69,29 +68,28 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
     setError(null);
 
     try {
-      // Get fresh session token from Shopify
+      // Get fresh session token from Shopify App Bridge CDN
       const sessionToken = await getSessionToken();
       
       if (!sessionToken) {
-        console.error('[AutoLogin] Failed to get session token from Shopify');
+        console.error('[AutoLogin] Failed to get session token from App Bridge CDN');
         setError('No se pudo obtener el token de sesión de Shopify');
         setIsLoading(false);
         return;
       }
 
-      console.log('[AutoLogin] Got session token, validating with backend...');
+      console.log('[AutoLogin] ✓ Session token obtained from CDN');
+      console.log('[AutoLogin] Validating with backend...');
+
+      // Use createAuthHeaders to get properly formatted headers
+      const headers = await createAuthHeaders();
 
       // Validate token with our backend
       const response = await fetch(
         `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-session-validate`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Session-Token': sessionToken,
-            'X-Shopify-Host': host,
-            'X-Shopify-Shop': shop,
-          },
+          headers,
         }
       );
 
@@ -104,7 +102,7 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
         return;
       }
 
-      console.log('[AutoLogin] Token validated, shop:', data.shopDomain);
+      console.log('[AutoLogin] ✓ Token validated, shop:', data.shopDomain);
       setShopDomain(data.shopDomain);
       setIsInstalled(data.installed);
 
@@ -116,11 +114,10 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
         setClientId(data.client.id);
       }
 
-      // If we got an auth token, use it to sign in
+      // If we got an auth token, use it to sign in silently
       if (data.authenticated && data.authToken && data.authEmail) {
         console.log('[AutoLogin] Signing in with magic link token...');
         
-        // Verify OTP token
         const { data: authData, error: authError } = await supabase.auth.verifyOtp({
           email: data.authEmail,
           token: data.authToken,
@@ -129,15 +126,13 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
 
         if (authError) {
           console.error('[AutoLogin] Sign in failed:', authError);
-          // Don't set error - user can still use the app, just not authenticated
-          // They might need to complete registration
           setIsAuthenticated(false);
         } else if (authData.session) {
-          console.log('[AutoLogin] Successfully signed in!');
+          console.log('[AutoLogin] ✓ Successfully signed in!');
           setIsAuthenticated(true);
         }
       } else {
-        console.log('[AutoLogin] No auth token available, user needs to complete setup');
+        console.log('[AutoLogin] No auth token, user needs setup');
         setIsAuthenticated(false);
       }
 
@@ -148,14 +143,13 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
       setError(err.message || 'Error de autenticación');
       setIsLoading(false);
     }
-  }, [isEmbedded, isInitialized, shop, host, getSessionToken]);
+  }, [isEmbedded, isInitialized, shop, host, getSessionToken, createAuthHeaders]);
 
   // Attempt auto-login when App Bridge is ready
   useEffect(() => {
     if (isEmbedded && isInitialized && shop && host) {
       performAutoLogin();
     } else if (!isEmbedded) {
-      // Not embedded, skip auto-login
       setIsLoading(false);
     }
   }, [isEmbedded, isInitialized, shop, host, performAutoLogin]);
