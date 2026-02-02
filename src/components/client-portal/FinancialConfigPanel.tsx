@@ -7,9 +7,10 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Settings, Percent, DollarSign, CreditCard, Package, Save, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { Settings, Percent, DollarSign, CreditCard, Package, Save, RefreshCw, Trash2, Plus, AlertTriangle } from 'lucide-react';
 
 interface FinancialConfigPanelProps {
   clientId: string;
@@ -38,12 +39,33 @@ const defaultConfig: FinancialConfig = {
   product_margins: {},
 };
 
+// Minimum reasonable CLP values (to detect USD values)
+const MIN_CLP_THRESHOLD = 1000;
+
+// Format number as Chilean pesos with thousands separator
+function formatCLP(value: number): string {
+  return value.toLocaleString('es-CL');
+}
+
+// Parse CLP input (remove dots used as thousands separators)
+function parseCLPInput(value: string): number {
+  // Remove dots (thousands separator) and parse
+  const cleaned = value.replace(/\./g, '').replace(/,/g, '');
+  return parseInt(cleaned) || 0;
+}
+
 export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<FinancialConfig>(defaultConfig);
   const [newSku, setNewSku] = useState('');
   const [newMargin, setNewMargin] = useState('');
+
+  // Detect if values look like USD (too low for CLP)
+  const hasLowValues = 
+    (config.shopify_plan_cost > 0 && config.shopify_plan_cost < MIN_CLP_THRESHOLD) ||
+    (config.klaviyo_plan_cost > 0 && config.klaviyo_plan_cost < MIN_CLP_THRESHOLD) ||
+    (config.other_fixed_costs > 0 && config.other_fixed_costs < MIN_CLP_THRESHOLD);
 
   useEffect(() => {
     fetchConfig();
@@ -65,9 +87,9 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           id: data.id,
           default_margin_percentage: Number(data.default_margin_percentage),
           use_shopify_costs: data.use_shopify_costs,
-          shopify_plan_cost: Number(data.shopify_plan_cost),
-          klaviyo_plan_cost: Number(data.klaviyo_plan_cost),
-          other_fixed_costs: Number(data.other_fixed_costs),
+          shopify_plan_cost: Math.round(Number(data.shopify_plan_cost)),
+          klaviyo_plan_cost: Math.round(Number(data.klaviyo_plan_cost)),
+          other_fixed_costs: Math.round(Number(data.other_fixed_costs)),
           other_fixed_costs_description: data.other_fixed_costs_description,
           payment_gateway_commission: Number(data.payment_gateway_commission),
           product_margins: (data.product_margins as Record<string, number>) || {},
@@ -81,15 +103,24 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
   };
 
   const handleSave = async () => {
+    // Validate values are in CLP range
+    if (hasLowValues) {
+      toast.error('Los valores parecen estar en USD. Por favor, ingresa los montos en Pesos Chilenos (CLP).', {
+        description: 'Ejemplo: $29.000 CLP en vez de $29 USD',
+        duration: 5000,
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         client_id: clientId,
         default_margin_percentage: config.default_margin_percentage,
         use_shopify_costs: config.use_shopify_costs,
-        shopify_plan_cost: config.shopify_plan_cost,
-        klaviyo_plan_cost: config.klaviyo_plan_cost,
-        other_fixed_costs: config.other_fixed_costs,
+        shopify_plan_cost: Math.round(config.shopify_plan_cost),
+        klaviyo_plan_cost: Math.round(config.klaviyo_plan_cost),
+        other_fixed_costs: Math.round(config.other_fixed_costs),
         other_fixed_costs_description: config.other_fixed_costs_description,
         payment_gateway_commission: config.payment_gateway_commission,
         product_margins: config.product_margins,
@@ -111,13 +142,20 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
         setConfig((prev) => ({ ...prev, id: data.id }));
       }
 
-      toast.success('Configuración guardada');
+      toast.success('Configuración guardada correctamente');
+      // Notify other views to refresh
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error) {
       console.error('Error saving config:', error);
       toast.error('Error al guardar configuración');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCostChange = (field: 'shopify_plan_cost' | 'klaviyo_plan_cost' | 'other_fixed_costs', value: string) => {
+    const numValue = parseInt(value.replace(/\D/g, '')) || 0;
+    setConfig((prev) => ({ ...prev, [field]: numValue }));
   };
 
   const handleAddProductMargin = () => {
@@ -177,6 +215,17 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           Guardar
         </Button>
       </div>
+
+      {/* Warning if values look like USD */}
+      {hasLowValues && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>⚠️ Los valores parecen estar en USD.</strong> Esta aplicación usa exclusivamente Pesos Chilenos (CLP). 
+            Por ejemplo, si tu plan de Shopify cuesta US$29, ingresa el equivalente en CLP: aproximadamente $27.550 CLP.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Margin Settings */}
@@ -282,72 +331,70 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           </CardContent>
         </Card>
 
-        {/* Fixed Costs */}
+        {/* Fixed Costs - CLP Only */}
         <Card className="glow-box">
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
-              Costos Fijos Mensuales (CLP)
+              Costos Fijos Mensuales
+              <Badge variant="secondary" className="ml-2">CLP</Badge>
             </CardTitle>
             <CardDescription>
-              Ingresa tus costos fijos en pesos chilenos para el cálculo del estado de resultados
+              Ingresa tus costos fijos en <strong>Pesos Chilenos (CLP)</strong>. No uses USD.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="shopify_cost">Plan de Shopify (CLP/mes)</Label>
+              <Label htmlFor="shopify_cost">Plan de Shopify</Label>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">$</span>
+                <span className="text-muted-foreground font-medium">$</span>
                 <Input
                   id="shopify_cost"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={config.shopify_plan_cost}
-                  onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, shopify_plan_cost: parseInt(e.target.value) || 0 }))
-                  }
-                  placeholder="Ej: 29000"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCLP(config.shopify_plan_cost)}
+                  onChange={(e) => handleCostChange('shopify_plan_cost', e.target.value)}
+                  placeholder="Ej: 27.550"
+                  className={config.shopify_plan_cost > 0 && config.shopify_plan_cost < MIN_CLP_THRESHOLD ? 'border-destructive' : ''}
                 />
-                <span className="text-muted-foreground text-sm">CLP</span>
+                <span className="text-muted-foreground text-sm font-medium">CLP/mes</span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Plan Basic ~$27.550 | Shopify ~$74.100 | Advanced ~$296.400
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="klaviyo_cost">Plan de Klaviyo (CLP/mes)</Label>
+              <Label htmlFor="klaviyo_cost">Plan de Klaviyo</Label>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">$</span>
+                <span className="text-muted-foreground font-medium">$</span>
                 <Input
                   id="klaviyo_cost"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={config.klaviyo_plan_cost}
-                  onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, klaviyo_plan_cost: parseInt(e.target.value) || 0 }))
-                  }
-                  placeholder="Ej: 45000"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCLP(config.klaviyo_plan_cost)}
+                  onChange={(e) => handleCostChange('klaviyo_plan_cost', e.target.value)}
+                  placeholder="Ej: 42.750"
+                  className={config.klaviyo_plan_cost > 0 && config.klaviyo_plan_cost < MIN_CLP_THRESHOLD ? 'border-destructive' : ''}
                 />
-                <span className="text-muted-foreground text-sm">CLP</span>
+                <span className="text-muted-foreground text-sm font-medium">CLP/mes</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="other_costs">Otros costos fijos (CLP/mes)</Label>
+              <Label htmlFor="other_costs">Otros costos fijos</Label>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">$</span>
+                <span className="text-muted-foreground font-medium">$</span>
                 <Input
                   id="other_costs"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={config.other_fixed_costs}
-                  onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, other_fixed_costs: parseInt(e.target.value) || 0 }))
-                  }
-                  placeholder="Ej: 15000"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCLP(config.other_fixed_costs)}
+                  onChange={(e) => handleCostChange('other_fixed_costs', e.target.value)}
+                  placeholder="Ej: 15.000"
+                  className={config.other_fixed_costs > 0 && config.other_fixed_costs < MIN_CLP_THRESHOLD ? 'border-destructive' : ''}
                 />
-                <span className="text-muted-foreground text-sm">CLP</span>
+                <span className="text-muted-foreground text-sm font-medium">CLP/mes</span>
               </div>
               <Input
                 placeholder="Descripción (ej: Hosting, Apps adicionales...)"
@@ -355,6 +402,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
                 onChange={(e) =>
                   setConfig((prev) => ({ ...prev, other_fixed_costs_description: e.target.value || null }))
                 }
+                maxLength={200}
               />
             </div>
 
@@ -381,7 +429,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
                 <span className="text-muted-foreground">%</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Ej: Transbank 2.95%, Mercado Pago 3.49% + IVA, Stripe 2.9%
+                Transbank 2.95% | Mercado Pago 3.49% + IVA | Flow 2.9%
               </p>
             </div>
           </CardContent>
@@ -397,9 +445,9 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
               <p className="font-semibold">{config.default_margin_percentage}%</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Costos fijos totales (CLP)</p>
+              <p className="text-xs text-muted-foreground">Costos fijos totales</p>
               <p className="font-semibold">
-                ${(config.shopify_plan_cost + config.klaviyo_plan_cost + config.other_fixed_costs).toLocaleString('es-CL')}/mes
+                ${formatCLP(config.shopify_plan_cost + config.klaviyo_plan_cost + config.other_fixed_costs)} CLP/mes
               </p>
             </div>
             <div>
@@ -412,7 +460,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Moneda base</p>
-              <p className="font-semibold text-primary">CLP</p>
+              <p className="font-semibold text-primary">🇨🇱 CLP</p>
             </div>
           </div>
         </CardContent>

@@ -32,7 +32,8 @@ interface ProfitLossPanelProps {
 }
 
 function formatCurrency(value: number, currency: string = 'CLP'): string {
-  return `$${value.toLocaleString('es-CL')}`;
+  // Always format with Chilean locale (dots for thousands)
+  return `$${Math.round(value).toLocaleString('es-CL')}`;
 }
 
 function ChangeIndicator({ current, previous }: { current: number; previous?: number }) {
@@ -57,6 +58,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <FileText className="w-4 h-4" />
           Estado de Resultados
+          <span className="ml-auto text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded">CLP</span>
         </CardTitle>
         <p className="text-xs text-muted-foreground">{periodLabel}</p>
       </CardHeader>
