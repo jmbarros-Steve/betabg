@@ -342,30 +342,46 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     createAuthHeaders,
   };
 
-  // RESCUE MODE: host missing after all fallbacks
+  // RESCUE MODE: shop present but host missing — redirect to Shopify Admin to get fresh host
   if (needsRescue) {
+    // Extract store slug from shop domain for the redirect URL
+    const storeSlug = (shop || '').replace('.myshopify.com', '');
+    const reanchorUrl = `https://admin.shopify.com/store/${storeSlug}/apps/loveable_public`;
+
+    const handleReanchor = () => {
+      console.log('🔄🔄🔄 Sincronizando Host con Shopify... 🔄🔄🔄');
+      console.log('[App Bridge] Redirigiendo a Shopify Admin para obtener host fresco:', reanchorUrl);
+      // Use top-level navigation to ensure Shopify sends back host param
+      try {
+        if (window.top && window.top !== window.self) {
+          window.top.location.href = reanchorUrl;
+          return;
+        }
+      } catch {
+        // Cross-origin, fall through
+      }
+      window.location.href = reanchorUrl;
+    };
+
     return (
       <ShopifyAppBridgeContext.Provider value={value}>
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
-          <div className="max-w-md w-full text-center space-y-4 p-6 border rounded-lg bg-card shadow-sm">
-            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
-            <h2 className="text-lg font-semibold text-foreground">Conexión Interrumpida</h2>
-            <p className="text-sm text-muted-foreground">
-              Para completar la conexión, por favor abre la App una vez más desde tu <strong>Panel de Shopify</strong>.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Esto permitirá que Shopify envíe los datos de sesión necesarios.
-            </p>
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
-              >
-                Reintentar
-              </button>
+          <div className="max-w-md w-full text-center space-y-6 p-8 border rounded-xl bg-card shadow-lg">
+            <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 text-primary" />
             </div>
+            <h2 className="text-xl font-bold text-foreground">Casi listo</h2>
+            <p className="text-sm text-muted-foreground">
+              Necesitamos sincronizar tu sesión con Shopify para completar la conexión.
+            </p>
+            <button
+              onClick={handleReanchor}
+              className="w-full px-6 py-4 bg-primary text-primary-foreground rounded-lg text-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              Haz clic aquí para sincronizar con Shopify
+            </button>
             <p className="text-xs text-muted-foreground/60">
-              Tienda detectada: {shop || 'desconocida'}
+              Tienda: {shop}
             </p>
           </div>
         </div>
