@@ -105,6 +105,7 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   if (urlHost) {
     sessionStorage.setItem('shopify_host', urlHost);
     localStorage.setItem('shopify_host', urlHost);
+    console.log('🔥 ¡Host recuperado! App Bridge listo para disparar los checks de Shopify');
   }
 
   // Recover: URL → sessionStorage → localStorage (triple fallback)
@@ -344,20 +345,20 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
   // RESCUE MODE: shop present but host missing — redirect to Shopify Admin to get fresh host
   if (needsRescue) {
-    // App identifier in Shopify
-    const APP_ID = 'loveable_public';
+    // App identifier in Shopify URL format (hyphenated)
+    const APP_SLUG = 'loveable-public';
     
     // Extract store slug from shop domain
-    const storeSlug = shop?.replace('.myshopify.com', '') || '';
+    const storeSlug = shop?.split('.')[0] || '';
     
     // Dynamic URL: if we have the store slug, use full app URL; otherwise fallback to admin home
     const reanchorUrl = storeSlug
-      ? `https://admin.shopify.com/store/${storeSlug}/apps/${APP_ID}`
+      ? `https://admin.shopify.com/store/${storeSlug}/apps/${APP_SLUG}`
       : 'https://admin.shopify.com';
     
     // Dynamic button text based on whether we have store info
     const buttonText = storeSlug
-      ? 'Haz clic aquí para sincronizar con Shopify'
+      ? 'Completar conexión con Shopify'
       : 'Regresar al Panel de Shopify';
 
     const handleReanchor = () => {
