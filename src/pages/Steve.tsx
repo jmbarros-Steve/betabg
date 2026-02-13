@@ -148,7 +148,7 @@ export default function Steve() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { signIn, signUp, signOut, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
@@ -233,22 +233,42 @@ export default function Steve() {
             })}
           </div>
 
-          <Button 
-            variant="default" 
-            size="sm" 
-            className="uppercase tracking-wider text-xs"
-            onClick={() => {
-              if (user) {
-                if (isAdmin) navigate('/dashboard');
-                else if (isClient) navigate('/portal');
-                else navigate('/auth');
-              } else {
-                setShowAuth(true);
-              }
-            }}
-          >
-            {user ? 'Ir al panel' : 'Comenzar'}
-          </Button>
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-xs text-muted-foreground hidden md:inline truncate max-w-[180px]">
+                {user.email}
+              </span>
+            )}
+            {user && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={async () => {
+                  await signOut();
+                  toast.success('Sesión cerrada');
+                }}
+              >
+                Salir
+              </Button>
+            )}
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="uppercase tracking-wider text-xs"
+              onClick={() => {
+                if (user) {
+                  if (isAdmin) navigate('/dashboard');
+                  else if (isClient) navigate('/portal');
+                  else navigate('/auth');
+                } else {
+                  setShowAuth(true);
+                }
+              }}
+            >
+              {user ? 'Ir al panel' : 'Comenzar'}
+            </Button>
+          </div>
         </div>
       </motion.nav>
 
@@ -599,7 +619,8 @@ export default function Steve() {
                 const { error } = await supabase.auth.signInWithOAuth({
                   provider: 'google',
                   options: {
-                    redirectTo: `${window.location.origin}/portal`
+                    redirectTo: `${window.location.origin}/auth`,
+                    queryParams: { prompt: 'select_account' },
                   }
                 });
                 if (error) {
@@ -616,7 +637,19 @@ export default function Steve() {
               Continuar con Google
             </Button>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
+              {isLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAuth(false);
+                    navigate('/auth?mode=forgot');
+                  }}
+                  className="block w-full text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsLogin(!isLogin)}
