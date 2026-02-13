@@ -1,8 +1,15 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Shopify App Bridge v3 CDN - MUST be first, no async/defer/module -->
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+    <!-- Shopify App Bridge: conditional load to avoid 'missing configuration fields' when not in Shopify -->
+    <script>
+      (function() {
+        var p = new URLSearchParams(window.location.search);
+        if (p.get('shop') || p.get('host')) {
+          document.write('<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"><\/script>');
+        }
+      })();
+    </script>
     
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
