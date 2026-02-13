@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ShopifyProductsPanel } from './ShopifyProductsPanel';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -465,6 +466,9 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Shopify Products Panel */}
+      <ShopifyProductsPanel clientId={clientId} />
     </div>
   );
 }
