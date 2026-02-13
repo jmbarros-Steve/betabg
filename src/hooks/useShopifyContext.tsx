@@ -43,13 +43,23 @@ export function ShopifyContextProvider({ children }: { children: ReactNode }) {
     const resolvedShop = urlShop
       || (urlStore ? (urlStore.includes('.myshopify.com') ? urlStore : `${urlStore}.myshopify.com`) : null);
 
-    // Persist to sessionStorage when present in URL
-    if (resolvedShop) sessionStorage.setItem('shopify_shop', resolvedShop);
-    if (urlHost) sessionStorage.setItem('shopify_host', urlHost);
+    // Persist to BOTH sessionStorage and localStorage
+    if (resolvedShop) {
+      sessionStorage.setItem('shopify_shop', resolvedShop);
+      localStorage.setItem('shopify_shop', resolvedShop);
+    }
+    if (urlHost) {
+      sessionStorage.setItem('shopify_host', urlHost);
+      localStorage.setItem('shopify_host', urlHost);
+    }
 
-    // Recover from sessionStorage if URL params were lost after redirect
-    const shop = resolvedShop || sessionStorage.getItem('shopify_shop');
-    const host = urlHost || sessionStorage.getItem('shopify_host');
+    // Triple fallback: URL → sessionStorage → localStorage
+    const shop = resolvedShop 
+      || sessionStorage.getItem('shopify_shop') 
+      || localStorage.getItem('shopify_shop');
+    const host = urlHost 
+      || sessionStorage.getItem('shopify_host') 
+      || localStorage.getItem('shopify_host');
 
     // We're in Shopify context if we have both shop and host (from URL or storage)
     const isShopifyContext = !!(shop && host);
