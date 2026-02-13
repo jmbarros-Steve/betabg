@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { useShopifyAuthFetch } from '@/hooks/useShopifyAuthFetch';
 import { toast } from 'sonner';
 import { Package, RefreshCw, AlertTriangle, TrendingUp, ImageOff } from 'lucide-react';
 
@@ -37,7 +36,6 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
   const [loading, setLoading] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
-  const { callEdgeFunction } = useShopifyAuthFetch();
 
   useEffect(() => {
     checkShopifyConnection();
@@ -63,19 +61,21 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
     if (!connectionId) return;
     setLoading(true);
     try {
-      const { data, error } = await callEdgeFunction<{ products: ShopifyProduct[]; count: number }>(
-        'fetch-shopify-products',
-        { body: { connectionId } }
-      );
+      const { data, error } = await supabase.functions.invoke('fetch-shopify-products', {
+        body: { connectionId },
+      });
 
       if (error) {
-        toast.error('Error al cargar productos: ' + error);
+        console.error('[ShopifyProducts] Error:', error);
+        toast.error('Error al cargar productos: ' + (error?.message || error));
         return;
       }
 
       if (data?.products) {
         setProducts(data.products);
         toast.success(`${data.count} productos cargados desde Shopify`);
+      } else if (data?.error) {
+        toast.error('Error: ' + data.error);
       }
     } catch (err: any) {
       toast.error('Error: ' + err.message);

@@ -6,6 +6,8 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  console.log('[fetch-shopify-products] Request received:', req.method);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -34,14 +36,15 @@ Deno.serve(async (req) => {
       }
       userId = client.client_user_id || client.user_id;
     } else if (authHeader?.startsWith('Bearer ')) {
-      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
+      // Use service role to validate the user token
       const token = authHeader.replace('Bearer ', '');
-      const { data, error: claimsError } = await supabaseAuth.auth.getClaims(token);
-      if (claimsError || !data?.claims?.sub) {
-        console.error('[fetch-shopify-products] Auth failed:', claimsError);
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const { data: { user }, error: authError } = await supabaseService.auth.getUser(token);
+      if (authError || !user) {
+        console.error('[fetch-shopify-products] Auth failed:', authError?.message);
+        return new Response(JSON.stringify({ error: 'Unauthorized', details: authError?.message }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      userId = data.claims.sub;
+      userId = user.id;
+      console.log('[fetch-shopify-products] Authenticated user:', userId);
     } else {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
