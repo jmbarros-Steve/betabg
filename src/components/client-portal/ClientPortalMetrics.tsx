@@ -99,23 +99,32 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         }
 
         const connIds = connections.map((c) => c.id);
+        // Separate Shopify connection IDs for revenue/orders (avoid double attribution)
+        const shopifyConnIds = connections.filter(c => c.platform === 'shopify').map(c => c.id);
+        const adConnIds = connections.filter(c => c.platform === 'meta' || c.platform === 'google').map(c => c.id);
         setConnectionIds(connIds);
 
         const startDate = getDateRangeStart(dateRange);
         const { start: prevStart, end: prevEnd } = getPreviousPeriodDates(dateRange);
 
-        // Fetch current and previous metrics in parallel, including campaign_metrics for ad spend
+        // Fetch current and previous metrics in parallel
+        // IMPORTANT: Only fetch revenue/orders from Shopify connections to avoid double attribution
+        // Ad spend comes from campaign_metrics (Meta + Google)
+        const shopifyQueryIds = shopifyConnIds.length > 0 ? shopifyConnIds : ['00000000-0000-0000-0000-000000000000'];
+        const adQueryIds = adConnIds.length > 0 ? adConnIds : ['00000000-0000-0000-0000-000000000000'];
+        
         const [currentRes, prevRes, configRes, campaignCurrentRes, campaignPrevRes] = await Promise.all([
+          // Only Shopify metrics for revenue/orders (no Meta purchase_value!)
           supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date')
-            .in('connection_id', connIds)
+            .in('connection_id', shopifyQueryIds)
             .gte('metric_date', startDate.toISOString().split('T')[0])
             .order('metric_date', { ascending: true }),
           supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date')
-            .in('connection_id', connIds)
+            .in('connection_id', shopifyQueryIds)
             .gte('metric_date', prevStart.toISOString().split('T')[0])
             .lte('metric_date', prevEnd.toISOString().split('T')[0]),
           supabase
@@ -127,12 +136,12 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           supabase
             .from('campaign_metrics')
             .select('spend, conversion_value, metric_date, platform')
-            .in('connection_id', connIds)
+            .in('connection_id', adQueryIds)
             .gte('metric_date', startDate.toISOString().split('T')[0]),
           supabase
             .from('campaign_metrics')
             .select('spend, conversion_value, metric_date, platform')
-            .in('connection_id', connIds)
+            .in('connection_id', adQueryIds)
             .gte('metric_date', prevStart.toISOString().split('T')[0])
             .lte('metric_date', prevEnd.toISOString().split('T')[0]),
         ]);
