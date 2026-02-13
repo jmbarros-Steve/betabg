@@ -78,6 +78,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [financialConfig, setFinancialConfig] = useState<FinancialConfig>(defaultFinancialConfig);
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
   const [productBreakdown, setProductBreakdown] = useState<ProductMarginItem[]>([]);
+  const [skuData, setSkuData] = useState<SkuData[]>([]);
+  const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -246,6 +248,22 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             }
           } catch (e) {
             console.warn('[Metrics] Could not fetch products for P&L breakdown:', e);
+          }
+
+          // Fetch real SKU sales and abandoned checkouts
+          try {
+            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': 30, 'ytd': 365 };
+            const { data: analyticsData } = await supabase.functions.invoke('fetch-shopify-analytics', {
+              body: { connectionId: shopifyConnIds[0], daysBack: daysMap[dateRange] || 30 },
+            });
+            if (analyticsData?.topSkus) {
+              setSkuData(analyticsData.topSkus);
+            }
+            if (analyticsData?.abandonedCarts) {
+              setAbandonedCarts(analyticsData.abandonedCarts);
+            }
+          } catch (e) {
+            console.warn('[Metrics] Could not fetch analytics:', e);
           }
         }
       } catch (error) {
@@ -422,30 +440,6 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       netProfitMargin: current.totalRevenue > 0 ? (netProfit / current.totalRevenue) * 100 : 0,
     };
   }, [current, profitMetrics, financialConfig]);
-
-  // Demo SKU data
-  const skuData: SkuData[] = useMemo(() => [
-    { sku: 'TSH-BLK-M', name: 'Polera Negra Talla M', quantity: 245, revenue: 7350000 },
-    { sku: 'JNS-AZL-32', name: 'Jeans Azul Talla 32', quantity: 189, revenue: 9450000 },
-    { sku: 'ZPT-WHT-42', name: 'Zapatillas Blancas 42', quantity: 156, revenue: 11700000 },
-    { sku: 'CHQ-GRS-L', name: 'Chaqueta Gris Talla L', quantity: 134, revenue: 13400000 },
-    { sku: 'PLR-RJO-S', name: 'Polar Rojo Talla S', quantity: 98, revenue: 4900000 },
-    { sku: 'CMS-NEG-M', name: 'Camisa Negra Talla M', quantity: 87, revenue: 3480000 },
-    { sku: 'SHT-BLC-L', name: 'Short Blanco Talla L', quantity: 76, revenue: 1900000 },
-    { sku: 'VES-VRD-M', name: 'Vestido Verde Talla M', quantity: 65, revenue: 3250000 },
-  ], []);
-
-  // Demo abandoned carts
-  const abandonedCarts: AbandonedCart[] = useMemo(() => {
-    const now = new Date();
-    return [
-      { id: 'cart-1', customerEmail: 'maria.gonzalez@gmail.com', customerName: 'María González', totalValue: 89900, itemCount: 3, abandonedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), contacted: false },
-      { id: 'cart-2', customerEmail: 'carlos.perez@outlook.com', customerName: 'Carlos Pérez', totalValue: 156000, itemCount: 5, abandonedAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(), contacted: true },
-      { id: 'cart-3', customerEmail: 'ana.martinez@yahoo.com', customerName: 'Ana Martínez', totalValue: 45000, itemCount: 2, abandonedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), contacted: false },
-      { id: 'cart-4', customerEmail: 'pedro.sanchez@gmail.com', customerName: 'Pedro Sánchez', totalValue: 234500, itemCount: 7, abandonedAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(), contacted: true },
-      { id: 'cart-5', customerEmail: 'lucia.diaz@hotmail.com', customerName: 'Lucía Díaz', totalValue: 67800, itemCount: 4, abandonedAt: new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString(), contacted: false },
-    ];
-  }, []);
 
   // Demo cohort data
   const cohortData = useMemo(() => [
