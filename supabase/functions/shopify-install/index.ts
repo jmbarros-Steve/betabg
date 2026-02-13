@@ -3,6 +3,7 @@ import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Security-Policy': "frame-ancestors https://admin.shopify.com https://*.myshopify.com;",
 };
 
 // Verify Shopify HMAC signature following Shopify's exact specification
@@ -106,12 +107,13 @@ Deno.serve(async (req) => {
     if (hmac) {
       const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
       if (!isValid) {
-        // NOTE: We do strict HMAC verification on the OAuth callback endpoint.
-        // Some Shopify entrypoints (or misconfigured links) may omit params like `host`
-        // which leads to signature mismatches. Since this endpoint only redirects to
-        // Shopify OAuth and does not mutate data, we allow the flow to continue.
-        console.warn('Invalid HMAC signature on shopify-install; continuing to OAuth redirect');
+        console.error('HMAC verification FAILED - rejecting request');
+        return new Response(
+          '<html><body><h1>Error de Seguridad</h1><p>Firma HMAC inválida. Por favor inicia la instalación desde el Admin de Shopify.</p></body></html>',
+          { status: 403, headers: { 'Content-Type': 'text/html', ...corsHeaders } }
+        );
       }
+      console.log('HMAC verification PASSED');
     }
 
     // Generate a random state for CSRF protection

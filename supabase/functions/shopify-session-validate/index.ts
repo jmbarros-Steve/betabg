@@ -19,6 +19,7 @@ import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-shopify-session-token, x-shopify-host, x-shopify-shop',
+  'Content-Security-Policy': "frame-ancestors https://admin.shopify.com https://*.myshopify.com;",
 };
 
 interface ShopifySessionTokenPayload {
