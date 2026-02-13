@@ -285,6 +285,9 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     if (shopify && isEmbedded) {
       const token = await getSessionToken();
       if (token) {
+        // Primary auth: Bearer token with Shopify Session Token
+        headers['Authorization'] = `Bearer ${token}`;
+        // Backwards compatible custom header
         headers['X-Shopify-Session-Token'] = token;
       }
       if (shopify.config?.host) {

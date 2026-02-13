@@ -163,13 +163,12 @@ export default function ShopifyEmbedded() {
     }
   };
 
+  // Login is now handled by Shopify Session Token auto-login
+  // No redirect to Google/external auth - Shopify IS the identity provider
   const handleLogin = () => {
-    if (isEmbedded && window.top) {
-      try {
-        window.top.location.href = 'https://betabg.lovable.app/auth';
-      } catch {
-        window.open('https://betabg.lovable.app/auth', '_blank');
-      }
+    if (isEmbedded) {
+      // Retry auto-login with Session Token
+      retryLogin();
     } else {
       window.open('https://betabg.lovable.app/auth', '_blank');
     }

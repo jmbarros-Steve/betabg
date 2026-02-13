@@ -36,10 +36,13 @@ export function useShopifyAuthFetch() {
         console.log('[AuthFetch] ✓ Session Token obtained, adding to headers');
         headers = {
           ...headers,
+          // Primary auth header: Shopify Session Token as Bearer
+          'Authorization': `Bearer ${sessionToken}`,
+          // Also include in custom header for backwards compatibility
           'X-Shopify-Session-Token': sessionToken,
         };
         
-        // Also include shop/host for validation handshake
+        // Include shop/host for validation handshake
         if (shopify.config?.host) {
           (headers as Record<string, string>)['X-Shopify-Host'] = shopify.config.host;
         }
