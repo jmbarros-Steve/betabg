@@ -1,7 +1,19 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { FileText, TrendingUp, TrendingDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { FileText, TrendingUp, TrendingDown, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+export interface ProductMarginItem {
+  title: string;
+  image: string | null;
+  revenue: number;
+  cost: number;
+  margin: number;
+  marginPercent: number;
+  quantity: number;
+}
 
 interface ProfitLossData {
   grossRevenue: number;
@@ -29,10 +41,10 @@ interface ProfitLossPanelProps {
   previousData?: ProfitLossData;
   currency?: string;
   periodLabel?: string;
+  productBreakdown?: ProductMarginItem[];
 }
 
 function formatCurrency(value: number, currency: string = 'CLP'): string {
-  // Always format with Chilean locale (dots for thousands)
   return `$${Math.round(value).toLocaleString('es-CL')}`;
 }
 
@@ -49,8 +61,9 @@ function ChangeIndicator({ current, previous }: { current: number; previous?: nu
   );
 }
 
-export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLabel = 'Período actual' }: ProfitLossPanelProps) {
+export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLabel = 'Período actual', productBreakdown }: ProfitLossPanelProps) {
   const isNetProfitPositive = data.netProfit >= 0;
+  const [showProductDetail, setShowProductDetail] = useState(false);
 
   return (
     <Card className="glow-box">
@@ -84,16 +97,79 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
 
         <Separator />
 
-        {/* Cost of Goods */}
+        {/* Cost of Goods with expandable product detail */}
         <div className="space-y-2">
           <div className="flex justify-between items-center text-muted-foreground">
             <span className="text-sm">(-) Costo de Productos</span>
             <span className="text-sm text-destructive">-{formatCurrency(data.costOfGoods, currency)}</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Utilidad Bruta</span>
-            <span className="font-semibold text-primary">{formatCurrency(data.grossProfit, currency)}</span>
-          </div>
+          
+          <Collapsible open={showProductDetail} onOpenChange={setShowProductDetail}>
+            <div className="flex justify-between items-center">
+              <CollapsibleTrigger asChild>
+                <button className="text-sm font-medium flex items-center gap-1.5 hover:text-primary transition-colors group cursor-pointer">
+                  {showProductDetail ? (
+                    <ChevronDown className="w-4 h-4 text-primary" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                  )}
+                  Utilidad Bruta
+                  {productBreakdown && productBreakdown.length > 0 && (
+                    <span className="text-xs text-muted-foreground font-normal ml-1">
+                      ({productBreakdown.length} productos)
+                    </span>
+                  )}
+                </button>
+              </CollapsibleTrigger>
+              <span className="font-semibold text-primary">{formatCurrency(data.grossProfit, currency)}</span>
+            </div>
+
+            <CollapsibleContent>
+              {productBreakdown && productBreakdown.length > 0 ? (
+                <div className="mt-3 space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs text-muted-foreground pb-1 border-b border-border/50 px-1">
+                    <span>Producto</span>
+                    <span className="text-right w-20">Ingreso</span>
+                    <span className="text-right w-20">Costo</span>
+                    <span className="text-right w-16">Margen</span>
+                  </div>
+                  {productBreakdown.map((product, index) => (
+                    <div
+                      key={index}
+                      className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-xs py-1.5 px-1 rounded hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {product.image ? (
+                          <img src={product.image} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-muted flex items-center justify-center shrink-0">
+                            <Package className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span className="truncate">{product.title}</span>
+                      </div>
+                      <span className="text-right w-20 font-mono">
+                        {formatCurrency(product.revenue)}
+                      </span>
+                      <span className="text-right w-20 font-mono text-destructive">
+                        -{formatCurrency(product.cost)}
+                      </span>
+                      <span className={cn(
+                        'text-right w-16 font-mono font-medium',
+                        product.marginPercent >= 30 ? 'text-primary' : product.marginPercent >= 15 ? 'text-yellow-600' : 'text-destructive'
+                      )}>
+                        {product.marginPercent.toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-2 pl-6">
+                  Carga los productos en Configuración para ver el detalle por producto.
+                </p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <Separator />
