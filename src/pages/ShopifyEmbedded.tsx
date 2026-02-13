@@ -76,7 +76,8 @@ export default function ShopifyEmbedded() {
     shopify, 
     isEmbedded, 
     isInitialized, 
-    getSessionToken, 
+    getSessionToken,
+    error: bridgeError,
   } = useAppBridge();
 
   // Auto-login using Shopify Session Token
@@ -174,15 +175,32 @@ export default function ShopifyEmbedded() {
     }
   };
 
-  // CRITICAL: Block rendering until App Bridge is initialized
+  // CRITICAL: Block rendering until App Bridge is initialized (with timeout fallback)
   if (isEmbedded && !isInitialized) {
+    if (bridgeError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <Card className="max-w-md w-full">
+            <CardContent className="p-6 text-center space-y-4">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+              <h2 className="text-lg font-semibold text-foreground">Error de App Bridge</h2>
+              <p className="text-sm text-muted-foreground">{bridgeError}</p>
+              <Button onClick={() => window.location.reload()} variant="default">
+                Reintentar
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">Inicializando App Bridge...</p>
           <p className="text-xs text-muted-foreground/60">
-            Esperando parámetros host y shop de Shopify
+            Conectando con Shopify Admin...
           </p>
         </div>
       </div>
