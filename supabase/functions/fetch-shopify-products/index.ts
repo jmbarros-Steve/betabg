@@ -35,11 +35,13 @@ Deno.serve(async (req) => {
       userId = client.client_user_id || client.user_id;
     } else if (authHeader?.startsWith('Bearer ')) {
       const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
-      const { data: { user } } = await supabaseAuth.auth.getUser(authHeader.replace('Bearer ', ''));
-      if (!user) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+      if (claimsError || !data?.claims?.sub) {
+        console.error('[fetch-shopify-products] Auth failed:', claimsError);
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      userId = user.id;
+      userId = data.claims.sub;
     } else {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
