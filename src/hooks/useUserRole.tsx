@@ -90,11 +90,17 @@ export function useUserRole(): UseUserRoleReturn {
 
         // Fetch client data for clients or Shopify users
         if (userRole === 'client' || shopifyUserCheck) {
-          const { data: client, error: clientError } = await supabase
+          const { data: clients, error: clientError } = await supabase
             .from('clients')
             .select('id, name, company, shop_domain')
             .eq('client_user_id', user.id)
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          // Pick the best match: prefer one with shop_domain set
+          const client = clients && clients.length > 0
+            ? clients.find(c => c.shop_domain) || clients[0]
+            : null;
 
           if (clientError) {
             console.error('Error fetching client data:', clientError);
