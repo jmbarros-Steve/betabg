@@ -163,18 +163,16 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     };
   }, [shopify, isEmbedded]);
 
-  // Initialize App Bridge
+  // Initialize App Bridge — DYNAMIC SCRIPT LOADING
   useEffect(() => {
-    // CRITICAL FIX: If shop+host params exist, we ARE in Shopify context
-    // regardless of iframe detection (which can fail due to CSP/cross-origin)
+    // Iframe detection
     let iframeCheck = false;
     try {
       iframeCheck = window.self !== window.top;
     } catch {
-      iframeCheck = true; // Cross-origin = definitely embedded
+      iframeCheck = true;
     }
 
-    // Force embedded mode when Shopify params are present
     const hasShopifyParams = !!(shop && host);
     const embedded = iframeCheck || hasShopifyParams;
     
@@ -190,9 +188,9 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
     console.log('[App Bridge] Paso 2: shop =', shop, '| host =', host ? host.substring(0, 30) + '...' : 'NULL');
 
+    // ===== IRON HAND: If host is missing, STOP EVERYTHING. No script, no init. =====
     if (!host || !shop) {
       console.warn('[App Bridge] ⚠ Embebido pero faltan params (shop:', shop, '| host:', host, ')');
-      // RESCUE MODE: Don't crash, show a friendly message to re-open from Shopify
       if (shop && !host) {
         console.error('[App Bridge] HOST ausente tras buscar en URL, sessionStorage y localStorage. Activando modo rescate.');
         setNeedsRescue(true);
@@ -206,6 +204,7 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       return;
     }
 
+    // ===== BOTH shop AND host confirmed — NOW we can load App Bridge =====
     console.log('[App Bridge] Host detectado');
     console.log('[App Bridge] Shop detectado:', shop);
 
@@ -214,35 +213,52 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     }
     initializationAttempted.current = true;
 
-    const initAppBridge = () => {
-      retryCountRef.current++;
-
-      if (retryCountRef.current > MAX_RETRIES) {
-        console.error('[App Bridge] ✗ Timeout: window.shopify no disponible después de', MAX_RETRIES * 100, 'ms');
-        setError('App Bridge no se pudo inicializar. Verifica que el script CDN esté cargado.');
-        setIsReady(true);
+    const loadAndInitAppBridge = () => {
+      // If script already loaded (e.g. from a previous mount), skip injection
+      if (window.shopify) {
+        console.log('[App Bridge] window.shopify ya existe, saltando inyección de script');
+        finalizeInit();
         return;
       }
 
-      try {
-        if (!window.shopify) {
-          if (retryCountRef.current % 5 === 0) {
-            console.log('[App Bridge] Paso 3: Esperando window.shopify... (intento', retryCountRef.current, '/', MAX_RETRIES, ')');
-          }
-          setTimeout(initAppBridge, 100);
-          return;
-        }
+      console.log('[App Bridge] Paso 3: Inyectando script CDN dinámicamente...');
+      const script = document.createElement('script');
+      script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
+      script.onload = () => {
+        console.log('[App Bridge] Script CDN cargado ✓');
+        waitForShopify();
+      };
+      script.onerror = () => {
+        console.error('[App Bridge] ✗ Falló la carga del script CDN');
+        setError('No se pudo cargar App Bridge desde CDN.');
+        setIsReady(true);
+      };
+      document.head.appendChild(script);
+    };
 
-        console.log('[App Bridge] Paso 3: window.shopify detectado ✓');
-        
-        // App Bridge CDN auto-configures from URL params, but check if ready
-        const configHost = window.shopify.config?.host;
-        const configShop = window.shopify.config?.shop;
+    const waitForShopify = () => {
+      retryCountRef.current++;
+      if (retryCountRef.current > MAX_RETRIES) {
+        console.error('[App Bridge] ✗ Timeout: window.shopify no disponible después de', MAX_RETRIES * 100, 'ms');
+        setError('App Bridge no se pudo inicializar.');
+        setIsReady(true);
+        return;
+      }
+      if (!window.shopify) {
+        setTimeout(waitForShopify, 100);
+        return;
+      }
+      finalizeInit();
+    };
+
+    const finalizeInit = () => {
+      try {
+        const configHost = window.shopify?.config?.host;
+        const configShop = window.shopify?.config?.shop;
 
         console.log('[App Bridge] Paso 4: Config → host:', configHost ? 'OK' : 'PENDIENTE', '| shop:', configShop || 'PENDIENTE');
 
         if (configHost && configShop) {
-          // Required exact logs for Shopify reviewer bot
           console.log('App Bridge cargado desde CDN');
           console.log('[App Bridge] ✓ CDN: https://cdn.shopify.com/shopifycloud/app-bridge.js');
           console.log('[App Bridge] ✓ Session Token Mode: ENABLED (cookie-less)');
@@ -250,12 +266,18 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
           console.log('[App Bridge] ✓ Shop:', configShop);
           console.log('[App Bridge] App Bridge inicializado');
           
-          setShopify(window.shopify);
+          setShopify(window.shopify!);
           setIsReady(true);
           setIsInitialized(true);
         } else {
           // Config not populated yet - keep waiting
-          setTimeout(initAppBridge, 100);
+          retryCountRef.current++;
+          if (retryCountRef.current > MAX_RETRIES) {
+            setError('App Bridge config no se pobló a tiempo.');
+            setIsReady(true);
+            return;
+          }
+          setTimeout(finalizeInit, 100);
         }
       } catch (err: any) {
         console.error('[App Bridge] Error de inicialización:', err);
@@ -264,8 +286,7 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       }
     };
 
-    // Start immediately - don't wait for 'load' event (CDN script is sync in <head>)
-    initAppBridge();
+    loadAndInitAppBridge();
   }, [host, shop]);
 
   /**
