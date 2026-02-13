@@ -8,7 +8,7 @@ import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ConversionLtvPanel } from './metrics/ConversionLtvPanel';
 import { ProfitMetricsPanel } from './metrics/ProfitMetricsPanel';
-import { ProfitLossPanel } from './metrics/ProfitLossPanel';
+import { ProfitLossPanel, ProductMarginItem } from './metrics/ProfitLossPanel';
 import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
 import { MetricsDateFilter, DateRange } from './metrics/MetricsDateFilter';
 
@@ -77,6 +77,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [previousMetrics, setPreviousMetrics] = useState<MetricRow[]>([]);
   const [financialConfig, setFinancialConfig] = useState<FinancialConfig>(defaultFinancialConfig);
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
+  const [productBreakdown, setProductBreakdown] = useState<ProductMarginItem[]>([]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -210,6 +211,42 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             other_fixed_costs: Number(configRes.data.other_fixed_costs),
             payment_gateway_commission: Number(configRes.data.payment_gateway_commission),
           });
+        }
+
+        // Fetch Shopify products for per-product margin breakdown
+        if (shopifyConnIds.length > 0) {
+          try {
+            const { data: prodData } = await supabase.functions.invoke('fetch-shopify-products', {
+              body: { connectionId: shopifyConnIds[0] },
+            });
+            if (prodData?.products) {
+              const marginConfig = configRes.data
+                ? Number(configRes.data.default_margin_percentage) / 100
+                : 0.3;
+              const items: ProductMarginItem[] = prodData.products.map((p: any) => {
+                const totalRevenue = (p.variants || []).reduce((sum: number, v: any) => sum + (v.price || 0), 0);
+                const hasCost = (p.variants || []).some((v: any) => v.cost !== null);
+                const totalCost = hasCost
+                  ? (p.variants || []).reduce((sum: number, v: any) => sum + (v.cost || 0), 0)
+                  : totalRevenue * (1 - marginConfig);
+                const margin = totalRevenue - totalCost;
+                const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
+                return {
+                  title: p.title,
+                  image: p.image,
+                  revenue: totalRevenue,
+                  cost: totalCost,
+                  margin,
+                  marginPercent,
+                  quantity: (p.variants || []).reduce((sum: number, v: any) => sum + (v.inventory_quantity || 0), 0),
+                };
+              });
+              items.sort((a, b) => b.revenue - a.revenue);
+              setProductBreakdown(items);
+            }
+          } catch (e) {
+            console.warn('[Metrics] Could not fetch products for P&L breakdown:', e);
+          }
         }
       } catch (error) {
         console.error('Error fetching metrics:', error);
@@ -542,7 +579,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
           {/* P&L and Cohort side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ProfitLossPanel data={profitLossData} currency="CLP" />
+            <ProfitLossPanel data={profitLossData} currency="CLP" productBreakdown={productBreakdown} />
             <CohortAnalysisPanel cohorts={cohortData} />
           </div>
 
