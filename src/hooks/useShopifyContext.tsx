@@ -4,9 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 interface ShopifyContextType {
   /** Whether this appears to be a Shopify embedded context (has shop+host params) */
   isShopifyContext: boolean;
-  /** The shop domain from URL params */
+  /** The shop domain from URL params or sessionStorage */
   shop: string | null;
-  /** The host param from URL (base64 encoded) */
+  /** The host param from URL or sessionStorage (base64 encoded) */
   host: string | null;
   /** Whether HMAC is present (fresh install flow) */
   hasHmac: boolean;
@@ -23,25 +23,39 @@ const ShopifyContext = createContext<ShopifyContextType>({
 });
 
 /**
- * Provider that detects Shopify embedded context from URL params.
+ * Provider that detects Shopify embedded context from URL params OR sessionStorage.
  * Must be placed INSIDE BrowserRouter but OUTSIDE routes that need auth.
  * 
- * When shop+host params are present, this signals that we're in Shopify Admin
- * and should attempt auto-login instead of redirecting to /auth.
+ * CRITICAL: Recovers shop/host from sessionStorage after internal redirects
+ * (e.g. / → /auth) so that shouldBypassAuth remains true and the app
+ * never redirects to Google login when inside Shopify Admin.
  */
 export function ShopifyContextProvider({ children }: { children: ReactNode }) {
   const [searchParams] = useSearchParams();
 
   const value = useMemo(() => {
-    const shop = searchParams.get('shop');
-    const host = searchParams.get('host');
+    const urlShop = searchParams.get('shop');
+    const urlHost = searchParams.get('host');
+    const urlStore = searchParams.get('store');
     const hmac = searchParams.get('hmac');
 
-    // We're in Shopify context if we have both shop and host params
+    // Resolve shop from 'shop' or 'store' param
+    const resolvedShop = urlShop
+      || (urlStore ? (urlStore.includes('.myshopify.com') ? urlStore : `${urlStore}.myshopify.com`) : null);
+
+    // Persist to sessionStorage when present in URL
+    if (resolvedShop) sessionStorage.setItem('shopify_shop', resolvedShop);
+    if (urlHost) sessionStorage.setItem('shopify_host', urlHost);
+
+    // Recover from sessionStorage if URL params were lost after redirect
+    const shop = resolvedShop || sessionStorage.getItem('shopify_shop');
+    const host = urlHost || sessionStorage.getItem('shopify_host');
+
+    // We're in Shopify context if we have both shop and host (from URL or storage)
     const isShopifyContext = !!(shop && host);
     
-    // We should bypass auth redirects if we're in Shopify context
-    // This allows auto-login to complete before any redirect to /auth
+    // Bypass auth redirects when in Shopify context
+    // This prevents the redirect to /auth → Google login flow
     const shouldBypassAuth = isShopifyContext;
 
     return {
@@ -62,9 +76,6 @@ export function ShopifyContextProvider({ children }: { children: ReactNode }) {
 
 /**
  * Hook to access Shopify context detection.
- * 
- * Use this in components that need to know if we're in Shopify embedded mode
- * BEFORE attempting any auth-related redirects.
  */
 export function useShopifyContext() {
   return useContext(ShopifyContext);
