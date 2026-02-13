@@ -86,20 +86,29 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 30; // 3 seconds max wait
 
-  // Persist shop/host across internal redirects (e.g. / → /auth)
+  // Persist shop/host across internal redirects (e.g. / → /auth → /portal)
   const urlShop = searchParams.get('shop');
   const urlHost = searchParams.get('host');
+  const urlStore = searchParams.get('store'); // Google OAuth callback may use 'store' instead of 'shop'
+
+  // EMERGENCY MAPPING: If 'shop' is missing but 'store' exists, construct the shop domain
+  const resolvedShop = urlShop 
+    || (urlStore ? (urlStore.includes('.myshopify.com') ? urlStore : `${urlStore}.myshopify.com`) : null);
 
   // Save to sessionStorage if present in URL
-  if (urlShop) sessionStorage.setItem('shopify_shop', urlShop);
+  if (resolvedShop) sessionStorage.setItem('shopify_shop', resolvedShop);
   if (urlHost) sessionStorage.setItem('shopify_host', urlHost);
 
   // Recover from sessionStorage if lost after redirect
-  const shop = urlShop || sessionStorage.getItem('shopify_shop');
+  const shop = resolvedShop || sessionStorage.getItem('shopify_shop');
   const host = urlHost || sessionStorage.getItem('shopify_host');
 
   console.log('[App Bridge] URL de origen detectada:', window.location.search);
-  console.log('[App Bridge] shop =', shop, '(fuente:', urlShop ? 'URL' : 'sessionStorage', ') | host =', host ? 'presente' : 'ausente', '(fuente:', urlHost ? 'URL' : 'sessionStorage', ')');
+  console.log('[App Bridge] Params → shop:', urlShop, '| store:', urlStore, '| resolvedShop:', resolvedShop);
+  console.log('[App Bridge] Final → shop =', shop, '(fuente:', resolvedShop ? 'URL' : 'sessionStorage', ') | host =', host ? 'presente' : 'ausente', '(fuente:', urlHost ? 'URL' : 'sessionStorage', ')');
+  if (!host && !urlHost) {
+    console.error('[App Bridge] ⚠ HOST NO DISPONIBLE en URL ni sessionStorage. Shopify debe enviar el parámetro host en el handshake inicial.');
+  }
 
   // Session Heartbeat: Keep session alive by refreshing token periodically
   useEffect(() => {
