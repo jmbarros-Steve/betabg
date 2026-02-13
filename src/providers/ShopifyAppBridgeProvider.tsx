@@ -86,8 +86,20 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 30; // 3 seconds max wait
 
-  const shop = searchParams.get('shop');
-  const host = searchParams.get('host');
+  // Persist shop/host across internal redirects (e.g. / → /auth)
+  const urlShop = searchParams.get('shop');
+  const urlHost = searchParams.get('host');
+
+  // Save to sessionStorage if present in URL
+  if (urlShop) sessionStorage.setItem('shopify_shop', urlShop);
+  if (urlHost) sessionStorage.setItem('shopify_host', urlHost);
+
+  // Recover from sessionStorage if lost after redirect
+  const shop = urlShop || sessionStorage.getItem('shopify_shop');
+  const host = urlHost || sessionStorage.getItem('shopify_host');
+
+  console.log('[App Bridge] URL de origen detectada:', window.location.search);
+  console.log('[App Bridge] shop =', shop, '(fuente:', urlShop ? 'URL' : 'sessionStorage', ') | host =', host ? 'presente' : 'ausente', '(fuente:', urlHost ? 'URL' : 'sessionStorage', ')');
 
   // Session Heartbeat: Keep session alive by refreshing token periodically
   useEffect(() => {
