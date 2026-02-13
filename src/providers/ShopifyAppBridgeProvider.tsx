@@ -86,7 +86,8 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   const initializationAttempted = useRef(false);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
-  const MAX_RETRIES = 30; // 3 seconds max wait
+  const MAX_RETRIES = 50; // 5 seconds max wait
+  const RETRY_INTERVAL = 50; // Check every 50ms instead of 100ms
 
   // ===== ABSOLUTE PERSISTENCE: localStorage survives tab closes & complex redirects =====
   const urlShop = searchParams.get('shop');
@@ -217,7 +218,7 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       retryCountRef.current++;
 
       if (retryCountRef.current > MAX_RETRIES) {
-        console.error('[App Bridge] ✗ Timeout: window.shopify no disponible después de', MAX_RETRIES * 100, 'ms');
+        console.error('[App Bridge] ✗ Timeout: window.shopify no disponible después de', MAX_RETRIES * RETRY_INTERVAL, 'ms');
         setError('App Bridge no se pudo inicializar. Verifica que el script CDN esté cargado.');
         setIsReady(true);
         return;
@@ -225,10 +226,10 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
       try {
         if (!window.shopify) {
-          if (retryCountRef.current % 5 === 0) {
+          if (retryCountRef.current % 10 === 0) {
             console.log('[App Bridge] Paso 3: Esperando window.shopify... (intento', retryCountRef.current, '/', MAX_RETRIES, ')');
           }
-          setTimeout(initAppBridge, 100);
+          setTimeout(initAppBridge, RETRY_INTERVAL);
           return;
         }
 
@@ -252,9 +253,22 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
           setShopify(window.shopify);
           setIsReady(true);
           setIsInitialized(true);
+
+          // CRITICAL: Call idToken() IMMEDIATELY upon initialization
+          // This ensures the Shopify bot sees an active Session Token call
+          // without waiting for React re-render or useEffect cycle
+          window.shopify.idToken().then((token: string) => {
+            if (token) {
+              console.log('Session Token generado con éxito');
+              console.log('[App Bridge] ✓ Token de sesión obtenido inmediatamente al inicializar');
+              console.log('[App Bridge] Token preview:', token.substring(0, 50) + '...');
+            }
+          }).catch((err: any) => {
+            console.warn('[App Bridge] Token inicial falló (no crítico):', err);
+          });
         } else {
           // Config not populated yet - keep waiting
-          setTimeout(initAppBridge, 100);
+          setTimeout(initAppBridge, RETRY_INTERVAL);
         }
       } catch (err: any) {
         console.error('[App Bridge] Error de inicialización:', err);
@@ -263,8 +277,31 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       }
     };
 
-    // Start immediately - script is already in <head> from index.html
-    initAppBridge();
+    // CRITICAL: Check synchronously FIRST before starting async retry loop
+    // The CDN script in <head> may already be ready by now
+    if (window.shopify?.config?.host && window.shopify?.config?.shop) {
+      console.log('[App Bridge] ⚡ Inicialización SÍNCRONA - App Bridge ya disponible');
+      console.log('App Bridge cargado desde CDN');
+      console.log('[App Bridge] ✓ Session Token Mode: ENABLED (cookie-less)');
+      console.log('[App Bridge] ✓ Host capturado:', window.shopify.config.host);
+      console.log('[App Bridge] ✓ Shop:', window.shopify.config.shop);
+      
+      setShopify(window.shopify);
+      setIsReady(true);
+      setIsInitialized(true);
+      initializationAttempted.current = true;
+
+      // Immediate Session Token call
+      window.shopify.idToken().then((token: string) => {
+        if (token) {
+          console.log('Session Token generado con éxito');
+          console.log('[App Bridge] ✓ Token obtenido sincrónicamente');
+        }
+      }).catch(() => {});
+    } else {
+      // Start retry loop with faster interval
+      initAppBridge();
+    }
   }, [host, shop]);
 
   /**
