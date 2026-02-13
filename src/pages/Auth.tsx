@@ -393,8 +393,8 @@ export default function Auth() {
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'google',
                       options: {
-                        // Redirect to /auth after OAuth, then role-based routing kicks in
-                        redirectTo: `${window.location.origin}/auth`
+                        redirectTo: `${window.location.origin}/auth`,
+                        queryParams: { prompt: 'select_account' },
                       }
                     });
                     if (error) {
