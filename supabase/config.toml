@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.fetch-shopify-products]
 verify_jwt = false
+
+[functions.fetch-shopify-analytics]
+verify_jwt = false
