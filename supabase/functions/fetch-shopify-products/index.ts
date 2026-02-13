@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     const cleanStoreUrl = store_url.replace(/^https?:\/\//, '');
 
-    // Fetch products from Shopify (with variants for cost info)
+    // Fetch products from Shopify
     const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2024-01/products.json?limit=250&fields=id,title,handle,status,variants,images,product_type`;
     
     console.log('[fetch-shopify-products] Fetching from:', cleanStoreUrl);
@@ -107,6 +107,40 @@ Deno.serve(async (req) => {
     const { products } = await shopifyResponse.json();
     console.log(`[fetch-shopify-products] Fetched ${products?.length || 0} products`);
 
+    // Collect all inventory_item_ids from variants to fetch costs
+    const allVariants = (products || []).flatMap((p: any) => p.variants || []);
+    const inventoryItemIds = allVariants
+      .map((v: any) => v.inventory_item_id)
+      .filter(Boolean);
+
+    // Fetch inventory items in batches of 100 to get cost data
+    const costMap = new Map<number, number | null>();
+    
+    if (inventoryItemIds.length > 0) {
+      const batchSize = 100;
+      for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
+        const batchIds = inventoryItemIds.slice(i, i + batchSize).join(',');
+        const invUrl = `https://${cleanStoreUrl}/admin/api/2024-01/inventory_items.json?ids=${batchIds}`;
+        
+        const invResponse = await fetch(invUrl, {
+          headers: {
+            'X-Shopify-Access-Token': decryptedToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (invResponse.ok) {
+          const { inventory_items } = await invResponse.json();
+          for (const item of (inventory_items || [])) {
+            costMap.set(item.id, item.cost ? parseFloat(item.cost) : null);
+          }
+        } else {
+          console.warn('[fetch-shopify-products] Inventory items fetch failed:', invResponse.status);
+        }
+      }
+      console.log(`[fetch-shopify-products] Fetched costs for ${costMap.size} inventory items`);
+    }
+
     // Map to a clean response with price and cost per variant
     const mappedProducts = (products || []).map((product: any) => ({
       id: product.id,
@@ -120,7 +154,7 @@ Deno.serve(async (req) => {
         title: v.title,
         sku: v.sku || '',
         price: parseFloat(v.price) || 0,
-        cost: v.cost ? parseFloat(v.cost) : null,
+        cost: costMap.get(v.inventory_item_id) ?? null,
         inventory_quantity: v.inventory_quantity ?? null,
       })),
     }));
