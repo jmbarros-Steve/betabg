@@ -175,9 +175,11 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
           const configShop = window.shopify.config?.shop;
 
           if (configHost && configShop) {
-            console.log('[App Bridge Provider] ✓ Validation PASSED');
-            console.log('[App Bridge Provider] ✓ CDN Script: LOADED');
-            console.log('[App Bridge Provider] ✓ Session Token Mode: ENABLED');
+            console.log('App Bridge cargado desde CDN');
+            console.log('[App Bridge Provider] ✓ CDN Script: LOADED (https://cdn.shopify.com/shopifycloud/app-bridge.js)');
+            console.log('[App Bridge Provider] ✓ Session Token Mode: ENABLED (cookie-less)');
+            console.log('[App Bridge Provider] ✓ Host capturado:', configHost);
+            console.log('[App Bridge Provider] ✓ Shop:', configShop);
             setShopify(window.shopify);
             setIsReady(true);
             setIsInitialized(true);
@@ -216,7 +218,8 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
     try {
       const token = await shopify.idToken();
-      console.log('[App Bridge Provider] Session token obtained');
+      console.log('Session Token generado con éxito');
+      console.log('[App Bridge Provider] Token obtained via shopify.idToken() (cookie-less)');
       return token;
     } catch (err: any) {
       console.error('[App Bridge Provider] Token error:', err);
