@@ -98,8 +98,17 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   const resolvedShop = urlShop 
     || (urlStore ? (urlStore.includes('.myshopify.com') ? urlStore : `${urlStore}.myshopify.com`) : null);
 
-  // Save to BOTH sessionStorage and localStorage for maximum persistence
+  // ===== POINT 4: localStorage cleanup when shop changes =====
+  // If the URL has a different shop than what's stored, clear old data to prevent conflicts
   if (resolvedShop) {
+    const storedShop = localStorage.getItem('shopify_shop');
+    if (storedShop && storedShop !== resolvedShop) {
+      console.log('[App Bridge] ⚠ Shop changed from', storedShop, 'to', resolvedShop, '- clearing old data');
+      sessionStorage.removeItem('shopify_shop');
+      sessionStorage.removeItem('shopify_host');
+      localStorage.removeItem('shopify_shop');
+      localStorage.removeItem('shopify_host');
+    }
     sessionStorage.setItem('shopify_shop', resolvedShop);
     localStorage.setItem('shopify_shop', resolvedShop);
   }
@@ -152,8 +161,8 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     // Initial heartbeat
     performHeartbeat();
 
-    // Periodic heartbeat every 4 minutes
-    heartbeatIntervalRef.current = setInterval(performHeartbeat, 4 * 60 * 1000);
+    // POINT 6: Aggressive heartbeat every 30 seconds for Shopify bot detection
+    heartbeatIntervalRef.current = setInterval(performHeartbeat, 30 * 1000);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -303,6 +312,59 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       initAppBridge();
     }
   }, [host, shop]);
+
+  // ===== POINT 10: Breakout detection =====
+  // If the app loads with shop+host params but is NOT in an iframe,
+  // redirect back into the Shopify admin
+  useEffect(() => {
+    if (!shop || !host) return;
+    
+    let inIframe = false;
+    try {
+      inIframe = window.self !== window.top;
+    } catch {
+      inIframe = true;
+    }
+
+    if (!inIframe && shop) {
+      const storeSlug = shop.replace('.myshopify.com', '');
+      const APP_SLUG = 'loveable-public';
+      const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_SLUG}`;
+      
+      console.log('[App Bridge] ⚠ BREAKOUT detected: app outside Shopify admin iframe');
+      console.log('[App Bridge] Redirecting to admin:', adminUrl);
+      window.open(adminUrl, '_top');
+    }
+  }, [shop, host]);
+
+  // ===== POINT 5: URL rewriting - sync app URL with Shopify params =====
+  useEffect(() => {
+    if (!isEmbedded || !isInitialized || !shop || !host) return;
+
+    const syncUrl = () => {
+      const currentUrl = new URL(window.location.href);
+      let changed = false;
+      
+      if (!currentUrl.searchParams.has('shop') && shop) {
+        currentUrl.searchParams.set('shop', shop);
+        changed = true;
+      }
+      if (!currentUrl.searchParams.has('host') && host) {
+        currentUrl.searchParams.set('host', host);
+        changed = true;
+      }
+      
+      if (changed) {
+        window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search);
+        console.log('[App Bridge] URL synced with Shopify params');
+      }
+    };
+
+    syncUrl();
+    const handlePopState = () => syncUrl();
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isEmbedded, isInitialized, shop, host]);
 
   /**
    * Get a fresh Session Token from Shopify
