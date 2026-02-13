@@ -233,13 +233,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('Fetching orders from Shopify:', store_url);
+    // Strip protocol if present to avoid double https://
+    const cleanStoreUrl = store_url.replace(/^https?:\/\//, '');
+    console.log('Fetching orders from Shopify:', cleanStoreUrl);
 
     // Fetch orders from Shopify (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const shopifyUrl = `https://${store_url}/admin/api/2024-01/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
+    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
     
     const shopifyResponse = await fetch(shopifyUrl, {
       headers: {
