@@ -22,6 +22,7 @@ import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
 import { KlaviyoPlanWizard } from './KlaviyoPlanWizard';
 import { KlaviyoVariables } from './KlaviyoVariables';
 import { SteveFeedbackDialog } from './SteveFeedbackDialog';
+import { KlaviyoMetricsPanel } from './KlaviyoMetricsPanel';
 
 interface EmailStep {
   id: string;
@@ -351,6 +352,9 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
           <KlaviyoVariables />
         </motion.div>
       )}
+
+      {/* Klaviyo Performance Metrics */}
+      <KlaviyoMetricsPanel clientId={clientId} />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'flows' | 'campaigns' | 'archive')}>

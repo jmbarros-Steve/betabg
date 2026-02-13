@@ -1,0 +1,371 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import {
+  RefreshCw, Mail, TrendingUp, Users, DollarSign, MousePointerClick,
+  Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface KlaviyoMetricsPanelProps {
+  clientId: string;
+}
+
+interface FlowMetrics {
+  recipients: number;
+  opens: number;
+  unique_opens: number;
+  clicks: number;
+  unique_clicks: number;
+  conversions: number;
+  revenue: number;
+}
+
+interface CampaignMetrics extends FlowMetrics {
+  unsubscribes: number;
+  bounces: number;
+}
+
+interface KlaviyoFlow {
+  id: string;
+  name: string;
+  status: string;
+  created: string;
+  updated: string;
+  trigger_type: string | null;
+  metrics: FlowMetrics | null;
+}
+
+interface KlaviyoCampaign {
+  id: string;
+  name: string;
+  status: string;
+  send_time: string | null;
+  created_at: string;
+  updated_at: string;
+  metrics: CampaignMetrics | null;
+}
+
+interface GlobalStats {
+  totalProfiles: number;
+  totalFlows: number;
+  activeFlows: number;
+  totalCampaigns: number;
+  sentCampaigns: number;
+  totalRevenue: number;
+  totalFlowRevenue: number;
+  totalCampaignRevenue: number;
+  totalConversions: number;
+}
+
+function formatNumber(n: number): string {
+  return Math.round(n).toLocaleString('es-CL');
+}
+
+function formatCurrency(n: number): string {
+  return `$${Math.round(n).toLocaleString('es-CL')}`;
+}
+
+function calcRate(numerator: number, denominator: number): string {
+  if (denominator === 0) return '0%';
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+function MetricBadge({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
+  return (
+    <div className="flex flex-col items-center gap-1 p-3 bg-muted/50 rounded-lg min-w-[80px]">
+      <Icon className="w-4 h-4 text-muted-foreground" />
+      <span className="text-lg font-bold">{value}</span>
+      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
+
+function FlowRow({ flow }: { flow: KlaviyoFlow }) {
+  const [open, setOpen] = useState(false);
+  const m = flow.metrics;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors text-left cursor-pointer">
+          <div className="flex items-center gap-3 min-w-0">
+            {open ? <ChevronDown className="w-4 h-4 shrink-0 text-primary" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+            <Zap className="w-4 h-4 shrink-0 text-purple-500" />
+            <span className="text-sm font-medium truncate">{flow.name}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant={flow.status === 'live' ? 'default' : 'secondary'} className="text-xs">
+              {flow.status === 'live' ? 'Activo' : flow.status === 'draft' ? 'Borrador' : flow.status}
+            </Badge>
+            {m && m.revenue > 0 && (
+              <span className="text-xs font-mono text-primary">{formatCurrency(m.revenue)}</span>
+            )}
+          </div>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {m ? (
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-10 pb-3">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Enviados</p>
+              <p className="font-semibold text-sm">{formatNumber(m.recipients)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Aperturas</p>
+              <p className="font-semibold text-sm">{calcRate(m.unique_opens, m.recipients)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Clics</p>
+              <p className="font-semibold text-sm">{calcRate(m.unique_clicks, m.recipients)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Conversiones</p>
+              <p className="font-semibold text-sm">{formatNumber(m.conversions)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Revenue</p>
+              <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Rev/Enviado</p>
+              <p className="font-semibold text-sm">{m.recipients > 0 ? formatCurrency(m.revenue / m.recipients) : '$0'}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground px-10 pb-3">Sin métricas disponibles (último 90 días)</p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
+  const [open, setOpen] = useState(false);
+  const m = campaign.metrics;
+
+  const sendDate = campaign.send_time
+    ? new Date(campaign.send_time).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors text-left cursor-pointer">
+          <div className="flex items-center gap-3 min-w-0">
+            {open ? <ChevronDown className="w-4 h-4 shrink-0 text-primary" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+            <Megaphone className="w-4 h-4 shrink-0 text-blue-500" />
+            <div className="min-w-0">
+              <span className="text-sm font-medium truncate block">{campaign.name}</span>
+              {sendDate && <span className="text-[10px] text-muted-foreground">{sendDate}</span>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant={campaign.send_time ? 'default' : 'secondary'} className="text-xs">
+              {campaign.send_time ? 'Enviada' : campaign.status}
+            </Badge>
+            {m && m.revenue > 0 && (
+              <span className="text-xs font-mono text-primary">{formatCurrency(m.revenue)}</span>
+            )}
+          </div>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {m ? (
+          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 px-10 pb-3">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Enviados</p>
+              <p className="font-semibold text-sm">{formatNumber(m.recipients)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Aperturas</p>
+              <p className="font-semibold text-sm">{calcRate(m.unique_opens, m.recipients)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Clics</p>
+              <p className="font-semibold text-sm">{calcRate(m.unique_clicks, m.recipients)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Conversiones</p>
+              <p className="font-semibold text-sm">{formatNumber(m.conversions)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Revenue</p>
+              <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Unsubs</p>
+              <p className="font-semibold text-sm">{formatNumber(m.unsubscribes)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Bounces</p>
+              <p className="font-semibold text-sm">{formatNumber(m.bounces)}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground px-10 pb-3">Sin métricas disponibles</p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
+  const [loading, setLoading] = useState(false);
+  const [flows, setFlows] = useState<KlaviyoFlow[]>([]);
+  const [campaigns, setCampaigns] = useState<KlaviyoCampaign[]>([]);
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [hasConnection, setHasConnection] = useState(false);
+
+  useEffect(() => {
+    checkConnection();
+  }, [clientId]);
+
+  const checkConnection = async () => {
+    const { data } = await supabase
+      .from('platform_connections')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('platform', 'klaviyo')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setConnectionId(data.id);
+      setHasConnection(true);
+    }
+  };
+
+  const fetchMetrics = async () => {
+    if (!connectionId) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+        body: { connectionId },
+      });
+
+      if (error) {
+        toast.error('Error al cargar métricas de Klaviyo: ' + (error?.message || error));
+        return;
+      }
+
+      if (data?.flows) setFlows(data.flows);
+      if (data?.campaigns) setCampaigns(data.campaigns);
+      if (data?.globalStats) setGlobalStats(data.globalStats);
+      toast.success('Métricas de Klaviyo actualizadas');
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!hasConnection) {
+    return (
+      <Card className="glow-box">
+        <CardContent className="py-8 text-center">
+          <Mail className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-muted-foreground text-sm">
+            Conecta Klaviyo en la pestaña "Conexiones" para ver tus métricas de email
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="glow-box">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Rendimiento de Klaviyo
+            </CardTitle>
+            <CardDescription>Métricas de los últimos 90 días</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchMetrics} disabled={loading}>
+            {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            {globalStats ? 'Actualizar' : 'Cargar Métricas'}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!globalStats && !loading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-50" />
+            <p className="text-sm">Haz clic en "Cargar Métricas" para importar tus datos de Klaviyo</p>
+          </div>
+        ) : loading ? (
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : globalStats ? (
+          <div className="space-y-6">
+            {/* Global Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <MetricBadge label="Perfiles" value={formatNumber(globalStats.totalProfiles)} icon={Users} />
+              <MetricBadge label="Flows Activos" value={`${globalStats.activeFlows}/${globalStats.totalFlows}`} icon={Zap} />
+              <MetricBadge label="Campañas" value={formatNumber(globalStats.sentCampaigns)} icon={Megaphone} />
+              <MetricBadge label="Conversiones" value={formatNumber(globalStats.totalConversions)} icon={MousePointerClick} />
+              <MetricBadge label="Revenue Total" value={formatCurrency(globalStats.totalRevenue)} icon={DollarSign} />
+            </div>
+
+            {/* Flows & Campaigns Tabs */}
+            <Tabs defaultValue="flows">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="flows" className="text-sm">
+                  <Zap className="w-4 h-4 mr-1.5" />
+                  Flows ({flows.length})
+                </TabsTrigger>
+                <TabsTrigger value="campaigns" className="text-sm">
+                  <Megaphone className="w-4 h-4 mr-1.5" />
+                  Campañas ({campaigns.filter(c => c.send_time).length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="flows" className="mt-4">
+                {flows.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-6">No hay flows configurados</p>
+                ) : (
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    {flows
+                      .sort((a, b) => (b.metrics?.revenue || 0) - (a.metrics?.revenue || 0))
+                      .map(flow => (
+                        <FlowRow key={flow.id} flow={flow} />
+                      ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="campaigns" className="mt-4">
+                {campaigns.filter(c => c.send_time).length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-6">No hay campañas enviadas</p>
+                ) : (
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    {campaigns
+                      .filter(c => c.send_time)
+                      .sort((a, b) => new Date(b.send_time!).getTime() - new Date(a.send_time!).getTime())
+                      .map(campaign => (
+                        <CampaignRow key={campaign.id} campaign={campaign} />
+                      ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
