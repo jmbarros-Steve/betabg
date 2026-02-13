@@ -1,5 +1,6 @@
 import { createContext, useContext, ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 /**
  * Type declarations for Shopify App Bridge from CDN
@@ -80,35 +81,43 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   const [isReady, setIsReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsRescue, setNeedsRescue] = useState(false);
   
   const initializationAttempted = useRef(false);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 30; // 3 seconds max wait
 
-  // Persist shop/host across internal redirects (e.g. / → /auth → /portal)
+  // ===== ABSOLUTE PERSISTENCE: localStorage survives tab closes & complex redirects =====
   const urlShop = searchParams.get('shop');
   const urlHost = searchParams.get('host');
-  const urlStore = searchParams.get('store'); // Google OAuth callback may use 'store' instead of 'shop'
+  const urlStore = searchParams.get('store');
 
-  // EMERGENCY MAPPING: If 'shop' is missing but 'store' exists, construct the shop domain
+  // EMERGENCY MAPPING: 'store' → 'shop'
   const resolvedShop = urlShop 
     || (urlStore ? (urlStore.includes('.myshopify.com') ? urlStore : `${urlStore}.myshopify.com`) : null);
 
-  // Save to sessionStorage if present in URL
-  if (resolvedShop) sessionStorage.setItem('shopify_shop', resolvedShop);
-  if (urlHost) sessionStorage.setItem('shopify_host', urlHost);
-
-  // Recover from sessionStorage if lost after redirect
-  const shop = resolvedShop || sessionStorage.getItem('shopify_shop');
-  const host = urlHost || sessionStorage.getItem('shopify_host');
-
-  console.log('[App Bridge] URL de origen detectada:', window.location.search);
-  console.log('[App Bridge] Params → shop:', urlShop, '| store:', urlStore, '| resolvedShop:', resolvedShop);
-  console.log('[App Bridge] Final → shop =', shop, '(fuente:', resolvedShop ? 'URL' : 'sessionStorage', ') | host =', host ? 'presente' : 'ausente', '(fuente:', urlHost ? 'URL' : 'sessionStorage', ')');
-  if (!host && !urlHost) {
-    console.error('[App Bridge] ⚠ HOST NO DISPONIBLE en URL ni sessionStorage. Shopify debe enviar el parámetro host en el handshake inicial.');
+  // Save to BOTH sessionStorage and localStorage for maximum persistence
+  if (resolvedShop) {
+    sessionStorage.setItem('shopify_shop', resolvedShop);
+    localStorage.setItem('shopify_shop', resolvedShop);
   }
+  if (urlHost) {
+    sessionStorage.setItem('shopify_host', urlHost);
+    localStorage.setItem('shopify_host', urlHost);
+  }
+
+  // Recover: URL → sessionStorage → localStorage (triple fallback)
+  const shop = resolvedShop 
+    || sessionStorage.getItem('shopify_shop') 
+    || localStorage.getItem('shopify_shop');
+  const host = urlHost 
+    || sessionStorage.getItem('shopify_host') 
+    || localStorage.getItem('shopify_host');
+
+  console.log('[App Bridge] URL:', window.location.search);
+  console.log('[App Bridge] Resolved → shop =', shop, '| host =', host ? 'presente' : 'AUSENTE',
+    '| fuente:', resolvedShop ? 'URL' : (sessionStorage.getItem('shopify_shop') ? 'sessionStorage' : 'localStorage'));
 
   // Session Heartbeat: Keep session alive by refreshing token periodically
   useEffect(() => {
@@ -181,7 +190,15 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     console.log('[App Bridge] Paso 2: shop =', shop, '| host =', host ? host.substring(0, 30) + '...' : 'NULL');
 
     if (!host || !shop) {
-      console.warn('[App Bridge] ⚠ Embebido pero faltan params. Fallback a modo standalone.');
+      console.warn('[App Bridge] ⚠ Embebido pero faltan params (shop:', shop, '| host:', host, ')');
+      // RESCUE MODE: Don't crash, show a friendly message to re-open from Shopify
+      if (shop && !host) {
+        console.error('[App Bridge] HOST ausente tras buscar en URL, sessionStorage y localStorage. Activando modo rescate.');
+        setNeedsRescue(true);
+        setIsReady(true);
+        return;
+      }
+      // No shop at all → standalone mode
       setIsEmbedded(false);
       setIsReady(true);
       setIsInitialized(true);
@@ -324,6 +341,37 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     showToast,
     createAuthHeaders,
   };
+
+  // RESCUE MODE: host missing after all fallbacks
+  if (needsRescue) {
+    return (
+      <ShopifyAppBridgeContext.Provider value={value}>
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md w-full text-center space-y-4 p-6 border rounded-lg bg-card shadow-sm">
+            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+            <h2 className="text-lg font-semibold text-foreground">Conexión Interrumpida</h2>
+            <p className="text-sm text-muted-foreground">
+              Para completar la conexión, por favor abre la App una vez más desde tu <strong>Panel de Shopify</strong>.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Esto permitirá que Shopify envíe los datos de sesión necesarios.
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground/60">
+              Tienda detectada: {shop || 'desconocida'}
+            </p>
+          </div>
+        </div>
+      </ShopifyAppBridgeContext.Provider>
+    );
+  }
 
   return (
     <ShopifyAppBridgeContext.Provider value={value}>
