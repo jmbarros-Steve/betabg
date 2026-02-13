@@ -475,23 +475,24 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <DollarSign className="w-3 h-3" />
               Gasto Total
             </div>
-            <p className="text-xl font-bold">{formatCurrency(totals.spend)}</p>
+            <p className="text-lg font-bold">{formatCurrency(totals.spend)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <ShoppingCart className="w-3 h-3" />
-              Revenue
+              Revenue (Atribuido)
             </div>
-            <p className="text-xl font-bold">{formatCurrency(totals.revenue)}</p>
+            <p className="text-lg font-bold">{formatCurrency(totals.revenue)}</p>
+            <p className="text-[10px] text-muted-foreground">Reportado por plataforma</p>
           </CardContent>
         </Card>
         <Card>
@@ -500,7 +501,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <TrendingUp className="w-3 h-3" />
               ROAS
             </div>
-            <p className={`text-xl font-bold ${overallRoas >= 3 ? 'text-green-500' : overallRoas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
+            <p className={`text-lg font-bold ${overallRoas >= 3 ? 'text-green-500' : overallRoas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
               {overallRoas.toFixed(2)}x
             </p>
           </CardContent>
@@ -511,7 +512,40 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <Eye className="w-3 h-3" />
               Conversiones
             </div>
-            <p className="text-xl font-bold">{formatNumber(totals.conversions)}</p>
+            <p className="text-lg font-bold">{formatNumber(totals.conversions)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <Target className="w-3 h-3" />
+              Costo/Conv
+            </div>
+            <p className="text-lg font-bold">
+              {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions) : '-'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <MousePointerClick className="w-3 h-3" />
+              CPC
+            </div>
+            <p className="text-lg font-bold">
+              {totals.clicks > 0 ? `$${(totals.spend / totals.clicks).toFixed(2)}` : '-'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <Eye className="w-3 h-3" />
+              CPM
+            </div>
+            <p className="text-lg font-bold">
+              {totals.impressions > 0 ? `$${((totals.spend / totals.impressions) * 1000).toFixed(2)}` : '-'}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -520,7 +554,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <MousePointerClick className="w-3 h-3" />
               CTR
             </div>
-            <p className="text-xl font-bold">{formatPercent(overallCtr)}</p>
+            <p className="text-lg font-bold">{formatPercent(overallCtr)}</p>
           </CardContent>
         </Card>
       </div>
@@ -618,13 +652,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                             )}
                           </div>
 
-                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 text-sm">
+                          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 text-sm">
                             <div>
                               <p className="text-muted-foreground text-xs">Gasto</p>
                               <p className="font-medium">{formatCurrency(campaign.total_spend)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">Revenue</p>
+                              <p className="text-muted-foreground text-xs">Revenue (Atrib.)</p>
                               <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
                             </div>
                             <div>
@@ -634,16 +668,26 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                               </p>
                             </div>
                             <div>
+                              <p className="text-muted-foreground text-xs">Costo/Conv</p>
+                              <p className="font-medium">
+                                {campaign.total_conversions > 0 ? formatCurrency(campaign.total_spend / campaign.total_conversions) : '-'}
+                              </p>
+                            </div>
+                            <div>
                               <p className="text-muted-foreground text-xs">CPC</p>
                               <p className="font-medium">${campaign.avg_cpc.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">CPM</p>
+                              <p className="font-medium">${campaign.avg_cpm.toFixed(2)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs">CTR</p>
                               <p className="font-medium">{formatPercent(campaign.avg_ctr)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">CPM</p>
-                              <p className="font-medium">${campaign.avg_cpm.toFixed(2)}</p>
+                              <p className="text-muted-foreground text-xs">Conversiones</p>
+                              <p className="font-medium">{formatNumber(campaign.total_conversions)}</p>
                             </div>
                           </div>
 
