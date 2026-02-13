@@ -118,31 +118,30 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     window.location.href = authUrl;
   };
 
+  const [showShopifyDialog, setShowShopifyDialog] = useState(false);
+  const [shopifyStoreName, setShopifyStoreName] = useState('');
+
   const handleConnectShopify = () => {
-    setConnectingShopify(true);
+    setShowShopifyDialog(true);
+  };
 
-    // Store client_id in sessionStorage for callback
-    sessionStorage.setItem('shopify_oauth_client_id', clientId);
-
-    // Build Shopify OAuth URL
-    const redirectUri = `${window.location.origin}/oauth/shopify/callback`;
-    const scopes = 'read_products,read_orders,read_customers,read_analytics';
-    
-    // Open a prompt to get the store name
-    const storeName = prompt('Ingresa el nombre de tu tienda Shopify (ej: mi-tienda)');
-    
-    if (!storeName) {
-      setConnectingShopify(false);
+  const handleShopifyDialogSubmit = () => {
+    if (!shopifyStoreName.trim()) {
+      toast.error('Ingresa el nombre de tu tienda Shopify');
       return;
     }
 
-    const shopDomain = storeName.includes('.myshopify.com') 
-      ? storeName 
-      : `${storeName}.myshopify.com`;
+    setConnectingShopify(true);
+    setShowShopifyDialog(false);
 
-    const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${clientId}`;
+    const shopDomain = shopifyStoreName.includes('.myshopify.com')
+      ? shopifyStoreName.trim()
+      : `${shopifyStoreName.trim()}.myshopify.com`;
 
-    window.location.href = authUrl;
+    // Use the shopify-install edge function which has the correct redirect_uri
+    const installUrl = `${SUPABASE_URL}/functions/v1/shopify-install?shop=${encodeURIComponent(shopDomain)}`;
+
+    window.location.href = installUrl;
   };
 
   const handleConnectGoogle = () => {
@@ -507,6 +506,60 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                   </>
                 ) : (
                   'Conectar'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shopify Store Name Dialog */}
+      <Dialog open={showShopifyDialog} onOpenChange={setShowShopifyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-green-600" />
+              Conectar Shopify
+            </DialogTitle>
+            <DialogDescription>
+              Ingresa el nombre de tu tienda Shopify para conectarla.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="shopify-store-name">Nombre de la tienda</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="shopify-store-name"
+                  placeholder="mi-tienda"
+                  value={shopifyStoreName}
+                  onChange={(e) => setShopifyStoreName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleShopifyDialogSubmit()}
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">.myshopify.com</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ejemplo: si tu tienda es mi-tienda.myshopify.com, escribe "mi-tienda"
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => {
+                setShowShopifyDialog(false);
+                setShopifyStoreName('');
+              }}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleShopifyDialogSubmit}
+                disabled={connectingShopify || !shopifyStoreName.trim()}
+              >
+                {connectingShopify ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Conectando...
+                  </>
+                ) : (
+                  'Conectar Shopify'
                 )}
               </Button>
             </div>
