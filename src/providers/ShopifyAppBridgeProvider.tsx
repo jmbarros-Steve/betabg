@@ -344,9 +344,21 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
   // RESCUE MODE: shop present but host missing — redirect to Shopify Admin to get fresh host
   if (needsRescue) {
-    // Extract store slug from shop domain for the redirect URL
-    const storeSlug = (shop || '').replace('.myshopify.com', '');
-    const reanchorUrl = `https://admin.shopify.com/store/${storeSlug}/apps/loveable_public`;
+    // App identifier in Shopify
+    const APP_ID = 'loveable_public';
+    
+    // Extract store slug from shop domain
+    const storeSlug = shop?.replace('.myshopify.com', '') || '';
+    
+    // Dynamic URL: if we have the store slug, use full app URL; otherwise fallback to admin home
+    const reanchorUrl = storeSlug
+      ? `https://admin.shopify.com/store/${storeSlug}/apps/${APP_ID}`
+      : 'https://admin.shopify.com';
+    
+    // Dynamic button text based on whether we have store info
+    const buttonText = storeSlug
+      ? 'Haz clic aquí para sincronizar con Shopify'
+      : 'Regresar al Panel de Shopify';
 
     const handleReanchor = () => {
       console.log('🔄🔄🔄 Sincronizando Host con Shopify... 🔄🔄🔄');
@@ -378,11 +390,13 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
               onClick={handleReanchor}
               className="w-full px-6 py-4 bg-primary text-primary-foreground rounded-lg text-lg font-semibold hover:bg-primary/90 transition-colors"
             >
-              Haz clic aquí para sincronizar con Shopify
+              {buttonText}
             </button>
-            <p className="text-xs text-muted-foreground/60">
-              Tienda: {shop}
-            </p>
+            {storeSlug && (
+              <p className="text-xs text-muted-foreground/60">
+                Tienda: {shop}
+              </p>
+            )}
           </div>
         </div>
       </ShopifyAppBridgeContext.Provider>
