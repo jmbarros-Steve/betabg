@@ -9,6 +9,27 @@ import { useToast } from '@/hooks/use-toast';
 import { ShopifyWelcomeScreen } from '@/components/shopify/ShopifyWelcomeScreen';
 import { ShopifyOnboardingTour } from '@/components/client-portal/ShopifyOnboardingTour';
 
+const APP_HANDLE = 'loveable-public';
+
+/**
+ * Redirects the browser into the Shopify Admin embedded app URL.
+ * Falls back to a standalone portal URL if shop is unknown.
+ */
+function redirectToShopifyAdmin(shopOrStore: string | null, fallbackPath: string, navigate: ReturnType<typeof useNavigate>) {
+  const shop = shopOrStore
+    || localStorage.getItem('shopify_shop')
+    || sessionStorage.getItem('shopify_shop');
+
+  if (shop) {
+    const shopName = shop.replace('.myshopify.com', '');
+    const adminUrl = `https://admin.shopify.com/store/${shopName}/apps/${APP_HANDLE}`;
+    console.log('[OAuthCallback] Redirecting to Shopify Admin:', adminUrl);
+    window.location.href = adminUrl;
+  } else {
+    navigate(fallbackPath);
+  }
+}
+
 type ConnectionStatus = 'loading' | 'success' | 'new_user' | 'tour' | 'error';
 
 export default function OAuthShopifyCallback() {
@@ -90,8 +111,9 @@ export default function OAuthShopifyCallback() {
             title: '¡Tienda reconectada!',
             description: `${store} ha sido conectada exitosamente.`,
           });
+          // Redirect back into Shopify Admin iframe
           setTimeout(() => {
-            navigate('/portal?tab=connections');
+            redirectToShopifyAdmin(store, '/portal?tab=connections', navigate);
           }, 1500);
         } else {
           // Not logged in - redirect to auth with store info
@@ -162,9 +184,9 @@ export default function OAuthShopifyCallback() {
             setStatus('new_user');
           }
         } else {
-          setStatus('success');
+        setStatus('success');
           setTimeout(() => {
-            navigate('/portal?tab=connections');
+            redirectToShopifyAdmin(shop, '/portal?tab=connections', navigate);
           }, 1500);
         }
       } catch (err: any) {
@@ -212,7 +234,8 @@ export default function OAuthShopifyCallback() {
       title: '¡Bienvenido a Steve!',
       description: `Tu tienda ${storeName} está lista.`,
     });
-    navigate('/portal?tab=metrics');
+    // Redirect back into Shopify Admin iframe
+    redirectToShopifyAdmin(storeName, '/portal?tab=metrics', navigate);
   };
 
   // Show onboarding tour for new users after login

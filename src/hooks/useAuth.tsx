@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useShopifyReEmbed } from '@/hooks/useShopifyReEmbed';
 
 interface AuthContextType {
   user: User | null;
@@ -74,6 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
   };
+
+  // Re-embed into Shopify Admin if we're top-level with an active session
+  useShopifyReEmbed(!!session);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>

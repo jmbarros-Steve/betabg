@@ -341,10 +341,10 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   }, [host, shop]);
 
   // ===== POINT 10: Breakout detection =====
-  // If the app loads with shop+host params but is NOT in an iframe,
-  // redirect back into the Shopify admin
+  // If the app loads with shop param but is NOT in an iframe,
+  // redirect back into the Shopify admin (host is NOT required for this check)
   useEffect(() => {
-    if (!shop || !host) return;
+    if (!shop) return;
     
     let inIframe = false;
     try {
@@ -353,16 +353,16 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       inIframe = true;
     }
 
-    if (!inIframe && shop) {
+    if (!inIframe) {
       const storeSlug = shop.replace('.myshopify.com', '');
       const APP_SLUG = 'loveable-public';
       const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_SLUG}`;
       
       console.log('[App Bridge] ⚠ BREAKOUT detected: app outside Shopify admin iframe');
       console.log('[App Bridge] Redirecting to admin:', adminUrl);
-      window.open(adminUrl, '_top');
+      window.location.href = adminUrl;
     }
-  }, [shop, host]);
+  }, [shop]);
 
   // ===== POINT 5: URL rewriting - sync app URL with Shopify params =====
   useEffect(() => {
