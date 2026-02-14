@@ -1,12 +1,27 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Shopify App Bridge v3 CDN - MUST be first script, no async/defer -->
-    <!-- Required by Shopify embedded app checks: always loaded statically -->
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-    
-    <!-- Shopify API Key meta tag - required for automatic App Bridge detection -->
-    <meta name="shopify-api-key" content="933109488c1e95e5fd630abb7e03809e" />
+    <!-- Shopify App Bridge v3 CDN - loaded statically for embedded app checks -->
+    <!-- The meta tag is injected dynamically ONLY when shop+host params are present -->
+    <script>
+      // Only load App Bridge when in Shopify context (has shop+host params)
+      // This prevents "missing required configuration fields: shop" on non-Shopify pages
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var shop = params.get('shop') || params.get('store');
+        var host = params.get('host');
+        if (shop || host || window.self !== window.top) {
+          // In Shopify context — load App Bridge and set API key meta tag
+          var script = document.createElement('script');
+          script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
+          document.head.appendChild(script);
+          var meta = document.createElement('meta');
+          meta.name = 'shopify-api-key';
+          meta.content = '933109488c1e95e5fd630abb7e03809e';
+          document.head.appendChild(meta);
+        }
+      })();
+    </script>
     
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
