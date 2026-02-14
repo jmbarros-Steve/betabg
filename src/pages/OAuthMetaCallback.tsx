@@ -60,10 +60,18 @@ export default function OAuthMetaCallback() {
         sessionStorage.removeItem('meta_oauth_client_id');
         toast.success('¡Meta conectado exitosamente!');
 
-        // Redirect after short delay
+        // Check if we came from Shopify embedded — redirect back into the admin
+        const shopName = localStorage.getItem('meta_oauth_shop_domain');
+        localStorage.removeItem('meta_oauth_shop_domain');
+
         setTimeout(() => {
-          navigate('/portal');
-        }, 2000);
+          if (shopName) {
+            // Redirect back into the Shopify admin app (underscore handle)
+            window.location.href = `https://admin.shopify.com/store/${shopName}/apps/loveable_public?meta_connected=true`;
+          } else {
+            navigate('/portal');
+          }
+        }, 1500);
       } catch (err) {
         console.error('OAuth callback error:', err);
         setStatus('error');
