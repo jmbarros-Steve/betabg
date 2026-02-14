@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ShopifyInstallScreen } from '@/components/shopify/ShopifyInstallScreen';
 import { useAppBridge } from '@/providers/ShopifyAppBridgeProvider';
 import { useShopifyAutoLogin } from '@/hooks/useShopifyAutoLogin';
+import { supabase } from '@/integrations/supabase/client';
 
 const benefits = [
   { icon: Clock, title: 'Disponible 24/7', description: 'Tu equipo de marketing nunca descansa' },
@@ -113,6 +114,32 @@ export default function ShopifyEmbedded() {
     }
   }, [shopify, isInitialized, isEmbedded, getSessionToken, host, shop]);
 
+  // Handle OAuth callback params (success, store, email, temp_pass)
+  // The shopify-oauth-callback now redirects here with host preserved
+  useEffect(() => {
+    const success = searchParams.get('success');
+    const email = searchParams.get('email');
+    const tempPass = searchParams.get('temp_pass');
+    const isNewUser = searchParams.get('new_user') === 'true';
+
+    if (success === 'true' && isNewUser && tempPass && email) {
+      console.log('[Shopify] OAuth callback: auto-login new user', email);
+      supabase.auth.signInWithPassword({ email, password: tempPass })
+        .then(({ error }) => {
+          if (error) {
+            console.error('[Shopify] Auto-login failed:', error);
+          } else {
+            console.log('[Shopify] ✓ Auto-login successful, navigating to portal');
+            navigate('/portal?tab=metrics', { replace: true });
+          }
+        });
+    } else if (success === 'true' && !isNewUser) {
+      // Existing user returning from OAuth — redirect to portal
+      console.log('[Shopify] OAuth callback: existing user, redirecting to portal');
+      navigate('/portal?tab=connections', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
   // Detect fresh install flow
   useEffect(() => {
     if (shop && hmac && !isEmbedded) {
@@ -121,11 +148,10 @@ export default function ShopifyEmbedded() {
     }
   }, [shop, hmac, isEmbedded]);
 
-  // Auto-redirect to portal when authenticated
+  // Auto-redirect to portal when authenticated via session token
   useEffect(() => {
     if (isEmbedded && shopifyAuthenticated && user && !autoLoginLoading) {
       console.log('[Shopify] User authenticated, redirecting to portal...');
-      // Use internal navigation to stay in the app
       navigate('/portal', { replace: true });
     }
   }, [isEmbedded, shopifyAuthenticated, user, autoLoginLoading, navigate]);

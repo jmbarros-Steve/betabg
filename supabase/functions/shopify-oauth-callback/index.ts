@@ -83,8 +83,20 @@ Deno.serve(async (req) => {
       code = url.searchParams.get('code') || '';
       shop = url.searchParams.get('shop') || '';
       hmac = url.searchParams.get('hmac');
+      const stateParam = url.searchParams.get('state') || '';
 
-      console.log('Direct Shopify callback:', { shop, hasCode: !!code, hasHmac: !!hmac });
+      // Extract persisted host from state parameter
+      // shopify-install encodes { nonce, host } as base64 in state
+      let persistedHost = '';
+      try {
+        const stateJson = JSON.parse(atob(stateParam));
+        persistedHost = stateJson.host || '';
+        console.log('State decoded: nonce =', stateJson.nonce, '| host =', persistedHost ? 'present' : 'absent');
+      } catch {
+        console.warn('Could not decode state param, host will not be restored');
+      }
+
+      console.log('Direct Shopify callback:', { shop, hasCode: !!code, hasHmac: !!hmac, hasHost: !!persistedHost });
 
       // Verify HMAC
       if (hmac) {
@@ -97,6 +109,9 @@ Deno.serve(async (req) => {
           });
         }
       }
+      
+      // Store host for use in final redirect
+      (globalThis as any).__persistedHost = persistedHost;
     } else {
       // POST from frontend
       const body = await req.json();
@@ -393,9 +408,18 @@ Deno.serve(async (req) => {
       console.log('Created new connection with shop_domain');
     }
 
-    // For direct redirects, redirect to frontend with params
+    // For direct redirects, redirect to frontend with params INCLUDING host
     if (isDirectRedirect) {
-      const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
+      const persistedHost = (globalThis as any).__persistedHost || '';
+      
+      // CRITICAL: Redirect to the embedded app URL (/shopify) with host param restored
+      // This is Shopify's recommended approach: persist host through OAuth flow
+      // so App Bridge can initialize without errors after auth completes
+      const redirectUrl = new URL(`${frontendUrl}/shopify`);
+      redirectUrl.searchParams.set('shop', normalizedShopDomain);
+      if (persistedHost) {
+        redirectUrl.searchParams.set('host', persistedHost);
+      }
       redirectUrl.searchParams.set('success', 'true');
       redirectUrl.searchParams.set('store', storeName);
       redirectUrl.searchParams.set('email', shopEmail);
@@ -403,6 +427,8 @@ Deno.serve(async (req) => {
         redirectUrl.searchParams.set('new_user', 'true');
         redirectUrl.searchParams.set('temp_pass', tempPassword);
       }
+      
+      console.log('Redirecting to embedded app with host:', persistedHost ? 'RESTORED' : 'ABSENT');
       
       return new Response(null, {
         status: 302,
