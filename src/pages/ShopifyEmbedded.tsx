@@ -111,8 +111,15 @@ export default function ShopifyEmbedded() {
           console.log('[Shopify] Token preview:', token.substring(0, 50) + '...');
         }
       });
+
+      // Show toast if returning from a successful Meta OAuth connection
+      const metaConnected = searchParams.get('meta_connected');
+      if (metaConnected === 'true') {
+        shopify.toast.show('¡Meta conectado con éxito!');
+        console.log('[Shopify] ✓ Meta connection toast shown via App Bridge');
+      }
     }
-  }, [shopify, isInitialized, isEmbedded, getSessionToken, host, shop]);
+  }, [shopify, isInitialized, isEmbedded, getSessionToken, host, shop, searchParams]);
 
   // Handle OAuth callback params (success, store, email, temp_pass)
   // The shopify-oauth-callback now redirects here with host preserved
