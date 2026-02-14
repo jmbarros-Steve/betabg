@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ShopifyWelcomeScreen } from '@/components/shopify/ShopifyWelcomeScreen';
 import { ShopifyOnboardingTour } from '@/components/client-portal/ShopifyOnboardingTour';
 
-const APP_HANDLE = 'loveable-public';
+const APP_HANDLE = 'loveable_public';
 
 /**
  * Derives the store slug from a store parameter.

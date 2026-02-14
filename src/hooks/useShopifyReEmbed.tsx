@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 /**
  * Shopify App Handle — must match the slug in the Shopify Partners Dashboard.
  */
-const APP_HANDLE = 'loveable-public';
+const APP_HANDLE = 'loveable_public';
 
 /**
  * Detects if the app is running as a top-level page (outside Shopify admin iframe)

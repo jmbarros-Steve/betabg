@@ -438,7 +438,7 @@ Deno.serve(async (req) => {
       // This ensures Shopify provides a fresh 'host' parameter for App Bridge
       // Format: https://admin.shopify.com/store/{store-slug}/apps/{app-handle}
       const storeSlug = normalizedShopDomain.replace('.myshopify.com', '');
-      const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/loveable-public`;
+      const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/loveable_public`;
       
       console.log('Existing user: redirecting back to Shopify Admin:', adminUrl);
       

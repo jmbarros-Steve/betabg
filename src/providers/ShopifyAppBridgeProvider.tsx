@@ -364,7 +364,7 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
     if (!inIframe) {
       const storeSlug = shop.replace('.myshopify.com', '');
-      const APP_SLUG = 'loveable-public';
+      const APP_SLUG = 'loveable_public';
       const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_SLUG}`;
       
       console.log('[App Bridge] ⚠ BREAKOUT detected: app outside Shopify admin iframe');
@@ -480,8 +480,8 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
   // RESCUE MODE: shop present but host missing — redirect to Shopify Admin to get fresh host
   if (needsRescue) {
-    // App identifier in Shopify URL format (hyphenated)
-    const APP_SLUG = 'loveable-public';
+    // App identifier in Shopify URL format (underscored)
+     const APP_SLUG = 'loveable_public';
     
     // Extract store slug from shop domain
     const storeSlug = shop?.split('.')[0] || '';
