@@ -289,17 +289,16 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Generate a new session for the user
-        const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
+        // Generate a magic link, then verify it SERVER-SIDE to get a real session.
+        // This avoids the 403 "token expired" error that happens when the frontend
+        // tries to verify the token in an iframe (3rd-party cookie issues).
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
           email: userData.user.email!,
-          options: {
-            redirectTo: `${supabaseUrl}/auth/v1/callback`,
-          }
         });
 
-        if (sessionError) {
-          console.error('[Session Validate] Failed to generate session:', sessionError);
+        if (linkError) {
+          console.error('[Session Validate] Failed to generate magic link:', linkError);
           return new Response(
             JSON.stringify({
               valid: true,
@@ -322,12 +321,64 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Extract token from the magic link
-        const magicLinkUrl = new URL(sessionData.properties.action_link);
-        const token = magicLinkUrl.searchParams.get('token');
-        const tokenType = magicLinkUrl.searchParams.get('type');
+        // Extract the OTP token from the generated link
+        const magicLinkUrl = new URL(linkData.properties.action_link);
+        const otpToken = magicLinkUrl.searchParams.get('token');
 
-        console.log('[Session Validate] ✓ Generated auth token for user:', userData.user.email);
+        if (!otpToken) {
+          console.error('[Session Validate] No token in magic link URL');
+          return new Response(
+            JSON.stringify({
+              valid: true, shopDomain, installed: true, authenticated: false,
+              error: 'Failed to extract auth token',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Verify the OTP token SERVER-SIDE using the Supabase Auth API directly
+        // This creates a real session without the frontend needing to call verifyOtp
+        console.log('[Session Validate] Verifying OTP server-side for:', userData.user.email);
+        
+        const verifyResponse = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || '',
+          },
+          body: JSON.stringify({
+            type: 'magiclink',
+            token: otpToken,
+          }),
+        });
+
+        if (!verifyResponse.ok) {
+          const verifyErr = await verifyResponse.text();
+          console.error('[Session Validate] Server-side OTP verify failed:', verifyResponse.status, verifyErr);
+          return new Response(
+            JSON.stringify({
+              valid: true, shopDomain, installed: true, authenticated: false,
+              error: `Auth verification failed: ${verifyResponse.status}`,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const sessionResult = await verifyResponse.json();
+        
+        if (!sessionResult.access_token || !sessionResult.refresh_token) {
+          console.error('[Session Validate] Verify response missing tokens:', Object.keys(sessionResult));
+          return new Response(
+            JSON.stringify({
+              valid: true, shopDomain, installed: true, authenticated: false,
+              error: 'Session creation returned incomplete data',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log('[Session Validate] ✓ Server-side session created for:', userData.user.email);
+        console.log('[Session Validate] Session expires_in:', sessionResult.expires_in);
 
         return new Response(
           JSON.stringify({
@@ -335,8 +386,10 @@ Deno.serve(async (req) => {
             shopDomain,
             installed: true,
             authenticated: true,
-            authToken: token,
-            authTokenType: tokenType,
+            // Return the full session tokens for setSession() on frontend
+            accessToken: sessionResult.access_token,
+            refreshToken: sessionResult.refresh_token,
+            expiresIn: sessionResult.expires_in,
             authEmail: userData.user.email,
             connection: {
               id: connection.id,

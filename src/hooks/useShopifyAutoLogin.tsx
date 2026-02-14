@@ -21,8 +21,10 @@ interface ValidationResponse {
   shopDomain: string;
   installed: boolean;
   authenticated?: boolean;
-  authToken?: string;
-  authTokenType?: string;
+  // New: server-side session tokens (replaces magic link approach)
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   authEmail?: string;
   error?: string;
   errorCode?: string;
@@ -196,8 +198,9 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
       console.log('[AutoLogin] Backend response details:', {
         installed: data.installed,
         authenticated: data.authenticated,
-        hasAuthToken: !!data.authToken,
-        hasAuthEmail: !!data.authEmail,
+        hasAccessToken: !!data.accessToken,
+        hasRefreshToken: !!data.refreshToken,
+        authEmail: data.authEmail,
         clientId: data.client?.id,
         connectionId: data.connection?.id,
       });
@@ -212,31 +215,30 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
         setClientId(data.client.id);
       }
 
-      // If we got an auth token, use it to sign in silently
-      if (data.authenticated && data.authToken && data.authEmail) {
-        console.log('[AutoLogin] Signing in with magic link token for:', data.authEmail);
+      // Use setSession() with server-verified tokens (no more client-side verifyOtp)
+      if (data.authenticated && data.accessToken && data.refreshToken) {
+        console.log('[AutoLogin] Setting session with server-verified tokens for:', data.authEmail);
         
-        const { data: authData, error: authError } = await supabase.auth.verifyOtp({
-          email: data.authEmail,
-          token: data.authToken,
-          type: 'magiclink',
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: data.accessToken,
+          refresh_token: data.refreshToken,
         });
 
-        if (authError) {
-          console.error('[AutoLogin] ❌ Sign in failed:', authError.message);
+        if (sessionError) {
+          console.error('[AutoLogin] ❌ setSession failed:', sessionError.message, sessionError);
           setIsAuthenticated(false);
-          setError('Error al iniciar sesión: ' + authError.message);
-        } else if (authData.session) {
-          console.log('[AutoLogin] ✓ Successfully signed in! Session user:', authData.session.user.email);
+          setError('Error al establecer sesión: ' + sessionError.message);
+        } else if (sessionData.session) {
+          console.log('[AutoLogin] ✓ Session set successfully! User:', sessionData.session.user.email);
           setIsAuthenticated(true);
           retryCount.current = 0;
         } else {
-          console.error('[AutoLogin] ❌ verifyOtp returned no session and no error');
+          console.error('[AutoLogin] ❌ setSession returned no session and no error');
           setIsAuthenticated(false);
         }
       } else {
-        console.log('[AutoLogin] ⚠ No auth token returned from backend. installed:', data.installed, 'authenticated:', data.authenticated);
-        console.log('[AutoLogin] This means the shop has no linked user account or connection not found.');
+        console.log('[AutoLogin] ⚠ No session tokens from backend. installed:', data.installed, 'authenticated:', data.authenticated);
+        console.log('[AutoLogin] This means the shop has no linked user account or session creation failed.');
         setIsAuthenticated(false);
       }
 
