@@ -4,14 +4,16 @@
     <!-- Shopify App Bridge v3 CDN - loaded statically for embedded app checks -->
     <!-- The meta tag is injected dynamically ONLY when shop+host params are present -->
     <script>
-      // Only load App Bridge when in Shopify context (has shop+host params)
-      // This prevents "missing required configuration fields: shop" on non-Shopify pages
+      // Only load App Bridge when ACTUALLY in Shopify embedded context
+      // Requires: host param (Shopify-generated) OR being inside an iframe
+      // IMPORTANT: 'shop' or 'store' alone is NOT enough — the OAuth callback
+      // has 'store' but is NOT embedded, and loading App Bridge without 'host' crashes
       (function() {
         var params = new URLSearchParams(window.location.search);
-        var shop = params.get('shop') || params.get('store');
         var host = params.get('host');
-        if (shop || host || window.self !== window.top) {
-          // In Shopify context — load App Bridge and set API key meta tag
+        var inIframe = false;
+        try { inIframe = window.self !== window.top; } catch(e) { inIframe = true; }
+        if (host || inIframe) {
           var script = document.createElement('script');
           script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
           document.head.appendChild(script);
