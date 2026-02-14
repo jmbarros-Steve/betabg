@@ -342,9 +342,18 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
   // ===== POINT 10: Breakout detection =====
   // If the app loads with shop param but is NOT in an iframe,
-  // redirect back into the Shopify admin (host is NOT required for this check)
+  // redirect back into the Shopify admin.
+  // CRITICAL: Skip on /oauth/ callback routes — those must complete auto-login first.
+  // The useShopifyReEmbed hook in AuthProvider handles re-embedding after auth completes.
   useEffect(() => {
     if (!shop) return;
+
+    // Skip breakout detection on OAuth callback routes — they need to finish processing
+    const path = window.location.pathname;
+    if (path.startsWith('/oauth/')) {
+      console.log('[App Bridge] Skipping breakout detection on OAuth callback route:', path);
+      return;
+    }
     
     let inIframe = false;
     try {

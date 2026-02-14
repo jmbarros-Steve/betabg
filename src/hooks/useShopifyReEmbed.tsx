@@ -30,14 +30,20 @@ export function useShopifyReEmbed(isAuthenticated: boolean) {
     }
     if (!isTopLevel) return; // Already embedded — nothing to do
 
-    // 2. Do we have a stored shop from a previous Shopify session?
+    // 2. Skip on OAuth callback routes — let them finish first
+    if (window.location.pathname.startsWith('/oauth/')) {
+      console.log('[ReEmbed] On OAuth callback route, skipping (callback handles its own redirect)');
+      return;
+    }
+
+    // 3. Do we have a stored shop from a previous Shopify session?
     const storedShop =
       localStorage.getItem('shopify_shop') ||
       sessionStorage.getItem('shopify_shop');
 
     if (!storedShop) return; // Not a Shopify merchant — skip
 
-    // 3. Build the admin URL and redirect
+    // 4. Build the admin URL and redirect
     const shopName = storedShop.replace('.myshopify.com', '');
     const adminUrl = `https://admin.shopify.com/store/${shopName}/apps/${APP_HANDLE}`;
 
