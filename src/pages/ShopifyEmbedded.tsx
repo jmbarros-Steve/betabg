@@ -149,8 +149,10 @@ export default function ShopifyEmbedded() {
   }, [shop, hmac, isEmbedded]);
 
   // Auto-redirect to portal when authenticated via session token
+  // CRITICAL: Use shopifyAuthenticated OR user to avoid race condition where
+  // useAuth hasn't processed the onAuthStateChange yet but setSession succeeded
   useEffect(() => {
-    if (isEmbedded && shopifyAuthenticated && user && !autoLoginLoading) {
+    if (isEmbedded && (shopifyAuthenticated || user) && !autoLoginLoading) {
       // Check for a post-login target path stored during OAuth redirect
       const targetPath = localStorage.getItem('post_login_target_path');
       if (targetPath) {
@@ -158,7 +160,7 @@ export default function ShopifyEmbedded() {
         console.log('[Shopify] Navigating to post-login target path:', targetPath);
         navigate(targetPath, { replace: true });
       } else {
-        console.log('[Shopify] User authenticated, redirecting to portal...');
+        console.log('[Shopify] User authenticated (shopifyAuth:', shopifyAuthenticated, ', user:', user?.email, '), redirecting to portal...');
         navigate('/portal', { replace: true });
       }
     }
@@ -383,7 +385,7 @@ export default function ShopifyEmbedded() {
           </div>
         )}
 
-        {shop && !isInstalled && !user && (() => {
+        {shop && !isInstalled && !user && !shopifyAuthenticated && (() => {
           console.log('[ShopifyEmbedded] 🔴 Showing "Conectar Shopify" screen because:', {
             shop,
             isInstalled,

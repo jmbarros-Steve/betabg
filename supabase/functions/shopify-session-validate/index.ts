@@ -349,6 +349,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             type: 'magiclink',
             token: otpToken,
+            email: userData.user.email!,
           }),
         });
 
