@@ -321,24 +321,23 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Extract the OTP token from the generated link
-        const magicLinkUrl = new URL(linkData.properties.action_link);
-        const otpToken = magicLinkUrl.searchParams.get('token');
+        // Use the hashed_token from generateLink (more reliable than extracting from URL)
+        const hashedToken = linkData.properties.hashed_token;
 
-        if (!otpToken) {
-          console.error('[Session Validate] No token in magic link URL');
+        if (!hashedToken) {
+          console.error('[Session Validate] No hashed_token in generateLink response');
+          console.error('[Session Validate] Available properties:', JSON.stringify(Object.keys(linkData.properties)));
           return new Response(
             JSON.stringify({
               valid: true, shopDomain, installed: true, authenticated: false,
-              error: 'Failed to extract auth token',
+              error: 'Failed to extract auth token hash',
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        // Verify the OTP token SERVER-SIDE using the Supabase Auth API directly
-        // This creates a real session without the frontend needing to call verifyOtp
-        console.log('[Session Validate] Verifying OTP server-side for:', userData.user.email);
+        // Verify the token SERVER-SIDE using token_hash (avoids otp_expired race condition)
+        console.log('[Session Validate] Verifying via token_hash server-side for:', userData.user.email);
         
         const verifyResponse = await fetch(`${supabaseUrl}/auth/v1/verify`, {
           method: 'POST',
@@ -348,8 +347,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             type: 'magiclink',
-            token: otpToken,
-            email: userData.user.email!,
+            token_hash: hashedToken,
           }),
         });
 
