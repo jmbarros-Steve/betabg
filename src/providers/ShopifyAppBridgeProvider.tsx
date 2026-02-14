@@ -131,15 +131,13 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
     '| fuente:', resolvedShop ? 'URL' : (sessionStorage.getItem('shopify_shop') ? 'sessionStorage' : 'localStorage'));
 
   // ===== IMMEDIATE CONFIG SET: Force App Bridge to recognize shop+host ASAP =====
-  // This runs on every render cycle to ensure Shopify's bot sees config populated
-  if (window.shopify && shop) {
+  // CRITICAL: Only set config when BOTH shop AND host are present
+  // Setting shop without host triggers "missing required configuration fields: shop" uncaught error
+  if (window.shopify && shop && host) {
     try {
-      const currentHost = host || window.shopify.config?.host || '';
-      if (currentHost) {
-        window.shopify.config.host = currentHost;
-      }
+      window.shopify.config.host = host;
       window.shopify.config.shop = shop;
-      console.log('[App Bridge] ⚡ Config forzado: shop =', shop, '| host =', currentHost ? 'SET' : 'pending');
+      console.log('[App Bridge] ⚡ Config forzado: shop =', shop, '| host = SET');
     } catch (e) {
       // Config may be read-only in some versions, that's OK
     }
@@ -213,28 +211,34 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
     console.log('[App Bridge] Paso 2: shop =', shop, '| host =', host ? host.substring(0, 30) + '...' : 'NULL');
 
-    // ===== SOFT MODE: If host is missing, allow app to render (limited) =====
-    // CRITICAL: Do NOT block rendering — Shopify's bot needs the app to load
-    // so the App Bridge CDN script can "report back" to Shopify servers
+    // ===== HOST MISSING: Show rescue UI instead of letting App Bridge crash =====
+    // CRITICAL: Do NOT attempt to use App Bridge without host — it throws
+    // "missing required configuration fields: shop" which Shopify's bot sees as a broken app
     if (!host || !shop) {
       console.warn('[App Bridge] ⚠ Embebido pero faltan params (shop:', shop, '| host:', host, ')');
       if (shop && !host) {
-        console.warn('[App Bridge] HOST ausente — app cargará en modo limitado (no bloquear para Shopify bot)');
-        // Don't set needsRescue — let the app render so Shopify's script can phone home
-        setIsReady(true);
-        // Still try to initialize if window.shopify has auto-detected host
-        if (window.shopify?.config?.host) {
-          console.log('[App Bridge] ✓ Host auto-detectado desde App Bridge config');
-          setShopify(window.shopify);
-          setIsInitialized(true);
+        // Check if App Bridge auto-detected host from the meta tag + iframe context
+        const autoHost = window.shopify?.config?.host;
+        if (autoHost) {
+          console.log('[App Bridge] ✓ Host auto-detectado desde App Bridge config:', autoHost);
+          // Persist it so we don't lose it again
+          sessionStorage.setItem('shopify_host', autoHost);
+          localStorage.setItem('shopify_host', autoHost);
+          // Let the effect re-run with the now-available host
+          // Don't return — fall through to the initialization logic below
+        } else {
+          console.warn('[App Bridge] HOST ausente — activando modo rescate (botón para volver a Shopify)');
+          setNeedsRescue(true);
+          setIsReady(true);
+          return;
         }
+      } else {
+        // No shop at all → standalone mode
+        setIsEmbedded(false);
+        setIsReady(true);
+        setIsInitialized(true);
         return;
       }
-      // No shop at all → standalone mode
-      setIsEmbedded(false);
-      setIsReady(true);
-      setIsInitialized(true);
-      return;
     }
 
     // ===== BOTH shop AND host confirmed — NOW initialize App Bridge =====
