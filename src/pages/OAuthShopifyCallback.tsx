@@ -91,7 +91,19 @@ export default function OAuthShopifyCallback() {
               return;
             }
 
-            // Auto-login successful - show the onboarding tour
+            // Auto-login successful — if we're top-level (outside iframe),
+            // redirect to Shopify Admin immediately instead of showing tour.
+            // The tour can be shown when the app loads inside the admin iframe.
+            let isTopLevel = true;
+            try { isTopLevel = window.self === window.top; } catch { isTopLevel = false; }
+
+            if (isTopLevel && store) {
+              console.log('[OAuthCallback] Top-level after auto-login, re-embedding into Shopify Admin');
+              redirectToShopifyAdmin(store, '/portal?tab=metrics', navigate);
+              return;
+            }
+
+            // Already embedded — show the onboarding tour
             setStatus('tour');
           } catch (e: any) {
             console.error('Auto-login error:', e);
