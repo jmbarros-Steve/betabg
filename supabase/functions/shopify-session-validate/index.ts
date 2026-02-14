@@ -216,13 +216,25 @@ Deno.serve(async (req) => {
     });
     
     // Look up the connection in our database
-    const { data: connection, error: dbError } = await supabaseAdmin
+    // IMPORTANT: Use .limit(1) instead of .single() to avoid errors when
+    // multiple connections exist for the same shop (e.g. from repeated OAuth flows)
+    const { data: connections, error: dbError } = await supabaseAdmin
       .from('platform_connections')
       .select('id, client_id, store_name, store_url, is_active, shop_domain')
       .eq('platform', 'shopify')
       .or(`shop_domain.eq.${shopDomain},store_url.ilike.%${shopDomain.replace('.myshopify.com', '')}%`)
       .eq('is_active', true)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const connection = connections?.[0] ?? null;
+    
+    console.log('[Session Validate] Connection lookup:', {
+      shopDomain,
+      found: !!connection,
+      totalResults: connections?.length ?? 0,
+      dbError: dbError?.message ?? null,
+    });
 
     if (dbError || !connection) {
       console.log('[Session Validate] No active connection found for shop:', shopDomain);

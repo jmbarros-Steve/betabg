@@ -383,7 +383,17 @@ export default function ShopifyEmbedded() {
           </div>
         )}
 
-        {shop && !isInstalled && !user && (
+        {shop && !isInstalled && !user && (() => {
+          console.log('[ShopifyEmbedded] 🔴 Showing "Conectar Shopify" screen because:', {
+            shop,
+            isInstalled,
+            user: user?.email ?? null,
+            shopifyAuthenticated,
+            autoLoginLoading,
+            autoLoginError,
+          });
+          return true;
+        })() && (
           <Card className="border-primary bg-primary/5">
             <CardContent className="p-4 text-center space-y-3">
               <h2 className="font-semibold text-foreground">¡Conecta tu tienda y empieza gratis!</h2>

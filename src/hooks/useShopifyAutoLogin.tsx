@@ -193,6 +193,14 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
       }
 
       console.log('[AutoLogin] ✓ Token validated, shop:', data.shopDomain);
+      console.log('[AutoLogin] Backend response details:', {
+        installed: data.installed,
+        authenticated: data.authenticated,
+        hasAuthToken: !!data.authToken,
+        hasAuthEmail: !!data.authEmail,
+        clientId: data.client?.id,
+        connectionId: data.connection?.id,
+      });
       setShopDomain(data.shopDomain);
       setIsInstalled(data.installed);
 
@@ -206,7 +214,7 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
 
       // If we got an auth token, use it to sign in silently
       if (data.authenticated && data.authToken && data.authEmail) {
-        console.log('[AutoLogin] Signing in with magic link token...');
+        console.log('[AutoLogin] Signing in with magic link token for:', data.authEmail);
         
         const { data: authData, error: authError } = await supabase.auth.verifyOtp({
           email: data.authEmail,
@@ -215,16 +223,20 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
         });
 
         if (authError) {
-          console.error('[AutoLogin] Sign in failed:', authError);
+          console.error('[AutoLogin] ❌ Sign in failed:', authError.message);
           setIsAuthenticated(false);
-          setError('Error al iniciar sesión');
+          setError('Error al iniciar sesión: ' + authError.message);
         } else if (authData.session) {
-          console.log('[AutoLogin] ✓ Successfully signed in!');
+          console.log('[AutoLogin] ✓ Successfully signed in! Session user:', authData.session.user.email);
           setIsAuthenticated(true);
-          retryCount.current = 0; // Reset retry count on success
+          retryCount.current = 0;
+        } else {
+          console.error('[AutoLogin] ❌ verifyOtp returned no session and no error');
+          setIsAuthenticated(false);
         }
       } else {
-        console.log('[AutoLogin] No auth token, user needs setup');
+        console.log('[AutoLogin] ⚠ No auth token returned from backend. installed:', data.installed, 'authenticated:', data.authenticated);
+        console.log('[AutoLogin] This means the shop has no linked user account or connection not found.');
         setIsAuthenticated(false);
       }
 
