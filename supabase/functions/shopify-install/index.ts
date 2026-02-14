@@ -63,6 +63,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const shop = url.searchParams.get('shop');
     const hmac = url.searchParams.get('hmac');
+    const hostParam = url.searchParams.get('host'); // Persist for App Bridge after OAuth
     
     const shopifyClientId = Deno.env.get('SHOPIFY_CLIENT_ID')!;
     const shopifyClientSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET')!;
@@ -79,6 +80,7 @@ Deno.serve(async (req) => {
     console.log('Shopify install request:', {
       shop,
       hasHmac: !!hmac,
+      hasHost: !!hostParam,
       paramKeys,
       shopifyClientIdPrefix: shopifyClientId?.slice?.(0, 6) ?? null,
       shopifyClientSecretLength: shopifyClientSecret?.trim?.()?.length ?? null,
@@ -118,8 +120,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate a random state for CSRF protection
-    const state = crypto.randomUUID();
+    // CRITICAL: Encode host into the OAuth state so we can restore it after callback
+    // Shopify docs: "your server needs to persist the host value during the initial page load"
+    const nonce = crypto.randomUUID();
+    const statePayload = JSON.stringify({ nonce, host: hostParam || '' });
+    const state = btoa(statePayload);
 
     // Build Shopify OAuth URL
     const scopes = 'read_orders,read_analytics,write_discounts,read_discounts,read_checkouts';

@@ -1,24 +1,26 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Suppress App Bridge auto-init error on non-Shopify pages -->
+    <!-- Shopify App Bridge v3 CDN - conditionally loaded -->
+    <!-- Only loads when host param is present (Shopify embedded context) or in iframe -->
+    <!-- This prevents "missing required configuration fields: shop" on non-embedded pages -->
     <script>
-      // Catch the "missing required configuration fields: shop" error
-      // that App Bridge throws when loaded without host/shop params
-      // This is harmless on non-Shopify pages (/, /portal, /auth, etc.)
-      window.addEventListener('error', function(e) {
-        if (e.message && e.message.indexOf('missing required configuration fields') !== -1) {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('[App Bridge] Suppressed auto-init error (not in Shopify context)');
-          return true;
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var host = params.get('host');
+        var inIframe = false;
+        try { inIframe = window.self !== window.top; } catch(e) { inIframe = true; }
+        if (host || inIframe) {
+          var script = document.createElement('script');
+          script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
+          document.head.appendChild(script);
+          var meta = document.createElement('meta');
+          meta.name = 'shopify-api-key';
+          meta.content = '933109488c1e95e5fd630abb7e03809e';
+          document.head.appendChild(meta);
         }
-      });
+      })();
     </script>
-    <!-- Shopify App Bridge v3 CDN - MUST be static in <head>, no async/defer -->
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-    <!-- Shopify API Key meta tag - required for automatic App Bridge detection -->
-    <meta name="shopify-api-key" content="933109488c1e95e5fd630abb7e03809e" />
     
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
