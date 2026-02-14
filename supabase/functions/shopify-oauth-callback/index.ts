@@ -409,31 +409,42 @@ Deno.serve(async (req) => {
       console.log('Created new connection with shop_domain');
     }
 
-    // For direct redirects, redirect to frontend with params INCLUDING host
+    // For direct redirects from Shopify OAuth
     if (isDirectRedirect) {
       const persistedHost = (globalThis as any).__persistedHost || '';
       
-      // CRITICAL: Redirect to the embedded app URL (/shopify) with host param restored
-      // This is Shopify's recommended approach: persist host through OAuth flow
-      // so App Bridge can initialize without errors after auth completes
-      const redirectUrl = new URL(`${frontendUrl}/shopify`);
-      redirectUrl.searchParams.set('shop', normalizedShopDomain);
-      if (persistedHost) {
-        redirectUrl.searchParams.set('host', persistedHost);
-      }
-      redirectUrl.searchParams.set('success', 'true');
-      redirectUrl.searchParams.set('store', storeName);
-      redirectUrl.searchParams.set('email', shopEmail);
       if (isNewUser && tempPassword) {
+        // New user: redirect to our callback page for auto-login
+        // We can't go through Shopify admin yet because the user needs to be created first
+        const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
+        redirectUrl.searchParams.set('success', 'true');
+        redirectUrl.searchParams.set('store', storeName);
+        redirectUrl.searchParams.set('shop', normalizedShopDomain);
+        redirectUrl.searchParams.set('email', shopEmail);
         redirectUrl.searchParams.set('new_user', 'true');
         redirectUrl.searchParams.set('temp_pass', tempPassword);
+        if (persistedHost) {
+          redirectUrl.searchParams.set('host', persistedHost);
+        }
+        
+        console.log('New user: redirecting to callback page for auto-login');
+        return new Response(null, {
+          status: 302,
+          headers: { 'Location': redirectUrl.toString() },
+        });
       }
       
-      console.log('Redirecting to embedded app with host:', persistedHost ? 'RESTORED' : 'ABSENT');
+      // Existing user: redirect back INTO Shopify Admin
+      // This ensures Shopify provides a fresh 'host' parameter for App Bridge
+      // Format: https://admin.shopify.com/store/{store-slug}/apps/{app-handle}
+      const storeSlug = normalizedShopDomain.replace('.myshopify.com', '');
+      const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/loveable-public`;
+      
+      console.log('Existing user: redirecting back to Shopify Admin:', adminUrl);
       
       return new Response(null, {
         status: 302,
-        headers: { 'Location': redirectUrl.toString() },
+        headers: { 'Location': adminUrl },
       });
     }
 
