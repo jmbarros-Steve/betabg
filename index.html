@@ -13,15 +13,15 @@
         // Also check localStorage for returning from OAuth with host persisted
         var storedHost = false;
         try { storedHost = !!localStorage.getItem('shopify_host'); } catch(e) {}
-        // Load App Bridge if ANY Shopify signal is present
-        if (host || (shop && inIframe) || (inIframe && storedHost)) {
-          // Use document.write for SYNCHRONOUS loading (required by Shopify)
-          document.write('<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"><\/script>');
-          // Add meta tag for API key
+        // Load App Bridge ONLY in iframe with valid host (from URL or storage)
+        if (inIframe && (host || storedHost)) {
+          // Add meta tag for API key BEFORE loading the CDN script
           var meta = document.createElement('meta');
           meta.name = 'shopify-api-key';
           meta.content = '933109488c1e95e5fd630abb7e03809e';
           document.head.appendChild(meta);
+          // Use document.write for SYNCHRONOUS loading (required by Shopify)
+          document.write('<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"><\/script>');
         }
       })();
     </script>
