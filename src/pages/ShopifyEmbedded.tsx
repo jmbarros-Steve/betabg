@@ -151,8 +151,16 @@ export default function ShopifyEmbedded() {
   // Auto-redirect to portal when authenticated via session token
   useEffect(() => {
     if (isEmbedded && shopifyAuthenticated && user && !autoLoginLoading) {
-      console.log('[Shopify] User authenticated, redirecting to portal...');
-      navigate('/portal', { replace: true });
+      // Check for a post-login target path stored during OAuth redirect
+      const targetPath = localStorage.getItem('post_login_target_path');
+      if (targetPath) {
+        localStorage.removeItem('post_login_target_path');
+        console.log('[Shopify] Navigating to post-login target path:', targetPath);
+        navigate(targetPath, { replace: true });
+      } else {
+        console.log('[Shopify] User authenticated, redirecting to portal...');
+        navigate('/portal', { replace: true });
+      }
     }
   }, [isEmbedded, shopifyAuthenticated, user, autoLoginLoading, navigate]);
 
