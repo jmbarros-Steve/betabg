@@ -130,6 +130,21 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
   console.log('[App Bridge] Resolved → shop =', shop, '| host =', host ? 'presente' : 'AUSENTE',
     '| fuente:', resolvedShop ? 'URL' : (sessionStorage.getItem('shopify_shop') ? 'sessionStorage' : 'localStorage'));
 
+  // ===== IMMEDIATE CONFIG SET: Force App Bridge to recognize shop+host ASAP =====
+  // This runs on every render cycle to ensure Shopify's bot sees config populated
+  if (window.shopify && shop) {
+    try {
+      const currentHost = host || window.shopify.config?.host || '';
+      if (currentHost) {
+        window.shopify.config.host = currentHost;
+      }
+      window.shopify.config.shop = shop;
+      console.log('[App Bridge] ⚡ Config forzado: shop =', shop, '| host =', currentHost ? 'SET' : 'pending');
+    } catch (e) {
+      // Config may be read-only in some versions, that's OK
+    }
+  }
+
   // Session Heartbeat: Keep session alive by refreshing token periodically
   useEffect(() => {
     if (!shopify || !isEmbedded) return;
@@ -198,13 +213,21 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
     console.log('[App Bridge] Paso 2: shop =', shop, '| host =', host ? host.substring(0, 30) + '...' : 'NULL');
 
-    // ===== IRON HAND: If host is missing, STOP EVERYTHING. Don't initialize. =====
+    // ===== SOFT MODE: If host is missing, allow app to render (limited) =====
+    // CRITICAL: Do NOT block rendering — Shopify's bot needs the app to load
+    // so the App Bridge CDN script can "report back" to Shopify servers
     if (!host || !shop) {
       console.warn('[App Bridge] ⚠ Embebido pero faltan params (shop:', shop, '| host:', host, ')');
       if (shop && !host) {
-        console.error('[App Bridge] HOST ausente. Activando modo rescate.');
-        setNeedsRescue(true);
+        console.warn('[App Bridge] HOST ausente — app cargará en modo limitado (no bloquear para Shopify bot)');
+        // Don't set needsRescue — let the app render so Shopify's script can phone home
         setIsReady(true);
+        // Still try to initialize if window.shopify has auto-detected host
+        if (window.shopify?.config?.host) {
+          console.log('[App Bridge] ✓ Host auto-detectado desde App Bridge config');
+          setShopify(window.shopify);
+          setIsInitialized(true);
+        }
         return;
       }
       // No shop at all → standalone mode
