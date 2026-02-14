@@ -1,19 +1,23 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Shopify App Bridge v3 CDN - conditionally loaded -->
-    <!-- Only loads when host param is present (Shopify embedded context) or in iframe -->
-    <!-- This prevents "missing required configuration fields: shop" on non-embedded pages -->
+    <!-- Shopify App Bridge v3 CDN - conditionally loaded SYNCHRONOUSLY -->
+    <!-- Only loads in Shopify context to prevent "missing required configuration fields" on other pages -->
     <script>
       (function() {
         var params = new URLSearchParams(window.location.search);
         var host = params.get('host');
+        var shop = params.get('shop');
         var inIframe = false;
         try { inIframe = window.self !== window.top; } catch(e) { inIframe = true; }
-        if (host || inIframe) {
-          var script = document.createElement('script');
-          script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
-          document.head.appendChild(script);
+        // Also check localStorage for returning from OAuth with host persisted
+        var storedHost = false;
+        try { storedHost = !!localStorage.getItem('shopify_host'); } catch(e) {}
+        // Load App Bridge if ANY Shopify signal is present
+        if (host || (shop && inIframe) || (inIframe && storedHost)) {
+          // Use document.write for SYNCHRONOUS loading (required by Shopify)
+          document.write('<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"><\/script>');
+          // Add meta tag for API key
           var meta = document.createElement('meta');
           meta.name = 'shopify-api-key';
           meta.content = '933109488c1e95e5fd630abb7e03809e';
