@@ -48,7 +48,8 @@ export function useShopifyReEmbed(isAuthenticated: boolean) {
     const adminUrl = `https://admin.shopify.com/store/${shopName}/apps/${APP_HANDLE}`;
 
     console.log('[ReEmbed] Top-level + authenticated + storedShop detected');
-    console.log('[ReEmbed] Redirecting to Shopify Admin:', adminUrl);
+    console.log('[ReEmbed] ✅ Final admin URL (canonical, no internal routes):', adminUrl);
+    console.log('[ReEmbed] 🔴 REDIRECTING NOW');
 
     hasRedirected.current = true;
     window.location.href = adminUrl;

@@ -368,7 +368,8 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
       const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_SLUG}`;
       
       console.log('[App Bridge] ⚠ BREAKOUT detected: app outside Shopify admin iframe');
-      console.log('[App Bridge] Redirecting to admin:', adminUrl);
+      console.log('[App Bridge] ✅ Final admin URL (canonical, no internal routes):', adminUrl);
+      console.log('[App Bridge] 🔴 REDIRECTING TO ADMIN NOW');
       window.location.href = adminUrl;
     }
   }, [shop]);
@@ -497,7 +498,8 @@ export function ShopifyAppBridgeProvider({ children }: { children: ReactNode }) 
 
     const handleReanchor = () => {
       console.log('🔄🔄🔄 Sincronizando Host con Shopify... 🔄🔄🔄');
-      console.log('[App Bridge] Redirigiendo a Shopify Admin para obtener host fresco:', reanchorUrl);
+     console.log('[App Bridge] ⚠ RESCUE MODE: host missing, need to get fresh host from admin');
+     console.log('[App Bridge] ✅ Final rescue admin URL (canonical):', reanchorUrl);
       // Use top-level navigation to ensure Shopify sends back host param
       try {
         if (window.top && window.top !== window.self) {
