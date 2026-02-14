@@ -47,10 +47,17 @@ function redirectToShopifyAdmin(
     const storeSlug = deriveStoreSlugFromStore(shop);
     console.log('[redirectToShopifyAdmin] Derived store slug =', storeSlug);
 
-    const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_HANDLE}${targetPath ?? ''}`;
+    // ✅ Canonical admin URL only — never append internal routes
+    const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_HANDLE}`;
     console.log('[redirectToShopifyAdmin] Final admin URL =', adminUrl);
-    console.log('[redirectToShopifyAdmin] 🔴 REDIRECTING TO SHOPIFY ADMIN NOW');
 
+    // Persist internal target path for the embedded app to pick up
+    if (targetPath) {
+      localStorage.setItem('post_login_target_path', targetPath);
+      console.log('[redirectToShopifyAdmin] Stored post_login_target_path =', targetPath);
+    }
+
+    console.log('[redirectToShopifyAdmin] 🔴 REDIRECTING TO SHOPIFY ADMIN NOW');
     window.location.href = adminUrl;
   } else {
     console.log('[redirectToShopifyAdmin] ⚠ No shop found, falling back to navigate:', fallbackPath);
