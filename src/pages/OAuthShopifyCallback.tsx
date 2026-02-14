@@ -12,20 +12,48 @@ import { ShopifyOnboardingTour } from '@/components/client-portal/ShopifyOnboard
 const APP_HANDLE = 'loveable-public';
 
 /**
+ * Derives the store slug from a store parameter.
+ * Handles both:
+ *   - Full domain: "pruebabgconsult.myshopify.com" → "pruebabgconsult"
+ *   - Slug only: "pruebabgconsult" → "pruebabgconsult"
+ */
+function deriveStoreSlugFromStore(store: string): string {
+  if (store.endsWith('.myshopify.com')) {
+    return store.replace('.myshopify.com', '');
+  }
+  return store;
+}
+
+/**
  * Redirects the browser into the Shopify Admin embedded app URL.
+ * Supports appending a target path like '/portal?tab=metrics'.
  * Falls back to a standalone portal URL if shop is unknown.
  */
-function redirectToShopifyAdmin(shopOrStore: string | null, fallbackPath: string, navigate: ReturnType<typeof useNavigate>) {
+function redirectToShopifyAdmin(
+  shopOrStore: string | null,
+  fallbackPath: string,
+  navigate: ReturnType<typeof useNavigate>,
+  targetPath?: string
+) {
   const shop = shopOrStore
     || localStorage.getItem('shopify_shop')
     || sessionStorage.getItem('shopify_shop');
 
+  console.log('[redirectToShopifyAdmin] Input shop/store =', shopOrStore);
+  console.log('[redirectToShopifyAdmin] Fallback path =', fallbackPath);
+  console.log('[redirectToShopifyAdmin] Target path =', targetPath ?? 'none');
+
   if (shop) {
-    const shopName = shop.replace('.myshopify.com', '');
-    const adminUrl = `https://admin.shopify.com/store/${shopName}/apps/${APP_HANDLE}`;
-    console.log('[OAuthCallback] Redirecting to Shopify Admin:', adminUrl);
+    const storeSlug = deriveStoreSlugFromStore(shop);
+    console.log('[redirectToShopifyAdmin] Derived store slug =', storeSlug);
+
+    const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_HANDLE}${targetPath ?? ''}`;
+    console.log('[redirectToShopifyAdmin] Final admin URL =', adminUrl);
+    console.log('[redirectToShopifyAdmin] 🔴 REDIRECTING TO SHOPIFY ADMIN NOW');
+
     window.location.href = adminUrl;
   } else {
+    console.log('[redirectToShopifyAdmin] ⚠ No shop found, falling back to navigate:', fallbackPath);
     navigate(fallbackPath);
   }
 }
@@ -97,12 +125,19 @@ export default function OAuthShopifyCallback() {
             let isTopLevel = true;
             try { isTopLevel = window.self === window.top; } catch { isTopLevel = false; }
 
+            console.log('[OAuthCallback] Auto-login succeeded for user:', email);
+            console.log('[OAuthCallback] isTopLevel (window.self === window.top) =', isTopLevel);
+            console.log('[OAuthCallback] store parameter =', store);
+
             if (isTopLevel && store) {
+              console.log('[OAuthCallback] ✅ CONDITION MET: Top-level AND store present');
               console.log('[OAuthCallback] Top-level after auto-login, re-embedding into Shopify Admin');
-              redirectToShopifyAdmin(store, '/portal?tab=metrics', navigate);
+              console.log('[OAuthCallback] Calling redirectToShopifyAdmin with store =', store, 'targetPath="/portal?tab=metrics"');
+              redirectToShopifyAdmin(store, '/portal?tab=metrics', navigate, '/portal?tab=metrics');
               return;
             }
 
+            console.log('[OAuthCallback] ❌ NOT redirecting to admin (either not top-level or no store). Showing tour instead.');
             // Already embedded — show the onboarding tour
             setStatus('tour');
           } catch (e: any) {
@@ -125,7 +160,7 @@ export default function OAuthShopifyCallback() {
           });
           // Redirect back into Shopify Admin iframe
           setTimeout(() => {
-            redirectToShopifyAdmin(store, '/portal?tab=connections', navigate);
+            redirectToShopifyAdmin(store, '/portal?tab=connections', navigate, '/portal?tab=connections');
           }, 1500);
         } else {
           // Not logged in - redirect to auth with store info
@@ -195,10 +230,10 @@ export default function OAuthShopifyCallback() {
             });
             setStatus('new_user');
           }
-        } else {
-        setStatus('success');
+         } else {
+         setStatus('success');
           setTimeout(() => {
-            redirectToShopifyAdmin(shop, '/portal?tab=connections', navigate);
+            redirectToShopifyAdmin(shop, '/portal?tab=connections', navigate, '/portal?tab=connections');
           }, 1500);
         }
       } catch (err: any) {
@@ -247,7 +282,7 @@ export default function OAuthShopifyCallback() {
       description: `Tu tienda ${storeName} está lista.`,
     });
     // Redirect back into Shopify Admin iframe
-    redirectToShopifyAdmin(storeName, '/portal?tab=metrics', navigate);
+    redirectToShopifyAdmin(storeName, '/portal?tab=metrics', navigate, '/portal?tab=metrics');
   };
 
   // Show onboarding tour for new users after login
