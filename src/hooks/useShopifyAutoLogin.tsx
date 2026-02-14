@@ -97,10 +97,19 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
   }, [shop, isEmbedded]);
 
   const performAutoLogin = useCallback(async () => {
-    if (!isEmbedded || !isInitialized || !shop || !host) {
-      console.log('[AutoLogin] Not in embedded mode or missing params, skipping');
+    // CRITICAL: Only require shop + embedded mode for auto-login
+    // host is needed for App Bridge UI but NOT for session token authentication
+    // The session token itself contains the shop identity
+    if (!isEmbedded || !shop) {
+      console.log('[AutoLogin] Not in embedded mode or missing shop, skipping');
       setIsLoading(false);
       return;
+    }
+
+    // Wait for App Bridge to be initialized OR for getSessionToken to be available
+    if (!isInitialized && !shopify) {
+      console.log('[AutoLogin] Waiting for App Bridge initialization...');
+      return; // Will retry when isInitialized changes
     }
 
     setIsLoading(true);
@@ -236,21 +245,22 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
       
       setIsLoading(false);
     }
-  }, [isEmbedded, isInitialized, shop, host, getSessionToken, createAuthHeaders]);
+  }, [isEmbedded, isInitialized, shop, getSessionToken, createAuthHeaders, shopify]);
 
   // Attempt auto-login when App Bridge is ready
+  // CRITICAL: Don't require host — shop + session token is enough for auth
   useEffect(() => {
-    if (isEmbedded && isInitialized && shop && host) {
+    if (isEmbedded && shop && (isInitialized || shopify)) {
       performAutoLogin();
     } else if (!isEmbedded) {
       setIsLoading(false);
     }
-  }, [isEmbedded, isInitialized, shop, host, performAutoLogin]);
+  }, [isEmbedded, isInitialized, shop, shopify, performAutoLogin]);
 
   // CRITICAL FOR SHOPIFY CHECKS: Periodically validate session token
   // Shopify's bot verifies every 2 hours that the app generates session data
   useEffect(() => {
-    if (!isEmbedded || !isInitialized || !shop || !host) return;
+    if (!isEmbedded || !isInitialized || !shop) return;
 
     const validateSessionPeriodically = async () => {
       try {
@@ -273,7 +283,7 @@ export function useShopifyAutoLogin(shop: string | null, host: string | null): S
     const interval = setInterval(validateSessionPeriodically, 30 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [isEmbedded, isInitialized, shop, host, getSessionToken, createAuthHeaders]);
+  }, [isEmbedded, isInitialized, shop, getSessionToken, createAuthHeaders]);
 
   return {
     isLoading,
