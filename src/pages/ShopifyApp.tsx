@@ -166,16 +166,12 @@ export default function ShopifyApp() {
               <Link to="/auth">
                 <Button variant="ghost" size="sm">Iniciar Sesión</Button>
               </Link>
-              <a 
-                href="https://apps.shopify.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
+              <Link to="/connect-shopify">
                 <Button variant="hero" size="sm" className="gap-2">
                   <img src={logoShopify} alt="Shopify" className="h-4 w-4" />
-                  Instalar App
+                  Conectar Tienda
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -201,17 +197,13 @@ export default function ShopifyApp() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <a 
-                href="https://apps.shopify.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
+              <Link to="/connect-shopify">
                 <Button size="lg" variant="hero" className="gap-2 text-lg px-8">
                   <img src={logoShopify} alt="Shopify" className="h-5 w-5" />
-                  Instalar Gratis
+                  Conectar Gratis
                   <ArrowRight className="h-5 w-5" />
                 </Button>
-              </a>
+              </Link>
               <Button size="lg" variant="outline" className="gap-2 text-lg px-8">
                 <Play className="h-5 w-5" />
                 Ver Demo
@@ -409,17 +401,12 @@ export default function ShopifyApp() {
                   ))}
                 </ul>
 
-                <a 
-                  href="https://apps.shopify.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block"
-                >
+                <Link to="/connect-shopify" className="block">
                   <Button variant="hero" size="lg" className="w-full gap-2">
                     <img src={logoShopify} alt="Shopify" className="h-5 w-5" />
-                    Instalar Ahora
+                    Conectar Ahora
                   </Button>
-                </a>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -463,17 +450,13 @@ export default function ShopifyApp() {
           <p className="text-xl text-muted-foreground mb-8">
             Instala Steve gratis y empieza a generar copies que convierten.
           </p>
-          <a 
-            href="https://apps.shopify.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
+          <Link to="/connect-shopify">
             <Button size="lg" variant="hero" className="gap-2 text-lg px-8">
               <img src={logoShopify} alt="Shopify" className="h-5 w-5" />
-              Instalar en Shopify
+              Conectar con Shopify
               <ArrowRight className="h-5 w-5" />
             </Button>
-          </a>
+          </Link>
         </div>
       </section>
 
