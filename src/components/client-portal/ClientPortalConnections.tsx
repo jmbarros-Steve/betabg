@@ -113,28 +113,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     // Store client_id in sessionStorage for callback
     sessionStorage.setItem('meta_oauth_client_id', clientId);
 
-    // If we're in Shopify embedded, save the shop domain so the callback
-    // can redirect back into the Shopify admin instead of /portal
-    if (isEmbedded) {
-      const currentShop = new URLSearchParams(window.location.search).get('shop');
-      if (currentShop) {
-        localStorage.setItem('meta_oauth_shop_domain', currentShop.replace('.myshopify.com', ''));
-      }
-    }
-
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}`;
 
-    // Use top-level navigation if embedded to break out of iframe
-    if (isEmbedded) {
-      try {
-        if (window.top && window.top !== window) {
-          window.top.location.href = authUrl;
-          return;
-        }
-      } catch {
-        // cross-origin, fallback
-      }
-    }
     window.location.href = authUrl;
   };
 

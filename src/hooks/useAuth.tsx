@@ -1,7 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useShopifyReEmbed } from '@/hooks/useShopifyReEmbed';
 
 interface AuthContextType {
   user: User | null;
@@ -22,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    // Listener for CONTINUOUS auth changes (does NOT control loading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isMounted) return;
@@ -32,13 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // INITIAL load (controls loading state)
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
         
-        console.log('[Auth] getSession after redirect:', session?.user?.email ?? 'no session');
+        console.log('[Auth] getSession:', session?.user?.email ?? 'no session');
         setSession(session);
         setUser(session?.user ?? null);
       } finally {
@@ -75,9 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
   };
-
-  // Re-embed into Shopify Admin if we're top-level with an active session
-  useShopifyReEmbed(!!session);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>

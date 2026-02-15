@@ -9,62 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { ShopifyWelcomeScreen } from '@/components/shopify/ShopifyWelcomeScreen';
 import { ShopifyOnboardingTour } from '@/components/client-portal/ShopifyOnboardingTour';
 
-const APP_HANDLE = 'loveable_public';
-
-/**
- * Derives the store slug from a store parameter.
- * Handles both:
- *   - Full domain: "pruebabgconsult.myshopify.com" → "pruebabgconsult"
- *   - Slug only: "pruebabgconsult" → "pruebabgconsult"
- */
-function deriveStoreSlugFromStore(store: string): string {
-  if (store.endsWith('.myshopify.com')) {
-    return store.replace('.myshopify.com', '');
-  }
-  return store;
-}
-
-/**
- * Redirects the browser into the Shopify Admin embedded app URL.
- * Supports appending a target path like '/portal?tab=metrics'.
- * Falls back to a standalone portal URL if shop is unknown.
- */
-function redirectToShopifyAdmin(
-  shopOrStore: string | null,
-  fallbackPath: string,
-  navigate: ReturnType<typeof useNavigate>,
-  targetPath?: string
-) {
-  const shop = shopOrStore
-    || localStorage.getItem('shopify_shop')
-    || sessionStorage.getItem('shopify_shop');
-
-  console.log('[redirectToShopifyAdmin] Input shop/store =', shopOrStore);
-  console.log('[redirectToShopifyAdmin] Fallback path =', fallbackPath);
-  console.log('[redirectToShopifyAdmin] Target path =', targetPath ?? 'none');
-
-  if (shop) {
-    const storeSlug = deriveStoreSlugFromStore(shop);
-    console.log('[redirectToShopifyAdmin] Derived store slug =', storeSlug);
-
-    // ✅ Canonical admin URL only — never append internal routes
-    const adminUrl = `https://admin.shopify.com/store/${storeSlug}/apps/${APP_HANDLE}`;
-    console.log('[redirectToShopifyAdmin] Final admin URL =', adminUrl);
-
-    // Persist internal target path for the embedded app to pick up
-    if (targetPath) {
-      localStorage.setItem('post_login_target_path', targetPath);
-      console.log('[redirectToShopifyAdmin] Stored post_login_target_path =', targetPath);
-    }
-
-    console.log('[redirectToShopifyAdmin] 🔴 REDIRECTING TO SHOPIFY ADMIN NOW');
-    window.location.href = adminUrl;
-  } else {
-    console.log('[redirectToShopifyAdmin] ⚠ No shop found, falling back to navigate:', fallbackPath);
-    navigate(fallbackPath);
-  }
-}
-
 type ConnectionStatus = 'loading' | 'success' | 'new_user' | 'tour' | 'error';
 
 export default function OAuthShopifyCallback() {
@@ -79,7 +23,6 @@ export default function OAuthShopifyCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      // Check for direct redirect params from edge function
       const success = searchParams.get('success');
       const error = searchParams.get('error');
       const store = searchParams.get('store');
@@ -110,7 +53,7 @@ export default function OAuthShopifyCallback() {
         // New user - auto-login with credentials
         if (isNewUser && tempPass && email) {
           setUserEmail(email);
-          setStatus('loading'); // Keep showing loading while we auto-login
+          setStatus('loading');
           
           try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -120,32 +63,13 @@ export default function OAuthShopifyCallback() {
 
             if (signInError) {
               console.error('Auto-login failed:', signInError);
-              // Fallback: show credentials screen
               setCredentials({ email, password: tempPass });
               setStatus('new_user');
               return;
             }
 
-            // Auto-login successful — if we're top-level (outside iframe),
-            // redirect to Shopify Admin immediately instead of showing tour.
-            // The tour can be shown when the app loads inside the admin iframe.
-            let isTopLevel = true;
-            try { isTopLevel = window.self === window.top; } catch { isTopLevel = false; }
-
             console.log('[OAuthCallback] Auto-login succeeded for user:', email);
-            console.log('[OAuthCallback] isTopLevel (window.self === window.top) =', isTopLevel);
-            console.log('[OAuthCallback] store parameter =', store);
-
-            if (isTopLevel && store) {
-              console.log('[OAuthCallback] ✅ CONDITION MET: Top-level AND store present');
-              console.log('[OAuthCallback] Top-level after auto-login, re-embedding into Shopify Admin');
-              console.log('[OAuthCallback] Calling redirectToShopifyAdmin with store =', store, 'targetPath="/portal?tab=metrics"');
-              redirectToShopifyAdmin(store, '/portal?tab=metrics', navigate, '/portal?tab=metrics');
-              return;
-            }
-
-            console.log('[OAuthCallback] ❌ NOT redirecting to admin (either not top-level or no store). Showing tour instead.');
-            // Already embedded — show the onboarding tour
+            // Show onboarding tour for new users
             setStatus('tour');
           } catch (e: any) {
             console.error('Auto-login error:', e);
@@ -159,18 +83,13 @@ export default function OAuthShopifyCallback() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
-          // Already logged in, show success and redirect
           setStatus('success');
           toast({
             title: '¡Tienda reconectada!',
             description: `${store} ha sido conectada exitosamente.`,
           });
-          // Redirect back into Shopify Admin iframe
-          setTimeout(() => {
-            redirectToShopifyAdmin(store, '/portal?tab=connections', navigate, '/portal?tab=connections');
-          }, 1500);
+          setTimeout(() => navigate('/portal?tab=connections', { replace: true }), 1500);
         } else {
-          // Not logged in - redirect to auth with store info
           toast({
             title: '¡Tienda conectada!',
             description: 'Inicia sesión para acceder a tu portal.',
@@ -196,7 +115,6 @@ export default function OAuthShopifyCallback() {
         });
 
         if (invokeError) {
-          console.error('Edge function error:', invokeError);
           setErrorMessage(invokeError.message || 'Error al conectar con Shopify');
           setStatus('error');
           return;
@@ -212,7 +130,6 @@ export default function OAuthShopifyCallback() {
         
         if (data.is_new_user && data.temp_password) {
           setUserEmail(data.user_email);
-          // Auto-login for legacy flow too
           try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
               email: data.user_email,
@@ -220,31 +137,21 @@ export default function OAuthShopifyCallback() {
             });
 
             if (signInError) {
-              setCredentials({
-                email: data.user_email,
-                password: data.temp_password,
-              });
+              setCredentials({ email: data.user_email, password: data.temp_password });
               setStatus('new_user');
               return;
             }
 
-            // Show onboarding tour after successful login
             setStatus('tour');
           } catch {
-            setCredentials({
-              email: data.user_email,
-              password: data.temp_password,
-            });
+            setCredentials({ email: data.user_email, password: data.temp_password });
             setStatus('new_user');
           }
-         } else {
-         setStatus('success');
-          setTimeout(() => {
-            redirectToShopifyAdmin(shop, '/portal?tab=connections', navigate, '/portal?tab=connections');
-          }, 1500);
+        } else {
+          setStatus('success');
+          setTimeout(() => navigate('/portal?tab=connections', { replace: true }), 1500);
         }
       } catch (err: any) {
-        console.error('Callback error:', err);
         setErrorMessage(err.message || 'Error inesperado');
         setStatus('error');
       }
@@ -262,23 +169,14 @@ export default function OAuthShopifyCallback() {
         });
 
         if (error) {
-          toast({
-            title: 'Error al iniciar sesión',
-            description: error.message,
-            variant: 'destructive',
-          });
+          toast({ title: 'Error al iniciar sesión', description: error.message, variant: 'destructive' });
           return;
         }
 
-        // Show tour after successful manual login
         setUserEmail(credentials.email);
         setStatus('tour');
       } catch (e: any) {
-        toast({
-          title: 'Error',
-          description: e.message,
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: e.message, variant: 'destructive' });
       }
     }
   };
@@ -288,11 +186,9 @@ export default function OAuthShopifyCallback() {
       title: '¡Bienvenido a Steve!',
       description: `Tu tienda ${storeName} está lista.`,
     });
-    // Redirect back into Shopify Admin iframe
-    redirectToShopifyAdmin(storeName, '/portal?tab=metrics', navigate, '/portal?tab=metrics');
+    navigate('/portal?tab=metrics', { replace: true });
   };
 
-  // Show onboarding tour for new users after login
   if (status === 'tour') {
     return (
       <ShopifyOnboardingTour
@@ -303,7 +199,6 @@ export default function OAuthShopifyCallback() {
     );
   }
 
-  // New user - show welcome screen with credentials (fallback)
   if (status === 'new_user' && credentials) {
     return (
       <ShopifyWelcomeScreen
@@ -324,9 +219,7 @@ export default function OAuthShopifyCallback() {
             <>
               <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
               <h2 className="text-xl font-semibold">Configurando tu cuenta...</h2>
-              <p className="text-muted-foreground">
-                Conectando tu tienda y preparando el portal
-              </p>
+              <p className="text-muted-foreground">Conectando tu tienda y preparando el portal</p>
             </>
           )}
 
@@ -337,9 +230,7 @@ export default function OAuthShopifyCallback() {
               <p className="text-muted-foreground">
                 Tu tienda <strong>{storeName}</strong> ha sido conectada correctamente.
               </p>
-              <p className="text-sm text-muted-foreground">
-                Redirigiendo al portal...
-              </p>
+              <p className="text-sm text-muted-foreground">Redirigiendo al portal...</p>
             </>
           )}
 
@@ -348,8 +239,8 @@ export default function OAuthShopifyCallback() {
               <XCircle className="h-12 w-12 mx-auto text-destructive" />
               <h2 className="text-xl font-semibold text-destructive">Error de conexión</h2>
               <p className="text-muted-foreground">{errorMessage}</p>
-              <Button onClick={() => navigate('/steve')} className="mt-4">
-                Volver a Steve
+              <Button onClick={() => navigate('/portal?tab=connections')} className="mt-4">
+                Volver al portal
               </Button>
             </>
           )}
