@@ -60,22 +60,9 @@ export default function OAuthMetaCallback() {
         setStatus('success');
         sessionStorage.removeItem('meta_oauth_client_id');
 
-        // Check if we came from Shopify embedded — redirect back into the admin
-        const shopName = localStorage.getItem('meta_oauth_shop_domain');
-        localStorage.removeItem('meta_oauth_shop_domain');
-
-        if (shopName) {
-          // Redirect IMMEDIATELY back into Shopify admin (tokens already persisted)
-          console.log('[Meta OAuth] Redirecting back to Shopify admin for store:', shopName);
-          window.location.replace(
-            `https://admin.shopify.com/store/${shopName}/apps/loveable_public?meta_connected=true`
-          );
-          return; // Stop rendering — we're leaving the page
-        }
-
-        // Non-Shopify flow: stay and show success, then navigate
+        // Standalone: always navigate to portal
         toast.success('¡Meta conectado exitosamente!');
-        setTimeout(() => navigate('/portal'), 1500);
+        setTimeout(() => navigate('/portal?tab=connections'), 1500);
       } catch (err) {
         console.error('OAuth callback error:', err);
         setStatus('error');
@@ -120,18 +107,8 @@ export default function OAuthMetaCallback() {
               <XCircle className="w-12 h-12 mx-auto text-destructive" />
               <p className="text-lg font-medium">Error de conexión</p>
               <p className="text-sm text-muted-foreground">{errorMessage}</p>
-              <Button onClick={() => {
-                const shopName = localStorage.getItem('meta_oauth_shop_domain');
-                localStorage.removeItem('meta_oauth_shop_domain');
-                if (shopName) {
-                  window.location.replace(
-                    `https://admin.shopify.com/store/${shopName}/apps/loveable_public`
-                  );
-                } else {
-                  navigate('/portal');
-                }
-              }} className="mt-4">
-                {localStorage.getItem('meta_oauth_shop_domain') ? 'Volver a Shopify' : 'Volver al portal'}
+              <Button onClick={() => navigate('/portal?tab=connections')} className="mt-4">
+                Volver al portal
               </Button>
             </>
           )}

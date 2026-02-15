@@ -1,31 +1,6 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Shopify App Bridge v3 CDN - conditionally loaded SYNCHRONOUSLY -->
-    <!-- Only loads in Shopify context to prevent "missing required configuration fields" on other pages -->
-    <script>
-      (function() {
-        var params = new URLSearchParams(window.location.search);
-        var host = params.get('host');
-        var shop = params.get('shop');
-        var inIframe = false;
-        try { inIframe = window.self !== window.top; } catch(e) { inIframe = true; }
-        // Also check localStorage for returning from OAuth with host persisted
-        var storedHost = false;
-        try { storedHost = !!localStorage.getItem('shopify_host'); } catch(e) {}
-        // Load App Bridge ONLY in iframe with valid host (from URL or storage)
-        if (inIframe && (host || storedHost)) {
-          // Add meta tag for API key BEFORE loading the CDN script
-          var meta = document.createElement('meta');
-          meta.name = 'shopify-api-key';
-          meta.content = '933109488c1e95e5fd630abb7e03809e';
-          document.head.appendChild(meta);
-          // Use document.write for SYNCHRONOUS loading (required by Shopify)
-          document.write('<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"><\/script>');
-        }
-      })();
-    </script>
-    
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Steve - Tu Agencia de Marketing 24/7</title>
