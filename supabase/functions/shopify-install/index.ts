@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     const state = btoa(statePayload);
 
     // Build Shopify OAuth URL
-    const scopes = 'read_orders,read_analytics,write_discounts,read_discounts,read_checkouts';
+    const scopes = 'read_orders,read_analytics,write_discounts,read_discounts,read_checkouts,read_products';
     const redirectUri = `${supabaseUrl}/functions/v1/shopify-oauth-callback`;
     
     const authUrl = new URL(`https://${shopDomain}/admin/oauth/authorize`);
