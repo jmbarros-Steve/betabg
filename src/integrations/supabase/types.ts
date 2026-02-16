@@ -390,6 +390,30 @@ export type Database = {
           },
         ]
       }
+      oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          nonce: string
+          shop_domain: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          nonce: string
+          shop_domain: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          nonce?: string
+          shop_domain?: string
+        }
+        Relationships: []
+      }
       platform_connections: {
         Row: {
           access_token_encrypted: string | null

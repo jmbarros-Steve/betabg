@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
+import { createHmac, timingSafeEqual } from "https://deno.land/std@0.177.0/node/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +15,9 @@ function generatePassword(length = 16): string {
   return password;
 }
 
+/**
+ * Verify HMAC using timing-safe comparison to prevent timing attacks
+ */
 function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
   const rawQuery = url.search.startsWith('?') ? url.search.slice(1) : url.search;
   const secretKey = secret.trim();
@@ -32,7 +35,70 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
   if (!receivedHmac) return false;
   const message = pairs.sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('&');
   const computed = createHmac('sha256', secretKey).update(message).digest('hex');
-  return computed === receivedHmac;
+  
+  // Timing-safe comparison
+  const encoder = new TextEncoder();
+  const computedBuffer = encoder.encode(computed);
+  const receivedBuffer = encoder.encode(receivedHmac);
+  if (computedBuffer.length !== receivedBuffer.length) return false;
+  return timingSafeEqual(computedBuffer, receivedBuffer);
+}
+
+/**
+ * Validate the OAuth state parameter against stored nonces (CSRF protection)
+ */
+async function validateState(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  stateParam: string | null,
+  shopDomain: string
+): Promise<{ valid: boolean; error?: string }> {
+  if (!stateParam) {
+    return { valid: false, error: 'missing_state' };
+  }
+
+  try {
+    const decoded = JSON.parse(atob(stateParam));
+    const nonce = decoded.nonce;
+    if (!nonce) {
+      return { valid: false, error: 'invalid_state_format' };
+    }
+
+    // Look up the nonce in the DB
+    const { data, error } = await supabaseAdmin
+      .from('oauth_states')
+      .select('id, shop_domain, expires_at')
+      .eq('nonce', nonce)
+      .single();
+
+    if (error || !data) {
+      console.warn('State nonce not found in DB:', nonce);
+      return { valid: false, error: 'state_not_found' };
+    }
+
+    // Check expiration
+    if (new Date(data.expires_at) < new Date()) {
+      console.warn('State nonce expired:', nonce);
+      // Clean up expired nonce
+      await supabaseAdmin.from('oauth_states').delete().eq('id', data.id);
+      return { valid: false, error: 'state_expired' };
+    }
+
+    // Check shop domain matches
+    const normalizedShop = shopDomain.toLowerCase().trim();
+    if (data.shop_domain !== normalizedShop) {
+      console.warn('State shop mismatch:', { expected: data.shop_domain, got: normalizedShop });
+      return { valid: false, error: 'state_shop_mismatch' };
+    }
+
+    // Delete used nonce (one-time use)
+    await supabaseAdmin.from('oauth_states').delete().eq('id', data.id);
+
+    console.log('State validation PASSED for nonce:', nonce);
+    return { valid: true };
+  } catch (e) {
+    console.error('State validation error:', e);
+    return { valid: false, error: 'state_parse_error' };
+  }
 }
 
 Deno.serve(async (req) => {
@@ -45,7 +111,6 @@ Deno.serve(async (req) => {
   const shopifyClientId = Deno.env.get('SHOPIFY_CLIENT_ID')!;
   const shopifyClientSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET')!;
   
-  // STANDALONE APP: Always redirect back to our own frontend
   const frontendUrl = 'https://betabg.lovable.app';
 
   try {
@@ -54,27 +119,33 @@ Deno.serve(async (req) => {
     let code: string;
     let shop: string;
     let hmac: string | null = null;
+    let stateParam: string | null = null;
 
     if (isDirectRedirect) {
       const url = new URL(req.url);
       code = url.searchParams.get('code') || '';
       shop = url.searchParams.get('shop') || '';
       hmac = url.searchParams.get('hmac');
+      stateParam = url.searchParams.get('state');
 
-      console.log('Direct Shopify callback:', { shop, hasCode: !!code, hasHmac: !!hmac });
+      console.log('Direct Shopify callback:', { shop, hasCode: !!code, hasHmac: !!hmac, hasState: !!stateParam });
 
       if (hmac) {
         const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
         if (!isValid) {
-          console.warn('HMAC verification FAILED on callback; continuing (token exchange validates authenticity)');
-        } else {
-          console.log('HMAC verification PASSED on callback');
+          console.error('HMAC verification FAILED on callback');
+          return new Response(null, {
+            status: 302,
+            headers: { 'Location': `${frontendUrl}/oauth/shopify/callback?error=hmac_failed` },
+          });
         }
+        console.log('HMAC verification PASSED (timing-safe)');
       }
     } else {
       const body = await req.json();
       code = body.code;
       shop = body.shop;
+      stateParam = body.state;
       console.log('Frontend callback:', { shop, hasCode: !!code });
     }
 
@@ -97,6 +168,22 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
+
+    // SECURITY: Validate state parameter (CSRF protection)
+    const stateResult = await validateState(supabaseAdmin, stateParam, normalizedShopDomain);
+    if (!stateResult.valid) {
+      console.error('State validation failed:', stateResult.error);
+      if (isDirectRedirect) {
+        return new Response(null, {
+          status: 302,
+          headers: { 'Location': `${frontendUrl}/oauth/shopify/callback?error=${stateResult.error}` },
+        });
+      }
+      return new Response(
+        JSON.stringify({ error: `State validation failed: ${stateResult.error}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Exchange authorization code for access token
     console.log('Exchanging code for access token...');
@@ -280,7 +367,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // STANDALONE: Always redirect back to OUR frontend callback page
+    // Redirect back to frontend
     if (isDirectRedirect) {
       const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
       redirectUrl.searchParams.set('success', 'true');
@@ -300,7 +387,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // For POST requests, return JSON
     return new Response(
       JSON.stringify({
         success: true,
