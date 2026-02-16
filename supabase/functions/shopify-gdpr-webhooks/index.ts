@@ -214,8 +214,44 @@ Deno.serve(async (req) => {
       payload = {};
     }
 
-    // Handle different GDPR webhook types
+    // Handle different webhook types (GDPR + app lifecycle)
     switch (topic) {
+      case 'app/uninstalled': {
+        // Merchant uninstalled the app — deactivate connection and clear token
+        const payloadShopDomain = payload.myshopify_domain || payload.domain || shopDomain;
+        console.log(`[Webhook ${webhookId}] App uninstalled for shop: ${payloadShopDomain}`);
+        
+        const supabase = getSupabaseAdmin();
+        
+        // Deactivate the Shopify connection and clear the access token
+        const { error: updateError, count } = await supabase
+          .from('platform_connections')
+          .update({
+            is_active: false,
+            access_token_encrypted: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('shop_domain', payloadShopDomain)
+          .eq('platform', 'shopify');
+        
+        if (updateError) {
+          console.error(`[Webhook ${webhookId}] Error deactivating connection:`, updateError);
+        } else {
+          console.log(`[Webhook ${webhookId}] Deactivated ${count ?? 0} connection(s) for ${payloadShopDomain}`);
+        }
+        
+        return new Response(JSON.stringify({
+          success: true,
+          webhook_id: webhookId,
+          topic: 'app/uninstalled',
+          message: `Connection deactivated for ${payloadShopDomain}`,
+          processed_at: new Date().toISOString(),
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       case 'customers/data_request': {
         // Customer requests their data under GDPR Article 15
         // We only store aggregated store metrics, no personal customer data

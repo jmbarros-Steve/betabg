@@ -1,4 +1,5 @@
 import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,9 +121,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    // CRITICAL: Encode host into the OAuth state so we can restore it after callback
-    // Shopify docs: "your server needs to persist the host value during the initial page load"
+    // CRITICAL: Generate nonce and persist it in DB for CSRF validation on callback
     const nonce = crypto.randomUUID();
+    
+    // Store nonce in oauth_states table for validation in callback
+    const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    
+    const normalizedShop = shopDomain.toLowerCase().trim();
+    await supabaseAdmin.from('oauth_states').insert({
+      nonce,
+      shop_domain: normalizedShop,
+    });
+    
+    // Clean up expired states (fire and forget)
+    supabaseAdmin.from('oauth_states')
+      .delete()
+      .lt('expires_at', new Date().toISOString())
+      .then(() => {});
+    
     const statePayload = JSON.stringify({ nonce, host: hostParam || '' });
     const state = btoa(statePayload);
 
