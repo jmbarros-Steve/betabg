@@ -367,6 +367,41 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Register app/uninstalled webhook via REST API (fire and forget, non-blocking)
+    const webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-webhooks`;
+    try {
+      const webhookRes = await fetch(
+        `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': accessToken,
+          },
+          body: JSON.stringify({
+            webhook: {
+              topic: 'app/uninstalled',
+              address: webhookUrl,
+              format: 'json',
+            },
+          }),
+        }
+      );
+      if (webhookRes.ok) {
+        console.log('Webhook app/uninstalled registered successfully');
+      } else {
+        const errBody = await webhookRes.text();
+        // 422 = already exists, which is fine
+        if (webhookRes.status === 422) {
+          console.log('Webhook app/uninstalled already registered');
+        } else {
+          console.warn('Failed to register app/uninstalled webhook:', webhookRes.status, errBody);
+        }
+      }
+    } catch (webhookErr) {
+      console.warn('Non-fatal: Could not register app/uninstalled webhook:', webhookErr);
+    }
+
     // Redirect back to frontend
     if (isDirectRedirect) {
       const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
