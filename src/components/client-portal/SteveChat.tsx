@@ -8,12 +8,13 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Send, User, Sparkles, RefreshCw } from 'lucide-react';
+import { Send, User, Sparkles, RefreshCw, Upload, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
 import avatarChonga from '@/assets/avatar-chonga.png';
 import { StructuredFieldsForm, type QuestionField } from './StructuredFieldsForm';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Message {
   id: string;
@@ -22,7 +23,6 @@ interface Message {
   created_at: string;
 }
 
-// Helper to detect and parse Chonga's spirit messages
 function parseMessageWithChonga(content: string) {
   const chongaPattern = /---\s*\n👻\s*\*\*\[ESPÍRITU DE LA CHONGA\]\:\*\*([^]*?)\*desaparece[^*]*\*\s*\n---/g;
   const parts: Array<{ type: 'steve' | 'chonga'; content: string }> = [];
@@ -53,6 +53,7 @@ interface SteveChatProps {
 }
 
 export function SteveChat({ clientId }: SteveChatProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -63,8 +64,13 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [examples, setExamples] = useState<string[]>([]);
   const [currentFields, setCurrentFields] = useState<QuestionField[]>([]);
   const [fieldValidation, setFieldValidation] = useState<string | undefined>();
+  const [showAssetUpload, setShowAssetUpload] = useState(false);
+  const [uploadingAssets, setUploadingAssets] = useState<string | null>(null);
+  const [uploadedAssets, setUploadedAssets] = useState<{ logo: string[]; products: string[] }>({ logo: [], products: [] });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const photosInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     initializeConversation();
@@ -72,9 +78,78 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 100);
     }
-  }, [messages, currentFields]);
+  }, [messages, currentFields, showAssetUpload]);
+
+  // Show asset upload when we're on Q15
+  useEffect(() => {
+    if (progress.answered >= 14 && !isComplete) {
+      setShowAssetUpload(true);
+      loadExistingAssets();
+    }
+  }, [progress.answered]);
+
+  async function loadExistingAssets() {
+    if (!user) return;
+    const loaded: typeof uploadedAssets = { logo: [], products: [] };
+    for (const cat of ['logo', 'products'] as const) {
+      const { data } = await supabase.storage
+        .from('client-assets')
+        .list(`${user.id}/${cat}`, { limit: 20 });
+      if (data) {
+        loaded[cat] = data.map(f => {
+          const { data: urlData } = supabase.storage.from('client-assets').getPublicUrl(`${user.id}/${cat}/${f.name}`);
+          return urlData.publicUrl;
+        });
+      }
+    }
+    setUploadedAssets(loaded);
+  }
+
+  async function handleAssetUpload(category: 'logo' | 'products', files: FileList | null) {
+    if (!files || !user) return;
+    setUploadingAssets(category);
+    try {
+      const newUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        const ext = file.name.split('.').pop();
+        const path = `${user.id}/${category}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error } = await supabase.storage.from('client-assets').upload(path, file);
+        if (error) throw error;
+        const { data: urlData } = supabase.storage.from('client-assets').getPublicUrl(path);
+        newUrls.push(urlData.publicUrl);
+      }
+      setUploadedAssets(prev => ({ ...prev, [category]: [...prev[category], ...newUrls] }));
+      if (category === 'logo' && newUrls.length > 0) {
+        await supabase.from('clients').update({ logo_url: newUrls[newUrls.length - 1] }).eq('id', clientId);
+      }
+      toast.success(`${files.length} archivo(s) subido(s)`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Error al subir archivo');
+    } finally {
+      setUploadingAssets(null);
+    }
+  }
+
+  async function handleDeleteAsset(category: 'logo' | 'products', url: string) {
+    if (!user) return;
+    try {
+      const pathMatch = url.match(/client-assets\/(.+)$/);
+      if (pathMatch) {
+        await supabase.storage.from('client-assets').remove([pathMatch[1]]);
+      }
+      setUploadedAssets(prev => ({ ...prev, [category]: prev[category].filter(u => u !== url) }));
+      toast.success('Archivo eliminado');
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  }
 
   async function initializeConversation() {
     setIsInitializing(true);
@@ -102,7 +177,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
         if (existingMessages && existingMessages.length > 0) {
           setMessages(existingMessages as Message[]);
-          
           const userMsgCount = existingMessages.filter(m => m.role === 'user').length;
           setProgress({ answered: userMsgCount, total: 15 });
           
@@ -132,9 +206,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       const { data, error } = await supabase.functions.invoke('steve-chat', {
         body: { client_id: clientId },
       });
-
       if (error) throw error;
-
       if (data?.conversation_id && data?.message) {
         setConversationId(data.conversation_id);
         setMessages([{
@@ -158,7 +230,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   async function sendMessage(messageText: string) {
     if (!messageText.trim() || isLoading || !conversationId) return;
-
     const userMessage = messageText.trim();
     setInput('');
     setExamples([]);
@@ -182,9 +253,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
           message: userMessage,
         },
       });
-
       if (error) throw error;
-
       if (data?.message) {
         const assistantMsg: Message = {
           id: crypto.randomUUID(),
@@ -193,19 +262,17 @@ export function SteveChat({ clientId }: SteveChatProps) {
           created_at: new Date().toISOString(),
         };
         setMessages(prev => [...prev, assistantMsg]);
-        
         if (data.answered_count !== undefined) {
           setProgress({ answered: data.answered_count, total: data.total_questions || 15 });
         }
-        
         if (data.examples?.length) setExamples(data.examples);
         if (data.fields?.length) {
           setCurrentFields(data.fields);
           setFieldValidation(data.field_validation);
         }
-        
         if (data.is_complete) {
           setIsComplete(true);
+          setShowAssetUpload(false);
           toast.success('¡Brief de Marca completado! 🎉');
         }
       }
@@ -241,7 +308,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   async function handleRestart() {
     if (!confirm('¿Estás seguro de que quieres reiniciar la conversación?')) return;
-
     setMessages([]);
     setConversationId(null);
     setIsComplete(false);
@@ -249,6 +315,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setExamples([]);
     setCurrentFields([]);
     setFieldValidation(undefined);
+    setShowAssetUpload(false);
     
     if (conversationId) {
       await supabase.from('steve_conversations').delete().eq('id', conversationId);
@@ -262,7 +329,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   if (isInitializing) {
     return (
-      <Card className="h-[700px]">
+      <Card className="h-[750px]">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -276,7 +343,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   return (
-    <Card className="h-[700px] flex flex-col">
+    <Card className="h-[750px] flex flex-col">
       {/* Header */}
       <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
@@ -321,13 +388,13 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {messages.map((message) => (
             <div key={message.id}>
               {message.role === 'user' ? (
                 <div className="flex gap-3 justify-end">
-                  <div className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-br-md">
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-primary text-primary-foreground rounded-br-md shadow-sm">
+                    <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                   </div>
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarFallback className="bg-secondary">
@@ -339,7 +406,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 parseMessageWithChonga(message.content).map((part, partIndex) => (
                   <div key={`${message.id}-${partIndex}`} className={cn(
                     "flex gap-3 justify-start",
-                    partIndex > 0 && "mt-3"
+                    partIndex > 0 && "mt-4"
                   )}>
                     <Avatar className={cn(
                       "h-8 w-8 flex-shrink-0 border",
@@ -359,18 +426,18 @@ export function SteveChat({ clientId }: SteveChatProps) {
                     </Avatar>
                     
                     <div className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm rounded-bl-md",
+                      "max-w-[80%] rounded-2xl px-4 py-3 text-sm rounded-bl-md shadow-sm",
                       part.type === 'chonga' 
                         ? "bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800" 
                         : "bg-muted"
                     )}>
                       {part.type === 'chonga' && (
-                        <div className="flex items-center gap-1 mb-1 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                        <div className="flex items-center gap-1 mb-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
                           <span>👻</span>
                           <span>Espíritu de La Chonga</span>
                         </div>
                       )}
-                      <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-1 [&>p:last-child]:mb-0">
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed">
                         <ReactMarkdown>{part.content}</ReactMarkdown>
                       </div>
                     </div>
@@ -398,6 +465,56 @@ export function SteveChat({ clientId }: SteveChatProps) {
         </div>
       </ScrollArea>
 
+      {/* Asset Upload for Q15 */}
+      {showAssetUpload && !isComplete && !isLoading && (
+        <div className="px-4 pb-2 flex-shrink-0 border-t pt-3">
+          <p className="text-xs font-medium text-muted-foreground mb-2">📸 Sube tus archivos aquí (obligatorio para el brief):</p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {/* Logo upload */}
+            <div className="bg-muted/50 rounded-lg p-3 border border-border">
+              <p className="text-xs font-medium mb-2">🎨 Logo</p>
+              {uploadedAssets.logo.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {uploadedAssets.logo.map((url, i) => (
+                    <div key={i} className="relative group">
+                      <img src={url} alt="Logo" className="h-12 w-12 object-contain rounded border border-border bg-background" />
+                      <button onClick={() => handleDeleteAsset('logo', url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <input type="file" ref={logoInputRef} accept="image/*" onChange={e => handleAssetUpload('logo', e.target.files)} className="hidden" />
+              <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'logo'} onClick={() => logoInputRef.current?.click()}>
+                {uploadingAssets === 'logo' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> {uploadedAssets.logo.length > 0 ? 'Cambiar' : 'Subir Logo'}</>}
+              </Button>
+            </div>
+
+            {/* Product photos upload */}
+            <div className="bg-muted/50 rounded-lg p-3 border border-border">
+              <p className="text-xs font-medium mb-2">📷 Fotos Productos</p>
+              {uploadedAssets.products.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {uploadedAssets.products.map((url, i) => (
+                    <div key={i} className="relative group">
+                      <img src={url} alt={`Producto ${i+1}`} className="h-12 w-12 object-cover rounded border border-border" />
+                      <button onClick={() => handleDeleteAsset('products', url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <input type="file" ref={photosInputRef} accept="image/*" multiple onChange={e => handleAssetUpload('products', e.target.files)} className="hidden" />
+              <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'products'} onClick={() => photosInputRef.current?.click()}>
+                {uploadingAssets === 'products' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> Subir Fotos ({uploadedAssets.products.length})</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Structured Fields Form */}
       {hasStructuredFields && (
         <div className="px-4 pb-2 flex-shrink-0">
@@ -411,7 +528,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
         </div>
       )}
 
-      {/* Example Suggestions (only when no structured fields) */}
+      {/* Example Suggestions */}
       {examples.length > 0 && !hasStructuredFields && !isLoading && !isComplete && (
         <div className="px-4 pb-2 flex-shrink-0">
           <p className="text-xs text-muted-foreground mb-2">💡 Ejemplos (haz clic para usar):</p>
