@@ -372,7 +372,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Register webhooks via REST API (fire and forget, non-blocking)
+    // Register webhooks via REST API — with deduplication
     const gdprWebhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-webhooks`;
     const fulfillmentWebhookUrl = `${supabaseUrl}/functions/v1/shopify-fulfillment-webhooks`;
 
@@ -383,7 +383,34 @@ Deno.serve(async (req) => {
       { topic: 'orders/cancelled', address: fulfillmentWebhookUrl },
     ];
 
+    // Fetch existing webhooks to avoid duplicates
+    let existingWebhooks: Array<{ topic: string; address: string }> = [];
+    try {
+      const listRes = await fetch(
+        `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+        { headers: { 'X-Shopify-Access-Token': accessToken } },
+      );
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        existingWebhooks = (listData.webhooks || []).map((w: any) => ({
+          topic: w.topic, address: w.address,
+        }));
+        console.log(`Found ${existingWebhooks.length} existing webhooks`);
+      }
+    } catch (e) {
+      console.warn('Could not list existing webhooks, will attempt to create all:', e);
+    }
+
     for (const wh of webhooksToRegister) {
+      // Skip if already registered with same topic + address
+      const alreadyExists = existingWebhooks.some(
+        (ew) => ew.topic === wh.topic && ew.address === wh.address
+      );
+      if (alreadyExists) {
+        console.log(`Webhook ${wh.topic} already registered — skipping`);
+        continue;
+      }
+
       try {
         const webhookRes = await fetch(
           `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
@@ -401,7 +428,7 @@ Deno.serve(async (req) => {
         } else {
           const errBody = await webhookRes.text();
           if (webhookRes.status === 422) {
-            console.log(`Webhook ${wh.topic} already registered`);
+            console.log(`Webhook ${wh.topic} already registered (422)`);
           } else {
             console.warn(`Failed to register ${wh.topic} webhook:`, webhookRes.status, errBody);
           }

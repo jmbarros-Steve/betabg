@@ -178,9 +178,11 @@ Deno.serve(async (req) => {
   console.log(`[GDPR Webhook ${webhookId}] Processing request...`);
 
   try {
-    const shopifySecret = Deno.env.get('SHOPIFY_CLIENT_SECRET');
+    // SHOPIFY_WEBHOOK_SECRET is the "Webhook signing secret" from the Partner Dashboard.
+    // Falls back to SHOPIFY_CLIENT_SECRET for backwards compatibility.
+    const shopifySecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET') || Deno.env.get('SHOPIFY_CLIENT_SECRET');
     if (!shopifySecret) {
-      console.error('[GDPR] SHOPIFY_CLIENT_SECRET not configured');
+      console.error('[GDPR] Neither SHOPIFY_WEBHOOK_SECRET nor SHOPIFY_CLIENT_SECRET configured');
       return new Response(JSON.stringify({ error: 'Server configuration error' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
