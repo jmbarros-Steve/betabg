@@ -50,6 +50,41 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_research: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          research_data: Json
+          research_type: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          research_data?: Json
+          research_type: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          research_data?: Json
+          research_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_research_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       buyer_personas: {
         Row: {
           client_id: string
@@ -259,10 +294,12 @@ export type Database = {
           email: string | null
           hourly_rate: number
           id: string
+          logo_url: string | null
           name: string
           shop_domain: string | null
           updated_at: string
           user_id: string
+          website_url: string | null
         }
         Insert: {
           client_user_id?: string | null
@@ -271,10 +308,12 @@ export type Database = {
           email?: string | null
           hourly_rate?: number
           id?: string
+          logo_url?: string | null
           name: string
           shop_domain?: string | null
           updated_at?: string
           user_id: string
+          website_url?: string | null
         }
         Update: {
           client_user_id?: string | null
@@ -283,10 +322,12 @@ export type Database = {
           email?: string | null
           hourly_rate?: number
           id?: string
+          logo_url?: string | null
           name?: string
           shop_domain?: string | null
           updated_at?: string
           user_id?: string
+          website_url?: string | null
         }
         Relationships: []
       }
