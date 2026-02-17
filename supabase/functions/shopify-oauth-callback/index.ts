@@ -36,6 +36,13 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
   const message = pairs.sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('&');
   const computed = createHmac('sha256', secretKey).update(message).digest('hex');
   
+  // DEBUG: Log for diagnosis (remove after fixing)
+  console.log('[HMAC-DEBUG] message:', message);
+  console.log('[HMAC-DEBUG] computed:', computed);
+  console.log('[HMAC-DEBUG] received:', receivedHmac);
+  console.log('[HMAC-DEBUG] secret length:', secretKey.length);
+  console.log('[HMAC-DEBUG] secret prefix:', secretKey.slice(0, 6));
+  
   // Timing-safe comparison
   const encoder = new TextEncoder();
   const computedBuffer = encoder.encode(computed);
