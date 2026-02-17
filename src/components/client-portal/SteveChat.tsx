@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Send, User, Sparkles, RefreshCw } from 'lucide-react';
+import { Send, User, Sparkles, RefreshCw, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
 import avatarChonga from '@/assets/avatar-chonga.png';
 
@@ -27,30 +29,20 @@ function parseMessageWithChonga(content: string) {
   let match;
 
   while ((match = chongaPattern.exec(content)) !== null) {
-    // Add Steve's part before Chonga
     if (match.index > lastIndex) {
       const stevePart = content.slice(lastIndex, match.index).trim();
-      if (stevePart) {
-        parts.push({ type: 'steve', content: stevePart });
-      }
+      if (stevePart) parts.push({ type: 'steve', content: stevePart });
     }
-    // Add Chonga's part
     parts.push({ type: 'chonga', content: match[1].trim() });
     lastIndex = match.index + match[0].length;
   }
 
-  // Add remaining Steve content
   if (lastIndex < content.length) {
     const remaining = content.slice(lastIndex).trim();
-    if (remaining) {
-      parts.push({ type: 'steve', content: remaining });
-    }
+    if (remaining) parts.push({ type: 'steve', content: remaining });
   }
 
-  // If no Chonga found, return the whole content as Steve
-  if (parts.length === 0) {
-    parts.push({ type: 'steve', content });
-  }
+  if (parts.length === 0) parts.push({ type: 'steve', content });
 
   return parts;
 }
@@ -66,6 +58,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
+  const [progress, setProgress] = useState({ answered: 0, total: 15 });
+  const [examples, setExamples] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -74,7 +68,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }, [clientId]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -83,7 +76,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
   async function initializeConversation() {
     setIsInitializing(true);
     try {
-      // Check if there's an existing conversation
       const { data: existingConvs, error: convError } = await supabase
         .from('steve_conversations')
         .select('id')
@@ -97,7 +89,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
         const convId = existingConvs[0].id;
         setConversationId(convId);
 
-        // Fetch existing messages
         const { data: existingMessages, error: msgError } = await supabase
           .from('steve_messages')
           .select('id, role, content, created_at')
@@ -109,7 +100,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
         if (existingMessages && existingMessages.length > 0) {
           setMessages(existingMessages as Message[]);
           
-          // Check if persona is complete
+          // Calc progress from user messages
+          const userMsgCount = existingMessages.filter(m => m.role === 'user').length;
+          setProgress({ answered: userMsgCount, total: 15 });
+          
           const { data: persona } = await supabase
             .from('buyer_personas')
             .select('is_complete')
@@ -118,11 +112,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
           
           setIsComplete(persona?.is_complete || false);
         } else {
-          // Start new conversation
           await startNewConversation();
         }
       } else {
-        // Start new conversation
         await startNewConversation();
       }
     } catch (error) {
@@ -149,6 +141,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
           content: data.message,
           created_at: new Date().toISOString(),
         }]);
+        setProgress({ answered: 0, total: data.total_questions || 15 });
+        if (data.examples) setExamples(data.examples);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -158,13 +152,12 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault();
-    
     if (!input.trim() || isLoading || !conversationId) return;
 
     const userMessage = input.trim();
     setInput('');
+    setExamples([]);
     
-    // Add user message optimistically
     const tempUserMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -194,28 +187,36 @@ export function SteveChat({ clientId }: SteveChatProps) {
         };
         setMessages(prev => [...prev, assistantMsg]);
         
+        if (data.answered_count !== undefined) {
+          setProgress({ answered: data.answered_count, total: data.total_questions || 15 });
+        }
+        
+        if (data.examples) setExamples(data.examples);
+        
         if (data.is_complete) {
           setIsComplete(true);
-          toast.success('¡Buyer persona completado! 🎉');
+          toast.success('¡Brief de Marca completado! 🎉');
         }
       }
     } catch (error: any) {
       console.error('Error sending message:', error);
-      
       if (error?.status === 429) {
-        toast.error('Demasiadas solicitudes. Por favor espera un momento.');
+        toast.error('Demasiadas solicitudes. Espera un momento.');
       } else if (error?.status === 402) {
         toast.error('Servicio de IA no disponible temporalmente.');
       } else {
         toast.error('Error al enviar mensaje');
       }
-      
-      // Remove optimistic message on error
       setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
     }
+  }
+
+  function handleExampleClick(example: string) {
+    setInput(example);
+    inputRef.current?.focus();
   }
 
   async function handleRestart() {
@@ -224,21 +225,21 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setMessages([]);
     setConversationId(null);
     setIsComplete(false);
+    setProgress({ answered: 0, total: 15 });
+    setExamples([]);
     
-    // Delete existing conversation
     if (conversationId) {
       await supabase.from('steve_conversations').delete().eq('id', conversationId);
     }
-    
-    // Delete brand brief
     await supabase.from('buyer_personas').delete().eq('client_id', clientId);
-    
     await startNewConversation();
   }
 
+  const progressPercent = Math.round((progress.answered / progress.total) * 100);
+
   if (isInitializing) {
     return (
-      <Card className="h-[600px]">
+      <Card className="h-[700px]">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -252,8 +253,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   return (
-    <Card className="h-[600px] flex flex-col">
-      <CardHeader className="border-b flex-shrink-0">
+    <Card className="h-[700px] flex flex-col">
+      {/* Header */}
+      <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -269,19 +271,33 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 <Sparkles className="h-4 w-4 text-primary" />
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                {isComplete ? 'Brief de Marca completado ✅' : 'Bulldog Francés PhD • Stanford'}
+                {isComplete ? 'Brief completado ✅' : 'Bulldog Francés PhD • Stanford'}
               </p>
             </div>
           </div>
-          {messages.length > 1 && (
-            <Button variant="ghost" size="sm" onClick={handleRestart}>
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Reiniciar
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {messages.length > 1 && (
+              <Button variant="ghost" size="sm" onClick={handleRestart}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Reiniciar
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Progress Bar */}
+        {!isComplete && (
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Progreso del Brief</span>
+              <span className="font-medium text-foreground">{progressPercent}% ({progress.answered}/{progress.total})</span>
+            </div>
+            <Progress value={progressPercent} className="h-2" />
+          </div>
+        )}
       </CardHeader>
 
+      {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.map((message) => (
@@ -298,7 +314,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
                   </Avatar>
                 </div>
               ) : (
-                // Parse assistant messages for Chonga's spirit
                 parseMessageWithChonga(message.content).map((part, partIndex) => (
                   <div key={`${message.id}-${partIndex}`} className={cn(
                     "flex gap-3 justify-start",
@@ -333,7 +348,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
                           <span>Espíritu de La Chonga</span>
                         </div>
                       )}
-                      <p className="whitespace-pre-wrap">{part.content}</p>
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-1 [&>p:last-child]:mb-0">
+                        <ReactMarkdown>{part.content}</ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -359,11 +376,30 @@ export function SteveChat({ clientId }: SteveChatProps) {
         </div>
       </ScrollArea>
 
+      {/* Example Suggestions */}
+      {examples.length > 0 && !isLoading && !isComplete && (
+        <div className="px-4 pb-2 flex-shrink-0">
+          <p className="text-xs text-muted-foreground mb-2">💡 Ejemplos (haz clic para usar):</p>
+          <div className="flex flex-wrap gap-2">
+            {examples.map((example, i) => (
+              <button
+                key={i}
+                onClick={() => handleExampleClick(example)}
+                className="text-xs bg-muted hover:bg-accent border border-border rounded-full px-3 py-1.5 text-left transition-colors max-w-full truncate"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input */}
       <div className="p-4 border-t flex-shrink-0">
         {isComplete ? (
           <div className="text-center py-2">
             <p className="text-sm text-muted-foreground mb-2">
-              🐕 ¡WOOF! Tu Brief de Marca está listo. Ahora podemos crear anuncios épicos.
+              🐕 ¡WOOF! Tu Brief de Marca está listo. Ve a la pestaña <strong>Brief</strong> para verlo y descargarlo.
             </p>
             <Button variant="outline" size="sm" onClick={handleRestart}>
               <RefreshCw className="h-4 w-4 mr-2" />
