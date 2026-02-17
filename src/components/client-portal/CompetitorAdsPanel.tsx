@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Instagram, Search, Loader2, Trophy, Clock, Eye,
   Megaphone, ShoppingCart, ArrowRight, ExternalLink,
-  Plus, X, RefreshCw, TrendingUp, AlertCircle
+  Plus, X, RefreshCw, TrendingUp, AlertCircle, Link2
 } from 'lucide-react';
 
 interface CompetitorAdsPanelProps {
@@ -55,6 +56,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'winners' | 'active'>('all');
+  const [hasMetaConnection, setHasMetaConnection] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -63,6 +65,18 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   async function fetchData() {
     setLoading(true);
     try {
+      // Check if Meta is connected
+      const { data: metaConn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'meta')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      setHasMetaConnection(!!metaConn);
+
       // Fetch tracking records
       const { data: trackingData } = await supabase
         .from('competitor_tracking')
@@ -73,12 +87,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       if (trackingData && trackingData.length > 0) {
         setTracking(trackingData as CompetitorTracking[]);
-        // Pre-fill handles
         const existing = trackingData.map(t => t.ig_handle);
         const filled = [...existing, ...Array(5 - existing.length).fill('')].slice(0, 5);
         setHandles(filled);
 
-        // Fetch ads
         const trackingIds = trackingData.map(t => t.id);
         const { data: adsData } = await supabase
           .from('competitor_ads')
@@ -113,6 +125,12 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       });
 
       if (response.error) {
+        const errData = response.data;
+        if (errData?.error === 'meta_not_connected') {
+          toast.error('Conecta Meta Ads primero en la pestaña Conexiones');
+          setHasMetaConnection(false);
+          return;
+        }
         throw new Error(response.error.message);
       }
 
@@ -153,6 +171,23 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
   return (
     <div className="space-y-6">
+      {/* Meta Connection Warning */}
+      {hasMetaConnection === false && (
+        <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
+          <Link2 className="h-4 w-4" />
+          <AlertTitle>Conecta Meta Ads primero</AlertTitle>
+          <AlertDescription className="mt-2 space-y-2">
+            <p>
+              Para rastrear los anuncios de tus competidores necesitas conectar tu cuenta de Meta Ads. 
+              Esto le permite a Steve acceder a la <strong>Meta Ad Library</strong> y buscar los anuncios activos.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Ve a la pestaña <strong>"Conexiones"</strong> → conecta <strong>Meta Ads</strong> con tu cuenta de Facebook/Instagram.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Input Section */}
       <Card>
         <CardHeader>
