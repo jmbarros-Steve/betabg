@@ -22,8 +22,12 @@
  *     HTTPS URL as the webhook address in Shopify.
  *
  * ENVIRONMENT VARIABLES (secrets):
- *   - SHOPIFY_CLIENT_SECRET  — your Shopify app's API secret key
- *                              (used as the HMAC shared secret)
+ *   - SHOPIFY_WEBHOOK_SECRET — The "Webhook signing secret" from Shopify
+ *                              Partner Dashboard → App → API credentials.
+ *                              This is used to verify HMAC signatures on
+ *                              incoming webhooks. Falls back to
+ *                              SHOPIFY_CLIENT_SECRET if not set.
+ *                              Configure in Lovable Cloud → Secrets.
  *   - SUPABASE_URL           — auto-provided by Lovable Cloud
  *   - SUPABASE_SERVICE_ROLE_KEY — auto-provided by Lovable Cloud
  *
@@ -46,7 +50,7 @@
  *
  * HMAC VERIFICATION (high-level):
  *   1. Read raw request body as text (NOT parsed JSON)
- *   2. Compute: Base64(HMAC-SHA256(rawBody, SHOPIFY_CLIENT_SECRET))
+ *   2. Compute: Base64(HMAC-SHA256(rawBody, SHOPIFY_WEBHOOK_SECRET))
  *   3. Compare computed hash to X-Shopify-Hmac-Sha256 header using timingSafeEqual
  *   4. If mismatch → 401. If match → process webhook.
  *
@@ -281,9 +285,11 @@ Deno.serve(async (req) => {
   const rawBody = await req.text();
 
   // ── HMAC verification ──
-  const shopifySecret = Deno.env.get('SHOPIFY_CLIENT_SECRET');
+  // SHOPIFY_WEBHOOK_SECRET is the "Webhook signing secret" from the Partner Dashboard.
+  // Falls back to SHOPIFY_CLIENT_SECRET for backwards compatibility.
+  const shopifySecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET') || Deno.env.get('SHOPIFY_CLIENT_SECRET');
   if (!shopifySecret) {
-    console.error('[Fulfillment] SHOPIFY_CLIENT_SECRET not configured');
+    console.error('[Fulfillment] Neither SHOPIFY_WEBHOOK_SECRET nor SHOPIFY_CLIENT_SECRET configured');
     return new Response(
       JSON.stringify({ error: 'Server misconfiguration' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
