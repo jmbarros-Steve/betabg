@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -18,11 +18,12 @@ import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
 import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
+import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
+type TabType = 'metrics' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
 interface ClientInfo {
   id: string;
   name: string;
@@ -144,6 +145,7 @@ export default function ClientPortal() {
     { id: 'connections', label: 'Conexiones', icon: Link2 },
     { id: 'brief', label: 'Brief', icon: FileText },
     { id: 'competitors', label: 'Competencia', icon: Instagram },
+    { id: 'deepdive', label: 'Deep Dive', icon: Code },
     { id: 'steve', label: 'Steve', icon: Bot },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
     { id: 'google', label: 'Google Ads', icon: Target },
@@ -231,6 +233,9 @@ export default function ClientPortal() {
           )}
           {activeTab === 'competitors' && effectiveClientId && (
             <CompetitorAdsPanel clientId={effectiveClientId} />
+          )}
+          {activeTab === 'deepdive' && effectiveClientId && (
+            <CompetitorDeepDivePanel clientId={effectiveClientId} />
           )}
           {activeTab === 'steve' && effectiveClientId && (
             <div className="max-w-2xl mx-auto">
