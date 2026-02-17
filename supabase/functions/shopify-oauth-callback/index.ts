@@ -367,39 +367,43 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Register app/uninstalled webhook via REST API (fire and forget, non-blocking)
-    const webhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-webhooks`;
-    try {
-      const webhookRes = await fetch(
-        `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': accessToken,
-          },
-          body: JSON.stringify({
-            webhook: {
-              topic: 'app/uninstalled',
-              address: webhookUrl,
-              format: 'json',
+    // Register webhooks via REST API (fire and forget, non-blocking)
+    const gdprWebhookUrl = `${supabaseUrl}/functions/v1/shopify-gdpr-webhooks`;
+    const fulfillmentWebhookUrl = `${supabaseUrl}/functions/v1/shopify-fulfillment-webhooks`;
+
+    const webhooksToRegister = [
+      { topic: 'app/uninstalled', address: gdprWebhookUrl },
+      { topic: 'orders/fulfilled', address: fulfillmentWebhookUrl },
+      { topic: 'orders/partially_fulfilled', address: fulfillmentWebhookUrl },
+      { topic: 'orders/cancelled', address: fulfillmentWebhookUrl },
+    ];
+
+    for (const wh of webhooksToRegister) {
+      try {
+        const webhookRes = await fetch(
+          `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Shopify-Access-Token': accessToken,
             },
-          }),
-        }
-      );
-      if (webhookRes.ok) {
-        console.log('Webhook app/uninstalled registered successfully');
-      } else {
-        const errBody = await webhookRes.text();
-        // 422 = already exists, which is fine
-        if (webhookRes.status === 422) {
-          console.log('Webhook app/uninstalled already registered');
+            body: JSON.stringify({ webhook: { topic: wh.topic, address: wh.address, format: 'json' } }),
+          }
+        );
+        if (webhookRes.ok) {
+          console.log(`Webhook ${wh.topic} registered successfully`);
         } else {
-          console.warn('Failed to register app/uninstalled webhook:', webhookRes.status, errBody);
+          const errBody = await webhookRes.text();
+          if (webhookRes.status === 422) {
+            console.log(`Webhook ${wh.topic} already registered`);
+          } else {
+            console.warn(`Failed to register ${wh.topic} webhook:`, webhookRes.status, errBody);
+          }
         }
+      } catch (webhookErr) {
+        console.warn(`Non-fatal: Could not register ${wh.topic} webhook:`, webhookErr);
       }
-    } catch (webhookErr) {
-      console.warn('Non-fatal: Could not register app/uninstalled webhook:', webhookErr);
     }
 
     // Redirect back to frontend
