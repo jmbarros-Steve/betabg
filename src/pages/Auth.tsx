@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { lovable } from '@/integrations/lovable/index';
 import { motion } from 'framer-motion';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, ArrowLeft, Loader2 } from 'lucide-react';
@@ -350,12 +351,9 @@ export default function Auth() {
                 onClick={async () => {
                   setOauthError(null);
                   try {
-                    const { error } = await supabase.auth.signInWithOAuth({
-                      provider: 'google',
-                      options: {
-                        redirectTo: `${window.location.origin}/auth`,
-                        queryParams: { prompt: 'select_account' },
-                      }
+                    const { error } = await lovable.auth.signInWithOAuth('google', {
+                      redirect_uri: window.location.origin,
+                      extraParams: { prompt: 'select_account' },
                     });
                     if (error) {
                       setOauthError(`OAuth Error: ${error.message}`);
