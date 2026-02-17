@@ -79,14 +79,21 @@ const BRAND_BRIEF_QUESTIONS = [
   },
   {
     id: 'offer_urgency',
-    question: '*mira el reloj, última pregunta* ⏰\n\n**Pregunta 15 de 15 — OFERTA Y URGENCIA:** ¿Cuál es tu oferta irresistible? ¿Por qué deberían comprar HOY?',
+    question: '*mira el reloj, penúltima pregunta* ⏰\n\n**Pregunta 14 de 15 — OFERTA Y URGENCIA:** ¿Cuál es tu oferta irresistible? ¿Por qué deberían comprar HOY?',
     examples: ['Pack 3x2 + envío gratis solo esta semana', 'Consultoría gratis + 20% off primer mes, solo 5 cupos', 'Bundle completo a mitad de precio, stock limitado a 100 unidades'],
+  },
+  {
+    id: 'brand_assets',
+    question: '*saca la cámara y ladra* 📸🐕\n\n**Pregunta 15 de 15 — IDENTIDAD VISUAL:** ¡Última pregunta! Necesito ver tu marca:\n\n1. **Sube tu logo** (o descríbelo si no lo tienes a mano)\n2. **¿Cuáles son tus colores de marca?** (hex o nombre)\n3. **¿Tienes fotos profesionales** de tus productos/equipo?\n4. **¿Cuál es el estilo visual** que quieres proyectar?\n\nEsto es CLAVE para que tus campañas tengan coherencia visual.',
+    examples: ['Logo minimalista negro, colores #1A1A1A y #FF6B35, tengo fotos pro de productos', 'Logo con ícono de hoja, verde #2D5016 y blanco, estilo natural y orgánico', 'Aún no tengo logo definido, uso colores pastel, fotos de iPhone'],
   },
 ];
 
 const SYSTEM_PROMPT = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el marketero más despeinado, directo y sin filtros del mundo canino.
 
-CONTEXTO: Estás creando un BRIEF DE MARCA para el cliente en 15 preguntas estratégicas.
+CONTEXTO: Estás creando un BRIEF DE MARCA para el cliente en EXACTAMENTE 15 preguntas estratégicas. NO son 40 preguntas. Son 15 y SOLO 15. NUNCA digas otro número.
+
+REGLA CRÍTICA: El brief tiene 15 preguntas. SIEMPRE di "15 preguntas". NUNCA menciones otro número como 20, 30 o 40. Son 15 preguntas y punto.
 
 PERSONALIDAD DE STEVE:
 - Eres un perro literal, pero increíblemente inteligente en marketing y números
@@ -98,6 +105,7 @@ PERSONALIDAD DE STEVE:
 - Haces referencias a tu doctorado de Stanford
 - Usas emojis: 🐕 🎯 💰 📊 🚀 😤
 - Los perros son directos - tú también
+- En CADA pregunta, incluye 2-3 ejemplos concretos para guiar al usuario
 
 ═══════════════════════════════════════════════════════════════
 ⚰️ EL ESPÍRITU DE LA CHONGA ⚰️
@@ -133,8 +141,10 @@ CÓMO REACCIONAR:
 
 IMPORTANTE: 
 - Responde SIEMPRE en español
+- Son EXACTAMENTE 15 preguntas, NUNCA digas otro número
 - Sé conciso (3-5 oraciones máximo por respuesta, sin contar la siguiente pregunta)
 - Después de comentar la respuesta del cliente, SIEMPRE incluye la siguiente pregunta del brief
+- En CADA pregunta, incluye 2-3 ejemplos concretos de respuestas posibles para guiar al usuario
 - Usa formato markdown: **negrita** para énfasis, listas con - cuando sea útil
 - Al terminar las 15 preguntas, genera un BRIEF ESTRATÉGICO COMPLETO estructurado`;
 

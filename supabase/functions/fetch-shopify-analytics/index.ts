@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     sinceDate.setDate(sinceDate.getDate() - daysBack);
 
     // Fetch orders (with line_items) and abandoned checkouts in parallel
-    const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency`;
+    const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price`;
     const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}`;
 
     console.log('[fetch-shopify-analytics] Fetching orders and checkouts from:', cleanStoreUrl);
@@ -98,20 +98,50 @@ Deno.serve(async (req) => {
       fetch(checkoutsUrl, { headers: shopifyHeaders }),
     ]);
 
-    // --- TOP SKUs ---
+    // --- TOP SKUs + Channel + UTM ---
     const skuMap = new Map<string, { sku: string; name: string; quantity: number; revenue: number }>();
+    const channelMap = new Map<string, { channel: string; orders: number; revenue: number }>();
+    const utmMap = new Map<string, { utm: string; source: string; medium: string; campaign: string; orders: number; revenue: number }>();
 
     if (ordersRes.ok) {
       const { orders } = await ordersRes.json();
       console.log(`[fetch-shopify-analytics] Fetched ${orders?.length || 0} orders`);
 
       for (const order of (orders || [])) {
+        const orderRevenue = parseFloat(order.total_price || '0');
+        
+        // SKU tracking
         for (const item of (order.line_items || [])) {
           const sku = item.sku || item.variant_title || `ID-${item.variant_id || item.product_id}`;
           const existing = skuMap.get(sku) || { sku, name: item.title || item.name || sku, quantity: 0, revenue: 0 };
           existing.quantity += item.quantity || 0;
           existing.revenue += parseFloat(item.price || '0') * (item.quantity || 0);
           skuMap.set(sku, existing);
+        }
+
+        // Channel tracking
+        const channel = order.source_name || 'direct';
+        const channelEntry = channelMap.get(channel) || { channel, orders: 0, revenue: 0 };
+        channelEntry.orders += 1;
+        channelEntry.revenue += orderRevenue;
+        channelMap.set(channel, channelEntry);
+
+        // UTM tracking from landing_site
+        const landingSite = order.landing_site || '';
+        if (landingSite.includes('utm_')) {
+          try {
+            const url = new URL(landingSite.startsWith('http') ? landingSite : `https://example.com${landingSite}`);
+            const source = url.searchParams.get('utm_source') || '';
+            const medium = url.searchParams.get('utm_medium') || '';
+            const campaign = url.searchParams.get('utm_campaign') || '';
+            if (source || campaign) {
+              const utmKey = `${source}|${medium}|${campaign}`;
+              const utmEntry = utmMap.get(utmKey) || { utm: utmKey, source, medium, campaign, orders: 0, revenue: 0 };
+              utmEntry.orders += 1;
+              utmEntry.revenue += orderRevenue;
+              utmMap.set(utmKey, utmEntry);
+            }
+          } catch { /* ignore invalid URLs */ }
         }
       }
     } else {
@@ -122,6 +152,13 @@ Deno.serve(async (req) => {
     const topSkus = Array.from(skuMap.values())
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10);
+
+    const salesByChannel = Array.from(channelMap.values())
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const utmPerformance = Array.from(utmMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 20);
 
     // --- ABANDONED CHECKOUTS ---
     let abandonedCarts: any[] = [];
@@ -139,17 +176,17 @@ Deno.serve(async (req) => {
         totalValue: parseFloat(c.total_price || '0'),
         itemCount: (c.line_items || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
         abandonedAt: c.created_at,
-        contacted: false, // Shopify doesn't expose this; default to false
+        contacted: false,
       }));
     } else {
       const errText = await checkoutsRes.text();
       console.warn('[fetch-shopify-analytics] Checkouts fetch failed:', checkoutsRes.status, errText);
     }
 
-    console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts`);
+    console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs`);
 
     return new Response(
-      JSON.stringify({ topSkus, abandonedCarts }),
+      JSON.stringify({ topSkus, abandonedCarts, salesByChannel, utmPerformance }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

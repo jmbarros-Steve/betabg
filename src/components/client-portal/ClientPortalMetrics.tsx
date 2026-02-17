@@ -577,11 +577,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             <CohortAnalysisPanel cohorts={cohortData} />
           </div>
 
-          {/* SKUs & Abandoned Carts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TopSkusPanel skus={skuData} currency="CLP" />
-            <AbandonedCartsPanel carts={abandonedCarts} currency="CLP" />
-          </div>
+          {/* Removed: SKUs & Abandoned Carts moved to Shopify tab */}
         </>
       ) : (
         <Card className="bg-muted/50">
