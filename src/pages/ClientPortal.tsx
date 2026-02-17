@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -20,10 +20,11 @@ import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnaly
 import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
+import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
 interface ClientInfo {
   id: string;
   name: string;
@@ -141,6 +142,7 @@ export default function ClientPortal() {
 
   const tabs = [
     { id: 'metrics', label: 'Métricas', icon: BarChart3 },
+    { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
     { id: 'connections', label: 'Conexiones', icon: Link2 },
     { id: 'brief', label: 'Brief', icon: FileText },
@@ -221,6 +223,9 @@ export default function ClientPortal() {
           )}
           {activeTab === 'campaigns' && effectiveClientId && (
             <CampaignAnalyticsPanel clientId={effectiveClientId} />
+          )}
+          {activeTab === 'shopify' && effectiveClientId && (
+            <ShopifyDashboard clientId={effectiveClientId} />
           )}
           {activeTab === 'connections' && effectiveClientId && (
             <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
