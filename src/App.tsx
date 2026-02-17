@@ -18,6 +18,9 @@ import ServiciosCorporativos from "./pages/ServiciosCorporativos";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DataDeletion from "./pages/DataDeletion";
+import FAQ from "./pages/FAQ";
+import Changelog from "./pages/Changelog";
+import Tutorial from "./pages/Tutorial";
 import ShopifyApp from "./pages/ShopifyApp";
 import ConnectShopify from "./pages/ConnectShopify";
 import NotFound from "./pages/NotFound";
@@ -47,6 +50,9 @@ const App = () => (
             <Route path="/terminos" element={<TermsOfService />} />
             <Route path="/privacidad" element={<PrivacyPolicy />} />
             <Route path="/eliminacion-datos" element={<DataDeletion />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/changelog" element={<Changelog />} />
+            <Route path="/tutorial" element={<Tutorial />} />
             <Route path="/shopify-app" element={<ShopifyApp />} />
             <Route path="/shopify" element={<ShopifyApp />} />
             <Route path="/connect-shopify" element={<ConnectShopify />} />
