@@ -39,17 +39,22 @@ Deno.serve(async (req) => {
 
     // Auth
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Missing authorization' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    const anonClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
+    const { data: claimsData, error: authError } = await anonClient.auth.getClaims(token);
+    if (authError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+    const userId = claimsData.claims.sub as string;
+    const user = { id: userId };
 
     const { client_id, ig_handles } = await req.json();
     if (!client_id || !ig_handles || !Array.isArray(ig_handles) || ig_handles.length === 0) {
@@ -91,22 +96,36 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    // Use Meta Ad Library API (public endpoint with app access token)
+    // Use Meta Ad Library API
     const metaAppId = Deno.env.get('META_APP_ID');
     const metaAppSecret = Deno.env.get('META_APP_SECRET');
     
     let accessToken = '';
     
     if (metaConn?.access_token_encrypted) {
-      // Use client's own token if available
       const { data: decrypted } = await supabase
         .rpc('decrypt_platform_token', { encrypted_token: metaConn.access_token_encrypted });
       if (decrypted) accessToken = decrypted;
     }
     
     if (!accessToken && metaAppId && metaAppSecret) {
-      // Fallback: use app-level access token for Ad Library API
-      accessToken = `${metaAppId}|${metaAppSecret}`;
+      // Fetch a proper app access token from Meta's OAuth endpoint
+      try {
+        const tokenRes = await fetch(
+          `https://graph.facebook.com/oauth/access_token?client_id=${metaAppId}&client_secret=${metaAppSecret}&grant_type=client_credentials`
+        );
+        const tokenData = await tokenRes.json();
+        if (tokenData.access_token) {
+          accessToken = tokenData.access_token;
+          console.log('[sync-competitor-ads] Using app access token from OAuth endpoint');
+        } else {
+          console.error('[sync-competitor-ads] Failed to get app token:', tokenData);
+        }
+      } catch (e) {
+        console.error('[sync-competitor-ads] Error fetching app token:', e);
+        // Fallback to pipe format
+        accessToken = `${metaAppId}|${metaAppSecret}`;
+      }
     }
 
     if (!accessToken) {
