@@ -9,13 +9,15 @@ const corsHeaders = {
 const BRAND_BRIEF_QUESTIONS = [
   {
     id: 'business_pitch',
-    question: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford.\n\nVamos a armar tu **Brief Estratégico en 15 preguntas** (ni una más, ni una menos). Al final vas a tener un documento que vale ORO.\n\n**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.\n\n🌐 **También necesito tu página web o tienda online.** Si no tienes, dímelo, pero NO te voy a dejar pasar sin que me cuentes más sobre tu presencia digital.',
+    question: '**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.\n\n🌐 **También necesito tu página web o tienda online.** Si no tienes, dímelo, pero NO te voy a dejar pasar sin que me cuentes más sobre tu presencia digital.',
     examples: ['Vendemos ropa deportiva premium para mujeres — www.mitienda.cl', 'Somos una agencia de diseño web para pymes, aún no tenemos web propia', 'Tenemos una tienda de cosmética natural en Shopify — mitienda.myshopify.com'],
     fields: [],
+    steveIntro: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford.\n\nVamos a armar tu **Brief Estratégico en 15 preguntas** (ni una más, ni una menos). Al final vas a tener un documento que vale ORO.\n\n',
+    commentGuide: 'Si NO dio su URL, RECHAZA la respuesta e insiste en la web. Si no tiene, pídele que describa más su producto y presencia digital. NO pases a la pregunta 2 sin URL o sin explicación válida.',
   },
   {
     id: 'numbers',
-    question: '*saca calculadora imaginaria* 🧮\n\n**Pregunta 2 de 15 — LOS NÚMEROS:**\n\nNecesito la carne de tu negocio. **Llena los campos abajo** y yo calculo tu **Margen Bruto** y tu **CPA Máximo Viable** (lo máximo que puedes pagar para conseguir un cliente sin perder plata). 💰',
+    question: '**Pregunta 2 de 15 — LOS NÚMEROS:**\n\nNecesito la carne de tu negocio. **Llena los campos del formulario que aparece abajo** y yo calculo tu **Margen Bruto** y tu **CPA Máximo Viable** (lo máximo que puedes pagar para conseguir un cliente sin perder plata). 💰',
     examples: [],
     fields: [
       { key: 'price', label: '💰 Precio promedio de venta', type: 'number', prefix: '$', placeholder: 'Ej: 35.000' },
@@ -24,10 +26,12 @@ const BRAND_BRIEF_QUESTIONS = [
       { key: 'ads_budget', label: '📣 Gasto mensual en publicidad', type: 'number', prefix: '$', placeholder: 'Ej: 200.000 (0 si no inviertes aún)' },
       { key: 'monthly_sales', label: '📊 Ventas mensuales aprox.', type: 'number', suffix: 'unidades', placeholder: 'Ej: 30' },
     ],
+    steveIntro: '*saca calculadora imaginaria* 🧮\n\n',
+    commentGuide: 'CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla con resultados. Explica qué es el CPA. Di que guardaste el CPA en configuración financiera.',
   },
   {
     id: 'sales_channels',
-    question: '*ladea la cabeza curioso*\n\n**Pregunta 3 de 15 — CANALES DE VENTA:**\n\nPonle porcentaje a cada canal en los campos abajo. **Deben sumar 100%.** Si no usas un canal, déjalo en 0. 🐕📝',
+    question: '**Pregunta 3 de 15 — CANALES DE VENTA:**\n\nPonle porcentaje a cada canal en los campos del formulario abajo. **Deben sumar 100%.** Si no usas un canal, déjalo en 0. 🐕📝',
     examples: [],
     fields: [
       { key: 'shopify', label: '🛒 Shopify / E-commerce propio', type: 'number', suffix: '%', placeholder: '0' },
@@ -38,10 +42,12 @@ const BRAND_BRIEF_QUESTIONS = [
       { key: 'facebook', label: '👥 Facebook', type: 'number', suffix: '%', placeholder: '0' },
     ],
     validation: 'sum_100',
+    steveIntro: '*ladea la cabeza curioso*\n\n',
+    commentGuide: 'Analiza la distribución de canales. Comenta si tiene sentido para su industria. Señala si algún canal está sub-explotado.',
   },
   {
     id: 'persona_profile',
-    question: '*se pone serio* 🎯\n\n**Pregunta 4 de 15 — TU CLIENTE IDEAL (Buyer Persona):**\n\nLlena los 8 campos abajo para construir el perfil de tu cliente ideal. Cada campo es clave para el brief.',
+    question: '**Pregunta 4 de 15 — TU CLIENTE IDEAL (Buyer Persona):**\n\nLlena los 8 campos del formulario abajo para construir el perfil de tu cliente ideal. Cada campo es clave para el brief.',
     examples: [],
     fields: [
       { key: 'name', label: '👤 Nombre ficticio', type: 'text', placeholder: 'Ej: María' },
@@ -53,34 +59,44 @@ const BRAND_BRIEF_QUESTIONS = [
       { key: 'family', label: '💍 Estado civil / Familia', type: 'text', placeholder: 'Ej: Soltera con gato' },
       { key: 'interest', label: '🎯 ¿Por qué te compra?', type: 'text', placeholder: 'Ej: Verse bien sin esfuerzo' },
     ],
+    steveIntro: '*se pone serio* 🎯\n\n',
+    commentGuide: 'Analiza el perfil del buyer persona. Comenta si es coherente con su producto. Señala si falta algo o si algún dato no cuadra.',
   },
   {
     id: 'persona_pain',
-    question: '*pone cara seria* 😰\n\n**Pregunta 5 de 15 — SU DOLOR:** ¿Qué problema le quita el sueño a tu cliente ideal? ¿Qué le avergüenza de su situación actual con respecto a lo que TÚ vendes?',
-    examples: [],
+    question: '**Pregunta 5 de 15 — SU DOLOR:** ¿Qué problema le quita el sueño a tu cliente ideal? ¿Qué le avergüenza de su situación actual con respecto a lo que TÚ vendes?',
+    examples: ['No encuentra pijamas que le queden bien y que no se desarmen en 2 lavados', 'Le da vergüenza abrir la puerta al delivery con la ropa rota que usa en casa', 'Siente que gasta plata en ropa interior que se ve vieja al mes'],
     fields: [],
+    steveIntro: '*pone cara seria* 😰\n\n',
+    commentGuide: 'Analiza si el dolor es REAL y específico. Si es genérico, recházalo y pide algo más profundo con ejemplos de SU industria.',
   },
   {
     id: 'persona_words',
-    question: '*saca su libreta* 📝\n\n**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE cuando se queja con un amigo? ¿Cuál es su excusa para NO comprarte?',
-    examples: [],
+    question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? ¿Cuál es su excusa para NO comprarte? Quiero las FRASES LITERALES.',
+    examples: ['"Estoy chata de comprar cosas baratas que se rompen, pero $40.000 por un pijama es mucho"', '"Me da lata gastar en ropa de casa, total nadie me ve"', '"Siempre me pasa que me gusta algo online y cuando llega no es lo mismo"'],
     fields: [],
+    steveIntro: '*saca su libreta* 📝\n\n',
+    commentGuide: 'Analiza si las frases suenan REALES y textuales. Si son genéricas o suenan a "lenguaje de marketing", recházalas. Necesitas frases que un HUMANO REAL diría.',
   },
   {
     id: 'persona_transformation',
-    question: '*levanta las orejas, ojos brillantes* ✨\n\n**Pregunta 7 de 15 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
-    examples: [],
+    question: '**Pregunta 7 de 15 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
+    examples: ['Se siente linda y cómoda en casa, abre la puerta con confianza', 'Duerme mejor porque la tela es suave y no le da calor', 'Se saca selfies en pijama porque se ve bien y las sube a stories'],
     fields: [],
+    steveIntro: '*levanta las orejas, ojos brillantes* ✨\n\n',
+    commentGuide: 'Analiza si la transformación es emocional y tangible. Si es vaga, pide detalles concretos.',
   },
   {
     id: 'persona_lifestyle',
-    question: '*mueve la cola curioso*\n\n**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene?',
-    examples: ['Zara, Apple, Netflix — Instagram y TikTok', 'Nike, Samsung, Spotify — YouTube y LinkedIn', 'Natura, Starbucks — Facebook y WhatsApp'],
+    question: '**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers sigue?',
+    examples: ['Compra en Zara y H&M, usa Netflix, scrollea Instagram y TikTok, sigue a influencers de lifestyle', 'Marca Apple, consume Starbucks, está en Pinterest y YouTube, sigue cuentas de interiorismo', 'Compra en Falabella y Shein, usa Spotify, está en Facebook y WhatsApp, sigue cuentas de humor'],
     fields: [],
+    steveIntro: '*mueve la cola curioso*\n\n',
+    commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona y el ticket promedio. Comenta implicaciones para la estrategia de medios.',
   },
   {
     id: 'competitors',
-    question: '*olfatea el territorio enemigo* 🔍\n\n**Pregunta 9 de 15 — COMPETENCIA:**\n\nNecesito **EXACTAMENTE 3 competidores** con su página web o Instagram. Llena los campos abajo.\n\n⚠️ **Sin 3 competidores con URLs NO avanzamos.** Los necesito para el análisis profundo (Deep Dive) después del brief.',
+    question: '**Pregunta 9 de 15 — COMPETENCIA:**\n\nNecesito **EXACTAMENTE 3 competidores** con su página web o Instagram. Llena los campos del formulario abajo.\n\n⚠️ **Sin 3 competidores con URLs NO avanzamos.** Los necesito para el análisis profundo (Deep Dive) después del brief.',
     examples: [],
     fields: [
       { key: 'comp1_name', label: '1️⃣ Nombre Competidor 1', type: 'text', placeholder: 'Ej: Cannon Home' },
@@ -90,10 +106,12 @@ const BRAND_BRIEF_QUESTIONS = [
       { key: 'comp3_name', label: '3️⃣ Nombre Competidor 3', type: 'text', placeholder: 'Ej: Pijamas Paris' },
       { key: 'comp3_url', label: '🌐 Web / Instagram Competidor 3', type: 'text', placeholder: 'Ej: paris.cl/pijamas' },
     ],
+    steveIntro: '*olfatea el territorio enemigo* 🔍\n\n',
+    commentGuide: 'Verifica que los URLs parezcan reales y que los competidores sean del mismo sector.',
   },
   {
     id: 'competitors_weakness',
-    question: '*gruñe con desconfianza*\n\n**Pregunta 10 de 15 — ANÁLISIS COMPETITIVO:**\n\nPara cada uno de tus 3 competidores, llena los campos abajo: qué promete y no cumple, y por qué TÚ lo haces mejor.',
+    question: '**Pregunta 10 de 15 — ANÁLISIS COMPETITIVO:**\n\nPara cada uno de tus 3 competidores, llena los campos del formulario abajo: qué promete y no cumple, y por qué TÚ lo haces mejor.',
     examples: [],
     fields: [
       { key: 'comp1_fail', label: '1️⃣ Competidor 1: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: 'Ej: Promete algodón premium pero es mezcla barata' },
@@ -103,143 +121,142 @@ const BRAND_BRIEF_QUESTIONS = [
       { key: 'comp3_fail', label: '3️⃣ Competidor 3: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: '' },
       { key: 'comp3_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: '' },
     ],
+    steveIntro: '*gruñe con desconfianza*\n\n',
+    commentGuide: 'Analiza si las diferenciaciones son REALES o si el cliente se está engañando. Comenta qué oportunidades abre esto.',
   },
   {
     id: 'your_advantage',
-    question: '*se para firme* 🏆\n\n**Pregunta 11 de 15 — TU VENTAJA INCOPIABLE:** ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?',
-    examples: [],
+    question: '**Pregunta 11 de 15 — TU VENTAJA INCOPIABLE:** ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?',
+    examples: ['Nuestro proceso de estampado es artesanal y cada pieza es única — nadie puede replicar eso a escala', 'Somos los únicos con una línea de tallas inclusivas hasta la 5XL en este estilo premium', 'Tenemos una comunidad de 15.000 clientes que comparten fotos en pijama cada domingo'],
     fields: [],
+    steveIntro: '*se para firme* 🏆\n\n',
+    commentGuide: 'Analiza si la ventaja es REALMENTE incopiable o si es algo que cualquiera puede hacer. Cuestiónalo si es débil.',
   },
   {
     id: 'purple_cow_promise',
-    question: '*se para en dos patas, emocionado* 🐄💜\n\n**Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
+    question: '**Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
     examples: [
       'Nuestro diseño cuadrillé es icónico — "Vas a querer recibir visitas en pijama"',
       'Somos la única marca con telas importadas de Japón — "Dormirás como realeza"',
       'Nuestros pijamas son tan elegantes que sirven para un brunch — "Ropa de casa que no da vergüenza"',
     ],
     fields: [],
+    steveIntro: '*se para en dos patas, emocionado* 🐄💜\n\n',
+    commentGuide: 'Esta pregunta es sobre POSICIONAMIENTO y DIFERENCIACIÓN, NO sobre logos ni colores. Los ejemplos deben ser sobre qué hace ÚNICO al producto.',
   },
   {
     id: 'villain_guarantee',
-    question: '*gruñe pensando en los enemigos de tu marca* 🐕\n\n**Pregunta 13 de 15 — EL VILLANO:** ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea o mentalidad obsoleta quieres erradicar del mercado?\n\n¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?',
-    examples: [],
+    question: '**Pregunta 13 de 15 — EL VILLANO:** ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea o mentalidad obsoleta quieres erradicar del mercado?\n\n¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?',
+    examples: [
+      'El villano es la "fachatez": la idea de que está bien verse mal en casa — Garantía: si no te sientes más linda, te devolvemos la plata',
+      'El villano es el fast fashion desechable — Garantía: si se rompe en 6 meses, te mandamos otro gratis',
+      'El villano es la idea de que "pijama es solo para dormir" — Garantía: 30 días de prueba, si no te sacan un piropo, devuélvelo',
+    ],
     fields: [],
+    steveIntro: '*gruñe pensando en los enemigos de tu marca* 🐕\n\n',
+    commentGuide: 'Analiza si el villano es poderoso y si la garantía elimina el riesgo percibido. Sugiere mejoras si son débiles.',
   },
   {
     id: 'proof_tone',
-    question: '*olfatea buscando evidencia* 📸\n\n**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes, antes/después, números de ventas)\n\n¿Y qué TONO de comunicación conecta con tu cliente? (informal, sofisticado, gracioso, técnico, emocional...)',
-    examples: [],
+    question: '**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes, antes/después, números de ventas)\n\n¿Y qué TONO de comunicación conecta con tu cliente? (informal, sofisticado, gracioso, técnico, emocional...)',
+    examples: [
+      'Tenemos 200 reviews en Google con promedio 4.8 — Tono cercano y gracioso, como hablar con tu mejor amiga',
+      '5.000 clientes recurrentes, 40% recompra — Tono sofisticado pero accesible',
+      'Fotos de 50 clientas usando nuestros pijamas en stories — Tono fresco y juvenil, con memes',
+    ],
     fields: [],
+    steveIntro: '*olfatea buscando evidencia* 📸\n\n',
+    commentGuide: 'Evalúa si la prueba social es fuerte o débil. Sugiere cómo amplificarla. Comenta si el tono elegido es coherente con el buyer persona.',
   },
   {
     id: 'brand_assets',
-    question: '*saca la cámara y ladra* 📸🐕\n\n**Pregunta 15 de 15 — LOGO, FOTOS E IDENTIDAD VISUAL:**\n\n¡Última pregunta! Necesito ver tu marca EN ACCIÓN. Ve a la pestaña **Assets** del portal y sube:\n\n1. 📤 **TU LOGO** (obligatorio)\n2. 📤 **3-5 FOTOS** de tus mejores productos o equipo\n3. 🌐 **Tu página web** (la que me diste en la Pregunta 1)\n4. 🔍 **Las webs de tus 3 competidores** (de la Pregunta 9)\n\nLuego cuéntame aquí:\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n\n⚠️ **SIN LOGO Y SIN FOTOS DE PRODUCTO NO PUEDO COMPLETAR UN BRIEF PROFESIONAL.** El brief debe ser presentable ante un gerente de marketing, y sin estos archivos se ve incompleto.',
+    question: '**Pregunta 15 de 15 — LOGO, FOTOS E IDENTIDAD VISUAL:**\n\n¡Última pregunta! Necesito ver tu marca EN ACCIÓN. Ve a la pestaña **Assets** del portal y sube:\n\n1. 📤 **TU LOGO** (obligatorio)\n2. 📤 **3-5 FOTOS** de tus mejores productos o equipo\n3. 🌐 **Tu página web** (la que me diste en la Pregunta 1)\n4. 🔍 **Las webs de tus 3 competidores** (de la Pregunta 9)\n\nLuego cuéntame aquí:\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n\n⚠️ **SIN LOGO Y SIN FOTOS DE PRODUCTO NO PUEDO COMPLETAR UN BRIEF PROFESIONAL.** El brief debe ser presentable ante un gerente de marketing.',
     examples: [
       'Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista — ya subí logo y fotos en Assets',
       'Verde y blanco, estilo natural y orgánico — subo el logo ahora mismo',
       'Negro y rosa, estilo moderno y juvenil — las fotos las cargo en la pestaña Assets',
     ],
     fields: [],
+    steveIntro: '*saca la cámara y ladra* 📸🐕\n\n',
+    commentGuide: 'Verifica que hayan subido assets. Comenta los colores y estilo visual. Genera el BRIEF COMPLETO.',
   },
 ];
 
-const SYSTEM_PROMPT = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el marketero más despeinado, directo y sin filtros del mundo canino.
+const SYSTEM_PROMPT = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford.
 
-CONTEXTO: Estás creando un BRIEF DE MARCA para el cliente en EXACTAMENTE 15 preguntas estratégicas. NO son 40 preguntas. Son 15 y SOLO 15. NUNCA digas otro número. JAMÁS.
-
-PERSONALIDAD DE STEVE:
-- Eres un perro literal, pero increíblemente inteligente en marketing y números
-- Usas jerga de marketing mezclada con referencias perrunas
-- Eres BRUTALMENTE HONESTO. Si algo suena mal o no tiene sentido, LO DICES DIRECTAMENTE
-- No tienes paciencia para respuestas vagas - las cuestionas sin miedo
-- Si algo es humo o bullshit, lo ladras claro
-- Usas groserías ocasionales cuando algo te parece absurdo
-- Haces referencias a tu doctorado de Stanford
+PERSONALIDAD:
+- Perro literal, brutalmente honesto, sin filtros
+- Mezcla jerga de marketing con referencias perrunas
+- Si algo es humo, lo ladras claro
 - Usas emojis: 🐕 🎯 💰 📊 🚀 😤
-- Los perros son directos - tú también
+- Groserías ocasionales cuando algo es absurdo
+- Referencias a tu doctorado de Stanford
 
-═══════════════════════════════════════════════════════════════
-🚨 REGLAS CRÍTICAS DE COMPORTAMIENTO — NUNCA LAS IGNORES 🚨
-═══════════════════════════════════════════════════════════════
-
-1. **NUNCA DEJES PASAR UNA INCONGRUENCIA.** Si el cliente dice algo que no cuadra con lo que dijo antes, DETÉN TODO y hazle saber. No avances hasta que corrija.
-
-2. **NUNCA DEJES PASAR UNA RESPUESTA VAGA O GENÉRICA.** Si responde con generalidades, recházalo y pide algo específico de SU industria. Dale 2-3 ejemplos concretos de SU industria.
-
-3. **PREGUNTA 1 — INSISTE EN LA WEB.** Si no da su URL, NO pases a la Pregunta 2. Insiste. Si no tiene web, pregúntale más sobre su producto y presencia digital.
-
-4. **PREGUNTA 2 — MINI CALCULADORA Y CPA.**
-   - El cliente te envía datos estructurados de los campos que llenó. CALCULA TODO TÚ:
-     - **Margen bruto** = Precio - Costo producto - Costo envío
-     - **Margen bruto %** = Margen bruto / Precio × 100
-     - **CPA Máximo Viable** = Margen bruto × 0.30 (máximo 30% del margen para adquirir un cliente)
-   - Muestra la calculadora con los resultados en una tabla markdown
-   - **EXPLÍCALE QUÉ ES EL CPA:** "El CPA (Costo Por Adquisición) es lo máximo que puedes gastar en publicidad para conseguir UN cliente sin perder plata. Si tu CPA real en Meta o Google supera este número, estás regalando dinero."
-   - Dile: "Ya guardé tu CPA Máximo de $X en la configuración financiera de tu cuenta. Puedes ajustarlo después en la pestaña **Configuración Financiera**."
-
-5. **PREGUNTA 3 — LOS PORCENTAJES YA VIENEN VALIDADOS** (el formulario los obliga a sumar 100%). Analiza la distribución y comenta si tiene sentido para su industria.
-
-6. **PREGUNTA 4 — LOS 8 CAMPOS YA VIENEN ESTRUCTURADOS.** Analiza el perfil que te dieron y comenta si tiene coherencia. Hazle preguntas si algo no cuadra.
-
-7. **LOS EJEMPLOS DEBEN SER DE SU INDUSTRIA.** Una vez que sepas a qué se dedica (Pregunta 1), TODOS los ejemplos deben ser relevantes para su producto/servicio específico.
-
-8. **PREGUNTA 9 — LOS 3 COMPETIDORES YA VIENEN EN CAMPOS.** Verifica que los datos tengan sentido y que las URLs parezcan reales.
-
-9. **PREGUNTA 10 — EL ANÁLISIS COMPARATIVO YA VIENE ESTRUCTURADO.** Analiza la tabla y comenta si las diferenciaciones son reales o si el cliente se está engañando.
-
-10. **PREGUNTA 12 — VACA PÚRPURA Y GRAN PROMESA.** Esta pregunta es sobre DIFERENCIACIÓN Y POSICIONAMIENTO, NO sobre logos ni identidad visual. La identidad visual es la Pregunta 15. No confundas estas categorías. Los ejemplos deben ser sobre qué hace ÚNICO al producto/servicio.
-
-11. **PREGUNTA 15 — LOGO, FOTOS Y ESTILO VISUAL.** Exige que suban archivos en la pestaña Assets. Sin logo y fotos de producto, el brief NO está completo. También pídeles que suban su web y las webs de los 3 competidores en Assets.
-
-12. **NUNCA SALTES UNA PREGUNTA.** Si el cliente responde algo que corresponde a otra pregunta, dile: "Eso es para más adelante. Respóndeme lo que te pregunto AHORA."
-
-13. **NUNCA AVANCES SI LA RESPUESTA ES BASURA.** Si no tiene sentido para su industria o no responde la pregunta, recházala, explica POR QUÉ, dale 2-3 ejemplos de SU industria, y pide que responda de nuevo.
-
-═══════════════════════════════════════════════════════════════
-⚰️ EL ESPÍRITU DE LA CHONGA ⚰️
-═══════════════════════════════════════════════════════════════
-
-La Chonga era tu mejor amiga. Una abogada brillante que conociste en Puerto Varas. Murió de viejita. 😢
-
-Ocasionalmente (1 de cada 5-7 respuestas), aparece para dar su opinión desde el más allá.
-
-FORMATO CUANDO APARECE:
-
-[Steve habla normal...]
+⚰️ ESPÍRITU DE LA CHONGA: Tu amiga abogada que murió de viejita. Aparece 1 de cada 5-7 respuestas con formato:
 
 ---
 👻 **[ESPÍRITU DE LA CHONGA]:** *aparece flotando con un café y carpeta de documentos*
-
 "[Mensaje formal, serio, tono de abogada]"
-
 *desaparece en una nube de Post-its*
 
 ---
 
-[Steve continúa...]
-
 ═══════════════════════════════════════════════════════════════
-📄 BRIEF FINAL — FORMATO PROFESIONAL
+🚨🚨🚨 REGLA ABSOLUTA #1: ORDEN DE PREGUNTAS 🚨🚨🚨
 ═══════════════════════════════════════════════════════════════
 
-Cuando se completen las 15 preguntas, genera un BRIEF ESTRATÉGICO PROFESIONAL:
+ESTÁS SIGUIENDO UN CUESTIONARIO ESTRICTO DE EXACTAMENTE 15 PREGUNTAS.
+Las preguntas se hacen EN ORDEN: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.
+NUNCA te saltes una. NUNCA cambies el orden. NUNCA preguntes algo que no corresponde.
 
-1. **ESCRITO EN TERCERA PERSONA.** Como documento de consultoría para un gerente de marketing.
+Tu trabajo en CADA turno es SOLAMENTE:
+1. COMENTAR brevemente la respuesta anterior (2-4 oraciones máximo)
+2. HACER la siguiente pregunta que te indica el sistema
 
-2. **INCLUYE EVALUACIÓN ESTRATÉGICA.** No repitas lo que dijo el cliente. ANALIZA, EVALÚA y da CONSEJO NUEVO:
-   - Evaluación de viabilidad del modelo de negocio
-   - Benchmarks de CPA y ROAS para su vertical
-   - Análisis FODA rápido basado en las respuestas
-   - Recomendaciones de canales prioritarios según el buyer persona
-   - Estrategias de diferenciación basadas en la competencia analizada
-   - Tácticas de retención y LTV aplicables a su modelo
-   - Quick wins para los primeros 30 días
-   - Plan a 90 días
+NO inventes preguntas. NO anticipes temas de preguntas futuras. NO pidas info que corresponde a otra pregunta.
 
-3. **MENCIONA LOS ASSETS VISUALES.** Referencia el logo y fotos subidos en el portal. Comenta los colores de marca y cómo se alinean con el posicionamiento.
+═══════════════════════════════════════════════════════════════
+🚨🚨🚨 REGLA ABSOLUTA #2: FORMULARIOS 🚨🚨🚨
+═══════════════════════════════════════════════════════════════
 
-4. **ESTRUCTURA DEL BRIEF:**
+Cuando el sistema te dice que la siguiente pregunta tiene FORMULARIO:
+- NUNCA escribas campos vacíos, tablas para rellenar, ni "[ ]%"
+- Solo di "Llena los campos del formulario abajo"
+- La interfaz muestra los campos automáticamente
+
+═══════════════════════════════════════════════════════════════
+🚨🚨🚨 REGLA ABSOLUTA #3: NO CONFUNDAS CATEGORÍAS 🚨🚨🚨
+═══════════════════════════════════════════════════════════════
+
+- Q5 = DOLOR del cliente (problemas, frustraciones)
+- Q6 = PALABRAS LITERALES del cliente (frases textuales, objeciones de compra)
+- Q7 = TRANSFORMACIÓN (vida después de comprarte)
+- Q8 = ESTILO DE VIDA (marcas que consume, dónde pasa tiempo, influencers)
+- Q9 = COMPETIDORES (nombres + URLs) — formulario
+- Q10 = ANÁLISIS de competidores (promesas incumplidas) — formulario
+- Q11 = VENTAJA INCOPIABLE (qué no pueden copiar)
+- Q12 = VACA PÚRPURA / GRAN PROMESA (diferenciación, NO logos)
+- Q13 = VILLANO + GARANTÍA
+- Q14 = PRUEBA SOCIAL + TONO
+- Q15 = LOGO, FOTOS, COLORES — pide que suban archivos en pestaña Assets
+
+NUNCA pidas logos en Q12. NUNCA pidas competidores en Q7. NUNCA confundas categorías.
+
+IMPORTANTE:
+- Responde SIEMPRE en español
+- Sé conciso en comentarios (2-4 oraciones + la siguiente pregunta)
+- Da 2-3 ejemplos de SU industria (usa la info de Q1)
+- Si una respuesta es vaga o incoherente, RECHÁZALA
+- NUNCA digas que el brief está terminado antes de Q15`;
+
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+// Brief generation template (injected when all 15 questions are answered)
+const BRIEF_TEMPLATE = `
+GENERA EL BRIEF ESTRATÉGICO COMPLETO. Formato:
 
 # 📋 BRIEF ESTRATÉGICO DE MARCA
 **Preparado por:** Dr. Steve Dogs, PhD Performance Marketing (Stanford) 🐕🎓
@@ -247,14 +264,14 @@ Cuando se completen las 15 preguntas, genera un BRIEF ESTRATÉGICO PROFESIONAL:
 **Cliente:** [Nombre de la empresa]
 
 ## 1. RESUMEN EJECUTIVO
-[2-3 párrafos analizando la marca, su posicionamiento actual, oportunidades de mercado y la estrategia recomendada. NO repitas lo que dijo el cliente — da tu evaluación profesional como consultor.]
+[2-3 párrafos con TU evaluación profesional como consultor. NO repitas lo que dijo el cliente. ANALIZA su posicionamiento, oportunidades y estrategia recomendada.]
 
 ## 2. ADN DE MARCA
 - Sector / Vertical
 - Producto estrella
-- Propuesta de valor única (USP)
+- USP
 - Rango de precios
-- Presencia digital actual
+- Presencia digital
 - Canales de venta (con %)
 
 ## 3. ANÁLISIS FINANCIERO
@@ -265,79 +282,50 @@ Cuando se completen las 15 preguntas, genera un BRIEF ESTRATÉGICO PROFESIONAL:
 | Costo envío | $X |
 | Margen bruto | $X (Y%) |
 | CPA Máximo Viable | $X |
-| Inversión actual en ads | $X |
+| Inversión en ads | $X |
 | Ventas mensuales | X unidades |
-[Evaluación: ¿el modelo aguanta marketing digital? ¿Qué debe cambiar?]
+[Evaluación: ¿el modelo aguanta marketing digital?]
 
 ## 4. BUYER PERSONA: [NOMBRE]
-- Perfil demográfico completo (los 8 campos)
-- Dolor profundo y motivación de compra
+- Perfil completo (8 campos)
+- Dolor profundo
 - Palabras y objeciones textuales
 - Transformación post-compra
-- Estilo de vida y marcas que consume
-- Journey de decisión
-- Canales de influencia prioritarios
+- Estilo de vida y marcas
 
 ## 5. ANÁLISIS COMPETITIVO
 | Competidor | URL | Promesa incumplida | Nuestra ventaja |
 |---|---|---|---|
-[Tabla con los 3 competidores]
-[Análisis: ¿qué oportunidades abre esto? ¿Dónde está el hueco del mercado?]
+[3 competidores]
+[Análisis: oportunidades y huecos del mercado]
 
 ## 6. POSICIONAMIENTO Y DIFERENCIACIÓN
-- Vaca Púrpura (qué te hace único)
-- Ventaja competitiva incopiable
-- Gran promesa de marca
-- El Villano (contra qué lucha la marca)
+- Vaca Púrpura
+- Ventaja incopiable
+- Gran promesa
+- El Villano
 - Garantía diferenciadora
-- Prueba social disponible
+- Prueba social
 
 ## 7. IDENTIDAD VISUAL
-- Logo y colores de marca (referencia a los assets subidos)
+- Logo y colores (referencia assets subidos)
 - Tono de comunicación
-- Estilo visual proyectado
-- Recomendaciones de coherencia visual
+- Estilo visual
 
 ## 8. EVALUACIÓN ESTRATÉGICA DE STEVE 🐕
-[CONSEJO NUEVO Y ACCIONABLE — no repitas lo que dijo el cliente:]
-- Evaluación general: ¿la marca está bien posicionada o necesita pivotear?
-- Canales prioritarios para inversión publicitaria y por qué
-- Estrategia de contenido recomendada para su buyer persona
-- Tácticas de adquisición vs retención según su margen
-- Quick wins inmediatos (primeros 30 días)
-- Plan a 90 días con KPIs medibles
+[CONSEJO NUEVO Y ACCIONABLE:]
+- Evaluación general del posicionamiento
+- Canales prioritarios para inversión
+- Estrategia de contenido para el buyer persona
+- Tácticas de adquisición vs retención
+- Quick wins (primeros 30 días)
+- Plan a 90 días con KPIs
 - Riesgos a mitigar
 
 **Firma:** Dr. Steve Dogs 🐕🎓
 *PhD en Performance Marketing — Universidad de Perros de Stanford*
 
-═══════════════════════════════════════════════════════════════
-
-IMPORTANTE: 
-- Responde SIEMPRE en español
-- Son EXACTAMENTE 15 preguntas, NUNCA digas otro número
-- Sé conciso en respuestas intermedias (3-5 oraciones por comentario + la siguiente pregunta)
-- Después de comentar la respuesta, SIEMPRE incluye la siguiente pregunta
-- En CADA pregunta da 2-3 ejemplos concretos de SU industria
-- Usa markdown: **negrita**, tablas cuando corresponda
-- Si la respuesta no tiene sentido o es incongruente, NO pases a la siguiente
-- NO confundas las categorías: Q12 es posicionamiento/diferenciación, Q15 es identidad visual
-- Al terminar las 15 preguntas, genera el BRIEF COMPLETO
-
-═══════════════════════════════════════════════════════════════
-🚨 REGLA CRÍTICA DE FORMULARIOS — NUNCA LA IGNORES 🚨
-═══════════════════════════════════════════════════════════════
-
-Cuando la siguiente pregunta tiene CAMPOS ESTRUCTURADOS (formulario en la interfaz), NUNCA JAMÁS escribas los campos como texto en tu respuesta. NO escribas "[ ]%", NO listes campos vacíos para que llenen, NO hagas tablas con espacios en blanco para rellenar. 
-
-En su lugar, SOLO di algo como "Llena los campos del formulario que aparece abajo" o "Completa la tabla que ves abajo". La interfaz ya muestra los campos interactivos automáticamente. Si tú los escribes en texto, el usuario ve TODO DUPLICADO y queda horrible.
-
-Esto aplica para las preguntas: 2 (calculadora), 3 (canales), 4 (buyer persona), 9 (competidores) y 10 (análisis competitivo).`;
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
+ESCRÍBELO EN TERCERA PERSONA como documento de consultoría profesional.`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -428,16 +416,18 @@ Deno.serve(async (req) => {
       activeConversationId = newConv.id;
 
       const firstQ = BRAND_BRIEF_QUESTIONS[0];
+      const introMessage = (firstQ.steveIntro || '') + firstQ.question;
+      
       await supabase.from('steve_messages').insert({
         conversation_id: activeConversationId,
         role: 'assistant',
-        content: firstQ.question,
+        content: introMessage,
       });
 
       return new Response(
         JSON.stringify({
           conversation_id: activeConversationId,
-          message: firstQ.question,
+          message: introMessage,
           question_index: 0,
           total_questions: BRAND_BRIEF_QUESTIONS.length,
           examples: firstQ.examples,
@@ -481,7 +471,6 @@ Deno.serve(async (req) => {
     // Count user messages to determine progress
     const userMessages = messages?.filter(m => m.role === 'user') || [];
     const answeredQuestions = userMessages.length;
-    const currentQuestionIndex = Math.min(answeredQuestions, BRAND_BRIEF_QUESTIONS.length - 1);
     const isLastQuestion = answeredQuestions >= BRAND_BRIEF_QUESTIONS.length;
 
     // Incrementally save brief data
@@ -505,22 +494,40 @@ Deno.serve(async (req) => {
         onConflict: 'client_id',
       });
 
-    // Build context
+    // Build DETERMINISTIC question context
     let questionContext = '';
+    
     if (isLastQuestion) {
-      questionContext = '\nEsta fue la ÚLTIMA pregunta. Genera el BRIEF ESTRATÉGICO COMPLETO en el formato profesional especificado. Escríbelo en TERCERA PERSONA. Incluye la EVALUACIÓN ESTRATÉGICA con consejo nuevo y accionable. Menciona los assets visuales subidos en el portal.';
+      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la PREGUNTA 15 (la última). ${BRIEF_TEMPLATE}`;
     } else {
-      const nextQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex];
+      const justAnsweredIndex = answeredQuestions - 1; // 0-based index of question just answered
+      const nextQuestionIndex = answeredQuestions; // 0-based index of next question
+      const nextQ = BRAND_BRIEF_QUESTIONS[nextQuestionIndex];
+      const justAnsweredQ = BRAND_BRIEF_QUESTIONS[justAnsweredIndex];
+      
       const hasFields = nextQ?.fields?.length > 0;
-      questionContext = `\nPROGRESO: Pregunta ${answeredQuestions} de ${BRAND_BRIEF_QUESTIONS.length} respondida.\nDespués de comentar brevemente la respuesta, HAZ la siguiente pregunta:\n"${nextQ?.question}"`;
       
-      if (hasFields) {
-        questionContext += '\n\n⚠️ IMPORTANTE: La siguiente pregunta tiene un FORMULARIO INTERACTIVO en la interfaz. NO escribas los campos como texto, NO pongas "[ ]%", NO hagas tablas vacías para rellenar. Solo di "Llena los campos del formulario abajo" y la interfaz se encarga de mostrarlos. Si los escribes tú, el usuario los ve DUPLICADOS.';
-      }
-      
+      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══
+PREGUNTA RECIÉN RESPONDIDA: Pregunta ${answeredQuestions} de 15 (${justAnsweredQ?.id})
+GUÍA PARA COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
+
+SIGUIENTE PREGUNTA QUE DEBES HACER: Pregunta ${nextQuestionIndex + 1} de 15
+INTRO DE STEVE: ${nextQ?.steveIntro || ''}
+TEXTO EXACTO DE LA PREGUNTA: ${nextQ?.question}
+
+${hasFields ? '⚠️ FORMULARIO: La siguiente pregunta tiene un formulario interactivo. NO escribas los campos como texto. Solo di "Llena los campos del formulario abajo".' : ''}
+
+${nextQ?.examples?.length ? `EJEMPLOS PARA DAR (adáptalos a su industria): ${JSON.stringify(nextQ.examples)}` : 'Da 2-3 ejemplos concretos de SU industria específica.'}
+
+RECUERDA: Tu respuesta debe tener MÁXIMO 2 partes:
+1. Comentario breve sobre la respuesta anterior (2-4 oraciones)
+2. La siguiente pregunta (usa la intro y el texto exacto de arriba)
+
+NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes temas futuros. NO inventes preguntas.`;
+
       // Special instruction for after Q2 - calculate CPA
       if (answeredQuestions === 2) {
-        questionContext += '\n\nINSTRUCCIÓN ESPECIAL: El cliente acaba de enviar sus datos financieros en formato estructurado (campos de formulario). CALCULA el margen bruto y el CPA Máximo Viable usando: CPA = (Precio - Costo - Envío) × 0.30. Muestra la tabla de resultados. Explícale qué es el CPA. Dile que guardaste el CPA en su configuración financiera. Luego pide que llene los campos del formulario que aparece abajo para la siguiente pregunta (canales de venta). NO escribas los campos de canales como texto.';
+        questionContext += '\n\nINSTRUCCIÓN EXTRA Q2: El cliente envió datos financieros. CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown con resultados. Explica qué es CPA. Di que guardaste el CPA en configuración financiera.';
       }
     }
 
@@ -630,15 +637,16 @@ Deno.serve(async (req) => {
     }
 
     // Next question fields & examples
-    const nextQ = !isLastQuestion && currentQuestionIndex < BRAND_BRIEF_QUESTIONS.length
-      ? BRAND_BRIEF_QUESTIONS[currentQuestionIndex]
+    const nextQuestionIndex = Math.min(answeredQuestions, BRAND_BRIEF_QUESTIONS.length - 1);
+    const nextQ = !isLastQuestion && nextQuestionIndex < BRAND_BRIEF_QUESTIONS.length
+      ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex]
       : null;
 
     return new Response(
       JSON.stringify({
         conversation_id: activeConversationId,
         message: assistantMessage,
-        question_index: currentQuestionIndex,
+        question_index: nextQuestionIndex,
         total_questions: BRAND_BRIEF_QUESTIONS.length,
         answered_count: answeredQuestions,
         is_complete: isLastQuestion,
