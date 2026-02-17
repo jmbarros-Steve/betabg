@@ -22,6 +22,7 @@ import FAQ from "./pages/FAQ";
 import Changelog from "./pages/Changelog";
 import Tutorial from "./pages/Tutorial";
 import AppDocumentation from "./pages/AppDocumentation";
+import SteveAppInfo from "./pages/SteveAppInfo";
 import ShopifyApp from "./pages/ShopifyApp";
 import ConnectShopify from "./pages/ConnectShopify";
 import NotFound from "./pages/NotFound";
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/changelog" element={<Changelog />} />
             <Route path="/tutorial" element={<Tutorial />} />
             <Route path="/documentacion" element={<AppDocumentation />} />
+            <Route path="/steve-info" element={<SteveAppInfo />} />
             <Route path="/shopify-app" element={<ShopifyApp />} />
             <Route path="/shopify" element={<ShopifyApp />} />
             <Route path="/connect-shopify" element={<ConnectShopify />} />
