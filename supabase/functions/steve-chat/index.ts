@@ -256,23 +256,28 @@ interface ChatMessage {
 
 // Brief generation template (injected when all 15 questions are answered)
 const BRIEF_TEMPLATE = `
-GENERA EL BRIEF ESTRATÉGICO COMPLETO. Formato:
+GENERA EL BRIEF ESTRATÉGICO COMPLETO.
 
-# 📋 BRIEF ESTRATÉGICO DE MARCA
-**Preparado por:** Dr. Steve Dogs, PhD Performance Marketing (Stanford) 🐕🎓
-**Fecha:** [fecha actual]
-**Cliente:** [Nombre de la empresa]
+REGLAS DE REDACCIÓN OBLIGATORIAS:
+1. TODO en TERCERA PERSONA ("La marca...", "El negocio...", "Se recomienda...", "El cliente objetivo...")
+2. TONO de consultoría profesional. Como si fuera un documento de McKinsey o BCG.
+3. NO copies textualmente lo que el cliente respondió. ANALIZA, SINTETIZA, y REDACTA como consultor estratégico.
+4. NO uses emojis ni jerga perruna en el brief (eso es para el chat). El brief es SERIO.
+5. Incluye DATOS CONCRETOS y MÉTRICAS cuando las tengas.
+6. COMPARA explícitamente con la competencia mencionada.
+
+Formato:
 
 ## 1. RESUMEN EJECUTIVO
-[2-3 párrafos con TU evaluación profesional como consultor. NO repitas lo que dijo el cliente. ANALIZA su posicionamiento, oportunidades y estrategia recomendada.]
+[3-4 párrafos de análisis estratégico en tercera persona. Evalúa el posicionamiento actual, las oportunidades de mercado, la viabilidad financiera y la recomendación estratégica principal. NO repitas respuestas del cliente. ANALIZA y SINTETIZA como un consultor senior.]
 
 ## 2. ADN DE MARCA
-- Sector / Vertical
-- Producto estrella
-- USP
-- Rango de precios
-- Presencia digital
-- Canales de venta (con %)
+- **Sector / Vertical:** [análisis del sector]
+- **Producto estrella:** [con contexto de mercado]
+- **Propuesta de Valor Única (USP):** [redactada profesionalmente]
+- **Rango de precios y posicionamiento:** [análisis vs. competencia]
+- **Presencia digital:** [evaluación]
+- **Distribución por canales:** [con análisis de oportunidades]
 
 ## 3. ANÁLISIS FINANCIERO
 | Métrica | Valor |
@@ -282,50 +287,54 @@ GENERA EL BRIEF ESTRATÉGICO COMPLETO. Formato:
 | Costo envío | $X |
 | Margen bruto | $X (Y%) |
 | CPA Máximo Viable | $X |
-| Inversión en ads | $X |
-| Ventas mensuales | X unidades |
-[Evaluación: ¿el modelo aguanta marketing digital?]
+| Inversión actual en ads | $X |
+| Volumen mensual | X unidades |
 
-## 4. BUYER PERSONA: [NOMBRE]
-- Perfil completo (8 campos)
-- Dolor profundo
-- Palabras y objeciones textuales
-- Transformación post-compra
-- Estilo de vida y marcas
+**Evaluación financiera:** [Análisis de si el modelo soporta inversión en marketing digital. Comparar CPA con benchmarks de la industria. Recomendación de inversión.]
 
-## 5. ANÁLISIS COMPETITIVO
-| Competidor | URL | Promesa incumplida | Nuestra ventaja |
-|---|---|---|---|
-[3 competidores]
-[Análisis: oportunidades y huecos del mercado]
+## 4. PERFIL DEL CONSUMIDOR OBJETIVO
+[Describe el buyer persona en tercera persona como un perfil profesional de investigación de mercado. Incluye datos demográficos, psicográficos, comportamiento de compra, motivaciones profundas y barreras de compra. Redáctalo como un estudio de mercado, NO como una lista.]
 
-## 6. POSICIONAMIENTO Y DIFERENCIACIÓN
-- Vaca Púrpura
-- Ventaja incopiable
-- Gran promesa
-- El Villano
-- Garantía diferenciadora
-- Prueba social
+## 5. ANÁLISIS COMPETITIVO ESTRATÉGICO
+Para cada competidor analizado:
+- Posicionamiento actual
+- Promesas de marca incumplidas (oportunidades)
+- Ventajas y debilidades
+- Cómo se diferencia [nombre del cliente] de cada uno
 
-## 7. IDENTIDAD VISUAL
-- Logo y colores (referencia assets subidos)
-- Tono de comunicación
-- Estilo visual
+**Huecos de mercado identificados:** [análisis de oportunidades sin explotar]
+**Ventaja competitiva sostenible:** [lo que no pueden copiar]
 
-## 8. EVALUACIÓN ESTRATÉGICA DE STEVE 🐕
-[CONSEJO NUEVO Y ACCIONABLE:]
-- Evaluación general del posicionamiento
-- Canales prioritarios para inversión
-- Estrategia de contenido para el buyer persona
-- Tácticas de adquisición vs retención
-- Quick wins (primeros 30 días)
-- Plan a 90 días con KPIs
-- Riesgos a mitigar
+## 6. ESTRATEGIA DE POSICIONAMIENTO Y DIFERENCIACIÓN
+- **Concepto diferenciador (Vaca Púrpura):** [redactado como estrategia]
+- **Narrativa de marca:** [el villano vs. el héroe]
+- **Garantía diferenciadora:** [cómo elimina el riesgo percibido]
+- **Prueba social disponible:** [evaluación de assets de credibilidad]
+- **Tono y personalidad de marca:** [guía de comunicación]
 
-**Firma:** Dr. Steve Dogs 🐕🎓
-*PhD en Performance Marketing — Universidad de Perros de Stanford*
+## 7. PLAN ESTRATÉGICO RECOMENDADO
 
-ESCRÍBELO EN TERCERA PERSONA como documento de consultoría profesional.`;
+### Fase 1: Primeros 30 días (Quick Wins)
+[3-4 acciones concretas y medibles]
+
+### Fase 2: Días 31-60 (Consolidación)
+[3-4 acciones de mediano plazo]
+
+### Fase 3: Días 61-90 (Escalamiento)
+[3-4 acciones de crecimiento]
+
+### KPIs Recomendados
+| KPI | Meta | Plazo |
+|---|---|---|
+[3-5 KPIs medibles]
+
+### Riesgos Identificados
+[2-3 riesgos con recomendaciones de mitigación]
+
+---
+**Documento preparado por Dr. Steve Dogs**
+*PhD Performance Marketing — Stanford Dog University*
+*Director de Estrategia, BG Consult*`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
