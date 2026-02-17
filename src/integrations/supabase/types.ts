@@ -331,6 +331,125 @@ export type Database = {
         }
         Relationships: []
       }
+      competitor_ads: {
+        Row: {
+          ad_description: string | null
+          ad_headline: string | null
+          ad_library_id: string
+          ad_text: string | null
+          ad_type: string | null
+          client_id: string
+          created_at: string
+          cta_type: string | null
+          days_running: number | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          started_at: string | null
+          tracking_id: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          ad_description?: string | null
+          ad_headline?: string | null
+          ad_library_id: string
+          ad_text?: string | null
+          ad_type?: string | null
+          client_id: string
+          created_at?: string
+          cta_type?: string | null
+          days_running?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          started_at?: string | null
+          tracking_id: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          ad_description?: string | null
+          ad_headline?: string | null
+          ad_library_id?: string
+          ad_text?: string | null
+          ad_type?: string | null
+          client_id?: string
+          created_at?: string
+          cta_type?: string | null
+          days_running?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          started_at?: string | null
+          tracking_id?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_ads_tracking_id_fkey"
+            columns: ["tracking_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_tracking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_tracking: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          ig_handle: string
+          is_active: boolean
+          last_sync_at: string | null
+          meta_page_id: string | null
+          profile_pic_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          ig_handle: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          meta_page_id?: string | null
+          profile_pic_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          ig_handle?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          meta_page_id?: string | null
+          profile_pic_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_tracking_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           client_id: string
