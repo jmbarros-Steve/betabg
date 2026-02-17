@@ -407,37 +407,46 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          deep_dive_data: Json | null
           display_name: string | null
           id: string
           ig_handle: string
           is_active: boolean
+          last_deep_dive_at: string | null
           last_sync_at: string | null
           meta_page_id: string | null
           profile_pic_url: string | null
+          store_url: string | null
           updated_at: string
         }
         Insert: {
           client_id: string
           created_at?: string
+          deep_dive_data?: Json | null
           display_name?: string | null
           id?: string
           ig_handle: string
           is_active?: boolean
+          last_deep_dive_at?: string | null
           last_sync_at?: string | null
           meta_page_id?: string | null
           profile_pic_url?: string | null
+          store_url?: string | null
           updated_at?: string
         }
         Update: {
           client_id?: string
           created_at?: string
+          deep_dive_data?: Json | null
           display_name?: string | null
           id?: string
           ig_handle?: string
           is_active?: boolean
+          last_deep_dive_at?: string | null
           last_sync_at?: string | null
           meta_page_id?: string | null
           profile_pic_url?: string | null
+          store_url?: string | null
           updated_at?: string
         }
         Relationships: [
