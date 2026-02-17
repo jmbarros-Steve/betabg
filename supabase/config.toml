@@ -72,5 +72,8 @@ verify_jwt = false
 [functions.fetch-shopify-analytics]
 verify_jwt = false
 
+[functions.sync-competitor-ads]
+verify_jwt = false
+
 [functions.shopify-fulfillment-webhooks]
 verify_jwt = false
