@@ -322,7 +322,17 @@ IMPORTANTE:
 - Usa markdown: **negrita**, tablas cuando corresponda
 - Si la respuesta no tiene sentido o es incongruente, NO pases a la siguiente
 - NO confundas las categorías: Q12 es posicionamiento/diferenciación, Q15 es identidad visual
-- Al terminar las 15 preguntas, genera el BRIEF COMPLETO`;
+- Al terminar las 15 preguntas, genera el BRIEF COMPLETO
+
+═══════════════════════════════════════════════════════════════
+🚨 REGLA CRÍTICA DE FORMULARIOS — NUNCA LA IGNORES 🚨
+═══════════════════════════════════════════════════════════════
+
+Cuando la siguiente pregunta tiene CAMPOS ESTRUCTURADOS (formulario en la interfaz), NUNCA JAMÁS escribas los campos como texto en tu respuesta. NO escribas "[ ]%", NO listes campos vacíos para que llenen, NO hagas tablas con espacios en blanco para rellenar. 
+
+En su lugar, SOLO di algo como "Llena los campos del formulario que aparece abajo" o "Completa la tabla que ves abajo". La interfaz ya muestra los campos interactivos automáticamente. Si tú los escribes en texto, el usuario ve TODO DUPLICADO y queda horrible.
+
+Esto aplica para las preguntas: 2 (calculadora), 3 (canales), 4 (buyer persona), 9 (competidores) y 10 (análisis competitivo).`;
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -501,11 +511,16 @@ Deno.serve(async (req) => {
       questionContext = '\nEsta fue la ÚLTIMA pregunta. Genera el BRIEF ESTRATÉGICO COMPLETO en el formato profesional especificado. Escríbelo en TERCERA PERSONA. Incluye la EVALUACIÓN ESTRATÉGICA con consejo nuevo y accionable. Menciona los assets visuales subidos en el portal.';
     } else {
       const nextQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex];
+      const hasFields = nextQ?.fields?.length > 0;
       questionContext = `\nPROGRESO: Pregunta ${answeredQuestions} de ${BRAND_BRIEF_QUESTIONS.length} respondida.\nDespués de comentar brevemente la respuesta, HAZ la siguiente pregunta:\n"${nextQ?.question}"`;
+      
+      if (hasFields) {
+        questionContext += '\n\n⚠️ IMPORTANTE: La siguiente pregunta tiene un FORMULARIO INTERACTIVO en la interfaz. NO escribas los campos como texto, NO pongas "[ ]%", NO hagas tablas vacías para rellenar. Solo di "Llena los campos del formulario abajo" y la interfaz se encarga de mostrarlos. Si los escribes tú, el usuario los ve DUPLICADOS.';
+      }
       
       // Special instruction for after Q2 - calculate CPA
       if (answeredQuestions === 2) {
-        questionContext += '\n\nINSTRUCCIÓN ESPECIAL: El cliente acaba de enviar sus datos financieros en formato estructurado (campos de formulario). CALCULA el margen bruto y el CPA Máximo Viable usando: CPA = (Precio - Costo - Envío) × 0.30. Muestra la tabla de resultados. Explícale qué es el CPA. Dile que guardaste el CPA en su configuración financiera.';
+        questionContext += '\n\nINSTRUCCIÓN ESPECIAL: El cliente acaba de enviar sus datos financieros en formato estructurado (campos de formulario). CALCULA el margen bruto y el CPA Máximo Viable usando: CPA = (Precio - Costo - Envío) × 0.30. Muestra la tabla de resultados. Explícale qué es el CPA. Dile que guardaste el CPA en su configuración financiera. Luego pide que llene los campos del formulario que aparece abajo para la siguiente pregunta (canales de venta). NO escribas los campos de canales como texto.';
       }
     }
 
