@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     console.log(`[sync-competitor-ads] Processing ${handles.length} handles for client ${client_id}`);
 
-    // Get Meta access token from client's Meta connection
+    // Get Meta access token — PRIORITIZE the client's user token (already has ads_read)
     const { data: metaConn } = await supabase
       .from('platform_connections')
       .select('access_token_encrypted')
@@ -96,42 +96,48 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    // Use Meta Ad Library API
-    const metaAppId = Deno.env.get('META_APP_ID');
-    const metaAppSecret = Deno.env.get('META_APP_SECRET');
-    
     let accessToken = '';
+    let tokenSource = '';
     
+    // Priority 1: Client's own Meta OAuth token (already approved with ads_read)
     if (metaConn?.access_token_encrypted) {
       const { data: decrypted } = await supabase
         .rpc('decrypt_platform_token', { encrypted_token: metaConn.access_token_encrypted });
-      if (decrypted) accessToken = decrypted;
+      if (decrypted) {
+        accessToken = decrypted;
+        tokenSource = 'user_token';
+      }
     }
     
-    if (!accessToken && metaAppId && metaAppSecret) {
-      // Fetch a proper app access token from Meta's OAuth endpoint
-      try {
-        const tokenRes = await fetch(
-          `https://graph.facebook.com/oauth/access_token?client_id=${metaAppId}&client_secret=${metaAppSecret}&grant_type=client_credentials`
-        );
-        const tokenData = await tokenRes.json();
-        if (tokenData.access_token) {
-          accessToken = tokenData.access_token;
-          console.log('[sync-competitor-ads] Using app access token from OAuth endpoint');
-        } else {
-          console.error('[sync-competitor-ads] Failed to get app token:', tokenData);
+    // Priority 2: App access token (requires Marketing API approval on Meta App)
+    if (!accessToken) {
+      const metaAppId = Deno.env.get('META_APP_ID');
+      const metaAppSecret = Deno.env.get('META_APP_SECRET');
+      if (metaAppId && metaAppSecret) {
+        try {
+          const tokenRes = await fetch(
+            `https://graph.facebook.com/oauth/access_token?client_id=${metaAppId}&client_secret=${metaAppSecret}&grant_type=client_credentials`
+          );
+          const tokenData = await tokenRes.json();
+          if (tokenData.access_token) {
+            accessToken = tokenData.access_token;
+            tokenSource = 'app_token';
+          }
+        } catch (e) {
+          console.error('[sync-competitor-ads] App token fetch failed:', e);
         }
-      } catch (e) {
-        console.error('[sync-competitor-ads] Error fetching app token:', e);
-        // Fallback to pipe format
-        accessToken = `${metaAppId}|${metaAppSecret}`;
       }
     }
 
     if (!accessToken) {
-      return new Response(JSON.stringify({ error: 'No Meta credentials available. Connect Meta Ads first or configure META_APP_ID/SECRET.' }),
+      return new Response(JSON.stringify({ 
+        error: 'meta_not_connected',
+        message: 'Debes conectar tu cuenta de Meta Ads primero para poder rastrear competidores.'
+      }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    console.log(`[sync-competitor-ads] Using ${tokenSource} for Ad Library queries`);
 
     const results: { handle: string; ads_found: number; status: string }[] = [];
 
