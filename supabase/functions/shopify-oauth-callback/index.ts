@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { createHmac, timingSafeEqual } from "https://deno.land/std@0.177.0/node/crypto.ts";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -263,6 +263,11 @@ Deno.serve(async (req) => {
 
       if (existingClient) {
         clientId = existingClient.id;
+        // Ensure shop_domain is set on reconnection
+        await supabaseAdmin.from('clients').update({
+          shop_domain: normalizedShopDomain,
+          company: storeName,
+        }).eq('id', clientId);
       } else {
         const { data: newClient, error: clientError } = await supabaseAdmin
           .from('clients').insert({
