@@ -30,18 +30,16 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
     const value = eqIdx === -1 ? '' : part.slice(eqIdx + 1);
     if (key === 'hmac') { receivedHmac = value; continue; }
     if (key === 'signature') continue;
-    pairs.push([key, value]);
+    // CRITICAL: Shopify computes HMAC over URL-decoded values
+    pairs.push([decodeURIComponent(key), decodeURIComponent(value)]);
   }
   if (!receivedHmac) return false;
   const message = pairs.sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('&');
   const computed = createHmac('sha256', secretKey).update(message).digest('hex');
   
-  // DEBUG: Log for diagnosis (remove after fixing)
   console.log('[HMAC-DEBUG] message:', message);
   console.log('[HMAC-DEBUG] computed:', computed);
   console.log('[HMAC-DEBUG] received:', receivedHmac);
-  console.log('[HMAC-DEBUG] secret length:', secretKey.length);
-  console.log('[HMAC-DEBUG] secret prefix:', secretKey.slice(0, 6));
   
   // Timing-safe comparison
   const encoder = new TextEncoder();
