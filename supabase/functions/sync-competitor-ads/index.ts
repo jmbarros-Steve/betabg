@@ -177,30 +177,47 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Step 2: Search Ad Library by page name (using search_terms since we have IG handle)
-        const adLibraryUrl = new URL('https://graph.facebook.com/v18.0/ads_archive');
+        // Step 2: Search Ad Library
+        const adLibraryUrl = new URL('https://graph.facebook.com/v21.0/ads_archive');
         adLibraryUrl.searchParams.set('access_token', accessToken);
         adLibraryUrl.searchParams.set('search_terms', handle);
         adLibraryUrl.searchParams.set('ad_type', 'ALL');
-        adLibraryUrl.searchParams.set('ad_reached_countries', '["CL","MX","CO","AR","PE","US"]');
+        adLibraryUrl.searchParams.set('ad_reached_countries', 'CL,MX,CO,AR,PE,US');
         adLibraryUrl.searchParams.set('ad_active_status', 'ALL');
         adLibraryUrl.searchParams.set('fields', 
           'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages'
         );
         adLibraryUrl.searchParams.set('limit', '25');
 
-        console.log(`[sync-competitor-ads] Fetching Ad Library for: ${handle}`);
+        console.log(`[sync-competitor-ads] Fetching Ad Library for: ${handle}`, adLibraryUrl.toString().replace(accessToken, '***'));
         const adResponse = await fetch(adLibraryUrl.toString());
         
-        if (!adResponse.ok) {
-          const errData = await adResponse.json();
-          console.error(`Ad Library API error for ${handle}:`, errData);
-          results.push({ handle, ads_found: 0, status: 'api_error: ' + (errData.error?.message || 'unknown') });
+        // Handle non-JSON responses
+        const responseText = await adResponse.text();
+        let adResponseJson: any;
+        try {
+          adResponseJson = JSON.parse(responseText);
+        } catch {
+          console.error(`Non-JSON response for ${handle}:`, responseText.slice(0, 500));
+          results.push({ handle, ads_found: 0, status: 'api_error: Non-JSON response from Meta' });
           continue;
         }
 
-        const adData = await adResponse.json();
-        const ads: AdLibraryAd[] = adData.data || [];
+        if (!adResponse.ok || adResponseJson.error) {
+          const errMsg = adResponseJson.error?.message || 'Unknown error';
+          const errCode = adResponseJson.error?.code || 0;
+          console.error(`Ad Library API error for ${handle}: code=${errCode}, msg=${errMsg}`);
+          
+          // Provide actionable error messages
+          let statusMsg = `api_error: ${errMsg}`;
+          if (errCode === 190) statusMsg = 'token_expired: El token de Meta expiró. Reconecta Meta Ads en Conexiones.';
+          if (errCode === 10 || errCode === 200) statusMsg = 'permission_denied: La app necesita permisos de Ad Library. Contacta soporte.';
+          
+          results.push({ handle, ads_found: 0, status: statusMsg });
+          continue;
+        }
+
+        const ads: AdLibraryAd[] = adResponseJson.data || [];
         console.log(`[sync-competitor-ads] Found ${ads.length} ads for ${handle}`);
 
         // Update page info if found
