@@ -470,10 +470,22 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
               Conectar Klaviyo
             </DialogTitle>
             <DialogDescription>
-              Ingresa tu Private API Key de Klaviyo para conectar tu cuenta.
+              Sigue estos pasos para obtener tu API Key y conectar tu cuenta.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
+            {/* Step-by-step guide */}
+            <div className="space-y-3 bg-muted/50 rounded-lg p-4 border">
+              <p className="text-sm font-medium">Cómo obtener tu API Key:</p>
+              <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                <li>Inicia sesión en <a href="https://www.klaviyo.com/login" target="_blank" rel="noopener noreferrer" className="text-primary underline font-medium">klaviyo.com</a></li>
+                <li>Ve a <span className="font-medium text-foreground">Settings</span> (esquina inferior izquierda, ícono de engranaje)</li>
+                <li>Selecciona <span className="font-medium text-foreground">API Keys</span></li>
+                <li>Clic en <span className="font-medium text-foreground">"Create Private API Key"</span></li>
+                <li>Ponle nombre (ej: "Steve") y copia la key que empieza con <code className="bg-muted px-1 rounded text-xs">pk_</code></li>
+              </ol>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="klaviyo-api-key">Private API Key</Label>
               <Input
@@ -484,9 +496,6 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                 placeholder="pk_..."
                 autoComplete="off"
               />
-              <p className="text-xs text-muted-foreground">
-                Puedes obtener tu API Key en Klaviyo → Settings → API Keys
-              </p>
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => {
