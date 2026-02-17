@@ -4,31 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import ReactMarkdown from 'react-markdown';
 import { 
-  FileText, 
-  RefreshCw, 
-  CheckCircle2, 
-  AlertCircle,
-  Building2,
-  Users,
-  Store,
-  MessageSquare,
-  Target,
-  Database,
-  Trophy,
-  DollarSign,
-  Percent,
-  Truck,
-  Calculator,
-  Gem,
-  Shield,
-  Gift,
-  Clock,
-  TrendingUp,
-  MousePointer,
-  Heart
+  FileText, RefreshCw, CheckCircle2, AlertCircle, Download,
+  Building2, Users, Trophy, MessageSquare, DollarSign, Store,
+  Target, Heart, Shield, TrendingUp, Gem, Clock, Gift
 } from 'lucide-react';
 
 interface BrandBriefViewProps {
@@ -41,109 +25,34 @@ interface BriefData {
   summary?: string;
   completed_at?: string;
   questions?: string[];
+  answered_count?: number;
+  total_questions?: number;
 }
 
-const QUESTION_ICONS: Record<string, React.ReactNode> = {
-  // Parte 1: Negocio
-  business_type: <Building2 className="h-4 w-4" />,
-  average_ticket: <DollarSign className="h-4 w-4" />,
-  margins: <Percent className="h-4 w-4" />,
-  shipping_cost: <Truck className="h-4 w-4" />,
-  fixed_costs: <Calculator className="h-4 w-4" />,
-  sales_channels: <Store className="h-4 w-4" />,
-  // Parte 2: Buyer Persona Psicográfico
-  persona_name: <Users className="h-4 w-4" />,
-  persona_demographics: <Users className="h-4 w-4" />,
-  persona_3am_pain: <Target className="h-4 w-4" />,
-  persona_shame: <Heart className="h-4 w-4" />,
-  persona_common_mistake: <Target className="h-4 w-4" />,
-  persona_fear_not_buying: <Shield className="h-4 w-4" />,
-  persona_sunday_feeling: <Heart className="h-4 w-4" />,
-  persona_exact_words: <MessageSquare className="h-4 w-4" />,
-  persona_internal_objection: <Shield className="h-4 w-4" />,
-  persona_transformation: <TrendingUp className="h-4 w-4" />,
-  persona_lifestyle_brands: <Gem className="h-4 w-4" />,
-  persona_impress_who: <Users className="h-4 w-4" />,
-  persona_channels: <MessageSquare className="h-4 w-4" />,
-  persona_desires: <Heart className="h-4 w-4" />,
-  persona_daily_frustrations: <Target className="h-4 w-4" />,
-  // Parte 3: Análisis Competitivo
-  competitors_list: <Trophy className="h-4 w-4" />,
-  competitors_complaints: <Target className="h-4 w-4" />,
-  competitors_false_promise: <Shield className="h-4 w-4" />,
-  competitors_pricing: <DollarSign className="h-4 w-4" />,
-  competitors_slow_point: <Clock className="h-4 w-4" />,
-  competitors_tone: <MessageSquare className="h-4 w-4" />,
-  competitors_ignored_channel: <Store className="h-4 w-4" />,
-  competitors_entry_offer: <Gift className="h-4 w-4" />,
-  why_switch_to_you: <Trophy className="h-4 w-4" />,
-  uncopyable_advantage: <Gem className="h-4 w-4" />,
-  // Parte 4: Estrategia Comunicacional
-  purple_cow: <Gem className="h-4 w-4" />,
-  big_promise: <Target className="h-4 w-4" />,
-  villain: <Shield className="h-4 w-4" />,
-  absurd_guarantee: <Shield className="h-4 w-4" />,
-  irrefutable_proof: <Database className="h-4 w-4" />,
-  insider_secret: <Gem className="h-4 w-4" />,
-  ideal_tone: <MessageSquare className="h-4 w-4" />,
-  irresistible_offer: <Gift className="h-4 w-4" />,
-  urgency_reason: <Clock className="h-4 w-4" />,
+const QUESTION_CONFIG: Record<string, { label: string; icon: React.ReactNode; section: string }> = {
+  business_pitch: { label: 'El Negocio', icon: <Building2 className="h-4 w-4" />, section: 'negocio' },
+  numbers: { label: 'Números Clave', icon: <DollarSign className="h-4 w-4" />, section: 'negocio' },
+  sales_channels: { label: 'Canales de Venta', icon: <Store className="h-4 w-4" />, section: 'negocio' },
+  persona_profile: { label: 'Perfil del Cliente', icon: <Users className="h-4 w-4" />, section: 'persona' },
+  persona_pain: { label: 'Dolor y Vergüenza', icon: <Heart className="h-4 w-4" />, section: 'persona' },
+  persona_words: { label: 'Palabras y Objeciones', icon: <MessageSquare className="h-4 w-4" />, section: 'persona' },
+  persona_transformation: { label: 'Transformación', icon: <TrendingUp className="h-4 w-4" />, section: 'persona' },
+  persona_lifestyle: { label: 'Estilo de Vida', icon: <Gem className="h-4 w-4" />, section: 'persona' },
+  competitors: { label: 'Competidores', icon: <Trophy className="h-4 w-4" />, section: 'competencia' },
+  competitors_weakness: { label: 'Fallas Competencia', icon: <Shield className="h-4 w-4" />, section: 'competencia' },
+  your_advantage: { label: 'Tu Ventaja', icon: <Trophy className="h-4 w-4" />, section: 'competencia' },
+  purple_cow_promise: { label: 'Vaca Púrpura', icon: <Gem className="h-4 w-4" />, section: 'estrategia' },
+  villain_guarantee: { label: 'Villano y Garantía', icon: <Shield className="h-4 w-4" />, section: 'estrategia' },
+  proof_tone: { label: 'Prueba y Tono', icon: <Target className="h-4 w-4" />, section: 'estrategia' },
+  offer_urgency: { label: 'Oferta y Urgencia', icon: <Gift className="h-4 w-4" />, section: 'estrategia' },
 };
 
-const QUESTION_LABELS: Record<string, string> = {
-  // Parte 1: Negocio
-  business_type: 'Tipo de Negocio',
-  average_ticket: 'Ticket Promedio',
-  margins: 'Márgenes',
-  shipping_cost: 'Costo de Envío',
-  fixed_costs: 'Gastos Fijos',
-  sales_channels: 'Canales de Venta',
-  // Parte 2: Buyer Persona
-  persona_name: 'Nombre del Persona',
-  persona_demographics: 'Demografía',
-  persona_3am_pain: 'Dolor de las 3 AM',
-  persona_shame: 'Vergüenza',
-  persona_common_mistake: 'Error Común',
-  persona_fear_not_buying: 'Miedo si No Compra',
-  persona_sunday_feeling: 'Sentimiento Domingo',
-  persona_exact_words: 'Palabras Exactas',
-  persona_internal_objection: 'Objeción Interna',
-  persona_transformation: 'Transformación Soñada',
-  persona_lifestyle_brands: 'Marcas que Consume',
-  persona_impress_who: '¿A Quién Impresiona?',
-  persona_channels: 'Canales del Cliente',
-  persona_desires: 'Sueños y Deseos',
-  persona_daily_frustrations: 'Frustraciones Diarias',
-  // Parte 3: Competencia
-  competitors_list: 'Competidores',
-  competitors_complaints: 'Quejas de Competencia',
-  competitors_false_promise: 'Promesas Falsas',
-  competitors_pricing: 'Precios Competencia',
-  competitors_slow_point: 'Punto Débil',
-  competitors_tone: 'Tono Competencia',
-  competitors_ignored_channel: 'Canal Ignorado',
-  competitors_entry_offer: 'Oferta de Entrada',
-  why_switch_to_you: '¿Por qué Cambiarse?',
-  uncopyable_advantage: 'Imposible de Copiar',
-  // Parte 4: Estrategia Comunicacional
-  purple_cow: 'Vaca Púrpura',
-  big_promise: 'Gran Promesa',
-  villain: 'El Villano',
-  absurd_guarantee: 'Garantía Absurda',
-  irrefutable_proof: 'Prueba Irrefutable',
-  insider_secret: 'Secreto del Insider',
-  ideal_tone: 'Tono Ideal',
-  irresistible_offer: 'Oferta Irresistible',
-  urgency_reason: 'Razón de Urgencia',
-};
-
-// Question indices for each section
-const SECTION_RANGES = {
-  business: { start: 0, end: 6, title: 'El Negocio', icon: Building2 },
-  persona: { start: 6, end: 21, title: 'Buyer Persona', icon: Users },
-  competition: { start: 21, end: 31, title: 'Análisis Competitivo', icon: Trophy },
-  communication: { start: 31, end: 40, title: 'Estrategia Comunicacional', icon: MessageSquare },
-};
+const SECTIONS = [
+  { id: 'negocio', title: 'El Negocio', icon: Building2 },
+  { id: 'persona', title: 'Buyer Persona', icon: Users },
+  { id: 'competencia', title: 'Análisis Competitivo', icon: Trophy },
+  { id: 'estrategia', title: 'Estrategia', icon: MessageSquare },
+];
 
 export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const [briefData, setBriefData] = useState<BriefData | null>(null);
@@ -176,16 +85,174 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
   }
 
+  function handleDownloadPDF() {
+    if (!briefData) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const maxWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('Brief de Marca Estratégico', margin, y);
+    y += 10;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Generado: ${briefData.completed_at ? new Date(briefData.completed_at).toLocaleDateString('es-CL') : new Date().toLocaleDateString('es-CL')}`, margin, y);
+    doc.setTextColor(0);
+    y += 15;
+
+    const questions = briefData.questions || [];
+    const responses = briefData.raw_responses || [];
+
+    for (const section of SECTIONS) {
+      const sectionQuestions = questions
+        .map((qId, i) => ({ qId, response: responses[i], config: QUESTION_CONFIG[qId] }))
+        .filter(q => q.config?.section === section.id);
+
+      if (sectionQuestions.length === 0) continue;
+
+      if (y > 250) { doc.addPage(); y = 20; }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(30, 100, 200);
+      doc.text(section.title.toUpperCase(), margin, y);
+      doc.setTextColor(0);
+      y += 8;
+
+      for (const q of sectionQuestions) {
+        if (y > 260) { doc.addPage(); y = 20; }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(q.config?.label || q.qId, margin, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const lines = doc.splitTextToSize(q.response || 'Sin respuesta', maxWidth);
+        doc.text(lines, margin, y);
+        y += lines.length * 4 + 6;
+      }
+
+      y += 4;
+    }
+
+    // Summary
+    if (briefData.summary) {
+      if (y > 200) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(30, 100, 200);
+      doc.text('RESUMEN DE STEVE', margin, y);
+      doc.setTextColor(0);
+      y += 8;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      // Strip markdown for PDF
+      const cleanSummary = briefData.summary.replace(/[*#_]/g, '').replace(/\n{3,}/g, '\n\n');
+      const summaryLines = doc.splitTextToSize(cleanSummary, maxWidth);
+      
+      for (const line of summaryLines) {
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(line, margin, y);
+        y += 4;
+      }
+    }
+
+    doc.save('Brief_de_Marca.pdf');
+    toast.success('PDF descargado');
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-48 w-full" />
       </div>
     );
   }
 
+  const questions = briefData?.questions || [];
+  const responses = briefData?.raw_responses || [];
+  const answeredCount = briefData?.answered_count || responses.length;
+  const totalQuestions = briefData?.total_questions || 15;
+  const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
+
+  // Show in-progress view
+  if (!isComplete && briefData && answeredCount > 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <FileText className="h-6 w-6" />
+              Brief de Marca
+            </h2>
+            <p className="text-muted-foreground text-sm mt-1">En progreso — habla con Steve para completarlo</p>
+          </div>
+          <Button onClick={onEditBrief}>
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Continuar con Steve
+          </Button>
+        </div>
+
+        {/* Progress */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-muted-foreground">Progreso del Brief</span>
+              <span className="font-semibold">{progressPercent}%</span>
+            </div>
+            <Progress value={progressPercent} className="h-3 mb-4" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {SECTIONS.map(section => {
+                const sectionQs = questions
+                  .map((qId, i) => ({ qId, answered: !!responses[i], config: QUESTION_CONFIG[qId] }))
+                  .filter(q => q.config?.section === section.id);
+                const done = sectionQs.filter(q => q.answered).length;
+                const total = Object.values(QUESTION_CONFIG).filter(c => c.section === section.id).length;
+                return (
+                  <div key={section.id} className="bg-muted/50 rounded-lg p-3 text-center">
+                    <section.icon className="h-5 w-5 mx-auto mb-1 text-primary" />
+                    <p className="text-xs font-medium">{section.title}</p>
+                    <p className="text-xs text-muted-foreground">{done}/{total}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Answered questions */}
+        {questions.map((qId, i) => {
+          if (!responses[i]) return null;
+          const config = QUESTION_CONFIG[qId];
+          if (!config) return null;
+          return (
+            <Card key={qId}>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
+                  {config.icon}
+                  {config.label}
+                  <CheckCircle2 className="h-3 w-3 text-green-500 ml-auto" />
+                </div>
+                <p className="text-sm">{responses[i]}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // No brief at all
   if (!briefData || !isComplete) {
     return (
       <Card className="text-center py-12">
@@ -193,7 +260,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Sin Brief de Marca</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Aún no tienes un Brief de Marca. Habla con Steve para crear uno y poder generar campañas efectivas.
+            Habla con Steve para crear tu Brief Estratégico en solo 15 preguntas.
           </p>
           <Button onClick={onEditBrief}>
             <MessageSquare className="h-4 w-4 mr-2" />
@@ -204,167 +271,86 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     );
   }
 
-  const questions = briefData.questions || [];
-  const responses = briefData.raw_responses || [];
-
+  // Complete brief
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <FileText className="h-6 w-6" />
             Brief de Marca
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Creado con Steve • {briefData.completed_at ? new Date(briefData.completed_at).toLocaleDateString('es-CL') : 'Fecha desconocida'}
+            Creado con Steve • {briefData.completed_at ? new Date(briefData.completed_at).toLocaleDateString('es-CL') : ''}
           </p>
         </div>
-        <Button variant="outline" onClick={onEditBrief}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Editar con Steve
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Descargar PDF
+          </Button>
+          <Button variant="outline" onClick={onEditBrief}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Editar con Steve
+          </Button>
+        </div>
       </div>
 
-      {/* Status Badge */}
       <div className="flex items-center gap-2">
         <Badge variant="default" className="bg-primary">
           <CheckCircle2 className="h-3 w-3 mr-1" />
           Brief Completo
         </Badge>
-        <Badge variant="secondary">
-          {responses.length} respuestas
-        </Badge>
+        <Badge variant="secondary">{responses.length} respuestas</Badge>
       </div>
 
-      {/* All 5 Sections */}
+      {/* Sections */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Part 1: Business */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              El Negocio
-            </CardTitle>
-            <CardDescription>Preguntas 1-6</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[250px] pr-4">
-              <div className="space-y-3">
-                {questions.slice(SECTION_RANGES.business.start, SECTION_RANGES.business.end).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${index + 1}`}
-                    </div>
-                    <p className="text-sm">
-                      {responses[SECTION_RANGES.business.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        {SECTIONS.map(section => {
+          const sectionQs = questions
+            .map((qId, i) => ({ qId, response: responses[i], config: QUESTION_CONFIG[qId] }))
+            .filter(q => q.config?.section === section.id);
 
-        {/* Part 2: Buyer Persona */}
-        <Card className="lg:row-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Buyer Persona Psicográfico
-            </CardTitle>
-            <CardDescription>El Cliente Soñado • Preguntas 7-21</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[550px] pr-4">
-              <div className="space-y-3">
-                {questions.slice(SECTION_RANGES.persona.start, SECTION_RANGES.persona.end).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${SECTION_RANGES.persona.start + index + 1}`}
-                    </div>
-                    <p className="text-sm">
-                      {responses[SECTION_RANGES.persona.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+          if (sectionQs.length === 0) return null;
 
-        {/* Part 3: Competitive Analysis */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              Análisis Competitivo
-            </CardTitle>
-            <CardDescription>Debilidades a Explotar • Preguntas 22-31</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-3">
-                {questions.slice(SECTION_RANGES.competition.start, SECTION_RANGES.competition.end).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${SECTION_RANGES.competition.start + index + 1}`}
+          return (
+            <Card key={section.id}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <section.icon className="h-5 w-5 text-primary" />
+                  {section.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {sectionQs.map(q => (
+                    <div key={q.qId} className="border-b border-border pb-2 last:border-0">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
+                        {q.config?.icon}
+                        {q.config?.label}
+                      </div>
+                      <p className="text-sm">{q.response || <span className="text-muted-foreground italic">Sin respuesta</span>}</p>
                     </div>
-                    <p className="text-sm">
-                      {responses[SECTION_RANGES.competition.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Part 4: Communication Strategy */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-primary" />
-              Estrategia Comunicacional
-            </CardTitle>
-            <CardDescription>Vaca Púrpura y Oferta • Preguntas 32-40</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-3">
-                {questions.slice(SECTION_RANGES.communication.start, SECTION_RANGES.communication.end).map((questionId, index) => (
-                  <div key={questionId} className="border-b border-border pb-2 last:border-0">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1">
-                      {QUESTION_ICONS[questionId] || <FileText className="h-3 w-3" />}
-                      {QUESTION_LABELS[questionId] || `Pregunta ${SECTION_RANGES.communication.start + index + 1}`}
-                    </div>
-                    <p className="text-sm">
-                      {responses[SECTION_RANGES.communication.start + index] || <span className="text-muted-foreground italic">Sin respuesta</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Summary from Steve */}
+      {/* Summary */}
       {briefData.summary && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               🐕 Resumen de Steve
             </CardTitle>
-            <CardDescription>Análisis y recomendaciones del Bulldog Francés PhD</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="max-h-[400px]">
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <p className="whitespace-pre-wrap text-sm">{briefData.summary}</p>
+                <ReactMarkdown>{briefData.summary}</ReactMarkdown>
               </div>
             </ScrollArea>
           </CardContent>
