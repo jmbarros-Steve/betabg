@@ -8,11 +8,12 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Send, User, Sparkles, RefreshCw, Download } from 'lucide-react';
+import { Send, User, Sparkles, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
 import avatarChonga from '@/assets/avatar-chonga.png';
+import { StructuredFieldsForm, type QuestionField } from './StructuredFieldsForm';
 
 interface Message {
   id: string;
@@ -60,6 +61,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [isComplete, setIsComplete] = useState(false);
   const [progress, setProgress] = useState({ answered: 0, total: 15 });
   const [examples, setExamples] = useState<string[]>([]);
+  const [currentFields, setCurrentFields] = useState<QuestionField[]>([]);
+  const [fieldValidation, setFieldValidation] = useState<string | undefined>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -71,7 +74,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, currentFields]);
 
   async function initializeConversation() {
     setIsInitializing(true);
@@ -100,7 +103,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
         if (existingMessages && existingMessages.length > 0) {
           setMessages(existingMessages as Message[]);
           
-          // Calc progress from user messages
           const userMsgCount = existingMessages.filter(m => m.role === 'user').length;
           setProgress({ answered: userMsgCount, total: 15 });
           
@@ -143,6 +145,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
         }]);
         setProgress({ answered: 0, total: data.total_questions || 15 });
         if (data.examples) setExamples(data.examples);
+        if (data.fields?.length) {
+          setCurrentFields(data.fields);
+          setFieldValidation(data.field_validation);
+        }
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -150,13 +156,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
     }
   }
 
-  async function handleSendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || isLoading || !conversationId) return;
+  async function sendMessage(messageText: string) {
+    if (!messageText.trim() || isLoading || !conversationId) return;
 
-    const userMessage = input.trim();
+    const userMessage = messageText.trim();
     setInput('');
     setExamples([]);
+    setCurrentFields([]);
+    setFieldValidation(undefined);
     
     const tempUserMsg: Message = {
       id: crypto.randomUUID(),
@@ -191,7 +198,11 @@ export function SteveChat({ clientId }: SteveChatProps) {
           setProgress({ answered: data.answered_count, total: data.total_questions || 15 });
         }
         
-        if (data.examples) setExamples(data.examples);
+        if (data.examples?.length) setExamples(data.examples);
+        if (data.fields?.length) {
+          setCurrentFields(data.fields);
+          setFieldValidation(data.field_validation);
+        }
         
         if (data.is_complete) {
           setIsComplete(true);
@@ -214,6 +225,15 @@ export function SteveChat({ clientId }: SteveChatProps) {
     }
   }
 
+  function handleSendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    sendMessage(input);
+  }
+
+  function handleStructuredSubmit(formattedMessage: string) {
+    sendMessage(formattedMessage);
+  }
+
   function handleExampleClick(example: string) {
     setInput(example);
     inputRef.current?.focus();
@@ -227,6 +247,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setIsComplete(false);
     setProgress({ answered: 0, total: 15 });
     setExamples([]);
+    setCurrentFields([]);
+    setFieldValidation(undefined);
     
     if (conversationId) {
       await supabase.from('steve_conversations').delete().eq('id', conversationId);
@@ -236,6 +258,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   const progressPercent = Math.round((progress.answered / progress.total) * 100);
+  const hasStructuredFields = currentFields.length > 0 && !isLoading && !isComplete;
 
   if (isInitializing) {
     return (
@@ -285,7 +308,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
           </div>
         </div>
 
-        {/* Progress Bar */}
         {!isComplete && (
           <div className="mt-3 space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
@@ -376,8 +398,21 @@ export function SteveChat({ clientId }: SteveChatProps) {
         </div>
       </ScrollArea>
 
-      {/* Example Suggestions */}
-      {examples.length > 0 && !isLoading && !isComplete && (
+      {/* Structured Fields Form */}
+      {hasStructuredFields && (
+        <div className="px-4 pb-2 flex-shrink-0">
+          <p className="text-xs text-muted-foreground mb-2">📝 Llena los campos y envía tu respuesta:</p>
+          <StructuredFieldsForm
+            fields={currentFields}
+            validation={fieldValidation}
+            onSubmit={handleStructuredSubmit}
+            isLoading={isLoading}
+          />
+        </div>
+      )}
+
+      {/* Example Suggestions (only when no structured fields) */}
+      {examples.length > 0 && !hasStructuredFields && !isLoading && !isComplete && (
         <div className="px-4 pb-2 flex-shrink-0">
           <p className="text-xs text-muted-foreground mb-2">💡 Ejemplos (haz clic para usar):</p>
           <div className="flex flex-wrap gap-2">
@@ -406,6 +441,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
               Crear nuevo Brief
             </Button>
           </div>
+        ) : hasStructuredFields ? (
+          <p className="text-xs text-center text-muted-foreground py-2">
+            ☝️ Completa los campos arriba para continuar
+          </p>
         ) : (
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <Input
