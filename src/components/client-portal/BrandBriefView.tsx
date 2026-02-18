@@ -563,19 +563,25 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   }
 
   async function fetchResearch() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('brand_research')
       .select('research_type, research_data')
       .eq('client_id', clientId);
-    if (data) {
+    if (error) {
+      console.error('fetchResearch error:', error);
+      return;
+    }
+    if (data && data.length > 0) {
       const r: ResearchData = {};
+      // Track status separately — never merge into research state
+      const SKIP_TYPES = ['analysis_status', 'analysis_progress'];
       for (const row of data) {
         if (row.research_type === 'analysis_status') {
           const status = (row.research_data as any)?.status;
           if (status === 'pending') setAnalysisStatus('pending');
           else if (status === 'complete') setAnalysisStatus('complete');
           else if (status === 'error') setAnalysisStatus('error');
-        } else {
+        } else if (!SKIP_TYPES.includes(row.research_type)) {
           (r as any)[row.research_type] = row.research_data;
         }
       }
@@ -2190,56 +2196,56 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             ) : (
               <>
-                {research.keywords?.primary?.length > 0 && (
+                {Array.isArray(research.keywords?.primary) && research.keywords.primary.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">🎯 Keywords Principales</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1.5">
-                        {research.keywords.primary.map((kw: string, i: number) => (
+                        {research.keywords.primary.map((kw: any, i: number) => (
                           <Badge key={i} variant="secondary" className="text-xs">{kw == null ? '' : String(kw)}</Badge>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
                 )}
-                {research.keywords?.long_tail?.length > 0 && (
+                {Array.isArray(research.keywords?.long_tail) && research.keywords.long_tail.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">🔍 Long-tail (Baja Competencia)</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1.5">
-                        {research.keywords.long_tail.map((kw: string, i: number) => (
+                        {research.keywords.long_tail.map((kw: any, i: number) => (
                           <Badge key={i} variant="outline" className="text-xs">{kw == null ? '' : String(kw)}</Badge>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
                 )}
-                {research.keywords?.competitor_keywords?.length > 0 && (
+                {Array.isArray(research.keywords?.competitor_keywords) && research.keywords.competitor_keywords.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">🏆 Keywords de Competidores</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1.5">
-                        {research.keywords.competitor_keywords.map((kw: string, i: number) => (
+                        {research.keywords.competitor_keywords.map((kw: any, i: number) => (
                           <Badge key={i} variant="outline" className="text-xs border-destructive/30 text-destructive">{kw == null ? '' : String(kw)}</Badge>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
                 )}
-                {research.keywords?.negative_keywords?.length > 0 && (
+                {Array.isArray(research.keywords?.negative_keywords) && research.keywords.negative_keywords.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">🚫 Keywords Negativas</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1.5">
-                        {research.keywords.negative_keywords.map((kw: string, i: number) => (
+                        {research.keywords.negative_keywords.map((kw: any, i: number) => (
                           <Badge key={i} variant="outline" className="text-xs text-muted-foreground">{kw == null ? '' : String(kw)}</Badge>
                         ))}
                       </div>
@@ -2252,12 +2258,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       <CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia Recomendada</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm leading-relaxed">{research.keywords.recommended_strategy}</p>
+                      <p className="text-sm leading-relaxed">{String(research.keywords.recommended_strategy)}</p>
                     </CardContent>
                   </Card>
                 )}
                 {research.keywords?.strategy && (
-                  <KeywordStrategyTimeline strategy={research.keywords.strategy} />
+                  <KeywordStrategyTimeline strategy={String(research.keywords.strategy)} />
                 )}
               </>
             )}
