@@ -40,7 +40,7 @@ const PERFORMANCE_QUOTES = [
   { quote: "Your ROAS is a vanity metric. Profit per customer is what matters.", author: "Andrew Wilkinson", role: "Tiny Capital" },
 ];
 
-function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail: string; pct: number } | null }) {
+function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail: string; pct: number } }) {
   const [quoteIdx, setQuoteIdx] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -69,7 +69,7 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
         <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-primary truncate">
-            {progressStep?.detail || 'Iniciando análisis de marca...'}
+            {progressStep.detail}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Steve está auditando tu sitio, investigando keywords y analizando hasta 6 competidores. 1–2 min.</p>
         </div>
@@ -78,15 +78,15 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
       <div>
         <div className="flex justify-between items-center mb-1">
           <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
-          <span className="text-[10px] font-bold text-primary">{progressStep?.pct ?? 2}%</span>
+          <span className="text-[10px] font-bold text-primary">{progressStep.pct}%</span>
         </div>
-        <Progress value={progressStep?.pct ?? 2} className="h-2" />
+        <Progress value={progressStep.pct} className="h-2" />
       </div>
 
       <div className="grid grid-cols-4 gap-2 text-center">
         {phases.map((phase, i) => {
-          const isActive = progressStep && phase.keys.includes(progressStep.step);
-          const pct = progressStep?.pct ?? 0;
+          const isActive = phase.keys.includes(progressStep.step);
+          const pct = progressStep.pct;
           const isDone = pct > phase.threshold && !isActive;
           return (
             <div key={i} className={`rounded-lg p-2 border transition-all duration-300 ${isActive ? 'bg-primary/10 border-primary/40' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background border-border'}`}>
@@ -128,7 +128,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [competitorUrls, setCompetitorUrls] = useState(['', '', '']);
   const [analyzing, setAnalyzing] = useState(false);
-  const [progressStep, setProgressStep] = useState<{ step: string; detail: string; pct: number } | null>(null);
+  const [progressStep, setProgressStep] = useState<{ step: string; detail: string; pct: number }>({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
   const [autoTriggered, setAutoTriggered] = useState(false);
   const fileRefs = useRef<Record<AssetCategory, HTMLInputElement | null>>({ logo: null, products: null, ads: null });
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -171,14 +171,14 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
         setAnalyzing(false);
-        setProgressStep(null);
+        setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
         toast.success('¡Análisis SEO, Keywords y Competencia completado!');
         onResearchComplete?.();
       } else if (status === 'error') {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
         setAnalyzing(false);
-        setProgressStep(null);
+        setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
         toast.error('Error en el análisis. Intenta de nuevo.');
       }
     }, 5000);
