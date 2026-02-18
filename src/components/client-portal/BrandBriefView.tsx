@@ -1561,6 +1561,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const answeredCount = briefData?.answered_count || responses.length;
   const totalQuestions = briefData?.total_questions || 15;
   const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
+  console.log('Research completo:', JSON.stringify(research));
   const hasResearch = Object.keys(research).length > 0;
   const hasSEO = !!research.seo_audit;
   const hasKeywords = !!research.keywords;
