@@ -2345,71 +2345,62 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 )}
 
                 {/* Keywords por Competidor */}
-                {research.competitor_analysis?.competitors?.length > 0 && (
+                {(Array.isArray(research.keywords?.competitor_keywords) && research.keywords.competitor_keywords.length > 0 || research.competitor_analysis?.competitors?.length > 0) && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <Trophy className="h-4 w-4 text-primary" />
                         Keywords por Competidor
                       </CardTitle>
-                      <CardDescription className="text-xs">Keywords y estrategia SEO detectadas en cada competidor analizado</CardDescription>
+                      <CardDescription className="text-xs">Keywords y posicionamiento competitivo detectado por la IA</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      {research.competitor_analysis.competitors.map((comp: any, i: number) => {
-                        const allKeywords: string[] = [
-                          ...(Array.isArray(comp.keywords) ? comp.keywords : []),
-                          ...(Array.isArray(comp.top_keywords) ? comp.top_keywords : []),
-                          ...(Array.isArray(comp.seo_keywords) ? comp.seo_keywords : []),
-                        ].filter(Boolean);
-                        const uniqueKeywords = [...new Set(allKeywords.map(k => String(k == null ? '' : k)))].filter(k => k !== '');
-                        const hasKeywordData = uniqueKeywords.length > 0 || comp.keyword_strategy || comp.top_keywords;
-                        return (
-                          <div key={i} className="border border-border rounded-lg p-3 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
-                              <span className="font-semibold text-sm">{comp.name || comp.url || `Competidor ${i + 1}`}</span>
-                              {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
-                            </div>
-
-                            {uniqueKeywords.length > 0 ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {uniqueKeywords.map((kw, j) => (
-                                  <Badge key={j} variant="outline" className="text-xs">
-                                    {kw}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : null}
-
-                            {comp.keyword_strategy && (
-                              <div>
-                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Estrategia de Keywords</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{String(comp.keyword_strategy)}</p>
-                              </div>
-                            )}
-
-                            {!hasKeywordData && (
-                              <>
-                                {comp.positioning && (
-                                  <div>
-                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Posicionamiento</p>
-                                    <p className="text-xs text-muted-foreground italic">"{String(comp.positioning)}"</p>
-                                  </div>
-                                )}
-                                {comp.value_proposition && (
-                                  <div>
-                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Propuesta de Valor</p>
-                                    <p className="text-xs text-muted-foreground">{String(comp.value_proposition)}</p>
-                                  </div>
-                                )}
-                                {!comp.positioning && !comp.value_proposition && (
-                                  <p className="text-xs text-muted-foreground italic">Sin datos de keywords disponibles para este competidor.</p>
-                                )}
-                              </>
-                            )}
+                    <CardContent className="space-y-4">
+                      {/* Keywords generales de competidores */}
+                      {Array.isArray(research.keywords?.competitor_keywords) && research.keywords.competitor_keywords.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">Keywords de Competidores</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {research.keywords.competitor_keywords.map((kw: any, i: number) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {kw == null ? '' : String(kw)}
+                              </Badge>
+                            ))}
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
+
+                      {/* Card por competidor */}
+                      {research.competitor_analysis?.competitors?.length > 0 && (
+                        <div className="space-y-3">
+                          {research.competitor_analysis.competitors.map((comp: any, i: number) => (
+                            <div key={i} className="border border-border rounded-lg p-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
+                                <span className="font-semibold text-sm">{comp.name || comp.url || `Competidor ${i + 1}`}</span>
+                                {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
+                              </div>
+                              {comp.positioning && (
+                                <div>
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Posicionamiento</p>
+                                  <p className="text-xs text-muted-foreground italic">"{String(comp.positioning)}"</p>
+                                </div>
+                              )}
+                              {comp.value_proposition && (
+                                <div>
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Propuesta de Valor</p>
+                                  <p className="text-xs text-muted-foreground">{String(comp.value_proposition)}</p>
+                                </div>
+                              )}
+                              {comp.attack_vector && (
+                                <div className="bg-destructive/5 border border-destructive/20 rounded p-2">
+                                  <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-0.5">⚔️ Táctica para Quitarles Clientes</p>
+                                  <p className="text-xs leading-relaxed">{String(comp.attack_vector)}</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
