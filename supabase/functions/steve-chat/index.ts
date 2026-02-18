@@ -262,6 +262,8 @@ GENERA EL BRIEF ESTRATÉGICO COMPLETO. ESTE DOCUMENTO SERÁ DESCARGADO COMO PDF 
 REGLAS DE REDACCIÓN ABSOLUTAS:
 ═══════════════════════════════════════
 
+0. EMPIEZA DIRECTAMENTE CON "## 1. RESUMEN EJECUTIVO" — SIN preámbulo, SIN texto introductorio, SIN "¡Listo!" ni emojis. El documento comienza en la primera línea con el header del resumen ejecutivo.
+
 1. TODO en TERCERA PERSONA PROFESIONAL:
    - CORRECTO: "La marca se posiciona como...", "El consumidor objetivo presenta...", "Se recomienda implementar..."
    - INCORRECTO: "Vendemos...", "Tu cliente...", "Yo creo que..."
@@ -561,7 +563,7 @@ NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes 
 
     console.log(`Steve chat: conversation ${activeConversationId}, answered ${answeredQuestions}/${BRAND_BRIEF_QUESTIONS.length}`);
 
-    const maxTokens = isLastQuestion ? 4500 : 1200;
+    const maxTokens = isLastQuestion ? 8000 : 1200;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
