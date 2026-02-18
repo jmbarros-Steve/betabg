@@ -543,7 +543,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       .eq('client_id', clientId)
       .maybeSingle();
     if (data) {
-      setBriefData(data.persona_data as BriefData);
+      const pd = data.persona_data as BriefData;
+      // Sanitizar raw_responses en el origen: null/undefined → '' para evitar crashes en .trim()
+      if (pd?.raw_responses && Array.isArray(pd.raw_responses)) {
+        pd.raw_responses = pd.raw_responses.map((r: any) => (r == null ? '' : String(r)));
+      }
+      setBriefData(pd);
       setIsComplete(data.is_complete);
     }
   }
@@ -827,7 +832,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     y += 6;
 
     const questions = briefData.questions || [];
-    const responses = briefData.raw_responses || [];
+    const responses = (briefData.raw_responses || []).map((r: any) => (r == null ? '' : String(r)));
 
     // === 1. RESUMEN EJECUTIVO ===
     if (briefData.summary) {
