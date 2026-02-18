@@ -781,6 +781,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         {sectionQs.map(q => {
                           // Special rendering for "El Negocio" Q1 — ensure third person
                           if (q.qId === 'business_pitch' && q.response) {
+                            // Convert first-person language to third-person for brief display
+                            const thirdPerson = q.response
+                              .replace(/\bvendemos\b/gi, `${clientInfo?.company || clientInfo?.name || 'La empresa'} vende`)
+                              .replace(/\bsomos\b/gi, `${clientInfo?.company || clientInfo?.name || 'La empresa'} es`)
+                              .replace(/\btenemos\b/gi, 'cuenta con')
+                              .replace(/\bnuestra tienda\b/gi, 'su tienda')
+                              .replace(/\bnuestro negocio\b/gi, 'el negocio')
+                              .replace(/\bnuestros productos\b/gi, 'sus productos')
+                              .replace(/\bnuestra marca\b/gi, 'la marca');
                             return (
                               <div key={q.qId} className="border-b border-border pb-3 last:border-0">
                                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1.5">
@@ -788,7 +797,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                                   {q.config?.label}
                                   <CheckCircle2 className="h-3 w-3 text-primary ml-auto" />
                                 </div>
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{q.response}</p>
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{thirdPerson}</p>
                               </div>
                             );
                           }
@@ -803,33 +812,37 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                                 </div>
                                 {/* Financial KPI Cards */}
                                 <div className="grid grid-cols-2 gap-2 mb-2">
-                                  <div className="bg-muted/60 rounded-lg p-2 text-center">
-                                    <p className="text-xs text-muted-foreground">Precio Venta</p>
-                                    <p className="text-base font-bold text-primary">{formatCurrency(financials.price)}</p>
+                                  <div className="bg-muted/60 rounded-lg p-3 text-center">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Precio Venta</p>
+                                    <p className="text-lg font-bold text-primary">{formatCurrency(financials.price)}</p>
                                   </div>
-                                  <div className="bg-muted/60 rounded-lg p-2 text-center">
-                                    <p className="text-xs text-muted-foreground">Costo</p>
-                                    <p className="text-base font-bold">{formatCurrency(financials.cost)}</p>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                  <div className="bg-primary/10 rounded-lg p-2 text-center border border-primary/20">
-                                    <p className="text-xs text-muted-foreground">Margen Bruto</p>
-                                    <p className="text-sm font-bold text-primary">{formatCurrency(margin)}</p>
-                                    <p className="text-xs text-primary">{marginPct}%</p>
-                                  </div>
-                                  <div className="bg-muted/60 rounded-lg p-2 text-center">
-                                    <p className="text-xs text-muted-foreground">Envío</p>
-                                    <p className="text-sm font-bold">{formatCurrency(financials.shipping)}</p>
-                                  </div>
-                                  <div className="bg-secondary/50 rounded-lg p-2 text-center border border-secondary">
-                                    <p className="text-xs text-muted-foreground">CPA Máx.</p>
-                                    <p className="text-sm font-bold text-secondary-foreground">${cpaMax}</p>
+                                  <div className="bg-muted/60 rounded-lg p-3 text-center">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Costo Producto</p>
+                                    <p className="text-lg font-bold text-foreground">{formatCurrency(financials.cost)}</p>
                                   </div>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-2 bg-muted/40 rounded p-2">
-                                  💡 <strong>CPA Máximo Viable:</strong> El máximo que se puede invertir para adquirir un cliente sin perder margen. Se calcula como el 30% del margen bruto.
-                                </p>
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                  <div className="bg-muted/60 rounded-lg p-3 text-center">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Envío</p>
+                                    <p className="text-base font-bold text-foreground">{formatCurrency(financials.shipping)}</p>
+                                  </div>
+                                  <div className="bg-primary/10 rounded-lg p-3 text-center border border-primary/20">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Margen Bruto</p>
+                                    <p className="text-base font-bold text-primary">{formatCurrency(margin)}</p>
+                                    <p className="text-[10px] text-primary font-semibold">{marginPct}%</p>
+                                  </div>
+                                  <div className="bg-secondary rounded-lg p-3 text-center border-2 border-primary/30">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">CPA Máximo</p>
+                                    <p className="text-base font-bold text-primary">${cpaMax}</p>
+                                    <p className="text-[10px] text-muted-foreground">30% margen</p>
+                                  </div>
+                                </div>
+                                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-2">
+                                  <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                  <p className="text-xs text-foreground leading-relaxed">
+                                    <strong className="text-primary">CPA Máximo Viable = ${cpaMax}:</strong> Es el costo máximo permitido para adquirir un cliente antes de perder margen. Ninguna campaña debe superar este valor. Se calcula como el 30% del margen bruto (${formatCurrency(margin ?? 0)}).
+                                  </p>
+                                </div>
                               </div>
                             );
                           }
@@ -870,29 +883,103 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             )}
 
-            {/* Steve's Strategic Evaluation — 7 Accionables */}
+            {/* Full Strategic Brief — sections 1-6 */}
             {briefData?.summary && isComplete && (
               <Card className="border-primary/20 border-2">
                 <CardHeader className="pb-3 bg-primary/5">
                   <div className="flex items-center gap-3">
                     <img src={avatarSteve} alt="Steve" className="h-12 w-12 rounded-full border-2 border-primary/20 shadow-md" />
                     <div>
-                      <CardTitle className="text-lg">Evaluación Estratégica — 7 Accionables</CardTitle>
+                      <CardTitle className="text-lg">Análisis Estratégico de Marca</CardTitle>
                       <CardDescription className="text-xs">Dr. Steve Dogs — PhD Performance Marketing, Stanford</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
+                  {/* Render sections 1-6 excluding section 7 */}
                   <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:border-l-2 [&>h3]:border-primary/30 [&>h3]:pl-3 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&_th]:bg-primary/10 [&_th]:text-left [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{
                       (() => {
                         const raw = briefData.summary || '';
-                        // Show full brief starting from section 1
                         const firstHeader = raw.indexOf('## ');
-                        return firstHeader > 0 ? raw.slice(firstHeader) : raw;
+                        const section7 = raw.match(/##\s*7\./);
+                        const start = firstHeader > 0 ? firstHeader : 0;
+                        const end = section7?.index ?? raw.length;
+                        return raw.slice(start, end).trim();
                       })()
                     }</ReactMarkdown>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Evaluación Estratégica — 7 Accionables as numbered cards */}
+            {briefData?.summary && isComplete && (
+              <Card className="border-2 border-primary/30">
+                <CardHeader className="pb-3 bg-primary/5">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">7</div>
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-primary" />
+                        Evaluación Estratégica — 7 Accionables Prioritarios
+                      </CardTitle>
+                      <CardDescription className="text-xs">Plan de acción con KPIs y responsables — Dr. Steve Dogs</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {(() => {
+                    const raw = briefData.summary || '';
+                    const section7Match = raw.match(/##\s*7\./);
+                    if (!section7Match || section7Match.index === undefined) {
+                      // Fallback: show raw section 7 as markdown
+                      return (
+                        <p className="text-sm text-muted-foreground italic">La evaluación estratégica se generará al completar el brief.</p>
+                      );
+                    }
+                    const section7Text = raw.slice(section7Match.index);
+                    // Try to extract numbered accionables blocks
+                    const accionableBlocks = section7Text.split(/\n(?=###\s*Accionable\s*\d|###\s*\d+\.|##\s*Accionable\s*\d)/i).filter(b => b.trim() && b.match(/accionable|\d+\./i));
+
+                    if (accionableBlocks.length >= 3) {
+                      return (
+                        <div className="space-y-3">
+                          {accionableBlocks.slice(0, 7).map((block, i) => {
+                            const lines = block.split('\n').map(l => l.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
+                            const title = lines[0] || `Accionable ${i + 1}`;
+                            const body = lines.slice(1).join(' ');
+                            const kpiMatch = body.match(/KPI[:\s]+([^.]+)/i);
+                            const kpi = kpiMatch?.[1]?.trim();
+                            const cleanBody = body.replace(/KPI[:\s]+[^.]+\./i, '').replace(/Responsable[:\s]+[^.]+\./i, '').trim();
+                            return (
+                              <div key={i} className="flex gap-3 bg-muted/40 rounded-xl p-4 border border-border hover:border-primary/30 transition-colors">
+                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm text-foreground mb-1">{title.replace(/^(Accionable\s*\d+[:.]\s*|\d+[:.]\s*)/i, '')}</p>
+                                  {cleanBody && <p className="text-xs text-muted-foreground leading-relaxed mb-2">{cleanBody.slice(0, 220)}{cleanBody.length > 220 ? '…' : ''}</p>}
+                                  {kpi && (
+                                    <div className="flex items-center gap-1.5">
+                                      <BarChart3 className="h-3 w-3 text-primary flex-shrink-0" />
+                                      <span className="text-[10px] font-semibold text-primary">KPI:</span>
+                                      <span className="text-[10px] text-muted-foreground">{kpi}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+
+                    // Fallback: render full section 7 as markdown
+                    return (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-4 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-3 [&>h3]:mb-1 [&>h3]:border-l-2 [&>h3]:border-primary/30 [&>h3]:pl-3 [&>p]:mb-2 [&>ul>li]:mb-1 [&>table]:text-xs [&_th]:bg-primary/10 [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{section7Text}</ReactMarkdown>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
@@ -942,7 +1029,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Hablar con Steve sobre anuncios
                     </Button>
-                    <Badge variant="outline" className="text-xs py-1.5 border-amber-400 text-amber-700 dark:text-amber-400">
+                    <Badge variant="outline" className="text-xs py-1.5 border-primary text-primary">
                       CPA Máximo: ${cpaMax || '—'} · Margen: {marginPct || '—'}%
                     </Badge>
                   </div>
@@ -1031,9 +1118,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <h3 className="text-lg font-bold">Score SEO Global</h3>
                         <p className="text-xs text-muted-foreground">{clientInfo?.website_url}</p>
                       </div>
-                      <div className={`text-5xl font-bold ${
+                       <div className={`text-5xl font-bold ${
                         (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
-                        (research.seo_audit.score || 0) >= 40 ? 'text-amber-600' : 'text-destructive'
+                        (research.seo_audit.score || 0) >= 40 ? 'text-warning' : 'text-destructive'
                       }`}>
                         {research.seo_audit.score || '?'}<span className="text-lg text-muted-foreground">/100</span>
                       </div>
@@ -1050,11 +1137,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </div>
                       <div className={`rounded-lg p-3 ${
                         (research.seo_audit.score || 0) >= 70 ? 'bg-primary/10' :
-                        (research.seo_audit.score || 0) >= 40 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-destructive/10'
+                        (research.seo_audit.score || 0) >= 40 ? 'bg-secondary' : 'bg-destructive/10'
                       }`}>
                         <p className={`font-bold text-xl ${
                           (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
-                          (research.seo_audit.score || 0) >= 40 ? 'text-amber-600' : 'text-destructive'
+                          (research.seo_audit.score || 0) >= 40 ? 'text-warning' : 'text-destructive'
                         }`}>{(research.seo_audit.score || 0) >= 70 ? 'Bueno' : (research.seo_audit.score || 0) >= 40 ? 'Regular' : 'Crítico'}</p>
                         <p className="text-muted-foreground">Estado</p>
                       </div>
@@ -1341,7 +1428,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <p className="text-xs font-semibold text-primary mb-2">🏆 Patrones Ganadores Detectados</p>
                           <ul className="space-y-1">{research.ads_library_analysis.winning_patterns.map((p: string, i: number) => (
                             <li key={i} className="text-sm flex items-start gap-2 bg-muted/50 rounded p-2">
-                              <span className="text-amber-600">★</span> {p}
+                              <span className="text-warning">★</span> {p}
                             </li>
                           ))}</ul>
                         </div>
