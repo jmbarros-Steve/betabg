@@ -269,9 +269,10 @@ REGLAS DE REDACCIÓN ABSOLUTAS:
    - INCORRECTO: "Vendemos...", "Tu cliente...", "Yo creo que..."
 
 2. TONO McKinsey/BCG — Documento de consultoría estratégica:
-   - Frases completas y bien estructuradas, no bullet points sueltos
-   - Cada sección debe tener 2-4 párrafos de análisis PROFUNDO
+   - Usa bullet points concisos para listar hallazgos clave, seguidos de 1-2 párrafos de conclusión por sección
+   - Prioriza CONCLUSIONES sobre datos — el lector quiere saber QUÉ SIGNIFICA, no repetir lo que dijo
    - NO copies lo que dijo el cliente. ANALIZA, CONTEXTUALIZA y SINTETIZA como un consultor senior.
+   - Sé CONCISO: menos texto, más estructura. Bullet points > párrafos largos.
 
 3. CERO emojis, CERO jerga perruna, CERO informalidad. El brief es un documento EJECUTIVO.
 
@@ -286,7 +287,12 @@ REGLAS DE REDACCIÓN ABSOLUTAS:
 FORMATO OBLIGATORIO (usa headers markdown ## para cada sección):
 
 ## 1. RESUMEN EJECUTIVO
-[Mínimo 4 párrafos. Evalúa: posicionamiento actual del negocio en su vertical, oportunidades de mercado identificadas, viabilidad financiera del modelo (usa los datos de Q2), y la recomendación estratégica principal. Compara con competidores. Esto debe leerse como un executive summary de McKinsey — completo, profesional, con conclusiones claras.]
+- **Diagnóstico:** [1 bullet con la situación actual del negocio]
+- **Oportunidad:** [1 bullet con la oportunidad de mercado identificada]
+- **Viabilidad:** [1 bullet sobre viabilidad financiera — conclusión, no datos]
+- **Recomendación principal:** [1 bullet con la acción estratégica #1]
+
+[1-2 párrafos de conclusión ejecutiva que integre todo lo anterior. Formal, concluyente, sin repetir datos crudos.]
 
 ## 2. ADN DE MARCA
 - **Sector y vertical:** [análisis del sector y posicionamiento]
@@ -298,19 +304,20 @@ FORMATO OBLIGATORIO (usa headers markdown ## para cada sección):
 | Indicador | Valor |
 |---|---|
 | Ticket promedio | $X |
-| Costo del producto | $X |
+| Costo unitario | $X |
 | Costo de envío | $X |
 | Margen bruto unitario | $X (Y%) |
 | CPA máximo viable | $X |
-| Inversión publicitaria actual | $X |
-| Volumen mensual estimado | X unidades |
 
-**Evaluación de viabilidad financiera:** [2 párrafos analizando si el modelo soporta inversión en marketing digital, comparando el CPA con benchmarks de la industria, y recomendación de nivel de inversión óptimo.]
+**Conclusión financiera:** [2 párrafos con CONCLUSIONES — NO repitas los datos. Analiza si el margen soporta inversión en marketing digital, compara el CPA con benchmarks de la industria (ej: CPA promedio en e-commerce de moda es $X), y da una recomendación clara de inversión óptima. Sé formal y concluyente.]
 
 ## 4. PERFIL DEL CONSUMIDOR OBJETIVO
-[Redactar como un perfil de investigación de mercado en tercera persona. NO como lista. Ej: "El consumidor objetivo de la marca corresponde a mujeres entre 30 y 45 años, residentes en zonas urbanas de la Región Metropolitana y Valparaíso, con un ingreso mensual promedio de $X. Este perfil demográfico se caracteriza por..."
+- **Demográfico:** [edad, género, ubicación, ingreso con formato $X.XXX.XXX con separador de miles]
+- **Psicográfico:** [valores, aspiraciones, estilo de vida — en 1-2 líneas]
+- **Motivación de compra:** [por qué compra, qué busca resolver]
+- **Barreras:** [objeciones principales y cómo superarlas]
 
-Incluir: datos demográficos, perfil psicográfico, patrones de consumo, motivaciones de compra, barreras y objeciones principales, y la transformación que busca. Todo en prosa profesional.]
+**Conclusión del perfil:** [1 párrafo formal que sintetice quién es el consumidor y qué implica para la estrategia de comunicación.]
 
 ## 5. ANÁLISIS COMPETITIVO ESTRATÉGICO
 [Para CADA competidor mencionado, redactar un análisis en prosa:

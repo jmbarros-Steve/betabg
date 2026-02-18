@@ -97,6 +97,13 @@ function detectGender(personaData: Record<string, string>): 'female' | 'male' {
 }
 
 // Format raw responses into professional third person text
+// Format currency with $ and thousand separators (Chilean style: $1.500.000)
+function formatCurrency(value: string | number): string {
+  const num = typeof value === 'string' ? parseInt(value.replace(/[^\d]/g, ''), 10) : value;
+  if (isNaN(num)) return String(value);
+  return '$' + num.toLocaleString('es-CL');
+}
+
 function formatResponseProfessional(qId: string, response: string): string {
   if (!response) return '';
   // Clean emoji prefixes from form submissions
@@ -421,7 +428,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       let py = y + 10;
       if (profileAge) { doc.text(`${profileAge} años • ${profileGender} • ${profileCity}`, px, py); py += 4; }
       if (profileOcc) { doc.text(`Ocupación: ${profileOcc}`, px, py); py += 4; }
-      if (profileIncome) { doc.text(`Ingreso mensual: ${profileIncome.replace(/^\$/, '')}`, px, py); py += 4; }
+      if (profileIncome) { doc.text(`Ingreso mensual: ${formatCurrency(profileIncome)}`, px, py); py += 4; }
       if (profileFamily) { doc.text(`${profileFamily}`, px, py); py += 4; }
       if (profileWhy) { doc.text(`Motivación: ${profileWhy}`, px, py); py += 4; }
       
@@ -702,7 +709,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       )}
                       {(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso']) && (
                         <p className="text-xs font-medium text-primary mt-1">
-                          {(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '').replace(/^\$/, '')}
+                          {formatCurrency(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '')}
                         </p>
                       )}
                     </div>
