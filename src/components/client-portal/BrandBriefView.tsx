@@ -28,57 +28,120 @@ import {
   ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-// Expandable accionable card component
+// Parse SCR fields from accionable block text
+function parseSCRBlock(text: string): { title: string; S: string; C: string; R: string; impacto: string } {
+  const clean = (s: string) => s.replace(/\*\*/g, '').replace(/^#+\s*/, '').trim();
+  const titleMatch = text.match(/^#+\s*Accionable\s*\d+[:\s]*(.+)/im) || text.match(/^#+\s*\d+[:.]\s*(.+)/im);
+  const title = titleMatch ? clean(titleMatch[1]) : clean(text.split('\n')[0]);
+  const sMatch = text.match(/\*?\*?Situaci[oó]n\s*\(S\)[:\s]*\*?\*?([^*]+?)(?=\*?\*?Complicaci|$)/si);
+  const cMatch = text.match(/\*?\*?Complicaci[oó]n\s*\(C\)[:\s]*\*?\*?([^*]+?)(?=\*?\*?Resoluci|$)/si);
+  const rMatch = text.match(/\*?\*?Resoluci[oó]n\s*\(R\)[:\s]*\*?\*?([^*]+?)(?=\*?\*?Impacto|$)/si);
+  const impactoMatch = text.match(/\*?\*?Impacto de Negocio[:\s]*\*?\*?([^*]+?)(?=###|$)/si);
+  return {
+    title: title.replace(/^Accionable\s*\d+[:.]\s*/i, '').trim(),
+    S: sMatch ? clean(sMatch[1]) : '',
+    C: cMatch ? clean(cMatch[1]) : '',
+    R: rMatch ? clean(rMatch[1]) : '',
+    impacto: impactoMatch ? clean(impactoMatch[1]) : '',
+  };
+}
+
+// Expandable accionable card component using SCR framework
 function ExpandableAccionables({ blocks }: { blocks: string[] }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   return (
     <div className="space-y-3">
       {blocks.map((block, i) => {
-        const lines = block.split('\n').map(l => l.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
-        const title = lines[0] || `Accionable ${i + 1}`;
-        const body = lines.slice(1).join(' ');
-        const kpiMatch = body.match(/KPI[:\s]+([^.]+)/i);
-        const kpi = kpiMatch?.[1]?.trim();
-        const cleanBody = body.replace(/KPI[:\s]+[^.]+\./i, '').replace(/Responsable[:\s]+[^.]+\./i, '').trim();
-        const isExpanded = expanded === i;
-        const isLong = cleanBody.length > 220;
+        const scr = parseSCRBlock(block);
+        const hasSCR = scr.S || scr.C || scr.R;
+        const isExpanded = !!expanded[i];
 
-        return (
-          <div
-            key={i}
-            className="flex gap-3 bg-muted/40 rounded-xl p-4 border border-border hover:border-primary/30 transition-colors"
-          >
-            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-foreground mb-1">{title.replace(/^(Accionable\s*\d+[:.]\s*|\d+[:.]\s*)/i, '')}</p>
-              {cleanBody && (
-                <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                  {isExpanded || !isLong ? cleanBody : `${cleanBody.slice(0, 220)}…`}
-                </p>
-              )}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                {kpi && (
-                  <div className="flex items-center gap-1.5">
-                    <BarChart3 className="h-3 w-3 text-primary flex-shrink-0" />
-                    <span className="text-[10px] font-semibold text-primary">KPI:</span>
-                    <span className="text-[10px] text-muted-foreground">{kpi}</span>
-                  </div>
+        // Plain fallback: if no SCR structure found, use simple card
+        if (!hasSCR) {
+          const lines = block.split('\n').map(l => l.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
+          const title = lines[0] || `Accionable ${i + 1}`;
+          const body = lines.slice(1).join(' ').replace(/KPI[:\s]+[^.]+\./i, '').trim();
+          const kpiMatch = block.match(/KPI[:\s]+([^.\n]+)/i);
+          const kpi = kpiMatch?.[1]?.trim();
+          const isLong = body.length > 220;
+          return (
+            <div key={i} className="flex gap-3 bg-muted/40 rounded-xl p-4 border border-border hover:border-primary/30 transition-colors">
+              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground mb-1">{title.replace(/^(Accionable\s*\d+[:.]\s*|\d+[:.]\s*)/i, '')}</p>
+                {body && (
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                    {isExpanded || !isLong ? body : `${body.slice(0, 220)}…`}
+                  </p>
                 )}
-                {isLong && (
-                  <button
-                    onClick={() => setExpanded(isExpanded ? null : i)}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors ml-auto"
-                  >
-                    {isExpanded ? (
-                      <><ChevronUp className="h-3 w-3" /> Ver menos</>
-                    ) : (
-                      <><ChevronDown className="h-3 w-3" /> Ver iniciativa completa</>
-                    )}
-                  </button>
-                )}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  {kpi && (
+                    <div className="flex items-center gap-1.5">
+                      <BarChart3 className="h-3 w-3 text-primary flex-shrink-0" />
+                      <span className="text-[10px] font-semibold text-primary">KPI:</span>
+                      <span className="text-[10px] text-muted-foreground">{kpi}</span>
+                    </div>
+                  )}
+                  {isLong && (
+                    <button
+                      onClick={() => setExpanded(prev => ({ ...prev, [i]: !prev[i] }))}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors ml-auto"
+                    >
+                      {isExpanded ? <><ChevronUp className="h-3 w-3" /> Ver menos</> : <><ChevronDown className="h-3 w-3" /> Ver iniciativa completa</>}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
+          );
+        }
+
+        return (
+          <div key={i} className="bg-muted/40 rounded-xl border border-border hover:border-primary/30 transition-colors overflow-hidden">
+            {/* Header — always visible */}
+            <div className="flex gap-3 p-4 items-start">
+              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground leading-snug">{scr.title}</p>
+              </div>
+              <button
+                onClick={() => setExpanded(prev => ({ ...prev, [i]: !prev[i] }))}
+                className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors flex-shrink-0 mt-0.5"
+              >
+                {isExpanded ? <><ChevronUp className="h-4 w-4" /></> : <><ChevronDown className="h-4 w-4" /></>}
+              </button>
+            </div>
+
+            {/* SCR Body — collapsible */}
+            {isExpanded && (
+              <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+                {scr.S && (
+                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Situación (S)</p>
+                    <p className="text-xs text-foreground leading-relaxed">{scr.S}</p>
+                  </div>
+                )}
+                {scr.C && (
+                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border-l-4 border-orange-400">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1">Complicación (C)</p>
+                    <p className="text-xs text-foreground leading-relaxed">{scr.C}</p>
+                  </div>
+                )}
+                {scr.R && (
+                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border-l-4 border-green-500">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-500 mb-1">Resolución (R)</p>
+                    <p className="text-xs text-foreground leading-relaxed">{scr.R}</p>
+                  </div>
+                )}
+                {scr.impacto && (
+                  <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Impacto de Negocio</p>
+                    <p className="text-xs text-foreground leading-relaxed font-medium">{scr.impacto}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -1369,9 +1432,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         {getResponse('persona_words') ? (
                           <ul className="space-y-1">
                             {getResponse('persona_words')
-                              .split('\n')
-                              .map(l => l.replace(/^[-•*\d.)\s]+/, '').replace(/^["'«]|["'»]$/g, '').trim())
-                              .filter(s => s.length > 4)
+                              .split(/\n|(?<=[.!?"])\s+(?=["']|[A-ZÁÉÍÓÚ])/g)
+                              .map(l =>
+                                l
+                                  .replace(/^[-•*\d.)]+\s*/, '')   // remove list markers
+                                  .replace(/^["'«""]/, '')          // remove opening quotes
+                                  .replace(/["'»""]$/, '')          // remove closing quotes
+                                  .replace(/^\s*\/\s*$/, '')        // remove bare slash lines
+                                  .replace(/^\//, '')               // remove leading slash
+                                  .replace(/\/$/, '')               // remove trailing slash
+                                  .trim()
+                              )
+                              .filter(s => s.length > 5 && s !== '/' && !/^[^\w\s]{1,3}$/.test(s))
                               .map((frase, i) => (
                                 <li key={i} className="text-sm italic text-muted-foreground border-l-2 border-primary/20 pl-2">
                                   "{frase}"
@@ -1584,17 +1656,31 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     const raw = briefData.summary || '';
                     const section7Match = raw.match(/##\s*7\./);
                     if (!section7Match || section7Match.index === undefined) {
-                      // Fallback: show raw section 7 as markdown
                       return (
                         <p className="text-sm text-muted-foreground italic">La evaluación estratégica se generará al completar el brief.</p>
                       );
                     }
                     const section7Text = raw.slice(section7Match.index);
-                    // Try to extract numbered accionables blocks
-                    const accionableBlocks = section7Text.split(/\n(?=###\s*Accionable\s*\d|###\s*\d+\.|##\s*Accionable\s*\d)/i).filter(b => b.trim() && b.match(/accionable|\d+\./i));
 
-                    if (accionableBlocks.length >= 3) {
-                      return <ExpandableAccionables blocks={accionableBlocks.slice(0, 7)} />;
+                    // Split into blocks starting at each ### Accionable N
+                    const accionableBlocks = section7Text
+                      .split(/(?=###\s*Accionable\s*\d)/gi)
+                      .filter(b => b.trim().match(/^###\s*Accionable\s*\d/i));
+
+                    if (accionableBlocks.length >= 2) {
+                      // Show intro paragraph above if exists
+                      const introEnd = section7Text.indexOf('### Accionable');
+                      const introText = introEnd > 0 ? section7Text.slice(0, introEnd).replace(/^##[^#\n]*\n/, '').trim() : '';
+                      return (
+                        <div className="space-y-4">
+                          {introText && (
+                            <div className="bg-muted/30 rounded-lg p-4 border border-border">
+                              <p className="text-xs text-muted-foreground leading-relaxed">{introText.replace(/\*\*/g, '').replace(/^#+\s*/gm, '')}</p>
+                            </div>
+                          )}
+                          <ExpandableAccionables blocks={accionableBlocks.slice(0, 7)} />
+                        </div>
+                      );
                     }
 
                     // Fallback: render full section 7 as markdown

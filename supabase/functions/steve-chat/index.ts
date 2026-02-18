@@ -5,15 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// 15 questions with optional structured fields for UI rendering
+// 15 questions (+ mandatory website question 0) with optional structured fields for UI rendering
 const BRAND_BRIEF_QUESTIONS = [
   {
+    id: 'website_url',
+    question: '**Antes de empezar — NECESITO TU PÁGINA WEB:**\n\nSin tu URL no puedo hacer el análisis SEO, compararte con la competencia ni generar el brief completo. 🌐\n\n**¿Cuál es tu sitio web o tienda online?**\n\n(Si todavía no tienes, escribe "sin web" y te explico qué hacemos en ese caso)',
+    examples: ['www.mitienda.cl', 'mitienda.myshopify.com', 'www.mimarca.com.ar'],
+    fields: [
+      { key: 'url', label: '🌐 URL de tu sitio web o tienda online', type: 'text', placeholder: 'Ej: www.mitienda.cl' },
+    ],
+    steveIntro: '*olisquea el aire y se prepara* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford.\n\nAntes de empezar con las **15 preguntas del Brief Estratégico**, necesito UNA sola cosa:\n\n',
+    commentGuide: 'OBLIGATORIO: El cliente DEBE dar una URL de sitio web. Si escribe "sin web" o "no tengo", EXPLÍCALE que sin web el análisis SEO y la comparación con competencia no es posible, y que pueden usar su Instagram o perfil de Shopify. Insiste hasta obtener al menos una URL válida o una red social con presencia digital. NO avances a la Pregunta 1 sin URL.',
+  },
+  {
     id: 'business_pitch',
-    question: '**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.\n\n🌐 **También necesito tu página web o tienda online.** Si no tienes, dímelo, pero NO te voy a dejar pasar sin que me cuentes más sobre tu presencia digital.',
-    examples: ['Vendemos ropa deportiva premium para mujeres — www.mitienda.cl', 'Somos una agencia de diseño web para pymes, aún no tenemos web propia', 'Tenemos una tienda de cosmética natural en Shopify — mitienda.myshopify.com'],
+    question: '**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.',
+    examples: ['Vendemos ropa deportiva premium para mujeres', 'Somos una agencia de diseño web para pymes', 'Tenemos una tienda de cosmética natural en Shopify'],
     fields: [],
-    steveIntro: '*sacude las orejas y se sienta profesionalmente* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford.\n\nVamos a armar tu **Brief Estratégico en 15 preguntas** (ni una más, ni una menos). Al final vas a tener un documento que vale ORO.\n\n',
-    commentGuide: 'Si NO dio su URL, RECHAZA la respuesta e insiste en la web. Si no tiene, pídele que describa más su producto y presencia digital. NO pases a la pregunta 2 sin URL o sin explicación válida.',
+    steveIntro: '*sacude las orejas y se sienta profesionalmente* 🐕\n\nExcelente. Ahora vamos a armar tu **Brief Estratégico en 15 preguntas** (ni una más, ni una menos). Al final vas a tener un documento que vale ORO.\n\n',
+    commentGuide: 'Analiza el pitch del negocio. Si es vago o genérico, pide más detalle.',
   },
   {
     id: 'numbers',
@@ -203,9 +213,14 @@ PERSONALIDAD:
 🚨🚨🚨 REGLA ABSOLUTA #1: ORDEN DE PREGUNTAS 🚨🚨🚨
 ═══════════════════════════════════════════════════════════════
 
-ESTÁS SIGUIENDO UN CUESTIONARIO ESTRICTO DE EXACTAMENTE 15 PREGUNTAS.
-Las preguntas se hacen EN ORDEN: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.
+ESTÁS SIGUIENDO UN CUESTIONARIO DE UNA PREGUNTA INICIAL (Q0: URL del sitio web) + 15 PREGUNTAS DEL BRIEF.
+Las preguntas se hacen EN ORDEN: Q0 (URL), 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.
 NUNCA te saltes una. NUNCA cambies el orden. NUNCA preguntes algo que no corresponde.
+
+Q0 (website_url) es OBLIGATORIA y BLOQUEANTE:
+- Si el cliente escribe "sin web", "no tengo" o deja vacío → RECHAZA. Explica que sin URL no se puede hacer el análisis SEO ni la comparación con competidores.
+- Acepta alternativas: URL de Instagram, perfil de Shopify, cuenta de TikTok. Pero DEBE dar algo.
+- SOLO después de obtener una URL válida o red social principal, avanza a la Pregunta 1.
 
 Tu trabajo en CADA turno es SOLAMENTE:
 1. COMENTAR brevemente la respuesta anterior (2-4 oraciones máximo)
@@ -226,6 +241,8 @@ Cuando el sistema te dice que la siguiente pregunta tiene FORMULARIO:
 🚨🚨🚨 REGLA ABSOLUTA #3: NO CONFUNDAS CATEGORÍAS 🚨🚨🚨
 ═══════════════════════════════════════════════════════════════
 
+- Q0 = URL del sitio web (BLOQUEANTE — sin URL no se avanza)
+- Q1 = PITCH DEL NEGOCIO (qué vende, descripción)
 - Q5 = DOLOR del cliente (problemas, frustraciones)
 - Q6 = PALABRAS LITERALES del cliente (frases textuales, objeciones de compra)
 - Q7 = TRANSFORMACIÓN (vida después de comprarte)
@@ -821,6 +838,22 @@ Deno.serve(async (req) => {
         onConflict: 'client_id',
       });
 
+    // After Q0 (website_url): save URL to clients table
+    if (answeredQuestions === 1) {
+      try {
+        const urlResponse = userMessages[0]?.content || '';
+        const urlMatch = urlResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+(?:\.[\w-]+)+(?:\/\S*)?/i);
+        if (urlMatch) {
+          await supabase
+            .from('clients')
+            .update({ website_url: urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}` })
+            .eq('id', client_id);
+        }
+      } catch (e) {
+        console.error('Error saving website URL:', e);
+      }
+    }
+
     // Build DETERMINISTIC question context
     let questionContext = '';
     
@@ -834,11 +867,15 @@ Deno.serve(async (req) => {
       
       const hasFields = nextQ?.fields?.length > 0;
       
+      // Q0 = website_url (shown as "Pregunta 0"), Q1 onwards = "Pregunta 1 de 15" etc.
+      const justAnsweredLabel = justAnsweredIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${justAnsweredIndex} de 15 (${justAnsweredQ?.id})`;
+      const nextLabel = nextQuestionIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${nextQuestionIndex} de 15`;
+      
       questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══
-PREGUNTA RECIÉN RESPONDIDA: Pregunta ${answeredQuestions} de 15 (${justAnsweredQ?.id})
+PREGUNTA RECIÉN RESPONDIDA: ${justAnsweredLabel}
 GUÍA PARA COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
 
-SIGUIENTE PREGUNTA QUE DEBES HACER: Pregunta ${nextQuestionIndex + 1} de 15
+SIGUIENTE PREGUNTA QUE DEBES HACER: ${nextLabel}
 INTRO DE STEVE: ${nextQ?.steveIntro || ''}
 TEXTO EXACTO DE LA PREGUNTA: ${nextQ?.question}
 
@@ -850,10 +887,15 @@ RECUERDA: Tu respuesta debe tener MÁXIMO 2 partes:
 1. Comentario breve sobre la respuesta anterior (2-4 oraciones)
 2. La siguiente pregunta (usa la intro y el texto exacto de arriba)
 
-NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes temas futuros. NO inventes preguntas.`;
+NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros. NO inventes preguntas.`;
+
+      // Special instruction for after Q0 - website URL saved
+      if (answeredQuestions === 1) {
+        questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis SEO. Luego arranca con la Pregunta 1 del Brief.';
+      }
 
       // Special instruction for after Q2 - calculate CPA
-      if (answeredQuestions === 2) {
+      if (answeredQuestions === 3) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q2: El cliente envió datos financieros. CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown con resultados. Explica qué es CPA. Di que guardaste el CPA en configuración financiera.';
       }
     }
@@ -914,10 +956,11 @@ NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes 
       content: assistantMessage,
     });
 
-    // After Q2: save CPA to financial config
-    if (answeredQuestions === 2) {
+    // After Q2 (now index 3 because Q0 is website_url): save CPA to financial config
+    // Q0=index0, Q1=index1, Q2=index2, so after 3 user messages answeredQuestions===3
+    if (answeredQuestions === 3) {
       try {
-        const q2Response = userMessages[1]?.content || '';
+        const q2Response = userMessages[2]?.content || '';
         const numbers = q2Response.match(/\$?\d[\d.,]*/g)?.map(n => parseFloat(n.replace(/[$.]/g, '').replace(',', '.'))) || [];
         
         if (numbers.length >= 2) {
