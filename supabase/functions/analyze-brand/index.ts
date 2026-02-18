@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Auth
+    // Auth — support both user JWT and internal service-role calls (from steve-chat auto-trigger)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -32,11 +32,18 @@ Deno.serve(async (req) => {
       });
     }
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const isInternalCall = token === serviceRoleKey;
+
+    let userId: string | null = null;
+    if (!isInternalCall) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      userId = user.id;
     }
 
     const { client_id, website_url, competitor_urls, research_type } = await req.json();
@@ -47,14 +54,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify access
+    // Verify access — internal calls skip ownership check (service role can access any client)
     const { data: client } = await supabase
       .from('clients')
       .select('id, client_user_id, user_id, name, company')
       .eq('id', client_id)
       .single();
 
-    if (!client || (client.client_user_id !== user.id && client.user_id !== user.id)) {
+    if (!client) {
+      return new Response(JSON.stringify({ error: 'Client not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!isInternalCall && userId && client.client_user_id !== userId && client.user_id !== userId) {
       return new Response(JSON.stringify({ error: 'Access denied' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -120,10 +120,37 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const [research, setResearch] = useState<ResearchData>({});
   const [clientInfo, setClientInfo] = useState<{ name?: string; company?: string; logo_url?: string; website_url?: string } | null>(null);
   const [assets, setAssets] = useState<{ logo: string[]; products: string[]; ads: string[] }>({ logo: [], products: [], ads: [] });
+  const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'pending' | 'complete' | 'error'>('idle');
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchAll();
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [clientId]);
+
+  // Poll when analysis is pending
+  useEffect(() => {
+    if (analysisStatus !== 'pending') return;
+    pollingRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId)
+        .eq('research_type', 'analysis_status')
+        .maybeSingle();
+      const status = (data?.research_data as any)?.status;
+      if (status === 'complete') {
+        setAnalysisStatus('complete');
+        clearInterval(pollingRef.current!);
+        await fetchResearch();
+        toast.success('¡Análisis SEO y Keywords completado! Ya puedes descargar el informe completo.');
+      } else if (status === 'error') {
+        setAnalysisStatus('error');
+        clearInterval(pollingRef.current!);
+      }
+    }, 5000);
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [analysisStatus, clientId]);
 
   async function fetchAll() {
     setLoading(true);
@@ -154,7 +181,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (data) {
       const r: ResearchData = {};
       for (const row of data) {
-        (r as any)[row.research_type] = row.research_data;
+        if (row.research_type === 'analysis_status') {
+          const status = (row.research_data as any)?.status;
+          if (status === 'pending') setAnalysisStatus('pending');
+          else if (status === 'complete') setAnalysisStatus('complete');
+          else if (status === 'error') setAnalysisStatus('error');
+        } else {
+          (r as any)[row.research_type] = row.research_data;
+        }
       }
       setResearch(r);
     }
@@ -836,9 +870,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         </div>
         <div className="flex gap-2 flex-wrap">
           {isComplete && (
-            <Button onClick={handleDownloadPDF}>
+            <Button onClick={handleDownloadPDF} disabled={analysisStatus === 'pending'}>
               <Download className="h-4 w-4 mr-2" />
-              Descargar PDF
+              {analysisStatus === 'pending' ? 'Analizando...' : 'Descargar PDF'}
             </Button>
           )}
           <Button variant="outline" onClick={onEditBrief}>
@@ -847,6 +881,55 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           </Button>
         </div>
       </div>
+
+      {/* Analysis progress banner */}
+      {analysisStatus === 'pending' && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-primary">Analizando tu marca en segundo plano...</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Steve está realizando el análisis SEO, investigando keywords y analizando a tu competencia. Esto puede tomar 1-2 minutos. El botón de descarga se habilitará automáticamente cuando esté listo.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="bg-background rounded-lg p-2 border border-border">
+                <Search className="h-4 w-4 text-primary mx-auto mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">SEO Audit</p>
+                <div className="mt-1 h-1 bg-primary/20 rounded-full overflow-hidden">
+                  <div className="h-1 bg-primary rounded-full animate-pulse w-2/3" />
+                </div>
+              </div>
+              <div className="bg-background rounded-lg p-2 border border-border">
+                <Key className="h-4 w-4 text-primary mx-auto mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">Keywords</p>
+                <div className="mt-1 h-1 bg-primary/20 rounded-full overflow-hidden">
+                  <div className="h-1 bg-primary rounded-full animate-pulse w-1/2" />
+                </div>
+              </div>
+              <div className="bg-background rounded-lg p-2 border border-border">
+                <Trophy className="h-4 w-4 text-primary mx-auto mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">Competencia</p>
+                <div className="mt-1 h-1 bg-primary/20 rounded-full overflow-hidden">
+                  <div className="h-1 bg-primary rounded-full animate-pulse w-1/3" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {analysisStatus === 'complete' && !research.seo_audit && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+            <p className="text-sm text-primary font-medium">Análisis SEO, Keywords y Competencia completado — el informe PDF ya incluye todos los datos.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Progress bar for in-progress */}
       {!isComplete && answeredCount > 0 && (
