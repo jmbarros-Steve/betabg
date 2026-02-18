@@ -131,123 +131,251 @@ Deno.serve(async (req) => {
 
     // Build comprehensive analysis prompt
     const brandContext = JSON.stringify(briefContext).slice(0, 3000);
-    const analysisPrompt = `Eres un analista senior de marketing digital con experiencia en SEO técnico, inteligencia competitiva y estrategia de keywords. Analiza EXHAUSTIVAMENTE la siguiente información.
+    const analysisPrompt = `Eres un consultor senior de marketing digital de primer nivel (nivel McKinsey/BCG) especializado en SEO técnico, publicidad digital (Meta Ads y Google Ads), inteligencia competitiva y estrategia de performance marketing para e-commerce. Analiza EXHAUSTIVAMENTE la siguiente información y genera un plan estratégico completo que sirva como hoja de ruta ejecutable.
 
 MARCA: ${client.name} (${client.company || 'Sin empresa'})
 WEBSITE: ${website_url || 'No proporcionado'}
 
-${websiteContent ? `=== CONTENIDO DEL SITIO WEB (scrapeado) ===\n${websiteContent.slice(0, 6000)}` : '=== SITIO WEB: No se pudo scrapear ==='}
+${websiteContent ? `=== CONTENIDO DEL SITIO WEB ===\n${websiteContent.slice(0, 6000)}` : '=== SITIO WEB: No se pudo analizar ==='}
 
-${competitorContents.length > 0 ? `=== CONTENIDO DE COMPETIDORES (scrapeado) ===\n${competitorContents.join('\n\n').slice(0, 8000)}` : '=== COMPETIDORES: No proporcionados o no scrapeados ==='}
+${competitorContents.length > 0 ? `=== CONTENIDO DE COMPETIDORES ===\n${competitorContents.join('\n\n').slice(0, 8000)}` : '=== COMPETIDORES: No proporcionados ==='}
 
-=== BRIEF DE MARCA ===
+=== BRIEF DE MARCA (datos del cliente) ===
 ${brandContext}
 
-Genera un JSON EXHAUSTIVO con estas secciones. Sé MUY específico con datos reales del contenido scrapeado:
+Genera un JSON EXHAUSTIVO con estas secciones. Sé MUY específico — cada recomendación debe ser accionable, con métricas, plazos y benchmarks de industria reales:
 
 {
   "seo_audit": {
-    "score": [número 0-100 basado en calidad del contenido, estructura, keywords, etc.],
+    "score": [número 0-100 basado en calidad del contenido, estructura técnica, keywords y UX],
     "issues": [
-      "Problema técnico específico detectado en el sitio 1",
-      "Problema técnico específico detectado en el sitio 2",
-      "Problema de contenido específico 3",
-      "Problema de estructura 4",
-      "Problema de velocidad/UX estimado 5"
+      "Problema técnico específico detectado 1 — con impacto estimado en rankings",
+      "Problema técnico específico 2",
+      "Problema de contenido/keywords específico 3",
+      "Problema de estructura (H1/H2/schema) 4",
+      "Problema de velocidad o Core Web Vitals estimado 5"
     ],
     "recommendations": [
-      "Acción concreta recomendación 1 con métricas esperadas",
-      "Acción concreta recomendación 2",
-      "Acción concreta recomendación 3",
-      "Acción concreta recomendación 4",
-      "Acción concreta recomendación 5"
+      "Acción concreta 1 — impacto esperado + tiempo de implementación",
+      "Acción concreta 2",
+      "Acción concreta 3",
+      "Acción concreta 4",
+      "Acción concreta 5"
     ],
-    "meta_analysis": "Análisis detallado de: títulos H1/H2, meta descriptions, estructura de URLs, uso de schema markup. Basado en el contenido scrapeado del sitio.",
-    "content_quality": "Análisis de: densidad de keywords, legibilidad, profundidad del contenido, CTAs, propuesta de valor visible. Menciona hallazgos CONCRETOS del sitio.",
-    "mobile_readiness": "Evaluación de: responsive design, velocidad estimada, experiencia móvil, core web vitals estimados.",
-    "competitive_seo_gap": "Comparación SEO específica entre ${client.name} y los competidores scrapeados. Quién está ganando en qué keywords y por qué."
+    "meta_analysis": "Análisis de: title tags (longitud, keyword principal), meta descriptions, H1/H2, estructura de URLs, schema markup presente. Con hallazgos CONCRETOS del contenido analizado.",
+    "content_quality": "Análisis de: densidad de keywords, legibilidad, profundidad del contenido, CTAs visibles, propuesta de valor en above-the-fold. Menciona lo que SÍ está bien y lo que falta.",
+    "mobile_readiness": "Evaluación de: diseño responsive, velocidad estimada (LCP, FID, CLS), experiencia móvil. Inferir desde el contenido analizado.",
+    "technical_seo_priority": "Las 3 acciones técnicas SEO con mayor ROI estimado para este sitio específicamente, ordenadas por impacto.",
+    "competitive_seo_gap": "Comparación SEO entre ${client.name} y los competidores analizados. Quién domina qué keywords, dónde está el gap y cómo cerrarlo."
   },
   "competitor_analysis": {
     "competitors": [
       {
         "name": "Nombre de la marca competidora",
         "url": "url exacta del competidor",
-        "strengths": ["Fortaleza específica detectada en su sitio 1", "Fortaleza 2", "Fortaleza 3"],
-        "weaknesses": ["Debilidad específica detectada 1", "Debilidad 2", "Debilidad 3"],
-        "positioning": "Cómo se posicionan EXACTAMENTE según su sitio web scrapeado",
-        "value_proposition": "Cuál es su propuesta de valor principal según su H1 y contenido hero",
-        "ad_strategy": "Tipo de anuncios estimado basado en su contenido y llamados a la acción",
-        "price_positioning": "Alto/Medio/Bajo — justificado con datos del sitio",
-        "tech_stack": "Plataforma detectada (Shopify, WooCommerce, etc.) si es identificable"
+        "seo_score": [número 0-100 estimado],
+        "strengths": ["Fortaleza específica detectada 1", "Fortaleza 2", "Fortaleza 3"],
+        "weaknesses": ["Debilidad específica detectada 1 — explotable por el cliente", "Debilidad 2", "Debilidad 3"],
+        "positioning": "Cómo se posicionan según su sitio — qué prometen y a quién le hablan",
+        "value_proposition": "Propuesta de valor principal según su H1, hero text y contenido de portada",
+        "ad_strategy_inferred": "Tipo de anuncios y mensajes inferidos según su contenido, CTAs y estructura de landing pages",
+        "price_positioning": "Alto/Medio/Bajo — justificado con datos del sitio o del sector",
+        "tech_stack": "Plataforma (Shopify, WooCommerce, Tiendanube, etc.) si es detectable",
+        "attack_vector": "La MEJOR forma de quitarle clientes a este competidor específicamente — táctica concreta"
       }
     ],
     "market_gaps": [
-      "Oportunidad específica de mercado no cubierta por los competidores 1",
+      "Oportunidad específica de mercado que NADIE está cubriendo bien — con estimación de tamaño",
       "Oportunidad 2",
-      "Oportunidad 3",
+      "Oportunidad 3 — blue ocean",
       "Oportunidad 4"
     ],
-    "competitive_advantage": "Ventaja competitiva CONCRETA y diferenciada que ${client.name} puede explotar basándose en los gaps detectados",
-    "benchmark_summary": "Tabla comparativa narrativa: cómo se compara ${client.name} vs cada competidor en: precio, contenido, UX, propuesta de valor"
+    "competitive_advantage": "Ventaja competitiva CONCRETA y sostenible de ${client.name} basándose en los gaps detectados. Debe ser difícil de replicar.",
+    "benchmark_summary": "Comparativa narrativa: ${client.name} vs cada competidor en: precio, propuesta de valor, UX percibida, contenido SEO, sofisticación de marketing digital."
   },
   "keywords": {
     "primary": [
-      "keyword principal 1 — alta intención comercial",
-      "keyword principal 2",
-      "keyword principal 3",
-      "keyword principal 4",
-      "keyword principal 5"
+      "keyword principal 1 — [volumen estimado] búsquedas/mes, [competencia: alta/media/baja]",
+      "keyword principal 2 — [volumen estimado], [competencia]",
+      "keyword principal 3 — [volumen estimado], [competencia]",
+      "keyword principal 4 — [volumen estimado], [competencia]",
+      "keyword principal 5 — [volumen estimado], [competencia]"
     ],
     "long_tail": [
-      "frase de búsqueda larga 1 — baja competencia alta conversión",
-      "frase larga 2",
-      "frase larga 3",
-      "frase larga 4",
-      "frase larga 5",
-      "frase larga 6",
-      "frase larga 7"
+      "frase long tail 1 — baja competencia, alta intención de compra",
+      "frase long tail 2",
+      "frase long tail 3",
+      "frase long tail 4",
+      "frase long tail 5",
+      "frase long tail 6",
+      "frase long tail 7"
     ],
     "competitor_keywords": [
-      "keyword que usa el competidor 1 y ${client.name} debería atacar",
-      "keyword competidor 2",
-      "keyword competidor 3",
-      "keyword competidor 4"
+      "keyword que usan competidores y ${client.name} debería atacar — con justificación",
+      "keyword competidora 2",
+      "keyword competidora 3",
+      "keyword competidora 4"
     ],
-    "negative_keywords": ["keyword a excluir 1", "keyword a excluir 2"],
-    "seasonal_keywords": ["keyword estacional o de tendencia 1", "keyword estacional 2"],
-    "recommended_strategy": "Estrategia de keywords COMPLETA: qué keywords atacar primero (Quick wins), cuáles son para largo plazo, cómo estructurar el contenido por intención de búsqueda. Include búsquedas de marca vs genéricas.",
+    "negative_keywords": ["keyword a excluir 1 — razón", "keyword a excluir 2 — razón", "keyword 3", "keyword 4"],
+    "seasonal_keywords": ["keyword estacional 1 — temporada relevante", "keyword estacional 2"],
+    "recommended_strategy": "Estrategia de keywords en 3 fases: (1) Quick wins en 30 días: qué keywords atacar primero con contenido y Google Ads. (2) Crecimiento 30-90 días: cluster de contenido y SEO on-page. (3) Dominación 90+ días: linkbuilding y autoridad de dominio para keywords de alta competencia.",
     "google_ads_match_types": {
-      "exact": ["[keyword exacta 1]", "[keyword exacta 2]"],
-      "phrase": ["\"frase keyword 1\"", "\"frase keyword 2\""],
+      "exact": ["[keyword exacta 1]", "[keyword exacta 2]", "[keyword exacta 3]"],
+      "phrase": ["\"frase keyword 1\"", "\"frase keyword 2\"", "\"frase keyword 3\""],
       "broad_modified": ["+keyword +modificada 1", "+keyword +modificada 2"]
-    }
+    },
+    "content_cluster_topics": [
+      "Tema de artículo evergreen 1 — alta búsqueda, baja competencia",
+      "Tema de artículo 2",
+      "Tema de artículo 3"
+    ]
   },
   "ads_library_analysis": {
-    "estimated_ad_types": ["Tipo de anuncio recomendado 1 para esta industria", "Tipo 2", "Tipo 3"],
-    "recommended_formats": ["Formato específico 1 (ej: Video testimonial 15s)", "Formato 2", "Formato 3"],
+    "meta_ads_strategy": {
+      "funnel_structure": "Descripción de la estructura TOFU-MOFU-BOFU recomendada para Meta Ads en este sector específico, con porcentajes de presupuesto sugeridos.",
+      "creative_formats_priority": [
+        "Formato #1 — [nombre]: [descripción DETALLADA del formato, duración si es video, composición visual, texto overlay recomendado, por qué funciona para este buyer persona]",
+        "Formato #2 — [nombre]: [descripción detallada]",
+        "Formato #3 — [nombre]: [descripción detallada]",
+        "Formato #4 — Retargeting: [descripción detallada del formato para recuperar carritos abandonados y visitantes]"
+      ],
+      "copy_hooks": [
+        "Hook de apertura 1 (para video/carrusel): [frase textual de apertura — debe conectar con el dolor del buyer persona en los primeros 3 segundos]",
+        "Hook 2: [frase textual]",
+        "Hook 3: [frase textual — variación emocional]",
+        "Hook 4: [frase textual — variación social proof]"
+      ],
+      "primary_text_templates": [
+        "Template de primary text para TOFU: [texto completo de ejemplo, máximo 125 caracteres para mobile, siguiendo estructura Problema → Agitación → Solución]",
+        "Template para BOFU: [texto con urgencia, garantía y CTA directa]"
+      ],
+      "cta_recommendations": ["CTA 1 recomendado para conversión", "CTA 2", "CTA 3"],
+      "audience_targeting": {
+        "cold": "Descripción detallada de audiencia fría: intereses específicos, comportamientos, demografía — basada en el buyer persona de la marca",
+        "warm": "Audiencia tibia: parámetros de engagement y retargeting de visitantes del sitio",
+        "hot": "Audiencia caliente: visitantes de página de producto, add-to-cart, checkout iniciado — ventanas de tiempo recomendadas",
+        "lookalike": "Configuración de lookalike: base recomendada y porcentaje"
+      },
+      "objections_to_address": [
+        "Objeción #1 del comprador y cómo el copy la neutraliza en el anuncio",
+        "Objeción #2 y táctica de neutralización"
+      ]
+    },
+    "google_ads_strategy": {
+      "campaign_structure": "Estructura de campañas recomendada: Search Brand + Search Genérico + Shopping/PMax + Display Remarketing. Justificación basada en el volumen de búsquedas del sector.",
+      "search_ad_copy": {
+        "headlines_examples": [
+          "Headline 1 (máx 30 chars): [ejemplo específico para este negocio]",
+          "Headline 2: [ejemplo con keyword principal]",
+          "Headline 3: [ejemplo con propuesta de valor]",
+          "Headline 4: [ejemplo con garantía]",
+          "Headline 5: [ejemplo con CTA]"
+        ],
+        "descriptions_examples": [
+          "Description 1 (máx 90 chars): [ejemplo con beneficio principal + CTA]",
+          "Description 2: [ejemplo rebatiendo objeción principal]"
+        ],
+        "extensions": ["Sitelink 1: [texto + descripción]", "Sitelink 2", "Callout 1", "Callout 2", "Callout 3"]
+      },
+      "bidding_strategy": "Estrategia de bidding por fases: Fase 1 (0-30 días) → Fase 2 (30-90 días) → Fase 3 (90+ días). Con CPA objetivo y ROAS objetivo basados en el margen del negocio.",
+      "pmax_recommendation": "Recomendación específica sobre Performance Max: cuándo activarlo, qué señales de audiencia usar, assets mínimos necesarios."
+    },
     "winning_patterns": [
-      "Patrón ganador detectado en competidores o industria 1",
+      "Patrón creativo ganador en esta industria 1 — con datos de por qué funciona",
       "Patrón 2",
       "Patrón 3",
       "Patrón 4"
-    ],
-    "cta_analysis": "Análisis de llamados a la acción: qué CTAs usan los competidores, cuáles tienen mayor tasa de conversión estimada en esta industria, recomendaciones específicas para ${client.name}",
-    "creative_recommendations": [
-      "Recomendación creativa específica basada en el análisis 1",
-      "Recomendación 2",
-      "Recomendación 3"
-    ],
-    "hook_ideas": ["Idea de hook/gancho para video/imagen 1", "Hook idea 2", "Hook idea 3"]
+    ]
   },
-  "executive_summary": "Resumen ejecutivo profesional de 3 párrafos estilo McKinsey: 1) Situación actual del sitio y posición competitiva. 2) Principales oportunidades identificadas. 3) Las 3 acciones prioritarias inmediatas con impacto estimado."
+  "cost_benchmarks": {
+    "meta_benchmarks": {
+      "cpm_range": "Rango de CPM estimado para este sector y geografía (ej: $6-$14 USD en LATAM para moda)",
+      "ctr_benchmark": "CTR promedio esperado por formato (feed: 0.9-1.5%, Stories: 0.5-0.8%)",
+      "cvr_benchmark": "Tasa de conversión promedio en este sector (ej: moda e-commerce: 1.5-2.5%)",
+      "cpa_target": "CPA objetivo recomendado basado en el margen del negocio (calcular si hay datos financieros en el brief)",
+      "roas_minimum": "ROAS mínimo aceptable para este margen",
+      "roas_target": "ROAS objetivo para ser rentable y escalar",
+      "budget_recommendation": "Presupuesto mínimo recomendado para obtener data estadísticamente significativa en 30 días"
+    },
+    "google_benchmarks": {
+      "cpc_range": "Rango de CPC estimado para keywords principales de este sector",
+      "ctr_search_benchmark": "CTR promedio en Search para este sector (ej: e-commerce: 4-6%)",
+      "cvr_search_benchmark": "Tasa de conversión desde Search (típicamente más alta que Meta por intención)",
+      "quality_score_targets": "Calidad de anuncio objetivo: QS 7+ para reducir CPC en 20-30%",
+      "cpa_target": "CPA objetivo en Google Ads (suele ser menor que Meta por mayor intención de compra)"
+    },
+    "pause_rules": [
+      "Regla de pausa 1: [condición específica con números — ej: 'Pausar ad set si CPA > 2× objetivo después de $X de inversión sin conversión']",
+      "Regla de pausa 2: [condición para keywords]",
+      "Regla de pausa 3: [condición para creativos]"
+    ],
+    "scale_triggers": [
+      "Señal de escalamiento 1: [cuándo y cómo duplicar presupuesto]",
+      "Señal de escalamiento 2: [KPI que indica que se puede escalar ROAS agresivo]"
+    ]
+  },
+  "seo_roadmap": {
+    "horizon_1_quick_wins": [
+      {"action": "Acción técnica 1", "impact": "Impacto estimado", "difficulty": "Baja/Media/Alta", "week": "1-2"},
+      {"action": "Acción técnica 2", "impact": "Impacto estimado", "difficulty": "Baja", "week": "1-2"},
+      {"action": "Acción on-page 3", "impact": "Impacto estimado", "difficulty": "Baja", "week": "2-3"},
+      {"action": "Schema markup 4", "impact": "Rich snippets → +30% CTR", "difficulty": "Media", "week": "3-4"},
+      {"action": "Optimización imágenes 5", "impact": "LCP < 2.5s", "difficulty": "Baja", "week": "1-2"}
+    ],
+    "horizon_2_growth": [
+      {"action": "Cluster de contenido sobre [tema principal]", "description": "Descripción detallada del cluster"},
+      {"action": "Linkbuilding inicial", "description": "Estrategia específica de backlinks para este sector"},
+      {"action": "Optimización de páginas de categoría", "description": "Agregar copy SEO en páginas clave"}
+    ],
+    "horizon_3_authority": [
+      "Estrategia de contenido evergreen: [3 temas específicos]",
+      "Keywords target top 3 en 90 días: [listar keywords específicas alcanzables]",
+      "Objetivo de DA/DR a 6 meses: [número estimado alcanzable]"
+    ],
+    "kpi_targets": {
+      "traffic_growth_30d": "X% de mejora en tráfico orgánico en 30 días",
+      "keywords_top10_90d": "X keywords en top 10 en 90 días",
+      "ctr_improvement": "Mejora de CTR orgánico en X% con optimización de title tags y meta descriptions"
+    },
+    "recommended_tools": ["Google Search Console (obligatorio)", "Semrush o Ahrefs (keyword tracking)", "Screaming Frog (auditoría técnica)", "PageSpeed Insights (Core Web Vitals)", "[herramienta específica si es Shopify/WordPress/otra plataforma]"]
+  },
+  "competitive_domination": {
+    "vulnerability_map": [
+      {"competitor": "Nombre competidor 1", "vulnerability": "Debilidad explotable específica", "attack_tactic": "Táctica concreta de ataque", "channel": "Meta/Google/SEO/Contenido", "timeline": "Corto/Mediano plazo"},
+      {"competitor": "Nombre competidor 2", "vulnerability": "Debilidad explotable", "attack_tactic": "Táctica concreta", "channel": "Canal", "timeline": "Plazo"},
+      {"competitor": "Nombre competidor 3", "vulnerability": "Debilidad explotable", "attack_tactic": "Táctica concreta", "channel": "Canal", "timeline": "Plazo"}
+    ],
+    "competitive_keyword_strategy": {
+      "bidding_on_competitors": "Análisis de si conviene pujar por keywords de marca de competidores — con estimación de CPC y ROI esperado",
+      "comparison_content": "Plan de contenido SEO de comparación: '${client.name} vs [Competidor]' — qué páginas crear y cómo posicionarlas",
+      "featured_snippet_opportunities": ["Pregunta de featured snippet 1 del sector", "Pregunta 2", "Pregunta 3"]
+    },
+    "messaging_per_competitor": [
+      "Para capturar clientes de [Competidor 1]: mensaje '[mensaje diferenciador específico]' en ads de keywords comparativas",
+      "Para capturar clientes de [Competidor 2]: mensaje '[mensaje específico]'",
+      "Para capturar clientes de [Competidor 3]: mensaje '[mensaje específico]'"
+    ],
+    "blue_ocean_opportunities": [
+      "Oportunidad blue ocean 1: segmento o propuesta no cubierta por ningún competidor — con potencial de mercado estimado",
+      "Oportunidad 2",
+      "Oportunidad 3 — con estrategia de entrada"
+    ],
+    "success_kpis_6months": [
+      "Share of Voice en keywords objetivo: X% (desde X% actual)",
+      "Posición promedio en Google para keywords competidoras: top X",
+      "% de tráfico orgánico capturado de búsquedas de marca de competidores: X%"
+    ]
+  },
+  "executive_summary": "Resumen ejecutivo de 4 párrafos estilo McKinsey: (1) Situación competitiva actual — posición de ${client.name} en el mercado vs. competidores. (2) Oportunidades prioritarias identificadas con mayor potencial de ROI. (3) Riesgos y brechas críticas a resolver en los próximos 30 días. (4) Recomendación final con las 3 acciones inmediatas de mayor impacto y sus KPIs de éxito esperados. Formal, concluyente, orientado a la acción."
 }
 
 REGLAS CRÍTICAS:
 1. Responde SOLO con el JSON válido, sin texto adicional, sin markdown, sin \`\`\`json
-2. Usa datos REALES del contenido scrapeado, no genérico
-3. Si no se pudo scrapear un competidor, usa el conocimiento del sector para estimar
-4. Sé específico: menciona textos exactos encontrados en los sitios, H1s, precios, CTAs
-5. Todas las keywords deben ser en el idioma del mercado objetivo (infiere del contenido)`;
+2. Usa datos REALES del contenido analizado. Si no hay datos, usa benchmarks reales del sector
+3. Sé específico con NÚMEROS: CPM, CPC, CTR, CVR, ROAS — usa rangos reales de industria 2024
+4. Cada recomendación de copy debe sonar como copy REAL de un anuncio, no como descripción genérica
+5. Las keywords deben estar en el idioma del mercado objetivo (inferir del contenido y la marca)
+6. Los benchmarks de costo deben ser relevantes para LATAM si la marca opera en la región`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -256,13 +384,13 @@ REGLAS CRÍTICAS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
-          { role: 'system', content: 'Eres un analista senior de marketing digital especializado en SEO, keywords y análisis competitivo. Responde SOLO en JSON válido sin markdown. Nunca uses ```json ni ```. Solo el JSON puro.' },
+          { role: 'system', content: 'Eres un consultor senior de marketing digital de primer nivel. Responde SOLO en JSON válido sin markdown. Nunca uses ```json ni ```. Solo el JSON puro y completo.' },
           { role: 'user', content: analysisPrompt },
         ],
         temperature: 0.2,
-        max_tokens: 6000,
+        max_tokens: 12000,
       }),
     });
 
@@ -293,7 +421,7 @@ REGLAS CRÍTICAS:
     }
 
     // Save each research type
-    const researchTypes = ['seo_audit', 'competitor_analysis', 'keywords', 'ads_library_analysis'];
+    const researchTypes = ['seo_audit', 'competitor_analysis', 'keywords', 'ads_library_analysis', 'cost_benchmarks', 'seo_roadmap', 'competitive_domination'];
     for (const rt of researchTypes) {
       if (result[rt]) {
         await supabase
