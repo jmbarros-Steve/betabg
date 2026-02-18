@@ -2304,23 +2304,39 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               ))}</ul>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs">
+
+                          {/* Ads Strategy & Attack Vector — full width */}
+                          {(comp.ad_strategy_inferred || comp.ad_strategy) && (
+                            <div className="bg-muted/40 rounded-lg p-3 border border-border">
+                              <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Estrategia de Ads</p>
+                              <p className="text-xs leading-relaxed">{comp.ad_strategy_inferred || comp.ad_strategy}</p>
+                            </div>
+                          )}
+                          {comp.attack_vector && (
+                            <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                              <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">⚔️ Táctica para Quitarles Clientes</p>
+                              <p className="text-xs leading-relaxed text-foreground">{comp.attack_vector}</p>
+                            </div>
+                          )}
+
+                          {/* Badges row */}
+                          <div className="flex flex-wrap gap-2 text-xs">
                             {comp.price_positioning && (
-                              <div className="bg-muted/50 rounded p-2 text-center">
-                                <p className="text-muted-foreground text-[10px]">Precio</p>
-                                <p className="font-semibold">{comp.price_positioning}</p>
-                              </div>
-                            )}
-                            {comp.ad_strategy && (
-                              <div className="bg-muted/50 rounded p-2 text-center">
-                                <p className="text-muted-foreground text-[10px]">Estrategia Ads</p>
-                                <p className="font-semibold">{comp.ad_strategy}</p>
+                              <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
+                                <span className="text-muted-foreground text-[10px]">Precio:</span>
+                                <span className="font-semibold">{comp.price_positioning}</span>
                               </div>
                             )}
                             {comp.tech_stack && (
-                              <div className="bg-muted/50 rounded p-2 text-center">
-                                <p className="text-muted-foreground text-[10px]">Tecnología</p>
-                                <p className="font-semibold">{comp.tech_stack}</p>
+                              <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
+                                <span className="text-muted-foreground text-[10px]">Tech:</span>
+                                <span className="font-semibold">{comp.tech_stack}</span>
+                              </div>
+                            )}
+                            {comp.seo_score && (
+                              <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
+                                <span className="text-muted-foreground text-[10px]">SEO Score:</span>
+                                <span className="font-semibold">{comp.seo_score}/100</span>
                               </div>
                             )}
                           </div>
