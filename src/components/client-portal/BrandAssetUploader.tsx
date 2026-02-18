@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,10 +34,9 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   const [analyzing, setAnalyzing] = useState(false);
   const fileRefs = useRef<Record<AssetCategory, HTMLInputElement | null>>({ logo: null, products: null, ads: null });
 
-  // Load existing assets on mount
-  useState(() => {
+  useEffect(() => {
     loadAssets();
-  });
+  }, [clientId]);
 
   async function loadAssets() {
     if (!user) return;
@@ -58,13 +57,44 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     }
     setAssets(loaded);
 
-    // Load website URL from client
+    // Load website URL and competitor URLs from client + brief
     const { data: clientData } = await supabase
       .from('clients')
       .select('website_url')
       .eq('id', clientId)
       .single();
     if (clientData?.website_url) setWebsiteUrl(clientData.website_url);
+
+    // Auto-populate competitor URLs from brief (Q9 competitors response)
+    const { data: persona } = await supabase
+      .from('buyer_personas')
+      .select('persona_data')
+      .eq('client_id', clientId)
+      .maybeSingle();
+
+    if (persona?.persona_data) {
+      const pd = persona.persona_data as any;
+      const questions: string[] = pd.questions || [];
+      const responses: string[] = pd.raw_responses || [];
+      const competitorIdx = questions.indexOf('competitors');
+      if (competitorIdx >= 0 && responses[competitorIdx]) {
+        const compResponse = responses[competitorIdx];
+        // Extract URLs from competitor response text
+        const urlMatches = compResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+\.[\w.]+(?:\/\S*)?/g) || [];
+        const extractedUrls = urlMatches.slice(0, 3);
+        if (extractedUrls.length > 0) {
+          setCompetitorUrls(prev => {
+            const newUrls = [...prev];
+            extractedUrls.forEach((url, i) => {
+              if (!newUrls[i] && url) {
+                newUrls[i] = url.startsWith('http') ? url : `https://${url}`;
+              }
+            });
+            return newUrls;
+          });
+        }
+      }
+    }
   }
 
   async function handleUpload(category: AssetCategory, files: FileList | null) {

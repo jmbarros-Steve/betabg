@@ -23,11 +23,9 @@ const BRAND_BRIEF_QUESTIONS = [
       { key: 'price', label: '💰 Precio promedio de venta', type: 'number', prefix: '$', placeholder: 'Ej: 35.000' },
       { key: 'cost', label: '📦 Costo del producto/servicio', type: 'number', prefix: '$', placeholder: 'Ej: 12.000' },
       { key: 'shipping', label: '🚚 Costo de envío promedio', type: 'number', prefix: '$', placeholder: 'Ej: 4.000 (0 si es gratis)' },
-      { key: 'ads_budget', label: '📣 Gasto mensual en publicidad', type: 'number', prefix: '$', placeholder: 'Ej: 200.000 (0 si no inviertes aún)' },
-      { key: 'monthly_sales', label: '📊 Ventas mensuales aprox.', type: 'number', suffix: 'unidades', placeholder: 'Ej: 30' },
     ],
     steveIntro: '*saca calculadora imaginaria* 🧮\n\n',
-    commentGuide: 'CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla con resultados. Explica qué es el CPA. Di que guardaste el CPA en configuración financiera.',
+    commentGuide: 'CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown profesional con: Precio de Venta, Costo Producto, Costo Envío, Margen Bruto ($), Margen (%), CPA Máximo Viable. Bajo la tabla explica qué significa el CPA en términos prácticos para este negocio. Di que guardaste el CPA en configuración financiera.',
   },
   {
     id: 'sales_channels',
@@ -272,11 +270,13 @@ interface ChatMessage {
 const BRIEF_TEMPLATE = `
 GENERA EL BRIEF ESTRATÉGICO COMPLETO. ESTE DOCUMENTO SERÁ DESCARGADO COMO PDF PROFESIONAL.
 
+⚠️ PROHIBIDO ABSOLUTO: NO incluyas ningún texto de La Chonga ni del Espíritu de La Chonga en el brief. El brief es un documento ejecutivo formal, SIN personajes, SIN humor, SIN emojis, SIN referencias perrunas.
+
 ═══════════════════════════════════════
 REGLAS DE REDACCIÓN ABSOLUTAS:
 ═══════════════════════════════════════
 
-0. EMPIEZA DIRECTAMENTE CON "## 1. RESUMEN EJECUTIVO" — SIN preámbulo, SIN texto introductorio, SIN "¡Listo!" ni emojis. El documento comienza en la primera línea con el header del resumen ejecutivo.
+0. EMPIEZA DIRECTAMENTE CON "## 1. RESUMEN EJECUTIVO" — SIN preámbulo, SIN texto introductorio, SIN "¡Listo!" ni emojis ni "¡Excelente!" ni referencias al chat. El documento comienza en la primera línea con el header del resumen ejecutivo.
 
 1. TODO en TERCERA PERSONA PROFESIONAL:
    - CORRECTO: "La marca se posiciona como...", "El consumidor objetivo presenta...", "Se recomienda implementar..."
@@ -353,33 +353,51 @@ FORMATO OBLIGATORIO (usa headers markdown ## para cada sección):
 - **Tono y personalidad de marca:** [guía de comunicación recomendada — concreto, no vago]
 - **Identidad visual:** [descripción profesional de colores, estilo y coherencia — NO poner "subo el logo ahora mismo" ni referencias al proceso del chat]
 
-## 7. PLAN ESTRATÉGICO DE 90 DÍAS
+## 7. EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS
 
-### Fase 1: Días 1-30 — Fundamentos
-- [Acción concreta y medible, con KPI asociado]
-- [Acción concreta — priorizar puntos de diferenciación inmediatos o nuevos canales si hay concentración excesiva]
-- [Acción concreta]
+Esta sección sintetiza las 7 acciones de mayor impacto para escalar el negocio, ordenadas por prioridad estratégica. Cada accionable debe ser específico, medible y ejecutable en los próximos 90 días.
 
-### Fase 2: Días 31-60 — Activación
-- [Acción concreta de campañas/contenido con métricas claras]
-- [Acción concreta]
-- [Acción concreta]
+### Accionable 1: [Título corto impactante]
+**Qué hacer:** [Descripción concreta de la acción — mínimo 2 oraciones en tercera persona]
+**Por qué es prioritario:** [Fundamento estratégico basado en los datos del brief]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
 
-### Fase 3: Días 61-90 — Optimización y Escalamiento
-- [Acción basada en datos obtenidos en fases anteriores]
-- [Acción concreta de escala]
-- [Si hay concentración en un solo canal: acciones para diversificar con canales específicos]
+### Accionable 2: [Título corto]
+**Qué hacer:** [Descripción concreta]
+**Por qué es prioritario:** [Fundamento estratégico]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
 
-### KPIs Recomendados
-| KPI | Meta | Plazo |
-|---|---|---|
-| [KPI concreto y medible] | [número específico] | [días] |
-| [KPI 2] | [número] | [días] |
-| [KPI 3] | [número] | [días] |
+### Accionable 3: [Título corto]
+**Qué hacer:** [Descripción concreta]
+**Por qué es prioritario:** [Fundamento estratégico]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
 
-### Riesgos y Mitigación
-- **[Riesgo 1]:** [Mitigación concreta]
-- **[Riesgo 2]:** [Mitigación concreta]
+### Accionable 4: [Título corto]
+**Qué hacer:** [Descripción concreta]
+**Por qué es prioritario:** [Fundamento estratégico]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
+
+### Accionable 5: [Título corto]
+**Qué hacer:** [Descripción concreta]
+**Por qué es prioritario:** [Fundamento estratégico]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
+
+### Accionable 6: [Título corto]
+**Qué hacer:** [Descripción concreta]
+**Por qué es prioritario:** [Fundamento estratégico]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
+
+### Accionable 7: [Título corto]
+**Qué hacer:** [Descripción concreta]
+**Por qué es prioritario:** [Fundamento estratégico]
+**KPI de éxito:** [Métrica específica y plazo]
+**Responsable sugerido:** [Rol o área]
 
 ---
 **Documento preparado por Dr. Steve Dogs**

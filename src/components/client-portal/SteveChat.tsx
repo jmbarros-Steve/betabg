@@ -23,27 +23,37 @@ interface Message {
   created_at: string;
 }
 
+// Strip system instruction annotations visible to user
+function cleanMessageForDisplay(content: string): string {
+  // Remove "⚠️ FORMULARIO: ..." lines that are system instructions
+  return content
+    .replace(/⚠️ FORMULARIO:[^\n]*/g, '')
+    .replace(/Da \d+-\d+ ejemplos[^\n]*/g, '')
+    .trim();
+}
+
 function parseMessageWithChonga(content: string) {
+  const cleaned = cleanMessageForDisplay(content);
   const chongaPattern = /---\s*\n👻\s*\*\*\[ESPÍRITU DE LA CHONGA\]\:\*\*([^]*?)\*desaparece[^*]*\*\s*\n---/g;
   const parts: Array<{ type: 'steve' | 'chonga'; content: string }> = [];
   let lastIndex = 0;
   let match;
 
-  while ((match = chongaPattern.exec(content)) !== null) {
+  while ((match = chongaPattern.exec(cleaned)) !== null) {
     if (match.index > lastIndex) {
-      const stevePart = content.slice(lastIndex, match.index).trim();
+      const stevePart = cleaned.slice(lastIndex, match.index).trim();
       if (stevePart) parts.push({ type: 'steve', content: stevePart });
     }
     parts.push({ type: 'chonga', content: match[1].trim() });
     lastIndex = match.index + match[0].length;
   }
 
-  if (lastIndex < content.length) {
-    const remaining = content.slice(lastIndex).trim();
+  if (lastIndex < cleaned.length) {
+    const remaining = cleaned.slice(lastIndex).trim();
     if (remaining) parts.push({ type: 'steve', content: remaining });
   }
 
-  if (parts.length === 0) parts.push({ type: 'steve', content });
+  if (parts.length === 0) parts.push({ type: 'steve', content: cleaned });
 
   return parts;
 }
@@ -69,6 +79,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [uploadedAssets, setUploadedAssets] = useState<{ logo: string[]; products: string[] }>({ logo: [], products: [] });
   // Delay showing the next interaction block so user can read Steve's response
   const [showInteraction, setShowInteraction] = useState(true);
+  // Track the last question context label for display
+  const [lastQuestionLabel, setLastQuestionLabel] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -344,6 +356,11 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const progressPercent = Math.round((progress.answered / progress.total) * 100);
   const hasStructuredFields = currentFields.length > 0 && !isLoading && !isComplete;
 
+  // Get the last user message for context reference
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+  // Get the last assistant message before any loading state
+  const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
+
   if (isInitializing) {
     return (
       <Card className="h-[750px]">
@@ -360,7 +377,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   return (
-    <Card className="h-[750px] flex flex-col">
+    <Card className="h-[800px] flex flex-col">
       {/* Header */}
       <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
@@ -406,7 +423,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-5">
-          {messages.map((message) => (
+          {messages.map((message, msgIndex) => (
             <div key={message.id}>
               {message.role === 'user' ? (
                 <div className="flex gap-3 justify-end">
@@ -485,6 +502,16 @@ export function SteveChat({ clientId }: SteveChatProps) {
       {/* Interaction area — delayed appearance so user reads Steve's answer */}
       {showInteraction && (
         <>
+          {/* Contexto de la pregunta anterior + tu respuesta — visible card */}
+          {hasStructuredFields && lastUserMessage && (
+            <div className="px-4 pt-2 flex-shrink-0">
+              <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 mb-2">
+                <p className="text-xs font-semibold text-primary mb-1">Tu respuesta anterior:</p>
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{lastUserMessage.content}</p>
+              </div>
+            </div>
+          )}
+
           {/* Asset Upload for Q15 — inline in chat */}
           {showAssetUpload && !isComplete && !isLoading && (
             <div className="px-4 pb-2 flex-shrink-0 border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -538,6 +565,21 @@ export function SteveChat({ clientId }: SteveChatProps) {
           {/* Structured Fields Form */}
           {hasStructuredFields && (
             <div className="px-4 pb-2 flex-shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              {/* Show Steve's last question above the form */}
+              {lastAssistantMessage && (
+                <div className="bg-muted/60 border border-border rounded-xl p-3 mb-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Avatar className="h-5 w-5">
+                      <AvatarImage src={avatarSteve} alt="Steve" />
+                      <AvatarFallback className="text-[10px]">🐕</AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-semibold text-primary">Pregunta de Steve:</span>
+                  </div>
+                  <div className="prose prose-xs dark:prose-invert max-w-none text-xs [&>p]:mb-1 [&>p:last-child]:mb-0 leading-relaxed">
+                    <ReactMarkdown>{cleanMessageForDisplay(lastAssistantMessage.content).split('\n').slice(0, 6).join('\n')}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mb-2">📝 Llena los campos y envía tu respuesta:</p>
               <StructuredFieldsForm
                 fields={currentFields}
