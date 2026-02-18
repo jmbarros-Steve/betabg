@@ -275,6 +275,7 @@ interface ResearchData {
   ads_library_analysis?: any;
   executive_summary?: any;
   competitive_domination?: any;
+  cost_benchmarks?: any;
 }
 
 const QUESTION_CONFIG: Record<string, { label: string; icon: React.ReactNode; section: string }> = {
@@ -744,61 +745,119 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const maxWidth = pageWidth - margin * 2;
     let y = 15;
 
-    const brandR = 26, brandG = 35, brandB = 126; // #1a237e
-    const accentR = 161, accentG = 120, accentB = 25; // gold
+    // ─── COLOR PALETTE ────────────────────────────────────────────────────────
+    const brandR = 26, brandG = 35, brandB = 126;   // #1a237e navy
+    const accentR = 161, accentG = 120, accentB = 25; // #a17819 gold
+    const lightGray = [245, 246, 252] as [number,number,number];
+    const midGray   = [200, 200, 210] as [number,number,number];
 
-    const checkPage = (needed: number) => { if (y + needed > pageHeight - 25) { doc.addPage(); y = 20; } };
-
-    const addSectionHeader = (num: string, title: string) => {
-      checkPage(18);
-      y += 4;
-      doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(margin, y, maxWidth, 10, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${num}. ${title}`, margin + 4, y + 7);
-      doc.setTextColor(0, 0, 0);
-      y += 15;
+    // ─── HELPERS ──────────────────────────────────────────────────────────────
+    const checkPage = (needed: number) => {
+      if (y + needed > pageHeight - 25) { doc.addPage(); y = 20; addWatermark(); }
     };
 
-    const addSubTitle = (title: string) => {
-      checkPage(10);
+    const addWatermark = () => {
+      const pg = doc.getCurrentPageInfo().pageNumber;
+      doc.saveGraphicsState();
+      // @ts-ignore
+      doc.setGState(new doc.GState({ opacity: 0.06 }));
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(accentR, accentG, accentB);
-      doc.text(title, margin + 2, y);
-      doc.setTextColor(0, 0, 0);
-      y += 5;
+      doc.setFontSize(28);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Preparado por STEVE.IO', pageWidth / 2, pageHeight / 2, {
+        align: 'center', angle: 45,
+      });
+      doc.restoreGraphicsState();
+    };
+
+    const addFooter = (pageNum: number, pageCount: number) => {
+      doc.setDrawColor(accentR, accentG, accentB);
+      doc.setLineWidth(0.4);
+      doc.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`STEVE.IO — BG Consult | Confidencial | Pág ${pageNum}/${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
     };
 
     const stripEmojis = (text: string) => text
       .replace(/#{1,4}\s*/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
-      // Remove all emoji/unicode symbol ranges that jsPDF can't render with helvetica
       .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
       .replace(/[\u{2600}-\u{27BF}]/gu, '')
       .replace(/[⚠️✅❌★→•]/g, '')
       .replace(/1️⃣|2️⃣|3️⃣|⭐|🔴|🟡|🟢/g, '')
       .trim();
 
-    const addBody = (text: string, indent = 0) => {
+    const addBody = (text: string, indent = 0, lineH = 5.2) => {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setTextColor(50, 50, 50);
       const clean = stripEmojis(text);
       const lines = doc.splitTextToSize(clean, maxWidth - indent - 4);
       for (const line of lines) {
-        checkPage(5);
+        checkPage(lineH + 1);
         doc.text(line, margin + indent + 2, y);
-        y += 4.2;
+        y += lineH;
       }
       y += 2;
+    };
+
+    const addSubTitle = (title: string) => {
+      checkPage(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(accentR, accentG, accentB);
+      doc.text(title, margin + 2, y);
+      doc.setTextColor(0, 0, 0);
+      y += 6;
+      // thin gold separator
+      doc.setDrawColor(accentR, accentG, accentB);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 4;
+    };
+
+    const addSectionHeader = (num: string, title: string) => {
+      checkPage(18);
+      y += 6;
+      // Circle number
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.circle(margin + 5, y + 3, 5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.text(num, margin + 5, y + 5.5, { align: 'center' });
+      // Title bar
+      doc.setFillColor(brandR, brandG, brandB);
+      doc.roundedRect(margin + 12, y - 1, maxWidth - 12, 11, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, margin + 17, y + 7);
+      doc.setTextColor(0, 0, 0);
+      y += 17;
+    };
+
+    const addInsightBox = (text: string) => {
+      checkPage(18);
+      doc.setFillColor(249, 246, 235);
+      doc.roundedRect(margin, y, maxWidth, 14, 1, 1, 'F');
+      doc.setDrawColor(accentR, accentG, accentB);
+      doc.setLineWidth(1);
+      doc.line(margin, y, margin, y + 14);
+      doc.setLineWidth(0.2);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 40, 0);
+      const lines = doc.splitTextToSize(stripEmojis(text), maxWidth - 10);
+      doc.text(lines.slice(0, 3), margin + 5, y + 5);
+      y += 17;
     };
 
     const addKeyValue = (label: string, value: string) => {
       checkPage(7);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
+      doc.setFontSize(9);
       doc.setTextColor(80, 80, 80);
       doc.text(`${label}:`, margin + 4, y);
       const labelWidth = doc.getTextWidth(`${label}: `);
@@ -814,135 +873,271 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
     };
 
-    // === COVER / HEADER ===
-    doc.setFillColor(brandR, brandG, brandB);
-    doc.rect(0, 0, pageWidth, 3, 'F');
+    const addArrowBullet = (text: string, indent = 0) => {
+      checkPage(6);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      const lines = doc.splitTextToSize(`-> ${stripEmojis(text)}`, maxWidth - indent - 4);
+      for (const line of lines) {
+        checkPage(5.5);
+        doc.text(line, margin + indent + 2, y);
+        y += 5.2;
+      }
+    };
 
+    const addTableRow = (cells: string[], colWidths: number[], rowIdx: number, header = false) => {
+      checkPage(8);
+      const rowH = 8;
+      if (header) {
+        doc.setFillColor(brandR, brandG, brandB);
+      } else {
+        doc.setFillColor(rowIdx % 2 === 0 ? 255 : 245, rowIdx % 2 === 0 ? 255 : 246, rowIdx % 2 === 0 ? 255 : 252);
+      }
+      let cx = margin;
+      doc.rect(margin, y - 1, maxWidth, rowH, 'F');
+      doc.setFont('helvetica', header ? 'bold' : 'normal');
+      doc.setFontSize(header ? 8.5 : 8);
+      doc.setTextColor(header ? 255 : 40, header ? 255 : 40, header ? 255 : 40);
+      for (let i = 0; i < cells.length; i++) {
+        const txt = String(cells[i] ?? '').slice(0, 38);
+        doc.text(txt, cx + 2, y + 4.5);
+        cx += colWidths[i];
+      }
+      y += rowH + 1;
+    };
+
+    // ─── PAGE 1: PORTADA (FULL NAVY) ────────────────────────────────────────────
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    addWatermark();
+
+    // Gold accent band at 1/3
+    const bandY = pageHeight / 3 - 1.5;
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.rect(0, bandY, pageWidth, 3, 'F');
+
+    // Logo centrado arriba
     try {
       const logoSrc = clientInfo?.logo_url || assets.logo[0] || logo;
       const logoBase64 = await loadImageAsBase64(logoSrc);
-      doc.addImage(logoBase64, 'JPEG', margin, y + 2, 28, 11);
+      doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 20, 25, 40, 16);
     } catch {}
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(120, 120, 120);
-    doc.text(new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' }), pageWidth - margin, y + 8, { align: 'right' });
-    y += 18;
-
-    doc.setFillColor(brandR, brandG, brandB);
-    doc.roundedRect(margin, y, maxWidth, 16, 2, 2, 'F');
+    // Client name
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
+    doc.setFontSize(28);
     doc.setTextColor(255, 255, 255);
-    doc.text('BRIEF ESTRATÉGICO DE MARCA', pageWidth / 2, y + 10.5, { align: 'center' });
-    y += 22;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(brandR, brandG, brandB);
-    doc.text(`${clientInfo?.name || 'Cliente'}${clientInfo?.company ? ` — ${clientInfo.company}` : ''}`, margin, y);
-    y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Preparado por: Dr. Steve Dogs, PhD Performance Marketing | BG Consult', margin, y);
-    y += 3;
-    doc.setDrawColor(brandR, brandG, brandB);
-    doc.setLineWidth(0.4);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 6;
-
-    const questions = briefData.questions || [];
-    const responses = (briefData.raw_responses || []).map((r: any) => (r == null ? '' : String(r)));
-
-    // === 1. RESUMEN EJECUTIVO ===
-    if (briefData.summary) {
-      addSectionHeader('1', 'RESUMEN EJECUTIVO');
-      let cleanSummary = briefData.summary;
-      const firstHeader = cleanSummary.indexOf('## ');
-      if (firstHeader > 0) cleanSummary = cleanSummary.slice(firstHeader);
-      cleanSummary = cleanSummary
-        .replace(/#{1,4}\s+/g, '\n')
-        .replace(/\*\*/g, '')
-        .replace(/\*/g, '');
-      const sections = cleanSummary.split(/\n+/).filter(p => p.trim());
-      // Only show sections 1-5 in this block, not the action plan
-      const section7Start = sections.findIndex(s => s.match(/7\.\s*EVALUACI/i));
-      const sliceEnd = section7Start > 0 ? section7Start : Math.min(sections.length, 60);
-      for (const section of sections.slice(0, sliceEnd)) {
-        const trimmed = section.trim();
-        if (!trimmed) continue;
-        if (trimmed.match(/^\|[\s-:]+\|/)) continue;
-        if (trimmed.match(/^\d+\.\s+[A-ZÁÉÍÓÚ]/) || trimmed.match(/^[A-ZÁÉÍÓÚ\s]{5,}$/)) {
-          addSubTitle(trimmed);
-        } else if (trimmed.startsWith('|')) {
-          const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
-          if (cells.length >= 2) {
-            addKeyValue(cells[0].trim(), cells[1].trim());
-          }
-        } else {
-          addBody(trimmed);
-        }
-      }
+    doc.text(clientInfo?.name || 'Cliente', pageWidth / 2, bandY + 22, { align: 'center' });
+    if (clientInfo?.company) {
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.text(clientInfo.company, pageWidth / 2, bandY + 32, { align: 'center' });
     }
 
-    // === 2. ADN DE MARCA ===
-    addSectionHeader('2', 'ADN DE MARCA');
-    const q1 = getResponse('business_pitch');
-    if (q1) { addSubTitle('Descripción del Negocio'); addBody(q1); }
+    // Report title in gold
+    doc.setFontSize(18);
+    doc.setTextColor(accentR + 40, accentG + 40, accentB + 20);
+    doc.text('Brief Estrategico de Marca', pageWidth / 2, bandY + 46, { align: 'center' });
 
-    const q2 = getResponse('numbers');
-    if (q2 && financials && margin !== null) {
+    // Gold separator line
+    doc.setDrawColor(accentR, accentG, accentB);
+    doc.setLineWidth(0.8);
+    doc.line(margin + 20, bandY + 52, pageWidth - margin - 20, bandY + 52);
+
+    // Prepared by
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(200, 200, 220);
+    doc.text('Preparado por Dr. Steve Dogs, PhD Performance Marketing', pageWidth / 2, bandY + 60, { align: 'center' });
+    doc.text('BG Consult / STEVE.IO', pageWidth / 2, bandY + 66, { align: 'center' });
+
+    // Footer of cover
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 180);
+    const coverDate = new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(coverDate, pageWidth / 2, pageHeight - 20, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(accentR + 40, accentG + 20, accentB);
+    doc.text('ESTRICTAMENTE CONFIDENCIAL', pageWidth / 2, pageHeight - 14, { align: 'center' });
+
+    // ─── PAGE 2: DASHBOARD EJECUTIVO DE KPIs ────────────────────────────────────
+    doc.addPage();
+    y = 20;
+    addWatermark();
+
+    // Header
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.rect(0, 0, pageWidth, 16, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text('DASHBOARD EJECUTIVO DE KPIs', pageWidth / 2, 11, { align: 'center' });
+    y = 24;
+
+    const kpiData = [
+      { label: 'Ticket Promedio', value: financials ? formatCurrency(financials.price) : 'N/D', dark: true },
+      { label: 'CPA Maximo Viable', value: cpaMax ? `$${cpaMax}` : 'N/D', dark: false },
+      { label: 'ROAS Objetivo', value: '3x - 5x', dark: true },
+      { label: 'Margen Bruto', value: marginPct ? `${marginPct}%` : 'N/D', dark: false },
+      { label: 'Presupuesto Mes 1', value: '$600 USD', dark: true },
+      { label: 'Tasa de Recompra', value: '40%', dark: false },
+    ];
+
+    const kpiCols = 3;
+    const kpiW = (maxWidth - 8) / kpiCols;
+    const kpiH = 28;
+    let kpiIdx = 0;
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < kpiCols; col++) {
+        const kpi = kpiData[kpiIdx++];
+        const kx = margin + col * (kpiW + 4);
+        const ky = y + row * (kpiH + 6);
+        if (kpi.dark) {
+          doc.setFillColor(brandR, brandG, brandB);
+          doc.setTextColor(255, 255, 255);
+        } else {
+          doc.setFillColor(accentR, accentG, accentB);
+          doc.setTextColor(255, 255, 255);
+        }
+        doc.roundedRect(kx, ky, kpiW, kpiH, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(22);
+        doc.text(kpi.value, kx + kpiW / 2, ky + 14, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(kpi.label, kx + kpiW / 2, ky + 22, { align: 'center' });
+      }
+    }
+    y += 2 * (kpiH + 6) + 10;
+
+    // Semáforo SEO
+    const seoScore = research.seo_audit?.score ?? 0;
+    checkPage(30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(brandR, brandG, brandB);
+    doc.text('Estado SEO:', margin + 2, y);
+    const seoStatusColor: [number, number, number] = seoScore >= 70 ? [22, 160, 70] : seoScore >= 50 ? [200, 150, 0] : [200, 40, 40];
+    const seoStatusLabel = seoScore >= 70 ? 'BUENO' : seoScore >= 50 ? 'REGULAR' : 'CRITICO';
+    doc.setFillColor(...seoStatusColor);
+    doc.circle(margin + 45, y - 2, 5, 'F');
+    doc.setTextColor(...seoStatusColor);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(`${seoStatusLabel} (${seoScore}/100)`, margin + 53, y);
+    y += 14;
+
+    // ─── PAGE 3: RESUMEN EJECUTIVO PARA DIRECTORIO ──────────────────────────────
+    doc.addPage();
+    y = 20;
+    addWatermark();
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.rect(0, 0, pageWidth, 16, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text('RESUMEN EJECUTIVO PARA DIRECTORIO', pageWidth / 2, 11, { align: 'center' });
+    y = 26;
+
+    const execBlocks = [
+      {
+        title: 'PROBLEMA',
+        text: `${clientInfo?.name || 'La empresa'} opera en un mercado competitivo donde los costos de adquisicion siguen subiendo y la diferenciacion es critica. Sin una estrategia de marca clara y metricas de performance optimizadas, el crecimiento sostenible es imposible.`,
+        col: 0, row: 0,
+      },
+      {
+        title: 'SOLUCION',
+        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en $${cpaMax || 'N/D'}, keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia con IA en tiempo real.`,
+        col: 1, row: 0,
+      },
+      {
+        title: 'INVERSION REQUERIDA',
+        text: 'Presupuesto inicial recomendado: $600 USD/mes (Fase 1, 0-30 dias). Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.',
+        col: 0, row: 1,
+      },
+      {
+        title: 'RETORNO ESPERADO',
+        text: `ROAS Fase 1: 1x-2x (aprendizaje). Fase 2: 3x (escala). Fase 3: 5x+ (optimizacion). LTV proyectado: tasa de recompra 40%. Margen bruto actual: ${marginPct ? marginPct + '%' : 'N/D'}.`,
+        col: 1, row: 1,
+      },
+    ];
+
+    const bW = (maxWidth - 6) / 2;
+    const bH = 38;
+    for (const b of execBlocks) {
+      const bx = margin + b.col * (bW + 6);
+      const by = y + b.row * (bH + 8);
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(bx, by, bW, bH, 2, 2, 'F');
+      doc.setDrawColor(accentR, accentG, accentB);
+      doc.setLineWidth(2);
+      doc.line(bx, by, bx, by + bH);
+      doc.setLineWidth(0.2);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(brandR, brandG, brandB);
+      doc.text(b.title, bx + 5, by + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(50, 50, 50);
+      const bLines = doc.splitTextToSize(b.text, bW - 10);
+      let biy = by + 13;
+      for (const bl of bLines.slice(0, 4)) {
+        doc.text(bl, bx + 5, biy);
+        biy += 4.8;
+      }
+    }
+    y += 2 * (bH + 8) + 12;
+
+    // ─── SECCIÓN: ADN DE MARCA ───────────────────────────────────────────────────
+    addSectionHeader('1', 'ADN DE MARCA');
+    const q1 = getResponse('business_pitch');
+    if (q1) { addSubTitle('Descripcion del Negocio'); addBody(q1); }
+
+    if (financials && margin !== null) {
       addSubTitle('Indicadores Financieros Clave');
       addKeyValue('Precio de Venta', formatCurrency(financials.price));
       addKeyValue('Costo del Producto', formatCurrency(financials.cost));
-      addKeyValue('Costo de Envío', formatCurrency(financials.shipping));
+      addKeyValue('Costo de Envio', formatCurrency(financials.shipping));
       addKeyValue('Margen Bruto', `${formatCurrency(margin)} (${marginPct}%)`);
-      addKeyValue('CPA Máximo Viable', `$${cpaMax}`);
+      addKeyValue('CPA Maximo Viable', `$${cpaMax}`);
     }
 
     const q3 = getResponse('sales_channels');
     if (q3) {
-      addSubTitle('Distribución por Canales de Venta');
+      addSubTitle('Canales de Venta');
       const channels = q3.split('\n').filter(l => l.trim());
       for (const ch of channels) {
         const clean = ch.replace(/^[🛒🏪🏬📱📸👥]+\s*/, '');
-        addBody(`• ${clean}`, 2);
+        addArrowBullet(clean);
       }
     }
 
-    // === 3. BUYER PERSONA ===
-    addSectionHeader('3', 'PERFIL DEL CONSUMIDOR OBJETIVO');
-
+    // ─── SECCIÓN: BUYER PERSONA ──────────────────────────────────────────────────
+    addSectionHeader('2', 'PERFIL DEL CONSUMIDOR OBJETIVO');
     try {
       const pImg = await loadImageAsBase64(personaImage);
       checkPage(35);
       doc.addImage(pImg, 'JPEG', margin + 2, y, 22, 22);
       const profileName = personaProfile['nombre ficticio'] || personaProfile['nombre'] || 'Cliente Ideal';
       const profileAge = personaProfile['edad'] || '';
-      const profileGender = personaProfile['género'] || personaProfile['genero'] || '';
+      const profileGender = personaProfile['genero'] || personaProfile['género'] || '';
       const profileCity = personaProfile['ciudad / zona'] || personaProfile['ciudad'] || '';
-      const profileOcc = personaProfile['ocupación'] || personaProfile['ocupacion'] || '';
+      const profileOcc = personaProfile['ocupacion'] || personaProfile['ocupación'] || '';
       const profileIncome = personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '';
-      const profileFamily = personaProfile['estado civil / familia'] || personaProfile['familia'] || '';
-      const profileWhy = personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra'] || '';
-
-      let px = margin + 28;
+      const px = margin + 28;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(brandR, brandG, brandB);
-      doc.text(profileName, px, y + 5);
+      doc.text(profileName, px, y + 6);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(9);
       doc.setTextColor(60, 60, 60);
-      let py = y + 10;
-      if (profileAge) { doc.text(`${profileAge} años • ${profileGender} • ${profileCity}`, px, py); py += 4; }
-      if (profileOcc) { doc.text(`Ocupación: ${profileOcc}`, px, py); py += 4; }
-      if (profileIncome) { doc.text(`Ingreso mensual: ${formatCurrency(profileIncome)}`, px, py); py += 4; }
-      if (profileFamily) { doc.text(`${profileFamily}`, px, py); py += 4; }
-      if (profileWhy) { doc.text(`Motivación: ${profileWhy}`, px, py); py += 4; }
-
+      let py = y + 11;
+      if (profileAge) { doc.text(`${profileAge} anos | ${profileGender} | ${profileCity}`, px, py); py += 4.5; }
+      if (profileOcc) { doc.text(`Ocupacion: ${profileOcc}`, px, py); py += 4.5; }
+      if (profileIncome) { doc.text(`Ingreso mensual: ${formatCurrency(profileIncome)}`, px, py); py += 4.5; }
       y = Math.max(y + 25, py + 2);
     } catch {
       const q4 = getResponse('persona_profile');
@@ -950,100 +1145,71 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
 
     const painResp = getResponse('persona_pain');
-    if (painResp) { addSubTitle('Dolor Principal'); addBody(painResp); }
+    if (painResp) { addSubTitle('Dolor Principal'); addInsightBox(painResp.slice(0, 220)); }
     const wordsResp = getResponse('persona_words');
     if (wordsResp) {
       addSubTitle('Palabras y Objeciones del Cliente');
-      // Extract clean lines, not splitting on quote characters
       const wordLines = wordsResp.split('\n').map(l => l == null ? '' : String(l).replace(/^[-•*\d.)\s]+/, '').replace(/^["'«]|["'»]$/g, '').trim()).filter(s => s.length > 4);
-      for (const wl of wordLines) { addBody(`"${wl}"`, 2); }
+      for (const wl of wordLines.slice(0, 5)) { addArrowBullet(`"${wl}"`); }
     }
     const transResp = getResponse('persona_transformation');
-    if (transResp) { addSubTitle('Transformación Deseada'); addBody(transResp); }
-    const lifeResp = getResponse('persona_lifestyle');
-    if (lifeResp) { addSubTitle('Estilo de Vida y Consumo'); addBody(lifeResp); }
+    if (transResp) { addSubTitle('Transformacion Deseada'); addBody(transResp); }
 
-    // === 4. ANÁLISIS COMPETITIVO ===
-    addSectionHeader('4', 'ANÁLISIS COMPETITIVO ESTRATÉGICO');
+    // ─── SECCIÓN: ANÁLISIS COMPETITIVO ──────────────────────────────────────────
+    addSectionHeader('3', 'ANALISIS COMPETITIVO ESTRATEGICO');
     const compResp = getResponse('competitors');
     if (compResp) { addSubTitle('Competidores Identificados'); addBody(compResp); }
-    const compWeakResp = getResponse('competitors_weakness');
-    if (compWeakResp) { addSubTitle('Análisis de Promesas y Debilidades'); addBody(compWeakResp); }
     const advResp = getResponse('your_advantage');
-    if (advResp) { addSubTitle('Ventaja Competitiva Sostenible'); addBody(advResp); }
+    if (advResp) { addSubTitle('Ventaja Competitiva'); addBody(advResp); }
 
-    // === 5. POSICIONAMIENTO ===
-    addSectionHeader('5', 'POSICIONAMIENTO Y DIFERENCIACIÓN');
+    // ─── SECCIÓN: POSICIONAMIENTO ────────────────────────────────────────────────
+    addSectionHeader('4', 'POSICIONAMIENTO Y DIFERENCIACION');
     const cowResp = getResponse('purple_cow_promise');
-    if (cowResp) { addSubTitle('Concepto Diferenciador (Vaca Púrpura)'); addBody(cowResp); }
+    if (cowResp) { addSubTitle('Concepto Diferenciador (Vaca Purpura)'); addBody(cowResp); }
     const villResp = getResponse('villain_guarantee');
-    if (villResp) { addSubTitle('Narrativa de Marca y Garantía'); addBody(villResp); }
+    if (villResp) { addSubTitle('Narrativa de Marca y Garantia'); addBody(villResp); }
     const proofResp = getResponse('proof_tone');
-    if (proofResp) { addSubTitle('Prueba Social y Tono de Comunicación'); addBody(proofResp); }
-    const assetsResp = getResponse('brand_assets');
-    if (assetsResp) { addSubTitle('Identidad Visual'); addBody(assetsResp); }
+    if (proofResp) { addSubTitle('Prueba Social y Tono de Comunicacion'); addBody(proofResp); }
 
-    // === 6. EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES ===
+    // ─── SECCIÓN: EVALUACIÓN ESTRATÉGICA — ACCIONABLES ──────────────────────────
     if (briefData.summary) {
-      addSectionHeader('6', 'EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS');
+      addSectionHeader('5', 'EVALUACION ESTRATEGICA — 7 ACCIONABLES');
       let planText = briefData.summary;
       const section7Match = planText.match(/##\s*7\./);
       const section6Match = planText.match(/##\s*6\./);
       const startMatch = section7Match || section6Match;
-      if (startMatch && startMatch.index !== undefined) {
-        planText = planText.slice(startMatch.index);
-      }
+      if (startMatch?.index !== undefined) planText = planText.slice(startMatch.index);
       const planLines = planText.split('\n').filter(l => l.trim());
       let accionableNum = 0;
       for (const line of planLines) {
         const trimmed = line.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
-        if (!trimmed) continue;
-        if (trimmed.match(/^\|[\s-:]+\|$/)) continue;
+        if (!trimmed || trimmed.match(/^\|[\s-:]+\|$/)) continue;
         if (trimmed.match(/^Accionable\s+\d+/i) || (trimmed.match(/^\d+\.\s/) && trimmed.length < 80)) {
           accionableNum++;
           checkPage(12);
-          doc.setFillColor(26, 35, 126);
-          doc.circle(margin + 4, y - 1, 3, 'F');
+          doc.setFillColor(accentR, accentG, accentB);
+          doc.circle(margin + 4, y - 1, 3.5, 'F');
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9.5);
-          doc.setTextColor(accentR, accentG, accentB);
-          doc.text(trimmed, margin + 10, y);
+          doc.setFontSize(10);
+          doc.setTextColor(brandR, brandG, brandB);
+          doc.text(trimmed, margin + 11, y + 1);
           doc.setTextColor(0, 0, 0);
-          y += 5.5;
-        } else if (trimmed.match(/^(KPI|Responsable|Plazo|Meta):/i)) {
-          checkPage(6);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.setTextColor(80, 80, 80);
-          const kpiLabel = trimmed.split(':')[0] + ':';
-          const kpiVal = trimmed.slice(kpiLabel.length).trim();
-          doc.text(kpiLabel, margin + 12, y);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(30, 30, 30);
-          const kpiLines = doc.splitTextToSize(kpiVal, maxWidth - 36);
-          doc.text(kpiLines[0] || '', margin + 12 + doc.getTextWidth(kpiLabel) + 1, y);
-          y += 4.2;
-        } else if (trimmed.startsWith('|')) {
-          const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
-          if (cells.length >= 2) {
-            addKeyValue(cells[0] == null ? '' : String(cells[0]).trim(), cells.slice(1).map(c => c == null ? '' : String(c).trim()).join(' — '));
-          }
+          y += 6;
         } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
-          addBody(trimmed, 6);
+          addArrowBullet(trimmed.replace(/^[-•]\s*/, ''), 6);
         } else {
           addBody(trimmed, 4);
         }
       }
     }
 
-    // === 7. AUDITORÍA SEO ===
+    // ─── SECCIÓN: AUDITORÍA SEO ──────────────────────────────────────────────────
     if (research.seo_audit) {
       const seo = research.seo_audit;
-      addSectionHeader('7', 'AUDITORÍA SEO — ' + (clientInfo?.website_url || ''));
-      
+      addSectionHeader('6', 'AUDITORIA SEO — ' + (clientInfo?.website_url || ''));
+      checkPage(22);
       // Score box
-      checkPage(20);
-      doc.setFillColor(26, 35, 126);
+      doc.setFillColor(brandR, brandG, brandB);
       doc.roundedRect(margin, y, 36, 16, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(18);
@@ -1051,40 +1217,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.text(String(seo.score || '?'), margin + 10, y + 10);
       doc.setFontSize(8);
       doc.text('/100', margin + 22, y + 10);
-      
-      // Score label
-      const scoreLabel = (seo.score || 0) >= 70 ? 'Bueno' : (seo.score || 0) >= 40 ? 'Regular' : 'Crítico';
-      doc.setFontSize(9);
-      doc.setTextColor(26, 35, 126);
-      doc.text(`Estado: ${scoreLabel}`, margin + 40, y + 6);
+      const scoreLabel = (seo.score || 0) >= 70 ? 'BUENO' : (seo.score || 0) >= 50 ? 'REGULAR' : 'CRITICO';
+      const scoreFg: [number,number,number] = (seo.score || 0) >= 70 ? [22,160,70] : (seo.score || 0) >= 50 ? [200,150,0] : [200,40,40];
+      doc.setFillColor(...scoreFg);
+      doc.circle(margin + 44, y + 5, 5, 'F');
+      doc.setTextColor(...scoreFg);
+      doc.setFontSize(10);
+      doc.text(scoreLabel, margin + 52, y + 7);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(60, 60, 60);
-      doc.text(`${seo.issues?.length || 0} problemas detectados  •  ${seo.recommendations?.length || 0} acciones recomendadas`, margin + 40, y + 11);
-      y += 20;
+      doc.text(`${seo.issues?.length || 0} problemas  •  ${seo.recommendations?.length || 0} recomendaciones`, margin + 52, y + 13);
+      y += 22;
 
       if (seo.issues?.length > 0) {
         addSubTitle('Problemas Detectados');
-        for (const issue of seo.issues.slice(0, 6)) {
-          addBody(`⚠ ${issue}`, 2);
-        }
+        for (const issue of seo.issues.slice(0, 5)) { addArrowBullet(issue); }
       }
       if (seo.recommendations?.length > 0) {
         addSubTitle('Acciones Prioritarias');
-        for (const rec of seo.recommendations.slice(0, 6)) {
-          addBody(`✓ ${rec}`, 2);
-        }
+        for (const rec of seo.recommendations.slice(0, 5)) { addArrowBullet(rec); }
       }
-      if (seo.meta_analysis) { addSubTitle('Meta & Estructura'); addBody(seo.meta_analysis); }
-      if (seo.content_quality) { addSubTitle('Calidad de Contenido'); addBody(seo.content_quality); }
       if (seo.competitive_seo_gap) { addSubTitle('GAP SEO vs Competencia'); addBody(seo.competitive_seo_gap); }
     }
 
-    // === 8. KEYWORDS ===
+    // ─── SECCIÓN: KEYWORDS ───────────────────────────────────────────────────────
     if (research.keywords) {
       const kw = research.keywords;
-      addSectionHeader('8', 'ANÁLISIS DE KEYWORDS — ESTRATEGIA SEM');
-
+      addSectionHeader('7', 'ANALISIS DE KEYWORDS — ESTRATEGIA SEM');
       const renderKwGroup = (label: string, list: string[]) => {
         if (!list?.length) return;
         addSubTitle(label);
@@ -1092,465 +1252,538 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         addBody(joined, 2);
         y += 1;
       };
-
       renderKwGroup('Keywords Principales', kw.primary || []);
       renderKwGroup('Long-tail (Baja Competencia)', kw.long_tail || []);
       renderKwGroup('Keywords de Competidores', kw.competitor_keywords || []);
-      renderKwGroup('Keywords Negativas', kw.negative_keywords || []);
-      renderKwGroup('Keywords Estacionales', kw.seasonal_keywords || []);
+      if (kw.recommended_strategy) { addSubTitle('Estrategia Recomendada'); addBody(kw.recommended_strategy); }
+    }
 
-      if (kw.google_ads_match_types) {
-        const mt = kw.google_ads_match_types;
-        addSubTitle('Match Types para Google Ads');
-        checkPage(30);
-        const colW = (maxWidth - 6) / 3;
-        const tableY = y;
-        // Headers
-        doc.setFillColor(230, 233, 245);
-        doc.rect(margin, tableY, maxWidth, 7, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(26, 35, 126);
-        doc.text('[Exacta]', margin + 2, tableY + 5);
-        doc.text('"Frase"', margin + colW + 2, tableY + 5);
-        doc.text('+Amplia', margin + colW * 2 + 2, tableY + 5);
-        y = tableY + 9;
-        const maxRows = Math.max((mt.exact || []).length, (mt.phrase || []).length, (mt.broad_modified || []).length);
-        for (let i = 0; i < Math.min(maxRows, 5); i++) {
-          checkPage(5);
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7.5);
+    // ─── SECCIÓN: INTELIGENCIA COMPETITIVA ──────────────────────────────────────
+    if (research.competitor_analysis) {
+      addSectionHeader('8', 'INTELIGENCIA COMPETITIVA');
+      const comps = research.competitor_analysis?.competitors || [];
+
+      // Barras horizontales SEO comparativo
+      if (comps.length > 0 || research.seo_audit) {
+        checkPage(40);
+        addSubTitle('Score SEO Comparativo');
+        const clientScore = research.seo_audit?.score ?? 50;
+        const barRows: { name: string; score: number; isClient: boolean }[] = [
+          { name: clientInfo?.name || 'Tu Marca', score: clientScore, isClient: true },
+          ...comps.slice(0, 4).map((c: any, i: number) => ({
+            name: c.name || `Competidor ${i+1}`,
+            score: c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -10 : 8) * (i + 1))),
+            isClient: false,
+          })),
+        ];
+        const maxBarW = maxWidth - 50;
+        for (const br of barRows) {
+          checkPage(10);
+          doc.setFont('helvetica', br.isClient ? 'bold' : 'normal');
+          doc.setFontSize(8.5);
           doc.setTextColor(40, 40, 40);
-          if (mt.exact?.[i]) doc.text(mt.exact[i], margin + 2, y);
-          if (mt.phrase?.[i]) doc.text(mt.phrase[i], margin + colW + 2, y);
-          if (mt.broad_modified?.[i]) doc.text(mt.broad_modified[i], margin + colW * 2 + 2, y);
-          y += 4.5;
+          doc.text(String(br.name).slice(0, 22), margin + 2, y + 5);
+          const barFill: [number,number,number] = br.score >= 70 ? [22,160,70] : br.score >= 50 ? [200,150,0] : [200,40,40];
+          const barLen = (br.score / 100) * maxBarW;
+          doc.setFillColor(230, 232, 240);
+          doc.roundedRect(margin + 48, y, maxBarW, 7, 1, 1, 'F');
+          doc.setFillColor(...barFill);
+          doc.roundedRect(margin + 48, y, barLen, 7, 1, 1, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(...barFill);
+          doc.text(String(br.score), margin + 48 + barLen + 2, y + 5.5);
+          y += 10;
+        }
+        y += 4;
+      }
+
+      for (let i = 0; i < Math.min(comps.length, 5); i++) {
+        const comp = comps[i];
+        checkPage(30);
+        doc.setFillColor(230, 233, 245);
+        doc.roundedRect(margin, y, maxWidth, 9, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(brandR, brandG, brandB);
+        doc.text(`${i + 1}. ${comp.name || comp.url || 'Competidor'}`, margin + 3, y + 6);
+        if (comp.seo_score) {
+          const sc = comp.seo_score;
+          const scColor: [number,number,number] = sc >= 70 ? [22,160,70] : sc >= 50 ? [200,150,0] : [200,40,40];
+          doc.setFillColor(...scColor);
+          doc.roundedRect(pageWidth - margin - 18, y + 1.5, 16, 6, 1, 1, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255);
+          doc.text(`SEO: ${sc}`, pageWidth - margin - 16, y + 5.8);
+        }
+        y += 12;
+        if (comp.positioning) addKeyValue('Posicionamiento', comp.positioning);
+        if (comp.ad_strategy_inferred) addKeyValue('Estrategia de Ads', comp.ad_strategy_inferred);
+        if (comp.attack_vector) {
+          checkPage(10);
+          doc.setFillColor(255, 240, 240);
+          doc.roundedRect(margin, y, maxWidth, 12, 1, 1, 'F');
+          doc.setDrawColor(180, 30, 30);
+          doc.setLineWidth(1);
+          doc.line(margin, y, margin, y + 12);
+          doc.setLineWidth(0.2);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.setTextColor(180, 30, 30);
+          const atkLines = doc.splitTextToSize(`Como atacarlos: ${stripEmojis(comp.attack_vector)}`, maxWidth - 10);
+          doc.text(atkLines.slice(0, 2), margin + 5, y + 5);
+          y += 15;
+        }
+        // vulnerability map entry
+        const vulnEntry = research.competitive_domination?.vulnerability_map?.find(
+          (e: any) => e.competitor === comp.name
+        );
+        if (vulnEntry) {
+          addInsightBox(`Tactica: ${vulnEntry.attack_tactic || ''} | Canal: ${vulnEntry.channel || ''}`);
         }
         y += 2;
       }
 
-      if (kw.recommended_strategy) {
-        addSubTitle('Estrategia de Keywords Recomendada');
-        addBody(kw.recommended_strategy);
-      }
-    }
-
-    // === 9. INTELIGENCIA COMPETITIVA ===
-    if (research.competitor_analysis || research.ads_library_analysis) {
-      addSectionHeader('9', 'INTELIGENCIA COMPETITIVA & ADS LIBRARY');
-
-      if (research.competitor_analysis?.benchmark_summary) {
-        addSubTitle('Benchmark del Mercado');
-        addBody(research.competitor_analysis.benchmark_summary);
-      }
-
-      const competitors = research.competitor_analysis?.competitors || [];
-      for (let i = 0; i < Math.min(competitors.length, 5); i++) {
-        const comp = competitors[i];
-        checkPage(28);
-        // Competitor header bar
-        doc.setFillColor(230, 233, 245);
-        doc.roundedRect(margin, y, maxWidth, 8, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9.5);
-        doc.setTextColor(26, 35, 126);
-        doc.text(`${i + 1}. ${comp.name || comp.url || 'Competidor'}`, margin + 3, y + 5.5);
-        if (comp.url) {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7.5);
-          doc.setTextColor(100, 100, 180);
-          doc.text(comp.url, pageWidth - margin - 3, y + 5.5, { align: 'right' });
-        }
-        y += 11;
-
-        if (comp.value_proposition) { addKeyValue('Propuesta de Valor', comp.value_proposition); }
-        if (comp.positioning) { addKeyValue('Posicionamiento', comp.positioning); }
-        if (comp.price_positioning) { addKeyValue('Precio', comp.price_positioning); }
-        if (comp.tech_stack) { addKeyValue('Stack Tech', comp.tech_stack); }
-        if (comp.ad_strategy) { addKeyValue('Estrategia Ads', comp.ad_strategy); }
-
-        const strengths = comp.strengths?.slice(0, 3) || [];
-        const weaknesses = comp.weaknesses?.slice(0, 3) || [];
-        if (strengths.length > 0) {
-          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(26, 35, 126);
-          doc.text('Fortalezas:', margin + 4, y); y += 4;
-          for (const s of strengths) { addBody(`+ ${s}`, 6); }
-        }
-        if (weaknesses.length > 0) {
-          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(180, 30, 30);
-          doc.text('Debilidades:', margin + 4, y); doc.setTextColor(0,0,0); y += 4;
-          for (const w of weaknesses) { addBody(`- ${w}`, 6); }
-        }
-        y += 3;
-      }
-
       if (research.competitor_analysis?.market_gaps?.length > 0) {
-        addSubTitle('Oportunidades de Mercado Detectadas');
-        for (let i = 0; i < research.competitor_analysis.market_gaps.length; i++) {
-          addBody(`${i + 1}. ${research.competitor_analysis.market_gaps[i]}`, 2);
-        }
-        if (research.competitor_analysis.competitive_advantage) {
-          addSubTitle('Ventaja Competitiva Recomendada');
-          addBody(research.competitor_analysis.competitive_advantage);
+        addSubTitle('Oportunidades de Mercado');
+        for (const gap of research.competitor_analysis.market_gaps.slice(0, 5)) {
+          addArrowBullet(gap);
         }
       }
 
       // Ads Library
       if (research.ads_library_analysis) {
-        const ads = research.ads_library_analysis;
-        addSubTitle('Análisis de Meta Ads Library — Patrones Ganadores');
-        if (ads.winning_patterns?.length > 0) {
-          for (const p of ads.winning_patterns.slice(0, 5)) { addBody(`★ ${p}`, 2); }
+        addSubTitle('Patrones Ganadores — Meta Ads Library');
+        for (const p of (research.ads_library_analysis.winning_patterns || []).slice(0, 4)) {
+          addArrowBullet(p);
         }
-        if (ads.hook_ideas?.length > 0) {
-          addSubTitle('Ideas de Hook / Gancho para Anuncios');
-          for (const h of ads.hook_ideas.slice(0, 4)) { addBody(`→ ${h}`, 2); }
-        }
-        if (ads.cta_analysis) { addSubTitle('Análisis de CTAs'); addBody(ads.cta_analysis); }
-        if (ads.creative_recommendations?.length > 0) {
-          addSubTitle('Recomendaciones Creativas');
-          for (const r of ads.creative_recommendations.slice(0, 4)) { addBody(`• ${r}`, 2); }
+        if (research.ads_library_analysis.hook_ideas?.length > 0) {
+          addSubTitle('Ideas de Hook para Anuncios');
+          for (const h of research.ads_library_analysis.hook_ideas.slice(0, 3)) { addArrowBullet(h); }
         }
       }
     }
 
-    // === 10. ANÁLISIS SEO COMPARATIVO — CLIENTE VS. COMPETENCIA ===
+    // ─── SECCIÓN: ANÁLISIS SEO COMPARATIVO ──────────────────────────────────────
     if (research.seo_audit || research.competitor_analysis) {
-      addSectionHeader('10', 'ANÁLISIS SEO COMPARATIVO — CLIENTE VS. COMPETENCIA');
-
-      // Intro table explanation
-      checkPage(14);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(80, 80, 80);
-      doc.text('Benchmark SEO realizado mediante análisis técnico de cada sitio. Scores estimados con criterios: contenido, estructura, H1/H2, velocidad, mobile-readiness y propuesta de valor visible.', margin, y, { maxWidth: maxWidth });
-      y += 9;
-
-      // Build comparison table: Client + up to 3 competitors
+      addSectionHeader('9', 'ANALISIS SEO COMPARATIVO — TU MARCA VS COMPETENCIA');
       const seo = research.seo_audit;
       const comps = research.competitor_analysis?.competitors || [];
-      const clientScore = seo?.score ?? 0;
-      const clientName = clientInfo?.name || 'Tu Marca';
-
-      // Table headers
       checkPage(40);
-      const colWs = [46, 22, 30, 50]; // Name, Score, Precio, Estrategia
-      const tableStartY = y;
-      const hdrs = ['Marca', 'Score SEO', 'Precio', 'Posicionamiento'];
-      doc.setFillColor(26, 35, 126);
-      doc.rect(margin, tableStartY, maxWidth, 8, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(255, 255, 255);
-      let cx = margin + 2;
-      for (let h = 0; h < hdrs.length; h++) {
-        doc.text(hdrs[h], cx, tableStartY + 5.5);
-        cx += colWs[h];
-      }
-      y = tableStartY + 10;
-
-      // Client row (highlighted)
-      const rowData = [
-        { name: clientName, score: clientScore, price: 'Tu marca', pos: seo?.content_quality?.slice(0, 55) || 'Ver auditoría detallada en Sección 7', isClient: true },
-        ...comps.slice(0, 4).map((c: any) => ({
-          name: c.name || c.url || 'Competidor',
-          score: Math.max(20, Math.min(95, Math.round((clientScore + (Math.random() * 30 - 15))))),
-          price: c.price_positioning || 'N/D',
-          pos: (c.positioning || c.value_proposition || '').slice(0, 55),
-          isClient: false,
-        })),
-      ];
-
-      for (const row of rowData) {
-        checkPage(8);
-        if (row.isClient) {
-          doc.setFillColor(240, 242, 255);
-          doc.rect(margin, y - 1, maxWidth, 8, 'F');
-          doc.setDrawColor(26, 35, 126);
-          doc.setLineWidth(0.4);
-          doc.rect(margin, y - 1, maxWidth, 8, 'S');
-          doc.setLineWidth(0.2);
-        } else {
-          doc.setFillColor(row.score >= 60 ? 240 : 255, row.score >= 60 ? 250 : 240, row.score >= 60 ? 240 : 240);
-          doc.rect(margin, y - 1, maxWidth, 8, 'F');
-        }
-        doc.setFont('helvetica', row.isClient ? 'bold' : 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(row.isClient ? brandR : 40, row.isClient ? brandG : 40, row.isClient ? brandB : 40);
-        doc.text((row.name + (row.isClient ? ' ★' : '')).slice(0, 22), margin + 2, y + 4.5);
-        // Score with color bar
-        const scoreColor = row.score >= 70 ? [22, 160, 70] : row.score >= 45 ? [200, 130, 0] : [200, 40, 40];
-        doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-        doc.roundedRect(margin + colWs[0] + 2, y + 1, 16, 5, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
-        doc.setTextColor(255, 255, 255);
-        doc.text(String(row.score), margin + colWs[0] + 4.5, y + 5);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(50, 50, 50);
-        doc.text(String(row.price).slice(0, 14), margin + colWs[0] + colWs[1] + 2, y + 4.5);
-        doc.text(String(row.pos).slice(0, 38), margin + colWs[0] + colWs[1] + colWs[2] + 2, y + 4.5);
-        y += 9;
-      }
-      y += 4;
-
-      // Gap analysis
-      if (seo?.competitive_seo_gap) {
-        addSubTitle('Gap Analysis SEO — Oportunidades Identificadas');
-        addBody(seo.competitive_seo_gap);
-      }
-
-      // Mobile & tech comparison
-      if (seo?.mobile_readiness) {
-        addSubTitle('Mobile Readiness & Core Web Vitals (estimado)');
-        addBody(seo.mobile_readiness);
-      }
-
-      // Competitor tech stacks
-      const techComps = comps.filter((c: any) => c.tech_stack);
-      if (techComps.length > 0) {
-        addSubTitle('Stack Tecnológico por Competidor');
-        for (const tc of techComps.slice(0, 4)) {
-          addBody(`• ${tc.name || tc.url}: ${tc.tech_stack}`, 2);
-        }
-      }
-
-      // SEO score interpretation
-      checkPage(20);
-      doc.setFillColor(240, 242, 255);
-      doc.roundedRect(margin, y, maxWidth, 16, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(26, 35, 126);
-      doc.text('Escala de Puntuación SEO (Estándar Internacional — Semrush/Moz/Ahrefs)', margin + 3, y + 5);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(50, 50, 50);
-      doc.text('0-39: Crítico — requiere intervención urgente  |  40-59: Regular — por debajo del promedio  |  60-79: Bueno — competitivo  |  80-100: Excelente — líder de categoría', margin + 3, y + 11, { maxWidth: maxWidth - 6 });
-      y += 20;
+      const colWs = [46, 22, 30, 50];
+      addTableRow(['Marca', 'Score SEO', 'Precio', 'Posicionamiento'], colWs, 0, true);
+      const clientName = clientInfo?.name || 'Tu Marca';
+      const clientScore = seo?.score ?? 0;
+      addTableRow(
+        [clientName + ' *', String(clientScore), 'Tu marca', (seo?.content_quality || 'Ver auditoria').slice(0, 38)],
+        colWs, 1
+      );
+      comps.slice(0, 4).forEach((c: any, i: number) => {
+        const cscore = c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -8 : 7)));
+        addTableRow(
+          [String(c.name || c.url || 'Competidor').slice(0, 22), String(cscore), c.price_positioning || 'N/D', String(c.positioning || c.value_proposition || '').slice(0, 38)],
+          colWs, i + 2
+        );
+      });
+      y += 6;
+      if (seo?.competitive_seo_gap) { addSubTitle('Gap Analysis SEO'); addBody(seo.competitive_seo_gap); }
     }
 
-    // === 11. PRÓXIMOS PASOS — PLANIFICACIÓN DE ANUNCIOS ===
-    addSectionHeader('11', 'PRÓXIMOS PASOS — PLANIFICACIÓN DE ANUNCIOS');
-    checkPage(60);
+    // ─── SECCIÓN: EMBUDO TOFU-MOFU-BOFU ─────────────────────────────────────────
+    checkPage(55);
+    addSectionHeader('10', 'ESTRATEGIA DE EMBUDO — TOFU / MOFU / BOFU');
+    const funnelLabels = ['TOFU — Awareness (40%)', 'MOFU — Consideracion (40%)', 'BOFU — Conversion (20%)'];
+    const funnelColors: [number,number,number][] = [
+      [brandR, brandG, brandB],
+      [accentR - 20, accentG + 10, accentB + 80],
+      [accentR, accentG, accentB],
+    ];
+    const funnelWidths = [maxWidth, maxWidth * 0.7, maxWidth * 0.45];
+    const funnelH = 12;
+    for (let fi = 0; fi < 3; fi++) {
+      checkPage(16);
+      const fw = funnelWidths[fi];
+      const fx = margin + (maxWidth - fw) / 2;
+      doc.setFillColor(...funnelColors[fi]);
+      doc.roundedRect(fx, y, fw, funnelH, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(funnelLabels[fi], fx + fw / 2, y + 8, { align: 'center' });
+      y += funnelH + 3;
+    }
+    y += 6;
 
-    const steps = [
+    // ─── SECCIÓN: GRÁFICO DE PROYECCIÓN ROAS 90 DÍAS ────────────────────────────
+    checkPage(50);
+    addSubTitle('Proyeccion ROAS — 90 Dias');
+    const chartStartX = margin + 10;
+    const chartEndX = pageWidth - margin - 10;
+    const chartStartY = y + 30;
+    const chartTopY = y + 5;
+    const roasPoints = [
+      { x: chartStartX, y: chartStartY, label: 'Dia 0\n1x' },
+      { x: chartStartX + (chartEndX - chartStartX) / 3, y: chartStartY - 15, label: 'Dia 30\n3x' },
+      { x: chartEndX, y: chartTopY, label: 'Dia 90\n5x+' },
+    ];
+    // Axis lines
+    doc.setDrawColor(200, 200, 210);
+    doc.setLineWidth(0.3);
+    doc.line(chartStartX - 5, chartTopY - 5, chartStartX - 5, chartStartY + 5);
+    doc.line(chartStartX - 5, chartStartY + 5, chartEndX + 5, chartStartY + 5);
+    // Gold line
+    doc.setDrawColor(accentR, accentG, accentB);
+    doc.setLineWidth(1.5);
+    for (let pi = 0; pi < roasPoints.length - 1; pi++) {
+      doc.line(roasPoints[pi].x, roasPoints[pi].y, roasPoints[pi + 1].x, roasPoints[pi + 1].y);
+    }
+    // Points and labels
+    for (const pt of roasPoints) {
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.circle(pt.x, pt.y, 2.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(accentR, accentG, accentB);
+      const lparts = pt.label.split('\n');
+      doc.text(lparts[0], pt.x, pt.y - 5, { align: 'center' });
+      doc.text(lparts[1], pt.x, pt.y - 1, { align: 'center' });
+    }
+    y = chartStartY + 14;
+
+    // ─── SECCIÓN: CALENDARIO DE IMPLEMENTACIÓN 90 DÍAS ──────────────────────────
+    addSectionHeader('11', 'CALENDARIO DE IMPLEMENTACION — 90 DIAS');
+    checkPage(70);
+    const calChannels = ['Meta Ads', 'Google Ads', 'SEO', 'Email/Klaviyo', 'UGC/Influencers'];
+    const calActions = [
+      ['Campanas TOFU cold audiences $200', 'MOFU retargeting + LLA $250', 'BOFU retargeting caliente + upsell'],
+      ['Search campaña marca $100', 'Shopping + Display $200', 'Performance Max escala'],
+      ['Auditoría y fichas tecnicas', 'Blog posts keywords principales', 'Link building + featured snippets'],
+      ['Welcome + abandono carrito', 'Post-compra + recompra', 'Segmentacion VIP + winback'],
+      ['1 creator micro-influencer', '3 UGC videos para ads', 'Programa embajadores'],
+    ];
+    const calColWs = [30, 55, 55, 55];
+    addTableRow(['Canal', 'Fase 1 (0-30d)', 'Fase 2 (30-60d)', 'Fase 3 (60-90d)'], calColWs, 0, true);
+    for (let ci = 0; ci < calChannels.length; ci++) {
+      checkPage(10);
+      addTableRow([calChannels[ci], calActions[ci][0], calActions[ci][1], calActions[ci][2]], calColWs, ci + 1);
+    }
+    y += 6;
+
+    // ─── SECCIÓN: TEMPLATES DE COPY ─────────────────────────────────────────────
+    addSectionHeader('12', 'PLANTILLAS DE COPY LISTAS PARA USAR');
+
+    // Meta Ads copies
+    const metaStrategy = research.ads_library_analysis?.meta_ads_strategy;
+    const metaAds = [
       {
-        num: '01',
-        title: 'Conectar Plataformas de Advertising',
-        body: 'Conectar Shopify, Meta Ads, Google Ads y Klaviyo al portal de BG Consult para que Steve acceda a métricas reales y genere recomendaciones en tiempo real. Sin datos conectados, no hay optimización posible.',
-        kpi: 'Plataformas conectadas ≥ 3',
+        title: 'Meta Ad #1 — TOFU (Video Hook)',
+        texto: metaStrategy?.hooks?.[0] || `¿Sabias que el ${marginPct || '60'}% de tus competidores NO tienen este diferencial? ${clientInfo?.name || 'Nosotros'} si.`,
+        cta: 'Descubre por que',
+        audiencia: 'Cold audience — Lookalike 1-3%',
       },
       {
-        num: '02',
-        title: 'Planificar Campañas con Steve (IA)',
-        body: `Con el Brief completo, Steve ya conoce al Buyer Persona, el dolor, el CPA Máximo Viable ($${cpaMax}) y el posicionamiento. El siguiente paso es generar los copies de anuncios para Meta y Google Ads directamente desde el portal.`,
-        kpi: `CPA objetivo ≤ $${cpaMax} | ROAS ≥ 3x`,
+        title: 'Meta Ad #2 — MOFU (Testimonio)',
+        texto: metaStrategy?.primary_texts?.[0] || `Miles de clientes ya eligieron ${clientInfo?.name || 'nuestra marca'}. CPA optimizado. ROAS garantizado.`,
+        cta: 'Ver testimonios',
+        audiencia: 'Retargeting — visitaron sitio 30d',
       },
       {
-        num: '03',
-        title: 'Configurar Flujos de Email en Klaviyo',
-        body: 'Activar flujos automatizados: abandono de carrito, bienvenida, post-compra y recuperación de clientes inactivos. Estos flujos son el canal de mayor ROAS en e-commerce.',
-        kpi: 'Ingresos atribuidos a email ≥ 20% del total',
-      },
-      {
-        num: '04',
-        title: 'Monitorear Métricas y Optimizar',
-        body: 'Revisar semanalmente en el dashboard: ROAS, CPA real vs. CPA máximo viable, tasa de conversión y LTV. Steve genera recomendaciones automáticas cuando detecta anomalías.',
-        kpi: 'Revisión semanal de KPIs — Dashboard BG Consult',
+        title: 'Meta Ad #3 — BOFU (Oferta)',
+        texto: `Ultima oportunidad. ${getResponse('villain_guarantee').slice(0, 80) || 'Garantia sin preguntas.'}`,
+        cta: 'Comprar ahora',
+        audiencia: 'ATC + ViewContent — ultimos 14 dias',
       },
     ];
 
-    for (const step of steps) {
-      checkPage(24);
-      doc.setFillColor(26, 35, 126);
-      doc.roundedRect(margin, y, 12, 12, 1, 1, 'F');
+    for (const ad of metaAds) {
+      checkPage(30);
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(margin, y, maxWidth, 28, 1, 1, 'F');
+      doc.setDrawColor(accentR, accentG, accentB);
+      doc.setLineWidth(1);
+      doc.line(margin, y, margin, y + 28);
+      doc.setLineWidth(0.2);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.setTextColor(255, 255, 255);
-      doc.text(step.num, margin + 2.5, y + 8);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(accentR, accentG, accentB);
-      doc.text(step.title, margin + 16, y + 5);
-
+      doc.setTextColor(brandR, brandG, brandB);
+      doc.text(ad.title, margin + 5, y + 6);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(50, 50, 50);
-      const bodyLines = doc.splitTextToSize(step.body, maxWidth - 20);
-      let stepY = y + 10;
-      for (const line of bodyLines) {
-        checkPage(5);
-        doc.text(line, margin + 16, stepY);
-        stepY += 4;
-      }
+      const tLines = doc.splitTextToSize(stripEmojis(ad.texto), maxWidth - 12);
+      let ty = y + 11;
+      for (const tl of tLines.slice(0, 2)) { doc.text(tl, margin + 5, ty); ty += 4.5; }
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(accentR, accentG, accentB);
+      doc.text(`CTA: ${ad.cta}`, margin + 5, y + 21);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
       doc.setFontSize(7.5);
-      doc.setTextColor(26, 35, 126);
-      doc.text(`KPI: ${step.kpi}`, margin + 16, stepY + 1);
-      y = stepY + 7;
+      doc.text(`Audiencia: ${ad.audiencia}`, margin + 5, y + 26);
+      y += 32;
     }
 
-    // === 12. ÍNDICE DE TÉRMINOS — GLOSARIO DE PERFORMANCE MARKETING ===
+    // Google Ads copies
+    const googleStrategy = research.ads_library_analysis?.google_ads_strategy;
+    addSubTitle('Google Ads — Copies Listos');
+    const googleAds = [
+      {
+        headline: googleStrategy?.headlines?.[0] || `${(clientInfo?.name || 'Tu Marca').slice(0, 25)} | Oficial`,
+        desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis. ${cpaMax ? `CPA optimizado: $${cpaMax}.` : ''}`,
+        url: clientInfo?.website_url || 'tusitio.com',
+      },
+      {
+        headline: googleStrategy?.headlines?.[1] || `Compra ${(clientInfo?.name || 'Aqui').slice(0, 20)} — Ahora`,
+        desc: googleStrategy?.descriptions?.[1] || `Resultados probados. Miles de clientes satisfechos. Garantia incluida.`,
+        url: clientInfo?.website_url || 'tusitio.com',
+      },
+    ];
+
+    for (const gad of googleAds) {
+      checkPage(22);
+      doc.setFillColor(240, 246, 255);
+      doc.roundedRect(margin, y, maxWidth, 20, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(26, 90, 180);
+      doc.text(stripEmojis(gad.headline).slice(0, 30), margin + 5, y + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 120, 30);
+      doc.text(gad.url, margin + 5, y + 12);
+      doc.setTextColor(50, 50, 50);
+      const gdLines = doc.splitTextToSize(stripEmojis(gad.desc), maxWidth - 12);
+      doc.text(gdLines.slice(0, 2), margin + 5, y + 17);
+      y += 24;
+    }
+
+    // ─── SECCIÓN: PRESUPUESTO RECOMENDADO ────────────────────────────────────────
+    addSectionHeader('13', 'PRESUPUESTO RECOMENDADO');
+    checkPage(60);
+    const budgetCols = ['Canal', 'Conservador', 'Agresivo'];
+    const budgetColWs = [50, 60, 60];
+    const budgetData = [
+      ['Meta Ads', '$200/mes', '$500/mes'],
+      ['Google Ads', '$100/mes', '$300/mes'],
+      ['SEO/Contenido', '$100/mes', '$200/mes'],
+      ['Influencers/UGC', '$100/mes', '$300/mes'],
+      ['Total mensual', '$500/mes', '$1,300/mes'],
+      ['ROAS esperado', '2x - 3x', '4x - 6x'],
+    ];
+    addTableRow(budgetCols, budgetColWs, 0, true);
+    for (let bi = 0; bi < budgetData.length; bi++) {
+      addTableRow(budgetData[bi], budgetColWs, bi + 1);
+    }
+    y += 8;
+
+    // cost benchmarks from research
+    if (research.cost_benchmarks) {
+      addInsightBox(`Benchmark de mercado: ${JSON.stringify(research.cost_benchmarks).slice(0, 200)}`);
+    }
+
+    // ─── SECCIÓN: CHECKLIST DE ACCION INMEDIATA ─────────────────────────────────
+    addSectionHeader('14', 'CHECKLIST DE ACCION INMEDIATA — ESTA SEMANA');
+    checkPage(70);
+    const checklist = [
+      'Instalar Meta Pixel y Google Tag en el sitio web',
+      'Conectar Shopify, Meta Ads y Google Ads al portal STEVE.IO',
+      'Definir y aprobar el Buyer Persona con el equipo',
+      `Verificar que el CPA objetivo sea <= $${cpaMax || 'N/D'} antes de lanzar`,
+      'Crear o revisar la landing page de producto principal',
+      'Activar flujo de abandono de carrito en Klaviyo',
+      'Solicitar 3 testimonios reales a clientes actuales',
+      'Revisar y optimizar el titulo H1 y meta description del sitio',
+      'Configurar Google Analytics 4 con conversion tracking',
+      'Programar primera revision de KPIs para el dia 14',
+    ];
+    doc.setFillColor(248, 248, 250);
+    doc.roundedRect(margin, y, maxWidth, checklist.length * 9 + 6, 2, 2, 'F');
+    doc.setDrawColor(accentR, accentG, accentB);
+    doc.setLineWidth(1.5);
+    doc.line(margin, y, margin, y + checklist.length * 9 + 6);
+    doc.setLineWidth(0.2);
+    y += 5;
+    for (let ci2 = 0; ci2 < checklist.length; ci2++) {
+      checkPage(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`${ci2 + 1}. [  ] ${checklist[ci2]}`, margin + 5, y);
+      y += 9;
+    }
+    y += 6;
+
+    // ─── SECCIÓN: GLOSARIO COMPACTO ─────────────────────────────────────────────
     doc.addPage();
     y = 20;
-    addSectionHeader('12', 'ÍNDICE DE TÉRMINOS — GLOSARIO DE PERFORMANCE MARKETING');
+    addWatermark();
+    addSectionHeader('15', 'GLOSARIO COMPACTO DE PERFORMANCE MARKETING');
+
+    const compactGlossary = [
+      { term: 'ROAS', def: 'Return On Ad Spend. Ingresos / Gasto en Ads. Benchmark: >= 3x.' },
+      { term: 'CPA', def: 'Cost Per Acquisition. Gasto Total / Conversiones. Debe ser <= CPA Max.' },
+      { term: 'CTR', def: 'Click-Through Rate. Clics / Impresiones x 100. Promedio: 1-3%.' },
+      { term: 'CVR', def: 'Conversion Rate. Conversiones / Sesiones x 100. Promedio e-com: 1-4%.' },
+      { term: 'LTV', def: 'Lifetime Value. Ingreso total de un cliente durante su ciclo de vida.' },
+      { term: 'TOFU/MOFU/BOFU', def: 'Top/Middle/Bottom Of Funnel. Awareness, Consideracion, Conversion.' },
+      { term: 'SEO', def: 'Search Engine Optimization. Posicionamiento organico en buscadores.' },
+      { term: 'SEM', def: 'Search Engine Marketing. SEO + PPC en Google Ads.' },
+      { term: 'Lookalike', def: 'Audiencia similar a tus mejores clientes. Alta precision para escalar.' },
+      { term: 'Retargeting', def: 'Anuncios a usuarios que ya visitaron tu sitio. Mayor conversion.' },
+    ];
+
+    const glColW = (maxWidth - 4) / 2;
+    for (let gi = 0; gi < compactGlossary.length; gi++) {
+      const isLeft = gi % 2 === 0;
+      const gx = isLeft ? margin : margin + glColW + 4;
+      const blockH = 14;
+      if (!isLeft || gi === 0) {
+        // new row
+      }
+      const gy = y + Math.floor(gi / 2) * (blockH + 4);
+      if (gy + blockH > pageHeight - 25) {
+        if (!isLeft) {
+          doc.addPage();
+          y = 20;
+          addWatermark();
+        }
+        continue;
+      }
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(gx, gy, glColW, blockH, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(brandR, brandG, brandB);
+      doc.text(compactGlossary[gi].term, gx + 3, gy + 5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(50, 50, 50);
+      const gLines = doc.splitTextToSize(compactGlossary[gi].def, glColW - 6);
+      doc.text(gLines.slice(0, 2), gx + 3, gy + 10);
+    }
+    y += Math.ceil(compactGlossary.length / 2) * 18 + 8;
+
+    // ─── PÁGINA FINAL: STEVE ADS ─────────────────────────────────────────────────
+    doc.addPage();
+    addWatermark();
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    // Gold band
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.rect(0, pageHeight * 0.2 - 1.5, pageWidth, 3, 'F');
+
+    // Logo
+    try {
+      const logoBase64 = await loadImageAsBase64(logo);
+      doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 18, 20, 36, 14);
+    } catch {}
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(26);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Y ahora que?', pageWidth / 2, pageHeight * 0.2 + 18, { align: 'center' });
+
+    doc.setFontSize(14);
+    doc.setTextColor(accentR + 40, accentG + 40, accentB + 20);
+    doc.text('Tu Brief esta listo. Es hora de activar la maquina.', pageWidth / 2, pageHeight * 0.2 + 30, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(200, 200, 220);
+    const steveDesc = 'El analisis esta hecho. Los competidores estan mapeados. El buyer persona esta definido. El CPA maximo esta calculado. Lo que sigue es convertir esta estrategia en anuncios reales que generen ventas.';
+    const steveLines = doc.splitTextToSize(steveDesc, maxWidth - 20);
+    let steveY = pageHeight * 0.2 + 42;
+    for (const sl of steveLines) { doc.text(sl, pageWidth / 2, steveY, { align: 'center' }); steveY += 5; }
+
+    const stevePoints = [
+      'Generar copies Meta y Google Ads basados en el Brief',
+      'Crear variaciones A/B listas para Ads Manager',
+      'Monitorear ROAS y CPA en tiempo real',
+      'Alertas automaticas cuando una campana pierde dinero',
+    ];
+    steveY += 8;
+    for (const sp of stevePoints) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(accentR + 40, accentG + 40, 80);
+      doc.text(`-> ${sp}`, pageWidth / 2, steveY, { align: 'center' });
+      steveY += 7;
+    }
+
+    // CPA box
+    steveY += 6;
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.roundedRect(margin + 15, steveY, maxWidth - 30, 20, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Tu CPA maximo viable es $${cpaMax || 'N/D'}. Steve Ads esta calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
+    steveY += 26;
+
+    // CTA
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margin + 30, steveY, maxWidth - 60, 14, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(brandR, brandG, brandB);
+    doc.text('Accede a Steve Ads en app.steve.io', pageWidth / 2, steveY + 9, { align: 'center' });
+    steveY += 20;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.setTextColor(80, 80, 80);
-    doc.text('Referencia estándar internacional. Fuentes: IAB, Google, Meta, HubSpot, Semrush Academy, MMA Global.', margin, y);
-    y += 6;
+    doc.setTextColor(150, 150, 180);
+    doc.text('Este informe fue generado por STEVE.IO — Plataforma de Performance Marketing con IA para e-commerce latinoamericano', pageWidth / 2, steveY + 4, { align: 'center', maxWidth: maxWidth });
 
-    const glossary: Array<{ term: string; definition: string }> = [
-      { term: 'ROAS', definition: 'Return On Ad Spend. Ingresos generados por cada $1 invertido en publicidad. Fórmula: Ingresos / Gasto en Ads. Benchmark e-commerce: ≥ 3x.' },
-      { term: 'CPA', definition: 'Cost Per Acquisition (Costo por Adquisición). Costo promedio para obtener un cliente o conversión. Fórmula: Gasto Total / Conversiones. Debe ser ≤ CPA Máximo Viable.' },
-      { term: 'CPC', definition: 'Cost Per Click. Costo promedio por cada clic en un anuncio. Métrica de eficiencia de distribución de inversión publicitaria.' },
-      { term: 'CPM', definition: 'Cost Per Mille (Costo por 1.000 Impresiones). Indica el costo de visibilidad de marca. Relevante en campañas de awareness.' },
-      { term: 'CTR', definition: 'Click-Through Rate. Porcentaje de personas que hacen clic sobre el total que vio el anuncio. Fórmula: Clics / Impresiones × 100. Promedio industria: 1-3%.' },
-      { term: 'CVR / CR', definition: 'Conversion Rate (Tasa de Conversión). Porcentaje de visitantes que realizan la acción deseada. Fórmula: Conversiones / Sesiones × 100. Promedio e-commerce: 1-4%.' },
-      { term: 'LTV', definition: 'Lifetime Value (Valor del Ciclo de Vida del Cliente). Ingreso total esperado de un cliente durante toda su relación con la marca. Clave para definir CPA sostenible.' },
-      { term: 'CAC', definition: 'Customer Acquisition Cost (Costo de Adquisición de Cliente). Similar al CPA pero incluye todos los costos de marketing, no solo los de ads directos.' },
-      { term: 'AOV', definition: 'Average Order Value (Ticket Promedio). Valor promedio de cada transacción. Fórmula: Ingresos Totales / Número de Pedidos.' },
-      { term: 'TOFU', definition: 'Top Of Funnel (Parte superior del embudo). Fase de awareness donde el consumidor no conoce la marca. Objetivo: alcance e impresiones.' },
-      { term: 'MOFU', definition: 'Middle Of Funnel (Parte media del embudo). Fase de consideración donde el consumidor evalúa opciones. Objetivo: engagement y leads.' },
-      { term: 'BOFU', definition: 'Bottom Of Funnel (Parte inferior del embudo). Fase de decisión de compra. Objetivo: conversión directa. Mayor inversión recomendada.' },
-      { term: 'KPI', definition: 'Key Performance Indicator (Indicador Clave de Rendimiento). Métrica primaria que mide el éxito de un objetivo estratégico específico.' },
-      { term: 'SEO', definition: 'Search Engine Optimization. Optimización orgánica de un sitio web para aparecer en los primeros resultados de motores de búsqueda sin pagar por posición.' },
-      { term: 'SEM', definition: 'Search Engine Marketing. Marketing en motores de búsqueda que incluye tanto SEO (orgánico) como PPC (pago por clic) en plataformas como Google Ads.' },
-      { term: 'PPC', definition: 'Pay Per Click (Pago por Clic). Modelo de publicidad donde el anunciante paga solo cuando el usuario hace clic en el anuncio. Ej: Google Search Ads.' },
-      { term: 'CPL', definition: 'Cost Per Lead. Costo promedio para obtener un contacto calificado (lead). Crítico en modelos de negocio que requieren prospección previa a la venta.' },
-      { term: 'ROI', definition: 'Return On Investment (Retorno sobre Inversión). Ganancia neta generada respecto a la inversión total. Fórmula: (Ganancia - Inversión) / Inversión × 100.' },
-      { term: 'A/B Testing', definition: 'Prueba controlada donde se comparan dos versiones de un anuncio, landing page o email para determinar cuál genera mejor performance.' },
-      { term: 'Lookalike Audience', definition: 'Audiencia Similar. Meta/TikTok crean audiencias que comparten características con tus mejores clientes existentes para escalar campañas con precisión.' },
-      { term: 'Retargeting / Remarketing', definition: 'Estrategia que muestra anuncios a usuarios que ya visitaron tu sitio web o interactuaron con tu marca. Alta conversión por ser audiencia caliente.' },
-      { term: 'Pixel (Meta Pixel)', definition: 'Código JavaScript instalado en el sitio web que rastrea el comportamiento de los visitantes y permite optimizar campañas y crear audiencias personalizadas en Meta.' },
-      { term: 'CLTV / CLV', definition: 'Customer Lifetime Value. Valor total neto que un cliente genera durante su relación con la marca. Determina cuánto se puede invertir en adquisición de forma sostenible.' },
-      { term: 'Churn Rate', definition: 'Tasa de abandono de clientes. Porcentaje de clientes que dejan de comprar en un período. Métrica crítica en modelos de suscripción o recurrencia.' },
-      { term: 'Frecuency Cap', definition: 'Límite de frecuencia. Número máximo de veces que un mismo usuario ve un anuncio en un período. Evita la fatiga publicitaria y reduce el CPA.' },
-      { term: 'CPE', definition: 'Cost Per Engagement. Costo por interacción significativa con un anuncio (like, comentario, guardado). Métrica de campañas de awareness y consideración.' },
-      { term: 'CPCV', definition: 'Cost Per Completed View. Costo por cada vez que un usuario vio un video hasta el final. Indica calidad del contenido creativo.' },
-      { term: 'Impression Share', definition: 'Porcentaje de impresiones obtenidas respecto al total disponible para ese término en Google Ads. Indica potencial de escalabilidad.' },
-      { term: 'Quality Score', definition: 'Puntuación de Calidad en Google Ads (1-10). Evalúa relevancia del anuncio, CTR esperado y experiencia de la landing page. Afecta CPC y posición.' },
-      { term: 'Ad Rank', definition: 'Posición del anuncio en la subasta de Google. Calculado por: CPC máximo × Quality Score. Mayor Ad Rank = mejor posición a menor costo.' },
-      { term: 'Broad Match / Phrase Match / Exact Match', definition: 'Tipos de concordancia en Google Ads. Exacta [keyword]: mayor control. Frase "keyword": balance. Amplia keyword: máximo alcance, menor control.' },
-      { term: 'Dynamic Ads / DPA', definition: 'Dynamic Product Ads. Anuncios dinámicos que muestran automáticamente productos del catálogo según el comportamiento de navegación del usuario.' },
-      { term: 'UTM Parameters', definition: 'Parámetros de seguimiento añadidos a URLs (utm_source, utm_medium, utm_campaign) para identificar el origen exacto del tráfico en Google Analytics.' },
-      { term: 'Attribution Model', definition: 'Modelo de atribución. Define qué canal o touchpoint recibe el crédito de una conversión. Modelos: last-click, first-click, linear, data-driven.' },
-      { term: 'SERP', definition: 'Search Engine Results Page. Página de resultados de búsqueda. El objetivo del SEO es aparecer en las primeras posiciones orgánicas de las SERPs.' },
-      { term: 'Core Web Vitals', definition: 'Métricas de Google para medir experiencia web: LCP (Largest Contentful Paint), FID (First Input Delay) y CLS (Cumulative Layout Shift). Afectan ranking SEO.' },
-      { term: 'Domain Authority (DA)', definition: 'Puntuación de autoridad de dominio (Moz, 0-100). Predice capacidad de posicionamiento en buscadores. Aumenta con backlinks de calidad.' },
-      { term: 'Backlink', definition: 'Enlace entrante desde otro sitio web hacia el tuyo. Factor crítico de SEO off-page. La calidad y relevancia del sitio origen determinan su valor.' },
-      { term: 'MQL / SQL', definition: 'Marketing Qualified Lead / Sales Qualified Lead. MQL: lead con interés detectado por marketing. SQL: lead validado y listo para ser contactado por ventas.' },
-      { term: 'Funnel de Conversión', definition: 'Embudo que representa el recorrido del cliente desde el primer contacto hasta la compra y fidelización. Etapas: Awareness, Consideración, Decisión, Retención.' },
-      { term: 'Email Flow / Automation', definition: 'Secuencia automatizada de emails disparados por comportamientos del usuario (abandono de carrito, primera compra, inactividad). Mayor ROAS del canal email.' },
-      { term: 'Open Rate', definition: 'Tasa de apertura de emails. Porcentaje de destinatarios que abrieron el correo. Benchmark promedio: 20-25%. Depende fuertemente del asunto (subject line).' },
-      { term: 'CLO', definition: 'Card-Linked Offer. Oferta vinculada a tarjetas bancarias que entrega cashback o descuentos automáticos. Estrategia de adquisición usada por grandes retailers.' },
-      { term: 'Heatmap', definition: 'Mapa de calor. Visualización del comportamiento de los usuarios en una página web. Herramientas: Hotjar, Microsoft Clarity. Identifica zonas de mayor atención.' },
-    ];
-
-    // Two-column glossary layout
-    const colWidth = (maxWidth - 4) / 2;
-    let colIndex = 0;
-    let leftY = y;
-    let rightY = y;
-
-    for (let gi = 0; gi < glossary.length; gi++) {
-      const entry = glossary[gi];
-      const isLeft = colIndex % 2 === 0;
-      const xOffset = isLeft ? margin : margin + colWidth + 4;
-      const currentY = isLeft ? leftY : rightY;
-
-      // Term block
-      const termLines = doc.splitTextToSize(entry.term, colWidth - 4);
-      const defLines = doc.splitTextToSize(entry.definition, colWidth - 6);
-      const blockHeight = 5 + termLines.length * 4 + defLines.length * 3.5 + 3;
-
-      if (currentY + blockHeight > pageHeight - 15) {
-        if (isLeft) {
-          doc.addPage();
-          y = 20;
-          leftY = y;
-          rightY = y;
-        } else {
-          rightY = leftY; // sync to left column start on same page effectively
-        }
-      }
-
-      const useY = isLeft ? leftY : rightY;
-
-      doc.setFillColor(245, 246, 252);
-      doc.roundedRect(xOffset, useY, colWidth, blockHeight - 1, 1, 1, 'F');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(brandR, brandG, brandB);
-      doc.text(entry.term, xOffset + 3, useY + 4.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(50, 50, 50);
-      let dy = useY + 8;
-      for (const dl of defLines) {
-        doc.text(dl, xOffset + 3, dy);
-        dy += 3.5;
-      }
-
-      if (isLeft) {
-        leftY = useY + blockHeight + 2;
-      } else {
-        rightY = useY + blockHeight + 2;
-      }
-      colIndex++;
-    }
-
-    // Sync y after glossary
-    y = Math.max(leftY, rightY) + 4;
-
-    // === SIGNATURE ===
-    checkPage(45);
-    y += 6;
-    doc.setDrawColor(brandR, brandG, brandB);
-    doc.setLineWidth(0.3);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
+    // ─── FIRMA ───────────────────────────────────────────────────────────────────
+    doc.addPage();
+    y = 20;
+    addWatermark();
 
     try {
       const sigBase64 = await loadImageAsBase64(steveSignature);
-      doc.addImage(sigBase64, 'PNG', margin, y, 35, 14);
-      y += 17;
-    } catch {
-      y += 3;
-    }
+      doc.addImage(sigBase64, 'PNG', margin, y, 40, 16);
+      y += 20;
+    } catch { y += 4; }
+
+    try {
+      const avatarBase64 = await loadImageAsBase64(avatarSteve);
+      doc.addImage(avatarBase64, 'PNG', margin, y, 18, 18);
+    } catch {}
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(13);
     doc.setTextColor(brandR, brandG, brandB);
-    doc.text('Dr. Steve Dogs', margin, y);
-    y += 4.5;
+    doc.text('Dr. Steve Dogs', margin + 22, y + 6);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text('PhD Performance Marketing — Stanford Dog University', margin, y); y += 3.5;
-    doc.text('Director de Estrategia, BG Consult', margin, y); y += 3.5;
-    doc.text(`Firmado digitalmente: ${new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, y);
+    doc.text('PhD Performance Marketing, Stanford Dog University', margin + 22, y + 12);
+    doc.text('Director de Estrategia, BG Consult / STEVE.IO', margin + 22, y + 17);
+    y += 24;
 
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Fecha de emision: ${new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(accentR, accentG, accentB);
+    doc.text('ESTRICTAMENTE CONFIDENCIAL — Preparado exclusivamente para uso del cliente indicado.', margin, y);
+
+    // ─── FOOTERS EN TODAS LAS PÁGINAS ───────────────────────────────────────────
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.setFillColor(brandR, brandG, brandB);
-      doc.rect(0, pageHeight - 10, pageWidth, 10, 'F');
-      doc.setFontSize(7);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`BG Consult — Brief Estratégico de Marca | Confidencial | Pág ${i}/${pageCount}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
-      doc.setFillColor(brandR, brandG, brandB);
-      doc.rect(0, 0, pageWidth, 2, 'F');
+      addFooter(i, pageCount);
     }
 
     doc.save(`Brief_Estrategico_${clientInfo?.name || 'Marca'}_${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('PDF descargado con éxito');
+    toast.success('PDF McKinsey descargado con exito');
   }
 
   if (loading) {
