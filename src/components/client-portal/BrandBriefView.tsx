@@ -25,8 +25,66 @@ import {
   Target, Heart, Shield, TrendingUp, Gem, Gift,
   Search, Globe, BarChart3, Key, Megaphone, Image,
   Sparkles, Award, AlertTriangle, TrendingDown, Lightbulb, MapPin, Briefcase,
-  ArrowRight, Zap, Rocket, LayoutDashboard
+  ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp
 } from 'lucide-react';
+
+// Expandable accionable card component
+function ExpandableAccionables({ blocks }: { blocks: string[] }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, i) => {
+        const lines = block.split('\n').map(l => l.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
+        const title = lines[0] || `Accionable ${i + 1}`;
+        const body = lines.slice(1).join(' ');
+        const kpiMatch = body.match(/KPI[:\s]+([^.]+)/i);
+        const kpi = kpiMatch?.[1]?.trim();
+        const cleanBody = body.replace(/KPI[:\s]+[^.]+\./i, '').replace(/Responsable[:\s]+[^.]+\./i, '').trim();
+        const isExpanded = expanded === i;
+        const isLong = cleanBody.length > 220;
+
+        return (
+          <div
+            key={i}
+            className="flex gap-3 bg-muted/40 rounded-xl p-4 border border-border hover:border-primary/30 transition-colors"
+          >
+            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-foreground mb-1">{title.replace(/^(Accionable\s*\d+[:.]\s*|\d+[:.]\s*)/i, '')}</p>
+              {cleanBody && (
+                <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                  {isExpanded || !isLong ? cleanBody : `${cleanBody.slice(0, 220)}…`}
+                </p>
+              )}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                {kpi && (
+                  <div className="flex items-center gap-1.5">
+                    <BarChart3 className="h-3 w-3 text-primary flex-shrink-0" />
+                    <span className="text-[10px] font-semibold text-primary">KPI:</span>
+                    <span className="text-[10px] text-muted-foreground">{kpi}</span>
+                  </div>
+                )}
+                {isLong && (
+                  <button
+                    onClick={() => setExpanded(isExpanded ? null : i)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors ml-auto"
+                  >
+                    {isExpanded ? (
+                      <><ChevronUp className="h-3 w-3" /> Ver menos</>
+                    ) : (
+                      <><ChevronDown className="h-3 w-3" /> Ver iniciativa completa</>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 interface BrandBriefViewProps {
   clientId: string;
@@ -1536,34 +1594,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     const accionableBlocks = section7Text.split(/\n(?=###\s*Accionable\s*\d|###\s*\d+\.|##\s*Accionable\s*\d)/i).filter(b => b.trim() && b.match(/accionable|\d+\./i));
 
                     if (accionableBlocks.length >= 3) {
-                      return (
-                        <div className="space-y-3">
-                          {accionableBlocks.slice(0, 7).map((block, i) => {
-                            const lines = block.split('\n').map(l => l.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
-                            const title = lines[0] || `Accionable ${i + 1}`;
-                            const body = lines.slice(1).join(' ');
-                            const kpiMatch = body.match(/KPI[:\s]+([^.]+)/i);
-                            const kpi = kpiMatch?.[1]?.trim();
-                            const cleanBody = body.replace(/KPI[:\s]+[^.]+\./i, '').replace(/Responsable[:\s]+[^.]+\./i, '').trim();
-                            return (
-                              <div key={i} className="flex gap-3 bg-muted/40 rounded-xl p-4 border border-border hover:border-primary/30 transition-colors">
-                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-sm text-foreground mb-1">{title.replace(/^(Accionable\s*\d+[:.]\s*|\d+[:.]\s*)/i, '')}</p>
-                                  {cleanBody && <p className="text-xs text-muted-foreground leading-relaxed mb-2">{cleanBody.slice(0, 220)}{cleanBody.length > 220 ? '…' : ''}</p>}
-                                  {kpi && (
-                                    <div className="flex items-center gap-1.5">
-                                      <BarChart3 className="h-3 w-3 text-primary flex-shrink-0" />
-                                      <span className="text-[10px] font-semibold text-primary">KPI:</span>
-                                      <span className="text-[10px] text-muted-foreground">{kpi}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
+                      return <ExpandableAccionables blocks={accionableBlocks.slice(0, 7)} />;
                     }
 
                     // Fallback: render full section 7 as markdown
