@@ -114,7 +114,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
   async function handleAnalyzeAuto(url: string, compUrls: string[]) {
     setAnalyzing(true);
-    setAnalysisProgress('Scrapeando tu sitio web...');
+    setAnalysisProgress('Analizando tu sitio web...');
     try {
       setAnalysisProgress('Analizando competidores...');
       const { data, error } = await supabase.functions.invoke('analyze-brand', {
@@ -190,7 +190,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       return;
     }
     setAnalyzing(true);
-    setAnalysisProgress('Scrapeando sitio web...');
+    setAnalysisProgress('Analizando sitio web...');
     try {
       setTimeout(() => setAnalysisProgress('Analizando SEO y keywords...'), 5000);
       setTimeout(() => setAnalysisProgress('Comparando con competidores...'), 15000);
@@ -295,7 +295,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
             Análisis Automático — SEO, Keywords & Competencia
           </CardTitle>
           <CardDescription>
-            Steve scrapeará tu sitio web y el de tus competidores para generar un análisis completo
+            Steve analizará tu sitio web y el de tus competidores para generar un informe completo
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

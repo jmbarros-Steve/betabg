@@ -747,7 +747,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(80, 80, 80);
-      doc.text('Benchmark SEO realizado mediante scraping directo de cada sitio. Scores estimados con criterios: contenido, estructura, H1/H2, velocidad, mobile-readiness y propuesta de valor visible.', margin, y, { maxWidth: maxWidth });
+      doc.text('Benchmark SEO realizado mediante análisis técnico de cada sitio. Scores estimados con criterios: contenido, estructura, H1/H2, velocidad, mobile-readiness y propuesta de valor visible.', margin, y, { maxWidth: maxWidth });
       y += 9;
 
       // Build comparison table: Client + up to 3 competitors
