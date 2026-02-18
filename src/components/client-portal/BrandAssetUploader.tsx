@@ -8,8 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  Upload, Image, Trash2, Loader2, Globe, Search,
-  Camera, Palette, FileImage, X
+  Upload, Trash2, Loader2, Globe, Search,
+  Camera, Palette, FileImage, X, Key, Trophy
 } from 'lucide-react';
 
 interface BrandAssetUploaderProps {
@@ -32,6 +32,8 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [competitorUrls, setCompetitorUrls] = useState(['', '', '']);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<string>('');
+  const [autoTriggered, setAutoTriggered] = useState(false);
   const fileRefs = useRef<Record<AssetCategory, HTMLInputElement | null>>({ logo: null, products: null, ads: null });
 
   useEffect(() => {
@@ -58,42 +60,79 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     setAssets(loaded);
 
     // Load website URL and competitor URLs from client + brief
-    const { data: clientData } = await supabase
-      .from('clients')
-      .select('website_url')
-      .eq('id', clientId)
-      .single();
-    if (clientData?.website_url) setWebsiteUrl(clientData.website_url);
+    const [clientResult, personaResult] = await Promise.all([
+      supabase.from('clients').select('website_url').eq('id', clientId).single(),
+      supabase.from('buyer_personas').select('persona_data').eq('client_id', clientId).maybeSingle(),
+    ]);
 
-    // Auto-populate competitor URLs from brief (Q9 competitors response)
-    const { data: persona } = await supabase
-      .from('buyer_personas')
-      .select('persona_data')
-      .eq('client_id', clientId)
-      .maybeSingle();
+    const savedWebUrl = clientResult.data?.website_url || '';
+    if (savedWebUrl) setWebsiteUrl(savedWebUrl);
 
-    if (persona?.persona_data) {
-      const pd = persona.persona_data as any;
+    // Extract competitor URLs from brief responses
+    let extractedCompUrls: string[] = [];
+    if (personaResult.data?.persona_data) {
+      const pd = personaResult.data.persona_data as any;
       const questions: string[] = pd.questions || [];
       const responses: string[] = pd.raw_responses || [];
+
+      // Try competitors question
       const competitorIdx = questions.indexOf('competitors');
       if (competitorIdx >= 0 && responses[competitorIdx]) {
         const compResponse = responses[competitorIdx];
-        // Extract URLs from competitor response text
-        const urlMatches = compResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+\.[\w.]+(?:\/\S*)?/g) || [];
-        const extractedUrls = urlMatches.slice(0, 3);
-        if (extractedUrls.length > 0) {
-          setCompetitorUrls(prev => {
-            const newUrls = [...prev];
-            extractedUrls.forEach((url, i) => {
-              if (!newUrls[i] && url) {
-                newUrls[i] = url.startsWith('http') ? url : `https://${url}`;
-              }
-            });
-            return newUrls;
-          });
-        }
+        const urlMatches = compResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+\.(?:com|cl|mx|ar|co|pe|es|io|store|shop)(?:\/\S*)?/gi) || [];
+        extractedCompUrls = urlMatches.slice(0, 3).map(u => u.startsWith('http') ? u : `https://${u}`);
       }
+    }
+
+    if (extractedCompUrls.length > 0) {
+      setCompetitorUrls(prev => {
+        const newUrls = [...prev];
+        extractedCompUrls.forEach((url, i) => {
+          if (url) newUrls[i] = url;
+        });
+        return newUrls;
+      });
+    }
+
+    // Auto-trigger analysis if we have website_url and no existing research
+    if (savedWebUrl && !autoTriggered) {
+      const { data: existingResearch } = await supabase
+        .from('brand_research')
+        .select('id')
+        .eq('client_id', clientId)
+        .limit(1);
+
+      if (!existingResearch || existingResearch.length === 0) {
+        setAutoTriggered(true);
+        // Small delay to let state settle
+        setTimeout(() => {
+          handleAnalyzeAuto(savedWebUrl, extractedCompUrls);
+        }, 800);
+      }
+    }
+  }
+
+  async function handleAnalyzeAuto(url: string, compUrls: string[]) {
+    setAnalyzing(true);
+    setAnalysisProgress('Scrapeando tu sitio web...');
+    try {
+      setAnalysisProgress('Analizando competidores...');
+      const { data, error } = await supabase.functions.invoke('analyze-brand', {
+        body: {
+          client_id: clientId,
+          website_url: url.trim(),
+          competitor_urls: compUrls.filter(u => u.trim()),
+        },
+      });
+      if (error) throw error;
+      setAnalysisProgress('');
+      toast.success('✅ Análisis SEO, Keywords y Competencia completado automáticamente');
+      onResearchComplete?.();
+    } catch (error: any) {
+      setAnalysisProgress('');
+      console.error('Auto-analysis error:', error);
+    } finally {
+      setAnalyzing(false);
     }
   }
 
@@ -151,7 +190,12 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       return;
     }
     setAnalyzing(true);
+    setAnalysisProgress('Scrapeando sitio web...');
     try {
+      setTimeout(() => setAnalysisProgress('Analizando SEO y keywords...'), 5000);
+      setTimeout(() => setAnalysisProgress('Comparando con competidores...'), 15000);
+      setTimeout(() => setAnalysisProgress('Generando recomendaciones estratégicas...'), 25000);
+
       const { data, error } = await supabase.functions.invoke('analyze-brand', {
         body: {
           client_id: clientId,
@@ -161,9 +205,11 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       });
 
       if (error) throw error;
-      toast.success('¡Análisis completado! Revisa tu Brief.');
+      setAnalysisProgress('');
+      toast.success('¡Análisis SEO, Keywords y Competencia completado!');
       onResearchComplete?.();
     } catch (error: any) {
+      setAnalysisProgress('');
       console.error('Analysis error:', error);
       if (error?.status === 429) {
         toast.error('Demasiadas solicitudes. Espera un momento.');
@@ -242,17 +288,29 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       </div>
 
       {/* Website & Competitor Analysis */}
-      <Card>
+      <Card className="border-primary/20">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
-            Análisis Automático
+            Análisis Automático — SEO, Keywords & Competencia
           </CardTitle>
           <CardDescription>
-            Steve analiza tu sitio web, competidores, SEO y palabras clave automáticamente
+            Steve scrapeará tu sitio web y el de tus competidores para generar un análisis completo
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Auto-analysis notice */}
+          {analyzing && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-primary">Steve está analizando...</p>
+                <p className="text-xs text-muted-foreground">{analysisProgress || 'Procesando información...'}</p>
+                <p className="text-xs text-muted-foreground mt-1">Esto puede tomar 30-60 segundos</p>
+              </div>
+            </div>
+          )}
+
           <div>
             <Label className="text-sm font-medium">Tu Sitio Web *</Label>
             <div className="flex gap-2 mt-1">
@@ -267,10 +325,13 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           </div>
 
           <div>
-            <Label className="text-sm font-medium">URLs de Competidores (hasta 3)</Label>
+            <Label className="text-sm font-medium flex items-center gap-2">
+              URLs de Competidores (hasta 3)
+              <Badge variant="secondary" className="text-xs font-normal">Auto-detectados del brief</Badge>
+            </Label>
             {competitorUrls.map((url, i) => (
               <div key={i} className="flex gap-2 mt-1.5">
-                <Badge variant="outline" className="flex-shrink-0 mt-1.5 text-xs">
+                <Badge variant="outline" className="flex-shrink-0 mt-1.5 text-xs w-6 justify-center">
                   {i + 1}
                 </Badge>
                 <Input
@@ -282,7 +343,22 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
                   }}
                   placeholder={`https://competidor${i + 1}.com`}
                   type="url"
+                  className={url ? 'border-primary/40' : ''}
                 />
+              </div>
+            ))}
+          </div>
+
+          {/* What will be analyzed */}
+          <div className="grid grid-cols-3 gap-2 py-2">
+            {[
+              { icon: <Globe className="h-3.5 w-3.5" />, label: 'Auditoría SEO' },
+              { icon: <Key className="h-3.5 w-3.5" />, label: 'Keywords' },
+              { icon: <Trophy className="h-3.5 w-3.5" />, label: 'Competencia' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                <span className="text-primary">{item.icon}</span>
+                {item.label}
               </div>
             ))}
           </div>
@@ -291,9 +367,10 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
             onClick={handleAnalyze}
             disabled={analyzing || !websiteUrl.trim()}
             className="w-full"
+            size="lg"
           >
             {analyzing ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analizando (puede tomar 30-60s)...</>
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {analysisProgress || 'Analizando...'}</>
             ) : (
               <><Search className="h-4 w-4 mr-2" /> 🐕 Que Steve Analice Todo</>
             )}
