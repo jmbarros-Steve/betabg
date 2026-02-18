@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { BrandAssetUploader } from './BrandAssetUploader';
 import avatarSteve from '@/assets/avatar-steve.png';
 import personaFemale from '@/assets/persona-female.jpg';
@@ -331,18 +332,30 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // === 1. RESUMEN EJECUTIVO ===
     if (briefData.summary) {
       addSectionHeader('1', 'RESUMEN EJECUTIVO');
-      const cleanSummary = briefData.summary
+      // Strip informal preamble before first ## header
+      let cleanSummary = briefData.summary;
+      const firstHeader = cleanSummary.indexOf('## ');
+      if (firstHeader > 0) cleanSummary = cleanSummary.slice(firstHeader);
+      cleanSummary = cleanSummary
         .replace(/#{1,4}\s+/g, '\n')
         .replace(/\*\*/g, '')
         .replace(/\*/g, '');
       // Split into sections and render cleanly
       const sections = cleanSummary.split(/\n+/).filter(p => p.trim());
-      for (const section of sections.slice(0, 20)) {
+      for (const section of sections.slice(0, 40)) {
         const trimmed = section.trim();
         if (!trimmed) continue;
+        // Skip table separator lines
+        if (trimmed.match(/^\|[\s-:]+\|/)) continue;
         // Detect if it's a section header
         if (trimmed.match(/^\d+\.\s+[A-ZÁÉÍÓÚ]/) || trimmed.match(/^[A-ZÁÉÍÓÚ\s]{5,}$/)) {
           addSubTitle(trimmed);
+        } else if (trimmed.startsWith('|')) {
+          // Table rows — format as clean key-value
+          const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
+          if (cells.length >= 2) {
+            addKeyValue(cells[0].trim(), cells[1].trim());
+          }
         } else {
           addBody(trimmed);
         }
@@ -408,7 +421,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       let py = y + 10;
       if (profileAge) { doc.text(`${profileAge} años • ${profileGender} • ${profileCity}`, px, py); py += 4; }
       if (profileOcc) { doc.text(`Ocupación: ${profileOcc}`, px, py); py += 4; }
-      if (profileIncome) { doc.text(`Ingreso mensual: $${profileIncome}`, px, py); py += 4; }
+      if (profileIncome) { doc.text(`Ingreso mensual: ${profileIncome.replace(/^\$/, '')}`, px, py); py += 4; }
       if (profileFamily) { doc.text(`${profileFamily}`, px, py); py += 4; }
       if (profileWhy) { doc.text(`Motivación: ${profileWhy}`, px, py); py += 4; }
       
@@ -451,26 +464,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // === 6. EVALUACIÓN ESTRATÉGICA ===
     if (briefData.summary) {
       addSectionHeader('6', 'EVALUACIÓN ESTRATÉGICA Y PLAN DE ACCIÓN');
-      // Extract the strategic plan sections from the summary
-      const planMatch = briefData.summary.match(/##?\s*\d*\.?\s*(PLAN|ESTRATEG|FASE|KPI|RIESGO)/i);
-      if (planMatch) {
-        const planSection = briefData.summary.slice(planMatch.index);
-        const planLines = planSection.split('\n').filter(l => l.trim());
-        for (const line of planLines) {
-          const trimmed = line.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
-          if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^(Fase|KPI|Riesgo|Meta|Plazo)/i)) {
-            addSubTitle(trimmed);
-          } else if (trimmed.startsWith('|')) {
-            // Table rows
-            const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-\s]+$/));
-            if (cells.length > 0) {
-              addBody(cells.map(c => c.trim()).join('  —  '), 2);
-            }
-          } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
-            addBody(trimmed, 4);
-          } else {
-            addBody(trimmed);
+      // Strip preamble and already-rendered sections (1-5)
+      let planText = briefData.summary;
+      const firstHeader = planText.indexOf('## ');
+      if (firstHeader > 0) planText = planText.slice(firstHeader);
+      // Find section 6 or 7 to start from
+      const section6Match = planText.match(/##\s*6\./);
+      if (section6Match && section6Match.index !== undefined) {
+        planText = planText.slice(section6Match.index);
+      }
+      const planLines = planText.split('\n').filter(l => l.trim());
+      for (const line of planLines) {
+        const trimmed = line.trim()
+          .replace(/^#+\s*/, '')
+          .replace(/\*\*/g, '');
+        if (!trimmed) continue;
+        // Skip table separator lines
+        if (trimmed.match(/^\|[\s-:]+\|$/)) continue;
+        if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^(Fase|KPI|Riesgo|Meta|Plazo)/i)) {
+          addSubTitle(trimmed);
+        } else if (trimmed.startsWith('|')) {
+          const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
+          if (cells.length >= 2) {
+            addKeyValue(cells[0].trim(), cells.slice(1).map(c => c.trim()).join(' — '));
           }
+        } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
+          addBody(trimmed, 4);
+        } else {
+          addBody(trimmed);
         }
       }
     }
@@ -681,7 +702,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       )}
                       {(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso']) && (
                         <p className="text-xs font-medium text-primary mt-1">
-                          ${personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso']}
+                          {(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '').replace(/^\$/, '')}
                         </p>
                       )}
                     </div>
@@ -793,8 +814,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&>table_th]:bg-primary/10 [&>table_th]:text-left [&>table_th]:p-2 [&>table_td]:p-2 [&>table_td]:border-b [&>table_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
-                    <ReactMarkdown>{briefData.summary}</ReactMarkdown>
+                  <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&_th]:bg-primary/10 [&_th]:text-left [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{
+                      // Strip any informal preamble before the first ## header
+                      (() => {
+                        const raw = briefData.summary || '';
+                        const firstHeader = raw.indexOf('## ');
+                        return firstHeader > 0 ? raw.slice(firstHeader) : raw;
+                      })()
+                    }</ReactMarkdown>
                   </div>
                 </CardContent>
               </Card>
