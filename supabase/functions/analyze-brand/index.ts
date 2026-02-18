@@ -108,30 +108,70 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Scrape competitors (provided ones + auto-detect up to 3 more via Firecrawl search)
-    let competitorContents: string[] = [];
-    let allCompetitorUrls = [...(competitor_urls || [])].slice(0, 3);
+    // ─── Extract competitor URLs from brief Q9 (what the client told Steve) ───
+    const briefCompetitorUrls: string[] = [];
+    if (briefContext && (briefContext as any).raw_responses && (briefContext as any).questions) {
+      const rawResponses: string[] = (briefContext as any).raw_responses || [];
+      const questions: string[] = (briefContext as any).questions || [];
+      const competitorsIdx = questions.indexOf('competitors');
+      if (competitorsIdx >= 0) {
+        const competitorsResponse = rawResponses[competitorsIdx] || '';
+        // Extract URLs/domains from the competitors response
+        // Pattern: looks for "cannonhome.cl", "intime.cl", "simplyb.cl" etc
+        const urlMatches = competitorsResponse.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
+        for (const match of urlMatches) {
+          const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
+          if (url && !url.includes(client.name?.toLowerCase())) {
+            briefCompetitorUrls.push(url.startsWith('http') ? url : `https://${url}`);
+          }
+        }
+        // Also try plain domain pattern (e.g. "cannonhome.cl")
+        if (briefCompetitorUrls.length === 0) {
+          const domainMatches = competitorsResponse.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co)\b/g) || [];
+          for (const domain of domainMatches) {
+            if (!domain.includes(client.name?.toLowerCase())) {
+              briefCompetitorUrls.push(`https://${domain}`);
+            }
+          }
+        }
+        console.log('Competitor URLs extracted from brief:', briefCompetitorUrls);
+      }
+    }
 
-    // Auto-detect additional competitors via Firecrawl search
-    if (firecrawlApiKey && websiteContent) {
+    // Scrape competitors: 3 from brief (what client told Steve) + up to 3 auto-detected
+    let competitorContents: string[] = [];
+    // Start with client-provided URLs from brief + any explicitly passed competitor_urls
+    const clientProvidedUrls = [...new Set([...briefCompetitorUrls, ...(competitor_urls || [])])].slice(0, 3);
+    let allCompetitorUrls = [...clientProvidedUrls];
+
+    // Auto-detect up to 3 additional competitors via Firecrawl search
+    if (firecrawlApiKey) {
       try {
-        // Extract brand/sector keywords from brief context for competitor search
         const briefStr = JSON.stringify(briefContext);
-        const sectorMatch = briefStr.match(/"business_pitch"[^"]*"([^"]{20,200})"/) || briefStr.match(/pijama|ropa|moda|tienda|e-commerce|fashion|clothing/i);
-        const searchQuery = `competidores sitios web similares a ${client.name} ${client.company || ''} e-commerce`;
+        const businessMatch = briefStr.match(/business_pitch[^:]*:\s*"([^"]{10,150})"/) || [''];
+        const searchQuery = `competidores ${client.name} ${client.company || ''} e-commerce Chile tienda online similar`;
         const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: searchQuery, limit: 8, lang: 'es' }),
+          body: JSON.stringify({ query: searchQuery, limit: 10, lang: 'es', country: 'cl' }),
         });
         if (searchResp.ok) {
           const searchData = await searchResp.json();
           const foundUrls: string[] = (searchData?.data || [])
-            .map((r: any) => r.url)
-            .filter((u: string) => u && !u.includes(client.name?.toLowerCase()) && !allCompetitorUrls.some(cu => u.includes(cu)))
+            .map((r: any) => r.url as string)
+            .filter((u: string) => {
+              if (!u) return false;
+              // Exclude the client's own domain
+              if (website_url && u.includes(new URL(website_url.startsWith('http') ? website_url : `https://${website_url}`).hostname)) return false;
+              // Exclude already added URLs
+              if (allCompetitorUrls.some(cu => u.includes(cu.replace('https://', '').replace('http://', '').split('/')[0]))) return false;
+              return true;
+            })
             .slice(0, 3);
           allCompetitorUrls = [...allCompetitorUrls, ...foundUrls];
+          console.log('Client competitors from brief:', clientProvidedUrls);
           console.log('Auto-detected additional competitors:', foundUrls);
+          console.log('Total to analyze:', allCompetitorUrls.length);
         }
       } catch (e) {
         console.error('Auto competitor detection error:', e);
@@ -171,7 +211,12 @@ WEBSITE: ${website_url || 'No proporcionado'}
 
 ${websiteContent ? `=== CONTENIDO DEL SITIO WEB ===\n${websiteContent.slice(0, 6000)}` : '=== SITIO WEB: No se pudo analizar ==='}
 
-${competitorContents.length > 0 ? `=== CONTENIDO DE COMPETIDORES (${competitorContents.length} analizados — incluye los 3 que el cliente indicó + hasta 3 detectados automáticamente) ===\n${competitorContents.join('\n\n').slice(0, 10000)}` : '=== COMPETIDORES: No proporcionados ==='}
+    ${competitorContents.length > 0 ? `=== CONTENIDO DE COMPETIDORES ANALIZADOS ===
+IMPORTANTE: Analiza TODOS los siguientes competidores. Los primeros ${clientProvidedUrls.length} son los que el cliente indicó explícitamente a Steve. Los siguientes son detectados automáticamente para ampliar el análisis. Debes incluir TODOS en el array "competitors" del JSON (máximo 6 total).
+Competidores del cliente: ${clientProvidedUrls.join(', ')}
+Total analizados: ${competitorContents.length}
+
+${competitorContents.join('\n\n').slice(0, 10000)}` : '=== COMPETIDORES: No proporcionados ==='}
 
 === BRIEF DE MARCA (datos del cliente) ===
 ${brandContext}

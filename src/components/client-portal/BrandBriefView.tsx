@@ -25,7 +25,7 @@ import {
   Target, Heart, Shield, TrendingUp, Gem, Gift,
   Search, Globe, BarChart3, Key, Megaphone, Image,
   Sparkles, Award, AlertTriangle, TrendingDown, Lightbulb, MapPin, Briefcase,
-  ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp
+  ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
 
 // Parse SCR fields from accionable block text
@@ -347,6 +347,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const [clientInfo, setClientInfo] = useState<{ name?: string; company?: string; logo_url?: string; website_url?: string } | null>(null);
   const [assets, setAssets] = useState<{ logo: string[]; products: string[]; ads: string[] }>({ logo: [], products: [], ads: [] });
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'pending' | 'complete' | 'error'>('idle');
+  const [reanalyzing, setReanalyzing] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -457,6 +458,58 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (!briefData?.questions || !briefData?.raw_responses) return '';
     const idx = briefData.questions.indexOf(questionId);
     return idx >= 0 ? briefData.raw_responses[idx] || '' : '';
+  }
+
+  // Extract competitor URLs from brief Q9 responses
+  function extractCompetitorUrlsFromBrief(): string[] {
+    if (!briefData?.questions || !briefData?.raw_responses) return [];
+    const idx = briefData.questions.indexOf('competitors');
+    if (idx < 0) return [];
+    const response = briefData.raw_responses[idx] || '';
+    const urls: string[] = [];
+    const urlMatches = response.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
+    for (const match of urlMatches) {
+      const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
+      if (url) urls.push(url.startsWith('http') ? url : `https://${url}`);
+    }
+    if (urls.length === 0) {
+      const domainMatches = response.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co)\b/g) || [];
+      domainMatches.forEach(d => urls.push(`https://${d}`));
+    }
+    return [...new Set(urls)].slice(0, 3);
+  }
+
+  async function handleReanalyze() {
+    const websiteUrl = clientInfo?.website_url || '';
+    if (!websiteUrl) {
+      toast.error('No hay URL de sitio web. Completa el brief primero.');
+      return;
+    }
+    setReanalyzing(true);
+    // Mark as pending
+    await supabase.from('brand_research').upsert({
+      client_id: clientId,
+      research_type: 'analysis_status',
+      research_data: { status: 'pending' },
+    }, { onConflict: 'client_id,research_type' });
+    setAnalysisStatus('pending');
+    toast.info('Iniciando análisis con los 6 competidores (3 tuyos + 3 detectados)...');
+    try {
+      const competitorUrls = extractCompetitorUrlsFromBrief();
+      const { error } = await supabase.functions.invoke('analyze-brand', {
+        body: { client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls, research_type: 'full' },
+      });
+      if (error) throw error;
+      toast.success('¡Re-análisis completado! Ahora verás los 6 competidores.');
+      setAnalysisStatus('complete');
+      await fetchResearch();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al re-analizar. Intenta de nuevo.');
+      setAnalysisStatus('error');
+    } finally {
+      setReanalyzing(false);
+    }
   }
 
   // Get Q2 financial calculations for display
@@ -1922,6 +1975,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
           {/* ===== SEO TAB ===== */}
           <TabsContent value="seo" className="space-y-4">
+            {/* Re-analyze button */}
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={reanalyzing || analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
+                {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {reanalyzing ? 'Analizando 6 competidores…' : 'Re-analizar (6 competidores)'}
+              </Button>
+            </div>
             {!hasSEO ? (
               <Card className="text-center py-10">
                 <CardContent>
@@ -2105,6 +2165,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
           {/* ===== KEYWORDS TAB ===== */}
           <TabsContent value="keywords" className="space-y-4">
+            {/* Re-analyze button */}
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={reanalyzing || analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
+                {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {reanalyzing ? 'Analizando 6 competidores…' : 'Re-analizar (6 competidores)'}
+              </Button>
+            </div>
             {!hasKeywords ? (
               <Card className="text-center py-10">
                 <CardContent>
@@ -2240,6 +2307,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
           {/* ===== COMPETENCIA TAB (includes Competitor + Ads Library) ===== */}
           <TabsContent value="research" className="space-y-4">
+            {/* Re-analyze button */}
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={reanalyzing || analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
+                {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {reanalyzing ? 'Analizando 6 competidores…' : 'Re-analizar (6 competidores)'}
+              </Button>
+            </div>
             {!hasCompetitors && !research.ads_library_analysis ? (
               <Card className="text-center py-10">
                 <CardContent>
