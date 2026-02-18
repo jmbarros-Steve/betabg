@@ -277,6 +277,19 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     const currentStatus = (statusRow?.research_data as any)?.status;
     if (currentStatus === 'pending') {
       setAnalyzing(true);
+      // Also load current progress step so banner shows immediately
+      const { data: progressRow } = await supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId)
+        .eq('research_type', 'analysis_progress')
+        .maybeSingle();
+      if (progressRow?.research_data) {
+        const p = progressRow.research_data as any;
+        setProgressStep({ step: p.step || 'inicio', detail: p.detail || 'Analizando...', pct: p.pct || 2 });
+      } else {
+        setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
+      }
       startPolling();
       return;
     }
@@ -371,7 +384,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           <CardDescription>Steve analizará tu sitio web y el de tus competidores para generar un informe completo</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {analyzing && <AnalysisBanner progressStep={progressStep} />}
+          {analyzing && <AnalysisBanner key="analysis-banner" progressStep={progressStep} />}
 
           <div>
             <Label className="text-sm font-medium">Tu Sitio Web *</Label>
