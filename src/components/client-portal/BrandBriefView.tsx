@@ -1603,7 +1603,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {SECTIONS.map(section => {
                 const sectionQs = questions
-                  .map((qId, i) => ({ qId, answered: !!responses[i], config: QUESTION_CONFIG[qId] }))
+                  .map((qId, i) => ({ qId, answered: !!(responses[i] ?? ''), config: QUESTION_CONFIG[qId] }))
                   .filter(q => q.config?.section === section.id);
                 const done = sectionQs.filter(q => q.answered).length;
                 const total = Object.values(QUESTION_CONFIG).filter(c => c.section === section.id).length;
@@ -1782,7 +1782,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             <div className="grid gap-4 lg:grid-cols-2">
               {SECTIONS.map(section => {
                 const sectionQs = questions
-                  .map((qId, i) => ({ qId, response: responses[i], config: QUESTION_CONFIG[qId] }))
+                  .map((qId, i) => ({ qId, response: responses[i] ?? '', config: QUESTION_CONFIG[qId] }))
                   .filter(q => q.config?.section === section.id);
                 if (sectionQs.length === 0) return null;
                 if (section.id === 'persona') return null;
