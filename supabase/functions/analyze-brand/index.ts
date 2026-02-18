@@ -317,12 +317,32 @@ Deno.serve(async (req) => {
     if (firecrawlApiKey) {
       try {
         await updateProgress('detectando', 'Detectando competidores adicionales en el mercado...', 20);
-        // Try multiple search strategies to find additional competitors
+
+        // Build industry-based search queries (NOT brand name — we want competitors, not mentions)
+        const industryKeywords = websiteContent.slice(0, 2000);
+        const productHints = industryKeywords.match(/(?:pijamas?|ropa|camas?|s[aá]banas?|textil|moda|hogar|deco|calzado|zapatillas?|joyería|electr[oó]nico|cosm[eé]tica|suplemento|deporte|prendas?|vestimenta|lencería)/gi) || [];
+        const productCategory = productHints.length > 0 ? [...new Set(productHints.map(h => h.toLowerCase()))].slice(0, 2).join(' ') : 'tienda online';
+        const country = website_url?.includes('.cl') ? 'cl' : website_url?.includes('.ar') ? 'ar' : website_url?.includes('.mx') ? 'mx' : 'cl';
+        const countryLabel = country === 'cl' ? 'Chile' : country === 'ar' ? 'Argentina' : 'México';
+
         const searchQueries = [
-          `${client.name} ${client.company || ''} tienda online competidores similares`,
-          `comprar ${client.name} alternativas tiendas online`,
-          `${client.company || client.name} e-commerce similar store`,
+          `tienda online ${productCategory} ${countryLabel} envío gratis`,
+          `comprar ${productCategory} online ${countryLabel}`,
+          `mejores marcas ${productCategory} ${countryLabel} e-commerce`,
         ];
+
+        // Comprehensive blocklist of non-competitor domains
+        const BLOCKED_DOMAINS = [
+          'google', 'facebook', 'instagram', 'twitter', 'youtube', 'wikipedia',
+          'linkedin', 'tiktok', 'pinterest', 'reddit', 'tumblr', 'snapchat', 'whatsapp',
+          'repositorio', 'udd.cl', 'uchile', 'puc.cl', 'udp.cl', 'academia.edu', 'researchgate',
+          'mercadolibre', 'mercadopago', 'falabella', 'ripley', 'paris', 'hites', 'sodimac',
+          'amazon', 'ebay', 'aliexpress', 'wish', 'shein', 'zara',
+          'shopify.com', 'woocommerce.com', 'wordpress.com', 'wix.com',
+          'gov.cl', '.edu.cl', 'blogger', 'medium.com', 'blogspot',
+          'emol', 'latercera', 'elmercurio', 'biobiochile',
+        ];
+
         const seenHosts = new Set(allCompetitorUrls.map(u => {
           try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace('www.', ''); } catch { return u; }
         }));
@@ -337,7 +357,7 @@ Deno.serve(async (req) => {
             const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query: searchQuery, limit: 8, lang: 'es', country: 'cl' }),
+              body: JSON.stringify({ query: searchQuery, limit: 10, lang: 'es', country }),
             });
             if (searchResp.ok) {
               const searchData = await searchResp.json();
@@ -346,9 +366,15 @@ Deno.serve(async (req) => {
                 .filter((u: string) => {
                   if (!u) return false;
                   try {
-                    const hostname = new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace('www.', '');
+                    const parsed = new URL(u.startsWith('http') ? u : `https://${u}`);
+                    const hostname = parsed.hostname.replace('www.', '');
+                    // Reject long paths (likely a blog post or article, not a store homepage)
+                    if (parsed.pathname.length > 50) return false;
                     if (seenHosts.has(hostname)) return false;
-                    if (hostname.includes('google') || hostname.includes('facebook') || hostname.includes('instagram') || hostname.includes('twitter') || hostname.includes('youtube') || hostname.includes('wikipedia')) return false;
+                    // Check against blocklist
+                    if (BLOCKED_DOMAINS.some(blocked => hostname.includes(blocked) || u.includes(blocked))) return false;
+                    // Must look like a real regional store TLD
+                    if (!hostname.match(/\.(cl|com|com\.ar|mx|pe|co|ar|store|shop)$/)) return false;
                     seenHosts.add(hostname);
                     return true;
                   } catch { return false; }
