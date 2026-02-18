@@ -399,10 +399,176 @@ Esta sección sintetiza las 7 acciones de mayor impacto para escalar el negocio,
 **KPI de éxito:** [Métrica específica y plazo]
 **Responsable sugerido:** [Rol o área]
 
+## 8. ESTRATEGIA DE PUBLICIDAD DIGITAL — META ADS Y GOOGLE ADS
+
+Esta sección establece el blueprint creativo y de segmentación para las campañas de pago. Basarse en el perfil del consumidor objetivo (sección 4), la ventaja competitiva (sección 6) y el margen financiero (sección 3).
+
+### 8.1 META ADS (Facebook & Instagram)
+
+**Estructura de campañas recomendada:**
+
+| Etapa del Funnel | Tipo de Campaña | Objetivo | Presupuesto Sugerido (%) |
+|---|---|---|---|
+| TOFU (Awareness) | Video / Reels | Alcance + Reconocimiento de marca | 30% |
+| MOFU (Consideración) | Carrusel / Imagen estática | Tráfico al sitio + Interacción | 30% |
+| BOFU (Conversión) | Dynamic Product Ads (DPA) | Compras / Conversiones | 40% |
+
+**Formatos creativos prioritarios (ordenados por impacto estimado):**
+- **[Formato #1]:** [Descripción detallada del formato — ej: "Video testimonial UGC de 15 segundos mostrando el antes/después del uso del producto. Debe iniciar con el dolor del cliente en los primeros 3 segundos para superar el scroll."]
+- **[Formato #2]:** [ej: "Carrusel de 5 slides: slide 1 = problema del cliente, slides 2-4 = atributos del producto con prueba visual, slide 5 = CTA con garantía. Formato 1:1 para feed, 9:16 para Stories."]
+- **[Formato #3]:** [ej: "Reel estático (imagen animada con texto overlay) mostrando la propuesta de valor en 6 palabras o menos. Usar color primario de marca como fondo."]
+- **[Formato #4 — Retargeting]:** [ej: "Anuncio de retargeting dinámico mostrando exactamente el producto visto + reseña + urgencia de stock limitado."]
+
+**Lenguaje y copywriting recomendado:**
+- **Tono general:** [Definir tono específico basado en Q14 — ej: "Cercano, femenino y aspiracional. Usar 'tú' directo. Evitar tecnicismos."]
+- **Hook de apertura (primeros 3 segundos):** [3 ejemplos de hooks específicos para ESTE producto y buyer persona. Ej: "¿Cansada de llegar a casa y ponerte lo primero que encuentras?"]
+- **Estructura del copy para ads de conversión:** Problema → Agitación → Solución → Prueba Social → CTA. Limitar el texto principal a 125 caracteres para feed mobile.
+- **CTAs recomendados:** [2-3 CTAs específicos — ej: "Compra hoy con envío gratis", "Ver colección", "Aprovecha el -20% de lanzamiento"]
+- **Objeciones a rebatir en el copy:** [Listar las 2-3 objeciones identificadas en Q6 y cómo el copy las neutraliza directamente]
+
+**Segmentación de audiencias:**
+- **Audiencia fría (Prospecting):** [Intereses específicos, comportamientos y demografía basada en buyer persona de Q4 y Q8 — ser muy específico]
+- **Audiencia tibia (Engagement):** [Visitantes de web 30 días, interactuados con perfil IG/FB últimos 60 días]
+- **Audiencia caliente (Retargeting):** [Visitantes de página de producto, añadieron al carrito, iniciaron checkout — ventana de 7 días]
+- **Lookalike:** [1%, 2-3% de base de compradores existentes si aplica]
+
+### 8.2 GOOGLE ADS
+
+**Estructura de campañas recomendada:**
+
+| Tipo de Campaña | Keywords / Targeting | Objetivo |
+|---|---|---|
+| Search — Marca | [Nombre de marca] + variantes | Defender tráfico de marca |
+| Search — Genérico | Keywords de intención comercial alta | Capturar demanda existente |
+| Shopping / PMax | Feed de productos optimizado | Conversiones directas e-commerce |
+| Display Remarketing | Visitantes últimos 30 días | Recuperar interés |
+
+**Keywords de conversión alta (intención de compra) para Search:**
+Incluir las siguientes en concordancia exacta y de frase:
+- [Listar 6-8 keywords específicas para ESTE negocio con intención comercial clara, basadas en Q1 y el sector detectado]
+
+**Keywords de marca que DEBEN protegerse:**
+- [Nombre de marca] + comprar, [nombre de marca] + precio, [nombre de marca] + envío
+
+**Keywords negativas obligatorias:**
+- [Listar 5-8 términos que generan clics irrelevantes para ESTE sector — ej: "gratis", "cómo hacer", "tutorial", competidores si no se busca comparación]
+
+**Estructura del anuncio de búsqueda (RSA):**
+- **Headlines (15 disponibles — usar todos):** El copy de los headlines debe incluir: keyword principal, propuesta de valor única, oferta/garantía, urgencia, nombre de marca. Máximo 30 caracteres cada uno.
+- **Descriptions (4 disponibles):** Expandir el beneficio principal, rebatir objeción #1, incluir CTA explícita con urgencia. Máximo 90 caracteres cada una.
+- **Extensions obligatorias:** Sitelinks (mínimo 4), Callout extensions (mínimo 4), Structured Snippets, Seller Ratings si aplica.
+
+**Performance Max (PMax):**
+- Activo cuando el sitio tiene mínimo 50 conversiones/mes registradas
+- Señales de audiencia: compradores actuales + visitantes de alta intención
+- Assets: mínimo 15 imágenes, 5 videos (pueden ser 15-20s), 15 headlines, 4 descriptions
+
+**Bidding recomendado:**
+- Fase 1 (0-30 días): Manual CPC o tCPA inicial con CPA objetivo = [CPA calculado en sección 3 × 0.8]
+- Fase 2 (30-90 días): tROAS si se alcanzan 30+ conversiones/mes
+- Fase 3 (90+ días): Maximizar valor de conversión con tROAS agresivo
+
+## 9. MAPA DE COSTOS Y RENTABILIDAD PUBLICITARIA
+
+Esta sección establece los parámetros financieros no negociables para evaluar el rendimiento de las campañas digitales.
+
+**Métricas objetivo por plataforma:**
+
+| KPI | Meta Ads | Google Ads | Referencia de industria |
+|---|---|---|---|
+| CPA objetivo (Costo por Adquisición) | $[Calcular: Margen bruto × 0.25-0.30] | $[Margen bruto × 0.20-0.25] | E-commerce similar: $X–$X |
+| ROAS mínimo aceptable | [Precio ÷ CPA objetivo] | [Precio ÷ CPA objetivo] | Industria: 2.5–4x típico |
+| ROAS objetivo | [ROAS mínimo × 1.5] | [ROAS mínimo × 1.5] | Top performers: 5x+ |
+| CPM estimado (costo por mil impresiones) | $X–$X (estimar por sector y país) | N/A | Promedio LATAM: $5–$15 |
+| CTR mínimo aceptable | 1.5% en feed, 0.8% en Stories | 3.5–5% en Search | Benchmarks 2024 |
+| CVR (tasa de conversión) mínima | 1.5% | 2.5% | E-commerce fashion: 1.8% promedio |
+
+**Umbral de corte de campañas:**
+- Pausar cualquier conjunto de anuncios que supere 2× el CPA objetivo sin conversiones en 7 días
+- Pausar keywords de Google con CTR < 1% después de 500 impresiones
+- Pausar creativos de Meta con CPM > $X (definir por sector) o frecuencia > 4 sin conversión
+
+**Escalabilidad financiera:**
+| Inversión mensual | ROAS objetivo | Ingresos proyectados | Beneficio neto estimado |
+|---|---|---|---|
+| $X | [ROAS obj] | $X | $X |
+| $X×2 | [ROAS obj] | $X | $X |
+| $X×4 | [ROAS obj manteniéndose] | $X | $X |
+
+[Calcular las 3 filas con números reales basados en el margen y CPA de la sección 3. Incluir nota sobre qué % del margen bruto se recomienda reinvertir en pauta.]
+
+**Regla de oro de inversión para este negocio:**
+[1 párrafo con la recomendación concreta: cuánto invertir en el mes 1, cómo escalar, y a partir de qué ROAS se justifica doblar la inversión. Específico para los números de ESTE cliente.]
+
+## 10. HOJA DE RUTA SEO — 90 DÍAS
+
+Estrategia SEO estructurada en tres horizontes de trabajo, ordenados por impacto esperado y velocidad de implementación.
+
+**Diagnóstico SEO actual:**
+[2-3 líneas de diagnóstico basado en lo que se conoce del sitio desde Q1 y el análisis de marca. Si hay URL del sitio, inferir fortalezas/debilidades típicas del sector.]
+
+**Horizonte 1 — Quick Wins (Semanas 1-4): Correcciones técnicas y on-page**
+
+| Acción | Prioridad | Impacto esperado | Dificultad |
+|---|---|---|---|
+| Optimizar title tags y meta descriptions con keyword principal | Alta | Mejora CTR orgánico 15-25% | Baja |
+| Agregar H1 único por página con keyword exacta de intención comercial | Alta | Mejora relevancia de página | Baja |
+| Comprimir imágenes y activar WebP | Alta | Mejora Core Web Vitals (LCP) | Baja |
+| Implementar schema markup Product + Review | Alta | Rich Snippets en SERP → +30% CTR | Media |
+| Crear/optimizar Google Business Profile si aplica | Media | Visibilidad local | Baja |
+| [Acción específica adicional basada en el sector y producto del cliente] | Alta | [Impacto estimado] | Baja |
+
+**Horizonte 2 — Crecimiento Orgánico (Semanas 5-8): Contenido y autoridad**
+
+| Acción | Descripción |
+|---|---|
+| Cluster de contenido principal | [Definir el topic cluster central basado en las keywords principales del negocio — ej: "Crear 5 artículos de blog alrededor de 'ropa de casa premium': guías de compra, comparativas, cuidado de telas"] |
+| Optimización de páginas de categoría | [Agregar copy SEO de 150-200 palabras en páginas de categoría con keywords comerciales de alta intención] |
+| Linkbuilding básico | [Estrategia de linkbuilding: directorios del sector, PR digital, intercambios con marcas complementarias no competidoras] |
+| Velocidad de página | [Objetivo: LCP < 2.5s, FID < 100ms, CLS < 0.1. Acciones específicas según plataforma detectada — ej: si es Shopify, reducir apps activas, activar CDN] |
+
+**Horizonte 3 — Dominación Orgánica (Semanas 9-12): Autoridad de dominio**
+
+- **Estrategia de contenido evergreen:** [3 temas específicos de alto volumen y baja competencia para ESTE sector]
+- **Keywords a posicionar en top 3:** [Listar 3-5 keywords específicas con intención comercial que son alcanzables en 90 días dado el nivel de competencia del sector]
+- **KPI final de SEO a 90 días:** [Métricas esperadas: % de mejora en tráfico orgánico, keywords en top 10, DA objetivo]
+
+**Stack SEO recomendado:**
+[Herramientas específicas: Google Search Console (obligatorio), Semrush o Ahrefs (para keyword tracking), Screaming Frog (auditoría técnica), PageSpeed Insights (velocidad). Si es Shopify, mencionar apps específicas.]
+
+## 11. PLAN DE DOMINACIÓN COMPETITIVA
+
+Esta sección define el playbook específico para tomar participación de mercado de cada competidor identificado.
+
+**Mapa de vulnerabilidades competitivas:**
+
+| Competidor | Vulnerabilidad principal | Táctica de ataque | Canal |
+|---|---|---|---|
+| [Competidor 1] | [Debilidad específica identificada en Q10] | [Táctica concreta para explotarla] | [Meta / Google / SEO / Contenido] |
+| [Competidor 2] | [Debilidad específica] | [Táctica concreta] | [Canal] |
+| [Competidor 3] | [Debilidad específica] | [Táctica concreta] | [Canal] |
+
+**Estrategia de keywords competitivas en Google:**
+- **Bidding sobre keywords de competidores:** [Identificar si tiene sentido pujar por [Nombre Competidor 1] + "precio", [Nombre Competidor 1] + "alternativa", etc. Justificar con CPC estimado vs. margen]
+- **SEO de comparación:** [Crear contenido tipo "[Marca del cliente] vs [Competidor 1]: ¿Cuál elegir?" — captura tráfico de usuarios en fase de decisión]
+- **Featured Snippets:** [Keywords de preguntas frecuentes del sector donde se puede desplazar a competidores posicionados]
+
+**Propuesta de valor diferencial por segmento:**
+[Para cada uno de los 3 competidores, definir en 1-2 líneas el mensaje específico que se usará en anuncios para capturar a clientes de ESE competidor. Ej: "Para capturar clientes de [Competidor X] que valoran [atributo]: usar mensaje '[mensaje diferenciador]' en campañas de retargeting y keywords de comparación."]
+
+**Huecos de mercado no cubiertos (Oportunidades Blue Ocean):**
+[3-4 oportunidades específicas donde ningún competidor está posicionado fuertemente. Estas son las apuestas de largo plazo con menor competencia y mayor potencial de crecimiento.]
+
+**Indicadores de éxito del plan competitivo (a 6 meses):**
+- Participación de voz (Share of Voice) en keywords objetivo: objetivo [X%]
+- Posición promedio en Google para keywords de competidores: top [X]
+- % de tráfico orgánico capturado de búsquedas de competidores: [X%]
+
 ---
 **Documento preparado por Dr. Steve Dogs**
 *PhD Performance Marketing — Stanford Dog University*
-*Director de Estrategia, BG Consult*`;
+*Director de Estrategia Digital, BG Consult*
+*Confidencial — Documento estratégico de uso exclusivo del cliente*`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
