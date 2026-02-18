@@ -1,107 +1,166 @@
 
-## Diagnóstico definitivo — Evidencia concreta de la base de datos
+## El Bug Real — Identificado con Evidencia Concreta
 
-### Lo que confirman los datos:
-- **El edge function funciona perfectamente:** Ultima ejecucion: 200 OK, 145 segundos, escribio `status: complete` y **6 competidores** en la DB
-- **`brand_research` esta en la publicacion Realtime:** La migracion funciono correctamente
-- **El estado actual en DB:** `analysis_status = complete`, `competitor_analysis = 6 competidores`
+### Causa 1 (CRÍTICA): Comparación de timestamps rota por formato de string
 
-### El bug real (por fin identificado con certeza)
+La comparación `updatedAt > startedAt` falla porque los dos strings tienen **formatos distintos**:
 
-El Realtime de Supabase con `filter: client_id=eq.${clientId}` en `postgres_changes` tiene un comportamiento critico documentado: **el filtro del lado servidor requiere que el usuario autenticado tenga una politica RLS que le permita hacer SELECT del row filtrado**. Si el evento es escrito por el `service_role` (el edge function), Realtime evalua si el *suscriptor* (el usuario del browser) puede ver ese row segun RLS, y si hay alguna ambiguedad, **descarta el evento silenciosamente sin error**.
+- `startedAt` (guardado por JS): `"2026-02-18T21:40:00.000Z"` — usa **T** como separador
+- `updated_at` (devuelto por Supabase): `"2026-02-18 21:48:29.561682+00"` — usa **espacio** como separador
 
-Esto explica por que el Realtime **nunca dispara** en el browser aunque el edge function escribe `complete` correctamente.
+En comparación lexicográfica, el espacio (`0x20`) tiene valor ASCII **menor** que `T` (`0x54`). Esto significa que `"2026-02-18 21:48:29..."` siempre es **menor** que `"2026-02-18T..."` aunque sea una hora posterior. El guard **siempre falla**, el banner **nunca se cierra**.
 
-**Prueba adicional:** El codigo tiene `event: 'UPDATE'` pero el edge function hace `upsert` con `onConflict: 'client_id,research_type'`. Si en algun momento el registro no existe, el upsert hace un `INSERT`, no un `UPDATE` — y el listener de Realtime no lo captura porque solo escucha `UPDATE`.
+### Causa 2 (SECUNDARIA): El `analysis_status` en DB ya dice `complete`
 
-### La solucion: Polling hibrido confiable (sin Realtime para el estado critico)
+La DB muestra que el último análisis terminó correctamente en `21:48:29`. El registro YA TIENE `status: complete`. Cuando el usuario hace click y el poll empieza, la primera lectura encuentra `status: complete` — pero como el guard de timestamp falla (por el problema de formato), lo ignora. Cuando el nuevo análisis termina y escribe `complete` de nuevo, el problema se repite.
 
-En lugar de depender exclusivamente de Realtime (que tiene el bug de filtros RLS), implementar un **polling de status simple y directo** cada 4 segundos:
+### Causa 3: El botón está `disabled` durante el análisis (`analyzing = true`) pero el `autoTriggered` no es suficiente
 
-1. Cuando el usuario hace click → `setAnalyzing(true)` inmediatamente → guardar timestamp local en `sessionStorage`
-2. Iniciar polling de status cada 4s que consulta `analysis_status` en la DB
-3. Cuando el poll encuentra `status: complete` con `updated_at` posterior al timestamp del click → cerrar banner
-4. Mantener el Realtime como canal adicional (si funciona, mejor; si no, el polling lo cubre)
-
-**Por que este enfoque es mas confiable que Realtime:**
-- No depende de filtros RLS del Realtime
-- No tiene el bug INSERT vs UPDATE
-- El guard de timestamp ahora funciona correctamente porque: el upsert de `pending` actualiza `updated_at` a "ahora", y el `complete` llega despues — ambos son posteriores al click del usuario
-- La comparacion de timestamps se hace en UTC string, no en numeros — eliminando el problema ms vs µs
-
-### Por que el guard de timestamp anterior fallaba
-
-El codigo anterior usaba `analysisStartRef.current` (milisegundos de JS) y comparaba con `updated_at` de Postgres (timestamp ISO string). La conversion era inconsistente. La nueva implementacion guarda el timestamp como string ISO en `sessionStorage` y compara directamente con `row.updated_at` (ambos strings ISO), lo que elimina el problema completamente.
+El mount effect puede ver `status: pending` en DB (si un análisis anterior falló a mitad), activar `isLaunchingRef = true`, e impedir que el click manual funcione. Esto es secundario pero explicaría un escenario adicional.
 
 ---
 
-## Cambios a implementar
+## La Solución Real — Simple y Definitiva
 
-### Archivo: `src/components/client-portal/BrandAssetUploader.tsx`
+### Fix 1: Normalizar ambos timestamps a Date antes de comparar
 
-**Cambios:**
-1. Eliminar la dependencia exclusiva en Realtime para detectar el `complete`
-2. Agregar un `statusPollingRef` que consulta `analysis_status` cada 4 segundos
-3. Guardar el timestamp del click en `sessionStorage` como string ISO
-4. En el poll: comparar `updated_at` del registro con el timestamp del click (ambos ISO strings) — si `updated_at > clickTimestamp` Y `status === complete`, cerrar banner
-5. Mantener el Realtime como canal adicional (doble cobertura)
-6. El banner debe aparecer **sincrónicamente** al hacer click (antes de cualquier async)
+En lugar de comparar strings, convertir ambos a objetos `Date` para una comparación numérica correcta:
 
-**Flujo nuevo garantizado:**
-```text
-Click del usuario
-  → setAnalyzing(true) [SINCRONO — banner aparece instantáneamente]
-  → sessionStorage.setItem('analysis_started_at', new Date().toISOString())
-  → clearAll() [kill pollings anteriores]
-  → isLaunchingRef.current = true
+```typescript
+// ANTES (roto):
+if (status === 'complete' && updatedAt > startedAt) { ... }
 
-await upsert pending [async]
-  → iniciar statusPollingRef (cada 4s)
-  → iniciar progressPollingRef (cada 3s)
-  → subscribeToStatus() [Realtime como bonus]
-  → fetch edge function [fire & forget]
-
-statusPoll (cada 4s):
-  → leer analysis_status de DB
-  → si status === complete Y updated_at > analysis_started_at → cerrar banner
-  → si status === error → cerrar banner con error
-
-Edge function:
-  → escribe pending → progress updates → complete
-  → Realtime O poll detectan el complete → banner se cierra
+// DESPUÉS (correcto):
+const updatedMs = new Date(updatedAt).getTime();
+const startedMs = new Date(startedAt).getTime();
+if (status === 'complete' && updatedMs > startedMs) { ... }
 ```
 
-**Seccion critica — como se guarda el timestamp:**
-```typescript
-// Al hacer click:
-const startedAt = new Date().toISOString();
-sessionStorage.setItem(`analysis_started_${clientId}`, startedAt);
+`new Date("2026-02-18 21:48:29.561682+00")` y `new Date("2026-02-18T21:40:00.000Z")` se parsean correctamente a timestamps numéricos, y la comparación numérica funciona sin importar el formato del string.
 
-// En el poll:
-const startedAt = sessionStorage.getItem(`analysis_started_${clientId}`) || '';
-if (row.status === 'complete' && row.updated_at > startedAt) {
-  // cerrar banner
+### Fix 2: Guardar startedAt como timestamp numérico (ms) en sessionStorage
+
+Para evitar cualquier ambigüedad futura:
+
+```typescript
+// Guardar: número de milisegundos
+sessionStorage.setItem(`analysis_started_${clientId}`, Date.now().toString());
+
+// Leer y comparar:
+const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0');
+const updatedMs = new Date(updatedAt).getTime();
+if (status === 'complete' && updatedMs > startedMs) { ... }
+```
+
+### Fix 3: El mount effect no debe activar `isLaunchingRef` si ya hay `complete` en DB
+
+Si al montar el componente el status es `complete`, no hacer nada (es el estado normal post-análisis). Solo activar el "resume" si el status es `pending`.
+
+---
+
+## Archivos a Modificar
+
+### Solo UN archivo: `src/components/client-portal/BrandAssetUploader.tsx`
+
+**Cambios específicos (líneas exactas):**
+
+**1. `startStatusPolling` (líneas 185-211):** Cambiar la comparación de strings a comparación de `Date` objects:
+
+```typescript
+function startStatusPolling() {
+  if (statusPollingRef.current) { clearInterval(statusPollingRef.current); }
+  console.log('[StatusPoll] Starting status polling every 4s');
+  statusPollingRef.current = setInterval(async () => {
+    const { data } = await supabase
+      .from('brand_research')
+      .select('research_data, updated_at')
+      .eq('client_id', clientId)
+      .eq('research_type', 'analysis_status')
+      .maybeSingle();
+
+    if (!data) return;
+    const status = (data.research_data as any)?.status;
+    const updatedMs = new Date(data.updated_at || 0).getTime();
+    const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0');
+    console.log('[StatusPoll] status:', status, '| updatedMs:', updatedMs, '| startedMs:', startedMs, '| diff:', updatedMs - startedMs);
+
+    if (status === 'complete' && updatedMs > startedMs) {
+      console.log('[StatusPoll] ✅ complete detected — closing banner');
+      finishAnalysis(true);
+    } else if (status === 'error' && updatedMs > startedMs) {
+      console.log('[StatusPoll] ❌ error detected — closing banner');
+      finishAnalysis(false);
+    }
+  }, 4000);
 }
 ```
 
-**Por que `updated_at > startedAt` funciona:**
-- `startedAt` es el ISO string del momento del click (ej: `2026-02-18T21:40:00.000Z`)
-- `updated_at` del registro `complete` es el ISO string de cuando el edge function termino (ej: `2026-02-18T21:42:05.770Z`)
-- La comparacion de strings ISO funciona lexicograficamente — siempre correcta
-- El registro `pending` tambien tiene `updated_at` posterior al click, pero `status !== complete`, por lo que se ignora
+**2. `subscribeToStatus` (líneas 213-250):** Mismo fix en el handler de Realtime:
 
-### No se tocan otros archivos
+```typescript
+const updatedMs = new Date(row.updated_at || 0).getTime();
+const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0');
 
-El edge function (`analyze-brand/index.ts`) ya funciona perfectamente. Los 6 competidores ya estan en la DB. Solo hay que arreglar el frontend.
+if (status === 'complete' && updatedMs > startedMs) { ... }
+```
+
+**3. `launchAnalysis` (líneas 295-296):** Guardar como número en lugar de ISO string:
+
+```typescript
+// ANTES:
+const startedAt = new Date().toISOString();
+sessionStorage.setItem(`analysis_started_${clientId}`, startedAt);
+
+// DESPUÉS:
+const startedMs = Date.now();
+sessionStorage.setItem(`analysis_started_${clientId}`, startedMs.toString());
+```
+
+**4. Mount effect (líneas 264-265):** Mismo cambio para el "resume" desde mount:
+
+```typescript
+// ANTES:
+sessionStorage.setItem(`analysis_started_${clientId}`, new Date(Date.now() - 3600000).toISOString());
+
+// DESPUÉS:
+sessionStorage.setItem(`analysis_started_${clientId}`, (Date.now() - 3600000).toString());
+```
 
 ---
 
-## Resumen de lo que se cambia vs lo que queda igual
+## Por Qué Esto Funciona
 
-| Elemento | Estado | Accion |
+La comparación `new Date("2026-02-18 21:48:29.561682+00").getTime()` devuelve `1771451309561` (ms desde epoch). La comparación `new Date("2026-02-18T21:40:00.000Z").getTime()` devuelve `1771450800000`. La resta es positiva (~509000 ms = ~8.5 min después), la comparación `updatedMs > startedMs` es `true`. El banner se cierra.
+
+Este es el mismo fix que ha fallado antes, pero por primera vez con evidencia concreta de por qué fallaba: el **formato del string** difería entre JS y Postgres.
+
+---
+
+## Verificación que Necesitas Hacer
+
+Después del fix, al hacer click en el botón, deberías ver en la consola (F12):
+
+```
+[Button] Clicked — analyzing: false websiteUrl: https://...
+[launchAnalysis] STARTING — url: https://... | startedMs: 1771452000000
+[launchAnalysis] DB status set to pending ✓
+[StatusPoll] Starting status polling every 4s
+[StatusPoll] status: pending | updatedMs: 1771452001234 | startedMs: 1771452000000 | diff: 1234
+... (2 minutos después) ...
+[StatusPoll] status: complete | updatedMs: 1771452120000 | startedMs: 1771452000000 | diff: 120000
+[StatusPoll] ✅ complete detected — closing banner
+```
+
+Si `diff` es positivo y el status es `complete`, el banner se cierra. Fin.
+
+---
+
+## Resumen
+
+| Componente | Estado Anterior | Estado Nuevo |
 |---|---|---|
-| Edge function analyze-brand | Funciona (6 competidores, status complete) | Sin cambios |
-| Realtime publicacion brand_research | Habilitada | Sin cambios (se mantiene como backup) |
-| Banner AnalysisBanner | Correcto | Sin cambios |
-| BrandAssetUploader — logica de status | Rota (solo Realtime, sin fallback) | ARREGLAR con polling hibrido |
-| Timestamp guard | Roto (numero vs string) | ARREGLAR con ISO string en sessionStorage |
+| Comparación de timestamps | String lexicográfico (roto por formato Postgres vs ISO) | Numérico via `Date.getTime()` |
+| sessionStorage | ISO string `"2026-02-18T..."` | Número ms `"1771452000000"` |
+| Edge function | Sin cambios — ya funciona | Sin cambios |
+| Realtime | Sin cambios — mantiene como bonus | Sin cambios |
+| Mount effect resume | Sin cambios — lógica correcta | Solo cambio de formato timestamp |
