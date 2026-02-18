@@ -450,13 +450,13 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { role: 'system', content: 'Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses ```json ni ```. Solo el JSON puro y completo.' },
           { role: 'user', content: analysisPrompt },
         ],
         temperature: 0.2,
-        max_tokens: 12000,
+        max_tokens: 16000,
       }),
     });
 
