@@ -274,6 +274,7 @@ interface ResearchData {
   keywords?: any;
   ads_library_analysis?: any;
   executive_summary?: any;
+  competitive_domination?: any;
 }
 
 const QUESTION_CONFIG: Record<string, { label: string; icon: React.ReactNode; section: string }> = {
@@ -2342,6 +2343,89 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 )}
                 {research.keywords?.strategy && (
                   <KeywordStrategyTimeline strategy={String(research.keywords.strategy)} />
+                )}
+
+                {/* Estrategia por Competidor */}
+                {research.competitor_analysis?.competitors?.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Target className="h-4 w-4 text-primary" /> Estrategia por Competidor
+                    </h3>
+                    {research.competitor_analysis.competitors.map((comp: any, i: number) => {
+                      const vulnEntry = research.competitive_domination?.vulnerability_map?.find(
+                        (e: any) => e.competitor === comp.name
+                      );
+                      return (
+                        <Card key={i}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
+                              <span className="font-bold text-sm">{comp.name || comp.url || `Competidor ${i + 1}`}</span>
+                              {comp.url && (
+                                <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">{comp.url}</a>
+                              )}
+                              {comp.seo_score != null && (
+                                <Badge variant="secondary" className="text-xs ml-auto">SEO {comp.seo_score}/100</Badge>
+                              )}
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            {comp.positioning && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Posicionamiento</p>
+                                <p className="text-xs text-muted-foreground italic">"{String(comp.positioning)}"</p>
+                              </div>
+                            )}
+                            {(comp.ad_strategy_inferred || comp.ad_strategy) && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-0.5">Estrategia de Ads</p>
+                                <p className="text-xs leading-relaxed">{String(comp.ad_strategy_inferred || comp.ad_strategy)}</p>
+                              </div>
+                            )}
+                            {comp.attack_vector && (
+                              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-2">
+                                <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-0.5">⚔️ Cómo Atacarlos</p>
+                                <p className="text-xs leading-relaxed">{String(comp.attack_vector)}</p>
+                              </div>
+                            )}
+                            {vulnEntry && (
+                              <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 space-y-1">
+                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide">🎯 Keywords a Usar Contra Ellos</p>
+                                {vulnEntry.attack_tactic && (
+                                  <p className="text-xs leading-relaxed">{String(vulnEntry.attack_tactic)}</p>
+                                )}
+                                {vulnEntry.channel && (
+                                  <Badge variant="outline" className="text-xs">{String(vulnEntry.channel)}</Badge>
+                                )}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Oportunidades de Keywords */}
+                {research.competitive_domination?.competitive_keyword_strategy?.featured_snippet_opportunities?.length > 0 && (
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" /> Oportunidades de Keywords
+                      </CardTitle>
+                      <CardDescription className="text-xs">Featured snippets y oportunidades detectadas por la IA</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1.5">
+                        {research.competitive_domination.competitive_keyword_strategy.featured_snippet_opportunities.map((opp: any, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-xs">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            {opp == null ? '' : String(opp)}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Keywords por Competidor */}
