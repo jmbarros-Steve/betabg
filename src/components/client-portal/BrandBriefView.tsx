@@ -338,6 +338,122 @@ function parseFinancials(response: string): { price: number; cost: number; shipp
   return null;
 }
 
+const PERFORMANCE_QUOTES = [
+  { quote: "Make an offer so good, people feel stupid saying no.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
+  { quote: "The money is in the list. The fortune is in the follow-up.", author: "Russell Brunson", role: "Co-Founder, ClickFunnels" },
+  { quote: "Price is only an issue in the absence of value.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
+  { quote: "The biggest mistake you can make is not testing your offer before scaling your ads.", author: "Russell Brunson", role: "Co-Founder, ClickFunnels" },
+  { quote: "Speed of implementation separates the rich from the broke.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
+  { quote: "The secret to scaling? Make the unit economics work first.", author: "Russell Brunson", role: "Co-Founder, ClickFunnels" },
+  { quote: "Whoever can spend the most to acquire a customer wins.", author: "Dan Kennedy", role: "Direct Response Marketing Legend" },
+  { quote: "Spend 20% of your budget testing, 80% scaling what works.", author: "Neil Patel", role: "Digital Marketing Expert" },
+  { quote: "Your ROAS is a vanity metric. Profit per customer is what matters.", author: "Andrew Wilkinson", role: "Tiny Capital" },
+  { quote: "The hook is not to get them to buy. It's to get them to consume the next piece of content.", author: "Gary Vaynerchuk", role: "CEO, VaynerMedia" },
+  { quote: "Attention is the new currency. Own it or buy it.", author: "Gary Vaynerchuk", role: "CEO, VaynerMedia" },
+  { quote: "Creatives are 70% of your ad performance. Test relentlessly.", author: "Andrew Foxwell", role: "Foxwell Digital" },
+  { quote: "Your landing page is either a leaky bucket or a money machine. There's no middle ground.", author: "Joanna Wiebe", role: "Copyhackers" },
+  { quote: "If you can't measure it, you can't improve it.", author: "Peter Drucker", role: "Management Consultant" },
+  { quote: "Stop selling. Start helping.", author: "Zig Ziglar", role: "Sales Legend" },
+  { quote: "Don't fall in love with your product. Fall in love with your customer's problem.", author: "Michael Skok", role: "Venture Capitalist" },
+  { quote: "The best marketing doesn't feel like marketing.", author: "Tom Fishburne", role: "Marketoonist" },
+  { quote: "Your ad creative is dead after 3 days. Refresh or die.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
+  { quote: "Stop trying to go viral. Start trying to be relevant.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
+  { quote: "The offer is the strategy. Everything else is just execution.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
+];
+
+function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string; detail: string; pct: number } | null }) {
+  const [quoteIdx, setQuoteIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setQuoteIdx(prev => (prev + 1) % PERFORMANCE_QUOTES.length);
+        setVisible(true);
+      }, 400);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const quote = PERFORMANCE_QUOTES[quoteIdx];
+  const phases = [
+    { key: ['inicio', 'sitio_web'], icon: <Globe className="h-4 w-4 mx-auto mb-1" />, label: 'Tu Sitio Web' },
+    { key: ['detectando'], icon: <Search className="h-4 w-4 mx-auto mb-1" />, label: 'Detectando' },
+    { key: ['competidor_0', 'competidor_1', 'competidor_2', 'competidor_3', 'competidor_4', 'competidor_5'], icon: <Trophy className="h-4 w-4 mx-auto mb-1" />, label: 'Competidores' },
+    { key: ['ia'], icon: <Sparkles className="h-4 w-4 mx-auto mb-1" />, label: 'Estrategia IA' },
+  ];
+  const thresholds = [0, 20, 25, 70];
+
+  return (
+    <Card className="border-primary/30 bg-primary/5 overflow-hidden">
+      <CardContent className="pt-4 pb-4">
+        {/* Status row */}
+        <div className="flex items-center gap-3 mb-3">
+          <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-primary truncate">
+              {progressStep?.detail || 'Iniciando análisis de marca...'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Steve está auditando tu sitio, investigando keywords y analizando hasta 6 competidores. 1–2 minutos.
+            </p>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
+            <span className="text-[10px] font-bold text-primary">{progressStep?.pct ?? 0}%</span>
+          </div>
+          <Progress value={progressStep?.pct ?? 5} className="h-2" />
+        </div>
+
+        {/* Step indicators */}
+        <div className="grid grid-cols-4 gap-2 text-center mb-5">
+          {phases.map((phase, i) => {
+            const isActive = progressStep && phase.key.includes(progressStep.step);
+            const pct = progressStep?.pct ?? 0;
+            const isDone = pct > thresholds[i] && !isActive;
+            return (
+              <div key={i} className={`rounded-lg p-2 border transition-all duration-300 ${isActive ? 'bg-primary/10 border-primary/40' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background border-border'}`}>
+                <div className={isActive ? 'text-primary' : isDone ? 'text-green-500' : 'text-muted-foreground'}>
+                  {isDone ? <CheckCircle2 className="h-4 w-4 mx-auto mb-1" /> : phase.icon}
+                </div>
+                <p className={`text-[10px] font-medium ${isActive ? 'text-primary' : isDone ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>{phase.label}</p>
+                {isActive && <div className="mt-1 h-0.5 bg-primary/20 rounded-full overflow-hidden"><div className="h-0.5 bg-primary rounded-full animate-pulse w-full" /></div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Rotating quote */}
+        <div
+          className="rounded-xl border border-primary/20 bg-background/60 p-4"
+          style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(6px)', transition: 'opacity 0.4s ease, transform 0.4s ease' }}
+        >
+          <div className="flex gap-3 items-start">
+            <span className="text-3xl leading-none text-primary/30 font-serif select-none flex-shrink-0 -mt-1">"</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground leading-snug italic">
+                {quote.quote}
+              </p>
+              <div className="flex items-center gap-2 mt-2.5">
+                <div className="h-px flex-1 bg-border" />
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[11px] font-bold text-primary">{quote.author}</p>
+                  <p className="text-[10px] text-muted-foreground">{quote.role}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const { user } = useAuth();
   const [briefData, setBriefData] = useState<BriefData | null>(null);
@@ -1444,54 +1560,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
       {/* Analysis progress banner */}
       {analysisStatus === 'pending' && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-primary">
-                  {progressStep?.detail || 'Iniciando análisis de marca...'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Steve está auditando tu sitio, investigando keywords y analizando a tu competencia (hasta 6 competidores). Esto puede tomar 1-2 minutos.
-                </p>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="mb-3">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
-                <span className="text-[10px] font-bold text-primary">{progressStep?.pct ?? 0}%</span>
-              </div>
-              <Progress value={progressStep?.pct ?? 5} className="h-2" />
-            </div>
-
-            {/* Step indicators */}
-            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-              {[
-                { key: ['inicio', 'sitio_web'], icon: <Globe className="h-4 w-4 mx-auto mb-1" />, label: 'Tu Sitio Web' },
-                { key: ['detectando'], icon: <Search className="h-4 w-4 mx-auto mb-1" />, label: 'Detectando' },
-                { key: ['competidor_0', 'competidor_1', 'competidor_2', 'competidor_3', 'competidor_4', 'competidor_5'], icon: <Trophy className="h-4 w-4 mx-auto mb-1" />, label: 'Competidores' },
-                { key: ['ia'], icon: <Sparkles className="h-4 w-4 mx-auto mb-1" />, label: 'Estrategia IA' },
-              ].map((phase, i) => {
-                const isActive = progressStep && phase.key.includes(progressStep.step);
-                const pct = progressStep?.pct ?? 0;
-                const thresholds = [0, 20, 25, 70];
-                const isDone = pct > thresholds[i] && !isActive;
-                return (
-                  <div key={i} className={`rounded-lg p-2 border transition-all ${isActive ? 'bg-primary/10 border-primary/40' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background border-border'}`}>
-                    <div className={isActive ? 'text-primary' : isDone ? 'text-green-500' : 'text-muted-foreground'}>
-                      {isDone ? <CheckCircle2 className="h-4 w-4 mx-auto mb-1" /> : phase.icon}
-                    </div>
-                    <p className={`text-[10px] font-medium ${isActive ? 'text-primary' : isDone ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>{phase.label}</p>
-                    {isActive && <div className="mt-1 h-0.5 bg-primary/20 rounded-full overflow-hidden"><div className="h-0.5 bg-primary rounded-full animate-pulse w-full" /></div>}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <AnalysisProgressBanner progressStep={progressStep} />
       )}
 
       {analysisStatus === 'complete' && !research.seo_audit && (
