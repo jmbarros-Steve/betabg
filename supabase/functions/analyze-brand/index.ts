@@ -108,21 +108,54 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Scrape competitors
+    // Scrape competitors (provided ones + auto-detect up to 3 more via Firecrawl search)
     let competitorContents: string[] = [];
-    if (competitor_urls?.length && firecrawlApiKey) {
-      for (const url of competitor_urls.slice(0, 3)) {
+    let allCompetitorUrls = [...(competitor_urls || [])].slice(0, 3);
+
+    // Auto-detect additional competitors via Firecrawl search
+    if (firecrawlApiKey && websiteContent) {
+      try {
+        // Extract brand/sector keywords from brief context for competitor search
+        const briefStr = JSON.stringify(briefContext);
+        const sectorMatch = briefStr.match(/"business_pitch"[^"]*"([^"]{20,200})"/) || briefStr.match(/pijama|ropa|moda|tienda|e-commerce|fashion|clothing/i);
+        const searchQuery = `competidores sitios web similares a ${client.name} ${client.company || ''} e-commerce`;
+        const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: searchQuery, limit: 8, lang: 'es' }),
+        });
+        if (searchResp.ok) {
+          const searchData = await searchResp.json();
+          const foundUrls: string[] = (searchData?.data || [])
+            .map((r: any) => r.url)
+            .filter((u: string) => u && !u.includes(client.name?.toLowerCase()) && !allCompetitorUrls.some(cu => u.includes(cu)))
+            .slice(0, 3);
+          allCompetitorUrls = [...allCompetitorUrls, ...foundUrls];
+          console.log('Auto-detected additional competitors:', foundUrls);
+        }
+      } catch (e) {
+        console.error('Auto competitor detection error:', e);
+      }
+    }
+
+    if (allCompetitorUrls.length && firecrawlApiKey) {
+      for (const url of allCompetitorUrls.slice(0, 6)) {
         try {
+          let formattedUrl = url.trim();
+          if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
           const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${firecrawlApiKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true }),
+            body: JSON.stringify({ url: formattedUrl, formats: ['markdown'], onlyMainContent: true }),
           });
           const data = await resp.json();
-          competitorContents.push(`## ${url}\n${(data?.data?.markdown || data?.markdown || '').slice(0, 3000)}`);
+          const content = (data?.data?.markdown || data?.markdown || '').slice(0, 2500);
+          if (content.length > 100) {
+            competitorContents.push(`## ${formattedUrl}\n${content}`);
+          }
         } catch (e) {
           console.error('Competitor scrape error:', e);
         }
@@ -138,7 +171,7 @@ WEBSITE: ${website_url || 'No proporcionado'}
 
 ${websiteContent ? `=== CONTENIDO DEL SITIO WEB ===\n${websiteContent.slice(0, 6000)}` : '=== SITIO WEB: No se pudo analizar ==='}
 
-${competitorContents.length > 0 ? `=== CONTENIDO DE COMPETIDORES ===\n${competitorContents.join('\n\n').slice(0, 8000)}` : '=== COMPETIDORES: No proporcionados ==='}
+${competitorContents.length > 0 ? `=== CONTENIDO DE COMPETIDORES (${competitorContents.length} analizados — incluye los 3 que el cliente indicó + hasta 3 detectados automáticamente) ===\n${competitorContents.join('\n\n').slice(0, 10000)}` : '=== COMPETIDORES: No proporcionados ==='}
 
 === BRIEF DE MARCA (datos del cliente) ===
 ${brandContext}
