@@ -127,16 +127,19 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   const [assets, setAssets] = useState<Record<AssetCategory, string[]>>({ logo: [], products: [], ads: [] });
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [competitorUrls, setCompetitorUrls] = useState(['', '', '']);
+  // analyzing drives the banner. We use a ref to avoid stale closures in intervals.
+  const analyzingRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [progressStep, setProgressStep] = useState<{ step: string; detail: string; pct: number }>({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
-  const analyzingRef = useRef(false);
   const [autoTriggered, setAutoTriggered] = useState(false);
   const fileRefs = useRef<Record<AssetCategory, HTMLInputElement | null>>({ logo: null, products: null, ads: null });
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Timestamp of when current analysis was started — used to ignore stale DB statuses
+  const analysisStartRef = useRef<number>(0);
 
   useEffect(() => {
-    // Check pending status immediately before full loadAssets to show banner ASAP
+    // On mount: immediately check if an analysis is already in progress
     (async () => {
       const { data: statusRow } = await supabase
         .from('brand_research')
@@ -145,21 +148,27 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         .eq('research_type', 'analysis_status')
         .maybeSingle();
       if ((statusRow?.research_data as any)?.status === 'pending') {
+        console.log('[BrandAssetUploader] Resuming in-progress analysis on mount');
         analyzingRef.current = true;
         setAnalyzing(true);
+        analysisStartRef.current = 0; // accept any timestamp when resuming
+        startStatusPolling();
+        startProgressPolling();
       }
     })();
     loadAssets();
     return () => {
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+      clearAllIntervals();
     };
   }, [clientId]);
 
-  function startPolling(startedAt: number) {
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+  function clearAllIntervals() {
+    if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; }
+    if (statusIntervalRef.current) { clearInterval(statusIntervalRef.current); statusIntervalRef.current = null; }
+  }
 
+  function startProgressPolling() {
+    if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); }
     progressIntervalRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('brand_research')
@@ -169,35 +178,44 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         .maybeSingle();
       if (data?.research_data) {
         const p = data.research_data as any;
-        // Only accept progress updates that are NEWER than when we started
-        if (p.ts && new Date(p.ts).getTime() >= startedAt) {
+        // Only update if this progress is from our current analysis (or we accept any)
+        if (analysisStartRef.current === 0 || (p.ts && new Date(p.ts).getTime() >= analysisStartRef.current)) {
           setProgressStep({ step: p.step, detail: p.detail, pct: p.pct });
         }
       }
     }, 3000);
+  }
 
+  function startStatusPolling() {
+    if (statusIntervalRef.current) { clearInterval(statusIntervalRef.current); }
     statusIntervalRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('brand_research')
-        .select('research_data,updated_at')
+        .select('research_data, updated_at')
         .eq('client_id', clientId)
         .eq('research_type', 'analysis_status')
         .maybeSingle();
-      const rd = data?.research_data as any;
-      const status = rd?.status;
-      // Only react to status changes AFTER we started this analysis
-      const updatedAt = data?.updated_at ? new Date(data.updated_at).getTime() : 0;
-      if (status === 'complete' && updatedAt >= startedAt) {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-        if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+      const status = (data?.research_data as any)?.status;
+      const dbUpdatedAt = data?.updated_at ? new Date(data.updated_at).getTime() : 0;
+      const startedAt = analysisStartRef.current;
+
+      console.log('[StatusPoll] status:', status, 'dbUpdatedAt:', dbUpdatedAt, 'startedAt:', startedAt, 'isNewer:', dbUpdatedAt >= startedAt);
+
+      // Only react to statuses written AFTER our analysis started
+      if (startedAt > 0 && dbUpdatedAt < startedAt) {
+        console.log('[StatusPoll] Ignoring stale status from previous analysis');
+        return;
+      }
+
+      if (status === 'complete') {
+        clearAllIntervals();
         analyzingRef.current = false;
         setAnalyzing(false);
         setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
         toast.success('¡Análisis SEO, Keywords y Competencia completado!');
         onResearchComplete?.();
-      } else if (status === 'error' && updatedAt >= startedAt) {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-        if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+      } else if (status === 'error') {
+        clearAllIntervals();
         analyzingRef.current = false;
         setAnalyzing(false);
         setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
@@ -207,42 +225,52 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   }
 
   async function launchAnalysis(url: string, compUrls: string[]) {
-    if (!url.trim()) return;
+    if (!url.trim()) {
+      console.warn('[launchAnalysis] No URL provided, aborting');
+      return;
+    }
 
-    // Record the exact timestamp when we START this analysis
-    // This prevents old 'complete' status from killing the banner
-    const analysisStartedAt = Date.now();
+    console.log('[launchAnalysis] STARTING — url:', url, 'compUrls:', compUrls);
 
-    // 1. Show banner IMMEDIATELY — pure sync, zero delay
+    // STEP 1: Record start time BEFORE anything else
+    const startedAt = Date.now();
+    analysisStartRef.current = startedAt;
+
+    // STEP 2: Kill any lingering intervals immediately
+    clearAllIntervals();
+
+    // STEP 3: Show banner — synchronous React state update
     analyzingRef.current = true;
     setAnalyzing(true);
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
 
-    // 2. Kill any lingering intervals from previous runs immediately
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+    console.log('[launchAnalysis] Banner set to visible, starting polling');
 
-    // 3. Start polling with a timestamp guard — will ignore any old DB statuses
-    startPolling(analysisStartedAt);
+    // STEP 4: Start polling IMMEDIATELY — timestamp guard prevents false-positive 'complete'
+    startProgressPolling();
+    startStatusPolling();
 
-    // 4. Persist status to DB (async, no await — polling is guarded by timestamp)
+    // STEP 5: Write 'pending' to DB (fire and forget — polling is timestamp-guarded)
     supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
-    }, { onConflict: 'client_id,research_type' });
+    }, { onConflict: 'client_id,research_type' }).then(() => {
+      console.log('[launchAnalysis] DB status set to pending');
+    });
 
     supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
-      research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date().toISOString() },
+      research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date(startedAt).toISOString() },
     }, { onConflict: 'client_id,research_type' });
 
-    // 5. Fire edge function (fire-and-forget, polling tracks progress)
+    // STEP 6: Fire edge function (fire and forget — polling tracks completion)
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     const projectId = 'jnqivntlkemzcpomkvwv';
 
+    console.log('[launchAnalysis] Firing edge function');
     fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand`, {
       method: 'POST',
       headers: {
@@ -256,7 +284,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         competitor_urls: compUrls.filter(u => u.trim()),
       }),
     }).catch((err) => {
-      console.log('analyze-brand fetch ended (polling tracks status):', err?.message);
+      console.log('[launchAnalysis] Edge function call ended (polling tracks status):', err?.message);
     });
   }
 
@@ -304,38 +332,12 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       });
     }
 
-    // Resume polling if analysis is still in progress
-    const { data: statusRow } = await supabase
-      .from('brand_research')
-      .select('research_data')
-      .eq('client_id', clientId)
-      .eq('research_type', 'analysis_status')
-      .maybeSingle();
-    const currentStatus = (statusRow?.research_data as any)?.status;
-    if (currentStatus === 'pending') {
-      setAnalyzing(true);
-      // Also load current progress step so banner shows immediately
-      const { data: progressRow } = await supabase
-        .from('brand_research')
-        .select('research_data')
-        .eq('client_id', clientId)
-        .eq('research_type', 'analysis_progress')
-        .maybeSingle();
-      if (progressRow?.research_data) {
-        const p = progressRow.research_data as any;
-        setProgressStep({ step: p.step || 'inicio', detail: p.detail || 'Analizando...', pct: p.pct || 2 });
-      } else {
-        setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
-      }
-      startPolling(0); // 0 = accept any status (resuming existing analysis)
-      return;
-    }
-
-    // Auto-trigger if no research exists yet
-    if (savedWebUrl && !autoTriggered) {
+    // Auto-trigger if no research exists yet (and not already analyzing)
+    if (savedWebUrl && !autoTriggered && !analyzingRef.current) {
       const { data: existingResearch } = await supabase
         .from('brand_research').select('id').eq('client_id', clientId).limit(1);
       if (!existingResearch || existingResearch.length === 0) {
+        console.log('[loadAssets] No research found, auto-triggering analysis');
         setAutoTriggered(true);
         setTimeout(() => launchAnalysis(savedWebUrl, extractedCompUrls), 800);
       }
@@ -463,7 +465,15 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
             ))}
           </div>
 
-          <Button onClick={() => launchAnalysis(websiteUrl, competitorUrls)} disabled={analyzing || !websiteUrl.trim()} className="w-full" size="lg">
+          <Button
+            onClick={() => {
+              console.log('[Button] Clicked — analyzing:', analyzing, 'websiteUrl:', websiteUrl);
+              launchAnalysis(websiteUrl, competitorUrls);
+            }}
+            disabled={analyzing || !websiteUrl.trim()}
+            className="w-full"
+            size="lg"
+          >
             {analyzing ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analizando...</>
             ) : (
