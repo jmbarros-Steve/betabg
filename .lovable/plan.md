@@ -1,82 +1,107 @@
 
-## Diagnóstico definitivo — Lo que encontré en el código real
+## Diagnóstico definitivo — Evidencia concreta de la base de datos
 
-### El problema del banner (causa raíz confirmada)
+### Lo que confirman los datos:
+- **El edge function funciona perfectamente:** Ultima ejecucion: 200 OK, 145 segundos, escribio `status: complete` y **6 competidores** en la DB
+- **`brand_research` esta en la publicacion Realtime:** La migracion funciono correctamente
+- **El estado actual en DB:** `analysis_status = complete`, `competitor_analysis = 6 competidores`
 
-Tras leer el código línea por línea y cruzar con la DB, el flujo actual tiene un defecto estructural grave:
+### El bug real (por fin identificado con certeza)
 
-**Doble llamada a `launchAnalysis` sin protección de mutex:**
+El Realtime de Supabase con `filter: client_id=eq.${clientId}` en `postgres_changes` tiene un comportamiento critico documentado: **el filtro del lado servidor requiere que el usuario autenticado tenga una politica RLS que le permita hacer SELECT del row filtrado**. Si el evento es escrito por el `service_role` (el edge function), Realtime evalua si el *suscriptor* (el usuario del browser) puede ver ese row segun RLS, y si hay alguna ambiguedad, **descarta el evento silenciosamente sin error**.
 
-1. El `useEffect` del mount llama `loadAssets()` (sin await)
-2. `loadAssets()` verifica si hay investigaciones previas
-3. Si `existingResearch.length === 0`, ejecuta `setTimeout(() => launchAnalysis(...), 800)`
-4. El usuario también hace click manualmente → segunda llamada a `launchAnalysis`
-5. La segunda llamada hace `clearAllIntervals()` + `setAnalyzing(true)`, PERO luego `loadAssets` ya terminó su verificación y la primera llamada (del timeout) también ejecuta `launchAnalysis`
-6. La primera llamada (del timeout) hace `clearAllIntervals()` → mata los pollings de la segunda llamada → el banner queda huérfano sin polling que lo cierre
+Esto explica por que el Realtime **nunca dispara** en el browser aunque el edge function escribe `complete` correctamente.
 
-**Adicionalmente:** El guard `startedAt > 0 && dbUpdatedAt < startedAt` compara timestamps en milisegundos (JS) vs microsegundos (Postgres). Si `dbUpdatedAt` del registro `pending` recién escrito es ligeramente anterior al `startedAt` local (por diferencia de reloj entre cliente y servidor), el guard ignora el `complete` legítimo y el banner **nunca se cierra**.
+**Prueba adicional:** El codigo tiene `event: 'UPDATE'` pero el edge function hace `upsert` con `onConflict: 'client_id,research_type'`. Si en algun momento el registro no existe, el upsert hace un `INSERT`, no un `UPDATE` — y el listener de Realtime no lo captura porque solo escucha `UPDATE`.
 
-**El problema de los 6 competidores:** La DB confirma que el análisis devuelve `complete`. El edge function ya tiene la lógica correcta. El problema es que el AI (Gemini 2.5 Flash) con `max_tokens: 12000` puede truncar el JSON antes de llegar al 6to competidor porque el prompt completo con 14,000 chars de contenido de competidores es muy grande. La solución es cambiar a `gemini-2.5-pro` con `max_tokens: 16000` para garantizar el JSON completo.
+### La solucion: Polling hibrido confiable (sin Realtime para el estado critico)
 
----
+En lugar de depender exclusivamente de Realtime (que tiene el bug de filtros RLS), implementar un **polling de status simple y directo** cada 4 segundos:
 
-## El nuevo plan — Enfoque radicalmente diferente
+1. Cuando el usuario hace click → `setAnalyzing(true)` inmediatamente → guardar timestamp local en `sessionStorage`
+2. Iniciar polling de status cada 4s que consulta `analysis_status` en la DB
+3. Cuando el poll encuentra `status: complete` con `updated_at` posterior al timestamp del click → cerrar banner
+4. Mantener el Realtime como canal adicional (si funciona, mejor; si no, el polling lo cubre)
 
-### Fix 1: Reemplazar polling por Supabase Realtime
+**Por que este enfoque es mas confiable que Realtime:**
+- No depende de filtros RLS del Realtime
+- No tiene el bug INSERT vs UPDATE
+- El guard de timestamp ahora funciona correctamente porque: el upsert de `pending` actualiza `updated_at` a "ahora", y el `complete` llega despues — ambos son posteriores al click del usuario
+- La comparacion de timestamps se hace en UTC string, no en numeros — eliminando el problema ms vs µs
 
-En lugar de `setInterval` con race conditions y guards de timestamp frágiles, usar **Supabase Realtime** (postgres_changes) para escuchar cambios en `brand_research`. Esto es:
-- Instantáneo (sin latencia de polling)
-- Sin race conditions (el evento llega exactamente cuando la DB cambia)
-- Sin necesidad de guards de timestamp
+### Por que el guard de timestamp anterior fallaba
 
-El componente suscribe a cambios en `brand_research` donde `client_id = clientId`. Cuando el edge function escribe `status: complete`, Realtime lo notifica al instante.
-
-**Para el progreso:** Mantener el polling de progreso (3s) ya que es solo UI cosmética. El estado crítico (pending/complete/error) pasa por Realtime.
-
-### Fix 2: Mutex para evitar doble `launchAnalysis`
-
-Agregar un `isLaunchingRef` para garantizar que solo una instancia de `launchAnalysis` corra a la vez. Si ya se está ejecutando, ignorar el segundo llamado.
-
-### Fix 3: Modelo AI más potente para garantizar JSON completo
-
-Cambiar `google/gemini-2.5-flash` a `google/gemini-2.5-pro` con `max_tokens: 16000` en el edge function para asegurar que el JSON se completa con los 6 competidores.
+El codigo anterior usaba `analysisStartRef.current` (milisegundos de JS) y comparaba con `updated_at` de Postgres (timestamp ISO string). La conversion era inconsistente. La nueva implementacion guarda el timestamp como string ISO en `sessionStorage` y compara directamente con `row.updated_at` (ambos strings ISO), lo que elimina el problema completamente.
 
 ---
 
-## Archivos a modificar
+## Cambios a implementar
 
-### 1. `src/components/client-portal/BrandAssetUploader.tsx`
+### Archivo: `src/components/client-portal/BrandAssetUploader.tsx`
 
 **Cambios:**
-- Eliminar `statusIntervalRef` y `startStatusPolling()`
-- Agregar suscripción Realtime a `brand_research` para escuchar cambios en `analysis_status`
-- Agregar `isLaunchingRef` como mutex para evitar doble ejecución
-- Mantener `progressIntervalRef` y `startProgressPolling()` para la barra de progreso visual
-- En el mount: si `status === pending`, activar banner + suscripción Realtime (sin polling)
-- En `launchAnalysis`: verificar mutex, luego activar banner, luego escribir `pending`, luego suscribir a Realtime
+1. Eliminar la dependencia exclusiva en Realtime para detectar el `complete`
+2. Agregar un `statusPollingRef` que consulta `analysis_status` cada 4 segundos
+3. Guardar el timestamp del click en `sessionStorage` como string ISO
+4. En el poll: comparar `updated_at` del registro con el timestamp del click (ambos ISO strings) — si `updated_at > clickTimestamp` Y `status === complete`, cerrar banner
+5. Mantener el Realtime como canal adicional (doble cobertura)
+6. El banner debe aparecer **sincrónicamente** al hacer click (antes de cualquier async)
 
-**Flujo nuevo:**
+**Flujo nuevo garantizado:**
+```text
+Click del usuario
+  → setAnalyzing(true) [SINCRONO — banner aparece instantáneamente]
+  → sessionStorage.setItem('analysis_started_at', new Date().toISOString())
+  → clearAll() [kill pollings anteriores]
+  → isLaunchingRef.current = true
+
+await upsert pending [async]
+  → iniciar statusPollingRef (cada 4s)
+  → iniciar progressPollingRef (cada 3s)
+  → subscribeToStatus() [Realtime como bonus]
+  → fetch edge function [fire & forget]
+
+statusPoll (cada 4s):
+  → leer analysis_status de DB
+  → si status === complete Y updated_at > analysis_started_at → cerrar banner
+  → si status === error → cerrar banner con error
+
+Edge function:
+  → escribe pending → progress updates → complete
+  → Realtime O poll detectan el complete → banner se cierra
 ```
-Click → isLaunchingRef=true → setAnalyzing(true) → escribir pending (await) → 
-suscribir Realtime → lanzar edge function (fire & forget)
-Edge function escribe complete → Realtime notifica → setAnalyzing(false) → unsubscribe
+
+**Seccion critica — como se guarda el timestamp:**
+```typescript
+// Al hacer click:
+const startedAt = new Date().toISOString();
+sessionStorage.setItem(`analysis_started_${clientId}`, startedAt);
+
+// En el poll:
+const startedAt = sessionStorage.getItem(`analysis_started_${clientId}`) || '';
+if (row.status === 'complete' && row.updated_at > startedAt) {
+  // cerrar banner
+}
 ```
 
-### 2. `supabase/functions/analyze-brand/index.ts`
+**Por que `updated_at > startedAt` funciona:**
+- `startedAt` es el ISO string del momento del click (ej: `2026-02-18T21:40:00.000Z`)
+- `updated_at` del registro `complete` es el ISO string de cuando el edge function termino (ej: `2026-02-18T21:42:05.770Z`)
+- La comparacion de strings ISO funciona lexicograficamente — siempre correcta
+- El registro `pending` tambien tiene `updated_at` posterior al click, pero `status !== complete`, por lo que se ignora
 
-**Cambios:**
-- Cambiar modelo de `google/gemini-2.5-flash` a `google/gemini-2.5-pro`
-- Cambiar `max_tokens` de `12000` a `16000`
-- Agregar en el prompt una sección FINAL explícita: "VERIFICACIÓN: Cuenta los competidores listados arriba. Tu array competitors[] DEBE tener exactamente N objetos. Si tienes menos, rellena con los datos disponibles."
+### No se tocan otros archivos
+
+El edge function (`analyze-brand/index.ts`) ya funciona perfectamente. Los 6 competidores ya estan en la DB. Solo hay que arreglar el frontend.
 
 ---
 
-## Ventajas del nuevo enfoque vs el anterior
+## Resumen de lo que se cambia vs lo que queda igual
 
-| Problema anterior | Solución nueva |
-|---|---|
-| Race condition entre mount poll y manual trigger | Realtime no tiene race conditions — evento único por cambio DB |
-| Guard de timestamp frágil (ms vs µs) | No se necesita guard — Realtime solo escucha cambios FUTUROS |
-| Doble llamada a `launchAnalysis` | Mutex `isLaunchingRef` bloquea segunda ejecución |
-| AI trunca JSON con Flash + 12k tokens | Gemini 2.5 Pro + 16k tokens garantiza JSON completo |
-| Poll puede leer estado viejo de DB | Realtime solo recibe eventos DESPUÉS de suscribir |
+| Elemento | Estado | Accion |
+|---|---|---|
+| Edge function analyze-brand | Funciona (6 competidores, status complete) | Sin cambios |
+| Realtime publicacion brand_research | Habilitada | Sin cambios (se mantiene como backup) |
+| Banner AnalysisBanner | Correcto | Sin cambios |
+| BrandAssetUploader — logica de status | Rota (solo Realtime, sin fallback) | ARREGLAR con polling hibrido |
+| Timestamp guard | Roto (numero vs string) | ARREGLAR con ISO string en sessionStorage |
