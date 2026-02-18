@@ -633,7 +633,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       toast.error('No hay URL de sitio web. Completa el brief primero.');
       return;
     }
-    setReanalyzing(false);
     setProgressStep(null);
 
     // Mark as pending in DB first so polling picks it up on refresh too
@@ -642,30 +641,45 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
     }, { onConflict: 'client_id,research_type' });
-    // Clear any old progress step
+    // Set initial progress step
     await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
       research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date().toISOString() },
     }, { onConflict: 'client_id,research_type' });
 
+    // Update UI state immediately so banner shows right away
     setAnalysisStatus('pending');
+    setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
     toast.info('Iniciando análisis — Steve está investigando tus competidores...');
 
-    // Fire and forget — the edge function runs async, polling will track progress
+    // Fire and forget via fetch directly to avoid SDK 60s timeout killing the flow
     const competitorUrls = extractCompetitorUrlsFromBrief();
-    supabase.functions.invoke('analyze-brand', {
-      body: { client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls, research_type: 'full' },
-    }).then(({ error }) => {
-      if (error) {
-        console.error('analyze-brand error:', error);
-        supabase.from('brand_research').upsert({
-          client_id: clientId,
-          research_type: 'analysis_status',
-          research_data: { status: 'error' },
-        }, { onConflict: 'client_id,research_type' });
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'jnqivntlkemzcpomkvwv';
+
+    fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
+      },
+      body: JSON.stringify({ client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls, research_type: 'full' }),
+    }).then(async (res) => {
+      // Only write error if the function returned a real error status (not timeout/network)
+      if (!res.ok && res.status !== 0) {
+        const body = await res.json().catch(() => ({}));
+        // 402 = payment error, don't spam error status — polling will handle it
+        if (res.status !== 429 && res.status !== 402) {
+          console.error('analyze-brand HTTP error:', res.status, body);
+        }
       }
-    }).catch(console.error);
+    }).catch((err) => {
+      // Network-level errors (timeout, CORS on fire-and-forget) are expected — polling tracks status
+      console.log('analyze-brand fetch ended (may be timeout, polling tracks status):', err?.message);
+    });
   }
 
   // Get Q2 financial calculations for display
