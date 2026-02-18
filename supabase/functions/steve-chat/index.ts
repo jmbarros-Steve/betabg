@@ -64,19 +64,19 @@ const BRAND_BRIEF_QUESTIONS = [
   },
   {
     id: 'persona_pain',
-    question: '**Pregunta 5 de 15 — SU DOLOR:** ¿Qué problema le quita el sueño a tu cliente ideal? ¿Qué le avergüenza de su situación actual con respecto a lo que TÚ vendes?',
-    examples: ['No encuentra pijamas que le queden bien y que no se desarmen en 2 lavados', 'Le da vergüenza abrir la puerta al delivery con la ropa rota que usa en casa', 'Siente que gasta plata en ropa interior que se ve vieja al mes'],
+    question: '**Pregunta 5 de 15 — SU DOLOR PROFUNDO:** Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:\n\n1. ¿Qué problema específico tiene?\n2. ¿Cómo lo ha intentado resolver antes?\n3. ¿Por qué esa solución anterior no le dio satisfacción completa?\n\nSé específico — piensa en situaciones concretas que vive tu cliente.',
+    examples: ['Compra pijamas baratos que se arruinan en 2 lavadas. Probó marcas más caras pero no se las pone porque "es ropa de casa". Le da vergüenza abrir la puerta con lo que usa.', 'Compra en fast fashion porque es barato, pero al mes parece viejo. Probó marcas premium pero siente que no vale la pena gastar en algo que "nadie ve".', 'Busca ropa de casa cómoda Y linda. Encuentra cómoda (pero fea) o linda (pero incómoda). Nunca las dos cosas juntas.'],
     fields: [],
     steveIntro: '*pone cara seria* 😰\n\n',
-    commentGuide: 'Analiza si el dolor es REAL y específico. Si es genérico, recházalo y pide algo más profundo con ejemplos de SU industria.',
+    commentGuide: 'Analiza si el dolor tiene TRES dimensiones: el problema, el intento fallido anterior y la frustración residual. Si falta alguna dimensión o es genérico, RECHAZA y pide más profundidad con ejemplos de SU industria.',
   },
   {
     id: 'persona_words',
-    question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? ¿Cuál es su excusa para NO comprarte? Quiero las FRASES LITERALES.',
-    examples: ['"Estoy chata de comprar cosas baratas que se rompen, pero $40.000 por un pijama es mucho"', '"Me da lata gastar en ropa de casa, total nadie me ve"', '"Siempre me pasa que me gusta algo online y cuando llega no es lo mismo"'],
+    question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame **2 o 3 frases literales distintas** — una queja habitual, una objeción de compra, y una frustración pasada. Quiero las FRASES TEXTUALES.',
+    examples: ['"Estoy chata de comprar cosas baratas que se rompen, pero $40.000 por un pijama es mucho" / "Me da lata gastar en ropa de casa, total nadie me ve" / "Siempre me pasa que me gusta algo online y cuando llega no es lo mismo"', '"Quiero algo lindo para estar en casa pero no encuentro nada que no parezca de hospital" / "Si lo veo por Instagram parece perfecto pero las fotos engañan" / "En mi familia siempre compramos lo que alcance, gastar en pijamas parece un lujo"'],
     fields: [],
     steveIntro: '*saca su libreta* 📝\n\n',
-    commentGuide: 'Analiza si las frases suenan REALES y textuales. Si son genéricas o suenan a "lenguaje de marketing", recházalas. Necesitas frases que un HUMANO REAL diría.',
+    commentGuide: 'VERIFICA que haya MÍNIMO 2 frases distintas y textuales. Si hay solo una frase, RECHAZA y pide al menos 2 más. Las frases deben sonar como HUMANOS REALES hablando — si suenan a copy de marketing, recházalas.',
   },
   {
     id: 'persona_transformation',
@@ -92,7 +92,7 @@ const BRAND_BRIEF_QUESTIONS = [
     examples: ['Compra en Zara y H&M, usa Netflix, scrollea Instagram y TikTok, sigue a influencers de lifestyle', 'Marca Apple, consume Starbucks, está en Pinterest y YouTube, sigue cuentas de interiorismo', 'Compra en Falabella y Shein, usa Spotify, está en Facebook y WhatsApp, sigue cuentas de humor'],
     fields: [],
     steveIntro: '*mueve la cola curioso*\n\n',
-    commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona y el ticket promedio. Comenta implicaciones para la estrategia de medios.',
+    commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona y el ticket promedio. ADEMÁS HAZ INFERENCIAS ACTIVAS: en base a lo que te dijeron (edad, ingreso, ocupación, ciudad), deduce qué marcas probablemente consume aunque no lo hayan dicho. Ej: si es profesional de 35-45 con ingresos altos en ciudad grande → iPhone, Mac, café de especialidad, Amazon, Netflix. Comenta implicaciones para la estrategia de medios.',
   },
   {
     id: 'competitors',
@@ -158,27 +158,27 @@ const BRAND_BRIEF_QUESTIONS = [
   },
   {
     id: 'proof_tone',
-    question: '**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes, antes/después, números de ventas)\n\n¿Y qué TONO de comunicación conecta con tu cliente? (informal, sofisticado, gracioso, técnico, emocional...)',
+    question: '**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes, antes/después, número de clientes)\n\n¿Y qué TONO de comunicación conecta con tu cliente? (informal, sofisticado, gracioso, técnico, emocional...)',
     examples: [
       'Tenemos 200 reviews en Google con promedio 4.8 — Tono cercano y gracioso, como hablar con tu mejor amiga',
       '5.000 clientes recurrentes, 40% recompra — Tono sofisticado pero accesible',
-      'Fotos de 50 clientas usando nuestros pijamas en stories — Tono fresco y juvenil, con memes',
+      'Fotos de clientas usando nuestros pijamas en stories — Tono fresco y juvenil, con memes',
     ],
     fields: [],
     steveIntro: '*olfatea buscando evidencia* 📸\n\n',
-    commentGuide: 'Evalúa si la prueba social es fuerte o débil. Sugiere cómo amplificarla. Comenta si el tono elegido es coherente con el buyer persona.',
+    commentGuide: 'Evalúa si la prueba social es fuerte o débil. Sugiere cómo amplificarla. Comenta si el tono elegido es coherente con el buyer persona. OJO: cuando el cliente mencione prueba social como "fotos de clientas en stories", NO repitas el número literalmente en el brief — redáctalo como "la marca cuenta con testimonios visuales de clientas reales en redes sociales".',
   },
   {
     id: 'brand_assets',
     question: '**Pregunta 15 de 15 — LOGO, FOTOS E IDENTIDAD VISUAL:**\n\n¡Última pregunta! Necesito ver tu marca EN ACCIÓN.\n\n📤 **Sube tu logo y fotos de productos en los botones que aparecen AQUÍ ABAJO en el chat** (NO necesitas ir a otra pestaña).\n\nLuego cuéntame aquí:\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n\n⚠️ **SIN LOGO Y SIN FOTOS NO PUEDO COMPLETAR UN BRIEF PROFESIONAL.**',
     examples: [
       'Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista — ya subí logo y fotos abajo',
-      'Verde y blanco, estilo natural y orgánico — subo el logo ahora mismo',
-      'Negro y rosa, estilo moderno y juvenil',
+      'Verde y blanco, estilo natural y orgánico — archivos subidos arriba',
+      'Negro y rosa, estilo moderno y juvenil — subí logo y 3 fotos de productos',
     ],
     fields: [],
     steveIntro: '*saca la cámara y ladra* 📸🐕\n\n',
-    commentGuide: 'Verifica que hayan subido assets (el sistema muestra botones de upload inline). Comenta los colores y estilo visual. Genera el BRIEF COMPLETO.',
+    commentGuide: 'Verifica que hayan subido assets (el sistema muestra botones de upload inline). Comenta los colores y estilo visual en tercera persona profesional. NUNCA incluyas en el brief frases como "subo el logo ahora mismo" o referencias al proceso del chat. Genera el BRIEF COMPLETO.',
   },
 ];
 
@@ -231,7 +231,7 @@ Cuando el sistema te dice que la siguiente pregunta tiene FORMULARIO:
 - Q5 = DOLOR del cliente (problemas, frustraciones)
 - Q6 = PALABRAS LITERALES del cliente (frases textuales, objeciones de compra)
 - Q7 = TRANSFORMACIÓN (vida después de comprarte)
-- Q8 = ESTILO DE VIDA (marcas que consume, dónde pasa tiempo, influencers)
+- Q8 = ESTILO DE VIDA (marcas que consume, dónde pasa tiempo, influencers) — INFERIR activamente en base a perfil demográfico
 - Q9 = COMPETIDORES (nombres + URLs) — formulario
 - Q10 = ANÁLISIS de competidores (promesas incumplidas) — formulario
 - Q11 = VENTAJA INCOPIABLE (qué no pueden copiar)
@@ -241,6 +241,20 @@ Cuando el sistema te dice que la siguiente pregunta tiene FORMULARIO:
 - Q15 = LOGO, FOTOS, COLORES — pide que suban archivos en pestaña Assets
 
 NUNCA pidas logos en Q12. NUNCA pidas competidores en Q7. NUNCA confundas categorías.
+
+═══════════════════════════════════════════════════════════════
+🚨🚨🚨 REGLA ABSOLUTA #4: DESCRIPCIÓN DEL NEGOCIO 🚨🚨🚨
+═══════════════════════════════════════════════════════════════
+Cuando el cliente describe su negocio, en el brief SIEMPRE redáctalo en TERCERA PERSONA:
+- CORRECTO: "La empresa comercializa pijamas de algodón 100% premium para mujeres..."
+- INCORRECTO: "Vendemos pijamas..." / "Mi empresa..." / "Nuestros productos..."
+
+═══════════════════════════════════════════════════════════════
+🚨🚨🚨 REGLA ABSOLUTA #5: PRUEBA SOCIAL 🚨🚨🚨
+═══════════════════════════════════════════════════════════════
+Al redactar prueba social en el brief:
+- NO copies números literales como "50 clientas" → redacta como "la marca cuenta con testimonio visual de clientas reales en redes sociales"
+- La prueba social es un ACTIVO DE CREDIBILIDAD, redáctalo como tal
 
 IMPORTANTE:
 - Responde SIEMPRE en español
@@ -295,10 +309,10 @@ FORMATO OBLIGATORIO (usa headers markdown ## para cada sección):
 [1-2 párrafos de conclusión ejecutiva que integre todo lo anterior. Formal, concluyente, sin repetir datos crudos.]
 
 ## 2. ADN DE MARCA
-- **Sector y vertical:** [análisis del sector y posicionamiento]
-- **Producto principal y propuesta de valor:** [redactada en tercera persona profesional, ej: "La marca comercializa pijamas de algodón 100% con certificación de calidad XYZ, posicionándose en el segmento premium del mercado de ropa de dormir."]
-- **Rango de precios y posicionamiento competitivo:** [análisis vs. competencia]
-- **Presencia digital y distribución:** [evaluación profesional]
+- **Sector y vertical:** [análisis del sector y posicionamiento de mercado]
+- **Producto principal y propuesta de valor:** [redactada en TERCERA PERSONA profesional — ej: "La marca comercializa pijamas de algodón 100% certificado, posicionándose en el segmento premium del mercado de ropa de hogar."]
+- **Rango de precios y posicionamiento competitivo:** [análisis del ticket vs. competencia y posicionamiento resultante]
+- **Presencia digital y distribución:** [evaluación profesional de canales y cobertura actual]
 
 ## 3. ANÁLISIS FINANCIERO
 | Indicador | Valor |
@@ -309,50 +323,63 @@ FORMATO OBLIGATORIO (usa headers markdown ## para cada sección):
 | Margen bruto unitario | $X (Y%) |
 | CPA máximo viable | $X |
 
-**Conclusión financiera:** [2 párrafos con CONCLUSIONES — NO repitas los datos. Analiza si el margen soporta inversión en marketing digital, compara el CPA con benchmarks de la industria (ej: CPA promedio en e-commerce de moda es $X), y da una recomendación clara de inversión óptima. Sé formal y concluyente.]
+**Conclusión financiera:** [2 párrafos con CONCLUSIONES — NO repitas los datos de la tabla. Analiza si el margen soporta inversión en marketing digital, compara el CPA con benchmarks de la industria (ej: CPA promedio en e-commerce de moda es $X), y da una recomendación clara de nivel de inversión óptimo. Sé formal y concluyente.]
 
 ## 4. PERFIL DEL CONSUMIDOR OBJETIVO
-- **Demográfico:** [edad, género, ubicación, ingreso con formato $X.XXX.XXX con separador de miles]
-- **Psicográfico:** [valores, aspiraciones, estilo de vida — en 1-2 líneas]
-- **Motivación de compra:** [por qué compra, qué busca resolver]
-- **Barreras:** [objeciones principales y cómo superarlas]
+- **Demográfico:** [edad, género, ubicación, ingreso SIEMPRE con formato $X.XXX.XXX con separador de miles — JAMÁS sin símbolo $]
+- **Dolor profundo:** [NO una frase. Explicar qué le ha pasado antes, cómo lo ha solucionado y por qué no logró satisfacción completa. Mínimo 3-4 líneas.]
+- **Lo que dice literalmente:** [2-3 frases textuales distintas que diría el cliente, en diferentes contextos — queja, objeción de compra, frustración histórica]
+- **Transformación:** [Qué logra o qué quiere lograr con la marca — específico para ESTA marca, no genérico]
+- **Estilo de vida inferido:** [Hacer inferencias activas basadas en edad, ingreso, ocupación y zona. Ej: "Probablemente usa iPhone y Mac; compra café en Starbucks; sigue cuentas de lifestyle en Instagram; consume Netflix". No copiar lo que dijo el cliente — INFERIR.]
+- **Barreras de compra:** [objeciones principales y cómo la marca las supera]
 
-**Conclusión del perfil:** [1 párrafo formal que sintetice quién es el consumidor y qué implica para la estrategia de comunicación.]
+**Conclusión del perfil:** [1 párrafo formal que sintetice quién es el consumidor, qué implica para la estrategia de comunicación y qué canales/mensajes son más efectivos para llegar a ella/él.]
 
 ## 5. ANÁLISIS COMPETITIVO ESTRATÉGICO
-[Para CADA competidor mencionado, redactar un análisis en prosa:
-- Posicionamiento actual en el mercado
-- Promesas de marca identificadas y brechas de cumplimiento
-- Ventajas y debilidades observadas
-- Diferenciación específica del cliente frente a este competidor
 
-Cerrar con: Huecos de mercado identificados y ventaja competitiva sostenible del cliente.]
+| Competidor | Promesa de Marca | Brecha Identificada | Diferenciador del Cliente |
+|---|---|---|---|
+| [Nombre 1] | [Qué promete] | [Qué no cumple] | [Cómo el cliente lo supera] |
+| [Nombre 2] | [Qué promete] | [Qué no cumple] | [Cómo el cliente lo supera] |
+| [Nombre 3] | [Qué promete] | [Qué no cumple] | [Cómo el cliente lo supera] |
+
+**Conclusión competitiva:** [1-2 párrafos formales con: (1) huecos de mercado identificados que los competidores no cubren, y (2) la ventaja competitiva sostenible del cliente. Concluir, no describir.]
 
 ## 6. ESTRATEGIA DE POSICIONAMIENTO Y DIFERENCIACIÓN
-- **Concepto diferenciador (Vaca Púrpura):** [redactado como estrategia de posicionamiento]
-- **Narrativa de marca:** [el antagonista del mercado vs. la propuesta del cliente]
+- **Concepto diferenciador (Vaca Púrpura):** [redactado como estrategia de posicionamiento — en tercera persona]
+- **Narrativa de marca:** [el antagonista del mercado vs. la propuesta del cliente — ej: "La marca posiciona al fast fashion desechable como adversario..."]
 - **Garantía diferenciadora:** [cómo elimina el riesgo percibido del consumidor]
-- **Capital de prueba social:** [evaluación de activos de credibilidad disponibles]
-- **Tono y personalidad de marca:** [guía de comunicación recomendada]
+- **Capital de prueba social:** [evaluación de activos de credibilidad disponibles — no poner "prueba de 50 clientes" sino "la marca cuenta con testimonio visual de X clientas..." como prueba social]
+- **Tono y personalidad de marca:** [guía de comunicación recomendada — concreto, no vago]
+- **Identidad visual:** [descripción profesional de colores, estilo y coherencia — NO poner "subo el logo ahora mismo" ni referencias al proceso del chat]
 
 ## 7. PLAN ESTRATÉGICO DE 90 DÍAS
 
 ### Fase 1: Días 1-30 — Fundamentos
-[3-4 acciones CONCRETAS y MEDIBLES. Ej: "Implementar pixel de Meta y Google Analytics 4 con eventos de conversión configurados para add_to_cart y purchase"]
+- [Acción concreta y medible, con KPI asociado]
+- [Acción concreta — priorizar puntos de diferenciación inmediatos o nuevos canales si hay concentración excesiva]
+- [Acción concreta]
 
 ### Fase 2: Días 31-60 — Activación
-[3-4 acciones de activación de campañas y contenido]
+- [Acción concreta de campañas/contenido con métricas claras]
+- [Acción concreta]
+- [Acción concreta]
 
 ### Fase 3: Días 61-90 — Optimización y Escalamiento
-[3-4 acciones de crecimiento basadas en datos]
+- [Acción basada en datos obtenidos en fases anteriores]
+- [Acción concreta de escala]
+- [Si hay concentración en un solo canal: acciones para diversificar con canales específicos]
 
 ### KPIs Recomendados
 | KPI | Meta | Plazo |
 |---|---|---|
-| [3-5 KPIs concretos y medibles] |
+| [KPI concreto y medible] | [número específico] | [días] |
+| [KPI 2] | [número] | [días] |
+| [KPI 3] | [número] | [días] |
 
 ### Riesgos y Mitigación
-[2-3 riesgos concretos con plan de mitigación]
+- **[Riesgo 1]:** [Mitigación concreta]
+- **[Riesgo 2]:** [Mitigación concreta]
 
 ---
 **Documento preparado por Dr. Steve Dogs**

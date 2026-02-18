@@ -13,6 +13,7 @@ import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BrandAssetUploader } from './BrandAssetUploader';
+import { SteveFeedbackPanel } from './SteveFeedbackPanel';
 import avatarSteve from '@/assets/avatar-steve.png';
 import personaFemale from '@/assets/persona-female.jpg';
 import personaMale from '@/assets/persona-male.jpg';
@@ -714,34 +715,52 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       )}
                     </div>
 
-                    {/* Persona details grid */}
-                    <div className="grid sm:grid-cols-2 gap-3">
+                     {/* Persona details grid — Dolor, palabras, transformación, estilo de vida */}
+                    <div className="space-y-3">
+                      {/* Dolor Principal — full width, con profundidad */}
                       <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
+                        <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <Heart className="h-3 w-3" /> Dolor Principal
                         </p>
-                        <p className="text-sm">{getResponse('persona_pain') || 'Pendiente'}</p>
+                        <p className="text-sm leading-relaxed">{getResponse('persona_pain') || 'Pendiente'}</p>
                       </div>
+
+                      {/* Lo que Dice — múltiples frases como bullets */}
                       <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
+                        <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <MessageSquare className="h-3 w-3" /> Lo que Dice
                         </p>
-                        <p className="text-sm italic">"{getResponse('persona_words') || 'Pendiente'}"</p>
+                        {getResponse('persona_words') ? (
+                          <ul className="space-y-1">
+                            {getResponse('persona_words').split(/\n|"[^"]*"/).filter(s => s.trim()).map((frase, i) => (
+                              <li key={i} className="text-sm italic text-muted-foreground">
+                                "{frase.replace(/^["']|["']$/g, '').trim()}"
+                              </li>
+                            ))}
+                          </ul>
+                        ) : <p className="text-sm text-muted-foreground italic">Pendiente</p>}
                       </div>
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
-                          <TrendingUp className="h-3 w-3" /> Transformación
-                        </p>
-                        <p className="text-sm">{getResponse('persona_transformation') || 'Pendiente'}</p>
+
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {/* Transformación */}
+                        <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+                          <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" /> Transformación
+                          </p>
+                          <p className="text-sm leading-relaxed">{getResponse('persona_transformation') || 'Pendiente'}</p>
+                        </div>
+
+                        {/* Estilo de vida — con inferencias */}
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
+                            <Gem className="h-3 w-3" /> Estilo de Vida
+                          </p>
+                          <p className="text-sm leading-relaxed">{getResponse('persona_lifestyle') || 'Pendiente'}</p>
+                        </div>
                       </div>
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
-                          <Gem className="h-3 w-3" /> Estilo de Vida
-                        </p>
-                        <p className="text-sm">{getResponse('persona_lifestyle') || 'Pendiente'}</p>
-                      </div>
+
                       {(personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra']) && (
-                        <div className="bg-primary/5 rounded-lg p-3 sm:col-span-2 border border-primary/10">
+                        <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
                           <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
                             <Target className="h-3 w-3" /> ¿Por qué Compra?
                           </p>
@@ -777,7 +796,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1.5">
                               {q.config?.icon}
                               {q.config?.label}
-                              {q.response && <CheckCircle2 className="h-3 w-3 text-green-500 ml-auto" />}
+                              {q.response && <CheckCircle2 className="h-3 w-3 text-primary ml-auto" />}
                             </div>
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">{q.response || <span className="text-muted-foreground italic">Pendiente</span>}</p>
                           </div>
@@ -833,6 +852,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Feedback Panel — visible when brief is complete */}
+            {isComplete && (
+              <SteveFeedbackPanel clientId={clientId} />
             )}
 
             {/* Signature */}
@@ -924,11 +948,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                             {comp.positioning && <p className="text-xs text-muted-foreground mb-2">{comp.positioning}</p>}
                             <div className="grid grid-cols-2 gap-3 mt-2">
                               <div>
-                                <p className="text-xs font-medium text-green-600 flex items-center gap-1 mb-1"><TrendingUp className="h-3 w-3" /> Fortalezas</p>
+                                <p className="text-xs font-medium text-primary flex items-center gap-1 mb-1"><TrendingUp className="h-3 w-3" /> Fortalezas</p>
                                 <ul className="text-xs space-y-0.5">{comp.strengths?.map((s: string, j: number) => <li key={j} className="text-muted-foreground">• {s}</li>)}</ul>
                               </div>
                               <div>
-                                <p className="text-xs font-medium text-red-500 flex items-center gap-1 mb-1"><TrendingDown className="h-3 w-3" /> Debilidades</p>
+                                <p className="text-xs font-medium text-destructive flex items-center gap-1 mb-1"><TrendingDown className="h-3 w-3" /> Debilidades</p>
                                 <ul className="text-xs space-y-0.5">{comp.weaknesses?.map((w: string, j: number) => <li key={j} className="text-muted-foreground">• {w}</li>)}</ul>
                               </div>
                             </div>
@@ -995,14 +1019,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 <div className="grid gap-4 md:grid-cols-2">
                   {research.seo_audit.issues?.length > 0 && (
                     <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-red-500"><AlertTriangle className="h-4 w-4" /> Problemas</CardTitle></CardHeader>
-                      <CardContent><ul className="text-sm space-y-1.5">{research.seo_audit.issues.map((issue: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="text-red-400 mt-0.5">⚠️</span><span>{issue}</span></li>)}</ul></CardContent>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Problemas</CardTitle></CardHeader>
+                      <CardContent><ul className="text-sm space-y-1.5">{research.seo_audit.issues.map((issue: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="text-destructive mt-0.5">⚠️</span><span>{issue}</span></li>)}</ul></CardContent>
                     </Card>
                   )}
                   {research.seo_audit.recommendations?.length > 0 && (
                     <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-green-600"><Lightbulb className="h-4 w-4" /> Recomendaciones</CardTitle></CardHeader>
-                      <CardContent><ul className="text-sm space-y-1.5">{research.seo_audit.recommendations.map((rec: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="text-green-500 mt-0.5">✅</span><span>{rec}</span></li>)}</ul></CardContent>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Lightbulb className="h-4 w-4" /> Recomendaciones</CardTitle></CardHeader>
+                      <CardContent><ul className="text-sm space-y-1.5">{research.seo_audit.recommendations.map((rec: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="text-primary mt-0.5">✅</span><span>{rec}</span></li>)}</ul></CardContent>
                     </Card>
                   )}
                 </div>
