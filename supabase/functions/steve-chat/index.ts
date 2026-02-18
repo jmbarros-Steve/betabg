@@ -698,7 +698,7 @@ NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes 
       }
     }
 
-    // If complete, update summary
+    // If complete, update summary and trigger automatic SEO/Keywords analysis
     if (isLastQuestion) {
       await supabase
         .from('buyer_personas')
@@ -711,6 +711,94 @@ NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes 
           is_complete: true,
         })
         .eq('client_id', client_id);
+
+      // Auto-trigger analyze-brand in background (fire and forget)
+      try {
+        // Get client info for website URL and competitor URLs
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('website_url')
+          .eq('id', client_id)
+          .single();
+
+        // Extract website URL from Q1 response (business_pitch)
+        const q1Response = userMessages[0]?.content || '';
+        const urlMatch = q1Response.match(/https?:\/\/[^\s,]+|www\.[^\s,]+|\b\w+\.(cl|com|net|store|shop|myshopify\.com)\b/i);
+        const websiteUrl = clientData?.website_url || (urlMatch ? urlMatch[0] : null);
+
+        // Extract competitor URLs from Q9 response (competitors)
+        const q9Response = userMessages[8]?.content || '';
+        const competitorUrls: string[] = [];
+        const urlMatches = q9Response.match(/https?:\/\/[^\s,]+|www\.[^\s,]+|\b\w+\.(cl|com|net|store|shop|myshopify\.com)\b/gi) || [];
+        for (const u of urlMatches.slice(0, 3)) {
+          const cleaned = u.startsWith('http') ? u : `https://${u}`;
+          competitorUrls.push(cleaned);
+        }
+
+        // Mark analysis as pending in brand_research
+        await supabase
+          .from('brand_research')
+          .upsert({
+            client_id,
+            research_type: 'analysis_status',
+            research_data: { status: 'pending', started_at: new Date().toISOString() },
+          }, { onConflict: 'client_id,research_type' });
+
+        // Call analyze-brand edge function asynchronously (don't await)
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const projectId = supabaseUrl.replace('https://', '').split('.')[0];
+        const analyzeUrl = `https://${projectId}.supabase.co/functions/v1/analyze-brand`;
+        
+        fetch(analyzeUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Content-Type': 'application/json',
+            'x-client-info': 'steve-chat-auto-trigger',
+          },
+          body: JSON.stringify({
+            client_id,
+            website_url: websiteUrl,
+            competitor_urls: competitorUrls,
+            research_type: 'full_analysis',
+          }),
+        }).then(async (r) => {
+          if (r.ok) {
+            console.log(`Auto analyze-brand completed for client ${client_id}`);
+            // Mark as complete
+            await supabase
+              .from('brand_research')
+              .upsert({
+                client_id,
+                research_type: 'analysis_status',
+                research_data: { status: 'complete', completed_at: new Date().toISOString() },
+              }, { onConflict: 'client_id,research_type' });
+          } else {
+            const errText = await r.text();
+            console.error(`Auto analyze-brand failed: ${r.status}`, errText);
+            await supabase
+              .from('brand_research')
+              .upsert({
+                client_id,
+                research_type: 'analysis_status',
+                research_data: { status: 'error', error: `HTTP ${r.status}` },
+              }, { onConflict: 'client_id,research_type' });
+          }
+        }).catch(async (err) => {
+          console.error('Auto analyze-brand fetch error:', err);
+          await supabase
+            .from('brand_research')
+            .upsert({
+              client_id,
+              research_type: 'analysis_status',
+              research_data: { status: 'error', error: String(err) },
+            }, { onConflict: 'client_id,research_type' });
+        });
+
+        console.log(`Auto analyze-brand triggered for client ${client_id}, website: ${websiteUrl}`);
+      } catch (autoAnalyzeErr) {
+        console.error('Error triggering auto analyze-brand:', autoAnalyzeErr);
+      }
     }
 
     // Next question fields & examples
