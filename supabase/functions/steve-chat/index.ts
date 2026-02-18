@@ -170,15 +170,15 @@ const BRAND_BRIEF_QUESTIONS = [
   },
   {
     id: 'brand_assets',
-    question: '**Pregunta 15 de 15 — LOGO, FOTOS E IDENTIDAD VISUAL:**\n\n¡Última pregunta! Necesito ver tu marca EN ACCIÓN. Ve a la pestaña **Assets** del portal y sube:\n\n1. 📤 **TU LOGO** (obligatorio)\n2. 📤 **3-5 FOTOS** de tus mejores productos o equipo\n3. 🌐 **Tu página web** (la que me diste en la Pregunta 1)\n4. 🔍 **Las webs de tus 3 competidores** (de la Pregunta 9)\n\nLuego cuéntame aquí:\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n\n⚠️ **SIN LOGO Y SIN FOTOS DE PRODUCTO NO PUEDO COMPLETAR UN BRIEF PROFESIONAL.** El brief debe ser presentable ante un gerente de marketing.',
+    question: '**Pregunta 15 de 15 — LOGO, FOTOS E IDENTIDAD VISUAL:**\n\n¡Última pregunta! Necesito ver tu marca EN ACCIÓN.\n\n📤 **Sube tu logo y fotos de productos en los botones que aparecen AQUÍ ABAJO en el chat** (NO necesitas ir a otra pestaña).\n\nLuego cuéntame aquí:\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n\n⚠️ **SIN LOGO Y SIN FOTOS NO PUEDO COMPLETAR UN BRIEF PROFESIONAL.**',
     examples: [
-      'Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista — ya subí logo y fotos en Assets',
+      'Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista — ya subí logo y fotos abajo',
       'Verde y blanco, estilo natural y orgánico — subo el logo ahora mismo',
-      'Negro y rosa, estilo moderno y juvenil — las fotos las cargo en la pestaña Assets',
+      'Negro y rosa, estilo moderno y juvenil',
     ],
     fields: [],
     steveIntro: '*saca la cámara y ladra* 📸🐕\n\n',
-    commentGuide: 'Verifica que hayan subido assets. Comenta los colores y estilo visual. Genera el BRIEF COMPLETO.',
+    commentGuide: 'Verifica que hayan subido assets (el sistema muestra botones de upload inline). Comenta los colores y estilo visual. Genera el BRIEF COMPLETO.',
   },
 ];
 
@@ -256,80 +256,94 @@ interface ChatMessage {
 
 // Brief generation template (injected when all 15 questions are answered)
 const BRIEF_TEMPLATE = `
-GENERA EL BRIEF ESTRATÉGICO COMPLETO.
+GENERA EL BRIEF ESTRATÉGICO COMPLETO. ESTE DOCUMENTO SERÁ DESCARGADO COMO PDF PROFESIONAL.
 
-REGLAS DE REDACCIÓN OBLIGATORIAS:
-1. TODO en TERCERA PERSONA ("La marca...", "El negocio...", "Se recomienda...", "El cliente objetivo...")
-2. TONO de consultoría profesional. Como si fuera un documento de McKinsey o BCG.
-3. NO copies textualmente lo que el cliente respondió. ANALIZA, SINTETIZA, y REDACTA como consultor estratégico.
-4. NO uses emojis ni jerga perruna en el brief (eso es para el chat). El brief es SERIO.
-5. Incluye DATOS CONCRETOS y MÉTRICAS cuando las tengas.
-6. COMPARA explícitamente con la competencia mencionada.
+═══════════════════════════════════════
+REGLAS DE REDACCIÓN ABSOLUTAS:
+═══════════════════════════════════════
 
-Formato:
+1. TODO en TERCERA PERSONA PROFESIONAL:
+   - CORRECTO: "La marca se posiciona como...", "El consumidor objetivo presenta...", "Se recomienda implementar..."
+   - INCORRECTO: "Vendemos...", "Tu cliente...", "Yo creo que..."
+
+2. TONO McKinsey/BCG — Documento de consultoría estratégica:
+   - Frases completas y bien estructuradas, no bullet points sueltos
+   - Cada sección debe tener 2-4 párrafos de análisis PROFUNDO
+   - NO copies lo que dijo el cliente. ANALIZA, CONTEXTUALIZA y SINTETIZA como un consultor senior.
+
+3. CERO emojis, CERO jerga perruna, CERO informalidad. El brief es un documento EJECUTIVO.
+
+4. DATOS CONCRETOS: Incluye métricas, porcentajes, benchmarks de industria cuando sea posible.
+
+5. COMPARACIÓN con la competencia en CADA sección relevante.
+
+6. El resumen ejecutivo DEBE ser completo (mínimo 4 párrafos), NO se corta a la mitad.
+
+7. El plan de 90 días DEBE tener acciones CONCRETAS y MEDIBLES, NO generalidades.
+
+FORMATO OBLIGATORIO (usa headers markdown ## para cada sección):
 
 ## 1. RESUMEN EJECUTIVO
-[3-4 párrafos de análisis estratégico en tercera persona. Evalúa el posicionamiento actual, las oportunidades de mercado, la viabilidad financiera y la recomendación estratégica principal. NO repitas respuestas del cliente. ANALIZA y SINTETIZA como un consultor senior.]
+[Mínimo 4 párrafos. Evalúa: posicionamiento actual del negocio en su vertical, oportunidades de mercado identificadas, viabilidad financiera del modelo (usa los datos de Q2), y la recomendación estratégica principal. Compara con competidores. Esto debe leerse como un executive summary de McKinsey — completo, profesional, con conclusiones claras.]
 
 ## 2. ADN DE MARCA
-- **Sector / Vertical:** [análisis del sector]
-- **Producto estrella:** [con contexto de mercado]
-- **Propuesta de Valor Única (USP):** [redactada profesionalmente]
-- **Rango de precios y posicionamiento:** [análisis vs. competencia]
-- **Presencia digital:** [evaluación]
-- **Distribución por canales:** [con análisis de oportunidades]
+- **Sector y vertical:** [análisis del sector y posicionamiento]
+- **Producto principal y propuesta de valor:** [redactada en tercera persona profesional, ej: "La marca comercializa pijamas de algodón 100% con certificación de calidad XYZ, posicionándose en el segmento premium del mercado de ropa de dormir."]
+- **Rango de precios y posicionamiento competitivo:** [análisis vs. competencia]
+- **Presencia digital y distribución:** [evaluación profesional]
 
 ## 3. ANÁLISIS FINANCIERO
-| Métrica | Valor |
+| Indicador | Valor |
 |---|---|
 | Ticket promedio | $X |
-| Costo producto | $X |
-| Costo envío | $X |
-| Margen bruto | $X (Y%) |
-| CPA Máximo Viable | $X |
-| Inversión actual en ads | $X |
-| Volumen mensual | X unidades |
+| Costo del producto | $X |
+| Costo de envío | $X |
+| Margen bruto unitario | $X (Y%) |
+| CPA máximo viable | $X |
+| Inversión publicitaria actual | $X |
+| Volumen mensual estimado | X unidades |
 
-**Evaluación financiera:** [Análisis de si el modelo soporta inversión en marketing digital. Comparar CPA con benchmarks de la industria. Recomendación de inversión.]
+**Evaluación de viabilidad financiera:** [2 párrafos analizando si el modelo soporta inversión en marketing digital, comparando el CPA con benchmarks de la industria, y recomendación de nivel de inversión óptimo.]
 
 ## 4. PERFIL DEL CONSUMIDOR OBJETIVO
-[Describe el buyer persona en tercera persona como un perfil profesional de investigación de mercado. Incluye datos demográficos, psicográficos, comportamiento de compra, motivaciones profundas y barreras de compra. Redáctalo como un estudio de mercado, NO como una lista.]
+[Redactar como un perfil de investigación de mercado en tercera persona. NO como lista. Ej: "El consumidor objetivo de la marca corresponde a mujeres entre 30 y 45 años, residentes en zonas urbanas de la Región Metropolitana y Valparaíso, con un ingreso mensual promedio de $X. Este perfil demográfico se caracteriza por..."
+
+Incluir: datos demográficos, perfil psicográfico, patrones de consumo, motivaciones de compra, barreras y objeciones principales, y la transformación que busca. Todo en prosa profesional.]
 
 ## 5. ANÁLISIS COMPETITIVO ESTRATÉGICO
-Para cada competidor analizado:
-- Posicionamiento actual
-- Promesas de marca incumplidas (oportunidades)
-- Ventajas y debilidades
-- Cómo se diferencia [nombre del cliente] de cada uno
+[Para CADA competidor mencionado, redactar un análisis en prosa:
+- Posicionamiento actual en el mercado
+- Promesas de marca identificadas y brechas de cumplimiento
+- Ventajas y debilidades observadas
+- Diferenciación específica del cliente frente a este competidor
 
-**Huecos de mercado identificados:** [análisis de oportunidades sin explotar]
-**Ventaja competitiva sostenible:** [lo que no pueden copiar]
+Cerrar con: Huecos de mercado identificados y ventaja competitiva sostenible del cliente.]
 
 ## 6. ESTRATEGIA DE POSICIONAMIENTO Y DIFERENCIACIÓN
-- **Concepto diferenciador (Vaca Púrpura):** [redactado como estrategia]
-- **Narrativa de marca:** [el villano vs. el héroe]
-- **Garantía diferenciadora:** [cómo elimina el riesgo percibido]
-- **Prueba social disponible:** [evaluación de assets de credibilidad]
-- **Tono y personalidad de marca:** [guía de comunicación]
+- **Concepto diferenciador (Vaca Púrpura):** [redactado como estrategia de posicionamiento]
+- **Narrativa de marca:** [el antagonista del mercado vs. la propuesta del cliente]
+- **Garantía diferenciadora:** [cómo elimina el riesgo percibido del consumidor]
+- **Capital de prueba social:** [evaluación de activos de credibilidad disponibles]
+- **Tono y personalidad de marca:** [guía de comunicación recomendada]
 
-## 7. PLAN ESTRATÉGICO RECOMENDADO
+## 7. PLAN ESTRATÉGICO DE 90 DÍAS
 
-### Fase 1: Primeros 30 días (Quick Wins)
-[3-4 acciones concretas y medibles]
+### Fase 1: Días 1-30 — Fundamentos
+[3-4 acciones CONCRETAS y MEDIBLES. Ej: "Implementar pixel de Meta y Google Analytics 4 con eventos de conversión configurados para add_to_cart y purchase"]
 
-### Fase 2: Días 31-60 (Consolidación)
-[3-4 acciones de mediano plazo]
+### Fase 2: Días 31-60 — Activación
+[3-4 acciones de activación de campañas y contenido]
 
-### Fase 3: Días 61-90 (Escalamiento)
-[3-4 acciones de crecimiento]
+### Fase 3: Días 61-90 — Optimización y Escalamiento
+[3-4 acciones de crecimiento basadas en datos]
 
 ### KPIs Recomendados
 | KPI | Meta | Plazo |
 |---|---|---|
-[3-5 KPIs medibles]
+| [3-5 KPIs concretos y medibles] |
 
-### Riesgos Identificados
-[2-3 riesgos con recomendaciones de mitigación]
+### Riesgos y Mitigación
+[2-3 riesgos concretos con plan de mitigación]
 
 ---
 **Documento preparado por Dr. Steve Dogs**
@@ -547,7 +561,7 @@ NO preguntes NADA que no sea la Pregunta ${nextQuestionIndex + 1}. NO anticipes 
 
     console.log(`Steve chat: conversation ${activeConversationId}, answered ${answeredQuestions}/${BRAND_BRIEF_QUESTIONS.length}`);
 
-    const maxTokens = isLastQuestion ? 3000 : 1200;
+    const maxTokens = isLastQuestion ? 4500 : 1200;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

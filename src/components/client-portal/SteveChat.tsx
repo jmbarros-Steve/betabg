@@ -67,6 +67,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [showAssetUpload, setShowAssetUpload] = useState(false);
   const [uploadingAssets, setUploadingAssets] = useState<string | null>(null);
   const [uploadedAssets, setUploadedAssets] = useState<{ logo: string[]; products: string[] }>({ logo: [], products: [] });
+  // Delay showing the next interaction block so user can read Steve's response
+  const [showInteraction, setShowInteraction] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -84,7 +86,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
         }
       }, 100);
     }
-  }, [messages, currentFields, showAssetUpload]);
+  }, [messages, currentFields, showAssetUpload, showInteraction]);
 
   // Show asset upload when we're on Q15
   useEffect(() => {
@@ -93,6 +95,20 @@ export function SteveChat({ clientId }: SteveChatProps) {
       loadExistingAssets();
     }
   }, [progress.answered]);
+
+  // Delay interaction elements after new assistant message so user reads first
+  useEffect(() => {
+    if (isLoading) {
+      setShowInteraction(false);
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      const timer = setTimeout(() => setShowInteraction(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, messages.length]);
 
   async function loadExistingAssets() {
     if (!user) return;
@@ -235,6 +251,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setExamples([]);
     setCurrentFields([]);
     setFieldValidation(undefined);
+    setShowInteraction(false);
     
     const tempUserMsg: Message = {
       id: crypto.randomUUID(),
@@ -388,7 +405,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-6">
+        <div className="space-y-5">
           {messages.map((message) => (
             <div key={message.id}>
               {message.role === 'user' ? (
@@ -465,85 +482,90 @@ export function SteveChat({ clientId }: SteveChatProps) {
         </div>
       </ScrollArea>
 
-      {/* Asset Upload for Q15 */}
-      {showAssetUpload && !isComplete && !isLoading && (
-        <div className="px-4 pb-2 flex-shrink-0 border-t pt-3">
-          <p className="text-xs font-medium text-muted-foreground mb-2">📸 Sube tus archivos aquí (obligatorio para el brief):</p>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            {/* Logo upload */}
-            <div className="bg-muted/50 rounded-lg p-3 border border-border">
-              <p className="text-xs font-medium mb-2">🎨 Logo</p>
-              {uploadedAssets.logo.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {uploadedAssets.logo.map((url, i) => (
-                    <div key={i} className="relative group">
-                      <img src={url} alt="Logo" className="h-12 w-12 object-contain rounded border border-border bg-background" />
-                      <button onClick={() => handleDeleteAsset('logo', url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="h-3 w-3" />
-                      </button>
+      {/* Interaction area — delayed appearance so user reads Steve's answer */}
+      {showInteraction && (
+        <>
+          {/* Asset Upload for Q15 — inline in chat */}
+          {showAssetUpload && !isComplete && !isLoading && (
+            <div className="px-4 pb-2 flex-shrink-0 border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <p className="text-xs font-medium text-muted-foreground mb-2">📸 Sube tus archivos aquí (obligatorio para el brief):</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {/* Logo upload */}
+                <div className="bg-muted/50 rounded-lg p-3 border border-border">
+                  <p className="text-xs font-medium mb-2">🎨 Logo</p>
+                  {uploadedAssets.logo.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {uploadedAssets.logo.map((url, i) => (
+                        <div key={i} className="relative group">
+                          <img src={url} alt="Logo" className="h-12 w-12 object-contain rounded border border-border bg-background" />
+                          <button onClick={() => handleDeleteAsset('logo', url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : null}
+                  <input type="file" ref={logoInputRef} accept="image/*" onChange={e => handleAssetUpload('logo', e.target.files)} className="hidden" />
+                  <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'logo'} onClick={() => logoInputRef.current?.click()}>
+                    {uploadingAssets === 'logo' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> {uploadedAssets.logo.length > 0 ? 'Cambiar' : 'Subir Logo'}</>}
+                  </Button>
                 </div>
-              ) : null}
-              <input type="file" ref={logoInputRef} accept="image/*" onChange={e => handleAssetUpload('logo', e.target.files)} className="hidden" />
-              <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'logo'} onClick={() => logoInputRef.current?.click()}>
-                {uploadingAssets === 'logo' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> {uploadedAssets.logo.length > 0 ? 'Cambiar' : 'Subir Logo'}</>}
-              </Button>
-            </div>
 
-            {/* Product photos upload */}
-            <div className="bg-muted/50 rounded-lg p-3 border border-border">
-              <p className="text-xs font-medium mb-2">📷 Fotos Productos</p>
-              {uploadedAssets.products.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {uploadedAssets.products.map((url, i) => (
-                    <div key={i} className="relative group">
-                      <img src={url} alt={`Producto ${i+1}`} className="h-12 w-12 object-cover rounded border border-border" />
-                      <button onClick={() => handleDeleteAsset('products', url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="h-3 w-3" />
-                      </button>
+                {/* Product photos upload */}
+                <div className="bg-muted/50 rounded-lg p-3 border border-border">
+                  <p className="text-xs font-medium mb-2">📷 Fotos Productos</p>
+                  {uploadedAssets.products.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {uploadedAssets.products.map((url, i) => (
+                        <div key={i} className="relative group">
+                          <img src={url} alt={`Producto ${i+1}`} className="h-12 w-12 object-cover rounded border border-border" />
+                          <button onClick={() => handleDeleteAsset('products', url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : null}
+                  <input type="file" ref={photosInputRef} accept="image/*" multiple onChange={e => handleAssetUpload('products', e.target.files)} className="hidden" />
+                  <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'products'} onClick={() => photosInputRef.current?.click()}>
+                    {uploadingAssets === 'products' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> Subir Fotos ({uploadedAssets.products.length})</>}
+                  </Button>
                 </div>
-              ) : null}
-              <input type="file" ref={photosInputRef} accept="image/*" multiple onChange={e => handleAssetUpload('products', e.target.files)} className="hidden" />
-              <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'products'} onClick={() => photosInputRef.current?.click()}>
-                {uploadingAssets === 'products' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> Subir Fotos ({uploadedAssets.products.length})</>}
-              </Button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Structured Fields Form */}
-      {hasStructuredFields && (
-        <div className="px-4 pb-2 flex-shrink-0">
-          <p className="text-xs text-muted-foreground mb-2">📝 Llena los campos y envía tu respuesta:</p>
-          <StructuredFieldsForm
-            fields={currentFields}
-            validation={fieldValidation}
-            onSubmit={handleStructuredSubmit}
-            isLoading={isLoading}
-          />
-        </div>
-      )}
+          {/* Structured Fields Form */}
+          {hasStructuredFields && (
+            <div className="px-4 pb-2 flex-shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <p className="text-xs text-muted-foreground mb-2">📝 Llena los campos y envía tu respuesta:</p>
+              <StructuredFieldsForm
+                fields={currentFields}
+                validation={fieldValidation}
+                onSubmit={handleStructuredSubmit}
+                isLoading={isLoading}
+              />
+            </div>
+          )}
 
-      {/* Example Suggestions */}
-      {examples.length > 0 && !hasStructuredFields && !isLoading && !isComplete && (
-        <div className="px-4 pb-2 flex-shrink-0">
-          <p className="text-xs text-muted-foreground mb-2">💡 Ejemplos (haz clic para usar):</p>
-          <div className="flex flex-wrap gap-2">
-            {examples.map((example, i) => (
-              <button
-                key={i}
-                onClick={() => handleExampleClick(example)}
-                className="text-xs bg-muted hover:bg-accent border border-border rounded-full px-3 py-1.5 text-left transition-colors max-w-full truncate"
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-        </div>
+          {/* Example Suggestions */}
+          {examples.length > 0 && !hasStructuredFields && !isLoading && !isComplete && (
+            <div className="px-4 pb-2 flex-shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <p className="text-xs text-muted-foreground mb-2">💡 Ejemplos (haz clic para usar):</p>
+              <div className="flex flex-wrap gap-2">
+                {examples.map((example, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleExampleClick(example)}
+                    className="text-xs bg-muted hover:bg-accent border border-border rounded-full px-3 py-1.5 text-left transition-colors max-w-full truncate"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Input */}
@@ -558,7 +580,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
               Crear nuevo Brief
             </Button>
           </div>
-        ) : hasStructuredFields ? (
+        ) : hasStructuredFields && showInteraction ? (
           <p className="text-xs text-center text-muted-foreground py-2">
             ☝️ Completa los campos arriba para continuar
           </p>
