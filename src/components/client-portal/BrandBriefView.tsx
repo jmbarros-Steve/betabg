@@ -2130,7 +2130,141 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
           {/* ===== SEO TAB ===== */}
           <TabsContent value="seo" className="space-y-4">
-            {/* Re-analyze button */}
+            {!hasSEO ? (
+              <Card className="text-center py-10">
+                <CardContent>
+                  <p className="text-muted-foreground text-sm">Ejecuta el análisis de marca para ver la auditoría SEO.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">📊 Puntuación SEO</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-4">
+                      <div className="text-4xl font-bold text-primary">{research.seo_audit.score ?? '?'}<span className="text-lg text-muted-foreground">/100</span></div>
+                      <div>
+                        <p className="text-sm font-medium">{(research.seo_audit.score || 0) >= 70 ? '✅ Bueno' : (research.seo_audit.score || 0) >= 40 ? '⚠️ Regular' : '❌ Crítico'}</p>
+                        <p className="text-xs text-muted-foreground">{research.seo_audit.issues?.length || 0} problemas · {research.seo_audit.recommendations?.length || 0} acciones</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {research.seo_audit.issues?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">⚠️ Problemas Detectados</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1">
+                        {research.seo_audit.issues.slice(0, 8).map((issue: string, i: number) => (
+                          <li key={i} className="text-sm flex items-start gap-2"><span className="text-destructive">•</span>{issue == null ? '' : String(issue)}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+                {research.seo_audit.recommendations?.length > 0 && (
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">✅ Acciones Prioritarias</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1">
+                        {research.seo_audit.recommendations.slice(0, 8).map((rec: string, i: number) => (
+                          <li key={i} className="text-sm flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />{rec == null ? '' : String(rec)}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* ===== KEYWORDS TAB ===== */}
+          <TabsContent value="keywords" className="space-y-4">
+            {!hasKeywords ? (
+              <Card className="text-center py-10">
+                <CardContent>
+                  <p className="text-muted-foreground text-sm">Ejecuta el análisis de marca para ver las keywords.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {research.keywords?.primary?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">🎯 Keywords Principales</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1.5">
+                        {research.keywords.primary.map((kw: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs">{kw == null ? '' : String(kw)}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {research.keywords?.long_tail?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">🔍 Long-tail (Baja Competencia)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1.5">
+                        {research.keywords.long_tail.map((kw: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{kw == null ? '' : String(kw)}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {research.keywords?.competitor_keywords?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">🏆 Keywords de Competidores</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1.5">
+                        {research.keywords.competitor_keywords.map((kw: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs border-destructive/30 text-destructive">{kw == null ? '' : String(kw)}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {research.keywords?.negative_keywords?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">🚫 Keywords Negativas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1.5">
+                        {research.keywords.negative_keywords.map((kw: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs text-muted-foreground">{kw == null ? '' : String(kw)}</Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {research.keywords?.recommended_strategy && (
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia Recomendada</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm leading-relaxed">{research.keywords.recommended_strategy}</p>
+                    </CardContent>
+                  </Card>
+                )}
+                {research.keywords?.strategy && (
+                  <KeywordStrategyTimeline strategy={research.keywords.strategy} />
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* ===== RESEARCH / COMPETENCIA TAB ===== */}
+          <TabsContent value="research" className="space-y-4">
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
                 {analysisStatus === 'pending' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
