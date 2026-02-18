@@ -310,8 +310,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build competitor list: 3 from brief/explicit + up to 3 auto-detected
-    const clientProvidedUrls = [...new Set([...briefCompetitorUrls, ...(competitor_urls || [])])].slice(0, 3);
+    // Build competitor list: 3 from explicit (frontend) + brief fallback + up to 3 auto-detected
+    // Priority: competitor_urls from frontend FIRST, then fill remaining from brief
+    const explicitUrls = (competitor_urls || []).filter((u: string) => u.trim());
+    const remainingSlots = 3 - Math.min(explicitUrls.length, 3);
+    const fillFromBrief = briefCompetitorUrls.filter(u => !explicitUrls.some((e: string) => e.includes(u.replace('https://','').replace('http://','').split('/')[0]))).slice(0, remainingSlots);
+    const clientProvidedUrls = [...new Set([...explicitUrls, ...fillFromBrief])].slice(0, 3);
     let allCompetitorUrls = [...clientProvidedUrls];
 
     if (firecrawlApiKey) {
