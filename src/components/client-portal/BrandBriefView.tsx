@@ -2182,6 +2182,83 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* SEO por Competidor */}
+                {research.competitor_analysis?.competitors?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-primary" />
+                        SEO por Competidor
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {research.competitor_analysis.competitors.map((comp: any, i: number) => (
+                        <div key={i} className="border border-border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
+                              <span className="font-semibold text-sm">{comp.name || comp.url || `Competidor ${i + 1}`}</span>
+                            </div>
+                            {comp.seo_score != null && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground">SEO Score:</span>
+                                <span className={`text-sm font-bold ${Number(comp.seo_score) >= 70 ? 'text-primary' : Number(comp.seo_score) >= 40 ? 'text-yellow-600' : 'text-destructive'}`}>
+                                  {comp.seo_score}/100
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {comp.url && (
+                            <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline block">{comp.url}</a>
+                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            {comp.strengths?.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Fortalezas</p>
+                                <ul className="text-xs space-y-0.5">
+                                  {comp.strengths.map((s: string, j: number) => (
+                                    <li key={j} className="flex items-start gap-1"><span className="text-primary">•</span>{s == null ? '' : String(s)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {comp.weaknesses?.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">Debilidades</p>
+                                <ul className="text-xs space-y-0.5">
+                                  {comp.weaknesses.map((w: string, j: number) => (
+                                    <li key={j} className="flex items-start gap-1"><span className="text-destructive">•</span>{w == null ? '' : String(w)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                          {comp.value_proposition && (
+                            <div className="bg-primary/5 rounded p-2">
+                              <p className="text-[10px] font-semibold text-primary mb-0.5">Propuesta de Valor</p>
+                              <p className="text-xs">{comp.value_proposition}</p>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {comp.price_positioning && (
+                              <div className="bg-muted/50 rounded px-2 py-1 text-xs">
+                                <span className="text-muted-foreground">Precio: </span>
+                                <span className="font-semibold">{comp.price_positioning}</span>
+                              </div>
+                            )}
+                            {(comp.ad_strategy_inferred || comp.ad_strategy) && (
+                              <div className="bg-muted/50 rounded px-2 py-1 text-xs">
+                                <span className="text-muted-foreground">Estrategia Ads: </span>
+                                <span className="font-semibold">{comp.ad_strategy_inferred || comp.ad_strategy}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </TabsContent>
@@ -2264,6 +2341,46 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 )}
                 {research.keywords?.strategy && (
                   <KeywordStrategyTimeline strategy={String(research.keywords.strategy)} />
+                )}
+
+                {/* Keywords por Competidor */}
+                {research.competitor_analysis?.competitors?.some((c: any) => c.keywords?.length > 0 || c.keyword_strategy) && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-primary" />
+                        Keywords por Competidor
+                      </CardTitle>
+                      <CardDescription className="text-xs">Keywords detectadas en cada competidor analizado</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {research.competitor_analysis.competitors.map((comp: any, i: number) => {
+                        const compKeywords: string[] = Array.isArray(comp.keywords) ? comp.keywords : [];
+                        const hasCompKw = compKeywords.length > 0 || comp.keyword_strategy;
+                        if (!hasCompKw) return null;
+                        return (
+                          <div key={i} className="border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
+                              <span className="font-semibold text-sm">{comp.name || comp.url || `Competidor ${i + 1}`}</span>
+                            </div>
+                            {compKeywords.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {compKeywords.map((kw: any, j: number) => (
+                                  <Badge key={j} variant="outline" className="text-xs border-yellow-400/50 text-yellow-700 dark:text-yellow-400">
+                                    {kw == null ? '' : String(kw)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            {comp.keyword_strategy && (
+                              <p className="text-xs text-muted-foreground leading-relaxed">{String(comp.keyword_strategy)}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
                 )}
               </>
             )}
