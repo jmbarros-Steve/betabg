@@ -203,20 +203,23 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   async function launchAnalysis(url: string, compUrls: string[]) {
     if (!url.trim()) return;
 
-    await supabase.from('brand_research').upsert({
+    // Show banner IMMEDIATELY — before any async calls
+    analyzingRef.current = true;
+    setAnalyzing(true);
+    setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
+
+    // Persist status & progress (async, don't await before showing banner)
+    supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
     }, { onConflict: 'client_id,research_type' });
-    await supabase.from('brand_research').upsert({
+    supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
       research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date().toISOString() },
     }, { onConflict: 'client_id,research_type' });
 
-    analyzingRef.current = true;
-    setAnalyzing(true);
-    setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
     startPolling();
 
     const { data: { session } } = await supabase.auth.getSession();

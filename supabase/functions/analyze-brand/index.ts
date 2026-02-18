@@ -357,33 +357,28 @@ Deno.serve(async (req) => {
             const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query: searchQuery, limit: 10, lang: 'es', country }),
+              // Use limit:15 so we have enough candidates after filtering
+              body: JSON.stringify({ query: searchQuery, limit: 15, lang: 'es', country }),
             });
             if (searchResp.ok) {
               const searchData = await searchResp.json();
-              const results: string[] = (searchData?.data || [])
-                .map((r: any) => {
-                  // Always use just the root domain (ignore paths/query strings from search results)
-                  try {
-                    const parsed = new URL(r.url?.startsWith('http') ? r.url : `https://${r.url}`);
-                    return `https://${parsed.hostname}`;
-                  } catch { return null; }
-                })
-                .filter((u: string | null): u is string => {
-                  if (!u) return false;
-                  try {
-                    const hostname = new URL(u).hostname.replace('www.', '');
-                    if (seenHosts.has(hostname)) return false;
-                    // Check against blocklist
-                    if (BLOCKED_DOMAINS.some(blocked => hostname.includes(blocked))) return false;
-                    // Must look like a real regional store TLD
-                    if (!hostname.match(/\.(cl|com|com\.ar|mx|pe|co|ar|store|shop)$/)) return false;
-                    seenHosts.add(hostname);
-                    return true;
-                  } catch { return false; }
-                })
-                .slice(0, 3 - foundUrls.length);
-              foundUrls.push(...results);
+              const candidates = (searchData?.data || searchData?.results || []);
+              for (const r of candidates) {
+                if (foundUrls.length >= 3) break;
+                const rawUrl = r.url || r.link || '';
+                if (!rawUrl) continue;
+                try {
+                  // Always normalize to root hostname — ignore paths/querystrings
+                  const parsed = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+                  const rootUrl = `https://${parsed.hostname}`;
+                  const hostname = parsed.hostname.replace('www.', '');
+                  if (seenHosts.has(hostname)) continue;
+                  if (BLOCKED_DOMAINS.some(blocked => hostname.includes(blocked))) continue;
+                  if (!hostname.match(/\.(cl|com|com\.ar|mx|pe|co|ar|store|shop|net)$/)) continue;
+                  seenHosts.add(hostname);
+                  foundUrls.push(rootUrl);
+                } catch { continue; }
+              }
             }
           } catch (e) {
             console.error('Search query failed:', searchQuery, e);
