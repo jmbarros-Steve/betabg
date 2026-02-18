@@ -317,33 +317,52 @@ Deno.serve(async (req) => {
     if (firecrawlApiKey) {
       try {
         await updateProgress('detectando', 'Detectando competidores adicionales en el mercado...', 20);
-        const searchQuery = `competidores ${client.name} ${client.company || ''} e-commerce Chile tienda online similar`;
-        const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: searchQuery, limit: 10, lang: 'es', country: 'cl' }),
-        });
-        if (searchResp.ok) {
-          const searchData = await searchResp.json();
-          const foundUrls: string[] = (searchData?.data || [])
-            .map((r: any) => r.url as string)
-            .filter((u: string) => {
-              if (!u) return false;
-              try {
-                const hostname = new URL(u.startsWith('http') ? u : `https://${u}`).hostname;
-                if (website_url && u.includes(hostname)) return false;
-              } catch { return false; }
-              if (allCompetitorUrls.some(cu => {
-                const cuHost = cu.replace('https://', '').replace('http://', '').split('/')[0];
-                return u.includes(cuHost);
-              })) return false;
-              return true;
-            })
-            .slice(0, 3);
-          allCompetitorUrls = [...allCompetitorUrls, ...foundUrls];
-          console.log('Auto-detected additional competitors:', foundUrls);
-          console.log('Total to analyze:', allCompetitorUrls.length);
+        // Try multiple search strategies to find additional competitors
+        const searchQueries = [
+          `${client.name} ${client.company || ''} tienda online competidores similares`,
+          `comprar ${client.name} alternativas tiendas online`,
+          `${client.company || client.name} e-commerce similar store`,
+        ];
+        const seenHosts = new Set(allCompetitorUrls.map(u => {
+          try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace('www.', ''); } catch { return u; }
+        }));
+        if (website_url) {
+          try { seenHosts.add(new URL(website_url.startsWith('http') ? website_url : `https://${website_url}`).hostname.replace('www.', '')); } catch {}
         }
+
+        const foundUrls: string[] = [];
+        for (const searchQuery of searchQueries) {
+          if (foundUrls.length >= 3) break;
+          try {
+            const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: searchQuery, limit: 8, lang: 'es', country: 'cl' }),
+            });
+            if (searchResp.ok) {
+              const searchData = await searchResp.json();
+              const results: string[] = (searchData?.data || [])
+                .map((r: any) => r.url as string)
+                .filter((u: string) => {
+                  if (!u) return false;
+                  try {
+                    const hostname = new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace('www.', '');
+                    if (seenHosts.has(hostname)) return false;
+                    if (hostname.includes('google') || hostname.includes('facebook') || hostname.includes('instagram') || hostname.includes('twitter') || hostname.includes('youtube') || hostname.includes('wikipedia')) return false;
+                    seenHosts.add(hostname);
+                    return true;
+                  } catch { return false; }
+                })
+                .slice(0, 3 - foundUrls.length);
+              foundUrls.push(...results);
+            }
+          } catch (e) {
+            console.error('Search query failed:', searchQuery, e);
+          }
+        }
+        allCompetitorUrls = [...allCompetitorUrls, ...foundUrls];
+        console.log('Auto-detected additional competitors:', foundUrls);
+        console.log('Total to analyze:', allCompetitorUrls.length);
       } catch (e) {
         console.error('Auto competitor detection error:', e);
       }
@@ -397,7 +416,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: 'Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses ```json ni ```. Solo el JSON puro y completo.' },
           { role: 'user', content: analysisPrompt },
