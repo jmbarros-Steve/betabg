@@ -633,34 +633,39 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       toast.error('No hay URL de sitio web. Completa el brief primero.');
       return;
     }
-    setReanalyzing(true);
+    setReanalyzing(false);
     setProgressStep(null);
-    // Mark as pending
+
+    // Mark as pending in DB first so polling picks it up on refresh too
     await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
     }, { onConflict: 'client_id,research_type' });
+    // Clear any old progress step
+    await supabase.from('brand_research').upsert({
+      client_id: clientId,
+      research_type: 'analysis_progress',
+      research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date().toISOString() },
+    }, { onConflict: 'client_id,research_type' });
+
     setAnalysisStatus('pending');
-    toast.info('Iniciando análisis con los 6 competidores (3 tuyos + 3 detectados)...');
-    try {
-      const competitorUrls = extractCompetitorUrlsFromBrief();
-      const { error } = await supabase.functions.invoke('analyze-brand', {
-        body: { client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls, research_type: 'full' },
-      });
-      if (error) throw error;
-      toast.success('¡Re-análisis completado! Ahora verás los 6 competidores.');
-      setAnalysisStatus('complete');
-      setProgressStep(null);
-      await fetchResearch();
-    } catch (err) {
-      console.error(err);
-      toast.error('Error al re-analizar. Intenta de nuevo.');
-      setAnalysisStatus('error');
-      setProgressStep(null);
-    } finally {
-      setReanalyzing(false);
-    }
+    toast.info('Iniciando análisis — Steve está investigando tus competidores...');
+
+    // Fire and forget — the edge function runs async, polling will track progress
+    const competitorUrls = extractCompetitorUrlsFromBrief();
+    supabase.functions.invoke('analyze-brand', {
+      body: { client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls, research_type: 'full' },
+    }).then(({ error }) => {
+      if (error) {
+        console.error('analyze-brand error:', error);
+        supabase.from('brand_research').upsert({
+          client_id: clientId,
+          research_type: 'analysis_status',
+          research_data: { status: 'error' },
+        }, { onConflict: 'client_id,research_type' });
+      }
+    }).catch(console.error);
   }
 
   // Get Q2 financial calculations for display
@@ -2093,341 +2098,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           <TabsContent value="seo" className="space-y-4">
             {/* Re-analyze button */}
             <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={reanalyzing || analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
-                {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                {reanalyzing ? 'Analizando 6 competidores…' : 'Re-analizar (6 competidores)'}
-              </Button>
-            </div>
-            {!hasSEO ? (
-              <Card className="text-center py-10">
-                <CardContent>
-                  <Globe className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="font-semibold mb-2">Sin Auditoría SEO</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Ve a la pestaña <strong>Assets</strong> e ingresa tu URL para generar el análisis automático.</p>
-                  <Button variant="outline" size="sm" onClick={() => document.querySelector('[value="assets"]')?.dispatchEvent(new MouseEvent('click'))}>
-                    Ir a Assets
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Score Card */}
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold">Score SEO Global</h3>
-                        <p className="text-xs text-muted-foreground">{clientInfo?.website_url}</p>
-                      </div>
-                       <div className={`text-5xl font-bold ${
-                        (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
-                        (research.seo_audit.score || 0) >= 40 ? 'text-warning' : 'text-destructive'
-                      }`}>
-                        {research.seo_audit.score || '?'}<span className="text-lg text-muted-foreground">/100</span>
-                      </div>
-                    </div>
-                    <Progress value={research.seo_audit.score || 0} className="h-3 mb-4" />
-                    <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                      <div className="bg-destructive/10 rounded-lg p-3">
-                        <p className="text-destructive font-bold text-xl">{research.seo_audit.issues?.length || 0}</p>
-                        <p className="text-muted-foreground">Problemas</p>
-                      </div>
-                      <div className="bg-primary/5 rounded-lg p-3">
-                        <p className="text-primary font-bold text-xl">{research.seo_audit.recommendations?.length || 0}</p>
-                        <p className="text-muted-foreground">Acciones</p>
-                      </div>
-                      <div className={`rounded-lg p-3 ${
-                        (research.seo_audit.score || 0) >= 70 ? 'bg-primary/10' :
-                        (research.seo_audit.score || 0) >= 40 ? 'bg-secondary' : 'bg-destructive/10'
-                      }`}>
-                        <p className={`font-bold text-xl ${
-                          (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
-                          (research.seo_audit.score || 0) >= 40 ? 'text-warning' : 'text-destructive'
-                        }`}>{(research.seo_audit.score || 0) >= 70 ? 'Bueno' : (research.seo_audit.score || 0) >= 40 ? 'Regular' : 'Crítico'}</p>
-                        <p className="text-muted-foreground">Estado</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {research.seo_audit.issues?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Problemas Detectados</CardTitle></CardHeader>
-                      <CardContent>
-                        <ul className="text-sm space-y-2">
-                          {research.seo_audit.issues.map((issue: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2 bg-destructive/5 rounded p-2">
-                              <span className="text-destructive mt-0.5 flex-shrink-0">⚠️</span>
-                              <span className="text-sm">{issue}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-                  {research.seo_audit.recommendations?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Lightbulb className="h-4 w-4" /> Acciones Prioritarias</CardTitle></CardHeader>
-                      <CardContent>
-                        <ul className="text-sm space-y-2">
-                          {research.seo_audit.recommendations.map((rec: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2 bg-primary/5 rounded p-2">
-                              <span className="text-primary mt-0.5 flex-shrink-0">✅</span>
-                              <span className="text-sm">{rec}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  {research.seo_audit.meta_analysis && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5 text-primary"><BarChart3 className="h-3.5 w-3.5" /> Meta & Estructura</CardTitle></CardHeader>
-                      <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{research.seo_audit.meta_analysis}</p></CardContent>
-                    </Card>
-                  )}
-                  {research.seo_audit.content_quality && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5 text-primary"><FileText className="h-3.5 w-3.5" /> Calidad de Contenido</CardTitle></CardHeader>
-                      <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{research.seo_audit.content_quality}</p></CardContent>
-                    </Card>
-                  )}
-                  {research.seo_audit.mobile_readiness && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5 text-primary"><Globe className="h-3.5 w-3.5" /> Mobile & Velocidad</CardTitle></CardHeader>
-                      <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{research.seo_audit.mobile_readiness}</p></CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {research.seo_audit.competitive_seo_gap && (
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Trophy className="h-4 w-4" /> GAP SEO vs Competencia</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm leading-relaxed">{research.seo_audit.competitive_seo_gap}</p></CardContent>
-                  </Card>
-                )}
-
-                {/* Competitor SEO Comparison Table */}
-                {research.competitor_analysis?.competitors?.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4 text-primary" />
-                        Análisis SEO Comparativo — Tu Marca vs Competencia
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">Benchmark realizado con criterios: estructura, contenido, H1/H2, velocidad estimada, propuesta de valor. Estándar Semrush/Moz/Ahrefs.</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-primary text-primary-foreground">
-                              <th className="text-left p-2 rounded-tl-lg font-semibold">Marca</th>
-                              <th className="text-center p-2 font-semibold">Score SEO</th>
-                              <th className="text-left p-2 font-semibold">Posicionamiento</th>
-                              <th className="text-center p-2 font-semibold">Precio</th>
-                              <th className="text-left p-2 rounded-tr-lg font-semibold">Tech Stack</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {/* Client row */}
-                            <tr className="bg-primary/10 border border-primary/30 font-semibold">
-                              <td className="p-2 font-bold text-primary">{clientInfo?.name || 'Tu Marca'} ★</td>
-                              <td className="p-2 text-center">
-                                <span className={`inline-flex items-center justify-center w-10 h-6 rounded font-bold text-primary-foreground text-xs ${
-                                  (research.seo_audit?.score || 0) >= 70 ? 'bg-primary' :
-                                  (research.seo_audit?.score || 0) >= 40 ? 'bg-secondary border border-border text-foreground' : 'bg-destructive'
-                                }`}>{research.seo_audit?.score || '?'}</span>
-                              </td>
-                              <td className="p-2 text-muted-foreground text-xs">{research.seo_audit?.content_quality?.slice(0, 80) || 'Ver auditoría detallada'}</td>
-                              <td className="p-2 text-center">—</td>
-                              <td className="p-2 text-muted-foreground">{clientInfo?.website_url?.includes('shopify') ? 'Shopify' : 'Sitio propio'}</td>
-                            </tr>
-                            {/* Competitor rows */}
-                            {research.competitor_analysis.competitors.slice(0, 5).map((comp: any, i: number) => {
-                              const compScore = Math.max(20, Math.min(90, (research.seo_audit?.score || 50) + Math.round((Math.sin(i * 2.1) * 20))));
-                              return (
-                                <tr key={i} className={i % 2 === 0 ? 'bg-muted/30' : 'bg-background'}>
-                                  <td className="p-2 font-medium">{comp.name || comp.url}</td>
-                                  <td className="p-2 text-center">
-                                    <span className={`inline-flex items-center justify-center w-10 h-6 rounded font-bold text-primary-foreground text-xs ${
-                                      compScore >= 70 ? 'bg-primary' : compScore >= 40 ? 'bg-secondary border border-border text-foreground' : 'bg-destructive'
-                                    }`}>{compScore}</span>
-                                  </td>
-                                  <td className="p-2 text-muted-foreground">{(comp.positioning || comp.value_proposition || '').slice(0, 80)}</td>
-                                  <td className="p-2 text-center text-muted-foreground">{comp.price_positioning || '—'}</td>
-                                  <td className="p-2 text-muted-foreground">{comp.tech_stack || '—'}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="mt-3 flex gap-3 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary inline-block opacity-80"></span> 70–100: Bueno</span>
-                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-secondary border border-border inline-block"></span> 40–69: Regular</span>
-                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-destructive inline-block opacity-70"></span> 0–39: Crítico</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          {/* ===== KEYWORDS TAB ===== */}
-          <TabsContent value="keywords" className="space-y-4">
-            {/* Re-analyze button */}
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={reanalyzing || analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
-                {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                {reanalyzing ? 'Analizando 6 competidores…' : 'Re-analizar (6 competidores)'}
-              </Button>
-            </div>
-            {!hasKeywords ? (
-              <Card className="text-center py-10">
-                <CardContent>
-                  <Key className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="font-semibold mb-2">Sin Análisis de Keywords</h3>
-                  <p className="text-sm text-muted-foreground">Ejecuta el análisis desde Assets para ver keywords.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  {research.keywords.primary?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Keywords Principales</CardTitle></CardHeader>
-                      <CardContent><div className="flex flex-wrap gap-1.5">{research.keywords.primary.map((kw: string, i: number) => <Badge key={i} variant="default" className="text-xs">{kw}</Badge>)}</div></CardContent>
-                    </Card>
-                  )}
-                  {research.keywords.long_tail?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Search className="h-4 w-4 text-primary" /> Long-tail (Baja Competencia)</CardTitle></CardHeader>
-                      <CardContent><div className="flex flex-wrap gap-1.5">{research.keywords.long_tail.map((kw: string, i: number) => <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>)}</div></CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  {research.keywords.competitor_keywords?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5 text-primary" /> De Competidores</CardTitle></CardHeader>
-                      <CardContent><div className="flex flex-wrap gap-1">{research.keywords.competitor_keywords.map((kw: string, i: number) => <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>)}</div></CardContent>
-                    </Card>
-                  )}
-                  {research.keywords.negative_keywords?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Keywords Negativas</CardTitle></CardHeader>
-                      <CardContent><div className="flex flex-wrap gap-1">{research.keywords.negative_keywords.map((kw: string, i: number) => <Badge key={i} variant="outline" className="text-xs border-destructive text-destructive">{kw}</Badge>)}</div></CardContent>
-                    </Card>
-                  )}
-                  {research.keywords.seasonal_keywords?.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-primary" /> Estacionales</CardTitle></CardHeader>
-                      <CardContent><div className="flex flex-wrap gap-1">{research.keywords.seasonal_keywords.map((kw: string, i: number) => <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>)}</div></CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {research.keywords.google_ads_match_types && (
-                  <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Match Types para Google Ads</CardTitle></CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-xs font-semibold text-primary mb-1.5">Exacta [exact]</p>
-                          <div className="space-y-1">{(research.keywords.google_ads_match_types.exact || []).map((kw: string, i: number) => <p key={i} className="text-xs font-mono bg-muted rounded px-2 py-1">{kw}</p>)}</div>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-primary mb-1.5">Frase "phrase"</p>
-                          <div className="space-y-1">{(research.keywords.google_ads_match_types.phrase || []).map((kw: string, i: number) => <p key={i} className="text-xs font-mono bg-muted rounded px-2 py-1">{kw}</p>)}</div>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-primary mb-1.5">Amplia +modificada</p>
-                          <div className="space-y-1">{(research.keywords.google_ads_match_types.broad_modified || []).map((kw: string, i: number) => <p key={i} className="text-xs font-mono bg-muted rounded px-2 py-1">{kw}</p>)}</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {research.keywords.recommended_strategy && (
-                  <KeywordStrategyTimeline strategy={research.keywords.recommended_strategy} />
-                )}
-
-                {/* Competitor SEO + Keywords comparison table */}
-                {research.competitor_analysis?.competitors?.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Trophy className="h-4 w-4 text-primary" />
-                        SEO de la Competencia — Análisis de Keywords por Rival
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">Comparación de estrategia de keywords y posicionamiento detectado en cada competidor.</p>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {research.competitor_analysis.competitors.slice(0, 5).map((comp: any, i: number) => (
-                        <div key={i} className="border border-border rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-bold text-foreground">{comp.name || comp.url}</h4>
-                            {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline">{comp.url}</a>}
-                          </div>
-                          {comp.positioning && (
-                            <p className="text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-2">{comp.positioning}</p>
-                          )}
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            {comp.value_proposition && (
-                              <div className="bg-primary/5 rounded p-2">
-                                <p className="font-semibold text-primary text-[10px] mb-0.5">Propuesta de Valor</p>
-                                <p className="text-muted-foreground">{comp.value_proposition}</p>
-                              </div>
-                            )}
-                           {(comp.ad_strategy_inferred || comp.ad_strategy) && (
-                              <div className="bg-muted/50 rounded p-2">
-                                <p className="font-semibold text-[10px] mb-0.5">Estrategia Ads</p>
-                                <p className="text-muted-foreground">{comp.ad_strategy_inferred || comp.ad_strategy}</p>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {comp.tech_stack && <Badge variant="outline" className="text-[10px]">{comp.tech_stack}</Badge>}
-                            {comp.price_positioning && <Badge variant="secondary" className="text-[10px]">Precio: {comp.price_positioning}</Badge>}
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Keywords gap vs competitors */}
-                      {research.keywords.competitor_keywords?.length > 0 && (
-                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
-                          <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
-                            <Key className="h-3 w-3" /> Keywords de Competidores que debes atacar
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {research.keywords.competitor_keywords.map((kw: string, i: number) => (
-                              <Badge key={i} variant="outline" className="text-xs border-primary/40 text-primary">{kw}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* ===== COMPETENCIA TAB (includes Competitor + Ads Library) ===== */}
-          <TabsContent value="research" className="space-y-4">
-            {/* Re-analyze button */}
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={reanalyzing || analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
-                {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                {reanalyzing ? 'Analizando 6 competidores…' : 'Re-analizar (6 competidores)'}
+              <Button variant="outline" size="sm" onClick={handleReanalyze} disabled={analysisStatus === 'pending'} className="flex items-center gap-2 text-xs">
+                {analysisStatus === 'pending' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {analysisStatus === 'pending' ? 'Analizando competidores…' : 'Re-analizar (6 competidores)'}
               </Button>
             </div>
             {!hasCompetitors && !research.ads_library_analysis ? (
