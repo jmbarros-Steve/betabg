@@ -24,7 +24,8 @@ import {
   Building2, Users, Trophy, MessageSquare, DollarSign, Store,
   Target, Heart, Shield, TrendingUp, Gem, Gift,
   Search, Globe, BarChart3, Key, Megaphone, Image,
-  Sparkles, Award, AlertTriangle, TrendingDown, Lightbulb, MapPin, Briefcase
+  Sparkles, Award, AlertTriangle, TrendingDown, Lightbulb, MapPin, Briefcase,
+  ArrowRight, Zap, Rocket, LayoutDashboard
 } from 'lucide-react';
 
 interface BrandBriefViewProps {
@@ -74,7 +75,6 @@ const SECTIONS = [
   { id: 'estrategia', title: 'Estrategia', icon: MessageSquare },
 ];
 
-// Parse persona profile from Q4 response — handles both structured form and text format
 function parsePersonaProfile(response: string): Record<string, string> {
   const profile: Record<string, string> = {};
   const lines = response.split('\n');
@@ -97,18 +97,19 @@ function detectGender(personaData: Record<string, string>): 'female' | 'male' {
   return 'male';
 }
 
-// Format raw responses into professional third person text
-// Format currency with $ and thousand separators (Chilean style: $1.500.000)
 function formatCurrency(value: string | number): string {
   const num = typeof value === 'string' ? parseInt(value.replace(/[^\d]/g, ''), 10) : value;
   if (isNaN(num)) return String(value);
   return '$' + num.toLocaleString('es-CL');
 }
 
-function formatResponseProfessional(qId: string, response: string): string {
-  if (!response) return '';
-  // Clean emoji prefixes from form submissions
-  return response.replace(/^[🎨📷🌐🔍💰📦🚚📣📊🛒🏪🏬📱📸👥👤🎂⚧📍💼💍🎯1️⃣2️⃣3️⃣✅]+\s*/gm, '').trim();
+// Parse Q2 financial data from response
+function parseFinancials(response: string): { price: number; cost: number; shipping: number } | null {
+  const numbers = response.match(/\$?\d[\d.,]*/g)?.map(n => parseFloat(n.replace(/[$.]/g, '').replace(',', '.'))) || [];
+  if (numbers.length >= 2) {
+    return { price: numbers[0] || 0, cost: numbers[1] || 0, shipping: numbers[2] || 0 };
+  }
+  return null;
 }
 
 export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
@@ -185,7 +186,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     setAssets(loaded);
   }
 
-  // Get persona data for the buyer persona card
   const personaResponse = briefData?.questions && briefData?.raw_responses
     ? briefData.raw_responses[briefData.questions.indexOf('persona_profile')] || ''
     : '';
@@ -198,6 +198,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const idx = briefData.questions.indexOf(questionId);
     return idx >= 0 ? briefData.raw_responses[idx] || '' : '';
   }
+
+  // Get Q2 financial calculations for display
+  const q2Response = getResponse('numbers');
+  const financials = parseFinancials(q2Response);
+  const margin = financials ? financials.price - financials.cost - financials.shipping : null;
+  const marginPct = financials && margin !== null ? ((margin / financials.price) * 100).toFixed(1) : null;
+  const cpaMax = margin !== null ? (margin * 0.3).toFixed(0) : null;
 
   async function loadImageAsBase64(src: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -227,10 +234,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const maxWidth = pageWidth - margin * 2;
     let y = 15;
 
-    const brandR = 30, brandG = 58, brandB = 138;
-    const accentR = 79, accentG = 70, accentB = 229;
+    const brandR = 26, brandG = 35, brandB = 126; // #1a237e
+    const accentR = 161, accentG = 120, accentB = 25; // gold
 
-    // Helper functions
     const checkPage = (needed: number) => { if (y + needed > pageHeight - 25) { doc.addPage(); y = 20; } };
 
     const addSectionHeader = (num: string, title: string) => {
@@ -291,25 +297,21 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     };
 
     // === COVER / HEADER ===
-    // Top bar
     doc.setFillColor(brandR, brandG, brandB);
     doc.rect(0, 0, pageWidth, 3, 'F');
 
-    // Logo
     try {
       const logoSrc = clientInfo?.logo_url || assets.logo[0] || logo;
       const logoBase64 = await loadImageAsBase64(logoSrc);
       doc.addImage(logoBase64, 'JPEG', margin, y + 2, 28, 11);
     } catch {}
-    
-    // Date right-aligned
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     doc.text(new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' }), pageWidth - margin, y + 8, { align: 'right' });
     y += 18;
 
-    // Title block
     doc.setFillColor(brandR, brandG, brandB);
     doc.roundedRect(margin, y, maxWidth, 16, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
@@ -318,7 +320,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.text('BRIEF ESTRATÉGICO DE MARCA', pageWidth / 2, y + 10.5, { align: 'center' });
     y += 22;
 
-    // Client info
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(brandR, brandG, brandB);
@@ -340,7 +341,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // === 1. RESUMEN EJECUTIVO ===
     if (briefData.summary) {
       addSectionHeader('1', 'RESUMEN EJECUTIVO');
-      // Strip informal preamble before first ## header
       let cleanSummary = briefData.summary;
       const firstHeader = cleanSummary.indexOf('## ');
       if (firstHeader > 0) cleanSummary = cleanSummary.slice(firstHeader);
@@ -348,18 +348,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         .replace(/#{1,4}\s+/g, '\n')
         .replace(/\*\*/g, '')
         .replace(/\*/g, '');
-      // Split into sections and render cleanly
       const sections = cleanSummary.split(/\n+/).filter(p => p.trim());
-      for (const section of sections.slice(0, 40)) {
+      // Only show sections 1-5 in this block, not the action plan
+      const section7Start = sections.findIndex(s => s.match(/7\.\s*EVALUACI/i));
+      const sliceEnd = section7Start > 0 ? section7Start : Math.min(sections.length, 60);
+      for (const section of sections.slice(0, sliceEnd)) {
         const trimmed = section.trim();
         if (!trimmed) continue;
-        // Skip table separator lines
         if (trimmed.match(/^\|[\s-:]+\|/)) continue;
-        // Detect if it's a section header
         if (trimmed.match(/^\d+\.\s+[A-ZÁÉÍÓÚ]/) || trimmed.match(/^[A-ZÁÉÍÓÚ\s]{5,}$/)) {
           addSubTitle(trimmed);
         } else if (trimmed.startsWith('|')) {
-          // Table rows — format as clean key-value
           const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
           if (cells.length >= 2) {
             addKeyValue(cells[0].trim(), cells[1].trim());
@@ -374,21 +373,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     addSectionHeader('2', 'ADN DE MARCA');
     const q1 = getResponse('business_pitch');
     if (q1) { addSubTitle('Descripción del Negocio'); addBody(q1); }
-    
+
     const q2 = getResponse('numbers');
-    if (q2) {
+    if (q2 && financials && margin !== null) {
       addSubTitle('Indicadores Financieros Clave');
-      // Parse and display as clean key-value pairs
-      const nums = q2.split('\n').filter(l => l.trim());
-      for (const line of nums) {
-        const clean = line.replace(/^[💰📦🚚📣📊]+\s*/, '');
-        const kv = clean.match(/^(.+?):\s*(.+)$/);
-        if (kv) {
-          addKeyValue(kv[1].trim(), kv[2].trim());
-        } else {
-          addBody(clean);
-        }
-      }
+      addKeyValue('Precio de Venta', formatCurrency(financials.price));
+      addKeyValue('Costo del Producto', formatCurrency(financials.cost));
+      addKeyValue('Costo de Envío', formatCurrency(financials.shipping));
+      addKeyValue('Margen Bruto', `${formatCurrency(margin)} (${marginPct}%)`);
+      addKeyValue('CPA Máximo Viable', `$${cpaMax}`);
     }
 
     const q3 = getResponse('sales_channels');
@@ -403,8 +396,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     // === 3. BUYER PERSONA ===
     addSectionHeader('3', 'PERFIL DEL CONSUMIDOR OBJETIVO');
-    
-    // Persona image
+
     try {
       const pImg = await loadImageAsBase64(personaImage);
       checkPage(35);
@@ -417,7 +409,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const profileIncome = personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '';
       const profileFamily = personaProfile['estado civil / familia'] || personaProfile['familia'] || '';
       const profileWhy = personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra'] || '';
-      
+
       let px = margin + 28;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
@@ -432,10 +424,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (profileIncome) { doc.text(`Ingreso mensual: ${formatCurrency(profileIncome)}`, px, py); py += 4; }
       if (profileFamily) { doc.text(`${profileFamily}`, px, py); py += 4; }
       if (profileWhy) { doc.text(`Motivación: ${profileWhy}`, px, py); py += 4; }
-      
+
       y = Math.max(y + 25, py + 2);
     } catch {
-      // Fallback: text-only persona
       const q4 = getResponse('persona_profile');
       if (q4) addBody(q4);
     }
@@ -469,17 +460,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const assetsResp = getResponse('brand_assets');
     if (assetsResp) { addSubTitle('Identidad Visual'); addBody(assetsResp); }
 
-    // === 6. EVALUACIÓN ESTRATÉGICA ===
+    // === 6. EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES ===
     if (briefData.summary) {
-      addSectionHeader('6', 'EVALUACIÓN ESTRATÉGICA Y PLAN DE ACCIÓN');
-      // Strip preamble and already-rendered sections (1-5)
+      addSectionHeader('6', 'EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS');
       let planText = briefData.summary;
-      const firstHeader = planText.indexOf('## ');
-      if (firstHeader > 0) planText = planText.slice(firstHeader);
-      // Find section 6 or 7 to start from
+      // Find section 7 (Evaluación)
+      const section7Match = planText.match(/##\s*7\./);
       const section6Match = planText.match(/##\s*6\./);
-      if (section6Match && section6Match.index !== undefined) {
-        planText = planText.slice(section6Match.index);
+      const startMatch = section7Match || section6Match;
+      if (startMatch && startMatch.index !== undefined) {
+        planText = planText.slice(startMatch.index);
       }
       const planLines = planText.split('\n').filter(l => l.trim());
       for (const line of planLines) {
@@ -487,9 +477,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           .replace(/^#+\s*/, '')
           .replace(/\*\*/g, '');
         if (!trimmed) continue;
-        // Skip table separator lines
         if (trimmed.match(/^\|[\s-:]+\|$/)) continue;
-        if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^(Fase|KPI|Riesgo|Meta|Plazo)/i)) {
+        if (trimmed.match(/^Accionable\s+\d+/i) || trimmed.match(/^\d+\.\s/) || trimmed.match(/^(Fase|KPI|Riesgo|Meta|Plazo|Qué hacer|Por qué|Responsable)/i)) {
           addSubTitle(trimmed);
         } else if (trimmed.startsWith('|')) {
           const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
@@ -532,7 +521,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.text('Director de Estrategia, BG Consult', margin, y); y += 3.5;
     doc.text(`Firmado digitalmente: ${new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, y);
 
-    // Footer on all pages
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -541,7 +529,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setFontSize(7);
       doc.setTextColor(255, 255, 255);
       doc.text(`BG Consult — Brief Estratégico de Marca | Confidencial | Pág ${i}/${pageCount}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
-      // Top accent bar
       doc.setFillColor(brandR, brandG, brandB);
       doc.rect(0, 0, pageWidth, 2, 'F');
     }
@@ -560,10 +547,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const totalQuestions = briefData?.total_questions || 15;
   const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
   const hasResearch = Object.keys(research).length > 0;
+  const hasSEO = !!research.seo_audit;
+  const hasKeywords = !!research.keywords;
+  const hasCompetitors = !!research.competitor_analysis;
 
   return (
     <div className="space-y-6">
-      {/* Header with logo */}
+      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           {(clientInfo?.logo_url || assets.logo[0]) && (
@@ -647,15 +637,21 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       {/* Tabs for complete brief */}
       {(isComplete || answeredCount > 0) && (
         <Tabs defaultValue="brief" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-5">
+          <TabsList className="flex flex-wrap gap-1 h-auto p-1">
             <TabsTrigger value="brief" className="text-xs">📋 Brief</TabsTrigger>
             <TabsTrigger value="assets" className="text-xs">📸 Assets</TabsTrigger>
-            <TabsTrigger value="research" className="text-xs">🔍 Investigación</TabsTrigger>
-            <TabsTrigger value="seo" className="text-xs">📊 SEO</TabsTrigger>
-            <TabsTrigger value="keywords" className="text-xs hidden lg:block">🔑 Keywords</TabsTrigger>
+            <TabsTrigger value="seo" className="text-xs flex items-center gap-1">
+              📊 SEO {hasSEO && <CheckCircle2 className="h-3 w-3 text-primary" />}
+            </TabsTrigger>
+            <TabsTrigger value="keywords" className="text-xs flex items-center gap-1">
+              🔑 Keywords {hasKeywords && <CheckCircle2 className="h-3 w-3 text-primary" />}
+            </TabsTrigger>
+            <TabsTrigger value="research" className="text-xs flex items-center gap-1">
+              🏆 Competencia {hasCompetitors && <CheckCircle2 className="h-3 w-3 text-primary" />}
+            </TabsTrigger>
           </TabsList>
 
-          {/* Brief Tab */}
+          {/* ===== BRIEF TAB ===== */}
           <TabsContent value="brief" className="space-y-6">
             {isComplete && (
               <div className="flex items-center gap-2 mb-2">
@@ -678,16 +674,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 </CardHeader>
                 <CardContent className="pt-4">
                   <div className="grid md:grid-cols-[200px_1fr] gap-6">
-                    {/* Photo + basic info */}
                     <div className="text-center">
-                      <img 
-                        src={personaImage} 
+                      <img
+                        src={personaImage}
                         alt="Buyer Persona"
                         className="w-36 h-36 object-cover rounded-xl mx-auto mb-3 shadow-md border-2 border-primary/10"
-                        onError={(e) => {
-                          // Fallback if image fails
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                       <h3 className="font-bold text-lg">{personaProfile['nombre ficticio'] || personaProfile['nombre'] || 'Cliente Ideal'}</h3>
                       <p className="text-sm text-muted-foreground">{personaProfile['edad'] ? `${personaProfile['edad']} años` : ''}</p>
@@ -715,9 +707,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       )}
                     </div>
 
-                     {/* Persona details grid — Dolor, palabras, transformación, estilo de vida */}
                     <div className="space-y-3">
-                      {/* Dolor Principal — full width, con profundidad */}
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <Heart className="h-3 w-3" /> Dolor Principal
@@ -725,7 +715,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <p className="text-sm leading-relaxed">{getResponse('persona_pain') || 'Pendiente'}</p>
                       </div>
 
-                      {/* Lo que Dice — múltiples frases como bullets */}
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <MessageSquare className="h-3 w-3" /> Lo que Dice
@@ -742,7 +731,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </div>
 
                       <div className="grid sm:grid-cols-2 gap-3">
-                        {/* Transformación */}
                         <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
                           <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                             <TrendingUp className="h-3 w-3" /> Transformación
@@ -750,7 +738,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <p className="text-sm leading-relaxed">{getResponse('persona_transformation') || 'Pendiente'}</p>
                         </div>
 
-                        {/* Estilo de vida — con inferencias */}
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                             <Gem className="h-3 w-3" /> Estilo de Vida
@@ -773,7 +760,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             )}
 
-            {/* Section Cards — excluding persona (shown above) */}
+            {/* Section Cards — El Negocio with enhanced financial display */}
             <div className="grid gap-4 lg:grid-cols-2">
               {SECTIONS.map(section => {
                 const sectionQs = questions
@@ -791,16 +778,72 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {sectionQs.map(q => (
-                          <div key={q.qId} className="border-b border-border pb-3 last:border-0">
-                            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1.5">
-                              {q.config?.icon}
-                              {q.config?.label}
-                              {q.response && <CheckCircle2 className="h-3 w-3 text-primary ml-auto" />}
+                        {sectionQs.map(q => {
+                          // Special rendering for "El Negocio" Q1 — ensure third person
+                          if (q.qId === 'business_pitch' && q.response) {
+                            return (
+                              <div key={q.qId} className="border-b border-border pb-3 last:border-0">
+                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1.5">
+                                  {q.config?.icon}
+                                  {q.config?.label}
+                                  <CheckCircle2 className="h-3 w-3 text-primary ml-auto" />
+                                </div>
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{q.response}</p>
+                              </div>
+                            );
+                          }
+                          // Special rendering for numbers Q2 — show financial KPIs
+                          if (q.qId === 'numbers' && financials && margin !== null) {
+                            return (
+                              <div key={q.qId} className="border-b border-border pb-3 last:border-0">
+                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
+                                  {q.config?.icon}
+                                  {q.config?.label}
+                                  <CheckCircle2 className="h-3 w-3 text-primary ml-auto" />
+                                </div>
+                                {/* Financial KPI Cards */}
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                  <div className="bg-muted/60 rounded-lg p-2 text-center">
+                                    <p className="text-xs text-muted-foreground">Precio Venta</p>
+                                    <p className="text-base font-bold text-primary">{formatCurrency(financials.price)}</p>
+                                  </div>
+                                  <div className="bg-muted/60 rounded-lg p-2 text-center">
+                                    <p className="text-xs text-muted-foreground">Costo</p>
+                                    <p className="text-base font-bold">{formatCurrency(financials.cost)}</p>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div className="bg-primary/10 rounded-lg p-2 text-center border border-primary/20">
+                                    <p className="text-xs text-muted-foreground">Margen Bruto</p>
+                                    <p className="text-sm font-bold text-primary">{formatCurrency(margin)}</p>
+                                    <p className="text-xs text-primary">{marginPct}%</p>
+                                  </div>
+                                  <div className="bg-muted/60 rounded-lg p-2 text-center">
+                                    <p className="text-xs text-muted-foreground">Envío</p>
+                                    <p className="text-sm font-bold">{formatCurrency(financials.shipping)}</p>
+                                  </div>
+                                  <div className="bg-secondary/50 rounded-lg p-2 text-center border border-secondary">
+                                    <p className="text-xs text-muted-foreground">CPA Máx.</p>
+                                    <p className="text-sm font-bold text-secondary-foreground">${cpaMax}</p>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2 bg-muted/40 rounded p-2">
+                                  💡 <strong>CPA Máximo Viable:</strong> El máximo que se puede invertir para adquirir un cliente sin perder margen. Se calcula como el 30% del margen bruto.
+                                </p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={q.qId} className="border-b border-border pb-3 last:border-0">
+                              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-1.5">
+                                {q.config?.icon}
+                                {q.config?.label}
+                                {q.response && <CheckCircle2 className="h-3 w-3 text-primary ml-auto" />}
+                              </div>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{q.response || <span className="text-muted-foreground italic">Pendiente</span>}</p>
                             </div>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{q.response || <span className="text-muted-foreground italic">Pendiente</span>}</p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
@@ -808,7 +851,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               })}
             </div>
 
-            {/* Product Photos in Brief */}
+            {/* Product Photos */}
             {assets.products.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
@@ -827,7 +870,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             )}
 
-            {/* Steve's Strategic Summary — full-width, properly formatted */}
+            {/* Steve's Strategic Evaluation — 7 Accionables */}
             {briefData?.summary && isComplete && (
               <Card className="border-primary/20 border-2">
                 <CardHeader className="pb-3 bg-primary/5">
@@ -842,15 +885,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 <CardContent className="pt-4">
                   <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:border-l-2 [&>h3]:border-primary/30 [&>h3]:pl-3 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&_th]:bg-primary/10 [&_th]:text-left [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{
-                      // Show section 7 (Evaluación Estratégica) specifically
                       (() => {
                         const raw = briefData.summary || '';
-                        // Try to find section 7
-                        const section7Match = raw.match(/##\s*7\./);
-                        if (section7Match && section7Match.index !== undefined) {
-                          return raw.slice(section7Match.index);
-                        }
-                        // Fallback: strip preamble before first ##
+                        // Show full brief starting from section 1
                         const firstHeader = raw.indexOf('## ');
                         return firstHeader > 0 ? raw.slice(firstHeader) : raw;
                       })()
@@ -860,10 +897,60 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             )}
 
-            {/* Feedback Panel — visible when brief is complete */}
+            {/* ===== NEXT STEPS CTA ===== */}
             {isComplete && (
-              <SteveFeedbackPanel clientId={clientId} />
+              <Card className="border-2 border-primary/30 bg-gradient-to-br from-muted/50 to-primary/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Rocket className="h-5 w-5 text-primary" />
+                    ¿Y ahora qué sigue?
+                  </CardTitle>
+                  <CardDescription>El Brief está listo. El siguiente paso es poner la máquina a trabajar.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="bg-background/80 rounded-xl p-4 border border-border flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                        <Zap className="h-4 w-4" />
+                        1. Conecta tus plataformas
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Conecta Shopify, Meta Ads, Google Ads y Klaviyo para que Steve analice tus métricas reales y genere recomendaciones en tiempo real.
+                      </p>
+                    </div>
+                    <div className="bg-background/80 rounded-xl p-4 border border-border flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                        <Target className="h-4 w-4" />
+                        2. Planifica tus anuncios
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Usa el Generador de Copys para crear anuncios de Meta y Google Ads 100% basados en tu brief. Steve ya sabe quién es tu cliente.
+                      </p>
+                    </div>
+                    <div className="bg-background/80 rounded-xl p-4 border border-border flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                        <LayoutDashboard className="h-4 w-4" />
+                        3. Monitorea resultados
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Una vez conectado, ve a tu panel de métricas para trackear ROAS, CPA real vs. CPA máximo viable y el desempeño de cada campaña.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button size="sm" onClick={onEditBrief} variant="outline">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Hablar con Steve sobre anuncios
+                    </Button>
+                    <Badge variant="outline" className="text-xs py-1.5 border-amber-400 text-amber-700 dark:text-amber-400">
+                      CPA Máximo: ${cpaMax || '—'} · Margen: {marginPct || '—'}%
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
             )}
+
+            {isComplete && <SteveFeedbackPanel clientId={clientId} />}
 
             {/* Signature */}
             {isComplete && (
@@ -882,7 +969,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
           </TabsContent>
 
-          {/* Assets Tab */}
+          {/* ===== ASSETS TAB ===== */}
           <TabsContent value="assets">
             <BrandAssetUploader clientId={clientId} onResearchComplete={fetchAll} />
             {assets.products.length > 0 && (
@@ -921,86 +1008,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
           </TabsContent>
 
-          {/* Research Tab */}
-          <TabsContent value="research" className="space-y-4">
-            {!hasResearch ? (
-              <Card className="text-center py-10">
-                <CardContent>
-                  <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="font-semibold mb-2">Sin Investigación</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Ve a la pestaña <strong>Assets</strong> e ingresa tu URL y competidores para que Steve los analice.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {research.competitor_analysis?.competitors && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Trophy className="h-5 w-5 text-primary" />
-                        Análisis de Competencia
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {research.competitor_analysis.competitors.map((comp: any, i: number) => (
-                          <div key={i} className="bg-muted/50 rounded-lg p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge variant="outline" className="text-xs">{i + 1}</Badge>
-                              <h4 className="font-semibold text-sm">{comp.name || comp.url}</h4>
-                            </div>
-                            {comp.positioning && <p className="text-xs text-muted-foreground mb-2">{comp.positioning}</p>}
-                            <div className="grid grid-cols-2 gap-3 mt-2">
-                              <div>
-                                <p className="text-xs font-medium text-primary flex items-center gap-1 mb-1"><TrendingUp className="h-3 w-3" /> Fortalezas</p>
-                                <ul className="text-xs space-y-0.5">{comp.strengths?.map((s: string, j: number) => <li key={j} className="text-muted-foreground">• {s}</li>)}</ul>
-                              </div>
-                              <div>
-                                <p className="text-xs font-medium text-destructive flex items-center gap-1 mb-1"><TrendingDown className="h-3 w-3" /> Debilidades</p>
-                                <ul className="text-xs space-y-0.5">{comp.weaknesses?.map((w: string, j: number) => <li key={j} className="text-muted-foreground">• {w}</li>)}</ul>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        {research.competitor_analysis.market_gaps?.length > 0 && (
-                          <div className="bg-primary/5 rounded-lg p-4 mt-3">
-                            <p className="text-sm font-medium flex items-center gap-2 mb-2"><Lightbulb className="h-4 w-4 text-primary" /> Oportunidades de Mercado</p>
-                            <ul className="text-sm space-y-1">{research.competitor_analysis.market_gaps.map((gap: string, i: number) => <li key={i}>• {gap}</li>)}</ul>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {research.ads_library_analysis && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2"><Megaphone className="h-5 w-5 text-primary" /> Análisis de Ads Library</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {research.ads_library_analysis.winning_patterns?.length > 0 && (
-                        <div><p className="text-xs font-medium mb-1">🏆 Patrones Ganadores</p><ul className="text-sm space-y-1">{research.ads_library_analysis.winning_patterns.map((p: string, i: number) => <li key={i}>• {p}</li>)}</ul></div>
-                      )}
-                      {research.ads_library_analysis.creative_recommendations?.length > 0 && (
-                        <div><p className="text-xs font-medium mb-1">💡 Recomendaciones</p><ul className="text-sm space-y-1">{research.ads_library_analysis.creative_recommendations.map((r: string, i: number) => <li key={i}>• {r}</li>)}</ul></div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          {/* SEO Tab */}
+          {/* ===== SEO TAB ===== */}
           <TabsContent value="seo" className="space-y-4">
-            {!research.seo_audit ? (
+            {!hasSEO ? (
               <Card className="text-center py-10">
                 <CardContent>
                   <Globe className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                   <h3 className="font-semibold mb-2">Sin Auditoría SEO</h3>
-                  <p className="text-sm text-muted-foreground">Ve a la pestaña Assets e ingresa tu URL para generar el análisis automático.</p>
+                  <p className="text-sm text-muted-foreground mb-4">Ve a la pestaña <strong>Assets</strong> e ingresa tu URL para generar el análisis automático.</p>
+                  <Button variant="outline" size="sm" onClick={() => document.querySelector('[value="assets"]')?.dispatchEvent(new MouseEvent('click'))}>
+                    Ir a Assets
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
@@ -1015,7 +1033,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </div>
                       <div className={`text-5xl font-bold ${
                         (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
-                        (research.seo_audit.score || 0) >= 40 ? 'text-muted-foreground' : 'text-destructive'
+                        (research.seo_audit.score || 0) >= 40 ? 'text-amber-600' : 'text-destructive'
                       }`}>
                         {research.seo_audit.score || '?'}<span className="text-lg text-muted-foreground">/100</span>
                       </div>
@@ -1032,11 +1050,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </div>
                       <div className={`rounded-lg p-3 ${
                         (research.seo_audit.score || 0) >= 70 ? 'bg-primary/10' :
-                        (research.seo_audit.score || 0) >= 40 ? 'bg-muted' : 'bg-destructive/10'
+                        (research.seo_audit.score || 0) >= 40 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-destructive/10'
                       }`}>
                         <p className={`font-bold text-xl ${
                           (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
-                          (research.seo_audit.score || 0) >= 40 ? 'text-foreground' : 'text-destructive'
+                          (research.seo_audit.score || 0) >= 40 ? 'text-amber-600' : 'text-destructive'
                         }`}>{(research.seo_audit.score || 0) >= 70 ? 'Bueno' : (research.seo_audit.score || 0) >= 40 ? 'Regular' : 'Crítico'}</p>
                         <p className="text-muted-foreground">Estado</p>
                       </div>
@@ -1048,28 +1066,35 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   {research.seo_audit.issues?.length > 0 && (
                     <Card>
                       <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Problemas Detectados</CardTitle></CardHeader>
-                      <CardContent><ul className="text-sm space-y-2">{research.seo_audit.issues.map((issue: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 bg-destructive/5 rounded p-2">
-                          <span className="text-destructive mt-0.5 flex-shrink-0">⚠️</span>
-                          <span className="text-sm">{issue}</span>
-                        </li>
-                      ))}</ul></CardContent>
+                      <CardContent>
+                        <ul className="text-sm space-y-2">
+                          {research.seo_audit.issues.map((issue: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 bg-destructive/5 rounded p-2">
+                              <span className="text-destructive mt-0.5 flex-shrink-0">⚠️</span>
+                              <span className="text-sm">{issue}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
                     </Card>
                   )}
                   {research.seo_audit.recommendations?.length > 0 && (
                     <Card>
                       <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Lightbulb className="h-4 w-4" /> Acciones Prioritarias</CardTitle></CardHeader>
-                      <CardContent><ul className="text-sm space-y-2">{research.seo_audit.recommendations.map((rec: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 bg-primary/5 rounded p-2">
-                          <span className="text-primary mt-0.5 flex-shrink-0">✅</span>
-                          <span className="text-sm">{rec}</span>
-                        </li>
-                      ))}</ul></CardContent>
+                      <CardContent>
+                        <ul className="text-sm space-y-2">
+                          {research.seo_audit.recommendations.map((rec: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 bg-primary/5 rounded p-2">
+                              <span className="text-primary mt-0.5 flex-shrink-0">✅</span>
+                              <span className="text-sm">{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
                     </Card>
                   )}
                 </div>
 
-                {/* Detailed Analysis Cards */}
                 <div className="grid gap-4 md:grid-cols-3">
                   {research.seo_audit.meta_analysis && (
                     <Card>
@@ -1101,9 +1126,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
           </TabsContent>
 
-          {/* Keywords Tab */}
+          {/* ===== KEYWORDS TAB ===== */}
           <TabsContent value="keywords" className="space-y-4">
-            {!research.keywords ? (
+            {!hasKeywords ? (
               <Card className="text-center py-10">
                 <CardContent>
                   <Key className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -1113,7 +1138,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             ) : (
               <div className="space-y-4">
-                {/* Primary + Long Tail */}
                 <div className="grid gap-4 md:grid-cols-2">
                   {research.keywords.primary?.length > 0 && (
                     <Card>
@@ -1129,7 +1153,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   )}
                 </div>
 
-                {/* Competitor + Negative + Seasonal */}
                 <div className="grid gap-4 md:grid-cols-3">
                   {research.keywords.competitor_keywords?.length > 0 && (
                     <Card>
@@ -1151,7 +1174,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   )}
                 </div>
 
-                {/* Google Ads Match Types */}
                 {research.keywords.google_ads_match_types && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Match Types para Google Ads</CardTitle></CardHeader>
@@ -1175,12 +1197,193 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 )}
 
                 {research.keywords.recommended_strategy && (
-                  <Card className="md:col-span-2 bg-primary/5 border-primary/20">
+                  <Card className="bg-primary/5 border-primary/20">
                     <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia de Keywords Completa</CardTitle></CardHeader>
                     <CardContent><p className="text-sm leading-relaxed">{research.keywords.recommended_strategy}</p></CardContent>
                   </Card>
                 )}
               </div>
+            )}
+          </TabsContent>
+
+          {/* ===== COMPETENCIA TAB (includes Competitor + Ads Library) ===== */}
+          <TabsContent value="research" className="space-y-4">
+            {!hasCompetitors && !research.ads_library_analysis ? (
+              <Card className="text-center py-10">
+                <CardContent>
+                  <Trophy className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <h3 className="font-semibold mb-2">Sin Investigación de Competencia</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Ve a la pestaña <strong>Assets</strong> e ingresa URLs de competidores para análisis completo.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Benchmark Table — if available */}
+                {research.competitor_analysis?.benchmark_summary && (
+                  <Card className="border-primary/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        Benchmark Competitivo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{research.competitor_analysis.benchmark_summary}</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Competitor Cards */}
+                {research.competitor_analysis?.competitors && (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-primary" /> Análisis por Competidor
+                    </h3>
+                    {research.competitor_analysis.competitors.map((comp: any, i: number) => (
+                      <Card key={i}>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
+                            <h4 className="font-bold text-base">{comp.name || comp.url}</h4>
+                            {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
+                          </div>
+                          {comp.positioning && <p className="text-xs text-muted-foreground italic mt-1">"{comp.positioning}"</p>}
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {comp.value_proposition && (
+                            <div className="bg-primary/5 rounded p-2">
+                              <p className="text-xs font-semibold text-primary mb-1">Propuesta de Valor</p>
+                              <p className="text-xs">{comp.value_proposition}</p>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs font-medium text-primary flex items-center gap-1 mb-1"><TrendingUp className="h-3 w-3" /> Fortalezas</p>
+                              <ul className="text-xs space-y-1">{comp.strengths?.map((s: string, j: number) => (
+                                <li key={j} className="flex items-start gap-1"><span className="text-primary">•</span> {s}</li>
+                              ))}</ul>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-destructive flex items-center gap-1 mb-1"><TrendingDown className="h-3 w-3" /> Debilidades</p>
+                              <ul className="text-xs space-y-1">{comp.weaknesses?.map((w: string, j: number) => (
+                                <li key={j} className="flex items-start gap-1"><span className="text-destructive">•</span> {w}</li>
+                              ))}</ul>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            {comp.price_positioning && (
+                              <div className="bg-muted/50 rounded p-2 text-center">
+                                <p className="text-muted-foreground text-[10px]">Precio</p>
+                                <p className="font-semibold">{comp.price_positioning}</p>
+                              </div>
+                            )}
+                            {comp.ad_strategy && (
+                              <div className="bg-muted/50 rounded p-2 text-center">
+                                <p className="text-muted-foreground text-[10px]">Estrategia Ads</p>
+                                <p className="font-semibold">{comp.ad_strategy}</p>
+                              </div>
+                            )}
+                            {comp.tech_stack && (
+                              <div className="bg-muted/50 rounded p-2 text-center">
+                                <p className="text-muted-foreground text-[10px]">Tecnología</p>
+                                <p className="font-semibold">{comp.tech_stack}</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {/* Market Gaps */}
+                {research.competitor_analysis?.market_gaps?.length > 0 && (
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-primary" />
+                        Oportunidades de Mercado Detectadas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {research.competitor_analysis.market_gaps.map((gap: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-sm">
+                            <span className="text-primary font-bold">{i + 1}.</span>
+                            {gap}
+                          </li>
+                        ))}
+                      </ul>
+                      {research.competitor_analysis.competitive_advantage && (
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <p className="text-xs font-semibold text-primary mb-1">Ventaja Competitiva Recomendada</p>
+                          <p className="text-sm">{research.competitor_analysis.competitive_advantage}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Ads Library Analysis */}
+                {research.ads_library_analysis && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Megaphone className="h-5 w-5 text-primary" />
+                        Análisis de Ads Library & Estrategia Creativa
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {research.ads_library_analysis.winning_patterns?.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-primary mb-2">🏆 Patrones Ganadores Detectados</p>
+                          <ul className="space-y-1">{research.ads_library_analysis.winning_patterns.map((p: string, i: number) => (
+                            <li key={i} className="text-sm flex items-start gap-2 bg-muted/50 rounded p-2">
+                              <span className="text-amber-600">★</span> {p}
+                            </li>
+                          ))}</ul>
+                        </div>
+                      )}
+                      {research.ads_library_analysis.hook_ideas?.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-primary mb-2">🎣 Ideas de Hook / Gancho</p>
+                          <ul className="space-y-1">{research.ads_library_analysis.hook_ideas.map((h: string, i: number) => (
+                            <li key={i} className="text-sm flex items-start gap-2 bg-primary/5 rounded p-2">
+                              <span className="text-primary">→</span> {h}
+                            </li>
+                          ))}</ul>
+                        </div>
+                      )}
+                      {research.ads_library_analysis.cta_analysis && (
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-primary mb-1">📢 Análisis de CTAs</p>
+                          <p className="text-sm">{research.ads_library_analysis.cta_analysis}</p>
+                        </div>
+                      )}
+                      {research.ads_library_analysis.creative_recommendations?.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-primary mb-2">💡 Recomendaciones Creativas</p>
+                          <ul className="space-y-1">{research.ads_library_analysis.creative_recommendations.map((r: string, i: number) => (
+                            <li key={i} className="text-sm flex items-start gap-2">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" /> {r}
+                            </li>
+                          ))}</ul>
+                        </div>
+                      )}
+                      {research.ads_library_analysis.estimated_ad_types?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          <p className="w-full text-xs font-semibold text-primary mb-1">📐 Formatos Recomendados</p>
+                          {research.ads_library_analysis.recommended_formats?.map((f: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{f}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>
