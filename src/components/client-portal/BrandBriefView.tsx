@@ -600,9 +600,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     setAssets(loaded);
   }
 
-  const personaResponse = briefData?.questions && briefData?.raw_responses
-    ? String(briefData.raw_responses[briefData.questions.indexOf('persona_profile')] ?? '')
-    : '';
+  const personaResponse = (() => {
+    if (!briefData?.questions || !briefData?.raw_responses) return '';
+    const idx = briefData.questions.indexOf('persona_profile');
+    if (idx < 0 || idx >= briefData.raw_responses.length) return '';
+    const val = briefData.raw_responses[idx];
+    return (val == null || val === undefined) ? '' : String(val);
+  })();
   const personaProfile = parsePersonaProfile(personaResponse);
   const personaGender = detectGender(personaProfile);
   const personaImage = personaGender === 'female' ? personaFemale : personaMale;
@@ -610,9 +614,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   function getResponse(questionId: string): string {
     if (!briefData?.questions || !briefData?.raw_responses) return '';
     const idx = briefData.questions.indexOf(questionId);
-    if (idx < 0) return '';
+    if (idx < 0 || idx >= briefData.raw_responses.length) return '';
     const val = briefData.raw_responses[idx];
-    return val == null ? '' : String(val);
+    return (val == null || val === undefined) ? '' : String(val);
   }
 
   // Extract competitor URLs from brief Q9 responses
