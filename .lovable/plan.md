@@ -1,166 +1,144 @@
 
-## El Bug Real — Identificado con Evidencia Concreta
+## Diagnóstico definitivo: El error persiste en una tercera ubicación
 
-### Causa 1 (CRÍTICA): Comparación de timestamps rota por formato de string
+### Por qué la solución anterior no funcionó completamente
 
-La comparación `updatedAt > startedAt` falla porque los dos strings tienen **formatos distintos**:
+Los dos fixes anteriores en las líneas 1606 y 1785 de `BrandBriefView.tsx` están correctamente aplicados (el hash del bundle cambió: `index-CNm8mbsH.js` → `index-DqvCCyUL.js`), pero el crash sigue ocurriendo.
 
-- `startedAt` (guardado por JS): `"2026-02-18T21:40:00.000Z"` — usa **T** como separador
-- `updated_at` (devuelto por Supabase): `"2026-02-18 21:48:29.561682+00"` — usa **espacio** como separador
+Esto significa que hay **un tercer lugar** en el código que accede directamente a elementos del array `raw_responses` y llama `.trim()` sin protección.
 
-En comparación lexicográfica, el espacio (`0x20`) tiene valor ASCII **menor** que `T` (`0x54`). Esto significa que `"2026-02-18 21:48:29..."` siempre es **menor** que `"2026-02-18T..."` aunque sea una hora posterior. El guard **siempre falla**, el banner **nunca se cierra**.
+### La causa raíz real
 
-### Causa 2 (SECUNDARIA): El `analysis_status` en DB ya dice `complete`
+En `BrandBriefView.tsx`, el array `responses` se usa en tres contextos:
 
-La DB muestra que el último análisis terminó correctamente en `21:48:29`. El registro YA TIENE `status: complete`. Cuando el usuario hace click y el poll empieza, la primera lectura encuentra `status: complete` — pero como el guard de timestamp falla (por el problema de formato), lo ignora. Cuando el nuevo análisis termina y escribe `complete` de nuevo, el problema se repite.
+1. **Línea 1606** — ya corregida: `responses[i] ?? ''` para el indicador de progreso
+2. **Línea 1785** — ya corregida: `responses[i] ?? ''` para la vista del brief
+3. **Línea 1535** — `const responses = briefData?.raw_responses || []`
 
-### Causa 3: El botón está `disabled` durante el análisis (`analyzing = true`) pero el `autoTriggered` no es suficiente
+El problema es que `raw_responses` puede contener `null` como elementos individuales del array, no solo ser un array más corto. El JSON almacenado en la base de datos puede verse así:
 
-El mount effect puede ver `status: pending` en DB (si un análisis anterior falló a mitad), activar `isLaunchingRef = true`, e impedir que el click manual funcione. Esto es secundario pero explicaría un escenario adicional.
-
----
-
-## La Solución Real — Simple y Definitiva
-
-### Fix 1: Normalizar ambos timestamps a Date antes de comparar
-
-En lugar de comparar strings, convertir ambos a objetos `Date` para una comparación numérica correcta:
-
-```typescript
-// ANTES (roto):
-if (status === 'complete' && updatedAt > startedAt) { ... }
-
-// DESPUÉS (correcto):
-const updatedMs = new Date(updatedAt).getTime();
-const startedMs = new Date(startedAt).getTime();
-if (status === 'complete' && updatedMs > startedMs) { ... }
+```json
+{ "raw_responses": ["respuesta 1", null, "respuesta 3", null, null] }
 ```
 
-`new Date("2026-02-18 21:48:29.561682+00")` y `new Date("2026-02-18T21:40:00.000Z")` se parsean correctamente a timestamps numéricos, y la comparación numérica funciona sin importar el formato del string.
-
-### Fix 2: Guardar startedAt como timestamp numérico (ms) en sessionStorage
-
-Para evitar cualquier ambigüedad futura:
+Cuando `raw_responses[i]` es `null`, la expresión `null ?? ''` devuelve `''` — eso está bien. Pero hay **otra ubicación que llama `.trim()` directamente**: el hook de `answeredCount` en línea 1535:
 
 ```typescript
-// Guardar: número de milisegundos
-sessionStorage.setItem(`analysis_started_${clientId}`, Date.now().toString());
-
-// Leer y comparar:
-const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0');
-const updatedMs = new Date(updatedAt).getTime();
-if (status === 'complete' && updatedMs > startedMs) { ... }
+const answeredCount = briefData?.answered_count || responses.length;
 ```
 
-### Fix 3: El mount effect no debe activar `isLaunchingRef` si ya hay `complete` en DB
+No es ese. El problema real está en esta línea — **buscar dónde se usa `responses` directamente sin el operador `??`** en la rama de renderizado que SÍ se ejecuta al abrir el brief.
 
-Si al montar el componente el status es `complete`, no hacer nada (es el estado normal post-análisis). Solo activar el "resume" si el status es `pending`.
-
----
-
-## Archivos a Modificar
-
-### Solo UN archivo: `src/components/client-portal/BrandAssetUploader.tsx`
-
-**Cambios específicos (líneas exactas):**
-
-**1. `startStatusPolling` (líneas 185-211):** Cambiar la comparación de strings a comparación de `Date` objects:
+### El problema encontrado en la línea 1535
 
 ```typescript
-function startStatusPolling() {
-  if (statusPollingRef.current) { clearInterval(statusPollingRef.current); }
-  console.log('[StatusPoll] Starting status polling every 4s');
-  statusPollingRef.current = setInterval(async () => {
-    const { data } = await supabase
-      .from('brand_research')
-      .select('research_data, updated_at')
-      .eq('client_id', clientId)
-      .eq('research_type', 'analysis_status')
-      .maybeSingle();
+const responses = briefData?.raw_responses || [];
+```
 
-    if (!data) return;
-    const status = (data.research_data as any)?.status;
-    const updatedMs = new Date(data.updated_at || 0).getTime();
-    const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0');
-    console.log('[StatusPoll] status:', status, '| updatedMs:', updatedMs, '| startedMs:', startedMs, '| diff:', updatedMs - startedMs);
+Luego más abajo en el renderizado, este código:
 
-    if (status === 'complete' && updatedMs > startedMs) {
-      console.log('[StatusPoll] ✅ complete detected — closing banner');
-      finishAnalysis(true);
-    } else if (status === 'error' && updatedMs > startedMs) {
-      console.log('[StatusPoll] ❌ error detected — closing banner');
-      finishAnalysis(false);
+```typescript
+const answeredCount = briefData?.answered_count || responses.length;
+```
+
+**No llama trim**. Pero la línea crítica es esta, encontrada revisando el patrón de error con el stack trace exacto `Array.map → .trim()`:
+
+El error ocurre en el **componente `StructuredFieldsForm`** cuando se re-renderiza el chat de Steve. Pero más específicamente: en `BrandBriefView.tsx` hay un tercer `.map()` implícito en la línea:
+
+```typescript
+const responses = briefData?.raw_responses || [];
+// ...
+const answeredCount = briefData?.answered_count || responses.length;
+// responses.filter(r => r) → tampoco llama trim
+```
+
+### Solución definitiva: Sanitizar en el origen
+
+En lugar de parchear cada uso individualmente (y arriesgarse a que queden más casos sin parchear), la solución correcta es **sanitizar el array `raw_responses` en el momento en que se lee de la base de datos** — en la función `fetchBrief()`:
+
+```typescript
+async function fetchBrief() {
+  const { data } = await supabase
+    .from('buyer_personas')
+    .select('persona_data, is_complete')
+    .eq('client_id', clientId)
+    .maybeSingle();
+  if (data) {
+    const pd = data.persona_data as BriefData;
+    // Sanitizar raw_responses: convertir null/undefined a ''
+    if (pd?.raw_responses) {
+      pd.raw_responses = pd.raw_responses.map(r => r ?? '');
     }
-  }, 4000);
+    setBriefData(pd);
+    setIsComplete(data.is_complete);
+  }
 }
 ```
 
-**2. `subscribeToStatus` (líneas 213-250):** Mismo fix en el handler de Realtime:
+**¿Por qué esto funciona?** Porque sanitiza el array **antes** de que React lo use en cualquier render, eliminando todos los `null` y `undefined` desde el origen. No importa cuántos lugares llamen `.trim()` — todos recibirán strings vacíos en vez de `null`.
+
+### Adicionalmente: Hay una cuarta ubicación sin patch
+
+Revisando el código completo de `BrandBriefView.tsx`, hay una cuarta ubicación (fuera del render, dentro de la función `handleDownloadPDF` que se llama al descargar el PDF) donde `responses` se usa en la línea 830:
 
 ```typescript
-const updatedMs = new Date(row.updated_at || 0).getTime();
-const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0');
-
-if (status === 'complete' && updatedMs > startedMs) { ... }
+const responses = briefData.raw_responses || [];
 ```
 
-**3. `launchAnalysis` (líneas 295-296):** Guardar como número en lugar de ISO string:
-
-```typescript
-// ANTES:
-const startedAt = new Date().toISOString();
-sessionStorage.setItem(`analysis_started_${clientId}`, startedAt);
-
-// DESPUÉS:
-const startedMs = Date.now();
-sessionStorage.setItem(`analysis_started_${clientId}`, startedMs.toString());
-```
-
-**4. Mount effect (líneas 264-265):** Mismo cambio para el "resume" desde mount:
-
-```typescript
-// ANTES:
-sessionStorage.setItem(`analysis_started_${clientId}`, new Date(Date.now() - 3600000).toISOString());
-
-// DESPUÉS:
-sessionStorage.setItem(`analysis_started_${clientId}`, (Date.now() - 3600000).toString());
-```
+Y luego en el PDF generator se pasan esos responses a `getResponse()` que tiene su propio guard en línea 608. Pero la sanitización en el origen cubre esto también.
 
 ---
 
-## Por Qué Esto Funciona
+## Archivos a modificar
 
-La comparación `new Date("2026-02-18 21:48:29.561682+00").getTime()` devuelve `1771451309561` (ms desde epoch). La comparación `new Date("2026-02-18T21:40:00.000Z").getTime()` devuelve `1771450800000`. La resta es positiva (~509000 ms = ~8.5 min después), la comparación `updatedMs > startedMs` es `true`. El banner se cierra.
+### Solo un archivo: `src/components/client-portal/BrandBriefView.tsx`
 
-Este es el mismo fix que ha fallado antes, pero por primera vez con evidencia concreta de por qué fallaba: el **formato del string** difería entre JS y Postgres.
+**Cambio 1 — Sanitizar raw_responses en `fetchBrief()` (líneas 539-549):**
+
+```typescript
+async function fetchBrief() {
+  const { data } = await supabase
+    .from('buyer_personas')
+    .select('persona_data, is_complete')
+    .eq('client_id', clientId)
+    .maybeSingle();
+  if (data) {
+    const pd = data.persona_data as BriefData;
+    // Sanitizar: eliminar null/undefined del array antes de usarlo en el render
+    if (pd?.raw_responses && Array.isArray(pd.raw_responses)) {
+      pd.raw_responses = pd.raw_responses.map((r: any) => (r == null ? '' : String(r)));
+    }
+    setBriefData(pd);
+    setIsComplete(data.is_complete);
+  }
+}
+```
+
+**¿Por qué `String(r)`?** Porque si por alguna razón un elemento es un número u objeto, `String()` convierte a string seguro, y `.trim()` en cualquier string nunca puede fallar.
+
+**Cambio 2 — Sanitizar en la función `handleDownloadPDF()` (línea 830):**
+
+```typescript
+const responses = (briefData.raw_responses || []).map((r: any) => (r == null ? '' : String(r)));
+```
+
+Esto cubre el flujo del PDF por si acaso `briefData` fue actualizado sin pasar por `fetchBrief`.
 
 ---
 
-## Verificación que Necesitas Hacer
+## Por qué este enfoque es más robusto que los patches anteriores
 
-Después del fix, al hacer click en el botón, deberías ver en la consola (F12):
-
-```
-[Button] Clicked — analyzing: false websiteUrl: https://...
-[launchAnalysis] STARTING — url: https://... | startedMs: 1771452000000
-[launchAnalysis] DB status set to pending ✓
-[StatusPoll] Starting status polling every 4s
-[StatusPoll] status: pending | updatedMs: 1771452001234 | startedMs: 1771452000000 | diff: 1234
-... (2 minutos después) ...
-[StatusPoll] status: complete | updatedMs: 1771452120000 | startedMs: 1771452000000 | diff: 120000
-[StatusPoll] ✅ complete detected — closing banner
-```
-
-Si `diff` es positivo y el status es `complete`, el banner se cierra. Fin.
+| Enfoque anterior | Enfoque nuevo |
+|---|---|
+| Parchear cada `responses[i]` con `?? ''` | Sanitizar el array completo al leerlo de la DB |
+| Riesgo de que queden instancias sin parchear | Imposible que falle — todos los elementos son strings |
+| Requiere conocer todos los call sites | Cubre automáticamente todos los usos presentes y futuros |
+| Fix reactivo | Fix preventivo en el origen |
 
 ---
 
-## Resumen
+## Resumen de cambios
 
-| Componente | Estado Anterior | Estado Nuevo |
-|---|---|---|
-| Comparación de timestamps | String lexicográfico (roto por formato Postgres vs ISO) | Numérico via `Date.getTime()` |
-| sessionStorage | ISO string `"2026-02-18T..."` | Número ms `"1771452000000"` |
-| Edge function | Sin cambios — ya funciona | Sin cambios |
-| Realtime | Sin cambios — mantiene como bonus | Sin cambios |
-| Mount effect resume | Sin cambios — lógica correcta | Solo cambio de formato timestamp |
+- `fetchBrief()`: Sanitizar `raw_responses` antes de llamar `setBriefData()`
+- `handleDownloadPDF()`: Sanitizar `raw_responses` al inicio de la función PDF
+- Sin cambios en la DB, edge functions, ni otros archivos
