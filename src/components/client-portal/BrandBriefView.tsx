@@ -1536,7 +1536,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   }
 
   const questions = briefData?.questions || [];
-  const responses = briefData?.raw_responses || [];
+  const responses = (briefData?.raw_responses || []).map((r: any) => (r == null ? '' : String(r)));
   const answeredCount = briefData?.answered_count || responses.length;
   const totalQuestions = briefData?.total_questions || 15;
   const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
