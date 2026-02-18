@@ -2204,10 +2204,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                                 <p className="text-muted-foreground">{comp.value_proposition}</p>
                               </div>
                             )}
-                            {comp.ad_strategy && (
+                           {(comp.ad_strategy_inferred || comp.ad_strategy) && (
                               <div className="bg-muted/50 rounded p-2">
                                 <p className="font-semibold text-[10px] mb-0.5">Estrategia Ads</p>
-                                <p className="text-muted-foreground">{comp.ad_strategy}</p>
+                                <p className="text-muted-foreground">{comp.ad_strategy_inferred || comp.ad_strategy}</p>
                               </div>
                             )}
                           </div>
