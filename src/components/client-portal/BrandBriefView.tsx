@@ -72,21 +72,20 @@ const SECTIONS = [
   { id: 'estrategia', title: 'Estrategia', icon: MessageSquare },
 ];
 
-// Parse persona profile from Q4 response
+// Parse persona profile from Q4 response — handles both structured form and text format
 function parsePersonaProfile(response: string): Record<string, string> {
   const profile: Record<string, string> = {};
   const lines = response.split('\n');
   for (const line of lines) {
     const match = line.match(/^(.+?):\s*(.+)$/);
     if (match) {
-      const key = match[1].replace(/^[^\w]*/, '').trim().toLowerCase();
+      const key = match[1].replace(/^[^\w]*/, '').replace(/^[\s🎂👤⚧📍💼💰💍🎯]+/, '').trim().toLowerCase();
       profile[key] = match[2].trim();
     }
   }
   return profile;
 }
 
-// Detect gender from persona data
 function detectGender(personaData: Record<string, string>): 'female' | 'male' {
   const genderField = Object.entries(personaData).find(([k]) => k.includes('género') || k.includes('genero') || k.includes('gender'));
   if (genderField) {
@@ -94,6 +93,13 @@ function detectGender(personaData: Record<string, string>): 'female' | 'male' {
     if (val.includes('mujer') || val.includes('fem') || val.includes('female')) return 'female';
   }
   return 'male';
+}
+
+// Format raw responses into professional third person text
+function formatResponseProfessional(qId: string, response: string): string {
+  if (!response) return '';
+  // Clean emoji prefixes from form submissions
+  return response.replace(/^[🎨📷🌐🔍💰📦🚚📣📊🛒🏪🏬📱📸👥👤🎂⚧📍💼💍🎯1️⃣2️⃣3️⃣✅]+\s*/gm, '').trim();
 }
 
 export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
@@ -178,7 +184,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const personaGender = detectGender(personaProfile);
   const personaImage = personaGender === 'female' ? personaFemale : personaMale;
 
-  // Get specific responses by question ID
   function getResponse(questionId: string): string {
     if (!briefData?.questions || !briefData?.raw_responses) return '';
     const idx = briefData.questions.indexOf(questionId);
@@ -209,205 +214,307 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
+    const margin = 18;
     const maxWidth = pageWidth - margin * 2;
-    let y = 20;
+    let y = 15;
 
-    // Brand color
     const brandR = 30, brandG = 58, brandB = 138;
-
-    // Try to add logo
-    try {
-      const logoSrc = clientInfo?.logo_url || assets.logo[0] || logo;
-      const logoBase64 = await loadImageAsBase64(logoSrc);
-      doc.addImage(logoBase64, 'JPEG', margin, y, 30, 12);
-      y += 18;
-    } catch { y += 5; }
-
-    // Title block
-    doc.setFillColor(brandR, brandG, brandB);
-    doc.rect(margin, y, maxWidth, 18, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
-    doc.text('BRIEF ESTRATÉGICO DE MARCA', pageWidth / 2, y + 12, { align: 'center' });
-    y += 24;
-
-    // Client info bar
-    doc.setFontSize(10);
-    doc.setTextColor(brandR, brandG, brandB);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Cliente: ${clientInfo?.name || 'N/A'}${clientInfo?.company ? ` — ${clientInfo.company}` : ''}`, margin, y);
-    y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Preparado por: Dr. Steve Dogs, PhD Performance Marketing | ${new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, y);
-    y += 3;
-    doc.setDrawColor(brandR, brandG, brandB);
-    doc.setLineWidth(0.5);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
+    const accentR = 79, accentG = 70, accentB = 229;
 
     // Helper functions
-    const checkPage = (needed: number) => { if (y + needed > pageHeight - 20) { doc.addPage(); y = 20; } };
+    const checkPage = (needed: number) => { if (y + needed > pageHeight - 25) { doc.addPage(); y = 20; } };
 
-    const addSectionTitle = (title: string) => {
-      checkPage(15);
+    const addSectionHeader = (num: string, title: string) => {
+      checkPage(18);
+      y += 4;
       doc.setFillColor(brandR, brandG, brandB);
-      doc.rect(margin, y, maxWidth, 8, 'F');
+      doc.roundedRect(margin, y, maxWidth, 10, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(255, 255, 255);
-      doc.text(title, margin + 3, y + 5.5);
+      doc.text(`${num}. ${title}`, margin + 4, y + 7);
       doc.setTextColor(0, 0, 0);
-      y += 12;
+      y += 15;
     };
 
     const addSubTitle = (title: string) => {
       checkPage(10);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(brandR, brandG, brandB);
-      doc.text(title, margin, y);
+      doc.setFontSize(9.5);
+      doc.setTextColor(accentR, accentG, accentB);
+      doc.text(title, margin + 2, y);
       doc.setTextColor(0, 0, 0);
       y += 5;
     };
 
-    const addText = (text: string, indent = 0) => {
+    const addBody = (text: string, indent = 0) => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      const lines = doc.splitTextToSize(text, maxWidth - indent);
+      doc.setTextColor(50, 50, 50);
+      const clean = text.replace(/#{1,4}\s*/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
+        .replace(/🐕|🎓|📋|💰|📊|🚀|😤|🎯|💜|🐄|👻|📸|🏆|✅|⚠️|❌|💼|🎂|👤|⚧|📍|💍|🌐|📦|🚚|📣|🛒|🏪|🏬|📱|👥|1️⃣|2️⃣|3️⃣/g, '');
+      const lines = doc.splitTextToSize(clean, maxWidth - indent - 4);
       for (const line of lines) {
         checkPage(5);
-        doc.text(line, margin + indent, y);
-        y += 4;
+        doc.text(line, margin + indent + 2, y);
+        y += 4.2;
       }
       y += 2;
     };
 
-    // Summary from AI
-    if (briefData.summary) {
-      addSectionTitle('1. RESUMEN EJECUTIVO');
-      // Clean the summary - remove markdown headers and format
-      const cleanSummary = briefData.summary
-        .replace(/#{1,4}\s+/g, '')
-        .replace(/\*\*/g, '')
-        .replace(/\*/g, '')
-        .replace(/🐕|🎓|📋|💰|📊|🚀|😤|🎯|💜|🐄|👻|📸|🏆|✅|⚠️|❌/g, '');
-      
-      const paragraphs = cleanSummary.split('\n\n').filter(p => p.trim());
-      for (const p of paragraphs.slice(0, 8)) {
-        addText(p.trim());
+    const addKeyValue = (label: string, value: string) => {
+      checkPage(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`${label}:`, margin + 4, y);
+      const labelWidth = doc.getTextWidth(`${label}: `);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      const valLines = doc.splitTextToSize(value, maxWidth - labelWidth - 8);
+      doc.text(valLines[0], margin + 4 + labelWidth, y);
+      y += 4.5;
+      for (let i = 1; i < valLines.length; i++) {
+        checkPage(5);
+        doc.text(valLines[i], margin + 4 + labelWidth, y);
+        y += 4.2;
       }
-    }
+    };
 
-    // Business DNA
+    // === COVER / HEADER ===
+    // Top bar
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.rect(0, 0, pageWidth, 3, 'F');
+
+    // Logo
+    try {
+      const logoSrc = clientInfo?.logo_url || assets.logo[0] || logo;
+      const logoBase64 = await loadImageAsBase64(logoSrc);
+      doc.addImage(logoBase64, 'JPEG', margin, y + 2, 28, 11);
+    } catch {}
+    
+    // Date right-aligned
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text(new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' }), pageWidth - margin, y + 8, { align: 'right' });
+    y += 18;
+
+    // Title block
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.roundedRect(margin, y, maxWidth, 16, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(255, 255, 255);
+    doc.text('BRIEF ESTRATÉGICO DE MARCA', pageWidth / 2, y + 10.5, { align: 'center' });
+    y += 22;
+
+    // Client info
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(brandR, brandG, brandB);
+    doc.text(`${clientInfo?.name || 'Cliente'}${clientInfo?.company ? ` — ${clientInfo.company}` : ''}`, margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Preparado por: Dr. Steve Dogs, PhD Performance Marketing | BG Consult', margin, y);
+    y += 3;
+    doc.setDrawColor(brandR, brandG, brandB);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
+
     const questions = briefData.questions || [];
     const responses = briefData.raw_responses || [];
 
-    addSectionTitle('2. ADN DE MARCA');
-    const businessQs = ['business_pitch', 'numbers', 'sales_channels'];
-    for (const qId of businessQs) {
-      const idx = questions.indexOf(qId);
-      if (idx >= 0 && responses[idx]) {
-        const cfg = QUESTION_CONFIG[qId];
-        addSubTitle(cfg?.label || qId);
-        addText(responses[idx]);
-      }
-    }
-
-    // Buyer Persona
-    addSectionTitle('3. BUYER PERSONA');
-    const personaQs = ['persona_profile', 'persona_pain', 'persona_words', 'persona_transformation', 'persona_lifestyle'];
-    for (const qId of personaQs) {
-      const idx = questions.indexOf(qId);
-      if (idx >= 0 && responses[idx]) {
-        const cfg = QUESTION_CONFIG[qId];
-        addSubTitle(cfg?.label || qId);
-        addText(responses[idx]);
-      }
-    }
-
-    // Competitive Analysis
-    addSectionTitle('4. ANÁLISIS COMPETITIVO');
-    const compQs = ['competitors', 'competitors_weakness', 'your_advantage'];
-    for (const qId of compQs) {
-      const idx = questions.indexOf(qId);
-      if (idx >= 0 && responses[idx]) {
-        const cfg = QUESTION_CONFIG[qId];
-        addSubTitle(cfg?.label || qId);
-        addText(responses[idx]);
-      }
-    }
-
-    // Strategy
-    addSectionTitle('5. POSICIONAMIENTO Y DIFERENCIACIÓN');
-    const stratQs = ['purple_cow_promise', 'villain_guarantee', 'proof_tone', 'brand_assets'];
-    for (const qId of stratQs) {
-      const idx = questions.indexOf(qId);
-      if (idx >= 0 && responses[idx]) {
-        const cfg = QUESTION_CONFIG[qId];
-        addSubTitle(cfg?.label || qId);
-        addText(responses[idx]);
-      }
-    }
-
-    // Steve's evaluation from the summary (extract last section)
+    // === 1. RESUMEN EJECUTIVO ===
     if (briefData.summary) {
-      addSectionTitle('6. EVALUACIÓN ESTRATÉGICA');
-      const evalSection = briefData.summary.split(/##?\s*\d*\.?\s*EVALUACIÓN/i);
-      if (evalSection.length > 1) {
-        addText(evalSection[1].replace(/#{1,4}\s+/g, '').replace(/\*\*/g, '').trim());
-      } else {
-        addText('Consultar el brief completo en la plataforma para la evaluación estratégica detallada.');
+      addSectionHeader('1', 'RESUMEN EJECUTIVO');
+      const cleanSummary = briefData.summary
+        .replace(/#{1,4}\s+/g, '\n')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '');
+      // Split into sections and render cleanly
+      const sections = cleanSummary.split(/\n+/).filter(p => p.trim());
+      for (const section of sections.slice(0, 20)) {
+        const trimmed = section.trim();
+        if (!trimmed) continue;
+        // Detect if it's a section header
+        if (trimmed.match(/^\d+\.\s+[A-ZÁÉÍÓÚ]/) || trimmed.match(/^[A-ZÁÉÍÓÚ\s]{5,}$/)) {
+          addSubTitle(trimmed);
+        } else {
+          addBody(trimmed);
+        }
       }
     }
 
-    // Signature
-    checkPage(40);
-    y += 5;
-    doc.setDrawColor(brandR, brandG, brandB);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 10;
+    // === 2. ADN DE MARCA ===
+    addSectionHeader('2', 'ADN DE MARCA');
+    const q1 = getResponse('business_pitch');
+    if (q1) { addSubTitle('Descripción del Negocio'); addBody(q1); }
+    
+    const q2 = getResponse('numbers');
+    if (q2) {
+      addSubTitle('Indicadores Financieros Clave');
+      // Parse and display as clean key-value pairs
+      const nums = q2.split('\n').filter(l => l.trim());
+      for (const line of nums) {
+        const clean = line.replace(/^[💰📦🚚📣📊]+\s*/, '');
+        const kv = clean.match(/^(.+?):\s*(.+)$/);
+        if (kv) {
+          addKeyValue(kv[1].trim(), kv[2].trim());
+        } else {
+          addBody(clean);
+        }
+      }
+    }
 
-    // Signature image
+    const q3 = getResponse('sales_channels');
+    if (q3) {
+      addSubTitle('Distribución por Canales de Venta');
+      const channels = q3.split('\n').filter(l => l.trim());
+      for (const ch of channels) {
+        const clean = ch.replace(/^[🛒🏪🏬📱📸👥]+\s*/, '');
+        addBody(`• ${clean}`, 2);
+      }
+    }
+
+    // === 3. BUYER PERSONA ===
+    addSectionHeader('3', 'PERFIL DEL CONSUMIDOR OBJETIVO');
+    
+    // Persona image
+    try {
+      const pImg = await loadImageAsBase64(personaImage);
+      checkPage(35);
+      doc.addImage(pImg, 'JPEG', margin + 2, y, 22, 22);
+      const profileName = personaProfile['nombre ficticio'] || personaProfile['nombre'] || 'Cliente Ideal';
+      const profileAge = personaProfile['edad'] || '';
+      const profileGender = personaProfile['género'] || personaProfile['genero'] || '';
+      const profileCity = personaProfile['ciudad / zona'] || personaProfile['ciudad'] || '';
+      const profileOcc = personaProfile['ocupación'] || personaProfile['ocupacion'] || '';
+      const profileIncome = personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '';
+      const profileFamily = personaProfile['estado civil / familia'] || personaProfile['familia'] || '';
+      const profileWhy = personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra'] || '';
+      
+      let px = margin + 28;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(brandR, brandG, brandB);
+      doc.text(profileName, px, y + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(60, 60, 60);
+      let py = y + 10;
+      if (profileAge) { doc.text(`${profileAge} años • ${profileGender} • ${profileCity}`, px, py); py += 4; }
+      if (profileOcc) { doc.text(`Ocupación: ${profileOcc}`, px, py); py += 4; }
+      if (profileIncome) { doc.text(`Ingreso mensual: $${profileIncome}`, px, py); py += 4; }
+      if (profileFamily) { doc.text(`${profileFamily}`, px, py); py += 4; }
+      if (profileWhy) { doc.text(`Motivación: ${profileWhy}`, px, py); py += 4; }
+      
+      y = Math.max(y + 25, py + 2);
+    } catch {
+      // Fallback: text-only persona
+      const q4 = getResponse('persona_profile');
+      if (q4) addBody(q4);
+    }
+
+    const painResp = getResponse('persona_pain');
+    if (painResp) { addSubTitle('Dolor Principal'); addBody(painResp); }
+    const wordsResp = getResponse('persona_words');
+    if (wordsResp) { addSubTitle('Palabras y Objeciones del Cliente'); addBody(`"${wordsResp}"`); }
+    const transResp = getResponse('persona_transformation');
+    if (transResp) { addSubTitle('Transformación Deseada'); addBody(transResp); }
+    const lifeResp = getResponse('persona_lifestyle');
+    if (lifeResp) { addSubTitle('Estilo de Vida y Consumo'); addBody(lifeResp); }
+
+    // === 4. ANÁLISIS COMPETITIVO ===
+    addSectionHeader('4', 'ANÁLISIS COMPETITIVO ESTRATÉGICO');
+    const compResp = getResponse('competitors');
+    if (compResp) { addSubTitle('Competidores Identificados'); addBody(compResp); }
+    const compWeakResp = getResponse('competitors_weakness');
+    if (compWeakResp) { addSubTitle('Análisis de Promesas y Debilidades'); addBody(compWeakResp); }
+    const advResp = getResponse('your_advantage');
+    if (advResp) { addSubTitle('Ventaja Competitiva Sostenible'); addBody(advResp); }
+
+    // === 5. POSICIONAMIENTO ===
+    addSectionHeader('5', 'POSICIONAMIENTO Y DIFERENCIACIÓN');
+    const cowResp = getResponse('purple_cow_promise');
+    if (cowResp) { addSubTitle('Concepto Diferenciador (Vaca Púrpura)'); addBody(cowResp); }
+    const villResp = getResponse('villain_guarantee');
+    if (villResp) { addSubTitle('Narrativa de Marca y Garantía'); addBody(villResp); }
+    const proofResp = getResponse('proof_tone');
+    if (proofResp) { addSubTitle('Prueba Social y Tono de Comunicación'); addBody(proofResp); }
+    const assetsResp = getResponse('brand_assets');
+    if (assetsResp) { addSubTitle('Identidad Visual'); addBody(assetsResp); }
+
+    // === 6. EVALUACIÓN ESTRATÉGICA ===
+    if (briefData.summary) {
+      addSectionHeader('6', 'EVALUACIÓN ESTRATÉGICA Y PLAN DE ACCIÓN');
+      // Extract the strategic plan sections from the summary
+      const planMatch = briefData.summary.match(/##?\s*\d*\.?\s*(PLAN|ESTRATEG|FASE|KPI|RIESGO)/i);
+      if (planMatch) {
+        const planSection = briefData.summary.slice(planMatch.index);
+        const planLines = planSection.split('\n').filter(l => l.trim());
+        for (const line of planLines) {
+          const trimmed = line.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
+          if (trimmed.match(/^\d+\.\s/) || trimmed.match(/^(Fase|KPI|Riesgo|Meta|Plazo)/i)) {
+            addSubTitle(trimmed);
+          } else if (trimmed.startsWith('|')) {
+            // Table rows
+            const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-\s]+$/));
+            if (cells.length > 0) {
+              addBody(cells.map(c => c.trim()).join('  —  '), 2);
+            }
+          } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
+            addBody(trimmed, 4);
+          } else {
+            addBody(trimmed);
+          }
+        }
+      }
+    }
+
+    // === SIGNATURE ===
+    checkPage(45);
+    y += 6;
+    doc.setDrawColor(brandR, brandG, brandB);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
     try {
       const sigBase64 = await loadImageAsBase64(steveSignature);
-      doc.addImage(sigBase64, 'PNG', margin, y, 40, 16);
-      y += 20;
+      doc.addImage(sigBase64, 'PNG', margin, y, 35, 14);
+      y += 17;
     } catch {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(14);
-      doc.setTextColor(brandR, brandG, brandB);
-      doc.text('Steve Dogs', margin, y);
-      y += 8;
+      y += 3;
     }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(brandR, brandG, brandB);
     doc.text('Dr. Steve Dogs', margin, y);
-    y += 5;
+    y += 4.5;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.text('PhD Performance Marketing — Stanford Dog University', margin, y);
-    y += 4;
-    doc.text('Director de Estrategia, BG Consult', margin, y);
-    y += 4;
+    doc.text('PhD Performance Marketing — Stanford Dog University', margin, y); y += 3.5;
+    doc.text('Director de Estrategia, BG Consult', margin, y); y += 3.5;
     doc.text(`Firmado digitalmente: ${new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, y);
 
     // Footer on all pages
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      // Footer bar
       doc.setFillColor(brandR, brandG, brandB);
-      doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
+      doc.rect(0, pageHeight - 10, pageWidth, 10, 'F');
       doc.setFontSize(7);
       doc.setTextColor(255, 255, 255);
-      doc.text(`BG Consult — Brief Estratégico de Marca | Confidencial | Pág ${i}/${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      doc.text(`BG Consult — Brief Estratégico de Marca | Confidencial | Pág ${i}/${pageCount}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
+      // Top accent bar
+      doc.setFillColor(brandR, brandG, brandB);
+      doc.rect(0, 0, pageWidth, 2, 'F');
     }
 
     doc.save(`Brief_Estrategico_${clientInfo?.name || 'Marca'}_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -531,7 +638,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </div>
             )}
 
-            {/* BUYER PERSONA CARD — Visual like reference image */}
+            {/* BUYER PERSONA CARD */}
             {personaResponse && (
               <Card className="overflow-hidden border-2 border-primary/10">
                 <CardHeader className="bg-primary/5 pb-3">
@@ -547,32 +654,36 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       <img 
                         src={personaImage} 
                         alt="Buyer Persona"
-                        className="w-40 h-40 object-cover rounded-xl mx-auto mb-3 shadow-md border-2 border-primary/10"
+                        className="w-36 h-36 object-cover rounded-xl mx-auto mb-3 shadow-md border-2 border-primary/10"
+                        onError={(e) => {
+                          // Fallback if image fails
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                       <h3 className="font-bold text-lg">{personaProfile['nombre ficticio'] || personaProfile['nombre'] || 'Cliente Ideal'}</h3>
                       <p className="text-sm text-muted-foreground">{personaProfile['edad'] ? `${personaProfile['edad']} años` : ''}</p>
-                      {personaProfile['ciudad / zona'] || personaProfile['ciudad'] ? (
+                      {(personaProfile['ciudad / zona'] || personaProfile['ciudad']) && (
                         <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
                           <MapPin className="h-3 w-3" />
                           {personaProfile['ciudad / zona'] || personaProfile['ciudad']}
                         </p>
-                      ) : null}
-                      {personaProfile['ocupación'] || personaProfile['ocupacion'] ? (
+                      )}
+                      {(personaProfile['ocupación'] || personaProfile['ocupacion']) && (
                         <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
                           <Briefcase className="h-3 w-3" />
                           {personaProfile['ocupación'] || personaProfile['ocupacion']}
                         </p>
-                      ) : null}
-                      {personaProfile['estado civil / familia'] || personaProfile['familia'] ? (
+                      )}
+                      {(personaProfile['estado civil / familia'] || personaProfile['familia']) && (
                         <p className="text-xs text-muted-foreground mt-1">
                           {personaProfile['estado civil / familia'] || personaProfile['familia']}
                         </p>
-                      ) : null}
-                      {personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] ? (
+                      )}
+                      {(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso']) && (
                         <p className="text-xs font-medium text-primary mt-1">
                           ${personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso']}
                         </p>
-                      ) : null}
+                      )}
                     </div>
 
                     {/* Persona details grid */}
@@ -601,28 +712,27 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         </p>
                         <p className="text-sm">{getResponse('persona_lifestyle') || 'Pendiente'}</p>
                       </div>
-                      {personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra'] ? (
+                      {(personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra']) && (
                         <div className="bg-primary/5 rounded-lg p-3 sm:col-span-2 border border-primary/10">
                           <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
                             <Target className="h-3 w-3" /> ¿Por qué Compra?
                           </p>
                           <p className="text-sm font-medium">{personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra']}</p>
                         </div>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Section Cards */}
+            {/* Section Cards — excluding persona (shown above) */}
             <div className="grid gap-4 lg:grid-cols-2">
               {SECTIONS.map(section => {
                 const sectionQs = questions
                   .map((qId, i) => ({ qId, response: responses[i], config: QUESTION_CONFIG[qId] }))
                   .filter(q => q.config?.section === section.id);
                 if (sectionQs.length === 0) return null;
-                // Skip persona section since we have the visual card
                 if (section.id === 'persona') return null;
                 return (
                   <Card key={section.id}>
@@ -670,7 +780,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Card>
             )}
 
-            {/* Steve's Strategic Summary */}
+            {/* Steve's Strategic Summary — full-width, properly formatted */}
             {briefData?.summary && isComplete && (
               <Card className="border-primary/20 border-2">
                 <CardHeader className="pb-3 bg-primary/5">
@@ -683,11 +793,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <ScrollArea className="max-h-[500px]">
-                    <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h2]:text-base [&>h3]:text-sm [&>p]:mb-3 [&>table]:text-sm">
-                      <ReactMarkdown>{briefData.summary}</ReactMarkdown>
-                    </div>
-                  </ScrollArea>
+                  <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&>table_th]:bg-primary/10 [&>table_th]:text-left [&>table_th]:p-2 [&>table_td]:p-2 [&>table_td]:border-b [&>table_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
+                    <ReactMarkdown>{briefData.summary}</ReactMarkdown>
+                  </div>
                 </CardContent>
               </Card>
             )}
