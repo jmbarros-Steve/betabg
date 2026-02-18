@@ -195,15 +195,15 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
       if (!data) return;
       const status = (data.research_data as any)?.status;
-      const updatedAt: string = data.updated_at || '';
-      // Guard: only act on events AFTER the click (ISO string lexicographic comparison)
-      const startedAt = sessionStorage.getItem(`analysis_started_${clientId}`) || '';
-      console.log('[StatusPoll] status:', status, '| updatedAt:', updatedAt, '| startedAt:', startedAt);
+      // Guard: convert both to numeric ms to avoid JS ISO vs Postgres space-separator comparison bug
+      const updatedMs = new Date(data.updated_at || 0).getTime();
+      const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0', 10);
+      console.log('[StatusPoll] status:', status, '| updatedMs:', updatedMs, '| startedMs:', startedMs, '| diff:', updatedMs - startedMs);
 
-      if (status === 'complete' && updatedAt > startedAt) {
+      if (status === 'complete' && updatedMs > startedMs) {
         console.log('[StatusPoll] ✅ complete detected — closing banner');
         finishAnalysis(true);
-      } else if (status === 'error' && updatedAt > startedAt) {
+      } else if (status === 'error' && updatedMs > startedMs) {
         console.log('[StatusPoll] ❌ error detected — closing banner');
         finishAnalysis(false);
       }
@@ -230,14 +230,14 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           if (row.client_id !== clientId) return;
           if (row.research_type !== 'analysis_status') return;
           const status = row.research_data?.status;
-          const updatedAt: string = row.updated_at || '';
-          const startedAt = sessionStorage.getItem(`analysis_started_${clientId}`) || '';
-          console.log('[Realtime] Received event — status:', status, '| updatedAt:', updatedAt, '| startedAt:', startedAt);
+          const updatedMs = new Date(row.updated_at || 0).getTime();
+          const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0', 10);
+          console.log('[Realtime] Received event — status:', status, '| updatedMs:', updatedMs, '| startedMs:', startedMs, '| diff:', updatedMs - startedMs);
 
-          if (status === 'complete' && updatedAt > startedAt) {
+          if (status === 'complete' && updatedMs > startedMs) {
             console.log('[Realtime] ✅ complete via Realtime — closing banner early');
             finishAnalysis(true);
-          } else if (status === 'error' && updatedAt > startedAt) {
+          } else if (status === 'error' && updatedMs > startedMs) {
             console.log('[Realtime] ❌ error via Realtime — closing banner');
             finishAnalysis(false);
           }
@@ -262,7 +262,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         console.log('[BrandAssetUploader] Resuming in-progress analysis on mount');
         // If no sessionStorage timestamp, set one to "far in the past" so poll detects complete
         if (!sessionStorage.getItem(`analysis_started_${clientId}`)) {
-          sessionStorage.setItem(`analysis_started_${clientId}`, new Date(Date.now() - 3600000).toISOString());
+          sessionStorage.setItem(`analysis_started_${clientId}`, (Date.now() - 3600000).toString());
         }
         analyzingRef.current = true;
         isLaunchingRef.current = true;
@@ -292,14 +292,14 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     }
 
     // ── SYNCHRONOUS: show banner & save timestamp IMMEDIATELY ──────
-    const startedAt = new Date().toISOString();
-    sessionStorage.setItem(`analysis_started_${clientId}`, startedAt);
+    const startedMs = Date.now();
+    sessionStorage.setItem(`analysis_started_${clientId}`, startedMs.toString());
     isLaunchingRef.current = true;
     analyzingRef.current = true;
     setAnalyzing(true);
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
 
-    console.log('[launchAnalysis] STARTING — url:', url, '| startedAt:', startedAt);
+    console.log('[launchAnalysis] STARTING — url:', url, '| startedMs:', startedMs);
 
     // Kill any lingering intervals/channels
     clearAll();
@@ -315,7 +315,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
-      research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: startedAt },
+      research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date(startedMs).toISOString() },
     }, { onConflict: 'client_id,research_type' });
 
     // Start PRIMARY status polling (every 4s — reliable fallback)
