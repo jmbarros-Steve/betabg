@@ -1000,42 +1000,103 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 <CardContent>
                   <Globe className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                   <h3 className="font-semibold mb-2">Sin Auditoría SEO</h3>
-                  <p className="text-sm text-muted-foreground">Ingresa tu URL en Assets para generar el análisis.</p>
+                  <p className="text-sm text-muted-foreground">Ve a la pestaña Assets e ingresa tu URL para generar el análisis automático.</p>
                 </CardContent>
               </Card>
             ) : (
               <>
+                {/* Score Card */}
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-lg font-bold">Score SEO</h3>
+                        <h3 className="text-lg font-bold">Score SEO Global</h3>
                         <p className="text-xs text-muted-foreground">{clientInfo?.website_url}</p>
                       </div>
-                      <div className={`text-4xl font-bold ${
-                        (research.seo_audit.score || 0) >= 70 ? 'text-green-500' :
-                        (research.seo_audit.score || 0) >= 40 ? 'text-yellow-500' : 'text-red-500'
+                      <div className={`text-5xl font-bold ${
+                        (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
+                        (research.seo_audit.score || 0) >= 40 ? 'text-muted-foreground' : 'text-destructive'
                       }`}>
                         {research.seo_audit.score || '?'}<span className="text-lg text-muted-foreground">/100</span>
                       </div>
                     </div>
-                    <Progress value={research.seo_audit.score || 0} className="h-3" />
+                    <Progress value={research.seo_audit.score || 0} className="h-3 mb-4" />
+                    <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                      <div className="bg-destructive/10 rounded-lg p-3">
+                        <p className="text-destructive font-bold text-xl">{research.seo_audit.issues?.length || 0}</p>
+                        <p className="text-muted-foreground">Problemas</p>
+                      </div>
+                      <div className="bg-primary/5 rounded-lg p-3">
+                        <p className="text-primary font-bold text-xl">{research.seo_audit.recommendations?.length || 0}</p>
+                        <p className="text-muted-foreground">Acciones</p>
+                      </div>
+                      <div className={`rounded-lg p-3 ${
+                        (research.seo_audit.score || 0) >= 70 ? 'bg-primary/10' :
+                        (research.seo_audit.score || 0) >= 40 ? 'bg-muted' : 'bg-destructive/10'
+                      }`}>
+                        <p className={`font-bold text-xl ${
+                          (research.seo_audit.score || 0) >= 70 ? 'text-primary' :
+                          (research.seo_audit.score || 0) >= 40 ? 'text-foreground' : 'text-destructive'
+                        }`}>{(research.seo_audit.score || 0) >= 70 ? 'Bueno' : (research.seo_audit.score || 0) >= 40 ? 'Regular' : 'Crítico'}</p>
+                        <p className="text-muted-foreground">Estado</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   {research.seo_audit.issues?.length > 0 && (
                     <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Problemas</CardTitle></CardHeader>
-                      <CardContent><ul className="text-sm space-y-1.5">{research.seo_audit.issues.map((issue: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="text-destructive mt-0.5">⚠️</span><span>{issue}</span></li>)}</ul></CardContent>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Problemas Detectados</CardTitle></CardHeader>
+                      <CardContent><ul className="text-sm space-y-2">{research.seo_audit.issues.map((issue: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2 bg-destructive/5 rounded p-2">
+                          <span className="text-destructive mt-0.5 flex-shrink-0">⚠️</span>
+                          <span className="text-sm">{issue}</span>
+                        </li>
+                      ))}</ul></CardContent>
                     </Card>
                   )}
                   {research.seo_audit.recommendations?.length > 0 && (
                     <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Lightbulb className="h-4 w-4" /> Recomendaciones</CardTitle></CardHeader>
-                      <CardContent><ul className="text-sm space-y-1.5">{research.seo_audit.recommendations.map((rec: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="text-primary mt-0.5">✅</span><span>{rec}</span></li>)}</ul></CardContent>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Lightbulb className="h-4 w-4" /> Acciones Prioritarias</CardTitle></CardHeader>
+                      <CardContent><ul className="text-sm space-y-2">{research.seo_audit.recommendations.map((rec: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2 bg-primary/5 rounded p-2">
+                          <span className="text-primary mt-0.5 flex-shrink-0">✅</span>
+                          <span className="text-sm">{rec}</span>
+                        </li>
+                      ))}</ul></CardContent>
                     </Card>
                   )}
                 </div>
+
+                {/* Detailed Analysis Cards */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {research.seo_audit.meta_analysis && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5 text-primary"><BarChart3 className="h-3.5 w-3.5" /> Meta & Estructura</CardTitle></CardHeader>
+                      <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{research.seo_audit.meta_analysis}</p></CardContent>
+                    </Card>
+                  )}
+                  {research.seo_audit.content_quality && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5 text-primary"><FileText className="h-3.5 w-3.5" /> Calidad de Contenido</CardTitle></CardHeader>
+                      <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{research.seo_audit.content_quality}</p></CardContent>
+                    </Card>
+                  )}
+                  {research.seo_audit.mobile_readiness && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5 text-primary"><Globe className="h-3.5 w-3.5" /> Mobile & Velocidad</CardTitle></CardHeader>
+                      <CardContent><p className="text-xs text-muted-foreground leading-relaxed">{research.seo_audit.mobile_readiness}</p></CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {research.seo_audit.competitive_seo_gap && (
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-primary"><Trophy className="h-4 w-4" /> GAP SEO vs Competencia</CardTitle></CardHeader>
+                    <CardContent><p className="text-sm leading-relaxed">{research.seo_audit.competitive_seo_gap}</p></CardContent>
+                  </Card>
+                )}
               </>
             )}
           </TabsContent>
@@ -1051,23 +1112,72 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {research.keywords.primary?.length > 0 && (
+              <div className="space-y-4">
+                {/* Primary + Long Tail */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {research.keywords.primary?.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Keywords Principales</CardTitle></CardHeader>
+                      <CardContent><div className="flex flex-wrap gap-1.5">{research.keywords.primary.map((kw: string, i: number) => <Badge key={i} variant="default" className="text-xs">{kw}</Badge>)}</div></CardContent>
+                    </Card>
+                  )}
+                  {research.keywords.long_tail?.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Search className="h-4 w-4 text-primary" /> Long-tail (Baja Competencia)</CardTitle></CardHeader>
+                      <CardContent><div className="flex flex-wrap gap-1.5">{research.keywords.long_tail.map((kw: string, i: number) => <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>)}</div></CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Competitor + Negative + Seasonal */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {research.keywords.competitor_keywords?.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5 text-primary" /> De Competidores</CardTitle></CardHeader>
+                      <CardContent><div className="flex flex-wrap gap-1">{research.keywords.competitor_keywords.map((kw: string, i: number) => <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>)}</div></CardContent>
+                    </Card>
+                  )}
+                  {research.keywords.negative_keywords?.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Keywords Negativas</CardTitle></CardHeader>
+                      <CardContent><div className="flex flex-wrap gap-1">{research.keywords.negative_keywords.map((kw: string, i: number) => <Badge key={i} variant="outline" className="text-xs border-destructive text-destructive">{kw}</Badge>)}</div></CardContent>
+                    </Card>
+                  )}
+                  {research.keywords.seasonal_keywords?.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-primary" /> Estacionales</CardTitle></CardHeader>
+                      <CardContent><div className="flex flex-wrap gap-1">{research.keywords.seasonal_keywords.map((kw: string, i: number) => <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>)}</div></CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Google Ads Match Types */}
+                {research.keywords.google_ads_match_types && (
                   <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Keywords Principales</CardTitle></CardHeader>
-                    <CardContent><div className="flex flex-wrap gap-1.5">{research.keywords.primary.map((kw: string, i: number) => <Badge key={i} variant="default" className="text-xs">{kw}</Badge>)}</div></CardContent>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Match Types para Google Ads</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-primary mb-1.5">Exacta [exact]</p>
+                          <div className="space-y-1">{(research.keywords.google_ads_match_types.exact || []).map((kw: string, i: number) => <p key={i} className="text-xs font-mono bg-muted rounded px-2 py-1">{kw}</p>)}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-primary mb-1.5">Frase "phrase"</p>
+                          <div className="space-y-1">{(research.keywords.google_ads_match_types.phrase || []).map((kw: string, i: number) => <p key={i} className="text-xs font-mono bg-muted rounded px-2 py-1">{kw}</p>)}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-primary mb-1.5">Amplia +modificada</p>
+                          <div className="space-y-1">{(research.keywords.google_ads_match_types.broad_modified || []).map((kw: string, i: number) => <p key={i} className="text-xs font-mono bg-muted rounded px-2 py-1">{kw}</p>)}</div>
+                        </div>
+                      </div>
+                    </CardContent>
                   </Card>
                 )}
-                {research.keywords.long_tail?.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Search className="h-4 w-4 text-primary" /> Long-tail</CardTitle></CardHeader>
-                    <CardContent><div className="flex flex-wrap gap-1.5">{research.keywords.long_tail.map((kw: string, i: number) => <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>)}</div></CardContent>
-                  </Card>
-                )}
+
                 {research.keywords.recommended_strategy && (
-                  <Card className="md:col-span-2 bg-primary/5">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia Recomendada</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm">{research.keywords.recommended_strategy}</p></CardContent>
+                  <Card className="md:col-span-2 bg-primary/5 border-primary/20">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia de Keywords Completa</CardTitle></CardHeader>
+                    <CardContent><p className="text-sm leading-relaxed">{research.keywords.recommended_strategy}</p></CardContent>
                   </Card>
                 )}
               </div>
