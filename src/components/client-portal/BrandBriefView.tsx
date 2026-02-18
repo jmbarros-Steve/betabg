@@ -834,17 +834,23 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   <div className="flex items-center gap-3">
                     <img src={avatarSteve} alt="Steve" className="h-12 w-12 rounded-full border-2 border-primary/20 shadow-md" />
                     <div>
-                      <CardTitle className="text-lg">Evaluación Estratégica</CardTitle>
+                      <CardTitle className="text-lg">Evaluación Estratégica — 7 Accionables</CardTitle>
                       <CardDescription className="text-xs">Dr. Steve Dogs — PhD Performance Marketing, Stanford</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&_th]:bg-primary/10 [&_th]:text-left [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
+                  <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:border-l-2 [&>h3]:border-primary/30 [&>h3]:pl-3 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&_th]:bg-primary/10 [&_th]:text-left [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{
-                      // Strip any informal preamble before the first ## header
+                      // Show section 7 (Evaluación Estratégica) specifically
                       (() => {
                         const raw = briefData.summary || '';
+                        // Try to find section 7
+                        const section7Match = raw.match(/##\s*7\./);
+                        if (section7Match && section7Match.index !== undefined) {
+                          return raw.slice(section7Match.index);
+                        }
+                        // Fallback: strip preamble before first ##
                         const firstHeader = raw.indexOf('## ');
                         return firstHeader > 0 ? raw.slice(firstHeader) : raw;
                       })()
