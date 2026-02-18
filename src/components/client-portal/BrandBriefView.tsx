@@ -1429,26 +1429,28 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <MessageSquare className="h-3 w-3" /> Lo que Dice
                         </p>
-                        {getResponse('persona_words') ? (
+                      {getResponse('persona_words') ? (
                           <ul className="space-y-1">
-                            {getResponse('persona_words')
-                              .split(/\n|(?<=[.!?"])\s+(?=["']|[A-ZÁÉÍÓÚ])/g)
-                              .map(l =>
-                                l
-                                  .replace(/^[-•*\d.)]+\s*/, '')   // remove list markers
-                                  .replace(/^["'«""]/, '')          // remove opening quotes
-                                  .replace(/["'»""]$/, '')          // remove closing quotes
-                                  .replace(/^\s*\/\s*$/, '')        // remove bare slash lines
-                                  .replace(/^\//, '')               // remove leading slash
-                                  .replace(/\/$/, '')               // remove trailing slash
-                                  .trim()
-                              )
-                              .filter(s => s.length > 5 && s !== '/' && !/^[^\w\s]{1,3}$/.test(s))
-                              .map((frase, i) => (
+                            {(() => {
+                              const raw = getResponse('persona_words');
+                              // Split by: slash separator, newlines, numbered list items, or sentence-ending quotes
+                              const parts = raw
+                                .split(/\s*\/\s*|\n+/)
+                                .map(l =>
+                                  l
+                                    .replace(/^[-•*\d.)]+\s*/, '')   // remove list markers like "1." "•" "-"
+                                    .replace(/^["'«""]\s*/, '')       // remove opening quotes
+                                    .replace(/\s*["'»""]$/, '')       // remove closing quotes
+                                    .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+/, '') // strip leading non-alpha
+                                    .trim()
+                                )
+                                .filter(s => s.length > 8 && /[a-zA-ZáéíóúÁÉÍÓÚ]/.test(s));
+                              return parts.map((frase, i) => (
                                 <li key={i} className="text-sm italic text-muted-foreground border-l-2 border-primary/20 pl-2">
                                   "{frase}"
                                 </li>
-                              ))}
+                              ));
+                            })()}
                           </ul>
                         ) : <p className="text-sm text-muted-foreground italic">Pendiente</p>}
                       </div>
@@ -1654,7 +1656,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 <CardContent className="pt-4">
                   {(() => {
                     const raw = briefData.summary || '';
-                    const section7Match = raw.match(/##\s*7\./);
+                    // Find section 7 — support both "## 7." and "## 7 " variants
+                    const section7Match = raw.match(/##\s*7[\.\s]/);
                     if (!section7Match || section7Match.index === undefined) {
                       return (
                         <p className="text-sm text-muted-foreground italic">La evaluación estratégica se generará al completar el brief.</p>
@@ -1662,22 +1665,29 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     }
                     const section7Text = raw.slice(section7Match.index);
 
-                    // Split into blocks starting at each ### Accionable N
-                    const accionableBlocks = section7Text
-                      .split(/(?=###\s*Accionable\s*\d)/gi)
-                      .filter(b => b.trim().match(/^###\s*Accionable\s*\d/i));
+                    // Find first accionable marker — flexible regex: "### Accionable 1" or "### 1." etc
+                    const firstAcc = section7Text.search(/###\s*(Accionable\s*)?\d/i);
+                    const introText = firstAcc > 0
+                      ? section7Text.slice(0, firstAcc).replace(/^##[^#\n]*\n/, '').replace(/\*\*/g, '').replace(/^#+\s*/gm, '').trim()
+                      : '';
 
-                    if (accionableBlocks.length >= 2) {
-                      // Show intro paragraph above if exists
-                      const introEnd = section7Text.indexOf('### Accionable');
-                      const introText = introEnd > 0 ? section7Text.slice(0, introEnd).replace(/^##[^#\n]*\n/, '').trim() : '';
+                    // Split from first accionable onward into individual blocks
+                    const accionableSection = firstAcc >= 0 ? section7Text.slice(firstAcc) : section7Text;
+                    // Split preserving the delimiter — use lookahead on ### followed by Accionable or number
+                    const accionableBlocks = accionableSection
+                      .split(/(?=###\s*(Accionable\s*)?\d)/gi)
+                      .map(b => b.trim())
+                      .filter(b => b.length > 20 && /###/.test(b));
+
+                    if (accionableBlocks.length >= 1) {
                       return (
                         <div className="space-y-4">
                           {introText && (
                             <div className="bg-muted/30 rounded-lg p-4 border border-border">
-                              <p className="text-xs text-muted-foreground leading-relaxed">{introText.replace(/\*\*/g, '').replace(/^#+\s*/gm, '')}</p>
+                              <p className="text-xs text-muted-foreground leading-relaxed italic">{introText}</p>
                             </div>
                           )}
+                          {/* Show exactly up to 7 accionables */}
                           <ExpandableAccionables blocks={accionableBlocks.slice(0, 7)} />
                         </div>
                       );

@@ -424,13 +424,14 @@ REGLAS CRÍTICAS:
     const researchTypes = ['seo_audit', 'competitor_analysis', 'keywords', 'ads_library_analysis', 'cost_benchmarks', 'seo_roadmap', 'competitive_domination'];
     for (const rt of researchTypes) {
       if (result[rt]) {
-        await supabase
+        const { error: upsertErr } = await supabase
           .from('brand_research')
           .upsert({
             client_id,
             research_type: rt,
             research_data: result[rt],
           }, { onConflict: 'client_id,research_type' });
+        if (upsertErr) console.error(`Error saving ${rt}:`, upsertErr);
       }
     }
 
@@ -444,6 +445,15 @@ REGLAS CRÍTICAS:
           research_data: { summary: result.executive_summary },
         }, { onConflict: 'client_id,research_type' });
     }
+
+    // CRITICAL: Mark analysis as complete so UI polling stops showing "pending"
+    await supabase
+      .from('brand_research')
+      .upsert({
+        client_id,
+        research_type: 'analysis_status',
+        research_data: { status: 'complete', completed_at: new Date().toISOString() },
+      }, { onConflict: 'client_id,research_type' });
 
     // Update client's website_url
     if (website_url) {
