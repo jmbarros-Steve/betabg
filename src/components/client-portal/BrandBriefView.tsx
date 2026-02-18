@@ -464,7 +464,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (briefData.summary) {
       addSectionHeader('6', 'EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS');
       let planText = briefData.summary;
-      // Find section 7 (Evaluación)
       const section7Match = planText.match(/##\s*7\./);
       const section6Match = planText.match(/##\s*6\./);
       const startMatch = section7Match || section6Match;
@@ -472,25 +471,286 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         planText = planText.slice(startMatch.index);
       }
       const planLines = planText.split('\n').filter(l => l.trim());
+      let accionableNum = 0;
       for (const line of planLines) {
-        const trimmed = line.trim()
-          .replace(/^#+\s*/, '')
-          .replace(/\*\*/g, '');
+        const trimmed = line.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
         if (!trimmed) continue;
         if (trimmed.match(/^\|[\s-:]+\|$/)) continue;
-        if (trimmed.match(/^Accionable\s+\d+/i) || trimmed.match(/^\d+\.\s/) || trimmed.match(/^(Fase|KPI|Riesgo|Meta|Plazo|Qué hacer|Por qué|Responsable)/i)) {
-          addSubTitle(trimmed);
+        if (trimmed.match(/^Accionable\s+\d+/i) || (trimmed.match(/^\d+\.\s/) && trimmed.length < 80)) {
+          accionableNum++;
+          checkPage(12);
+          doc.setFillColor(26, 35, 126);
+          doc.circle(margin + 4, y - 1, 3, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9.5);
+          doc.setTextColor(accentR, accentG, accentB);
+          doc.text(trimmed, margin + 10, y);
+          doc.setTextColor(0, 0, 0);
+          y += 5.5;
+        } else if (trimmed.match(/^(KPI|Responsable|Plazo|Meta):/i)) {
+          checkPage(6);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          const kpiLabel = trimmed.split(':')[0] + ':';
+          const kpiVal = trimmed.slice(kpiLabel.length).trim();
+          doc.text(kpiLabel, margin + 12, y);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(30, 30, 30);
+          const kpiLines = doc.splitTextToSize(kpiVal, maxWidth - 36);
+          doc.text(kpiLines[0] || '', margin + 12 + doc.getTextWidth(kpiLabel) + 1, y);
+          y += 4.2;
         } else if (trimmed.startsWith('|')) {
           const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
           if (cells.length >= 2) {
             addKeyValue(cells[0].trim(), cells.slice(1).map(c => c.trim()).join(' — '));
           }
         } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
-          addBody(trimmed, 4);
+          addBody(trimmed, 6);
         } else {
-          addBody(trimmed);
+          addBody(trimmed, 4);
         }
       }
+    }
+
+    // === 7. AUDITORÍA SEO ===
+    if (research.seo_audit) {
+      const seo = research.seo_audit;
+      addSectionHeader('7', 'AUDITORÍA SEO — ' + (clientInfo?.website_url || ''));
+      
+      // Score box
+      checkPage(20);
+      doc.setFillColor(26, 35, 126);
+      doc.roundedRect(margin, y, 36, 16, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text(String(seo.score || '?'), margin + 10, y + 10);
+      doc.setFontSize(8);
+      doc.text('/100', margin + 22, y + 10);
+      
+      // Score label
+      const scoreLabel = (seo.score || 0) >= 70 ? 'Bueno' : (seo.score || 0) >= 40 ? 'Regular' : 'Crítico';
+      doc.setFontSize(9);
+      doc.setTextColor(26, 35, 126);
+      doc.text(`Estado: ${scoreLabel}`, margin + 40, y + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`${seo.issues?.length || 0} problemas detectados  •  ${seo.recommendations?.length || 0} acciones recomendadas`, margin + 40, y + 11);
+      y += 20;
+
+      if (seo.issues?.length > 0) {
+        addSubTitle('Problemas Detectados');
+        for (const issue of seo.issues.slice(0, 6)) {
+          addBody(`⚠ ${issue}`, 2);
+        }
+      }
+      if (seo.recommendations?.length > 0) {
+        addSubTitle('Acciones Prioritarias');
+        for (const rec of seo.recommendations.slice(0, 6)) {
+          addBody(`✓ ${rec}`, 2);
+        }
+      }
+      if (seo.meta_analysis) { addSubTitle('Meta & Estructura'); addBody(seo.meta_analysis); }
+      if (seo.content_quality) { addSubTitle('Calidad de Contenido'); addBody(seo.content_quality); }
+      if (seo.competitive_seo_gap) { addSubTitle('GAP SEO vs Competencia'); addBody(seo.competitive_seo_gap); }
+    }
+
+    // === 8. KEYWORDS ===
+    if (research.keywords) {
+      const kw = research.keywords;
+      addSectionHeader('8', 'ANÁLISIS DE KEYWORDS — ESTRATEGIA SEM');
+
+      const renderKwGroup = (label: string, list: string[]) => {
+        if (!list?.length) return;
+        addSubTitle(label);
+        const joined = list.join('  |  ');
+        addBody(joined, 2);
+        y += 1;
+      };
+
+      renderKwGroup('Keywords Principales', kw.primary || []);
+      renderKwGroup('Long-tail (Baja Competencia)', kw.long_tail || []);
+      renderKwGroup('Keywords de Competidores', kw.competitor_keywords || []);
+      renderKwGroup('Keywords Negativas', kw.negative_keywords || []);
+      renderKwGroup('Keywords Estacionales', kw.seasonal_keywords || []);
+
+      if (kw.google_ads_match_types) {
+        const mt = kw.google_ads_match_types;
+        addSubTitle('Match Types para Google Ads');
+        checkPage(30);
+        const colW = (maxWidth - 6) / 3;
+        const tableY = y;
+        // Headers
+        doc.setFillColor(230, 233, 245);
+        doc.rect(margin, tableY, maxWidth, 7, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(26, 35, 126);
+        doc.text('[Exacta]', margin + 2, tableY + 5);
+        doc.text('"Frase"', margin + colW + 2, tableY + 5);
+        doc.text('+Amplia', margin + colW * 2 + 2, tableY + 5);
+        y = tableY + 9;
+        const maxRows = Math.max((mt.exact || []).length, (mt.phrase || []).length, (mt.broad_modified || []).length);
+        for (let i = 0; i < Math.min(maxRows, 5); i++) {
+          checkPage(5);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(40, 40, 40);
+          if (mt.exact?.[i]) doc.text(mt.exact[i], margin + 2, y);
+          if (mt.phrase?.[i]) doc.text(mt.phrase[i], margin + colW + 2, y);
+          if (mt.broad_modified?.[i]) doc.text(mt.broad_modified[i], margin + colW * 2 + 2, y);
+          y += 4.5;
+        }
+        y += 2;
+      }
+
+      if (kw.recommended_strategy) {
+        addSubTitle('Estrategia de Keywords Recomendada');
+        addBody(kw.recommended_strategy);
+      }
+    }
+
+    // === 9. INTELIGENCIA COMPETITIVA ===
+    if (research.competitor_analysis || research.ads_library_analysis) {
+      addSectionHeader('9', 'INTELIGENCIA COMPETITIVA & ADS LIBRARY');
+
+      if (research.competitor_analysis?.benchmark_summary) {
+        addSubTitle('Benchmark del Mercado');
+        addBody(research.competitor_analysis.benchmark_summary);
+      }
+
+      const competitors = research.competitor_analysis?.competitors || [];
+      for (let i = 0; i < Math.min(competitors.length, 5); i++) {
+        const comp = competitors[i];
+        checkPage(28);
+        // Competitor header bar
+        doc.setFillColor(230, 233, 245);
+        doc.roundedRect(margin, y, maxWidth, 8, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(26, 35, 126);
+        doc.text(`${i + 1}. ${comp.name || comp.url || 'Competidor'}`, margin + 3, y + 5.5);
+        if (comp.url) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(100, 100, 180);
+          doc.text(comp.url, pageWidth - margin - 3, y + 5.5, { align: 'right' });
+        }
+        y += 11;
+
+        if (comp.value_proposition) { addKeyValue('Propuesta de Valor', comp.value_proposition); }
+        if (comp.positioning) { addKeyValue('Posicionamiento', comp.positioning); }
+        if (comp.price_positioning) { addKeyValue('Precio', comp.price_positioning); }
+        if (comp.tech_stack) { addKeyValue('Stack Tech', comp.tech_stack); }
+        if (comp.ad_strategy) { addKeyValue('Estrategia Ads', comp.ad_strategy); }
+
+        const strengths = comp.strengths?.slice(0, 3) || [];
+        const weaknesses = comp.weaknesses?.slice(0, 3) || [];
+        if (strengths.length > 0) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(26, 35, 126);
+          doc.text('Fortalezas:', margin + 4, y); y += 4;
+          for (const s of strengths) { addBody(`+ ${s}`, 6); }
+        }
+        if (weaknesses.length > 0) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(180, 30, 30);
+          doc.text('Debilidades:', margin + 4, y); doc.setTextColor(0,0,0); y += 4;
+          for (const w of weaknesses) { addBody(`- ${w}`, 6); }
+        }
+        y += 3;
+      }
+
+      if (research.competitor_analysis?.market_gaps?.length > 0) {
+        addSubTitle('Oportunidades de Mercado Detectadas');
+        for (let i = 0; i < research.competitor_analysis.market_gaps.length; i++) {
+          addBody(`${i + 1}. ${research.competitor_analysis.market_gaps[i]}`, 2);
+        }
+        if (research.competitor_analysis.competitive_advantage) {
+          addSubTitle('Ventaja Competitiva Recomendada');
+          addBody(research.competitor_analysis.competitive_advantage);
+        }
+      }
+
+      // Ads Library
+      if (research.ads_library_analysis) {
+        const ads = research.ads_library_analysis;
+        addSubTitle('Análisis de Meta Ads Library — Patrones Ganadores');
+        if (ads.winning_patterns?.length > 0) {
+          for (const p of ads.winning_patterns.slice(0, 5)) { addBody(`★ ${p}`, 2); }
+        }
+        if (ads.hook_ideas?.length > 0) {
+          addSubTitle('Ideas de Hook / Gancho para Anuncios');
+          for (const h of ads.hook_ideas.slice(0, 4)) { addBody(`→ ${h}`, 2); }
+        }
+        if (ads.cta_analysis) { addSubTitle('Análisis de CTAs'); addBody(ads.cta_analysis); }
+        if (ads.creative_recommendations?.length > 0) {
+          addSubTitle('Recomendaciones Creativas');
+          for (const r of ads.creative_recommendations.slice(0, 4)) { addBody(`• ${r}`, 2); }
+        }
+      }
+    }
+
+    // === 10. PRÓXIMOS PASOS — PLANIFICACIÓN DE ANUNCIOS ===
+    addSectionHeader('10', 'PRÓXIMOS PASOS — PLANIFICACIÓN DE ANUNCIOS');
+    checkPage(60);
+
+    const steps = [
+      {
+        num: '01',
+        title: 'Conectar Plataformas de Advertising',
+        body: 'Conectar Shopify, Meta Ads, Google Ads y Klaviyo al portal de BG Consult para que Steve acceda a métricas reales y genere recomendaciones en tiempo real. Sin datos conectados, no hay optimización posible.',
+        kpi: 'Plataformas conectadas ≥ 3',
+      },
+      {
+        num: '02',
+        title: 'Planificar Campañas con Steve (IA)',
+        body: `Con el Brief completo, Steve ya conoce al Buyer Persona, el dolor, el CPA Máximo Viable ($${cpaMax}) y el posicionamiento. El siguiente paso es generar los copies de anuncios para Meta y Google Ads directamente desde el portal.`,
+        kpi: `CPA objetivo ≤ $${cpaMax} | ROAS ≥ 3x`,
+      },
+      {
+        num: '03',
+        title: 'Configurar Flujos de Email en Klaviyo',
+        body: 'Activar flujos automatizados: abandono de carrito, bienvenida, post-compra y recuperación de clientes inactivos. Estos flujos son el canal de mayor ROAS en e-commerce.',
+        kpi: 'Ingresos atribuidos a email ≥ 20% del total',
+      },
+      {
+        num: '04',
+        title: 'Monitorear Métricas y Optimizar',
+        body: 'Revisar semanalmente en el dashboard: ROAS, CPA real vs. CPA máximo viable, tasa de conversión y LTV. Steve genera recomendaciones automáticas cuando detecta anomalías.',
+        kpi: 'Revisión semanal de KPIs — Dashboard BG Consult',
+      },
+    ];
+
+    for (const step of steps) {
+      checkPage(24);
+      doc.setFillColor(26, 35, 126);
+      doc.roundedRect(margin, y, 12, 12, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.text(step.num, margin + 2.5, y + 8);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(accentR, accentG, accentB);
+      doc.text(step.title, margin + 16, y + 5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(50, 50, 50);
+      const bodyLines = doc.splitTextToSize(step.body, maxWidth - 20);
+      let stepY = y + 10;
+      for (const line of bodyLines) {
+        checkPage(5);
+        doc.text(line, margin + 16, stepY);
+        stepY += 4;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(26, 35, 126);
+      doc.text(`KPI: ${step.kpi}`, margin + 16, stepY + 1);
+      y = stepY + 7;
     }
 
     // === SIGNATURE ===
