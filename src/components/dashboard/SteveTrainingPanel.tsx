@@ -190,7 +190,7 @@ export function SteveTrainingPanel() {
           campaign_metrics: metricsJson,
           correct_analysis: exampleForm.correct,
           incorrect_analysis: exampleForm.incorrect || null,
-          tags: exampleForm.tags.split(',').map(t => t.trim()).filter(Boolean),
+          tags: exampleForm.tags.split(',').map(t => t == null ? '' : String(t).trim()).filter(Boolean),
           created_by: user.id,
         });
 
