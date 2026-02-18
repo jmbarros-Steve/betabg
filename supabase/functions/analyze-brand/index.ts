@@ -253,10 +253,23 @@ Deno.serve(async (req) => {
 
     const briefContext = persona?.persona_data || {};
 
+    // Helper to persist progress steps
+    async function updateProgress(step: string, detail: string, pct: number) {
+      await supabase
+        .from('brand_research')
+        .upsert(
+          { client_id, research_type: 'analysis_progress', research_data: { step, detail, pct, ts: new Date().toISOString() } },
+          { onConflict: 'client_id,research_type' }
+        );
+    }
+
+    await updateProgress('inicio', 'Iniciando análisis de marca...', 5);
+
     // Scrape website
     let websiteContent = '';
     if (website_url && firecrawlApiKey) {
       try {
+        await updateProgress('sitio_web', `Analizando tu sitio web (${website_url})...`, 10);
         const scrapeResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
@@ -303,6 +316,7 @@ Deno.serve(async (req) => {
 
     if (firecrawlApiKey) {
       try {
+        await updateProgress('detectando', 'Detectando competidores adicionales en el mercado...', 20);
         const searchQuery = `competidores ${client.name} ${client.company || ''} e-commerce Chile tienda online similar`;
         const searchResp = await fetch('https://api.firecrawl.dev/v1/search', {
           method: 'POST',
@@ -327,20 +341,29 @@ Deno.serve(async (req) => {
             })
             .slice(0, 3);
           allCompetitorUrls = [...allCompetitorUrls, ...foundUrls];
-          console.log('Total competitors to analyze:', allCompetitorUrls.length);
+          console.log('Auto-detected additional competitors:', foundUrls);
+          console.log('Total to analyze:', allCompetitorUrls.length);
         }
       } catch (e) {
         console.error('Auto competitor detection error:', e);
       }
     }
 
-    // Scrape all competitors
+    // Analyze all competitors with progress per competitor
     const competitorContents: string[] = [];
-    if (allCompetitorUrls.length && firecrawlApiKey) {
-      for (const url of allCompetitorUrls.slice(0, 6)) {
+    const urlsToAnalyze = allCompetitorUrls.slice(0, 6);
+    const isClientCompetitor = (url: string) => clientProvidedUrls.some(c => url.includes(c.replace('https://', '').replace('http://', '').split('/')[0]));
+
+    if (urlsToAnalyze.length && firecrawlApiKey) {
+      for (let i = 0; i < urlsToAnalyze.length; i++) {
+        const url = urlsToAnalyze[i];
         try {
           let formattedUrl = url.trim();
           if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
+          const domain = new URL(formattedUrl).hostname.replace('www.', '');
+          const label = isClientCompetitor(formattedUrl) ? `Analizando competidor (indicado por ti): ${domain}` : `Analizando competidor detectado: ${domain}`;
+          const pct = 25 + Math.round((i / urlsToAnalyze.length) * 40);
+          await updateProgress(`competidor_${i}`, label, pct);
           const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
@@ -367,6 +390,8 @@ Deno.serve(async (req) => {
       clientProvidedUrls,
       brandContext
     );
+
+    await updateProgress('ia', `Generando plan estratégico con inteligencia artificial (${competitorContents.length} competidores analizados)...`, 70);
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
