@@ -757,12 +757,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     };
 
     const addWatermark = () => {
-      const pg = doc.getCurrentPageInfo().pageNumber;
       doc.saveGraphicsState();
       // @ts-ignore
-      doc.setGState(new doc.GState({ opacity: 0.06 }));
+      doc.setGState(new doc.GState({ opacity: 0.03 }));
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(28);
+      doc.setFontSize(20);
       doc.setTextColor(100, 100, 100);
       doc.text('Preparado por STEVE.IO', pageWidth / 2, pageHeight / 2, {
         align: 'center', angle: 45,
@@ -819,7 +818,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     const addSectionHeader = (num: string, title: string) => {
       checkPage(18);
-      y += 6;
+      y += 14; // increased spacing before section
       // Circle number
       doc.setFillColor(accentR, accentG, accentB);
       doc.circle(margin + 5, y + 3, 5, 'F');
@@ -887,24 +886,41 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     };
 
     const addTableRow = (cells: string[], colWidths: number[], rowIdx: number, header = false) => {
-      checkPage(8);
-      const rowH = 8;
+      checkPage(10);
+      const rowH = 9;
+      const rowX = margin;
+      let cx = rowX;
       if (header) {
         doc.setFillColor(brandR, brandG, brandB);
       } else {
-        doc.setFillColor(rowIdx % 2 === 0 ? 255 : 245, rowIdx % 2 === 0 ? 255 : 246, rowIdx % 2 === 0 ? 255 : 252);
+        if (rowIdx % 2 === 0) {
+          doc.setFillColor(255, 255, 255);
+        } else {
+          doc.setFillColor(245, 246, 252);
+        }
       }
-      let cx = margin;
-      doc.rect(margin, y - 1, maxWidth, rowH, 'F');
+      // fill background
+      doc.rect(rowX, y, maxWidth, rowH, 'F');
+      // cell borders
+      doc.setDrawColor(204, 204, 204);
+      doc.setLineWidth(0.2);
+      doc.rect(rowX, y, maxWidth, rowH, 'S');
+      cx = rowX;
       doc.setFont('helvetica', header ? 'bold' : 'normal');
-      doc.setFontSize(header ? 8.5 : 8);
+      doc.setFontSize(header ? 9 : 8.5);
       doc.setTextColor(header ? 255 : 40, header ? 255 : 40, header ? 255 : 40);
       for (let i = 0; i < cells.length; i++) {
-        const txt = String(cells[i] ?? '').slice(0, 38);
-        doc.text(txt, cx + 2, y + 4.5);
+        // vertical divider between cells
+        if (i > 0) {
+          doc.setDrawColor(204, 204, 204);
+          doc.setLineWidth(0.2);
+          doc.line(cx, y, cx, y + rowH);
+        }
+        const txt = String(cells[i] ?? '').slice(0, 50);
+        doc.text(txt, cx + 6, y + 6);
         cx += colWidths[i];
       }
-      y += rowH + 1;
+      y += rowH;
     };
 
     // ─── PAGE 1: PORTADA (FULL NAVY) ────────────────────────────────────────────
@@ -1011,22 +1027,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     y += 2 * (kpiH + 6) + 10;
 
-    // Semáforo SEO
-    const seoScore = research.seo_audit?.score ?? 0;
-    checkPage(30);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(brandR, brandG, brandB);
-    doc.text('Estado SEO:', margin + 2, y);
-    const seoStatusColor: [number, number, number] = seoScore >= 70 ? [22, 160, 70] : seoScore >= 50 ? [200, 150, 0] : [200, 40, 40];
-    const seoStatusLabel = seoScore >= 70 ? 'BUENO' : seoScore >= 50 ? 'REGULAR' : 'CRITICO';
-    doc.setFillColor(...seoStatusColor);
-    doc.circle(margin + 45, y - 2, 5, 'F');
-    doc.setTextColor(...seoStatusColor);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text(`${seoStatusLabel} (${seoScore}/100)`, margin + 53, y);
-    y += 14;
+    // (SEO semáforo moved to SEO audit section — removed from KPI dashboard)
+
 
     // ─── PAGE 3: RESUMEN EJECUTIVO PARA DIRECTORIO ──────────────────────────────
     doc.addPage();
@@ -1100,9 +1102,27 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       addKeyValue('Precio de Venta', formatCurrency(financials.price));
       addKeyValue('Costo del Producto', formatCurrency(financials.cost));
       addKeyValue('Costo de Envio', formatCurrency(financials.shipping));
-      addKeyValue('Margen Bruto', `${formatCurrency(margin)} (${marginPct}%)`);
+      addKeyValue('Margen Bruto', `${formatCurrency(financials.price - financials.cost - financials.shipping)} (${marginPct}%)`);
       addKeyValue('CPA Maximo Viable', `$${cpaMax}`);
+      // CPA explanation box
+      if (cpaMax && margin !== null) {
+        checkPage(22);
+        doc.setFillColor(255, 253, 240);
+        doc.roundedRect(margin, y, maxWidth, 20, 1, 1, 'F');
+        doc.setDrawColor(accentR, accentG, accentB);
+        doc.setLineWidth(1.5);
+        doc.line(margin, y, margin, y + 20);
+        doc.setLineWidth(0.2);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(60, 40, 0);
+        const cpaExplain = `Por que $${cpaMax}? Tu margen bruto unitario es de ${formatCurrency(margin)}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
+        const cpaLines = doc.splitTextToSize(cpaExplain, maxWidth - 10);
+        doc.text(cpaLines.slice(0, 4), margin + 5, y + 6);
+        y += 24;
+      }
     }
+
 
     const q3 = getResponse('sales_channels');
     if (q3) {
@@ -1306,7 +1326,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(brandR, brandG, brandB);
-        doc.text(`${i + 1}. ${comp.name || comp.url || 'Competidor'}`, margin + 3, y + 6);
+        // Fix #6: use helvetica to avoid character-spaced monospace rendering
+        const compDisplayName = String(comp.name || comp.url || 'Competidor');
+        doc.text(`${i + 1}. ${compDisplayName}`, margin + 3, y + 6);
         if (comp.seo_score) {
           const sc = comp.seo_score;
           const scColor: [number,number,number] = sc >= 70 ? [22,160,70] : sc >= 50 ? [200,150,0] : [200,40,40];
@@ -1473,18 +1495,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // ─── SECCIÓN: TEMPLATES DE COPY ─────────────────────────────────────────────
     addSectionHeader('12', 'PLANTILLAS DE COPY LISTAS PARA USAR');
 
-    // Meta Ads copies
+    // Meta Ads copies — rendered as proper visual table
     const metaStrategy = research.ads_library_analysis?.meta_ads_strategy;
+    // Use business name from brief (not client name/owner name)
+    const businessName = stripEmojis(getResponse('business_pitch')).split(/[.,\n]/)[0].slice(0, 40).trim() || clientInfo?.company || clientInfo?.name || 'Tu Marca';
     const metaAds = [
       {
         title: 'Meta Ad #1 — TOFU (Video Hook)',
-        texto: metaStrategy?.hooks?.[0] || `¿Sabias que el ${marginPct || '60'}% de tus competidores NO tienen este diferencial? ${clientInfo?.name || 'Nosotros'} si.`,
+        texto: metaStrategy?.hooks?.[0] || `¿Sabias que el ${marginPct || '60'}% de tus competidores NO tienen este diferencial? ${businessName} si.`,
         cta: 'Descubre por que',
         audiencia: 'Cold audience — Lookalike 1-3%',
       },
       {
         title: 'Meta Ad #2 — MOFU (Testimonio)',
-        texto: metaStrategy?.primary_texts?.[0] || `Miles de clientes ya eligieron ${clientInfo?.name || 'nuestra marca'}. CPA optimizado. ROAS garantizado.`,
+        texto: metaStrategy?.primary_texts?.[0] || `Miles de clientes ya eligieron ${businessName}. CPA optimizado. ROAS garantizado.`,
         cta: 'Ver testimonios',
         audiencia: 'Retargeting — visitaron sitio 30d',
       },
@@ -1496,67 +1520,93 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
     ];
 
-    for (const ad of metaAds) {
-      checkPage(30);
-      doc.setFillColor(...lightGray);
-      doc.roundedRect(margin, y, maxWidth, 28, 1, 1, 'F');
-      doc.setDrawColor(accentR, accentG, accentB);
-      doc.setLineWidth(1);
-      doc.line(margin, y, margin, y + 28);
+    // Meta Ads table
+    addSubTitle('Meta Ads — Copies Listos');
+    checkPage(10 + metaAds.length * 11);
+    const metaColWs = [55, 75, 28, 40];
+    const metaHeaders = ['Anuncio', 'Texto Principal', 'CTA', 'Audiencia'];
+    addTableRow(metaHeaders, metaColWs, 0, true);
+    for (let mi = 0; mi < metaAds.length; mi++) {
+      const ad = metaAds[mi];
+      checkPage(12);
+      const rowH = 11;
+      const rowIdx = mi + 1;
+      doc.setFillColor(rowIdx % 2 === 0 ? 255 : 245, rowIdx % 2 === 0 ? 255 : 246, rowIdx % 2 === 0 ? 255 : 252);
+      doc.rect(margin, y, maxWidth, rowH, 'F');
+      doc.setDrawColor(204, 204, 204);
       doc.setLineWidth(0.2);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(brandR, brandG, brandB);
-      doc.text(ad.title, margin + 5, y + 6);
+      doc.rect(margin, y, maxWidth, rowH, 'S');
+      const mCols = [
+        ad.title.replace('Meta Ad ', ''),
+        stripEmojis(ad.texto).slice(0, 55),
+        ad.cta,
+        ad.audiencia.slice(0, 28),
+      ];
+      let mcx = margin;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(50, 50, 50);
-      const tLines = doc.splitTextToSize(stripEmojis(ad.texto), maxWidth - 12);
-      let ty = y + 11;
-      for (const tl of tLines.slice(0, 2)) { doc.text(tl, margin + 5, ty); ty += 4.5; }
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(accentR, accentG, accentB);
-      doc.text(`CTA: ${ad.cta}`, margin + 5, y + 21);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
       doc.setFontSize(7.5);
-      doc.text(`Audiencia: ${ad.audiencia}`, margin + 5, y + 26);
-      y += 32;
+      doc.setTextColor(40, 40, 40);
+      for (let ci = 0; ci < mCols.length; ci++) {
+        if (ci > 0) {
+          doc.setDrawColor(204, 204, 204);
+          doc.line(mcx, y, mcx, y + rowH);
+        }
+        doc.text(mCols[ci], mcx + 4, y + 7);
+        mcx += metaColWs[ci];
+      }
+      y += rowH;
     }
+    y += 8;
 
-    // Google Ads copies
+    // Google Ads copies — rendered as proper visual table
     const googleStrategy = research.ads_library_analysis?.google_ads_strategy;
     addSubTitle('Google Ads — Copies Listos');
+    checkPage(10 + 3 * 11);
     const googleAds = [
       {
-        headline: googleStrategy?.headlines?.[0] || `${(clientInfo?.name || 'Tu Marca').slice(0, 25)} | Oficial`,
-        desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis. ${cpaMax ? `CPA optimizado: $${cpaMax}.` : ''}`,
+        headline: googleStrategy?.headlines?.[0] || `${businessName.slice(0, 25)} | Oficial`,
+        desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis. ${cpaMax ? `CPA: $${cpaMax}.` : ''}`,
         url: clientInfo?.website_url || 'tusitio.com',
       },
       {
-        headline: googleStrategy?.headlines?.[1] || `Compra ${(clientInfo?.name || 'Aqui').slice(0, 20)} — Ahora`,
+        headline: googleStrategy?.headlines?.[1] || `Compra ${businessName.slice(0, 20)} — Ahora`,
         desc: googleStrategy?.descriptions?.[1] || `Resultados probados. Miles de clientes satisfechos. Garantia incluida.`,
         url: clientInfo?.website_url || 'tusitio.com',
       },
     ];
-
-    for (const gad of googleAds) {
-      checkPage(22);
-      doc.setFillColor(240, 246, 255);
-      doc.roundedRect(margin, y, maxWidth, 20, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(26, 90, 180);
-      doc.text(stripEmojis(gad.headline).slice(0, 30), margin + 5, y + 7);
+    const gColWs = [60, 90, 50];
+    const gHeaders = ['Headline (30 car.)', 'Descripcion (90 car.)', 'URL display'];
+    addTableRow(gHeaders, gColWs, 0, true);
+    for (let gi2 = 0; gi2 < googleAds.length; gi2++) {
+      const gad = googleAds[gi2];
+      checkPage(12);
+      const rowH = 11;
+      const rowIdx = gi2 + 1;
+      doc.setFillColor(rowIdx % 2 === 0 ? 255 : 245, rowIdx % 2 === 0 ? 255 : 246, rowIdx % 2 === 0 ? 255 : 252);
+      doc.rect(margin, y, maxWidth, rowH, 'F');
+      doc.setDrawColor(204, 204, 204);
+      doc.setLineWidth(0.2);
+      doc.rect(margin, y, maxWidth, rowH, 'S');
+      const gCells = [
+        stripEmojis(gad.headline).slice(0, 30),
+        stripEmojis(gad.desc).slice(0, 60),
+        gad.url.replace(/^https?:\/\//, '').slice(0, 30),
+      ];
+      let gcx = margin;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(30, 120, 30);
-      doc.text(gad.url, margin + 5, y + 12);
-      doc.setTextColor(50, 50, 50);
-      const gdLines = doc.splitTextToSize(stripEmojis(gad.desc), maxWidth - 12);
-      doc.text(gdLines.slice(0, 2), margin + 5, y + 17);
-      y += 24;
+      doc.setFontSize(7.5);
+      doc.setTextColor(40, 40, 40);
+      for (let ci = 0; ci < gCells.length; ci++) {
+        if (ci > 0) {
+          doc.setDrawColor(204, 204, 204);
+          doc.line(gcx, y, gcx, y + rowH);
+        }
+        doc.text(gCells[ci], gcx + 4, y + 7);
+        gcx += gColWs[ci];
+      }
+      y += rowH;
     }
+    y += 8;
 
     // ─── SECCIÓN: PRESUPUESTO RECOMENDADO ────────────────────────────────────────
     addSectionHeader('13', 'PRESUPUESTO RECOMENDADO');
@@ -1577,9 +1627,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     y += 8;
 
-    // cost benchmarks from research
-    if (research.cost_benchmarks) {
-      addInsightBox(`Benchmark de mercado: ${JSON.stringify(research.cost_benchmarks).slice(0, 200)}`);
+    // cost benchmarks — show as insight box only if it has named fields, not raw JSON
+    if (research.cost_benchmarks && typeof research.cost_benchmarks === 'object') {
+      const cb = research.cost_benchmarks as Record<string, any>;
+      const cbKeys = Object.keys(cb).slice(0, 4);
+      if (cbKeys.length > 0) {
+        const cbText = cbKeys.map(k => `${k}: ${String(cb[k])}`).join('  |  ');
+        addInsightBox(`Benchmark de mercado: ${cbText}`);
+      }
     }
 
     // ─── SECCIÓN: CHECKLIST DE ACCION INMEDIATA ─────────────────────────────────
@@ -1737,43 +1792,44 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setTextColor(150, 150, 180);
     doc.text('Este informe fue generado por STEVE.IO — Plataforma de Performance Marketing con IA para e-commerce latinoamericano', pageWidth / 2, steveY + 4, { align: 'center', maxWidth: maxWidth });
 
-    // ─── FIRMA ───────────────────────────────────────────────────────────────────
+    // ─── FIRMA — tercio superior compacto ────────────────────────────────────────
     doc.addPage();
-    y = 20;
+    y = 18;
     addWatermark();
 
     try {
       const sigBase64 = await loadImageAsBase64(steveSignature);
-      doc.addImage(sigBase64, 'PNG', margin, y, 40, 16);
-      y += 20;
+      doc.addImage(sigBase64, 'PNG', margin, y, 38, 14);
+      y += 17;
     } catch { y += 4; }
 
     try {
       const avatarBase64 = await loadImageAsBase64(avatarSteve);
-      doc.addImage(avatarBase64, 'PNG', margin, y, 18, 18);
+      doc.addImage(avatarBase64, 'PNG', margin, y, 16, 16);
     } catch {}
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.setTextColor(brandR, brandG, brandB);
-    doc.text('Dr. Steve Dogs', margin + 22, y + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text('PhD Performance Marketing, Stanford Dog University', margin + 22, y + 12);
-    doc.text('Director de Estrategia, BG Consult / STEVE.IO', margin + 22, y + 17);
-    y += 24;
-
+    doc.text('Dr. Steve Dogs', margin + 20, y + 5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(100, 100, 100);
+    doc.text('PhD Performance Marketing, Stanford Dog University', margin + 20, y + 10);
+    doc.text('Director de Estrategia, BG Consult / STEVE.IO', margin + 20, y + 15);
+    y += 20;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
     doc.text(`Fecha de emision: ${new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, y);
-    y += 6;
+    y += 5;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(accentR, accentG, accentB);
     doc.text('ESTRICTAMENTE CONFIDENCIAL — Preparado exclusivamente para uso del cliente indicado.', margin, y);
+
 
     // ─── FOOTERS EN TODAS LAS PÁGINAS ───────────────────────────────────────────
     const pageCount = doc.getNumberOfPages();
