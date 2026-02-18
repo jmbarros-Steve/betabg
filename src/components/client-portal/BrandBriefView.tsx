@@ -149,6 +149,111 @@ function ExpandableAccionables({ blocks }: { blocks: string[] }) {
   );
 }
 
+// Keyword Strategy Timeline component — renders Fase 1/2/3 as a visual timeline
+function KeywordStrategyTimeline({ strategy }: { strategy: string }) {
+  // Parse phases from the strategy text
+  const phases: { num: string; label: string; content: string }[] = [];
+
+  // Split by "Fase X" pattern
+  const faseRegex = /Fase\s*(\d+)\s*[:\-–(]?\s*([^:.\n]*)?[:.]/gi;
+  const parts = strategy.split(/(?=Fase\s*\d)/i);
+
+  for (const part of parts) {
+    if (!part.trim()) continue;
+    const header = part.match(/^Fase\s*(\d+)\s*(?:\(([^)]+)\))?[:\s-]*/i);
+    if (header) {
+      const num = header[1];
+      const labelInParens = header[2] || '';
+      const rest = part.slice(header[0].length).trim();
+      // Extract time label from content if not in parens
+      const timeMatch = rest.match(/^\(?(\d+-\d+\s*d[íi]as?)\)?[:\s-]*/i);
+      const timeLabel = labelInParens || (timeMatch ? timeMatch[1] : `Fase ${num}`);
+      const content = timeMatch ? rest.slice(timeMatch[0].length).trim() : rest;
+      phases.push({ num, label: timeLabel, content });
+    }
+  }
+
+  // Fallback: if no phases parsed, show as plain text
+  if (phases.length === 0) {
+    return (
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Estrategia de Keywords Completa
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm leading-relaxed">{strategy}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const phaseConfig = [
+    { bg: 'bg-blue-500', light: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-400', text: 'text-blue-700 dark:text-blue-300', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', icon: <Zap className="h-4 w-4" /> },
+    { bg: 'bg-violet-500', light: 'bg-violet-50 dark:bg-violet-950/30', border: 'border-violet-400', text: 'text-violet-700 dark:text-violet-300', badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300', icon: <TrendingUp className="h-4 w-4" /> },
+    { bg: 'bg-emerald-500', light: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', icon: <Rocket className="h-4 w-4" /> },
+  ];
+
+  return (
+    <Card className="border-primary/20 overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3 flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary-foreground" />
+        <h3 className="text-sm font-bold text-primary-foreground">Estrategia de Keywords — Hoja de Ruta por Fases</h3>
+      </div>
+
+      <CardContent className="p-4">
+        {/* Timeline */}
+        <div className="relative">
+          {/* Connecting line */}
+          {phases.length > 1 && (
+            <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gradient-to-b from-blue-400 via-violet-400 to-emerald-500 opacity-40" />
+          )}
+
+          <div className="space-y-4">
+            {phases.map((phase, i) => {
+              const cfg = phaseConfig[i % phaseConfig.length];
+              // Parse bullet points from content
+              const bullets = phase.content.split(/(?:\.\s+(?=[A-ZÁÉÍÓÚ])|(?<=\.)\s*\n)/).filter(b => b.trim().length > 10);
+
+              return (
+                <div key={i} className="relative flex gap-3">
+                  {/* Circle indicator */}
+                  <div className={`relative z-10 flex-shrink-0 h-10 w-10 rounded-full ${cfg.bg} flex items-center justify-center text-white shadow-md`}>
+                    {cfg.icon}
+                  </div>
+
+                  {/* Content */}
+                  <div className={`flex-1 ${cfg.light} rounded-xl border ${cfg.border} p-3 min-w-0`}>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                        FASE {phase.num}
+                      </span>
+                      <span className={`text-xs font-semibold ${cfg.text}`}>{phase.label}</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {bullets.length > 1 ? bullets.map((b, bi) => (
+                        <div key={bi} className="flex gap-2 text-xs text-foreground leading-relaxed">
+                          <ArrowRight className={`h-3 w-3 flex-shrink-0 mt-0.5 ${cfg.text}`} />
+                          <span>{b.trim().replace(/^[.\s]+/, '')}</span>
+                        </div>
+                      )) : (
+                        <p className="text-xs text-foreground leading-relaxed">{phase.content}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface BrandBriefViewProps {
   clientId: string;
   onEditBrief: () => void;
@@ -2069,10 +2174,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 )}
 
                 {research.keywords.recommended_strategy && (
-                  <Card className="bg-primary/5 border-primary/20">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia de Keywords Completa</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm leading-relaxed">{research.keywords.recommended_strategy}</p></CardContent>
-                  </Card>
+                  <KeywordStrategyTimeline strategy={research.keywords.recommended_strategy} />
                 )}
 
                 {/* Competitor SEO + Keywords comparison table */}
