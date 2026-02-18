@@ -59,7 +59,7 @@ function ExpandableAccionables({ blocks }: { blocks: string[] }) {
 
         // Plain fallback: if no SCR structure found, use simple card
         if (!hasSCR) {
-          const lines = block.split('\n').map(l => l.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
+          const lines = block.split('\n').map(l => l == null ? '' : String(l).replace(/^#+\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean);
           const title = lines[0] || `Accionable ${i + 1}`;
           const body = lines.slice(1).join(' ').replace(/KPI[:\s]+[^.]+\./i, '').trim();
           const kpiMatch = block.match(/KPI[:\s]+([^.\n]+)/i);
@@ -948,7 +948,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (wordsResp) {
       addSubTitle('Palabras y Objeciones del Cliente');
       // Extract clean lines, not splitting on quote characters
-      const wordLines = wordsResp.split('\n').map(l => l.replace(/^[-•*\d.)\s]+/, '').replace(/^["'«]|["'»]$/g, '').trim()).filter(s => s.length > 4);
+      const wordLines = wordsResp.split('\n').map(l => l == null ? '' : String(l).replace(/^[-•*\d.)\s]+/, '').replace(/^["'«]|["'»]$/g, '').trim()).filter(s => s.length > 4);
       for (const wl of wordLines) { addBody(`"${wl}"`, 2); }
     }
     const transResp = getResponse('persona_transformation');
@@ -1019,7 +1019,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         } else if (trimmed.startsWith('|')) {
           const cells = trimmed.split('|').filter(c => c.trim() && !c.match(/^[-:\s]+$/));
           if (cells.length >= 2) {
-            addKeyValue(cells[0].trim(), cells.slice(1).map(c => c.trim()).join(' — '));
+            addKeyValue(cells[0] == null ? '' : String(cells[0]).trim(), cells.slice(1).map(c => c == null ? '' : String(c).trim()).join(' — '));
           }
         } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
           addBody(trimmed, 6);
@@ -1989,7 +1989,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     // Split preserving the delimiter — use lookahead on ### followed by Accionable or number
                     const accionableBlocks = accionableSection
                       .split(/(?=###\s*(Accionable\s*)?\d)/gi)
-                      .map(b => b.trim())
+                      .map(b => b == null ? '' : String(b).trim())
                       .filter(b => b.length > 20 && /###/.test(b));
 
                     if (accionableBlocks.length >= 1) {
