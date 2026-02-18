@@ -203,25 +203,31 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   async function launchAnalysis(url: string, compUrls: string[]) {
     if (!url.trim()) return;
 
-    // Show banner IMMEDIATELY — before any async calls
+    // 1. Show banner IMMEDIATELY (sync, no delay)
     analyzingRef.current = true;
     setAnalyzing(true);
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
 
-    // Persist status & progress (async, don't await before showing banner)
-    supabase.from('brand_research').upsert({
+    // 2. AWAIT the status upsert to 'pending' BEFORE starting polling
+    // Critical: if we don't await, the status polling may read the OLD 'complete' status
+    // within the first 5-second tick and set analyzing=false, killing the banner.
+    await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
     }, { onConflict: 'client_id,research_type' });
+
+    // Fire progress upsert without await (non-critical)
     supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
       research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date().toISOString() },
     }, { onConflict: 'client_id,research_type' });
 
+    // 3. NOW start polling — DB definitely has status='pending'
     startPolling();
 
+    // 4. Fire edge function (fire-and-forget, polling tracks progress)
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     const projectId = 'jnqivntlkemzcpomkvwv';

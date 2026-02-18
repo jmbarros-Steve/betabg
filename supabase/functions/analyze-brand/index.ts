@@ -414,9 +414,9 @@ Deno.serve(async (req) => {
           });
           const data = await resp.json();
           const content = (data?.data?.markdown || data?.markdown || '').slice(0, 2500);
-          if (content.length > 100) {
-            competitorContents.push(`## ${formattedUrl}\n${content}`);
-          }
+          // Lower threshold: include even if minimal content (just URL as header is enough for AI context)
+          competitorContents.push(`## ${formattedUrl}\n${content || '(Sin contenido disponible)'}`);
+
         } catch (e) {
           console.error('Competitor scrape error:', e);
         }
