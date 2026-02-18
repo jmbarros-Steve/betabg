@@ -14,13 +14,19 @@ function buildAnalysisPrompt(
   clientProvidedUrls: string[],
   brandContext: string
 ): string {
+  // Build an explicit numbered URL list for the AI so it can't "lose" any competitor
+  const allUrls = competitorContents.map(c => c.split('\n')[0].replace('## ', '').trim());
+  const urlListStr = allUrls.map((u, i) => `  ${i + 1}. ${u}${i < clientProvidedUrls.length ? ' ← indicado por el cliente' : ' ← detectado automáticamente'}`).join('\n');
+
   const competitorSection = competitorContents.length > 0
     ? `=== CONTENIDO DE COMPETIDORES ANALIZADOS ===
-IMPORTANTE: Analiza TODOS los siguientes competidores. Los primeros ${clientProvidedUrls.length} son los que el cliente indicó explícitamente. Los siguientes son detectados automáticamente.
-Competidores del cliente: ${clientProvidedUrls.join(', ')}
-Total analizados: ${competitorContents.length}
+CRÍTICO: El array "competitors" en tu respuesta JSON DEBE contener EXACTAMENTE ${competitorContents.length} objetos — uno por cada URL de la lista a continuación. No omitas ninguno.
 
-${competitorContents.join('\n\n').slice(0, 10000)}`
+URLs a analizar (${competitorContents.length} total):
+${urlListStr}
+
+Contenido scrapeado de cada competidor:
+${competitorContents.join('\n\n').slice(0, 14000)}`
     : '=== COMPETIDORES: No proporcionados ===';
 
   const websiteSection = websiteContent

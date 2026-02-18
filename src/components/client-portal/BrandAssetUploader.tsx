@@ -186,9 +186,17 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     }, 3000);
   }
 
-  function startStatusPolling() {
+  function startStatusPolling(delayMs = 0) {
     if (statusIntervalRef.current) { clearInterval(statusIntervalRef.current); }
-    statusIntervalRef.current = setInterval(async () => {
+    let firstCheck = true;
+
+    const runPoll = async () => {
+      if (firstCheck && delayMs > 0) {
+        firstCheck = false;
+        return; // skip first tick — wait for the next interval
+      }
+      firstCheck = false;
+
       const { data } = await supabase
         .from('brand_research')
         .select('research_data, updated_at')
@@ -201,7 +209,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
       console.log('[StatusPoll] status:', status, 'dbUpdatedAt:', dbUpdatedAt, 'startedAt:', startedAt, 'isNewer:', dbUpdatedAt >= startedAt);
 
-      // Only react to statuses written AFTER our analysis started
+      // Only react to statuses written AFTER our analysis started (startedAt=0 means resume mode: accept any)
       if (startedAt > 0 && dbUpdatedAt < startedAt) {
         console.log('[StatusPoll] Ignoring stale status from previous analysis');
         return;
@@ -221,7 +229,9 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
         toast.error('Error en el análisis. Intenta de nuevo.');
       }
-    }, 5000);
+    };
+
+    statusIntervalRef.current = setInterval(runPoll, 5000);
   }
 
   async function launchAnalysis(url: string, compUrls: string[]) {
@@ -236,7 +246,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     const startedAt = Date.now();
     analysisStartRef.current = startedAt;
 
-    // STEP 2: Kill any lingering intervals immediately
+    // STEP 2: Kill any lingering intervals immediately (including any mount-resume poll with startedAt=0)
     clearAllIntervals();
 
     // STEP 3: Show banner — synchronous React state update
@@ -244,26 +254,27 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     setAnalyzing(true);
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
 
-    console.log('[launchAnalysis] Banner set to visible, starting polling');
+    console.log('[launchAnalysis] Banner set to visible, writing pending to DB...');
 
-    // STEP 4: Start polling IMMEDIATELY — timestamp guard prevents false-positive 'complete'
-    startProgressPolling();
-    startStatusPolling();
-
-    // STEP 5: Write 'pending' to DB (fire and forget — polling is timestamp-guarded)
-    supabase.from('brand_research').upsert({
+    // STEP 4: Write 'pending' to DB SYNCHRONOUSLY before starting polling
+    // This ensures the DB reflects the new analysis before any poll fires
+    await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
-    }, { onConflict: 'client_id,research_type' }).then(() => {
-      console.log('[launchAnalysis] DB status set to pending');
-    });
+    }, { onConflict: 'client_id,research_type' });
+    console.log('[launchAnalysis] DB status set to pending ✓');
 
-    supabase.from('brand_research').upsert({
+    await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
       research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date(startedAt).toISOString() },
     }, { onConflict: 'client_id,research_type' });
+
+    // STEP 5: Start polling with 8s delay for status (progress poll starts immediately)
+    // The 8s delay gives the edge function time to start writing progress updates
+    startProgressPolling();
+    startStatusPolling(8000);
 
     // STEP 6: Fire edge function (fire and forget — polling tracks completion)
     const { data: { session } } = await supabase.auth.getSession();
