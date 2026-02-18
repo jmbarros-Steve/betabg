@@ -42,6 +42,7 @@ export default function ClientPortal() {
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
 
   // SECURITY: Only super admins can view other clients' portals
   // Shopify users with admin role should NOT have this access
@@ -128,6 +129,18 @@ export default function ClientPortal() {
     }
   }, [roleLoading, isClient, isAdmin, isSuperAdmin, isShopifyUser, isAdminView, user, urlClientId, navigate]);
 
+  // Fetch client logo
+  useEffect(() => {
+    const id = isAdminView ? urlClientId : clientData?.id;
+    if (!id) return;
+    supabase
+      .from('clients')
+      .select('logo_url')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => { if (data?.logo_url) setClientLogoUrl(data.logo_url); });
+  }, [clientData?.id, urlClientId, isAdminView]);
+
   if (authLoading || roleLoading || loadingClient) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -167,9 +180,13 @@ export default function ClientPortal() {
               </Button>
             )}
             <img src={logo} alt="Consultoría BG" className="h-10 w-auto" />
-            <div className="hidden sm:block">
+            <div className="hidden sm:block h-8 w-px bg-border mx-1" />
+            <div className="hidden sm:flex flex-col items-start justify-center">
+              {clientLogoUrl && (
+                <img src={clientLogoUrl} alt={displayClient?.name} className="h-8 w-auto max-w-[120px] object-contain mb-0.5" />
+              )}
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{displayClient?.name}</p>
+                <p className="text-sm font-medium leading-tight">{displayClient?.name}</p>
                 {isAdminView && (
                   <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                     Vista Admin
@@ -177,7 +194,7 @@ export default function ClientPortal() {
                 )}
               </div>
               {displayClient?.company && (
-                <p className="text-xs text-muted-foreground">{displayClient.company}</p>
+                <p className="text-xs text-muted-foreground leading-tight">{displayClient.company}</p>
               )}
             </div>
           </div>
