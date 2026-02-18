@@ -546,7 +546,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const pd = data.persona_data as BriefData;
       // Sanitizar raw_responses en el origen: null/undefined → '' para evitar crashes en .trim()
       if (pd?.raw_responses && Array.isArray(pd.raw_responses)) {
-        pd.raw_responses = pd.raw_responses.map((r: any) => (r == null ? '' : String(r)));
+        pd.raw_responses = (pd.raw_responses as any[]).map((r: any) => {
+          if (r === null || r === undefined) return '';
+          if (typeof r === 'string') return r;
+          return String(r);
+        });
+        for (let i = 0; i < pd.raw_responses.length; i++) {
+          if (!(i in pd.raw_responses) || pd.raw_responses[i] === undefined) {
+            pd.raw_responses[i] = '';
+          }
+        }
       }
       setBriefData(pd);
       setIsComplete(data.is_complete);
