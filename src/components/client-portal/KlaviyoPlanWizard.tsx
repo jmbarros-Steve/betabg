@@ -655,7 +655,7 @@ export function KlaviyoPlanWizard({
                         value={wizardData.selectedProducts.join(', ')}
                         onChange={(e) => setWizardData({
                           ...wizardData,
-                          selectedProducts: e.target.value.split(',').map(p => p.trim()).filter(Boolean),
+                          selectedProducts: e.target.value.split(',').map(p => p == null ? '' : String(p).trim()).filter(Boolean),
                         })}
                         rows={3}
                       />
