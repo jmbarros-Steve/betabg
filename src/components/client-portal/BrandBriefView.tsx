@@ -348,16 +348,40 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const [assets, setAssets] = useState<{ logo: string[]; products: string[]; ads: string[] }>({ logo: [], products: [], ads: [] });
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'pending' | 'complete' | 'error'>('idle');
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [progressStep, setProgressStep] = useState<{ step: string; detail: string; pct: number } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchAll();
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (progressPollingRef.current) clearInterval(progressPollingRef.current);
+    };
   }, [clientId]);
 
-  // Poll when analysis is pending
+  // Poll status when analysis is pending
   useEffect(() => {
-    if (analysisStatus !== 'pending') return;
+    if (analysisStatus !== 'pending') {
+      if (progressPollingRef.current) clearInterval(progressPollingRef.current);
+      return;
+    }
+
+    // Poll progress steps every 3s
+    progressPollingRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId)
+        .eq('research_type', 'analysis_progress')
+        .maybeSingle();
+      if (data?.research_data) {
+        const p = data.research_data as any;
+        setProgressStep({ step: p.step, detail: p.detail, pct: p.pct });
+      }
+    }, 3000);
+
+    // Poll completion status every 5s
     pollingRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('brand_research')
@@ -368,15 +392,23 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const status = (data?.research_data as any)?.status;
       if (status === 'complete') {
         setAnalysisStatus('complete');
+        setProgressStep(null);
         clearInterval(pollingRef.current!);
+        clearInterval(progressPollingRef.current!);
         await fetchResearch();
         toast.success('¡Análisis SEO y Keywords completado! Ya puedes descargar el informe completo.');
       } else if (status === 'error') {
         setAnalysisStatus('error');
+        setProgressStep(null);
         clearInterval(pollingRef.current!);
+        clearInterval(progressPollingRef.current!);
       }
     }, 5000);
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (progressPollingRef.current) clearInterval(progressPollingRef.current);
+    };
   }, [analysisStatus, clientId]);
 
   async function fetchAll() {
@@ -486,6 +518,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       return;
     }
     setReanalyzing(true);
+    setProgressStep(null);
     // Mark as pending
     await supabase.from('brand_research').upsert({
       client_id: clientId,
@@ -502,11 +535,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (error) throw error;
       toast.success('¡Re-análisis completado! Ahora verás los 6 competidores.');
       setAnalysisStatus('complete');
+      setProgressStep(null);
       await fetchResearch();
     } catch (err) {
       console.error(err);
       toast.error('Error al re-analizar. Intenta de nuevo.');
       setAnalysisStatus('error');
+      setProgressStep(null);
     } finally {
       setReanalyzing(false);
     }
@@ -1411,37 +1446,49 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       {analysisStatus === 'pending' && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <RefreshCw className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-primary">Analizando tu marca en segundo plano...</p>
+                <p className="text-sm font-semibold text-primary">
+                  {progressStep?.detail || 'Iniciando análisis de marca...'}
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Steve está realizando el análisis SEO, investigando keywords y analizando a tu competencia. Esto puede tomar 1-2 minutos. El botón de descarga se habilitará automáticamente cuando esté listo.
+                  Steve está auditando tu sitio, investigando keywords y analizando a tu competencia (hasta 6 competidores). Esto puede tomar 1-2 minutos.
                 </p>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="bg-background rounded-lg p-2 border border-border">
-                <Search className="h-4 w-4 text-primary mx-auto mb-1" />
-                <p className="text-[10px] text-muted-foreground font-medium">SEO Audit</p>
-                <div className="mt-1 h-1 bg-primary/20 rounded-full overflow-hidden">
-                  <div className="h-1 bg-primary rounded-full animate-pulse w-2/3" />
-                </div>
+
+            {/* Progress bar */}
+            <div className="mb-3">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
+                <span className="text-[10px] font-bold text-primary">{progressStep?.pct ?? 0}%</span>
               </div>
-              <div className="bg-background rounded-lg p-2 border border-border">
-                <Key className="h-4 w-4 text-primary mx-auto mb-1" />
-                <p className="text-[10px] text-muted-foreground font-medium">Keywords</p>
-                <div className="mt-1 h-1 bg-primary/20 rounded-full overflow-hidden">
-                  <div className="h-1 bg-primary rounded-full animate-pulse w-1/2" />
-                </div>
-              </div>
-              <div className="bg-background rounded-lg p-2 border border-border">
-                <Trophy className="h-4 w-4 text-primary mx-auto mb-1" />
-                <p className="text-[10px] text-muted-foreground font-medium">Competencia</p>
-                <div className="mt-1 h-1 bg-primary/20 rounded-full overflow-hidden">
-                  <div className="h-1 bg-primary rounded-full animate-pulse w-1/3" />
-                </div>
-              </div>
+              <Progress value={progressStep?.pct ?? 5} className="h-2" />
+            </div>
+
+            {/* Step indicators */}
+            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+              {[
+                { key: ['inicio', 'sitio_web'], icon: <Globe className="h-4 w-4 mx-auto mb-1" />, label: 'Tu Sitio Web' },
+                { key: ['detectando'], icon: <Search className="h-4 w-4 mx-auto mb-1" />, label: 'Detectando' },
+                { key: ['competidor_0', 'competidor_1', 'competidor_2', 'competidor_3', 'competidor_4', 'competidor_5'], icon: <Trophy className="h-4 w-4 mx-auto mb-1" />, label: 'Competidores' },
+                { key: ['ia'], icon: <Sparkles className="h-4 w-4 mx-auto mb-1" />, label: 'Estrategia IA' },
+              ].map((phase, i) => {
+                const isActive = progressStep && phase.key.includes(progressStep.step);
+                const pct = progressStep?.pct ?? 0;
+                const thresholds = [0, 20, 25, 70];
+                const isDone = pct > thresholds[i] && !isActive;
+                return (
+                  <div key={i} className={`rounded-lg p-2 border transition-all ${isActive ? 'bg-primary/10 border-primary/40' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background border-border'}`}>
+                    <div className={isActive ? 'text-primary' : isDone ? 'text-green-500' : 'text-muted-foreground'}>
+                      {isDone ? <CheckCircle2 className="h-4 w-4 mx-auto mb-1" /> : phase.icon}
+                    </div>
+                    <p className={`text-[10px] font-medium ${isActive ? 'text-primary' : isDone ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>{phase.label}</p>
+                    {isActive && <div className="mt-1 h-0.5 bg-primary/20 rounded-full overflow-hidden"><div className="h-0.5 bg-primary rounded-full animate-pulse w-full" /></div>}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
