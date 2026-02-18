@@ -362,17 +362,20 @@ Deno.serve(async (req) => {
             if (searchResp.ok) {
               const searchData = await searchResp.json();
               const results: string[] = (searchData?.data || [])
-                .map((r: any) => r.url as string)
-                .filter((u: string) => {
+                .map((r: any) => {
+                  // Always use just the root domain (ignore paths/query strings from search results)
+                  try {
+                    const parsed = new URL(r.url?.startsWith('http') ? r.url : `https://${r.url}`);
+                    return `https://${parsed.hostname}`;
+                  } catch { return null; }
+                })
+                .filter((u: string | null): u is string => {
                   if (!u) return false;
                   try {
-                    const parsed = new URL(u.startsWith('http') ? u : `https://${u}`);
-                    const hostname = parsed.hostname.replace('www.', '');
-                    // Reject long paths (likely a blog post or article, not a store homepage)
-                    if (parsed.pathname.length > 50) return false;
+                    const hostname = new URL(u).hostname.replace('www.', '');
                     if (seenHosts.has(hostname)) return false;
                     // Check against blocklist
-                    if (BLOCKED_DOMAINS.some(blocked => hostname.includes(blocked) || u.includes(blocked))) return false;
+                    if (BLOCKED_DOMAINS.some(blocked => hostname.includes(blocked))) return false;
                     // Must look like a real regional store TLD
                     if (!hostname.match(/\.(cl|com|com\.ar|mx|pe|co|ar|store|shop)$/)) return false;
                     seenHosts.add(hostname);

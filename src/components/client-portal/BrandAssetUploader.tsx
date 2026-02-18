@@ -129,12 +129,26 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   const [competitorUrls, setCompetitorUrls] = useState(['', '', '']);
   const [analyzing, setAnalyzing] = useState(false);
   const [progressStep, setProgressStep] = useState<{ step: string; detail: string; pct: number }>({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
+  const analyzingRef = useRef(false);
   const [autoTriggered, setAutoTriggered] = useState(false);
   const fileRefs = useRef<Record<AssetCategory, HTMLInputElement | null>>({ logo: null, products: null, ads: null });
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    // Check pending status immediately before full loadAssets to show banner ASAP
+    (async () => {
+      const { data: statusRow } = await supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId)
+        .eq('research_type', 'analysis_status')
+        .maybeSingle();
+      if ((statusRow?.research_data as any)?.status === 'pending') {
+        analyzingRef.current = true;
+        setAnalyzing(true);
+      }
+    })();
     loadAssets();
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -170,6 +184,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       if (status === 'complete') {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+        analyzingRef.current = false;
         setAnalyzing(false);
         setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
         toast.success('¡Análisis SEO, Keywords y Competencia completado!');
@@ -177,6 +192,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       } else if (status === 'error') {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+        analyzingRef.current = false;
         setAnalyzing(false);
         setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
         toast.error('Error en el análisis. Intenta de nuevo.');
@@ -198,6 +214,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       research_data: { step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2, ts: new Date().toISOString() },
     }, { onConflict: 'client_id,research_type' });
 
+    analyzingRef.current = true;
     setAnalyzing(true);
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
     startPolling();
