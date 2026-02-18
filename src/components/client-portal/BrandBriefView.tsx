@@ -601,7 +601,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   }
 
   const personaResponse = briefData?.questions && briefData?.raw_responses
-    ? briefData.raw_responses[briefData.questions.indexOf('persona_profile')] || ''
+    ? String(briefData.raw_responses[briefData.questions.indexOf('persona_profile')] ?? '')
     : '';
   const personaProfile = parsePersonaProfile(personaResponse);
   const personaGender = detectGender(personaProfile);
@@ -610,7 +610,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   function getResponse(questionId: string): string {
     if (!briefData?.questions || !briefData?.raw_responses) return '';
     const idx = briefData.questions.indexOf(questionId);
-    return idx >= 0 ? briefData.raw_responses[idx] || '' : '';
+    if (idx < 0) return '';
+    const val = briefData.raw_responses[idx];
+    return val == null ? '' : String(val);
   }
 
   // Extract competitor URLs from brief Q9 responses
@@ -618,7 +620,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (!briefData?.questions || !briefData?.raw_responses) return [];
     const idx = briefData.questions.indexOf('competitors');
     if (idx < 0) return [];
-    const response = briefData.raw_responses[idx] || '';
+    const response = String(briefData.raw_responses[idx] ?? '');
     const urls: string[] = [];
     const urlMatches = response.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
     for (const match of urlMatches) {
