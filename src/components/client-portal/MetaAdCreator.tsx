@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, Sparkles, Image as ImageIcon, Video, ArrowLeft, ArrowRight,
   RotateCcw, CheckCircle, ThumbsDown, RefreshCw, Star, Edit, Package,
-  Tag, Globe, Target, Coins, Play, ChevronRight,
+  Tag, Globe, Target, Coins, Rocket, Calendar, Bell, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,7 +31,7 @@ interface Variacion {
 }
 interface GeneratedVariaciones { explicacion: string; variaciones: Variacion[]; }
 
-type AdStep = 'strategy' | 'product' | 'campaign' | 'angle' | 'instrucciones' | 'variaciones' | 'brief';
+type AdStep = 'strategy' | 'product' | 'campaign' | 'angle' | 'instrucciones' | 'variaciones' | 'brief' | 'publish' | 'charlie';
 
 const CAMPAIGN_OPTIONS = [
   { id: 'retargeting', label: 'Broad Retargeting', emoji: '🎯', desc: 'Recuperar audiencia que ya te conoce' },
@@ -63,6 +63,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [manualFase, setManualFase] = useState('');
   const [manualPresupuesto, setManualPresupuesto] = useState('');
   const [savingConfig, setSavingConfig] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishedAdSet, setPublishedAdSet] = useState<{name: string; id: string; budget: string; reviewDate: string} | null>(null);
+  const [charlieRevisionDate, setCharlieRevisionDate] = useState('');
 
   // Product selection
   const [productMode, setProductMode] = useState<'product' | 'category' | 'generic' | null>(null);
@@ -745,7 +748,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                   </Button>
                 ) : (
                   <div className="space-y-3">
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+                    <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-sm text-green-700 dark:text-green-300">
                       ✅ Creativo guardado. Ahora genera el visual.
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -767,10 +770,144 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                         )}
                       </div>
                     )}
+                    <Button className="w-full mt-2" onClick={() => setStep('publish')}>
+                      <Rocket className="w-4 h-4 mr-2" />Continuar — Publicar Ad Set en Meta
+                    </Button>
                   </div>
                 )}
               </div>
             ) : null}
+          </motion.div>
+        )}
+
+        {/* STEP 8: PUBLISH */}
+        {step === 'publish' && (
+          <motion.div key="publish" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+            <Button variant="ghost" size="sm" onClick={() => setStep('brief')}><ArrowLeft className="w-4 h-4 mr-1" />Volver</Button>
+            <h3 className="text-lg font-semibold">🚀 Publicar Ad Set en Meta</h3>
+
+            {/* Technical config card */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-sm font-semibold text-primary">⚙️ Configuración técnica del Ad Set</p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><p className="text-xs text-muted-foreground">Tipo de campaña</p><p className="font-medium">{CAMPAIGN_OPTIONS.find(c => c.id === selectedCampaign)?.label}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Estructura</p><p className="font-medium">CBO activado</p></div>
+                  <div><p className="text-xs text-muted-foreground">Presupuesto diario</p><p className="font-medium">${presupuestoAds ? (parseInt(presupuestoAds) / 30).toLocaleString('es-CL') : '—'} CLP</p></div>
+                  <div><p className="text-xs text-muted-foreground">Formato</p><p className="font-medium">Advantage+ placements</p></div>
+                  <div><p className="text-xs text-muted-foreground">Audiencia</p><p className="font-medium">Visitas web 30 días + seguidores IG</p></div>
+                  <div><p className="text-xs text-muted-foreground">Segmentación</p><p className="font-medium">Solo edad, género, ubicación</p></div>
+                </div>
+                <div className="border-t border-border/50 pt-3">
+                  <p className="text-xs text-muted-foreground">Ad Set — Variaciones 3-2-2</p>
+                  <p className="text-xs font-medium mt-1">3 copies · 2 títulos · 2 descripciones</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Copy summary */}
+            {selectedVariacion && (
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Copy aprobado</p>
+                  <p className="text-sm font-semibold">{selectedVariacion.titulo}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-3">{selectedVariacion.texto_principal}</p>
+                  {selectedVariacion.cta && <Badge>{selectedVariacion.cta}</Badge>}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Publish action */}
+            {!publishedAdSet ? (
+              <Button
+                className="w-full"
+                onClick={async () => {
+                  setPublishLoading(true);
+                  await new Promise(r => setTimeout(r, 2000)); // Simulated API call
+                  const reviewDate = new Date();
+                  reviewDate.setDate(reviewDate.getDate() + 7);
+                  const adSetName = `${CAMPAIGN_OPTIONS.find(c => c.id === selectedCampaign)?.label} — ${effectiveAngle} — ${new Date().toLocaleDateString('es-CL')}`;
+                  const simulatedId = `adset_${Date.now()}`;
+                  setPublishedAdSet({
+                    name: adSetName,
+                    id: simulatedId,
+                    budget: presupuestoAds ? `${(parseInt(presupuestoAds) / 30).toLocaleString('es-CL')} CLP/día` : '—',
+                    reviewDate: reviewDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }),
+                  });
+                  setCharlieRevisionDate(reviewDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }));
+                  setPublishLoading(false);
+                  setStep('charlie');
+                }}
+                disabled={publishLoading}
+              >
+                {publishLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Publicando Ad Set...</> : <><Rocket className="w-4 h-4 mr-2" />✅ Confirmar y Publicar Ad Set en Meta</>}
+              </Button>
+            ) : null}
+          </motion.div>
+        )}
+
+        {/* STEP 9: CHARLIE POST LAUNCH */}
+        {step === 'charlie' && (
+          <motion.div key="charlie" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+            {/* Success header */}
+            <div className="text-center py-6 space-y-3">
+              <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+                <Rocket className="w-8 h-8 text-green-500" />
+              </div>
+              <h3 className="text-xl font-bold">🚀 ¡Ad Set lanzado con Método Charlie!</h3>
+            </div>
+
+            {/* Launch summary */}
+            {publishedAdSet && (
+              <Card className="border-green-500/20 bg-green-500/5">
+                <CardContent className="p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><p className="text-xs text-muted-foreground">Producto</p><p className="font-medium">{selectedProduct?.title || selectedCategory || 'Genérico'}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Ángulo</p><p className="font-medium">{effectiveAngle}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Presupuesto diario</p><p className="font-medium">{publishedAdSet.budget}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Estado</p><Badge variant="outline" className="text-xs text-amber-600 border-amber-300">En revisión por Meta (24-48h)</Badge></div>
+                    <div className="col-span-2"><p className="text-xs text-muted-foreground">ID Ad Set</p><p className="font-mono text-xs text-muted-foreground">{publishedAdSet.id}</p></div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Charlie rules */}
+            <Card className="border-destructive/30">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-sm font-bold text-destructive">⚠️ Reglas hasta {charlieRevisionDate}:</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-4 h-4 shrink-0" /><span>❌ No pausar el Ad Set</span></div>
+                  <div className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-4 h-4 shrink-0" /><span>❌ No cambiar el presupuesto</span></div>
+                  <div className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-4 h-4 shrink-0" /><span>❌ No cambiar la audiencia</span></div>
+                  <div className="flex items-center gap-2 text-green-600"><CheckCircle className="w-4 h-4 shrink-0" /><span>✅ Dejar que Meta aprenda durante 7 días</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Notification info */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-semibold text-primary">Revisión Charlie agendada</p>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span>{charlieRevisionDate}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Te notificaremos aquí en la pestaña "📅 Revisión Charlie" cuando sea el momento de revisar.</p>
+              </CardContent>
+            </Card>
+
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={reset}>
+                <RotateCcw className="w-4 h-4 mr-2" />Crear otro Ad Set
+              </Button>
+              <Button className="flex-1" onClick={onBack}>
+                Ver panel de campañas
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

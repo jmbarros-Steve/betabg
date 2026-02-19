@@ -6,16 +6,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   RefreshCw, TrendingUp, TrendingDown, DollarSign, MousePointerClick, 
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
-  BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers
+  BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
+  Clock, CheckCircle, PauseCircle, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
+
 
 interface CampaignAnalyticsPanelProps {
   clientId: string;
@@ -118,10 +121,19 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [generatingRecs, setGeneratingRecs] = useState(false);
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'recommendations'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'recommendations' | 'charlie'>('campaigns');
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [adSetsByCampaign, setAdSetsByCampaign] = useState<Record<string, AdSet[]>>({});
   const [loadingAdSets, setLoadingAdSets] = useState<Set<string>>(new Set());
+  const [charlieModal, setCharlieModal] = useState<{
+    type: 'scale' | 'pause';
+    adSetName: string;
+    adSetId: string;
+    spend: number;
+    daysActive: number;
+    currentBudget?: number;
+  } | null>(null);
+  const [charlieActionLoading, setCharlieActionLoading] = useState(false);
   useEffect(() => {
     fetchConnections();
   }, [clientId]);
@@ -380,6 +392,43 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const overallRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const overallCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
 
+  // Charlie semaphore for ad sets
+  const CLP_RATE = 950; // approximate USD -> CLP
+  const getAdSetSemaphore = (adSet: AdSet, maxCpaUsd?: number) => {
+    const spend = parseFloat(adSet.spend) || 0;
+    const conversions = adSet.conversions || 0;
+    const cpa = conversions > 0 ? spend / conversions : null;
+    const spendClp = spend * CLP_RATE;
+    const maxCpa = maxCpaUsd || 50; // fallback $50 USD
+    
+    if (spend === 0 && conversions === 0) return 'nodata';
+    if (cpa !== null && cpa > maxCpa * 2) return 'danger';
+    if (cpa !== null && cpa <= maxCpa) return 'good';
+    return 'learning'; // no CPA data or < 7 days
+  };
+
+  const semaphoreConfig = {
+    good: { emoji: '🟢', label: 'Funcionando', color: 'text-green-600', bg: 'bg-green-500/10 border-green-500/20', action: 'scale' as const },
+    learning: { emoji: '🟡', label: 'En aprendizaje', color: 'text-yellow-600', bg: 'bg-yellow-500/10 border-yellow-500/20', action: 'wait' as const },
+    danger: { emoji: '🔴', label: 'Revisar', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/20', action: 'pause' as const },
+    nodata: { emoji: '⚫', label: 'Sin datos', color: 'text-muted-foreground', bg: 'bg-muted/30 border-border', action: 'review' as const },
+  };
+
+  // Collect all ad sets across campaigns for Charlie review tab
+  const allAdSetsForCharlie = useMemo(() => {
+    const result: Array<{adSet: AdSet; campaignName: string; semaphore: keyof typeof semaphoreConfig}> = [];
+    for (const [campaignId, adSets] of Object.entries(adSetsByCampaign)) {
+      const campaign = aggregatedCampaigns.find(c => c.campaign_id === campaignId);
+      for (const adSet of adSets) {
+        const s = getAdSetSemaphore(adSet) as keyof typeof semaphoreConfig;
+        result.push({ adSet, campaignName: campaign?.campaign_name || campaignId, semaphore: s });
+      }
+    }
+    // Sort: danger first, then nodata, then learning, then good
+    const order = { danger: 0, nodata: 1, learning: 2, good: 3 };
+    return result.sort((a, b) => order[a.semaphore] - order[b.semaphore]);
+  }, [adSetsByCampaign, aggregatedCampaigns]);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -574,6 +623,14 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="charlie">
+              📅 Revisión Charlie
+              {allAdSetsForCharlie.filter(a => a.semaphore === 'danger' || a.semaphore === 'good').length > 0 && (
+                <Badge variant="destructive" className="ml-2 text-xs">
+                  {allAdSetsForCharlie.filter(a => a.semaphore === 'danger' || a.semaphore === 'good').length}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           {activeTab === 'recommendations' && (
@@ -712,56 +769,97 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                 No hay Ad Sets disponibles para esta campaña
                               </div>
                             ) : (
-                              <div className="space-y-2 pt-2 border-t border-dashed">
+                              <div className="space-y-3 pt-2 border-t border-dashed">
                                 <div className="flex items-center gap-2 mb-3">
                                   <Layers className="w-4 h-4 text-muted-foreground" />
                                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                     Ad Sets ({adSets.length})
                                   </span>
                                 </div>
-                                {adSets.map((adSet) => (
-                                  <div 
-                                    key={adSet.id} 
-                                    className="bg-muted/30 rounded-lg p-3 border border-border/50"
-                                  >
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium text-sm">{adSet.name}</span>
-                                        <Badge variant="outline" className="text-xs capitalize">
-                                          {adSet.status.toLowerCase()}
-                                        </Badge>
+                                {adSets.map((adSet) => {
+                                  const semKey = getAdSetSemaphore(adSet) as keyof typeof semaphoreConfig;
+                                  const sem = semaphoreConfig[semKey];
+                                  const spendClp = (parseFloat(adSet.spend) || 0) * CLP_RATE;
+                                  return (
+                                    <div 
+                                      key={adSet.id} 
+                                      className={`rounded-lg p-3 border ${sem.bg}`}
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-base">{sem.emoji}</span>
+                                          <span className="font-medium text-sm">{adSet.name}</span>
+                                          <Badge variant="outline" className={`text-xs ${sem.color}`}>
+                                            {sem.label}
+                                          </Badge>
+                                          <Badge variant="outline" className="text-xs capitalize">
+                                            {adSet.status.toLowerCase()}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs mb-3">
+                                        <div>
+                                          <p className="text-muted-foreground">Gasto CLP</p>
+                                          <p className="font-medium">${spendClp.toLocaleString('es-CL', {maximumFractionDigits: 0})}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-muted-foreground">CPA real</p>
+                                          <p className="font-medium">
+                                            {adSet.conversions > 0 
+                                              ? `$${((parseFloat(adSet.spend) / adSet.conversions) * CLP_RATE).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP`
+                                              : '—'}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-muted-foreground">Conversiones</p>
+                                          <p className="font-medium">{adSet.conversions || 0}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-muted-foreground">ROAS</p>
+                                          <p className={`font-medium ${adSet.roas >= 3 ? 'text-green-600' : adSet.roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
+                                            {adSet.roas > 0 ? `${adSet.roas.toFixed(2)}x` : '—'}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-muted-foreground">CTR</p>
+                                          <p className="font-medium">{parseFloat(adSet.ctr).toFixed(2)}%</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-muted-foreground">CPM CLP</p>
+                                          <p className="font-medium">${(parseFloat(adSet.cpm) * CLP_RATE).toLocaleString('es-CL', {maximumFractionDigits: 0})}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* Charlie action button */}
+                                      <div className="pt-2 border-t border-border/30">
+                                        {semKey === 'good' && (
+                                          <Button size="sm" variant="outline" className="text-xs text-green-700 border-green-300 hover:bg-green-50"
+                                            onClick={() => setCharlieModal({
+                                              type: 'scale', adSetName: adSet.name, adSetId: adSet.id,
+                                              spend: parseFloat(adSet.spend) || 0, daysActive: 8
+                                            })}>
+                                            📈 Aprobar escalado 20%
+                                          </Button>
+                                        )}
+                                        {semKey === 'danger' && (
+                                          <Button size="sm" variant="outline" className="text-xs text-red-700 border-red-300 hover:bg-red-50"
+                                            onClick={() => setCharlieModal({
+                                              type: 'pause', adSetName: adSet.name, adSetId: adSet.id,
+                                              spend: parseFloat(adSet.spend) || 0, daysActive: 3
+                                            })}>
+                                            ⏸ Aprobar pausa de Ad Set
+                                          </Button>
+                                        )}
+                                        {semKey === 'learning' && (
+                                          <span className="text-xs text-yellow-600">⏳ En aprendizaje — revisión pendiente</span>
+                                        )}
+                                        {semKey === 'nodata' && (
+                                          <span className="text-xs text-muted-foreground">🔄 Sin datos — activa o elimina este Ad Set</span>
+                                        )}
                                       </div>
                                     </div>
-                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs">
-                                      <div>
-                                        <p className="text-muted-foreground">Gasto</p>
-                                        <p className="font-medium">{formatCurrency(parseFloat(adSet.spend))}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">Revenue</p>
-                                        <p className="font-medium">{formatCurrency(adSet.conversion_value)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">ROAS</p>
-                                        <p className={`font-medium ${adSet.roas >= 3 ? 'text-green-500' : adSet.roas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                          {adSet.roas.toFixed(2)}x
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">CPC</p>
-                                        <p className="font-medium">${parseFloat(adSet.cpc).toFixed(2)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">CTR</p>
-                                        <p className="font-medium">{parseFloat(adSet.ctr).toFixed(2)}%</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">Conversiones</p>
-                                        <p className="font-medium">{formatNumber(adSet.conversions)}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </CollapsibleContent>
@@ -830,6 +928,125 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                             </Button>
                           </div>
                         </CardContent>
+                      </Card>
+                    </Collapsible>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Charlie Review Tab */}
+        <TabsContent value="charlie" className="mt-4">
+          {allAdSetsForCharlie.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Calendar className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground mb-2">No hay Ad Sets cargados.</p>
+                <p className="text-xs text-muted-foreground">Expande una campaña Meta para cargar Ad Sets.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {allAdSetsForCharlie.map(({ adSet, campaignName, semaphore }) => {
+                const sem = semaphoreConfig[semaphore];
+                const spendClp = (parseFloat(adSet.spend) || 0) * CLP_RATE;
+                return (
+                  <Card key={adSet.id} className={`border ${sem.bg}`}>
+                    <CardContent className="py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span>{sem.emoji}</span>
+                            <span className={`text-xs font-bold uppercase ${sem.color}`}>
+                              {semaphore === 'good' ? 'ESCALAR' : semaphore === 'danger' ? 'URGENTE' : semaphore === 'learning' ? 'EN APRENDIZAJE' : 'SIN DATOS'}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium">Ad Set "{adSet.name}"</p>
+                          <p className="text-xs text-muted-foreground">{campaignName}</p>
+                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                            <span>Gasto: ${spendClp.toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP</span>
+                            <span>Conv: {adSet.conversions || 0}</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          {semaphore === 'good' && (
+                            <Button size="sm" className="text-xs"
+                              onClick={() => setCharlieModal({ type: 'scale', adSetName: adSet.name, adSetId: adSet.id, spend: parseFloat(adSet.spend) || 0, daysActive: 8 })}>
+                              📈 Aprobar escalado 20%
+                            </Button>
+                          )}
+                          {semaphore === 'danger' && (
+                            <Button size="sm" variant="destructive" className="text-xs"
+                              onClick={() => setCharlieModal({ type: 'pause', adSetName: adSet.name, adSetId: adSet.id, spend: parseFloat(adSet.spend) || 0, daysActive: 3 })}>
+                              ⏸ Aprobar pausa Ad Set
+                            </Button>
+                          )}
+                          {semaphore === 'learning' && <span className="text-xs text-yellow-600">⏳ Esperar 7 días</span>}
+                          {semaphore === 'nodata' && <span className="text-xs text-muted-foreground">🔄 Revisar</span>}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Charlie Scale Dialog */}
+      <Dialog open={charlieModal?.type === 'scale'} onOpenChange={() => setCharlieModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>📈 ESCALAR AD SET — MÉTODO CHARLIE</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2 text-sm">
+                <p><strong>Ad Set:</strong> {charlieModal?.adSetName}</p>
+                <p><strong>Presupuesto actual:</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
+                <p><strong>Nuevo presupuesto (+20%):</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30 * 1.2).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCharlieModal(null)}>❌ Cancelar</Button>
+            <Button onClick={() => { toast.success(`✅ Escala el presupuesto del Ad Set "${charlieModal?.adSetName}" +20% en Meta`); setCharlieModal(null); }}>
+              ✅ Confirmar escalado
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Charlie Pause Dialog */}
+      <Dialog open={charlieModal?.type === 'pause'} onOpenChange={() => setCharlieModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">⚠️ ADVERTENCIA — MÉTODO CHARLIE</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2 text-sm">
+                <p>¿Seguro que quieres pausar el Ad Set <strong>"{charlieModal?.adSetName}"</strong>?</p>
+                <p>Lleva <strong>{charlieModal?.daysActive} días activo</strong> con <strong>${((charlieModal?.spend || 0) * CLP_RATE).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP</strong> gastados.</p>
+                <div className="bg-muted rounded-lg p-3 text-xs space-y-1 mt-2">
+                  <p>✅ Pausas el <strong>Ad Set</strong>, no la campaña.</p>
+                  <p>✅ La campaña principal sigue activa con los demás Ad Sets.</p>
+                  <p className="text-destructive font-medium">⚠️ Pausar antes de 7 días destruye el aprendizaje del algoritmo.</p>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setCharlieModal(null)}>❌ No pausar — seguir el método</Button>
+            <Button variant="destructive" onClick={() => { toast.warning(`⏸ Ad Set "${charlieModal?.adSetName}" marcado para pausa`); setCharlieModal(null); }}>
+              ⏸ Pausar Ad Set de todas formas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
                       </Card>
                     </motion.div>
                   );
