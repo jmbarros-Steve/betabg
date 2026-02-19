@@ -423,10 +423,12 @@ export type Database = {
           company: string | null
           created_at: string
           email: string | null
+          fase_negocio: string | null
           hourly_rate: number
           id: string
           logo_url: string | null
           name: string
+          presupuesto_ads: number | null
           shop_domain: string | null
           updated_at: string
           user_id: string
@@ -437,10 +439,12 @@ export type Database = {
           company?: string | null
           created_at?: string
           email?: string | null
+          fase_negocio?: string | null
           hourly_rate?: number
           id?: string
           logo_url?: string | null
           name: string
+          presupuesto_ads?: number | null
           shop_domain?: string | null
           updated_at?: string
           user_id: string
@@ -451,10 +455,12 @@ export type Database = {
           company?: string | null
           created_at?: string
           email?: string | null
+          fase_negocio?: string | null
           hourly_rate?: number
           id?: string
           logo_url?: string | null
           name?: string
+          presupuesto_ads?: number | null
           shop_domain?: string | null
           updated_at?: string
           user_id?: string
