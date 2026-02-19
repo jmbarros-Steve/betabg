@@ -80,3 +80,18 @@ verify_jwt = false
 
 [functions.shopify-fulfillment-webhooks]
 verify_jwt = false
+
+[functions.generate-copy]
+verify_jwt = false
+
+[functions.generate-brief-visual]
+verify_jwt = false
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.generate-video]
+verify_jwt = false
+
+[functions.check-video-status]
+verify_jwt = false
