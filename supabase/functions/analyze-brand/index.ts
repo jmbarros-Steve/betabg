@@ -433,6 +433,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    const categoria = 'brief';
+    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
+      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
+      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoria).eq('activo', true).order('orden'),
+    ]);
+    const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledge.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
     const brandContext = JSON.stringify(briefContext).slice(0, 3000);
     const analysisPrompt = buildAnalysisPrompt(
       client.name,
@@ -452,7 +460,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-pro',
         messages: [
-          { role: 'system', content: 'Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses ```json ni ```. Solo el JSON puro y completo.' },
+          { role: 'system', content: `${bugSection}${knowledgeSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.` },
           { role: 'user', content: analysisPrompt },
         ],
         temperature: 0.2,

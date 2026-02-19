@@ -51,10 +51,18 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
+    const categoria = 'anuncios';
+    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
+      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
+      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoria).eq('activo', true).order('orden'),
+    ]);
+    const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledge.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
     const competidores = (brief.competitors as string[])?.join(', ') || 'No especificados';
     const photosList = (assetUrls as string[] || []).slice(0, 5).join(', ');
 
-    const systemPrompt = `Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson. Genera copies de alta conversión para Meta Ads basado en los datos del cliente.`;
+    const systemPrompt = `${bugSection}${knowledgeSection}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson. Genera copies de alta conversión para Meta Ads basado en los datos del cliente.`;
 
     const userPrompt = `DATOS DEL CLIENTE:
 - Negocio: ${brief.business_description || brief.descripcion || 'E-commerce'}
