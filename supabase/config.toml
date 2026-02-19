@@ -84,6 +84,12 @@ verify_jwt = false
 [functions.generate-copy]
 verify_jwt = false
 
+[functions.analyze-brand-research]
+verify_jwt = false
+
+[functions.analyze-brand-strategy]
+verify_jwt = false
+
 [functions.generate-brief-visual]
 verify_jwt = false
 

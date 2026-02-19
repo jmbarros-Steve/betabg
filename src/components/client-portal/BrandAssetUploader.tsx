@@ -325,27 +325,52 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     // Subscribe Realtime as bonus
     subscribeToStatus();
 
-    // Fire edge function (fire and forget)
+    // Two-phase analysis: research (scraping ~30s) → strategy (Claude Opus ~60s)
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     const projectId = 'jnqivntlkemzcpomkvwv';
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
+    };
 
-    console.log('[launchAnalysis] Firing edge function');
-    fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
-      },
-      body: JSON.stringify({
-        client_id: clientId,
-        website_url: url.trim(),
-        competitor_urls: compUrls.filter(u => u.trim()),
-      }),
-    }).catch((err) => {
-      console.log('[launchAnalysis] Edge function call ended:', err?.message);
-    });
+    console.log('[launchAnalysis] Phase 1 — research (scraping)');
+    let research: any = null;
+    try {
+      const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          client_id: clientId,
+          website_url: url.trim(),
+          competitor_urls: compUrls.filter(u => u.trim()),
+        }),
+      });
+      if (researchRes.ok) {
+        const researchData = await researchRes.json();
+        research = researchData.research;
+        console.log('[launchAnalysis] Phase 1 complete — competitors scraped:', research?.competitorContents?.length);
+      } else {
+        console.error('[launchAnalysis] Phase 1 error:', researchRes.status);
+      }
+    } catch (err) {
+      console.error('[launchAnalysis] Phase 1 failed:', err);
+    }
+
+    // Phase 2: fire and forget (polling tracks completion)
+    if (research) {
+      console.log('[launchAnalysis] Phase 2 — strategy (Claude Opus)');
+      fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ client_id: clientId, research }),
+      }).catch((err) => {
+        console.log('[launchAnalysis] Phase 2 ended (polling tracks status):', err?.message);
+      });
+    } else {
+      console.error('[launchAnalysis] Skipping Phase 2 — research failed');
+    }
   }
 
   async function loadAssets() {
