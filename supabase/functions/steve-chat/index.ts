@@ -628,7 +628,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (client.client_user_id !== user.id && client.user_id !== user.id) {
+    // Check if user is a super admin (can access any client's chat)
+    const { data: roleRow } = await supabase
+      .from('user_roles')
+      .select('is_super_admin')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    const isSuperAdmin = roleRow?.is_super_admin === true;
+
+    if (!isSuperAdmin && client.client_user_id !== user.id && client.user_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Access denied' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
