@@ -85,8 +85,8 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [generatedVariaciones, setGeneratedVariaciones] = useState<GeneratedVariaciones | null>(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
 
-  // 3-2-2 selection — all pre-selected by default
-  const [selectedCopies, setSelectedCopies] = useState<number[]>([0, 1, 2]);
+  // 3-2-2 selection — copies start empty (user picks 3 of 10), titles/descriptions pre-selected
+  const [selectedCopies, setSelectedCopies] = useState<number[]>([]);
   const [selectedTitles, setSelectedTitles] = useState<number[]>([0, 1]);
   const [selectedDescriptions, setSelectedDescriptions] = useState<number[]>([0, 1]);
 
@@ -191,7 +191,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         setGeneratedVariaciones({ ...generatedVariaciones, variaciones: updated });
       } else {
         setGeneratedVariaciones(parsed);
-        setSelectedCopies([0, 1, 2]);
+        setSelectedCopies([]);
         setSelectedTitles([0, 1]);
         setSelectedDescriptions([0, 1]);
         setStep('variaciones');
@@ -206,9 +206,13 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     }
   };
 
-  const toggleCopy = (idx: number) => setSelectedCopies(prev =>
-    prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
-  );
+  const toggleCopy = (idx: number) => {
+    if (selectedCopies.includes(idx)) {
+      setSelectedCopies(selectedCopies.filter(i => i !== idx));
+    } else if (selectedCopies.length < 3) {
+      setSelectedCopies([...selectedCopies, idx]);
+    }
+  };
   const toggleTitle = (idx: number) => setSelectedTitles(prev =>
     prev.includes(idx) ? prev.filter(i => i !== idx) : prev.length < 2 ? [...prev, idx] : prev
   );
@@ -690,7 +694,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               disabled={isGenerating}
               onClick={() => generateVariaciones()}
             >
-              {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando copies...</> : <><Sparkles className="w-4 h-4 mr-2" />Generar 3 Variaciones de Copy</>}
+              {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando copies...</> : <><Sparkles className="w-4 h-4 mr-2" />Generar 10 Variaciones de Copy</>}
             </Button>
           </motion.div>
         )}
@@ -725,17 +729,19 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               </div>
               {generatedVariaciones.variaciones.map((v, i) => {
                 const isChecked = selectedCopies.includes(i);
+                const isDisabled = !isChecked && selectedCopies.length >= 3;
                 return (
                   <div
                     key={i}
-                    onClick={() => toggleCopy(i)}
-                    className={`cursor-pointer p-4 rounded-lg border-2 transition-all space-y-2 ${isChecked ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                    onClick={() => !isDisabled && toggleCopy(i)}
+                    className={`p-4 rounded-lg border-2 transition-all space-y-2 ${isChecked ? 'border-primary bg-primary/5 cursor-pointer' : isDisabled ? 'border-border opacity-40 cursor-not-allowed' : 'border-border hover:border-primary/50 cursor-pointer'}`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <input
                           type="checkbox"
                           checked={isChecked}
+                          disabled={isDisabled}
                           onChange={() => toggleCopy(i)}
                           onClick={e => e.stopPropagation()}
                           className="w-4 h-4 accent-primary shrink-0"

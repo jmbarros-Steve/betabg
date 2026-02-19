@@ -96,60 +96,24 @@ ${productoContext}
 Usa las fotos para hacer el copy más específico y descriptivo cuando estén disponibles.
 ${producto_seleccionado ? `El copy debe enfocarse específicamente en el producto "${producto_seleccionado.title}" y sus beneficios concretos.` : ''}
 
-Genera exactamente 3 variaciones usando el ángulo "${angulo}" para un anuncio ${funnel?.toUpperCase()} ${formato === 'video' ? 'en video' : 'en imagen estática'}.
+Genera exactamente 10 variaciones de copy distintas usando el ángulo "${angulo}" para un anuncio ${funnel?.toUpperCase()} ${formato === 'video' ? 'en video' : 'en imagen estática'}.
+Cada variación debe tener un enfoque ligeramente diferente dentro del mismo ángulo.
+Numeradas del 1 al 10.
 
 Responde SOLO en JSON válido sin markdown ni backticks:
 {
   "explicacion": "Por qué este ángulo funciona para este cliente (2-3 líneas concretas)",
   "variaciones": [
-    {
-      "badge": "Variación A",
-      "titulo": "...",
-      "texto_principal": "...",
-      "descripcion": "...",
-      "cta": "..."
-    },
-    {
-      "badge": "Variación B",
-      "titulo": "...",
-      "texto_principal": "...",
-      "descripcion": "...",
-      "cta": "..."
-    },
-    {
-      "badge": "Variación C",
-      "titulo": "...",
-      "texto_principal": "...",
-      "descripcion": "...",
-      "cta": "..."
-    }
-  ]
-
-Responde SOLO en JSON válido sin markdown ni backticks:
-{
-  "explicacion": "Por qué este ángulo funciona para este cliente (2-3 líneas concretas)",
-  "variaciones": [
-    {
-      "badge": "Variación A",
-      "titulo": "...",
-      "texto_principal": "...",
-      "descripcion": "...",
-      "cta": "..."
-    },
-    {
-      "badge": "Variación B",
-      "titulo": "...",
-      "texto_principal": "...",
-      "descripcion": "...",
-      "cta": "..."
-    },
-    {
-      "badge": "Variación C",
-      "titulo": "...",
-      "texto_principal": "...",
-      "descripcion": "...",
-      "cta": "..."
-    }
+    { "badge": "Variación 1", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 2", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 3", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 4", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 5", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 6", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 7", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 8", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 9", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." },
+    { "badge": "Variación 10", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..." }
   ]
 }`;
 
@@ -162,7 +126,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
+        max_tokens: 6000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
