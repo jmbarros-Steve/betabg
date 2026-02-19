@@ -61,7 +61,17 @@ Deno.serve(async (req) => {
     }
 
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
-    if (clientData.user_id !== userId && clientData.client_user_id !== userId) {
+
+    // Check super admin access
+    const { data: roleRow } = await serviceClient
+      .from('user_roles')
+      .select('is_super_admin')
+      .eq('user_id', userId!)
+      .eq('role', 'admin')
+      .maybeSingle();
+    const isSuperAdmin = roleRow?.is_super_admin === true;
+
+    if (!isSuperAdmin && clientData.user_id !== userId && clientData.client_user_id !== userId) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
