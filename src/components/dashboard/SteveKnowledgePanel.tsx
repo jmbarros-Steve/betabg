@@ -349,7 +349,8 @@ export function SteveKnowledgePanel() {
 
       {/* Category tabs */}
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as TabId)}>
-        <TabsList className="flex-wrap h-auto gap-1">
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="flex w-max gap-1 h-auto flex-nowrap">
           {TABS.map(tab => {
             const kCount = knowledge.filter(k => k.categoria === tab.categoria && k.activo).length;
             const bCount = bugs.filter(b => b.categoria === tab.categoria && b.activo).length;
@@ -364,7 +365,8 @@ export function SteveKnowledgePanel() {
               </TabsTrigger>
             );
           })}
-        </TabsList>
+          </TabsList>
+        </div>
 
         {TABS.map(tab => (
           <TabsContent key={tab.id} value={tab.id} className="mt-6 space-y-6">
