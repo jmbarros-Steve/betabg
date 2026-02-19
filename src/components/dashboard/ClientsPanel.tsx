@@ -56,14 +56,20 @@ export function ClientsPanel({ userId }: Props) {
 
   useEffect(() => {
     fetchClients();
-  }, [userId]);
+  }, [userId, isAdmin]);
 
   const fetchClients = async () => {
-    const { data, error } = await supabase
+    // Super admins see all clients; regular users see only their own
+    let query = supabase
       .from('clients')
       .select('id, name, email, company, hourly_rate, client_user_id')
-      .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    if (!isAdmin) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast.error('Error al cargar clientes');
