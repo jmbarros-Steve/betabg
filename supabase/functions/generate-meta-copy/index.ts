@@ -738,7 +738,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
         method: 'POST',
         headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'google/gemini-3-flash-preview',
+          model: 'claude-sonnet-4-6',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.85,
         }),
@@ -792,7 +792,7 @@ ${adType === 'static'
         method: 'POST',
         headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'google/gemini-3-flash-preview',
+          model: 'claude-sonnet-4-6',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
         }),
@@ -1020,7 +1020,7 @@ las preferencias específicas de cada cliente cuando las conozco.
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'claude-sonnet-4-6',
         messages: [
           { role: 'system', content: systemPrompt },
           { 

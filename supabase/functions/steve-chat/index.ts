@@ -801,7 +801,7 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
       method: 'POST',
       headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-opus-4-6',
         messages: chatMessages,
         max_tokens: maxTokens,
         temperature: 0.7,

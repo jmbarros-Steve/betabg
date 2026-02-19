@@ -121,7 +121,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],

@@ -259,7 +259,7 @@ REGLAS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-6',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Genera copies para una campaña de ${campaign.name} basándote en el brief de marca proporcionado.` },

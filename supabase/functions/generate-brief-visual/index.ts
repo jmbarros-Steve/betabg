@@ -87,7 +87,7 @@ Responde SOLO el JSON sin markdown ni backticks.`;
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1500,
         system: `${bugSection}${knowledgeSection}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción.`,
         messages: [{ role: 'user', content: userPrompt }],
