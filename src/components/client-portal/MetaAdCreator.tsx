@@ -940,12 +940,12 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                           />
                         </div>
                         {variacion && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">{variacion.titulo}</p>
+                          <p className="text-xs text-muted-foreground">{variacion.titulo}</p>
                         )}
-                        {Object.entries(brief).filter(([k]) => k !== 'prompt_generacion').slice(0, 2).map(([k, v]) => (
+                        {Object.entries(brief).filter(([k]) => k !== 'prompt_generacion').map(([k, v]) => (
                           <div key={k}>
                             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{k.replace(/_/g, ' ')}</p>
-                            <p className="text-xs line-clamp-2">{String(v)}</p>
+                            <p className="text-xs">{String(v)}</p>
                           </div>
                         ))}
                       </div>
