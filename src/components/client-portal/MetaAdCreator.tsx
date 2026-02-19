@@ -85,7 +85,12 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [generatedVariaciones, setGeneratedVariaciones] = useState<GeneratedVariaciones | null>(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
 
-  // Brief / generation
+  // 3-2-2 selection: 3 copies, 2 titles, 2 descriptions
+  const [selectedVariaciones, setSelectedVariaciones] = useState<number[]>([0, 1, 2]); // indices
+  const [selectedTitles, setSelectedTitles] = useState<number[]>([]);
+  const [selectedDescriptions, setSelectedDescriptions] = useState<number[]>([]);
+
+  // Brief / generation (use first selected variacion for brief)
   const [selectedVariacion, setSelectedVariacion] = useState<Variacion | null>(null);
   const [briefVisual, setBriefVisual] = useState<Record<string, unknown> | null>(null);
   const [generatingBrief, setGeneratingBrief] = useState(false);
@@ -186,6 +191,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         setGeneratedVariaciones({ ...generatedVariaciones, variaciones: updated });
       } else {
         setGeneratedVariaciones(parsed);
+        setSelectedVariaciones([0, 1, 2]); // all 3 selected by default
+        setSelectedTitles([]);
+        setSelectedDescriptions([]);
         setStep('variaciones');
       }
       toast.success('✨ Copies generados');
@@ -198,14 +206,33 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     }
   };
 
-  const handleChooseVariacion = async (v: Variacion) => {
-    setSelectedVariacion(v);
+  // Toggle helpers for 3-2-2 selection
+  const toggle322 = (
+    arr: number[], setArr: (v: number[]) => void,
+    idx: number, max: number
+  ) => {
+    if (arr.includes(idx)) {
+      setArr(arr.filter(i => i !== idx));
+    } else if (arr.length < max) {
+      setArr([...arr, idx]);
+    }
+  };
+
+  const can322Proceed =
+    selectedVariaciones.length === 3 &&
+    selectedTitles.length === 2 &&
+    selectedDescriptions.length === 2;
+
+  const handleApproveVariaciones = async () => {
+    if (!generatedVariaciones) return;
+    const firstV = generatedVariaciones.variaciones[selectedVariaciones[0]];
+    setSelectedVariacion(firstV);
     setStep('brief');
     setGeneratingBrief(true);
     setBriefVisual(null);
     try {
       const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
-        body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: v },
+        body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: firstV },
       });
       if (error) throw error;
       let parsed = data;
@@ -670,48 +697,133 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
           </motion.div>
         )}
 
-        {/* STEP 6: VARIACIONES */}
+        {/* STEP 6: VARIACIONES — 3-2-2 selection */}
         {step === 'variaciones' && generatedVariaciones && (
-          <motion.div key="variaciones" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+          <motion.div key="variaciones" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">3 Variaciones Generadas</h3>
+              <div>
+                <h3 className="text-lg font-semibold">Formato 3-2-2</h3>
+                <p className="text-xs text-muted-foreground">Selecciona 3 copies · 2 títulos · 2 descripciones</p>
+              </div>
               <Button variant="ghost" size="sm" onClick={() => generateVariaciones()}>
                 <RefreshCw className="w-4 h-4 mr-1" />Regenerar las 3
               </Button>
             </div>
 
             {generatedVariaciones.explicacion && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm text-foreground">
                 💡 {generatedVariaciones.explicacion}
               </div>
             )}
 
-            <div className="space-y-4">
-              {generatedVariaciones.variaciones.map((v, i) => (
-                <Card key={i} className="border">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline">{v.badge}</Badge>
-                      <Button
-                        variant="ghost" size="sm"
-                        disabled={regeneratingIdx === i}
-                        onClick={() => generateVariaciones(i)}
-                      >
-                        {regeneratingIdx === i ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
-                        <span className="ml-1 text-xs">👎 Regenerar esta</span>
-                      </Button>
-                    </div>
-                    {v.titulo && <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Título</p><p className="font-semibold text-sm">{v.titulo}</p></div>}
-                    <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p><p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p></div>
-                    {v.descripcion && <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Descripción</p><p className="text-sm">{v.descripcion}</p></div>}
-                    {v.cta && <div><p className="text-xs text-muted-foreground uppercase tracking-wider">CTA</p><Badge>{v.cta}</Badge></div>}
-                    <Button className="w-full" onClick={() => handleChooseVariacion(v)}>
-                      <CheckCircle className="w-4 h-4 mr-2" />✅ Elegir esta variación
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+            {/* 3 COPIES — all selected by default, can deselect */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold uppercase tracking-wider">Copies</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedVariaciones.length === 3 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  {selectedVariaciones.length}/3 seleccionadas
+                </span>
+              </div>
+              {generatedVariaciones.variaciones.map((v, i) => {
+                const isSelected = selectedVariaciones.includes(i);
+                return (
+                  <Card
+                    key={i}
+                    className={`border-2 cursor-pointer transition-all ${isSelected ? 'border-primary bg-primary/5' : 'border-border opacity-60'}`}
+                    onClick={() => toggle322(selectedVariaciones, setSelectedVariaciones, i, 3)}
+                  >
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                            {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                          </div>
+                          <Badge variant="outline">{v.badge}</Badge>
+                        </div>
+                        <Button
+                          variant="ghost" size="sm"
+                          disabled={regeneratingIdx === i}
+                          onClick={e => { e.stopPropagation(); generateVariaciones(i); }}
+                        >
+                          {regeneratingIdx === i ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
+                          <span className="ml-1 text-xs">Regenerar</span>
+                        </Button>
+                      </div>
+                      <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p><p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p></div>
+                      {v.cta && <Badge variant="secondary">{v.cta}</Badge>}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
+
+            {/* 2 TÍTULOS — pick 2 from the 3 titles */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold uppercase tracking-wider">Títulos</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedTitles.length === 2 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  {selectedTitles.length}/2 seleccionados
+                </span>
+              </div>
+              {generatedVariaciones.variaciones.map((v, i) => {
+                if (!v.titulo) return null;
+                const isSelected = selectedTitles.includes(i);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => toggle322(selectedTitles, setSelectedTitles, i, 2)}
+                    className={`cursor-pointer p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${isSelected ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-100'}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                      {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                    </div>
+                    <span className="text-sm font-semibold">{v.titulo}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 2 DESCRIPCIONES — pick 2 from the 3 descriptions */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold uppercase tracking-wider">Descripciones</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedDescriptions.length === 2 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  {selectedDescriptions.length}/2 seleccionadas
+                </span>
+              </div>
+              {generatedVariaciones.variaciones.map((v, i) => {
+                if (!v.descripcion) return null;
+                const isSelected = selectedDescriptions.includes(i);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => toggle322(selectedDescriptions, setSelectedDescriptions, i, 2)}
+                    className={`cursor-pointer p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${isSelected ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-100'}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                      {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+                    </div>
+                    <span className="text-sm">{v.descripcion}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Progress summary */}
+            <div className={`rounded-lg p-3 text-sm border ${can322Proceed ? 'bg-green-50 border-green-200 text-green-800' : 'bg-muted border-border text-muted-foreground'}`}>
+              {can322Proceed
+                ? '✅ Formato 3-2-2 completo — listo para aprobar'
+                : `Selecciona ${selectedVariaciones.length < 3 ? `${3 - selectedVariaciones.length} cop${3 - selectedVariaciones.length === 1 ? 'y' : 'ies'} más` : ''}${selectedTitles.length < 2 ? ` · ${2 - selectedTitles.length} título${selectedTitles.length === 1 ? '' : 's'} más` : ''}${selectedDescriptions.length < 2 ? ` · ${2 - selectedDescriptions.length} descripción${selectedDescriptions.length === 1 ? '' : 'es'} más` : ''}`
+              }
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={!can322Proceed}
+              onClick={handleApproveVariaciones}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />Aprobar selección 3-2-2 y continuar
+            </Button>
           </motion.div>
         )}
 
