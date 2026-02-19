@@ -90,9 +90,10 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [selectedTitles, setSelectedTitles] = useState<number[]>([0, 1]);
   const [selectedDescriptions, setSelectedDescriptions] = useState<number[]>([0, 1]);
 
-  // Brief / generation — 3 briefs, one per selected copy
+  // Brief / generation — 6 briefs generated, user picks 3
   const [selectedVariacion, setSelectedVariacion] = useState<Variacion | null>(null);
   const [briefsVisuales, setBriefsVisuales] = useState<Array<Record<string, unknown>>>([]);
+  const [selectedBriefs, setSelectedBriefs] = useState<number[]>([]);
   const [generatingBrief, setGeneratingBrief] = useState(false);
   const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -228,6 +229,14 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     selectedTitles.length === 2 &&
     selectedDescriptions.length === 2;
 
+  const toggleBrief = (index: number) => {
+    setSelectedBriefs(prev => {
+      if (prev.includes(index)) return prev.filter(i => i !== index);
+      else if (prev.length < 3) return [...prev, index];
+      return prev;
+    });
+  };
+
   const handleApproveVariaciones = async () => {
     if (!generatedVariaciones) return;
     const firstV = generatedVariaciones.variaciones[selectedCopies[0]];
@@ -235,9 +244,13 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     setStep('brief');
     setGeneratingBrief(true);
     setBriefsVisuales([]);
+    setSelectedBriefs([]);
     try {
+      // Generate 6 briefs in parallel — cycling through the 3 selected copies: [0,1,2,0,1,2]
+      const copyPattern = [0, 1, 2, 0, 1, 2];
       const results = await Promise.all(
-        selectedCopies.map(async (copyIndex) => {
+        copyPattern.map(async (patternIdx) => {
+          const copyIndex = selectedCopies[patternIdx];
           const variacion = generatedVariaciones.variaciones[copyIndex];
           const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
             body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: variacion },
@@ -257,7 +270,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   };
 
   const handleApproveBrief = async () => {
-    const primaryBrief = briefsVisuales[0];
+    // Use first selected brief (or fallback to briefsVisuales[0])
+    const briefIdx = selectedBriefs.length > 0 ? selectedBriefs[0] : 0;
+    const primaryBrief = briefsVisuales[briefIdx];
     if (!primaryBrief || !selectedVariacion) return;
     try {
       const { data, error } = await (supabase as any).from('ad_creatives').insert({
@@ -274,7 +289,8 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   };
 
   const handleGenerateImage = async () => {
-    const primaryBrief = briefsVisuales[0];
+    const briefIdx = selectedBriefs.length > 0 ? selectedBriefs[0] : 0;
+    const primaryBrief = briefsVisuales[briefIdx];
     if (!savedCreativeId || !primaryBrief) return;
     setGeneratingImage(true);
     setGeneratedAssetUrl(null);
@@ -308,7 +324,8 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   }, [savedCreativeId, clientId]);
 
   const handleGenerateVideo = async () => {
-    const primaryBrief = briefsVisuales[0];
+    const briefIdx = selectedBriefs.length > 0 ? selectedBriefs[0] : 0;
+    const primaryBrief = briefsVisuales[briefIdx];
     if (!savedCreativeId || !primaryBrief) return;
     setGeneratingVideo(true); setVideoProgress('Iniciando...'); setGeneratedAssetUrl(null);
     try {
@@ -325,7 +342,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     setSelectedCategory(null); setSelectedCampaign(null); setSelectedAngle(null);
     setCustomAngle(''); setShowCustomAngle(false); setInstrucciones('');
     setGeneratedVariaciones(null); setSelectedVariacion(null); setBriefsVisuales([]);
-    setSavedCreativeId(null); setGeneratedAssetUrl(null); setVideoProgress('');
+    setSelectedBriefs([]); setSavedCreativeId(null); setGeneratedAssetUrl(null); setVideoProgress('');
   };
 
   const saveManualConfig = async () => {
@@ -864,45 +881,81 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         {/* STEP 7: BRIEF VISUAL */}
         {step === 'brief' && (
           <motion.div key="brief" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-            <h3 className="text-lg font-semibold">Briefs Visuales</h3>
+            <div>
+              <h3 className="text-lg font-semibold">Briefs Visuales</h3>
+              {briefsVisuales.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">Elige tus 3 favoritos para generar las fotos/videos</p>
+              )}
+            </div>
             {generatingBrief ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Generando 3 briefs visuales en paralelo...</p>
+                <p className="text-sm text-muted-foreground">Generando 6 briefs visuales en paralelo...</p>
               </div>
             ) : briefsVisuales.length > 0 ? (
               <div className="space-y-4">
-                {briefsVisuales.map((brief, index) => {
-                  const variacion = generatedVariaciones?.variaciones[selectedCopies[index]];
-                  return (
-                    <Card key={index}>
-                      <CardContent className="p-4 space-y-3 text-sm">
-                        <p className="text-xs font-bold uppercase tracking-wider text-primary">Brief Visual — Copy {index + 1}</p>
+                {/* Counter */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedBriefs.length === 3 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                    Seleccionados: {selectedBriefs.length}/3
+                  </span>
+                  {selectedBriefs.length < 3 && (
+                    <span className="text-xs text-muted-foreground">Selecciona {3 - selectedBriefs.length} más</span>
+                  )}
+                </div>
+
+                {/* 2x3 grid of 6 brief cards */}
+                <div className="grid grid-cols-2 gap-3">
+                  {briefsVisuales.map((brief, index) => {
+                    const copyPatternIdx = [0, 1, 2, 0, 1, 2][index];
+                    const copyIndex = selectedCopies[copyPatternIdx];
+                    const variacion = generatedVariaciones?.variaciones[copyIndex];
+                    const isChecked = selectedBriefs.includes(index);
+                    const isDisabled = !isChecked && selectedBriefs.length >= 3;
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => !isDisabled && toggleBrief(index)}
+                        className={`rounded-lg border-2 p-3 space-y-2 transition-all ${isChecked ? 'border-primary bg-primary/5 cursor-pointer' : isDisabled ? 'border-border opacity-40 cursor-not-allowed' : 'border-border hover:border-primary/50 cursor-pointer'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-primary">📋 Brief {index + 1}</p>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isDisabled}
+                            onChange={() => toggleBrief(index)}
+                            onClick={e => e.stopPropagation()}
+                            className="w-4 h-4 accent-primary shrink-0"
+                          />
+                        </div>
                         {variacion && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Copy</p>
-                            <p className="font-medium">{variacion.titulo}</p>
-                            <p className="mt-1 text-muted-foreground">{variacion.texto_principal}</p>
-                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{variacion.titulo}</p>
                         )}
-                        {Object.entries(brief).filter(([k]) => k !== 'prompt_generacion').map(([k, v]) => (
+                        {Object.entries(brief).filter(([k]) => k !== 'prompt_generacion').slice(0, 2).map(([k, v]) => (
                           <div key={k}>
                             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{k.replace(/_/g, ' ')}</p>
-                            <p>{String(v)}</p>
+                            <p className="text-xs line-clamp-2">{String(v)}</p>
                           </div>
                         ))}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
+                </div>
 
+                {/* CTA - enabled only when 3 selected */}
                 {!savedCreativeId ? (
-                  <Button className="w-full" onClick={handleApproveBrief}>
-                    <CheckCircle className="w-4 h-4 mr-2" />Aprobar Briefs y Guardar en Biblioteca
+                  <Button
+                    className="w-full"
+                    disabled={selectedBriefs.length !== 3}
+                    onClick={handleApproveBrief}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    {selectedBriefs.length === 3 ? 'Generar fotos y videos' : `Selecciona ${3 - selectedBriefs.length} brief${3 - selectedBriefs.length !== 1 ? 's' : ''} más`}
                   </Button>
                 ) : (
                   <div className="space-y-3">
-                    <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3 text-sm text-green-700 dark:text-green-300">
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-sm text-green-700 dark:text-green-300">
                       ✅ Creativo guardado. Ahora genera el visual.
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -933,6 +986,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
             ) : null}
           </motion.div>
         )}
+
 
         {/* STEP 8: PUBLISH */}
         {step === 'publish' && (
