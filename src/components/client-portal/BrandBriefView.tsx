@@ -585,8 +585,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     const r: ResearchData = {};
     const SKIP_TYPES = ['analysis_status', 'analysis_progress'];
+    let newStatus: 'idle' | 'pending' | 'complete' | 'error' | null = null;
     if (data && data.length > 0) {
-      let newStatus: 'idle' | 'pending' | 'complete' | 'error' | null = null;
       for (const row of data) {
         if (row.research_type === 'analysis_status') {
           const status = (row.research_data as any)?.status;
@@ -597,11 +597,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           (r as any)[row.research_type] = row.research_data;
         }
       }
-      // Update both states together after loop to avoid intermediate renders
-      if (newStatus) setAnalysisStatus(newStatus);
     }
-    // Always update research state (even if empty) to ensure stale data is cleared
+    // Always set both states — research first so render sees data when status changes
     setResearch(r);
+    if (newStatus) setAnalysisStatus(newStatus);
   }
 
 
@@ -1913,11 +1912,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         <AnalysisProgressBanner progressStep={progressStep} />
       )}
 
-      {analysisStatus === 'complete' && !research.seo_audit && (
+      {analysisStatus === 'complete' && hasResearch && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-primary font-medium">Análisis SEO, Keywords y Competencia completado — el informe PDF ya incluye todos los datos.</p>
+            <p className="text-sm text-primary font-medium">Análisis completado — revisa los tabs SEO, Keywords y Competencia.</p>
           </CardContent>
         </Card>
       )}
