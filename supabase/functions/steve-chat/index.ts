@@ -46,9 +46,21 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'price', label: '💰 Precio promedio de venta', type: 'number', prefix: '$', placeholder: 'Ej: 35.000' },
         { key: 'cost', label: '📦 Costo del producto/servicio', type: 'number', prefix: '$', placeholder: 'Ej: 12.000' },
         { key: 'shipping', label: '🚚 Costo de envío promedio', type: 'number', prefix: '$', placeholder: 'Ej: 4.000 (0 si es gratis)' },
+        { key: 'fase_negocio', label: '📈 ¿Cuánto facturas mensualmente?', type: 'select', placeholder: 'Selecciona tu fase', options: [
+          { value: 'Fase Inicial', label: 'Menos de $500.000 CLP — Fase Inicial' },
+          { value: 'Fase Crecimiento', label: '$500.000 - $5.000.000 CLP — Fase Crecimiento' },
+          { value: 'Fase Escalado', label: '$5.000.000 - $25.000.000 CLP — Fase Escalado' },
+          { value: 'Fase Avanzada', label: 'Más de $25.000.000 CLP — Fase Avanzada' },
+        ]},
+        { key: 'presupuesto_ads', label: '📢 ¿Cuánto tienes disponible mensualmente para publicidad?', type: 'select', placeholder: 'Selecciona tu presupuesto', options: [
+          { value: 'Menos de $100.000 CLP', label: 'Menos de $100.000 CLP' },
+          { value: '$100.000 - $500.000 CLP', label: '$100.000 - $500.000 CLP' },
+          { value: '$500.000 - $2.000.000 CLP', label: '$500.000 - $2.000.000 CLP' },
+          { value: 'Más de $2.000.000 CLP', label: 'Más de $2.000.000 CLP' },
+        ]},
       ],
       steveIntro: '*saca calculadora imaginaria* 🧮\n\n',
-      commentGuide: 'CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown profesional. Di que guardaste el CPA en configuración financiera.',
+      commentGuide: 'CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown profesional. Di que guardaste el CPA en configuración financiera. También menciona la fase del negocio detectada y ajusta tus recomendaciones de presupuesto publicitario en consecuencia.',
     },
     {
       id: 'sales_channels',
@@ -708,11 +720,24 @@ Deno.serve(async (req) => {
     const answeredQuestions = userMessages.length;
     const isLastQuestion = answeredQuestions >= BRAND_BRIEF_QUESTIONS.length;
 
+    // Extract fase_negocio and presupuesto_ads from Q2 response (index 2 = after Q0 + Q1 + Q2)
+    let faseNegocio = '';
+    let presupuestoAds = '';
+    if (userMessages.length >= 3) {
+      const q2Resp = userMessages[2]?.content || '';
+      const faseMatch = q2Resp.match(/Fase\s+(Inicial|Crecimiento|Escalado|Avanzada)/i);
+      if (faseMatch) faseNegocio = `Fase ${faseMatch[1]}`;
+      const presupuestoMatch = q2Resp.match(/(?:Menos de \$100\.000|(?:\$100\.000\s*-\s*\$500\.000)|(?:\$500\.000\s*-\s*\$2\.000\.000)|Más de \$2\.000\.000)\s*CLP/i);
+      if (presupuestoMatch) presupuestoAds = presupuestoMatch[0];
+    }
+
     const briefData = {
       raw_responses: userMessages.map(m => m.content),
       questions: BRAND_BRIEF_QUESTIONS.slice(0, answeredQuestions).map(q => q.id),
       answered_count: answeredQuestions,
       total_questions: BRAND_BRIEF_QUESTIONS.length,
+      fase_negocio: faseNegocio || undefined,
+      presupuesto_ads: presupuestoAds || undefined,
     };
 
     await supabase.from('buyer_personas').upsert({
@@ -796,7 +821,23 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
       ? `\nCONOCIMIENTO BASE:\n${knowledge.map((k: { titulo: string; contenido: string }) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`
       : '';
 
-    const dynamicSystemPrompt = bugSection + knowledgeSection + SYSTEM_PROMPT;
+    const phaseContext = faseNegocio ? `\n\n═══ CONTEXTO DE FASE DEL NEGOCIO ═══
+Fase del negocio: ${faseNegocio}
+Presupuesto mensual de ads: ${presupuestoAds || 'No especificado'} CLP
+
+Reglas por fase:
+- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA recomendar prospección fría.
+- Fase Crecimiento: Broad Retargeting + prospección fría básica. Sin estructuras complejas.
+- Fase Escalado: Campaña maestra + catálogos dinámicos. Estructuras más sofisticadas.
+- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.
+
+REGLAS ABSOLUTAS:
+- Nunca recomendar estrategias que superen el presupuesto disponible.
+- Nunca recomendar estructuras para una fase más avanzada.
+- Siempre medir GPT (Ganancia Por Transacción) no solo ROAS.
+- En Fase Inicial, SIEMPRE recomendar producto ancla.` : '';
+
+    const dynamicSystemPrompt = bugSection + knowledgeSection + SYSTEM_PROMPT + phaseContext;
 
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: dynamicSystemPrompt + questionContext },

@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface QuestionField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'textarea';
+  type: 'text' | 'number' | 'textarea' | 'select';
   prefix?: string;
   suffix?: string;
   placeholder?: string;
+  options?: Array<{ value: string; label: string }>;
 }
 
 interface StructuredFieldsFormProps {
@@ -28,7 +30,9 @@ export function StructuredFieldsForm({ fields, validation, onSubmit, isLoading }
     setValues(prev => ({ ...prev, [key]: value }));
   };
 
-  const getTotal = () => fields.reduce((acc, f) => acc + (parseFloat(values[f.key] || '0') || 0), 0);
+  const getTotal = () => fields
+    .filter(f => f.type !== 'select')
+    .reduce((acc, f) => acc + (parseFloat(values[f.key] || '0') || 0), 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +79,21 @@ export function StructuredFieldsForm({ fields, validation, onSubmit, isLoading }
                   className="text-sm min-h-[60px] bg-background"
                   disabled={isLoading}
                 />
+              ) : field.type === 'select' ? (
+                <Select
+                  value={values[field.key] || ''}
+                  onValueChange={(val) => handleChange(field.key, val)}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="text-sm bg-background w-full">
+                    <SelectValue placeholder={field.placeholder || 'Selecciona una opción'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {field.options?.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
                 <Input
                   type="text"
