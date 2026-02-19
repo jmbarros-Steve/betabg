@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { clientId, funnel, formato, angulo, instrucciones, assetUrls } = await req.json();
+    const { clientId, funnel, formato, angulo, instrucciones, assetUrls, fase_negocio, presupuesto_ads, producto_seleccionado, categoria_seleccionada, tipo_anuncio, campana_destino } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -62,7 +62,15 @@ serve(async (req) => {
     const competidores = (brief.competitors as string[])?.join(', ') || 'No especificados';
     const photosList = (assetUrls as string[] || []).slice(0, 5).join(', ');
 
-    const systemPrompt = `${bugSection}${knowledgeSection}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson. Genera copies de alta conversión para Meta Ads basado en los datos del cliente.`;
+    const phaseRulesSection = fase_negocio ? `\nFASE DEL NEGOCIO: ${fase_negocio}\nPRESUPUESTO MENSUAL DE ADS: ${presupuesto_ads || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\n\nNunca recomendar estrategias que superen el presupuesto disponible.\nNunca recomendar estructuras para una fase más avanzada.\nSiempre medir GPT no ROAS.\nEn Fase Inicial, SIEMPRE recomendar producto ancla.\n` : '';
+
+    const systemPrompt = `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson. Genera copies de alta conversión para Meta Ads basado en los datos del cliente.`;
+
+    const productoContext = producto_seleccionado
+      ? `- Producto específico: ${producto_seleccionado.title} — Precio: ${producto_seleccionado.price} — ${producto_seleccionado.description || ''}`
+      : categoria_seleccionada
+      ? `- Categoría de producto: ${categoria_seleccionada}`
+      : '- Tipo de anuncio: Genérico de marca / Awareness';
 
     const userPrompt = `DATOS DEL CLIENTE:
 - Negocio: ${brief.business_description || brief.descripcion || 'E-commerce'}
@@ -75,6 +83,10 @@ serve(async (req) => {
 - Ventaja competitiva: ${brief.competitive_advantage || brief.ventaja_competitiva || 'No especificada'}
 - CPA máximo: ${brief.max_cpa || brief.cpa_max || 'No especificado'}
 - Competidores: ${competidores}
+- Fase del negocio: ${fase_negocio || 'No especificada'}
+- Presupuesto de ads: ${presupuesto_ads || 'No especificado'} CLP
+- Campaña destino: ${campana_destino || funnel?.toUpperCase()}
+${productoContext}
 - Funnel: ${funnel?.toUpperCase()}
 - Formato: ${formato === 'video' ? 'Video' : 'Imagen estática'}
 - Ángulo creativo: ${angulo}
@@ -82,8 +94,36 @@ serve(async (req) => {
 - Fotos del producto disponibles: ${photosList || 'No hay fotos aún'}
 
 Usa las fotos para hacer el copy más específico y descriptivo cuando estén disponibles.
+${producto_seleccionado ? `El copy debe enfocarse específicamente en el producto "${producto_seleccionado.title}" y sus beneficios concretos.` : ''}
 
 Genera exactamente 3 variaciones usando el ángulo "${angulo}" para un anuncio ${funnel?.toUpperCase()} ${formato === 'video' ? 'en video' : 'en imagen estática'}.
+
+Responde SOLO en JSON válido sin markdown ni backticks:
+{
+  "explicacion": "Por qué este ángulo funciona para este cliente (2-3 líneas concretas)",
+  "variaciones": [
+    {
+      "badge": "Variación A",
+      "titulo": "...",
+      "texto_principal": "...",
+      "descripcion": "...",
+      "cta": "..."
+    },
+    {
+      "badge": "Variación B",
+      "titulo": "...",
+      "texto_principal": "...",
+      "descripcion": "...",
+      "cta": "..."
+    },
+    {
+      "badge": "Variación C",
+      "titulo": "...",
+      "texto_principal": "...",
+      "descripcion": "...",
+      "cta": "..."
+    }
+  ]
 
 Responde SOLO en JSON válido sin markdown ni backticks:
 {

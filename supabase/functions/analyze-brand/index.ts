@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
       userId = user.id;
     }
 
-    const { client_id, website_url, competitor_urls } = await req.json();
+    const { client_id, website_url, competitor_urls, fase_negocio, presupuesto_ads } = await req.json();
 
     if (!client_id) {
       return new Response(JSON.stringify({ error: 'Missing client_id' }), {
@@ -454,13 +454,20 @@ Deno.serve(async (req) => {
 
     await updateProgress('ia', `Generando plan estratégico con inteligencia artificial (${competitorContents.length} competidores analizados)...`, 70);
 
+    // Extract phase from brief if not provided directly
+    const briefPersonaData = persona?.persona_data as any;
+    const resolvedFase = fase_negocio || briefPersonaData?.fase_negocio || '';
+    const resolvedPresupuesto = presupuesto_ads || briefPersonaData?.presupuesto_ads || '';
+
+    const phaseRulesSection = resolvedFase ? `\nFASE DEL NEGOCIO: ${resolvedFase}\nPRESUPUESTO MENSUAL DE ADS: ${resolvedPresupuesto || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\nNunca recomendar estrategias que superen el presupuesto disponible.\nSiempre medir GPT no ROAS.\n` : '';
+
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-opus-4-6',
         messages: [
-          { role: 'system', content: `${bugSection}${knowledgeSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.` },
+          { role: 'system', content: `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.` },
           { role: 'user', content: analysisPrompt },
         ],
         temperature: 0.2,

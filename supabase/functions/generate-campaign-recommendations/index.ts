@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { connection_id, campaign_id } = await req.json();
+    const { connection_id, campaign_id, fase_negocio, presupuesto_ads } = await req.json();
     
     if (!connection_id) {
       return new Response(
@@ -417,7 +417,7 @@ Responde SOLO con un JSON array con este formato:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         messages: [
-          { role: 'system', content: `${bugSection}${knowledgeSection}Eres un experto en publicidad digital y optimización de campañas. Responde siempre en español.` },
+          { role: 'system', content: `${bugSection}${knowledgeSection}${fase_negocio ? `\nFase del negocio: ${fase_negocio}\nPresupuesto mensual de ads: ${presupuesto_ads || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\nNunca recomendar estrategias que superen el presupuesto disponible.\nSiempre medir GPT no ROAS.\n` : ''}Eres un experto en publicidad digital y optimización de campañas. Responde siempre en español.` },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
