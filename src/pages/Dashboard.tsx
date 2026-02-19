@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, ShieldAlert, Loader2 } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
-import { ClientsPanel } from '@/components/dashboard/ClientsPanel';
+import { AdminClientsPanel } from '@/components/dashboard/AdminClientsPanel';
 import { TimeEntryPanel } from '@/components/dashboard/TimeEntryPanel';
 import { InvoicesPanel } from '@/components/dashboard/InvoicesPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
@@ -114,7 +114,7 @@ export default function Dashboard() {
         >
           {activeTab === 'overview' && <DashboardStats userId={user.id} />}
           {activeTab === 'metrics' && <ClientMetricsPanel />}
-          {activeTab === 'clients' && <ClientsPanel userId={user.id} />}
+          {activeTab === 'clients' && <AdminClientsPanel />}
           {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
           {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
