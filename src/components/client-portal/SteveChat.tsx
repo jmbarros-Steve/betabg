@@ -230,26 +230,35 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   async function startNewConversation() {
+    const WELCOME_MESSAGE = '¡Hola! Soy Steve, tu consultor de performance marketing. Voy a ayudarte a construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Son 15 preguntas y toma unos 20 minutos. ¿Empezamos? Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
+
     try {
-      const { data, error } = await supabase.functions.invoke('steve-chat', {
-        body: { client_id: clientId },
+      // Create conversation record in DB
+      const { data: convData, error: convError } = await supabase
+        .from('steve_conversations')
+        .insert({ client_id: clientId })
+        .select('id')
+        .single();
+
+      if (convError) throw convError;
+
+      const convId = convData.id;
+      setConversationId(convId);
+
+      // Save welcome message to DB so history is preserved
+      await supabase.from('steve_messages').insert({
+        conversation_id: convId,
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
       });
-      if (error) throw error;
-      if (data?.conversation_id && data?.message) {
-        setConversationId(data.conversation_id);
-        setMessages([{
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.message,
-          created_at: new Date().toISOString(),
-        }]);
-        setProgress({ answered: 0, total: data.total_questions || 15 });
-        if (data.examples) setExamples(data.examples);
-        if (data.fields?.length) {
-          setCurrentFields(data.fields);
-          setFieldValidation(data.field_validation);
-        }
-      }
+
+      setMessages([{
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
+        created_at: new Date().toISOString(),
+      }]);
+      setProgress({ answered: 0, total: 15 });
     } catch (error) {
       console.error('Error starting conversation:', error);
       toast.error('Error al iniciar conversación con Steve');
