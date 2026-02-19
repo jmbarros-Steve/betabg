@@ -233,32 +233,26 @@ export function SteveChat({ clientId }: SteveChatProps) {
     const WELCOME_MESSAGE = '¡Hola! Soy Steve, tu consultor de performance marketing. Voy a ayudarte a construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Son 15 preguntas y toma unos 20 minutos. ¿Empezamos? Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
 
     try {
-      // Create conversation record in DB
-      const { data: convData, error: convError } = await supabase
-        .from('steve_conversations')
-        .insert({ client_id: clientId })
-        .select('id')
-        .single();
-
-      if (convError) throw convError;
-
-      const convId = convData.id;
-      setConversationId(convId);
-
-      // Save welcome message to DB so history is preserved
-      await supabase.from('steve_messages').insert({
-        conversation_id: convId,
-        role: 'assistant',
-        content: WELCOME_MESSAGE,
+      // Use edge function to create conversation — it uses service_role and bypasses RLS.
+      // This is required for both regular clients AND super admins viewing a client's portal.
+      const { data, error } = await supabase.functions.invoke('steve-chat', {
+        body: { client_id: clientId },
       });
 
-      setMessages([{
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: WELCOME_MESSAGE,
-        created_at: new Date().toISOString(),
-      }]);
-      setProgress({ answered: 0, total: 15 });
+      if (error) throw error;
+
+      if (data?.conversation_id) {
+        setConversationId(data.conversation_id);
+        // Show the hardcoded welcome message immediately (don't use the LLM-generated one
+        // to guarantee the exact text specified in requirements).
+        setMessages([{
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: WELCOME_MESSAGE,
+          created_at: new Date().toISOString(),
+        }]);
+        setProgress({ answered: 0, total: data.total_questions || 15 });
+      }
     } catch (error) {
       console.error('Error starting conversation:', error);
       toast.error('Error al iniciar conversación con Steve');
