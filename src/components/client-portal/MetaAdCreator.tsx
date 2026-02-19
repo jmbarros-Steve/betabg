@@ -248,7 +248,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     try {
       // Generate 6 briefs in parallel — cycling through the 3 selected copies: [0,1,2,0,1,2]
       const copyPattern = [0, 1, 2, 0, 1, 2];
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         copyPattern.map(async (patternIdx) => {
           const copyIndex = selectedCopies[patternIdx];
           const variacion = generatedVariaciones.variaciones[copyIndex];
@@ -261,7 +261,17 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
           return parsed as Record<string, unknown>;
         })
       );
-      setBriefsVisuales(results);
+
+      const successful = results
+        .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === 'fulfilled')
+        .map(r => r.value);
+
+      if (successful.length === 0) {
+        toast.error('Error generando los briefs visuales');
+        return;
+      }
+
+      setBriefsVisuales(successful);
     } catch (err) {
       toast.error('Error generando los briefs visuales');
     } finally {
