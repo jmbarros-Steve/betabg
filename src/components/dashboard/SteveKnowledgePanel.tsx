@@ -65,6 +65,8 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<string>('image/jpeg');
+  const [performance, setPerformance] = useState<string>('no_se');
+  const [context, setContext] = useState<string>('');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [saveCategory, setSaveCategory] = useState<string>('anuncios');
@@ -82,7 +84,6 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
       setPreview(result);
-      // Extract pure base64 (remove data:image/...;base64, prefix)
       setImageBase64(result.split(',')[1]);
     };
     reader.readAsDataURL(file);
@@ -94,7 +95,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
     setAnalyzing(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-ad-image', {
-        body: { imageBase64, mediaType },
+        body: { imageBase64, mediaType, performance, context },
       });
       if (error) throw error;
       setAnalysis(data.analysis);
@@ -164,6 +165,35 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
           </div>
         )}
 
+        {/* Context fields — shown once image is loaded */}
+        {imageBase64 && (
+          <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/20">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">¿Este anuncio funcionó?</Label>
+              <Select value={performance} onValueChange={setPerformance}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="funciono">✅ Sí funcionó</SelectItem>
+                  <SelectItem value="no_funciono">❌ No funcionó</SelectItem>
+                  <SelectItem value="no_se">🤷 No sé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Contexto opcional</Label>
+              <Textarea
+                rows={2}
+                value={context}
+                onChange={e => setContext(e.target.value)}
+                placeholder="Escribe métricas reales si las tienes (CTR, ROAS, CPA, etc)"
+                className="text-sm resize-none"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Analyze button */}
         {imageBase64 && (
           <Button onClick={analyze} disabled={analyzing} className="w-full">
@@ -210,9 +240,8 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-
-
 // ─── Sub-components ────────────────────────────────────────────────────────────
+
 
 function KnowledgeCard({
   entry,

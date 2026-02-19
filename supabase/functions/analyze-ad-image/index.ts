@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { imageBase64, mediaType } = await req.json()
+    const { imageBase64, mediaType, performance, context } = await req.json()
 
     if (!imageBase64) {
       return new Response(JSON.stringify({ error: 'imageBase64 is required' }), {
@@ -50,15 +50,36 @@ Deno.serve(async (req) => {
               },
               {
                 type: 'text',
-                text: `Eres un experto en performance marketing y creativos de alta conversión.
+                text: (() => {
+                  const perfLabel = performance === 'funciono'
+                    ? '✅ ANUNCIO QUE SÍ FUNCIONÓ'
+                    : performance === 'no_funciono'
+                    ? '❌ ANUNCIO QUE NO FUNCIONÓ'
+                    : '🤷 RENDIMIENTO DESCONOCIDO';
+
+                  const contextBlock = context
+                    ? `\nMétricas / contexto real proporcionado:\n${context}\n`
+                    : '';
+
+                  const focusInstruction = performance === 'funciono'
+                    ? 'Este anuncio SÍ funcionó. Enfoca el análisis en qué elementos lo hicieron exitoso y por qué funciona bien.'
+                    : performance === 'no_funciono'
+                    ? 'Este anuncio NO funcionó. Enfoca el análisis en identificar qué falló: qué elementos debilitaron el anuncio, qué errores cometió y cómo corregirlos.'
+                    : 'No se sabe si funcionó. Analiza objetivamente fortalezas y debilidades.';
+
+                  return `Eres un experto en performance marketing y creativos de alta conversión.
+
+CONTEXTO: ${perfLabel}
+${contextBlock}
+${focusInstruction}
 
 Analiza este anuncio y extrae:
 
-1. POR QUÉ FUNCIONA (o no funciona):
+1. POR QUÉ FUNCIONA (o por qué falló):
    - Composición visual
    - Uso del color
    - Jerarquía de texto
-   - Elemento principal que captura atención
+   - Elemento principal que captura (o pierde) atención
 
 2. PATRÓN DE COPY:
    - Hook utilizado
@@ -67,13 +88,14 @@ Analiza este anuncio y extrae:
 
 3. ÁNGULO CREATIVO:
    - Qué tipo de ángulo usa (beneficio, dolor, social proof, etc)
-   - Por qué este ángulo para esta audiencia
+   - Por qué este ángulo funciona o falla para esta audiencia
 
 4. LO QUE STEVE DEBE APRENDER:
    - 3 reglas concretas extraídas de este anuncio
    - En formato: "Cuando hagas X, siempre Y porque Z"
 
-Responde en español, de forma concreta y accionable.`,
+Responde en español, de forma concreta y accionable.`;
+                })(),
               },
             ],
           },
