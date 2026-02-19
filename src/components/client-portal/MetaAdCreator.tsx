@@ -90,9 +90,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [selectedTitles, setSelectedTitles] = useState<number[]>([0, 1]);
   const [selectedDescriptions, setSelectedDescriptions] = useState<number[]>([0, 1]);
 
-  // Brief / generation (use first selected variacion for brief)
+  // Brief / generation — 3 briefs, one per selected copy
   const [selectedVariacion, setSelectedVariacion] = useState<Variacion | null>(null);
-  const [briefVisual, setBriefVisual] = useState<Record<string, unknown> | null>(null);
+  const [briefsVisuales, setBriefsVisuales] = useState<Array<Record<string, unknown>>>([]);
   const [generatingBrief, setGeneratingBrief] = useState(false);
   const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -234,30 +234,37 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     setSelectedVariacion(firstV);
     setStep('brief');
     setGeneratingBrief(true);
-    setBriefVisual(null);
+    setBriefsVisuales([]);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
-        body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: firstV },
-      });
-      if (error) throw error;
-      let parsed = data;
-      if (typeof data === 'string') parsed = JSON.parse(data.replace(/```json|```/g, '').trim());
-      setBriefVisual(parsed);
+      const results = await Promise.all(
+        selectedCopies.map(async (copyIndex) => {
+          const variacion = generatedVariaciones.variaciones[copyIndex];
+          const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
+            body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: variacion },
+          });
+          if (error) throw error;
+          let parsed = data;
+          if (typeof data === 'string') parsed = JSON.parse(data.replace(/```json|```/g, '').trim());
+          return parsed as Record<string, unknown>;
+        })
+      );
+      setBriefsVisuales(results);
     } catch (err) {
-      toast.error('Error generando el brief visual');
+      toast.error('Error generando los briefs visuales');
     } finally {
       setGeneratingBrief(false);
     }
   };
 
   const handleApproveBrief = async () => {
-    if (!briefVisual || !selectedVariacion) return;
+    const primaryBrief = briefsVisuales[0];
+    if (!primaryBrief || !selectedVariacion) return;
     try {
       const { data, error } = await (supabase as any).from('ad_creatives').insert({
         client_id: clientId, funnel, formato: 'static', angulo: effectiveAngle,
         titulo: selectedVariacion.titulo, texto_principal: selectedVariacion.texto_principal,
         descripcion: selectedVariacion.descripcion, cta: selectedVariacion.cta,
-        brief_visual: briefVisual, prompt_generacion: (briefVisual.prompt_generacion as string) || null,
+        brief_visual: primaryBrief, prompt_generacion: (primaryBrief.prompt_generacion as string) || null,
         estado: 'aprobado', custom_instructions: instrucciones.trim() || null,
       }).select('id').single();
       if (error) throw error;
@@ -267,12 +274,13 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   };
 
   const handleGenerateImage = async () => {
-    if (!savedCreativeId || !briefVisual) return;
+    const primaryBrief = briefsVisuales[0];
+    if (!savedCreativeId || !primaryBrief) return;
     setGeneratingImage(true);
     setGeneratedAssetUrl(null);
     try {
       const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { clientId, creativeId: savedCreativeId, promptGeneracion: briefVisual.prompt_generacion as string },
+        body: { clientId, creativeId: savedCreativeId, promptGeneracion: primaryBrief.prompt_generacion as string },
       });
       if (error) throw error;
       if (data?.asset_url) { setGeneratedAssetUrl(data.asset_url); toast.success('🖼 Imagen generada'); }
@@ -300,11 +308,12 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   }, [savedCreativeId, clientId]);
 
   const handleGenerateVideo = async () => {
-    if (!savedCreativeId || !briefVisual) return;
+    const primaryBrief = briefsVisuales[0];
+    if (!savedCreativeId || !primaryBrief) return;
     setGeneratingVideo(true); setVideoProgress('Iniciando...'); setGeneratedAssetUrl(null);
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: { clientId, creativeId: savedCreativeId, promptGeneracion: briefVisual.prompt_generacion as string },
+        body: { clientId, creativeId: savedCreativeId, promptGeneracion: primaryBrief.prompt_generacion as string },
       });
       if (error) throw error;
       if (data?.prediction_id) { startVideoPolling(data.prediction_id); }
@@ -315,7 +324,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     setStep('strategy'); setProductMode(null); setSelectedProduct(null);
     setSelectedCategory(null); setSelectedCampaign(null); setSelectedAngle(null);
     setCustomAngle(''); setShowCustomAngle(false); setInstrucciones('');
-    setGeneratedVariaciones(null); setSelectedVariacion(null); setBriefVisual(null);
+    setGeneratedVariaciones(null); setSelectedVariacion(null); setBriefsVisuales([]);
     setSavedCreativeId(null); setGeneratedAssetUrl(null); setVideoProgress('');
   };
 
@@ -855,33 +864,41 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         {/* STEP 7: BRIEF VISUAL */}
         {step === 'brief' && (
           <motion.div key="brief" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-            <h3 className="text-lg font-semibold">Brief Visual</h3>
+            <h3 className="text-lg font-semibold">Briefs Visuales</h3>
             {generatingBrief ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Generando brief visual...</p>
+                <p className="text-sm text-muted-foreground">Generando 3 briefs visuales en paralelo...</p>
               </div>
-            ) : briefVisual ? (
+            ) : briefsVisuales.length > 0 ? (
               <div className="space-y-4">
-                <Card>
-                  <CardContent className="p-4 space-y-3 text-sm">
-                    {selectedVariacion && (
-                      <>
-                        <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Copy elegido</p><p className="font-medium">{selectedVariacion.titulo}</p><p className="mt-1 text-muted-foreground">{selectedVariacion.texto_principal}</p></div>
-                      </>
-                    )}
-                    {Object.entries(briefVisual).filter(([k]) => k !== 'prompt_generacion').map(([k, v]) => (
-                      <div key={k}>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{k.replace(/_/g, ' ')}</p>
-                        <p>{String(v)}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                {briefsVisuales.map((brief, index) => {
+                  const variacion = generatedVariaciones?.variaciones[selectedCopies[index]];
+                  return (
+                    <Card key={index}>
+                      <CardContent className="p-4 space-y-3 text-sm">
+                        <p className="text-xs font-bold uppercase tracking-wider text-primary">Brief Visual — Copy {index + 1}</p>
+                        {variacion && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Copy</p>
+                            <p className="font-medium">{variacion.titulo}</p>
+                            <p className="mt-1 text-muted-foreground">{variacion.texto_principal}</p>
+                          </div>
+                        )}
+                        {Object.entries(brief).filter(([k]) => k !== 'prompt_generacion').map(([k, v]) => (
+                          <div key={k}>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{k.replace(/_/g, ' ')}</p>
+                            <p>{String(v)}</p>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
 
                 {!savedCreativeId ? (
                   <Button className="w-full" onClick={handleApproveBrief}>
-                    <CheckCircle className="w-4 h-4 mr-2" />Aprobar Brief y Guardar en Biblioteca
+                    <CheckCircle className="w-4 h-4 mr-2" />Aprobar Briefs y Guardar en Biblioteca
                   </Button>
                 ) : (
                   <div className="space-y-3">
