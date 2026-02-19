@@ -23,6 +23,11 @@ export type Database = {
           created_at: string
           cta: string | null
           custom_instructions: string | null
+          dct_briefs: Json | null
+          dct_copies: Json | null
+          dct_descripciones: Json | null
+          dct_imagenes: Json | null
+          dct_titulos: Json | null
           descripcion: string | null
           estado: string
           formato: string
@@ -43,6 +48,11 @@ export type Database = {
           created_at?: string
           cta?: string | null
           custom_instructions?: string | null
+          dct_briefs?: Json | null
+          dct_copies?: Json | null
+          dct_descripciones?: Json | null
+          dct_imagenes?: Json | null
+          dct_titulos?: Json | null
           descripcion?: string | null
           estado?: string
           formato: string
@@ -63,6 +73,11 @@ export type Database = {
           created_at?: string
           cta?: string | null
           custom_instructions?: string | null
+          dct_briefs?: Json | null
+          dct_copies?: Json | null
+          dct_descripciones?: Json | null
+          dct_imagenes?: Json | null
+          dct_titulos?: Json | null
           descripcion?: string | null
           estado?: string
           formato?: string

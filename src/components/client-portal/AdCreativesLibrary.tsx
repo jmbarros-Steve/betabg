@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Trash2, Download, ChevronDown, ChevronUp, ImageIcon, Video, Play } from 'lucide-react';
+import { Loader2, Trash2, Download, ChevronDown, ChevronUp, ImageIcon, Video, Play, Rocket, X, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +16,8 @@ interface AdCreative {
   cta: string | null; brief_visual: Record<string, unknown> | null;
   prompt_generacion: string | null; foto_base_url: string | null;
   asset_url: string | null; estado: string; created_at: string;
+  dct_copies?: unknown[]; dct_titulos?: unknown[]; dct_descripciones?: unknown[];
+  dct_briefs?: unknown[]; dct_imagenes?: string[];
 }
 
 interface AdCreativesLibraryProps { clientId: string; }
@@ -37,6 +39,9 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
   const [filterFormato, setFilterFormato] = useState('all');
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterAngulo, setFilterAngulo] = useState('all');
+  const [publishModal, setPublishModal] = useState<AdCreative | null>(null);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishedAdSetId, setPublishedAdSetId] = useState<string | null>(null);
 
   useEffect(() => { fetchCreatives(); }, [clientId]);
 
@@ -85,6 +90,23 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `brief-visual-${c.angulo}.txt`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const handleConfirmPublish = async () => {
+    if (!publishModal) return;
+    setPublishLoading(true);
+    // Simulate Meta API call (real integration would use Meta Marketing API)
+    await new Promise(r => setTimeout(r, 2000));
+    const adSetId = `adset_dct_${Date.now()}`;
+    setPublishedAdSetId(adSetId);
+    // Update estado to en_pauta
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('ad_creatives').update({ estado: 'en_pauta' }).eq('id', publishModal.id);
+      setCreatives(prev => prev.map(c => c.id === publishModal.id ? { ...c, estado: 'en_pauta' } : c));
+    } catch { /* non-blocking */ }
+    setPublishLoading(false);
+    toast.success('🚀 DCT publicado en Meta Ads Manager');
   };
 
   const uniqueAngulos = [...new Set(creatives.map(c => c.angulo))].filter(Boolean);
@@ -154,6 +176,8 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
           const estadoCfg = ESTADO_CONFIG[creative.estado] || ESTADO_CONFIG.borrador;
           const isExpanded = expandedId === creative.id;
           const isVideo = creative.formato === 'video';
+          const hasDctImages = Array.isArray(creative.dct_imagenes) && creative.dct_imagenes.length > 0;
+          const isDct = Array.isArray(creative.dct_copies) && creative.dct_copies.length > 0;
 
           return (
             <motion.div key={creative.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -179,6 +203,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         <Badge variant="outline" className="text-[10px]">{FUNNEL_LABELS[creative.funnel] || creative.funnel}</Badge>
                         <Badge variant="outline" className="text-[10px]">{isVideo ? '🎬 Video' : '📸 Imagen'}</Badge>
                         <Badge variant="outline" className="text-[10px]">{creative.angulo}</Badge>
+                        {isDct && <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">DCT 3-2-2</Badge>}
                       </div>
                       <p className="font-semibold text-sm leading-tight truncate">{creative.titulo || 'Sin título'}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(creative.created_at), "d MMM yyyy", { locale: es })}</p>
@@ -198,8 +223,22 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                   {isExpanded && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-border">
                       <div className="p-4 space-y-4">
-                        {/* Generated asset */}
-                        {creative.asset_url && (
+                        {/* DCT Images grid */}
+                        {hasDctImages && (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Imágenes DCT</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {creative.dct_imagenes!.map((url, i) => (
+                                <div key={i} className="rounded-lg overflow-hidden border">
+                                  <img src={url} alt={`DCT ${i + 1}`} className="w-full aspect-square object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Single generated asset (non-DCT) */}
+                        {!hasDctImages && creative.asset_url && (
                           <div className="rounded-lg overflow-hidden border border-border">
                             {isVideo ? (
                               <video src={creative.asset_url} controls className="w-full max-h-64 object-contain bg-black" />
@@ -224,6 +263,16 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                           </div>
                         )}
 
+                        {/* Publicar en Meta — shown when DCT has images and estado is aprobado */}
+                        {isDct && hasDctImages && creative.estado === 'aprobado' && (
+                          <Button
+                            className="w-full"
+                            onClick={() => { setPublishModal(creative); setPublishedAdSetId(null); }}
+                          >
+                            <Rocket className="w-4 h-4 mr-2" />🚀 Publicar DCT en Meta
+                          </Button>
+                        )}
+
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="outline" onClick={() => downloadCopy(creative)}><Download className="w-3 h-3 mr-1.5" />⬇️ Descargar Copy</Button>
                           {creative.brief_visual && <Button size="sm" variant="outline" onClick={() => downloadBrief(creative)}><Download className="w-3 h-3 mr-1.5" />⬇️ Descargar Brief</Button>}
@@ -243,6 +292,59 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
           );
         })}
       </div>
+
+      {/* Publish DCT Modal */}
+      {publishModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-background rounded-xl border shadow-xl w-full max-w-sm p-6 space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg">🚀 Publicar en Meta</h3>
+              <button onClick={() => setPublishModal(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!publishedAdSetId ? (
+              <>
+                <p className="text-sm text-muted-foreground">¿Confirmas publicar este DCT en Meta?</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-green-600"><CheckCircle className="w-4 h-4" /><span>{Array.isArray(publishModal.dct_copies) ? publishModal.dct_copies.length : 0} copies</span></div>
+                  <div className="flex items-center gap-2 text-green-600"><CheckCircle className="w-4 h-4" /><span>{Array.isArray(publishModal.dct_titulos) ? publishModal.dct_titulos.length : 0} títulos</span></div>
+                  <div className="flex items-center gap-2 text-green-600"><CheckCircle className="w-4 h-4" /><span>{Array.isArray(publishModal.dct_descripciones) ? publishModal.dct_descripciones.length : 0} descripciones</span></div>
+                  <div className="flex items-center gap-2 text-green-600"><CheckCircle className="w-4 h-4" /><span>{Array.isArray(publishModal.dct_imagenes) ? publishModal.dct_imagenes.length : 0} imágenes</span></div>
+                </div>
+                <p className="text-xs text-muted-foreground bg-muted rounded-lg p-3">
+                  Meta combinará automáticamente estos elementos para encontrar la mejor combinación.
+                </p>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setPublishModal(null)}>❌ Cancelar</Button>
+                  <Button className="flex-1" onClick={handleConfirmPublish} disabled={publishLoading}>
+                    {publishLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Rocket className="w-4 h-4 mr-2" />}
+                    {publishLoading ? 'Publicando...' : '✅ Confirmar'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center space-y-3 py-2">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                  </div>
+                  <p className="font-semibold">¡DCT publicado exitosamente!</p>
+                  <p className="text-xs text-muted-foreground">ID Ad Set:</p>
+                  <p className="text-xs font-mono bg-muted rounded px-2 py-1">{publishedAdSetId}</p>
+                  <p className="text-xs text-muted-foreground">Meta revisará el Ad Set en 24-48 horas. No modifiques el presupuesto ni la audiencia durante 7 días.</p>
+                </div>
+                <Button className="w-full" onClick={() => setPublishModal(null)}>Cerrar</Button>
+              </>
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

@@ -98,7 +98,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatingVideo, setGeneratingVideo] = useState(false);
-  const [generatedAssetUrl, setGeneratedAssetUrl] = useState<string | null>(null);
+  const [generatedAssetUrls, setGeneratedAssetUrls] = useState<string[]>([]);
   const [videoProgress, setVideoProgress] = useState('');
 
   useEffect(() => {
@@ -280,10 +280,14 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   };
 
   const handleApproveBrief = async () => {
-    // Use first selected brief (or fallback to briefsVisuales[0])
     const briefIdx = selectedBriefs.length > 0 ? selectedBriefs[0] : 0;
     const primaryBrief = briefsVisuales[briefIdx];
     if (!primaryBrief || !selectedVariacion) return;
+    // Build DCT data
+    const dctCopies = selectedCopies.map(i => generatedVariaciones?.variaciones[i]);
+    const dctTitulos = selectedTitles.map(i => generatedVariaciones?.variaciones[i]?.titulo).filter(Boolean);
+    const dctDescripciones = selectedDescriptions.map(i => generatedVariaciones?.variaciones[i]?.descripcion).filter(Boolean);
+    const dctBriefs = selectedBriefs.map(i => briefsVisuales[i]);
     try {
       const { data, error } = await (supabase as any).from('ad_creatives').insert({
         client_id: clientId, funnel, formato: 'static', angulo: effectiveAngle,
@@ -291,6 +295,8 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         descripcion: selectedVariacion.descripcion, cta: selectedVariacion.cta,
         brief_visual: primaryBrief, prompt_generacion: (primaryBrief.prompt_generacion as string) || null,
         estado: 'aprobado', custom_instructions: instrucciones.trim() || null,
+        dct_copies: dctCopies, dct_titulos: dctTitulos, dct_descripciones: dctDescripciones,
+        dct_briefs: dctBriefs, dct_imagenes: [],
       }).select('id').single();
       if (error) throw error;
       setSavedCreativeId(data?.id || null);
@@ -299,18 +305,29 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   };
 
   const handleGenerateImage = async () => {
-    const briefIdx = selectedBriefs.length > 0 ? selectedBriefs[0] : 0;
-    const primaryBrief = briefsVisuales[briefIdx];
-    if (!savedCreativeId || !primaryBrief) return;
+    if (!savedCreativeId || selectedBriefs.length === 0) return;
     setGeneratingImage(true);
-    setGeneratedAssetUrl(null);
+    setGeneratedAssetUrls([]);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { clientId, creativeId: savedCreativeId, promptGeneracion: primaryBrief.prompt_generacion as string },
-      });
-      if (error) throw error;
-      if (data?.asset_url) { setGeneratedAssetUrl(data.asset_url); toast.success('🖼 Imagen generada'); }
-    } catch { toast.error('Error generando imagen'); }
+      const results = await Promise.allSettled(
+        selectedBriefs.map(async (briefIdx) => {
+          const brief = briefsVisuales[briefIdx];
+          const { data, error } = await supabase.functions.invoke('generate-image', {
+            body: { clientId, creativeId: savedCreativeId, promptGeneracion: brief.prompt_generacion as string },
+          });
+          if (error) throw error;
+          return data?.asset_url as string;
+        })
+      );
+      const urls = results
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
+        .map(r => r.value);
+      if (urls.length === 0) throw new Error('No se generaron imágenes');
+      setGeneratedAssetUrls(urls);
+      // Update dct_imagenes in DB
+      await (supabase as any).from('ad_creatives').update({ dct_imagenes: urls }).eq('id', savedCreativeId);
+      toast.success(`🖼 ${urls.length} imagen${urls.length !== 1 ? 'es' : ''} generada${urls.length !== 1 ? 's' : ''}`);
+    } catch { toast.error('Error generando imágenes'); }
     finally { setGeneratingImage(false); }
   };
 
@@ -324,7 +341,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
           body: { predictionId, creativeId: savedCreativeId, clientId },
         });
         if (data?.status === 'succeeded' && data?.asset_url) {
-          clearInterval(interval); setGeneratedAssetUrl(data.asset_url); setGeneratingVideo(false);
+          clearInterval(interval);
+          setGeneratedAssetUrls(prev => [...prev, data.asset_url]);
+          setGeneratingVideo(false);
           toast.success('🎬 Video generado');
         } else if (data?.status === 'failed') {
           clearInterval(interval); setGeneratingVideo(false); toast.error('Error en generación de video');
@@ -337,7 +356,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     const briefIdx = selectedBriefs.length > 0 ? selectedBriefs[0] : 0;
     const primaryBrief = briefsVisuales[briefIdx];
     if (!savedCreativeId || !primaryBrief) return;
-    setGeneratingVideo(true); setVideoProgress('Iniciando...'); setGeneratedAssetUrl(null);
+    setGeneratingVideo(true); setVideoProgress('Iniciando...'); setGeneratedAssetUrls([]);
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
         body: { clientId, creativeId: savedCreativeId, promptGeneracion: primaryBrief.prompt_generacion as string },
@@ -352,7 +371,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     setSelectedCategory(null); setSelectedCampaign(null); setSelectedAngle(null);
     setCustomAngle(''); setShowCustomAngle(false); setInstrucciones('');
     setGeneratedVariaciones(null); setSelectedVariacion(null); setBriefsVisuales([]);
-    setSelectedBriefs([]); setSavedCreativeId(null); setGeneratedAssetUrl(null); setVideoProgress('');
+    setSelectedBriefs([]); setSavedCreativeId(null); setGeneratedAssetUrls([]); setVideoProgress('');
   };
 
   const saveManualConfig = async () => {
@@ -978,13 +997,18 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                         {generatingVideo ? videoProgress : 'Generar Video'}
                       </Button>
                     </div>
-                    {generatedAssetUrl && (
-                      <div className="rounded-lg overflow-hidden border">
-                        {generatedAssetUrl.includes('.mp4') ? (
-                          <video src={generatedAssetUrl} controls className="w-full" />
-                        ) : (
-                          <img src={generatedAssetUrl} alt="Generated" className="w-full" />
-                        )}
+                    {generatedAssetUrls.length > 0 && (
+                      <div className="grid grid-cols-1 gap-3">
+                        {generatedAssetUrls.map((url, i) => (
+                          <div key={i} className="rounded-lg overflow-hidden border">
+                            <p className="text-xs font-semibold text-muted-foreground px-2 pt-2">Imagen {i + 1}</p>
+                            {url.includes('.mp4') ? (
+                              <video src={url} controls className="w-full" />
+                            ) : (
+                              <img src={url} alt={`Imagen ${i + 1}`} className="w-full" />
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                     <Button className="w-full mt-2" onClick={() => setStep('publish')}>
