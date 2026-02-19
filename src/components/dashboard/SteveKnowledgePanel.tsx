@@ -38,14 +38,16 @@ interface BugEntry {
 // ─── Tab Config ────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'seo',      label: '🔍 SEO',       categoria: 'seo' },
-  { id: 'keywords', label: '🔑 Keywords',   categoria: 'keywords' },
-  { id: 'meta',     label: '📘 Meta Ads',   categoria: 'meta' },
-  { id: 'google',   label: '🟡 Google Ads', categoria: 'google' },
-  { id: 'klaviyo',  label: '📧 Klaviyo',    categoria: 'klaviyo' },
-  { id: 'shopify',  label: '🛍 Shopify',    categoria: 'shopify' },
-  { id: 'brief',    label: '📋 Brief',      categoria: 'brief' },
-  { id: 'anuncios', label: '🎯 Anuncios',   categoria: 'anuncios' },
+  { id: 'seo',      label: '🔍 SEO',                    categoria: 'seo' },
+  { id: 'keywords', label: '🔑 Keywords',                categoria: 'keywords' },
+  { id: 'meta',     label: '📘 Meta Ads',                categoria: 'meta' },
+  { id: 'google',   label: '🟡 Google Ads',              categoria: 'google' },
+  { id: 'klaviyo',  label: '📧 Klaviyo',                 categoria: 'klaviyo' },
+  { id: 'shopify',  label: '🛍 Shopify',                 categoria: 'shopify' },
+  { id: 'brief',    label: '📋 Brief',                   categoria: 'brief' },
+  { id: 'buyer_persona', label: '👤 Buyer Persona',      categoria: 'buyer_persona' },
+  { id: 'anuncios', label: '🎯 Anuncios',                categoria: 'anuncios' },
+  { id: 'analisis', label: '📊 Generación de Análisis',  categoria: 'analisis' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
