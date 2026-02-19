@@ -85,10 +85,10 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [generatedVariaciones, setGeneratedVariaciones] = useState<GeneratedVariaciones | null>(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
 
-  // 3-2-2 selection: 3 copies, 2 titles, 2 descriptions
-  const [selectedVariaciones, setSelectedVariaciones] = useState<number[]>([0, 1, 2]); // indices
-  const [selectedTitles, setSelectedTitles] = useState<number[]>([]);
-  const [selectedDescriptions, setSelectedDescriptions] = useState<number[]>([]);
+  // 3-2-2 selection — all pre-selected by default
+  const [selectedCopies, setSelectedCopies] = useState<number[]>([0, 1, 2]);
+  const [selectedTitles, setSelectedTitles] = useState<number[]>([0, 1]);
+  const [selectedDescriptions, setSelectedDescriptions] = useState<number[]>([0, 1]);
 
   // Brief / generation (use first selected variacion for brief)
   const [selectedVariacion, setSelectedVariacion] = useState<Variacion | null>(null);
@@ -191,9 +191,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         setGeneratedVariaciones({ ...generatedVariaciones, variaciones: updated });
       } else {
         setGeneratedVariaciones(parsed);
-        setSelectedVariaciones([0, 1, 2]); // all 3 selected by default
-        setSelectedTitles([]);
-        setSelectedDescriptions([]);
+        setSelectedCopies([0, 1, 2]);
+        setSelectedTitles([0, 1]);
+        setSelectedDescriptions([0, 1]);
         setStep('variaciones');
       }
       toast.success('✨ Copies generados');
@@ -206,26 +206,24 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     }
   };
 
-  // Toggle helpers for 3-2-2 selection
-  const toggle322 = (
-    arr: number[], setArr: (v: number[]) => void,
-    idx: number, max: number
-  ) => {
-    if (arr.includes(idx)) {
-      setArr(arr.filter(i => i !== idx));
-    } else if (arr.length < max) {
-      setArr([...arr, idx]);
-    }
-  };
+  const toggleCopy = (idx: number) => setSelectedCopies(prev =>
+    prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+  );
+  const toggleTitle = (idx: number) => setSelectedTitles(prev =>
+    prev.includes(idx) ? prev.filter(i => i !== idx) : prev.length < 2 ? [...prev, idx] : prev
+  );
+  const toggleDescription = (idx: number) => setSelectedDescriptions(prev =>
+    prev.includes(idx) ? prev.filter(i => i !== idx) : prev.length < 2 ? [...prev, idx] : prev
+  );
 
-  const can322Proceed =
-    selectedVariaciones.length === 3 &&
+  const canProceed =
+    selectedCopies.length === 3 &&
     selectedTitles.length === 2 &&
     selectedDescriptions.length === 2;
 
   const handleApproveVariaciones = async () => {
     if (!generatedVariaciones) return;
-    const firstV = generatedVariaciones.variaciones[selectedVariaciones[0]];
+    const firstV = generatedVariaciones.variaciones[selectedCopies[0]];
     setSelectedVariacion(firstV);
     setStep('brief');
     setGeneratingBrief(true);
@@ -716,24 +714,32 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               </div>
             )}
 
-            {/* 3 COPIES — always all selected, non-removable */}
+            {/* COPIES — checkbox múltiple, mínimo 3 de 3 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold uppercase tracking-wider">Copies</p>
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
-                  3/3 ✓
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedCopies.length === 3 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  {selectedCopies.length}/3 seleccionados
                 </span>
-                <span className="text-xs text-muted-foreground">— todos se suben juntos a Meta</span>
+                <span className="text-xs text-muted-foreground">— se suben los 3 juntos a Meta</span>
               </div>
-              {generatedVariaciones.variaciones.map((v, i) => (
-                <Card key={i} className="border-2 border-primary bg-primary/5">
-                  <CardContent className="p-4 space-y-2">
+              {generatedVariaciones.variaciones.map((v, i) => {
+                const isChecked = selectedCopies.includes(i);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => toggleCopy(i)}
+                    className={`cursor-pointer p-4 rounded-lg border-2 transition-all space-y-2 ${isChecked ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {/* Checkbox — always checked, disabled */}
-                        <div className="w-4 h-4 rounded border-2 border-primary bg-primary flex items-center justify-center shrink-0">
-                          <CheckCircle className="w-2.5 h-2.5 text-primary-foreground" />
-                        </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCopy(i)}
+                          onClick={e => e.stopPropagation()}
+                          className="w-4 h-4 accent-primary shrink-0"
+                        />
                         <Badge variant="outline">{v.badge}</Badge>
                       </div>
                       <Button
@@ -745,14 +751,12 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                         <span className="ml-1 text-xs">Regenerar</span>
                       </Button>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p>
-                      <p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p>
-                    </div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p>
+                    <p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p>
                     {v.cta && <Badge variant="secondary">{v.cta}</Badge>}
-                  </CardContent>
-                </Card>
-              ))}
+                  </div>
+                );
+              })}
             </div>
 
             {/* 2 TÍTULOS — checkboxes, select any 2 */}
@@ -822,16 +826,16 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
             </div>
 
             {/* Progress + CTA */}
-            <div className={`rounded-lg p-3 text-sm border ${can322Proceed ? 'bg-green-50 border-green-200 text-green-800' : 'bg-muted border-border text-muted-foreground'}`}>
-              {can322Proceed
+            <div className={`rounded-lg p-3 text-sm border ${canProceed ? 'bg-green-50 border-green-200 text-green-800' : 'bg-muted border-border text-muted-foreground'}`}>
+              {canProceed
                 ? '✅ Formato 3-2-2 completo — listo para aprobar'
-                : `Pendiente: ${selectedTitles.length < 2 ? `${2 - selectedTitles.length} título${selectedTitles.length === 1 ? '' : 's'}` : ''}${selectedTitles.length < 2 && selectedDescriptions.length < 2 ? ' · ' : ''}${selectedDescriptions.length < 2 ? `${2 - selectedDescriptions.length} descripción${selectedDescriptions.length === 1 ? '' : 'es'}` : ''}`
+                : `Pendiente: ${selectedCopies.length < 3 ? `${3 - selectedCopies.length} cop${3 - selectedCopies.length === 1 ? 'y' : 'ies'} · ` : ''}${selectedTitles.length < 2 ? `${2 - selectedTitles.length} título${selectedTitles.length === 1 ? '' : 's'} · ` : ''}${selectedDescriptions.length < 2 ? `${2 - selectedDescriptions.length} descripción${selectedDescriptions.length === 1 ? '' : 'es'}` : ''}`
               }
             </div>
 
             <Button
               className="w-full"
-              disabled={!can322Proceed}
+              disabled={!canProceed}
               onClick={handleApproveVariaciones}
             >
               <CheckCircle className="w-4 h-4 mr-2" />Aprobar y continuar con Brief Visual
