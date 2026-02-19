@@ -29,6 +29,7 @@ export type Database = {
           foto_base_url: string | null
           funnel: string
           id: string
+          prediction_id: string | null
           prompt_generacion: string | null
           texto_principal: string | null
           titulo: string | null
@@ -48,6 +49,7 @@ export type Database = {
           foto_base_url?: string | null
           funnel: string
           id?: string
+          prediction_id?: string | null
           prompt_generacion?: string | null
           texto_principal?: string | null
           titulo?: string | null
@@ -67,6 +69,7 @@ export type Database = {
           foto_base_url?: string | null
           funnel?: string
           id?: string
+          prediction_id?: string | null
           prompt_generacion?: string | null
           texto_principal?: string | null
           titulo?: string | null
@@ -331,6 +334,44 @@ export type Database = {
         }
         Relationships: []
       }
+      client_credits: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          creditos_disponibles: number
+          creditos_usados: number
+          id: string
+          plan: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          creditos_disponibles?: number
+          creditos_usados?: number
+          id?: string
+          plan?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          creditos_disponibles?: number
+          creditos_usados?: number
+          id?: string
+          plan?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_credits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_financial_config: {
         Row: {
           client_id: string
@@ -542,6 +583,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "competitor_tracking_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_transactions: {
+        Row: {
+          accion: string
+          client_id: string | null
+          costo_real_usd: number | null
+          created_at: string
+          creditos_usados: number
+          id: string
+        }
+        Insert: {
+          accion: string
+          client_id?: string | null
+          costo_real_usd?: number | null
+          created_at?: string
+          creditos_usados?: number
+          id?: string
+        }
+        Update: {
+          accion?: string
+          client_id?: string | null
+          costo_real_usd?: number | null
+          created_at?: string
+          creditos_usados?: number
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_transactions_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
