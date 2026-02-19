@@ -763,8 +763,33 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
       }
     }
 
+    // Fetch dynamic knowledge and bugs for 'brief' category
+    const [{ data: bugs }, { data: knowledge }] = await Promise.all([
+      supabase
+        .from('steve_bugs')
+        .select('descripcion, ejemplo_malo, ejemplo_bueno')
+        .eq('categoria', 'brief')
+        .eq('activo', true),
+      supabase
+        .from('steve_knowledge')
+        .select('titulo, contenido')
+        .eq('categoria', 'brief')
+        .eq('activo', true)
+        .order('orden'),
+    ]);
+
+    const bugSection = bugs && bugs.length > 0
+      ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${bugs.map((b: { descripcion: string; ejemplo_malo: string; ejemplo_bueno: string }) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n`
+      : '';
+
+    const knowledgeSection = knowledge && knowledge.length > 0
+      ? `\nCONOCIMIENTO BASE:\n${knowledge.map((k: { titulo: string; contenido: string }) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`
+      : '';
+
+    const dynamicSystemPrompt = bugSection + knowledgeSection + SYSTEM_PROMPT;
+
     const chatMessages: ChatMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT + questionContext },
+      { role: 'system', content: dynamicSystemPrompt + questionContext },
       ...messages!.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
