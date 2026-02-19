@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_creatives: {
+        Row: {
+          angulo: string
+          asset_url: string | null
+          brief_visual: Json | null
+          client_id: string
+          created_at: string
+          cta: string | null
+          custom_instructions: string | null
+          descripcion: string | null
+          estado: string
+          formato: string
+          foto_base_url: string | null
+          funnel: string
+          id: string
+          prompt_generacion: string | null
+          texto_principal: string | null
+          titulo: string | null
+          updated_at: string
+        }
+        Insert: {
+          angulo: string
+          asset_url?: string | null
+          brief_visual?: Json | null
+          client_id: string
+          created_at?: string
+          cta?: string | null
+          custom_instructions?: string | null
+          descripcion?: string | null
+          estado?: string
+          formato: string
+          foto_base_url?: string | null
+          funnel: string
+          id?: string
+          prompt_generacion?: string | null
+          texto_principal?: string | null
+          titulo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          angulo?: string
+          asset_url?: string | null
+          brief_visual?: Json | null
+          client_id?: string
+          created_at?: string
+          cta?: string | null
+          custom_instructions?: string | null
+          descripcion?: string | null
+          estado?: string
+          formato?: string
+          foto_base_url?: string | null
+          funnel?: string
+          id?: string
+          prompt_generacion?: string | null
+          texto_principal?: string | null
+          titulo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           category: string | null
@@ -240,6 +300,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      client_assets: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          nombre: string
+          tipo: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          nombre: string
+          tipo?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          tipo?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
       }
       client_financial_config: {
         Row: {

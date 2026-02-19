@@ -10,6 +10,10 @@ interface GenerateRequest {
   adType: 'static' | 'video';
   funnelStage: 'tofu' | 'mofu' | 'bofu';
   customPrompt?: string;
+  angulo?: string;
+  assetUrls?: string[];
+  variacionElegida?: Record<string, string>;
+  mode?: 'variaciones' | 'brief_visual' | 'legacy';
 }
 
 // =============================================================================
@@ -681,11 +685,111 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { clientId, adType, funnelStage, customPrompt } = await req.json() as GenerateRequest;
+    const { clientId, adType, funnelStage, customPrompt, angulo, assetUrls, variacionElegida, mode } = await req.json() as GenerateRequest;
 
     if (!clientId || !adType || !funnelStage) {
       throw new Error('Missing required parameters');
     }
+
+    // ── VARIACIONES MODE ──────────────────────────────────────────────────────
+    if (mode === 'variaciones') {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+      if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: briefData } = await supabase
+        .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
+        .order('created_at', { ascending: false }).limit(1).single();
+
+      const rawData = briefData?.persona_data || briefData?.raw_data || {};
+
+      const prompt = `Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
+
+DATOS DEL CLIENTE:
+- Brief: ${JSON.stringify(rawData, null, 2)}
+- Fotos del producto disponibles: ${(assetUrls || []).join(', ')}
+
+Genera exactamente 3 variaciones usando el ángulo "${angulo}" para un anuncio ${funnelStage?.toUpperCase()} ${adType === 'video' ? 'video' : 'imagen'}.
+${customPrompt ? `Instrucciones adicionales: ${customPrompt}` : ''}
+
+Usa las fotos para hacer el copy más específico — menciona colores, diseños o detalles reales que veas.
+
+Responde SOLO en JSON válido sin markdown ni backticks:
+{
+  "explicacion": "Por qué este ángulo funciona para este cliente (2-3 líneas)",
+  "variaciones": [
+    {"badge": "Variación A", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..."},
+    {"badge": "Variación B", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..."},
+    {"badge": "Variación C", "titulo": "...", "texto_principal": "...", "descripcion": "...", "cta": "..."}
+  ]
+}`;
+
+      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'google/gemini-3-flash-preview',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.85,
+        }),
+      });
+      if (!aiResp.ok) throw new Error(`AI error ${aiResp.status}`);
+      const aiData = await aiResp.json();
+      const raw = aiData.choices?.[0]?.message?.content || '';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
+      return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── BRIEF VISUAL MODE ─────────────────────────────────────────────────────
+    if (mode === 'brief_visual') {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+      if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: briefData } = await supabase
+        .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
+        .order('created_at', { ascending: false }).limit(1).single();
+
+      const rawData = briefData?.persona_data || briefData?.raw_data || {};
+
+      const prompt = `Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
+
+Copy aprobado: ${JSON.stringify(variacionElegida)}
+Formato: ${adType}
+Ángulo: ${angulo}
+Brief del cliente: ${JSON.stringify(rawData, null, 2)}
+Fotos disponibles: ${(assetUrls || []).join(', ')}
+
+${adType === 'static'
+  ? `Responde SOLO en JSON sin markdown:
+{"tipo":"imagen","concepto":"...","plano_principal":"...","texto_overlay":"...","estilo_fotografico":"lifestyle/ugc/editorial/clean","iluminacion":"...","colores":"...","foto_recomendada":"URL de la foto más adecuada o null si no hay","instruccion_foto":"usarla tal cual / cambiar fondo / agregar texto / animar","prompt_generacion":"prompt detallado en inglés para Fal.ai Flux Pro"}`
+  : `Responde SOLO en JSON sin markdown:
+{"tipo":"video","duracion":"15s","escena_1":{"tiempo":"0-3s","descripcion":"...","texto_overlay":"..."},"escena_2":{"tiempo":"3-12s","descripcion":"...","texto_overlay":"..."},"escena_3":{"tiempo":"12-15s","descripcion":"...","texto_overlay":"..."},"musica_sugerida":"...","tono":"...","foto_recomendada":"URL de la foto más adecuada o null si no hay","instruccion_foto":"animar / usar como base / cambiar fondo","prompt_generacion":"prompt detallado en inglés para Kling AI"}`
+}`;
+
+      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'google/gemini-3-flash-preview',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+        }),
+      });
+      if (!aiResp.ok) throw new Error(`AI error ${aiResp.status}`);
+      const aiData = await aiResp.json();
+      const raw = aiData.choices?.[0]?.message?.content || '';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
+      return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── LEGACY MODE (existing behaviour) ──────────────────────────────────────
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
