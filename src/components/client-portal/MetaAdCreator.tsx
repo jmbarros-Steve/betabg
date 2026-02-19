@@ -716,48 +716,46 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               </div>
             )}
 
-            {/* 3 COPIES — all selected by default, can deselect */}
+            {/* 3 COPIES — always all selected, non-removable */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold uppercase tracking-wider">Copies</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedVariaciones.length === 3 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
-                  {selectedVariaciones.length}/3 seleccionadas
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+                  3/3 ✓
                 </span>
+                <span className="text-xs text-muted-foreground">— todos se suben juntos a Meta</span>
               </div>
-              {generatedVariaciones.variaciones.map((v, i) => {
-                const isSelected = selectedVariaciones.includes(i);
-                return (
-                  <Card
-                    key={i}
-                    className={`border-2 cursor-pointer transition-all ${isSelected ? 'border-primary bg-primary/5' : 'border-border opacity-60'}`}
-                    onClick={() => toggle322(selectedVariaciones, setSelectedVariaciones, i, 3)}
-                  >
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
-                            {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
-                          </div>
-                          <Badge variant="outline">{v.badge}</Badge>
+              {generatedVariaciones.variaciones.map((v, i) => (
+                <Card key={i} className="border-2 border-primary bg-primary/5">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {/* Checkbox — always checked, disabled */}
+                        <div className="w-4 h-4 rounded border-2 border-primary bg-primary flex items-center justify-center shrink-0">
+                          <CheckCircle className="w-2.5 h-2.5 text-primary-foreground" />
                         </div>
-                        <Button
-                          variant="ghost" size="sm"
-                          disabled={regeneratingIdx === i}
-                          onClick={e => { e.stopPropagation(); generateVariaciones(i); }}
-                        >
-                          {regeneratingIdx === i ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
-                          <span className="ml-1 text-xs">Regenerar</span>
-                        </Button>
+                        <Badge variant="outline">{v.badge}</Badge>
                       </div>
-                      <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p><p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p></div>
-                      {v.cta && <Badge variant="secondary">{v.cta}</Badge>}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      <Button
+                        variant="ghost" size="sm"
+                        disabled={regeneratingIdx === i}
+                        onClick={e => { e.stopPropagation(); generateVariaciones(i); }}
+                      >
+                        {regeneratingIdx === i ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
+                        <span className="ml-1 text-xs">Regenerar</span>
+                      </Button>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p>
+                      <p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p>
+                    </div>
+                    {v.cta && <Badge variant="secondary">{v.cta}</Badge>}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            {/* 2 TÍTULOS — pick 2 from the 3 titles */}
+            {/* 2 TÍTULOS — checkboxes, select any 2 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold uppercase tracking-wider">Títulos</p>
@@ -768,22 +766,29 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               {generatedVariaciones.variaciones.map((v, i) => {
                 if (!v.titulo) return null;
                 const isSelected = selectedTitles.includes(i);
+                const isDisabled = !isSelected && selectedTitles.length >= 2;
                 return (
-                  <div
+                  <label
                     key={i}
-                    onClick={() => toggle322(selectedTitles, setSelectedTitles, i, 2)}
-                    className={`cursor-pointer p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${isSelected ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-100'}`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : isDisabled ? 'border-border opacity-40 cursor-not-allowed' : 'border-border hover:border-primary/50'}`}
                   >
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
-                      {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
-                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={isDisabled}
+                      onChange={() => {
+                        if (isSelected) setSelectedTitles(selectedTitles.filter(x => x !== i));
+                        else if (selectedTitles.length < 2) setSelectedTitles([...selectedTitles, i]);
+                      }}
+                      className="w-4 h-4 accent-primary shrink-0"
+                    />
                     <span className="text-sm font-semibold">{v.titulo}</span>
-                  </div>
+                  </label>
                 );
               })}
             </div>
 
-            {/* 2 DESCRIPCIONES — pick 2 from the 3 descriptions */}
+            {/* 2 DESCRIPCIONES — checkboxes, select any 2 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold uppercase tracking-wider">Descripciones</p>
@@ -794,26 +799,33 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               {generatedVariaciones.variaciones.map((v, i) => {
                 if (!v.descripcion) return null;
                 const isSelected = selectedDescriptions.includes(i);
+                const isDisabled = !isSelected && selectedDescriptions.length >= 2;
                 return (
-                  <div
+                  <label
                     key={i}
-                    onClick={() => toggle322(selectedDescriptions, setSelectedDescriptions, i, 2)}
-                    className={`cursor-pointer p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${isSelected ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-100'}`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : isDisabled ? 'border-border opacity-40 cursor-not-allowed' : 'border-border hover:border-primary/50'}`}
                   >
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
-                      {isSelected && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
-                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={isDisabled}
+                      onChange={() => {
+                        if (isSelected) setSelectedDescriptions(selectedDescriptions.filter(x => x !== i));
+                        else if (selectedDescriptions.length < 2) setSelectedDescriptions([...selectedDescriptions, i]);
+                      }}
+                      className="w-4 h-4 accent-primary shrink-0"
+                    />
                     <span className="text-sm">{v.descripcion}</span>
-                  </div>
+                  </label>
                 );
               })}
             </div>
 
-            {/* Progress summary */}
+            {/* Progress + CTA */}
             <div className={`rounded-lg p-3 text-sm border ${can322Proceed ? 'bg-green-50 border-green-200 text-green-800' : 'bg-muted border-border text-muted-foreground'}`}>
               {can322Proceed
                 ? '✅ Formato 3-2-2 completo — listo para aprobar'
-                : `Selecciona ${selectedVariaciones.length < 3 ? `${3 - selectedVariaciones.length} cop${3 - selectedVariaciones.length === 1 ? 'y' : 'ies'} más` : ''}${selectedTitles.length < 2 ? ` · ${2 - selectedTitles.length} título${selectedTitles.length === 1 ? '' : 's'} más` : ''}${selectedDescriptions.length < 2 ? ` · ${2 - selectedDescriptions.length} descripción${selectedDescriptions.length === 1 ? '' : 'es'} más` : ''}`
+                : `Pendiente: ${selectedTitles.length < 2 ? `${2 - selectedTitles.length} título${selectedTitles.length === 1 ? '' : 's'}` : ''}${selectedTitles.length < 2 && selectedDescriptions.length < 2 ? ' · ' : ''}${selectedDescriptions.length < 2 ? `${2 - selectedDescriptions.length} descripción${selectedDescriptions.length === 1 ? '' : 'es'}` : ''}`
               }
             </div>
 
@@ -822,7 +834,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               disabled={!can322Proceed}
               onClick={handleApproveVariaciones}
             >
-              <CheckCircle className="w-4 h-4 mr-2" />Aprobar selección 3-2-2 y continuar
+              <CheckCircle className="w-4 h-4 mr-2" />Aprobar y continuar con Brief Visual
             </Button>
           </motion.div>
         )}
