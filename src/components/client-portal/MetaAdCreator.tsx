@@ -915,7 +915,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                 </div>
 
                 {/* 2x3 grid of 6 brief cards */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   {briefsVisuales.map((brief, index) => {
                     const copyPatternIdx = [0, 1, 2, 0, 1, 2][index];
                     const copyIndex = selectedCopies[copyPatternIdx];
