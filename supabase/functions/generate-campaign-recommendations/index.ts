@@ -281,12 +281,22 @@ Deno.serve(async (req) => {
         .not('improved_recommendation', 'is', null)
         .limit(10);
 
+      const categoriaCR = 'meta_ads';
+      const [{ data: kbBugsCR }, { data: kbKnowledgeCR }] = await Promise.all([
+        supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaCR).eq('activo', true),
+        supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaCR).eq('activo', true).order('orden'),
+      ]);
+      const bugSectionCR = kbBugsCR && kbBugsCR.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsCR.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+      const knowledgeSectionCR = kbKnowledgeCR && kbKnowledgeCR.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeCR.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
       const aiRecommendations = await getAIRecommendations(
         campaigns, 
         lovableApiKey,
         trainingExamples || [],
         positiveFeedback || [],
-        negativeFeedback || []
+        negativeFeedback || [],
+        bugSectionCR,
+        knowledgeSectionCR
       );
       recommendations.push(...aiRecommendations.map(r => ({
         ...r,
@@ -341,7 +351,9 @@ async function getAIRecommendations(
   apiKey: string,
   trainingExamples: Array<{ scenario_description: string; correct_analysis: string; incorrect_analysis: string | null }>,
   positiveFeedback: Array<{ original_recommendation: string; improved_recommendation: string | null; feedback_notes: string | null }>,
-  negativeFeedback: Array<{ original_recommendation: string; improved_recommendation: string | null; feedback_notes: string | null }>
+  negativeFeedback: Array<{ original_recommendation: string; improved_recommendation: string | null; feedback_notes: string | null }>,
+  bugSection: string = '',
+  knowledgeSection: string = ''
 ): Promise<Recommendation[]> {
   const recommendations: Recommendation[] = [];
 
@@ -405,7 +417,7 @@ Responde SOLO con un JSON array con este formato:
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: 'Eres un experto en publicidad digital y optimización de campañas. Responde siempre en español.' },
+          { role: 'system', content: `${bugSection}${knowledgeSection}Eres un experto en publicidad digital y optimización de campañas. Responde siempre en español.` },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,

@@ -106,6 +106,14 @@ serve(async (req) => {
       );
     }
 
+    const categoriaGG = 'google_ads';
+    const [{ data: kbBugsGG }, { data: kbKnowledgeGG }] = await Promise.all([
+      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaGG).eq('activo', true),
+      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaGG).eq('activo', true).order('orden'),
+    ]);
+    const bugSectionGG = kbBugsGG && kbBugsGG.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsGG.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+    const knowledgeSectionGG = kbKnowledgeGG && kbKnowledgeGG.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeGG.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
     // ═══════════════════════════════════════════════════════════════════════════
     // STEVE'S LEARNING ENGINE: Dual-layer learning from ALL clients + this client
     // ═══════════════════════════════════════════════════════════════════════════
@@ -180,7 +188,7 @@ ${clientNegative.map(f => `- "${f.feedback_text}"`).join('\n')}
 
     const campaign = CAMPAIGN_TYPES[campaignType as keyof typeof CAMPAIGN_TYPES] || CAMPAIGN_TYPES.search;
 
-    const systemPrompt = `Eres un experto en Google Ads y copywriting, entrenado en las metodologías de Sabri Suby y Russell Brunson.
+    const systemPrompt = `${bugSectionGG}${knowledgeSectionGG}Eres un experto en Google Ads y copywriting, entrenado en las metodologías de Sabri Suby y Russell Brunson.
 
 ${GOOGLE_ADS_METHODOLOGY}
 

@@ -705,7 +705,15 @@ Deno.serve(async (req) => {
 
       const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
-      const prompt = `Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
+      const categoriaVar = 'meta_ads';
+      const [{ data: kbBugsVar }, { data: kbKnowledgeVar }] = await Promise.all([
+        supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaVar).eq('activo', true),
+        supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaVar).eq('activo', true).order('orden'),
+      ]);
+      const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+      const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeVar.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
+      const prompt = `${bugSectionVar}${knowledgeSectionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
 
 DATOS DEL CLIENTE:
 - Brief: ${JSON.stringify(rawData, null, 2)}
@@ -757,7 +765,15 @@ Responde SOLO en JSON válido sin markdown ni backticks:
 
       const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
-      const prompt = `Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
+      const categoriaBV = 'anuncios';
+      const [{ data: kbBugsBV }, { data: kbKnowledgeBV }] = await Promise.all([
+        supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaBV).eq('activo', true),
+        supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaBV).eq('activo', true).order('orden'),
+      ]);
+      const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+      const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeBV.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
+      const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
 
 Copy aprobado: ${JSON.stringify(variacionElegida)}
 Formato: ${adType}
@@ -984,7 +1000,15 @@ las preferencias específicas de cada cliente cuando las conozco.
       },
     };
 
-    const systemPrompt = buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
+    const categoriaLegacy = 'meta_ads';
+    const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }] = await Promise.all([
+      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaLegacy).eq('activo', true),
+      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaLegacy).eq('activo', true).order('orden'),
+    ]);
+    const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+    const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeLegacy.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
+    const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
 
     console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 
