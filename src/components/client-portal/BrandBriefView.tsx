@@ -518,12 +518,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         .eq('research_type', 'analysis_status')
         .maybeSingle();
       const status = (data?.research_data as any)?.status;
+      console.log('[BrandBriefView] polling analysis_status:', status, data?.research_data);
       if (status === 'complete') {
-        setAnalysisStatus('complete');
-        setProgressStep(null);
+        console.log('[BrandBriefView] ✅ Analysis complete — fetching research data...');
         clearInterval(pollingRef.current!);
         clearInterval(progressPollingRef.current!);
         await fetchResearch();
+        setAnalysisStatus('complete');
+        setProgressStep(null);
         toast.success('¡Análisis SEO y Keywords completado! Ya puedes descargar el informe completo.');
       } else if (status === 'error') {
         setAnalysisStatus('error');
