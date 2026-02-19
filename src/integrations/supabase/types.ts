@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_assets: {
+        Row: {
+          asset_url: string | null
+          client_id: string | null
+          created_at: string | null
+          creative_id: string | null
+          id: string
+          tipo: string | null
+        }
+        Insert: {
+          asset_url?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          creative_id?: string | null
+          id?: string
+          tipo?: string | null
+        }
+        Update: {
+          asset_url?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          creative_id?: string | null
+          id?: string
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_assets_creative_id_fkey"
+            columns: ["creative_id"]
+            isOneToOne: false
+            referencedRelation: "ad_creatives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_creatives: {
         Row: {
           angulo: string
