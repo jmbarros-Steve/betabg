@@ -206,12 +206,15 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     }
   };
 
-  const toggleCopy = (idx: number) => {
-    if (selectedCopies.includes(idx)) {
-      setSelectedCopies(selectedCopies.filter(i => i !== idx));
-    } else if (selectedCopies.length < 3) {
-      setSelectedCopies([...selectedCopies, idx]);
-    }
+  const toggleCopy = (index: number) => {
+    setSelectedCopies(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else if (prev.length < 3) {
+        return [...prev, index];
+      }
+      return prev;
+    });
   };
   const toggleTitle = (idx: number) => setSelectedTitles(prev =>
     prev.includes(idx) ? prev.filter(i => i !== idx) : prev.length < 2 ? [...prev, idx] : prev
@@ -708,7 +711,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                 <p className="text-xs text-muted-foreground">Selecciona 3 copies · 2 títulos · 2 descripciones</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => generateVariaciones()}>
-                <RefreshCw className="w-4 h-4 mr-1" />Regenerar las 3
+                <RefreshCw className="w-4 h-4 mr-1" />Regenerar las 10
               </Button>
             </div>
 
