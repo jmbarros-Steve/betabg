@@ -469,8 +469,8 @@ Deno.serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
-        max_tokens: 16000,
+        model: 'claude-haiku-4-5',
+        max_tokens: 8000,
         system: `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
         messages: [{ role: 'user', content: analysisPrompt }],
       }),
