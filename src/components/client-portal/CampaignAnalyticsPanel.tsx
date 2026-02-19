@@ -899,43 +899,43 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                       exit={{ opacity: 0, x: 20 }}
                       transition={{ delay: idx * 0.05 }}
                     >
-                      <Card className={`border ${config.color.split(' ')[2]}`}>
-                        <CardContent className="py-4">
-                          <div className="flex items-start gap-3">
-                            <div className={`p-2 rounded-lg ${config.color.split(' ').slice(0, 2).join(' ')}`}>
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge variant="outline" className="text-xs capitalize">
-                                  {rec.priority}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {campaign?.campaign_name || rec.campaign_id}
-                                </span>
-                              </div>
-                              <p className="text-sm">{rec.recommendation_text}</p>
-                            </div>
+                       <Card className={`border ${config.color.split(' ')[2]}`}>
+                         <CardContent className="py-4">
+                           <div className="flex items-start gap-3">
+                             <div className={`p-2 rounded-lg ${config.color.split(' ').slice(0, 2).join(' ')}`}>
+                               <Icon className="w-4 h-4" />
+                             </div>
+                             
+                             <div className="flex-1">
+                               <div className="flex items-center gap-2 mb-1">
+                                 <Badge variant="outline" className="text-xs capitalize">
+                                   {rec.priority}
+                                 </Badge>
+                                 <span className="text-xs text-muted-foreground">
+                                   {campaign?.campaign_name || rec.campaign_id}
+                                 </span>
+                               </div>
+                               <p className="text-sm">{rec.recommendation_text}</p>
+                             </div>
 
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="shrink-0"
-                              onClick={() => dismissRecommendation(rec.id)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Collapsible>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
+                             <Button 
+                               variant="ghost" 
+                               size="icon"
+                               className="shrink-0"
+                               onClick={() => dismissRecommendation(rec.id)}
+                             >
+                               <X className="w-4 h-4" />
+                             </Button>
+                           </div>
+                         </CardContent>
+                       </Card>
+                     </motion.div>
+                 );
+               })}
+             </div>
+           )}
+           </AnimatePresence>
+         </TabsContent>
 
         {/* Charlie Review Tab */}
         <TabsContent value="charlie" className="mt-4">
@@ -1047,15 +1047,3 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   );
 }
 
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </AnimatePresence>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
