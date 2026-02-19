@@ -807,14 +807,25 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
 
     const maxTokens = isLastQuestion ? 8000 : 1200;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+
+    // Convert messages: Anthropic uses system separately, not in messages array
+    const systemMessage = chatMessages.find(m => m.role === 'system')?.content || '';
+    const userMessages_anthropic = chatMessages.filter(m => m.role !== 'system');
+
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({
         model: 'claude-opus-4-6',
-        messages: chatMessages,
         max_tokens: maxTokens,
-        temperature: 0.7,
+        system: systemMessage,
+        messages: userMessages_anthropic,
       }),
     });
 
@@ -822,12 +833,11 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
       const errorText = await aiResponse.text();
       console.error('AI API error:', aiResponse.status, errorText);
       if (aiResponse.status === 429) return new Response(JSON.stringify({ error: 'Rate limit' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      if (aiResponse.status === 402) return new Response(JSON.stringify({ error: 'Payment required' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       return new Response(JSON.stringify({ error: 'AI service error' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const aiData = await aiResponse.json();
-    const assistantMessage = aiData.choices?.[0]?.message?.content || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
+    const assistantMessage = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
 
     await supabase.from('steve_messages').insert({
       conversation_id: activeConversationId,
