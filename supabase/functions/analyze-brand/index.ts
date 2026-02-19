@@ -194,10 +194,10 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
 
-    if (!lovableApiKey) {
+    if (!anthropicApiKey) {
       return new Response(JSON.stringify({ error: 'AI not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -461,17 +461,18 @@ Deno.serve(async (req) => {
 
     const phaseRulesSection = resolvedFase ? `\nFASE DEL NEGOCIO: ${resolvedFase}\nPRESUPUESTO MENSUAL DE ADS: ${resolvedPresupuesto || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\nNunca recomendar estrategias que superen el presupuesto disponible.\nSiempre medir GPT no ROAS.\n` : '';
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({
         model: 'claude-opus-4-6',
-        messages: [
-          { role: 'system', content: `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.` },
-          { role: 'user', content: analysisPrompt },
-        ],
-        temperature: 0.2,
         max_tokens: 16000,
+        system: `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
+        messages: [{ role: 'user', content: analysisPrompt }],
       }),
     });
 
@@ -489,7 +490,7 @@ Deno.serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    let rawContent = aiData.choices?.[0]?.message?.content || '{}';
+    let rawContent = aiData.content?.[0]?.text || '{}';
     rawContent = rawContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
     let result: any = {};
