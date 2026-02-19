@@ -13,7 +13,7 @@ import { BlogPanel } from '@/components/dashboard/BlogPanel';
 import { StudyResourcesPanel } from '@/components/dashboard/StudyResourcesPanel';
 import { PlatformConnectionsPanel } from '@/components/dashboard/PlatformConnectionsPanel';
 import { ClientMetricsPanel } from '@/components/dashboard/ClientMetricsPanel';
-import { SteveTrainingPanel } from '@/components/dashboard/SteveTrainingPanel';
+import { SteveKnowledgePanel } from '@/components/dashboard/SteveKnowledgePanel';
 import logo from '@/assets/logo.jpg';
 
 type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training';
@@ -118,7 +118,7 @@ export default function Dashboard() {
           {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
           {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
-          {activeTab === 'training' && <SteveTrainingPanel />}
+          {activeTab === 'training' && <SteveKnowledgePanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
           {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}
         </motion.div>

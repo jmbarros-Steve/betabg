@@ -946,6 +946,36 @@ export type Database = {
           },
         ]
       }
+      steve_bugs: {
+        Row: {
+          activo: boolean | null
+          categoria: string
+          created_at: string | null
+          descripcion: string
+          ejemplo_bueno: string | null
+          ejemplo_malo: string | null
+          id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria: string
+          created_at?: string | null
+          descripcion: string
+          ejemplo_bueno?: string | null
+          ejemplo_malo?: string | null
+          id?: string
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string
+          created_at?: string | null
+          descripcion?: string
+          ejemplo_bueno?: string | null
+          ejemplo_malo?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
       steve_conversations: {
         Row: {
           client_id: string
@@ -1015,6 +1045,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      steve_knowledge: {
+        Row: {
+          activo: boolean | null
+          categoria: string
+          contenido: string
+          created_at: string | null
+          id: string
+          orden: number | null
+          titulo: string
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria: string
+          contenido: string
+          created_at?: string | null
+          id?: string
+          orden?: number | null
+          titulo: string
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string
+          contenido?: string
+          created_at?: string | null
+          id?: string
+          orden?: number | null
+          titulo?: string
+        }
+        Relationships: []
       }
       steve_messages: {
         Row: {
