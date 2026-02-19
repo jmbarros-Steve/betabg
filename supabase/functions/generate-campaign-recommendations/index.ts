@@ -415,7 +415,7 @@ Responde SOLO con un JSON array con este formato:
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-6',
         messages: [
           { role: 'system', content: `${bugSection}${knowledgeSection}Eres un experto en publicidad digital y optimización de campañas. Responde siempre en español.` },
           { role: 'user', content: prompt }
