@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,160 @@ type TabId = typeof TABS[number]['id'];
 
 const emptyKnowledge = { titulo: '', contenido: '', orden: 0 };
 const emptyBug = { descripcion: '', ejemplo_malo: '', ejemplo_bueno: '' };
+
+// ─── Ad Image Analyzer ─────────────────────────────────────────────────────────
+
+function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<string>('image/jpeg');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [saveCategory, setSaveCategory] = useState<string>('anuncios');
+  const [saving, setSaving] = useState(false);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('La imagen no puede superar 10MB');
+      return;
+    }
+    setMediaType(file.type || 'image/jpeg');
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setPreview(result);
+      // Extract pure base64 (remove data:image/...;base64, prefix)
+      setImageBase64(result.split(',')[1]);
+    };
+    reader.readAsDataURL(file);
+    setAnalysis(null);
+  }
+
+  async function analyze() {
+    if (!imageBase64) return;
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-ad-image', {
+        body: { imageBase64, mediaType },
+      });
+      if (error) throw error;
+      setAnalysis(data.analysis);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al analizar la imagen');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function saveToKnowledge() {
+    if (!analysis) return;
+    setSaving(true);
+    try {
+      const date = new Date().toLocaleDateString('es-CL');
+      const { error } = await supabase.from('steve_knowledge').insert({
+        titulo: `Análisis de anuncio — ${date}`,
+        contenido: analysis,
+        categoria: saveCategory,
+        activo: true,
+        orden: 0,
+      });
+      if (error) throw error;
+      toast.success('Análisis guardado en Knowledge Base');
+      onSaved();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="border-primary/20">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ImageIcon className="w-5 h-5 text-primary" />
+          🖼 Análisis de Anuncios con IA
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Sube un anuncio y Claude Vision extrae patrones, copy y ángulos creativos para la Knowledge Base.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Upload */}
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleFile}
+          />
+          <Button variant="outline" onClick={() => fileRef.current?.click()} className="w-full">
+            <Upload className="w-4 h-4 mr-2" />
+            Subir anuncio para analizar
+          </Button>
+          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP — máximo 10MB</p>
+        </div>
+
+        {/* Preview */}
+        {preview && (
+          <div className="rounded-lg overflow-hidden border border-border max-h-72 flex items-center justify-center bg-muted/30">
+            <img src={preview} alt="Preview" className="max-h-72 object-contain" />
+          </div>
+        )}
+
+        {/* Analyze button */}
+        {imageBase64 && (
+          <Button onClick={analyze} disabled={analyzing} className="w-full">
+            {analyzing ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analizando con Claude Vision…</>
+            ) : (
+              <><Sparkles className="w-4 h-4 mr-2" />Analizar con Claude Vision</>
+            )}
+          </Button>
+        )}
+
+        {/* Analysis output */}
+        {analysis && (
+          <div className="space-y-3">
+            <div className="bg-muted/40 rounded-lg p-4 text-sm whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto border border-border">
+              {analysis}
+            </div>
+
+            {/* Save section */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">Categoría para guardar</Label>
+                <Select value={saveCategory} onValueChange={setSaveCategory}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="anuncios">🎯 Anuncios</SelectItem>
+                    <SelectItem value="meta">📘 Meta Ads</SelectItem>
+                    <SelectItem value="google">🟡 Google Ads</SelectItem>
+                    <SelectItem value="analisis">📊 Generación de Análisis</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={saveToKnowledge} disabled={saving} size="sm">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                Guardar en Knowledge Base
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
@@ -346,6 +501,9 @@ export function SteveKnowledgePanel() {
           Gestiona el conocimiento y los bugs de Steve por categoría
         </p>
       </div>
+
+      {/* Ad Image Analyzer */}
+      <AdImageAnalyzer onSaved={fetchAll} />
 
       {/* Category tabs */}
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as TabId)}>
