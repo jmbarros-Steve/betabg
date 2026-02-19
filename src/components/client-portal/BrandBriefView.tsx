@@ -478,7 +478,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     };
   }, [clientId]);
 
-  // Poll status when analysis is pending
+  // Re-fetch research data whenever analysisStatus transitions to 'complete'
+  // This ensures tabs update after a new analysis completes during this session
+  const prevAnalysisStatusRef = useRef<string>('idle');
+  useEffect(() => {
+    if (analysisStatus === 'complete' && prevAnalysisStatusRef.current !== 'complete') {
+      fetchResearch();
+    }
+    prevAnalysisStatusRef.current = analysisStatus;
+  }, [analysisStatus]);
+
+
   useEffect(() => {
     if (analysisStatus !== 'pending') {
       if (progressPollingRef.current) clearInterval(progressPollingRef.current);
@@ -573,23 +583,27 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       console.error('fetchResearch error:', error);
       return;
     }
+    const r: ResearchData = {};
+    const SKIP_TYPES = ['analysis_status', 'analysis_progress'];
     if (data && data.length > 0) {
-      const r: ResearchData = {};
-      // Track status separately — never merge into research state
-      const SKIP_TYPES = ['analysis_status', 'analysis_progress'];
+      let newStatus: 'idle' | 'pending' | 'complete' | 'error' | null = null;
       for (const row of data) {
         if (row.research_type === 'analysis_status') {
           const status = (row.research_data as any)?.status;
-          if (status === 'pending') setAnalysisStatus('pending');
-          else if (status === 'complete') setAnalysisStatus('complete');
-          else if (status === 'error') setAnalysisStatus('error');
+          if (status === 'pending') newStatus = 'pending';
+          else if (status === 'complete') newStatus = 'complete';
+          else if (status === 'error') newStatus = 'error';
         } else if (!SKIP_TYPES.includes(row.research_type)) {
           (r as any)[row.research_type] = row.research_data;
         }
       }
-      setResearch(r);
+      // Update both states together after loop to avoid intermediate renders
+      if (newStatus) setAnalysisStatus(newStatus);
     }
+    // Always update research state (even if empty) to ensure stale data is cleared
+    setResearch(r);
   }
+
 
   async function fetchClientInfo() {
     const { data } = await supabase
