@@ -58,7 +58,6 @@ const BUDGET_RECS: Record<string, string> = {
 
 export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [step, setStep] = useState<AdStep>('strategy');
-  const [briefData, setBriefData] = useState<Record<string, unknown>>({});
   const [faseNegocio, setFaseNegocio] = useState('');
   const [presupuestoAds, setPresupuestoAds] = useState('');
   const [manualFase, setManualFase] = useState('');
@@ -98,36 +97,15 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   }, [clientId]);
 
   const loadBriefData = async () => {
-    // First try buyer_personas
-    const { data } = await supabase
-      .from('buyer_personas')
-      .select('persona_data')
-      .eq('client_id', clientId)
-      .eq('is_complete', true)
+    // Read fase_negocio and presupuesto_ads directly from clients table
+    const { data: clientData } = await supabase
+      .from('clients')
+      .select('fase_negocio, presupuesto_ads')
+      .eq('id', clientId)
       .maybeSingle();
 
-    if (data?.persona_data) {
-      const pd = data.persona_data as Record<string, unknown>;
-      setBriefData(pd);
-      if (typeof pd.fase_negocio === 'string' && pd.fase_negocio) setFaseNegocio(pd.fase_negocio);
-      if (typeof pd.presupuesto_ads === 'string' && pd.presupuesto_ads) setPresupuestoAds(pd.presupuesto_ads);
-    }
-
-    // Fallback: try brand_research cost_benchmarks for budget hint
-    const { data: benchmarks } = await supabase
-      .from('brand_research')
-      .select('research_data')
-      .eq('client_id', clientId)
-      .eq('research_type', 'cost_benchmarks')
-      .maybeSingle();
-
-    if (benchmarks?.research_data) {
-      const bd = benchmarks.research_data as Record<string, unknown>;
-      const meta = bd.meta_benchmarks as Record<string, unknown> | undefined;
-      if (meta?.budget_recommendation && !presupuestoAds) {
-        setPresupuestoAds(meta.budget_recommendation as string);
-      }
-    }
+    if (clientData?.fase_negocio) setFaseNegocio(clientData.fase_negocio);
+    if (clientData?.presupuesto_ads) setPresupuestoAds(String(clientData.presupuesto_ads));
   };
 
   const loadProducts = async () => {
@@ -310,28 +288,20 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     setSavingConfig(true);
     try {
       const faseToSave = manualFase || faseNegocio;
-      const presToSave = manualPresupuesto || presupuestoAds;
+      const presNumerico = parseInt((manualPresupuesto || presupuestoAds).replace(/\D/g, ''), 10) || null;
 
-      const { data: existing } = await supabase
-        .from('buyer_personas')
-        .select('id, persona_data')
-        .eq('client_id', clientId)
-        .maybeSingle();
+      const { error } = await supabase
+        .from('clients')
+        .update({ 
+          fase_negocio: faseToSave || null,
+          presupuesto_ads: presNumerico,
+        })
+        .eq('id', clientId);
 
-      const updatedData = {
-        ...(existing?.persona_data as Record<string, unknown> || {}),
-        fase_negocio: faseToSave,
-        presupuesto_ads: presToSave,
-      };
-
-      if (existing?.id) {
-        await supabase.from('buyer_personas').update({ persona_data: updatedData }).eq('id', existing.id);
-      } else {
-        await supabase.from('buyer_personas').insert({ client_id: clientId, persona_data: updatedData, is_complete: false });
-      }
+      if (error) throw error;
 
       if (faseToSave) setFaseNegocio(faseToSave);
-      if (presToSave) setPresupuestoAds(presToSave);
+      if (presNumerico) setPresupuestoAds(String(presNumerico));
       setManualFase('');
       setManualPresupuesto('');
       toast.success('✅ Configuración guardada');
