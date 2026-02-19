@@ -86,13 +86,13 @@ serve(async (req) => {
       .from('client-assets')
       .getPublicUrl(storagePath);
 
-    // Update creative
-    if (creativeId) {
-      await supabase.from('ad_creatives').update({
-        asset_url: publicUrl,
-        estado: 'aprobado',
-      }).eq('id', creativeId);
-    }
+    // Save image as a separate asset record (supports parallel generation)
+    await supabase.from('ad_assets').insert({
+      creative_id: creativeId || null,
+      client_id: clientId,
+      asset_url: publicUrl,
+      tipo: 'imagen',
+    });
 
     // Deduct credits
     await supabase.from('client_credits').update({
