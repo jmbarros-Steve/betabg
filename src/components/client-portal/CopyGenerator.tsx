@@ -1,308 +1,309 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Copy, Check, Sparkles, Video, Image, Megaphone, FileText, ArrowRight, ArrowLeft, RotateCcw, History, Trash2, Calendar, Download } from 'lucide-react';
+import {
+  Loader2, Sparkles, Image, Video, ArrowLeft, ArrowRight,
+  RotateCcw, CheckCircle, ThumbsDown, ImageIcon, RefreshCw,
+  Edit, Wand2
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { PDFDownloader } from './PDFDownloader';
-import { SteveFeedbackDialog } from './SteveFeedbackDialog';
+import { ClientAssetsGallery } from './ClientAssetsGallery';
+import { AdCreativesLibrary } from './AdCreativesLibrary';
 
 interface CopyGeneratorProps {
   clientId: string;
 }
 
-type FunnelStage = 'tofu' | 'mofu' | 'bofu';
-type AdType = 'static' | 'video';
-type Step = 'funnel' | 'adType' | 'options' | 'result';
+type Funnel = 'tofu' | 'mofu' | 'bofu';
+type Formato = 'static' | 'video';
+type WizardStep = 'funnel' | 'formato' | 'angulo' | 'instrucciones' | 'variaciones' | 'brief';
 
-interface GeneratedContent {
-  headlines: string[];
-  primaryText: string;
-  description?: string;
-  hooks?: string[];
-  script?: string;
+interface Variacion {
+  badge: string;
+  titulo: string;
+  texto_principal: string;
+  descripcion: string;
+  cta: string;
 }
 
-interface SavedCopy {
+interface GeneratedVariaciones {
+  explicacion: string;
+  variaciones: Variacion[];
+}
+
+interface ClientAsset {
   id: string;
-  funnel_stage: string;
-  ad_type: string;
-  has_script: boolean;
-  headlines: string[];
-  primary_texts: string[];
-  descriptions: string[];
-  video_hooks: string[] | null;
-  video_scripts: string[] | null;
-  custom_instructions: string | null;
+  url: string;
+  nombre: string;
+  tipo: string;
   created_at: string;
 }
 
 const FUNNEL_INFO = {
   tofu: {
-    name: 'TOFU',
-    fullName: 'Top of Funnel',
+    emoji: '🎯',
+    label: 'TOFU',
     subtitle: 'Audiencia Fría',
-    description: 'No te conocen. Hay que educar y generar curiosidad.',
-    details: 'Copies enfocados en el PROBLEMA, no el producto. Interrumpir el scroll, generar intriga.',
-    icon: '🎯',
-    gradient: 'from-blue-500 to-cyan-500',
-    bgColor: 'bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30',
-    activeColor: 'bg-blue-500 text-white border-blue-600',
+    desc: 'No te conocen. Hay que educar y generar curiosidad.',
+    color: 'border-blue-400 bg-blue-50 hover:bg-blue-100',
+    activeColor: 'border-blue-500 bg-blue-500 text-white',
+    recomienda: ['Call Out', 'Bold Statement', 'Ugly Ads', 'Memes'],
   },
   mofu: {
-    name: 'MOFU', 
-    fullName: 'Middle of Funnel',
+    emoji: '🔥',
+    label: 'MOFU',
     subtitle: 'Audiencia Tibia',
-    description: 'Te consideran. Hay que construir confianza.',
-    details: 'Copies que muestran credenciales, testimonios y te diferencian de la competencia.',
-    icon: '🔥',
-    gradient: 'from-amber-500 to-orange-500',
-    bgColor: 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30',
-    activeColor: 'bg-amber-500 text-white border-amber-600',
+    desc: 'Te consideran. Hay que construir confianza.',
+    color: 'border-amber-400 bg-amber-50 hover:bg-amber-100',
+    activeColor: 'border-amber-500 bg-amber-500 text-white',
+    recomienda: ['Reviews', 'Us vs Them', 'Credenciales en Medios', 'Testimonios'],
   },
   bofu: {
-    name: 'BOFU',
-    fullName: 'Bottom of Funnel',
+    emoji: '💰',
+    label: 'BOFU',
     subtitle: 'Audiencia Caliente',
-    description: 'Listos para comprar. Hay que cerrar la venta.',
-    details: 'Copies de conversión con ofertas irresistibles, urgencia y garantías.',
-    icon: '💰',
-    gradient: 'from-green-500 to-emerald-500',
-    bgColor: 'bg-green-500/10 hover:bg-green-500/20 border-green-500/30',
-    activeColor: 'bg-green-500 text-white border-green-600',
+    desc: 'Listos para comprar. Hay que cerrar la venta.',
+    color: 'border-green-400 bg-green-50 hover:bg-green-100',
+    activeColor: 'border-green-500 bg-green-500 text-white',
+    recomienda: ['Descuentos/Ofertas', 'Resultados', 'Paquetes', 'Reviews + Beneficios'],
   },
 };
 
-const AD_TYPE_INFO = {
-  static: {
-    name: 'Estático',
-    description: 'Anuncio con imagen',
-    details: 'Headlines, texto principal y descripción para anuncios con imagen.',
-    icon: Image,
-    emoji: '🖼️',
-  },
-  video: {
-    name: 'Video',
-    description: 'Anuncio con video',
-    details: 'Headlines, texto, hooks para los primeros 3 segundos y guión completo.',
-    icon: Video,
-    emoji: '🎬',
-  },
-};
+const ALL_ANGLES = [
+  'Beneficios', 'Bold Statement', 'Us vs Them', 'Call Out',
+  'Antes y Después', 'Beneficios Principales', 'Pantalla Dividida',
+  'Nueva Colección', 'Reviews', 'Detalles de Producto', 'Ugly Ads',
+  'Cyber/Fechas Especiales', 'Ingredientes/Material', 'Credenciales en Medios',
+  'Reviews + Beneficios', 'Memes', 'Descuentos/Ofertas', 'Resultados',
+  'Paquetes', 'Mensajes y Comentarios',
+];
 
 export function CopyGenerator({ clientId }: CopyGeneratorProps) {
-  const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
-  const [step, setStep] = useState<Step>('funnel');
-  const [funnelStage, setFunnelStage] = useState<FunnelStage | null>(null);
-  const [adType, setAdType] = useState<AdType | null>(null);
-  const [needsScript, setNeedsScript] = useState(true);
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
-  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'generate' | 'assets' | 'biblioteca'>('generate');
+  const [step, setStep] = useState<WizardStep>('funnel');
+  const [funnel, setFunnel] = useState<Funnel | null>(null);
+  const [formato, setFormato] = useState<Formato | null>(null);
+  const [angulo, setAngulo] = useState<string | null>(null);
+  const [customAngulo, setCustomAngulo] = useState('');
+  const [showCustomAngulo, setShowCustomAngulo] = useState(false);
+  const [instrucciones, setInstrucciones] = useState('');
+  const [assets, setAssets] = useState<ClientAsset[]>([]);
   const [hasBrief, setHasBrief] = useState<boolean | null>(null);
-  
-  // History state
-  const [savedCopies, setSavedCopies] = useState<SavedCopy[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [expandedCopyId, setExpandedCopyId] = useState<string | null>(null);
-  
-  // Feedback state
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [lastSavedCopyId, setLastSavedCopyId] = useState<string | null>(null);
+
+  // Generation state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedVariaciones, setGeneratedVariaciones] = useState<GeneratedVariaciones | null>(null);
+  const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
+
+  // Brief visual state
+  const [selectedVariacion, setSelectedVariacion] = useState<Variacion | null>(null);
+  const [briefVisual, setBriefVisual] = useState<Record<string, unknown> | null>(null);
+  const [generatingBrief, setGeneratingBrief] = useState(false);
+  const [editingBrief, setEditingBrief] = useState(false);
+  const [selectedFotoUrl, setSelectedFotoUrl] = useState<string | null>(null);
+  const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function checkBrief() {
-      const { data } = await supabase
-        .from('buyer_personas')
-        .select('id, is_complete')
-        .eq('client_id', clientId)
-        .eq('is_complete', true)
-        .maybeSingle();
-      
-      setHasBrief(!!data);
-    }
-    checkBrief();
+    supabase
+      .from('buyer_personas')
+      .select('id, is_complete')
+      .eq('client_id', clientId)
+      .eq('is_complete', true)
+      .maybeSingle()
+      .then(({ data }) => setHasBrief(!!data));
   }, [clientId]);
 
-  useEffect(() => {
-    if (activeTab === 'history') {
-      fetchSavedCopies();
-    }
-  }, [activeTab, clientId]);
-
-  const fetchSavedCopies = async () => {
-    setLoadingHistory(true);
-    try {
-      const { data, error } = await supabase
-        .from('saved_meta_copies')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSavedCopies(data || []);
-    } catch (error) {
-      console.error('Error fetching saved copies:', error);
-      toast.error('Error al cargar el historial');
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const handleSelectFunnel = (stage: FunnelStage) => {
-    setFunnelStage(stage);
-    setStep('adType');
-  };
-
-  const handleSelectAdType = (type: AdType) => {
-    setAdType(type);
-    setStep('options');
-  };
-
-  const handleBack = () => {
-    if (step === 'adType') {
-      setStep('funnel');
-      setFunnelStage(null);
-    } else if (step === 'options') {
-      setStep('adType');
-      setAdType(null);
-    } else if (step === 'result') {
-      setStep('options');
-      setGeneratedContent(null);
-    }
-  };
-
-  const handleReset = () => {
+  const resetWizard = () => {
     setStep('funnel');
-    setFunnelStage(null);
-    setAdType(null);
-    setNeedsScript(true);
-    setCustomPrompt('');
-    setGeneratedContent(null);
+    setFunnel(null);
+    setFormato(null);
+    setAngulo(null);
+    setCustomAngulo('');
+    setShowCustomAngulo(false);
+    setInstrucciones('');
+    setGeneratedVariaciones(null);
+    setSelectedVariacion(null);
+    setBriefVisual(null);
+    setEditingBrief(false);
+    setSelectedFotoUrl(null);
+    setSavedCreativeId(null);
   };
 
-  const saveCopyToHistory = async (content: GeneratedContent): Promise<string | null> => {
-    if (!funnelStage || !adType) return null;
+  const efectiveAngulo = showCustomAngulo && customAngulo.trim() ? customAngulo.trim() : angulo;
 
-    try {
-      const { data, error } = await supabase
-        .from('saved_meta_copies')
-        .insert({
-          client_id: clientId,
-          funnel_stage: funnelStage,
-          ad_type: adType,
-          has_script: adType === 'video' && needsScript,
-          headlines: content.headlines,
-          primary_texts: [content.primaryText],
-          descriptions: content.description ? [content.description] : [],
-          video_hooks: content.hooks || null,
-          video_scripts: content.script ? [content.script] : null,
-          custom_instructions: customPrompt.trim() || null,
-        })
-        .select('id')
-        .single();
+  const getRecommendedAngles = (): string[] => {
+    if (!funnel) return [];
+    return FUNNEL_INFO[funnel].recomienda;
+  };
 
-      if (error) throw error;
-      return data?.id || null;
-    } catch (error) {
-      console.error('Error saving copy:', error);
-      return null;
+  const generateVariaciones = async (regenerateIdx?: number) => {
+    if (!funnel || !formato || !efectiveAngulo) return;
+
+    if (regenerateIdx !== undefined) {
+      setRegeneratingIdx(regenerateIdx);
+    } else {
+      setIsGenerating(true);
     }
-  };
-
-  const handleGenerate = async () => {
-    if (!funnelStage || !adType) return;
-    
-    setIsGenerating(true);
-    setGeneratedContent(null);
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-meta-copy', {
         body: {
           clientId,
-          adType,
-          funnelStage,
-          needsScript: adType === 'video' ? needsScript : false,
-          customPrompt: customPrompt.trim() || undefined,
+          adType: formato,
+          funnelStage: funnel,
+          angulo: efectiveAngulo,
+          customPrompt: instrucciones.trim() || undefined,
+          assetUrls: assets.slice(0, 5).map(a => a.url),
+          mode: 'variaciones',
         },
       });
 
       if (error) throw error;
-      setGeneratedContent(data);
-      setStep('result');
-      
-      // Save to history automatically
-      const savedId = await saveCopyToHistory(data);
-      if (savedId) {
-        setLastSavedCopyId(savedId);
-        setShowFeedback(true);
+
+      // Try to parse the response
+      let parsed: GeneratedVariaciones;
+      if (typeof data === 'string') {
+        const clean = data.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
+      } else {
+        parsed = data;
       }
-      
-      toast.success('¡Copies generados y guardados!');
-    } catch (error) {
-      console.error('Error generating copy:', error);
-      toast.error('Error al generar copies. Intenta de nuevo.');
+
+      if (regenerateIdx !== undefined && generatedVariaciones) {
+        // Replace just that one variacion
+        const updatedVars = [...generatedVariaciones.variaciones];
+        if (parsed.variaciones?.[0]) {
+          updatedVars[regenerateIdx] = { ...parsed.variaciones[0], badge: `Variación ${['A', 'B', 'C'][regenerateIdx]}` };
+        }
+        setGeneratedVariaciones({ ...generatedVariaciones, variaciones: updatedVars });
+      } else {
+        setGeneratedVariaciones(parsed);
+        setStep('variaciones');
+      }
+      toast.success('Copies generados');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al generar. Intenta de nuevo.');
     } finally {
       setIsGenerating(false);
+      setRegeneratingIdx(null);
     }
   };
 
-  const handleDeleteCopy = async (copyId: string) => {
+  const handleChooseVariacion = async (v: Variacion) => {
+    setSelectedVariacion(v);
+    setStep('brief');
+    await generateBriefVisual(v);
+  };
+
+  const generateBriefVisual = async (v: Variacion) => {
+    setGeneratingBrief(true);
+    setBriefVisual(null);
     try {
-      const { error } = await supabase
-        .from('saved_meta_copies')
-        .delete()
-        .eq('id', copyId);
+      const { data, error } = await supabase.functions.invoke('generate-meta-copy', {
+        body: {
+          clientId,
+          adType: formato,
+          funnelStage: funnel,
+          angulo: efectiveAngulo,
+          assetUrls: assets.slice(0, 5).map(a => a.url),
+          variacionElegida: v,
+          mode: 'brief_visual',
+        },
+      });
 
       if (error) throw error;
-      
-      setSavedCopies(prev => prev.filter(c => c.id !== copyId));
-      toast.success('Copy eliminado');
-    } catch (error) {
-      console.error('Error deleting copy:', error);
-      toast.error('Error al eliminar');
+
+      let parsed: Record<string, unknown>;
+      if (typeof data === 'string') {
+        const clean = data.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
+      } else {
+        parsed = data;
+      }
+
+      setBriefVisual(parsed);
+
+      // Auto-select recommended photo
+      if (parsed.foto_recomendada && typeof parsed.foto_recomendada === 'string') {
+        setSelectedFotoUrl(parsed.foto_recomendada as string);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error generando el brief visual');
+    } finally {
+      setGeneratingBrief(false);
     }
   };
 
-  const copyToClipboard = async (text: string, id: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedIndex(id);
-    toast.success('Copiado al portapapeles');
-    setTimeout(() => setCopiedIndex(null), 2000);
+  const handleApproveBrief = async () => {
+    if (!briefVisual || !selectedVariacion || !funnel || !formato || !efectiveAngulo) return;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('ad_creatives')
+        .insert({
+          client_id: clientId,
+          funnel,
+          formato,
+          angulo: efectiveAngulo,
+          titulo: selectedVariacion.titulo,
+          texto_principal: selectedVariacion.texto_principal,
+          descripcion: selectedVariacion.descripcion,
+          cta: selectedVariacion.cta,
+          brief_visual: briefVisual,
+          prompt_generacion: (briefVisual.prompt_generacion as string) || null,
+          foto_base_url: selectedFotoUrl,
+          estado: 'aprobado',
+          custom_instructions: instrucciones.trim() || null,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      setSavedCreativeId(data?.id || null);
+      toast.success('✅ Creativo guardado en la Biblioteca');
+    } catch (err) {
+      toast.error('Error al guardar');
+    }
   };
 
+  const stepTitles: Record<WizardStep, string> = {
+    funnel: 'Paso 1 — Funnel',
+    formato: 'Paso 2 — Formato',
+    angulo: 'Paso 3 — Ángulo',
+    instrucciones: 'Paso 4 — Instrucciones',
+    variaciones: 'Paso 5 — Variaciones',
+    brief: 'Paso 6 — Brief Visual',
+  };
+
+  const steps: WizardStep[] = ['funnel', 'formato', 'angulo', 'instrucciones', 'variaciones', 'brief'];
+  const currentStepIdx = steps.indexOf(step);
+
   if (hasBrief === null) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
   if (!hasBrief) {
     return (
       <Card className="border-dashed">
         <CardContent className="py-12 text-center">
-          <Megaphone className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <Sparkles className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Brief Incompleto</h3>
-          <p className="text-muted-foreground mb-4">
-            Para generar copies efectivos, primero necesitas completar el Brief de Marca con Steve.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Ve a la pestaña <strong>"Steve"</strong> y responde las 40 preguntas para desbloquear el generador de copies.
-          </p>
+          <p className="text-sm text-muted-foreground">Completa el Brief de Marca con Steve primero para usar el generador de copies.</p>
         </CardContent>
       </Card>
     );
   }
+
+  const recommendedAngles = getRecommendedAngles();
+  const otherAngles = ALL_ANGLES.filter(a => !recommendedAngles.includes(a));
 
   return (
     <div className="space-y-6">
@@ -312,781 +313,434 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
           <Sparkles className="w-6 h-6 text-primary" />
         </div>
         <div>
-          <h2 className="text-xl font-bold">Generador de Copies para Meta Ads</h2>
-          <p className="text-sm text-muted-foreground">
-            Metodología Sabri Suby + Russell Brunson
-          </p>
+          <h2 className="text-xl font-bold">Generador de Meta Ads</h2>
+          <p className="text-sm text-muted-foreground">Metodología Sabri Suby + Russell Brunson</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'generate' | 'history')}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="generate" className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4" />
-            Generar
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="generate" id="generate-tab-trigger">
+            <Sparkles className="w-4 h-4 mr-2" />Generar
           </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="w-4 h-4" />
-            Historial
-            {savedCopies.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary/20">
-                {savedCopies.length}
-              </span>
-            )}
+          <TabsTrigger value="assets" id="assets-tab-trigger">
+            <ImageIcon className="w-4 h-4 mr-2" />Mis Assets
+          </TabsTrigger>
+          <TabsTrigger value="biblioteca">
+            <ImageIcon className="w-4 h-4 mr-2" />Biblioteca
           </TabsTrigger>
         </TabsList>
 
-        {/* Generate Tab */}
+        {/* ─── GENERATE TAB ─── */}
         <TabsContent value="generate" className="mt-6">
-          <div className="space-y-6">
-            {/* Progress Indicator */}
-            {step !== 'funnel' && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {['funnel', 'adType', 'options', 'result'].map((s, index) => (
-                    <div key={s} className="flex items-center">
-                      <div 
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                          step === s 
-                            ? 'bg-primary text-primary-foreground' 
-                            : index < ['funnel', 'adType', 'options', 'result'].indexOf(step)
-                              ? 'bg-primary/20 text-primary'
-                              : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {index + 1}
-                      </div>
-                      {index < 3 && (
-                        <div className={`w-8 h-0.5 ${
-                          index < ['funnel', 'adType', 'options', 'result'].indexOf(step)
-                            ? 'bg-primary/50'
-                            : 'bg-muted'
-                        }`} />
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleReset}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Reiniciar
-                </Button>
+          {/* Asset warning banner */}
+          <ClientAssetsGallery
+            clientId={clientId}
+            compact
+            onAssetsLoaded={setAssets}
+          />
+
+          {/* Progress bar */}
+          <div className="flex items-center gap-1 mb-6">
+            {steps.slice(0, 4).map((s, i) => (
+              <div key={s} className="flex items-center gap-1">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  i < currentStepIdx ? 'bg-primary/20 text-primary' :
+                  i === currentStepIdx ? 'bg-primary text-primary-foreground' :
+                  'bg-muted text-muted-foreground'
+                }`}>{i + 1}</div>
+                {i < 3 && <div className={`flex-1 h-0.5 w-8 ${i < currentStepIdx ? 'bg-primary/40' : 'bg-muted'}`} />}
               </div>
-            )}
+            ))}
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={resetWizard}>
+              <RotateCcw className="w-4 h-4 mr-1" />Reiniciar
+            </Button>
+          </div>
 
-            <AnimatePresence mode="wait">
-              {/* Step 1: Select Funnel Stage */}
-              {step === 'funnel' && (
-                <motion.div
-                  key="funnel"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
-                >
-                  <div className="text-center mb-6">
-                    <h3 className="text-lg font-semibold mb-2">¿En qué etapa del funnel está tu audiencia?</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Selecciona la temperatura de tu tráfico para generar copies adecuados
-                    </p>
-                  </div>
-
-                  <div className="grid gap-4">
-                    {Object.entries(FUNNEL_INFO).map(([key, info]) => (
-                      <Card
-                        key={key}
-                        className={`cursor-pointer transition-all border-2 ${info.bgColor}`}
-                        onClick={() => handleSelectFunnel(key as FunnelStage)}
-                      >
-                        <CardContent className="p-6">
-                          <div className="flex items-start gap-4">
-                            <span className="text-4xl">{info.icon}</span>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="text-lg font-bold">{info.name}</h4>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-background/50">
-                                  {info.subtitle}
-                                </span>
-                              </div>
-                              <p className="font-medium mb-1">{info.description}</p>
-                              <p className="text-sm text-muted-foreground">{info.details}</p>
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-muted-foreground" />
+          <AnimatePresence mode="wait">
+            {/* ── STEP 1: FUNNEL ── */}
+            {step === 'funnel' && (
+              <motion.div key="funnel" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                <h3 className="text-lg font-semibold text-center">¿En qué etapa del funnel está tu audiencia?</h3>
+                <div className="grid gap-4">
+                  {(Object.entries(FUNNEL_INFO) as [Funnel, typeof FUNNEL_INFO.tofu][]).map(([key, info]) => (
+                    <Card
+                      key={key}
+                      className={`cursor-pointer transition-all border-2 ${funnel === key ? info.activeColor : info.color}`}
+                      onClick={() => { setFunnel(key); setStep('formato'); }}
+                    >
+                      <CardContent className="p-5 flex items-center gap-4">
+                        <span className="text-4xl">{info.emoji}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-bold text-base">{info.label}</span>
+                            <Badge variant="outline" className="text-[10px]">{info.subtitle}</Badge>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 2: Select Ad Type */}
-              {step === 'adType' && funnelStage && (
-                <motion.div
-                  key="adType"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
-                >
-                  <Button variant="ghost" size="sm" onClick={handleBack} className="mb-2">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Volver
-                  </Button>
-
-                  <div className="text-center mb-6">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted mb-3">
-                      <span>{FUNNEL_INFO[funnelStage].icon}</span>
-                      <span className="text-sm font-medium">{FUNNEL_INFO[funnelStage].name} seleccionado</span>
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2">¿Qué tipo de anuncio necesitas?</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Elige el formato de tu creatividad
-                    </p>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {Object.entries(AD_TYPE_INFO).map(([key, info]) => {
-                      const Icon = info.icon;
-                      return (
-                        <Card
-                          key={key}
-                          className="cursor-pointer transition-all hover:border-primary/50 hover:bg-primary/5"
-                          onClick={() => handleSelectAdType(key as AdType)}
-                        >
-                          <CardContent className="p-8 text-center">
-                            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                              <Icon className="w-8 h-8 text-primary" />
-                            </div>
-                            <h4 className="text-lg font-bold mb-1">{info.name}</h4>
-                            <p className="text-sm text-muted-foreground mb-2">{info.description}</p>
-                            <p className="text-xs text-muted-foreground">{info.details}</p>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 3: Options */}
-              {step === 'options' && funnelStage && adType && (
-                <motion.div
-                  key="options"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
-                >
-                  <Button variant="ghost" size="sm" onClick={handleBack} className="mb-2">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Volver
-                  </Button>
-
-                  {/* Summary */}
-                  <Card className="bg-muted/30">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span>{FUNNEL_INFO[funnelStage].icon}</span>
-                          <span className="font-medium">{FUNNEL_INFO[funnelStage].name}</span>
+                          <p className="text-sm">{info.desc}</p>
                         </div>
-                        <div className="text-muted-foreground">→</div>
-                        <div className="flex items-center gap-2">
-                          <span>{AD_TYPE_INFO[adType].emoji}</span>
-                          <span className="font-medium">{AD_TYPE_INFO[adType].name}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Script Option for Video */}
-                  {adType === 'video' && (
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-muted-foreground" />
-                            <div>
-                              <Label htmlFor="needs-script" className="text-base font-medium cursor-pointer">
-                                ¿Necesitas guiones para el video?
-                              </Label>
-                              <p className="text-sm text-muted-foreground">
-                                Genera guiones estructurados con timestamps e indicaciones visuales
-                              </p>
-                            </div>
-                          </div>
-                          <Switch
-                            id="needs-script"
-                            checked={needsScript}
-                            onCheckedChange={setNeedsScript}
-                          />
-                        </div>
+                        <ArrowRight className="w-4 h-4 opacity-50" />
                       </CardContent>
                     </Card>
-                  )}
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
-                  {/* Custom Instructions */}
-                  <div className="space-y-2">
-                    <Label htmlFor="custom-prompt">Instrucciones adicionales (opcional)</Label>
-                    <Textarea
-                      id="custom-prompt"
-                      placeholder="Ej: Enfócate en el dolor de los pisos opacos, menciona la garantía de 30 días, usa un tono más juvenil..."
-                      value={customPrompt}
-                      onChange={(e) => setCustomPrompt(e.target.value)}
-                      rows={3}
-                    />
+            {/* ── STEP 2: FORMATO ── */}
+            {step === 'formato' && funnel && (
+              <motion.div key="formato" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                <Button variant="ghost" size="sm" onClick={() => setStep('funnel')}>
+                  <ArrowLeft className="w-4 h-4 mr-1" />Volver
+                </Button>
+                <h3 className="text-lg font-semibold text-center">¿Qué tipo de creativo necesitas?</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {[
+                    { key: 'static' as Formato, emoji: '📸', label: 'Estático', desc: 'Ideal para Reviews, Beneficios, Ofertas y BOFU', rec: funnel === 'bofu' },
+                    { key: 'video' as Formato, emoji: '🎬', label: 'Video', desc: 'Ideal para TOFU, Transformaciones y Ugly Ads', rec: funnel === 'tofu' },
+                  ].map(f => (
+                    <Card
+                      key={f.key}
+                      className="cursor-pointer hover:border-primary/60 hover:bg-primary/5 transition-all border-2"
+                      onClick={() => { setFormato(f.key); setStep('angulo'); }}
+                    >
+                      <CardContent className="p-8 text-center">
+                        <div className="text-5xl mb-3">{f.emoji}</div>
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <h4 className="font-bold">{f.label}</h4>
+                          {f.rec && <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">⭐ Recomendado</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{f.desc}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── STEP 3: ÁNGULO ── */}
+            {step === 'angulo' && funnel && formato && (
+              <motion.div key="angulo" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-5">
+                <Button variant="ghost" size="sm" onClick={() => setStep('formato')}>
+                  <ArrowLeft className="w-4 h-4 mr-1" />Volver
+                </Button>
+                <h3 className="text-lg font-semibold">¿Qué ángulo creativo usamos?</h3>
+
+                {/* Recommended angles */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">⭐ Recomendados para {funnel.toUpperCase()}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {recommendedAngles.map(a => (
+                      <button
+                        key={a}
+                        onClick={() => { setAngulo(a); setShowCustomAngulo(false); }}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                          angulo === a && !showCustomAngulo
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        ⭐ {a}
+                      </button>
+                    ))}
                   </div>
+                </div>
 
-                  {/* Generate Button */}
-                  <Button 
-                    onClick={handleGenerate} 
-                    disabled={isGenerating}
-                    size="lg"
-                    className="w-full"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generando copies...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Generar Copies {adType === 'video' && needsScript ? 'y Guiones' : ''}
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
-              )}
+                {/* Other angles */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Otros ángulos</p>
+                  <div className="flex flex-wrap gap-2">
+                    {otherAngles.map(a => (
+                      <button
+                        key={a}
+                        onClick={() => { setAngulo(a); setShowCustomAngulo(false); }}
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
+                          angulo === a && !showCustomAngulo
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Step 4: Results */}
-              {step === 'result' && generatedContent && funnelStage && adType && (
-                <motion.div
-                  key="result"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
+                {/* Custom angle */}
+                <button
+                  onClick={() => { setShowCustomAngulo(true); setAngulo(null); }}
+                  className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border-2 border-dashed transition-all ${
+                    showCustomAngulo ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50'
+                  }`}
                 >
-                  {/* Summary Bar */}
-                  <Card className="bg-muted/30">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <span>{FUNNEL_INFO[funnelStage].icon}</span>
-                            <span className="font-medium">{FUNNEL_INFO[funnelStage].name}</span>
+                  <Edit className="w-4 h-4" />
+                  ✏️ Quiero usar mi propio ángulo
+                </button>
+                {showCustomAngulo && (
+                  <input
+                    type="text"
+                    value={customAngulo}
+                    onChange={e => setCustomAngulo(e.target.value)}
+                    placeholder="Describe tu ángulo creativo..."
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    autoFocus
+                  />
+                )}
+
+                <Button
+                  className="w-full"
+                  disabled={!efectiveAngulo}
+                  onClick={() => setStep('instrucciones')}
+                >
+                  Continuar <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </motion.div>
+            )}
+
+            {/* ── STEP 4: INSTRUCCIONES ── */}
+            {step === 'instrucciones' && (
+              <motion.div key="instrucciones" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                <Button variant="ghost" size="sm" onClick={() => setStep('angulo')}>
+                  <ArrowLeft className="w-4 h-4 mr-1" />Volver
+                </Button>
+
+                {/* Summary */}
+                <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/50">
+                  <Badge variant="outline">{funnel?.toUpperCase()}</Badge>
+                  <Badge variant="outline">{formato === 'video' ? '🎬 Video' : '📸 Imagen'}</Badge>
+                  <Badge variant="outline">{efectiveAngulo}</Badge>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Instrucciones adicionales</h3>
+                  <p className="text-sm text-muted-foreground mb-3">Opcional — menciona ofertas específicas, temporadas, productos destacados, etc.</p>
+                  <Textarea
+                    value={instrucciones}
+                    onChange={e => setInstrucciones(e.target.value)}
+                    placeholder="Ej: Tenemos 30% OFF esta semana. El producto estrella es el set premium de 3 piezas."
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                <Button
+                  className="w-full"
+                  size="lg"
+                  disabled={isGenerating}
+                  onClick={() => generateVariaciones()}
+                >
+                  {isGenerating ? (
+                    <><Loader2 className="w-5 h-5 animate-spin mr-2" />Generando con IA...</>
+                  ) : (
+                    <><Wand2 className="w-5 h-5 mr-2" />✨ Generar 3 Variaciones de Copy</>
+                  )}
+                </Button>
+              </motion.div>
+            )}
+
+            {/* ── STEP 5: VARIACIONES ── */}
+            {step === 'variaciones' && generatedVariaciones && (
+              <motion.div key="variaciones" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" onClick={() => setStep('instrucciones')}>
+                    <ArrowLeft className="w-4 h-4 mr-1" />Volver
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => generateVariaciones()} disabled={isGenerating}>
+                    <RefreshCw className={`w-4 h-4 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
+                    Regenerar las 3
+                  </Button>
+                </div>
+
+                {/* Explicación de Steve */}
+                <div className="p-4 rounded-lg border-l-4 border-amber-400 bg-amber-50">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">💡 Por qué este ángulo funciona</p>
+                  <p className="text-sm text-amber-800">{generatedVariaciones.explicacion}</p>
+                </div>
+
+                {/* 3 variaciones */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {generatedVariaciones.variaciones.map((v, idx) => (
+                    <Card key={idx} className="flex flex-col">
+                      <CardContent className="p-4 flex flex-col flex-1 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Badge className="bg-primary/10 text-primary border-primary/20">{v.badge}</Badge>
+                          <button
+                            onClick={() => generateVariaciones(idx)}
+                            disabled={regeneratingIdx === idx}
+                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                          >
+                            {regeneratingIdx === idx
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <ThumbsDown className="w-3 h-3" />}
+                            Regenerar
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 flex-1">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-muted-foreground">Título</p>
+                            <p className="text-sm font-semibold">{v.titulo}</p>
                           </div>
-                          <div className="text-muted-foreground">→</div>
-                          <div className="flex items-center gap-2">
-                            <span>{AD_TYPE_INFO[adType].emoji}</span>
-                            <span className="font-medium">{AD_TYPE_INFO[adType].name}</span>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-muted-foreground">Texto Principal</p>
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{v.texto_principal}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-muted-foreground">Descripción</p>
+                            <p className="text-sm">{v.descripcion}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-muted-foreground">CTA</p>
+                            <p className="text-sm font-medium text-primary">{v.cta}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-green-600 bg-green-500/10 px-2 py-1 rounded-full">
-                            ✓ Guardado en historial
-                          </span>
-                          <PDFDownloader
-                            type="meta_copy"
-                            title={`Meta Ads - ${FUNNEL_INFO[funnelStage].name}`}
-                            content={{
-                              funnelStage: FUNNEL_INFO[funnelStage].name,
-                              adType: AD_TYPE_INFO[adType].name,
-                              headlines: generatedContent.headlines,
-                              primaryText: generatedContent.primaryText,
-                              description: generatedContent.description,
-                              hooks: generatedContent.hooks,
-                              script: generatedContent.script,
-                            }}
-                          />
-                          <Button variant="outline" size="sm" onClick={handleReset}>
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            Generar otros
-                          </Button>
+
+                        <Button
+                          className="w-full"
+                          size="sm"
+                          onClick={() => handleChooseVariacion(v)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1.5" />
+                          Elegir esta variación
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── STEP 6: BRIEF VISUAL ── */}
+            {step === 'brief' && (
+              <motion.div key="brief" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-5">
+                <Button variant="ghost" size="sm" onClick={() => setStep('variaciones')}>
+                  <ArrowLeft className="w-4 h-4 mr-1" />Volver a variaciones
+                </Button>
+
+                {generatingBrief && (
+                  <div className="flex flex-col items-center py-12 gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Generando brief visual con IA...</p>
+                  </div>
+                )}
+
+                {briefVisual && !generatingBrief && (
+                  <>
+                    <div className="p-4 rounded-lg border border-amber-200 bg-amber-50">
+                      <p className="text-xs font-semibold text-amber-700 mb-1">📋 Brief Visual de Producción</p>
+                      <p className="text-xs text-amber-600">
+                        {briefVisual.tipo === 'video' ? '🎬 Video · Costo estimado: ~$0.50 USD' : '🖼 Imagen · Costo estimado: ~$0.05 USD'}
+                      </p>
+                    </div>
+
+                    {/* Brief fields */}
+                    <div className="grid gap-3">
+                      {Object.entries(briefVisual)
+                        .filter(([k]) => k !== 'tipo')
+                        .map(([key, val]) => (
+                          <div key={key} className="p-3 rounded-lg border border-border bg-card">
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-1">
+                              {key.replace(/_/g, ' ')}
+                            </p>
+                            {typeof val === 'object' ? (
+                              <pre className="text-xs whitespace-pre-wrap font-mono text-foreground/80">
+                                {JSON.stringify(val, null, 2)}
+                              </pre>
+                            ) : (
+                              <p className="text-sm">{String(val)}</p>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* Foto recomendada */}
+                    {assets.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">📷 Foto base</p>
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {assets.map(a => (
+                            <button
+                              key={a.id}
+                              onClick={() => setSelectedFotoUrl(a.url)}
+                              className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                                selectedFotoUrl === a.url ? 'border-primary' : 'border-transparent'
+                              }`}
+                            >
+                              <img src={a.url} alt={a.nombre} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
 
-                  <GeneratedContentDisplay 
-                    content={generatedContent}
-                    adType={adType}
-                    copiedIndex={copiedIndex}
-                    onCopy={copyToClipboard}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                    {/* Generación stub */}
+                    <div className="p-4 rounded-lg border border-dashed border-border bg-muted/30">
+                      <p className="text-sm font-medium mb-2">🚀 Generación de Creativo</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" disabled className="flex-1">
+                          <ImageIcon className="w-4 h-4 mr-2 opacity-40" />
+                          🖼 Generar Imagen
+                        </Button>
+                        <Button variant="outline" disabled className="flex-1">
+                          <Video className="w-4 h-4 mr-2 opacity-40" />
+                          🎬 Generar Video
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Próximamente — integración con Fal.ai / Kling AI
+                      </p>
+                    </div>
+
+                    {savedCreativeId ? (
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <p className="text-sm text-green-700 font-medium">Guardado en la Biblioteca de Creativos</p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ml-auto"
+                          onClick={() => setActiveTab('biblioteca')}
+                        >
+                          Ver biblioteca →
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3">
+                        <Button
+                          className="flex-1"
+                          onClick={handleApproveBrief}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          ✅ Aprobar Brief y Guardar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => generateBriefVisual(selectedVariacion!)}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-1" />
+                          Regenerar
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </TabsContent>
 
-        {/* History Tab */}
-        <TabsContent value="history" className="mt-6">
-          {loadingHistory ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : savedCopies.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <History className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Sin copies guardados</h3>
-                <p className="text-muted-foreground mb-4">
-                  Cuando generes copies, se guardarán automáticamente aquí.
-                </p>
-                <Button onClick={() => setActiveTab('generate')}>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Generar primer copy
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {savedCopies.map((copy) => {
-                const funnelInfo = FUNNEL_INFO[copy.funnel_stage as FunnelStage];
-                const adInfo = AD_TYPE_INFO[copy.ad_type as AdType];
-                const isExpanded = expandedCopyId === copy.id;
+        {/* ─── ASSETS TAB ─── */}
+        <TabsContent value="assets" className="mt-6">
+          <ClientAssetsGallery
+            clientId={clientId}
+            onAssetsLoaded={setAssets}
+          />
+        </TabsContent>
 
-                return (
-                  <Card key={copy.id} className="overflow-hidden">
-                    <CardHeader 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setExpandedCopyId(isExpanded ? null : copy.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <span>{funnelInfo?.icon || '📝'}</span>
-                            <span className="font-medium">{funnelInfo?.name || copy.funnel_stage}</span>
-                          </div>
-                          <div className="text-muted-foreground">→</div>
-                          <div className="flex items-center gap-2">
-                            <span>{adInfo?.emoji || '📄'}</span>
-                            <span className="font-medium">{adInfo?.name || copy.ad_type}</span>
-                          </div>
-                          {copy.has_script && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                              Con guión
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="w-3 h-3" />
-                            {format(new Date(copy.created_at), "d MMM yyyy, HH:mm", { locale: es })}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCopy(copy.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <CardContent className="border-t pt-4">
-                            <SavedCopyDisplay 
-                              copy={copy}
-                              copiedIndex={copiedIndex}
-                              onCopy={copyToClipboard}
-                            />
-                          </CardContent>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+        {/* ─── BIBLIOTECA TAB ─── */}
+        <TabsContent value="biblioteca" className="mt-6">
+          <AdCreativesLibrary clientId={clientId} />
         </TabsContent>
       </Tabs>
-
-      {/* Steve Feedback Dialog */}
-      {showFeedback && lastSavedCopyId && (
-        <SteveFeedbackDialog
-          clientId={clientId}
-          contentType="meta_copy"
-          contentId={lastSavedCopyId}
-          onComplete={() => setShowFeedback(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-// Component to display generated content
-function GeneratedContentDisplay({ 
-  content, 
-  adType, 
-  copiedIndex, 
-  onCopy 
-}: { 
-  content: GeneratedContent;
-  adType: AdType;
-  copiedIndex: string | null;
-  onCopy: (text: string, id: string) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      {/* Headlines */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span className="text-lg">📢</span>
-            Headlines / Títulos
-          </CardTitle>
-          <CardDescription>
-            5 variaciones de headlines para probar
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {content.headlines.map((headline, index) => (
-            <div
-              key={index}
-              className="flex items-start justify-between gap-3 p-3 bg-muted/50 rounded-lg group"
-            >
-              <p className="font-medium flex-1">{headline}</p>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onCopy(headline, `headline-${index}`)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              >
-                {copiedIndex === `headline-${index}` ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Primary Text */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span className="text-lg">✍️</span>
-            Texto Principal
-          </CardTitle>
-          <CardDescription>
-            Copy completo siguiendo Hook → Historia → Oferta
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="relative group">
-            <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap">
-              {content.primaryText}
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onCopy(content.primaryText, 'primary')}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              {copiedIndex === 'primary' ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Description */}
-      {content.description && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-lg">📝</span>
-              Descripción Corta
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative group">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                {content.description}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onCopy(content.description!, 'description')}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                {copiedIndex === 'description' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Video Hooks */}
-      {adType === 'video' && content.hooks && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-lg">🎬</span>
-              Hooks para Video
-            </CardTitle>
-            <CardDescription>
-              Los primeros 3 segundos son TODO. Prueba estos hooks para detener el scroll.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {content.hooks.map((hook, index) => (
-              <div
-                key={index}
-                className="flex items-start justify-between gap-3 p-3 bg-muted/50 rounded-lg group"
-              >
-                <div className="flex-1">
-                  <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Hook #{index + 1}
-                  </span>
-                  <p className="font-medium">{hook}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onCopy(hook, `hook-${index}`)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                >
-                  {copiedIndex === `hook-${index}` ? (
-                    <Check className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Video Script */}
-      {adType === 'video' && content.script && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-lg">🎥</span>
-              Guión Completo
-            </CardTitle>
-            <CardDescription>
-              Estructura Star → Story → Solution con timestamps e indicaciones visuales
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="relative group">
-              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap text-sm font-mono">
-                {content.script}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onCopy(content.script!, 'script')}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                {copiedIndex === 'script' ? (
-                  <Check className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// Component to display saved copy from history
-function SavedCopyDisplay({ 
-  copy, 
-  copiedIndex, 
-  onCopy 
-}: { 
-  copy: SavedCopy;
-  copiedIndex: string | null;
-  onCopy: (text: string, id: string) => void;
-}) {
-  const adType = copy.ad_type as AdType;
-  
-  return (
-    <div className="space-y-4">
-      {/* Headlines */}
-      {copy.headlines.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <span>📢</span> Headlines
-          </h4>
-          <div className="space-y-2">
-            {copy.headlines.map((headline, index) => (
-              <div
-                key={index}
-                className="flex items-start justify-between gap-3 p-2 bg-muted/50 rounded-lg group text-sm"
-              >
-                <p className="flex-1">{headline}</p>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  onClick={() => onCopy(headline, `saved-headline-${copy.id}-${index}`)}
-                >
-                  {copiedIndex === `saved-headline-${copy.id}-${index}` ? (
-                    <Check className="w-3 h-3 text-green-500" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Primary Text */}
-      {copy.primary_texts.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <span>✍️</span> Texto Principal
-          </h4>
-          <div className="relative group">
-            <div className="p-3 bg-muted/50 rounded-lg whitespace-pre-wrap text-sm">
-              {copy.primary_texts[0]}
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => onCopy(copy.primary_texts[0], `saved-primary-${copy.id}`)}
-            >
-              {copiedIndex === `saved-primary-${copy.id}` ? (
-                <Check className="w-3 h-3 text-green-500" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Description */}
-      {copy.descriptions.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <span>📝</span> Descripción
-          </h4>
-          <div className="relative group">
-            <div className="p-3 bg-muted/50 rounded-lg text-sm">
-              {copy.descriptions[0]}
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => onCopy(copy.descriptions[0], `saved-desc-${copy.id}`)}
-            >
-              {copiedIndex === `saved-desc-${copy.id}` ? (
-                <Check className="w-3 h-3 text-green-500" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Video Hooks */}
-      {adType === 'video' && copy.video_hooks && copy.video_hooks.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <span>🎬</span> Hooks para Video
-          </h4>
-          <div className="space-y-2">
-            {copy.video_hooks.map((hook, index) => (
-              <div
-                key={index}
-                className="flex items-start justify-between gap-3 p-2 bg-muted/50 rounded-lg group text-sm"
-              >
-                <div className="flex-1">
-                  <span className="text-xs text-muted-foreground">Hook #{index + 1}:</span>
-                  <p>{hook}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  onClick={() => onCopy(hook, `saved-hook-${copy.id}-${index}`)}
-                >
-                  {copiedIndex === `saved-hook-${copy.id}-${index}` ? (
-                    <Check className="w-3 h-3 text-green-500" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Video Script */}
-      {adType === 'video' && copy.video_scripts && copy.video_scripts.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <span>🎥</span> Guión
-          </h4>
-          <div className="relative group">
-            <div className="p-3 bg-muted/50 rounded-lg whitespace-pre-wrap text-xs font-mono max-h-60 overflow-y-auto">
-              {copy.video_scripts[0]}
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => onCopy(copy.video_scripts![0], `saved-script-${copy.id}`)}
-            >
-              {copiedIndex === `saved-script-${copy.id}` ? (
-                <Check className="w-3 h-3 text-green-500" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Instructions */}
-      {copy.custom_instructions && (
-        <div className="pt-2 border-t">
-          <p className="text-xs text-muted-foreground">
-            <strong>Instrucciones usadas:</strong> {copy.custom_instructions}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
