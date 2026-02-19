@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, Sparkles, Image as ImageIcon, Video, ArrowLeft, ArrowRight,
   RotateCcw, CheckCircle, ThumbsDown, RefreshCw, Star, Edit, Package,
-  Tag, Globe, Target, Coins, Play, ChevronRight, Pencil, Save,
+  Tag, Globe, Target, Coins, Play, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -61,10 +61,8 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [briefData, setBriefData] = useState<Record<string, unknown>>({});
   const [faseNegocio, setFaseNegocio] = useState('');
   const [presupuestoAds, setPresupuestoAds] = useState('');
-  const [editingPhase, setEditingPhase] = useState(false);
-  const [editingBudget, setEditingBudget] = useState(false);
-  const [tempFase, setTempFase] = useState('');
-  const [tempPresupuesto, setTempPresupuesto] = useState('');
+  const [manualFase, setManualFase] = useState('');
+  const [manualPresupuesto, setManualPresupuesto] = useState('');
   const [savingConfig, setSavingConfig] = useState(false);
 
   // Product selection
@@ -311,6 +309,9 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const saveManualConfig = async () => {
     setSavingConfig(true);
     try {
+      const faseToSave = manualFase || faseNegocio;
+      const presToSave = manualPresupuesto || presupuestoAds;
+
       const { data: existing } = await supabase
         .from('buyer_personas')
         .select('id, persona_data')
@@ -319,8 +320,8 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
 
       const updatedData = {
         ...(existing?.persona_data as Record<string, unknown> || {}),
-        fase_negocio: tempFase || faseNegocio,
-        presupuesto_ads: tempPresupuesto || presupuestoAds,
+        fase_negocio: faseToSave,
+        presupuesto_ads: presToSave,
       };
 
       if (existing?.id) {
@@ -329,17 +330,19 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
         await supabase.from('buyer_personas').insert({ client_id: clientId, persona_data: updatedData, is_complete: false });
       }
 
-      if (tempFase) setFaseNegocio(tempFase);
-      if (tempPresupuesto) setPresupuestoAds(tempPresupuesto);
-      setEditingPhase(false);
-      setEditingBudget(false);
-      toast.success('Configuración guardada');
+      if (faseToSave) setFaseNegocio(faseToSave);
+      if (presToSave) setPresupuestoAds(presToSave);
+      setManualFase('');
+      setManualPresupuesto('');
+      toast.success('✅ Configuración guardada');
     } catch {
       toast.error('Error al guardar');
     } finally {
       setSavingConfig(false);
     }
   };
+
+
 
   return (
     <div className="space-y-6">
@@ -362,121 +365,96 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
           <motion.div key="strategy" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
             <h3 className="text-lg font-semibold">🎯 Estrategia Recomendada para tu Negocio</h3>
 
-            {/* Info banner when not configured */}
+            {/* Inline config form when values are missing */}
             {(!faseNegocio || !presupuestoAds) && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border text-sm text-muted-foreground">
-                <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
-                <span>Completa el brief con Steve para detectar tu fase automáticamente, o configúralo manualmente aquí para continuar.</span>
-              </div>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Fase de negocio */}
-              <Card className="border-primary/20 bg-primary/5">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-semibold text-primary">Fase detectada</span>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setTempFase(faseNegocio); setEditingPhase(true); }}>
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  {editingPhase ? (
-                    <div className="space-y-2">
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="p-4 space-y-4">
+                  <p className="text-sm font-semibold text-primary">⚙️ Configura tu negocio para continuar</p>
+                  <p className="text-xs text-muted-foreground">Completa estos datos o conecta el Brief con Steve para detección automática.</p>
+                  
+                  {!faseNegocio && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground">Fase de negocio</label>
                       <select
                         className="w-full text-sm border border-border rounded-md p-2 bg-background text-foreground"
-                        value={tempFase}
-                        onChange={e => setTempFase(e.target.value)}
+                        value={manualFase}
+                        onChange={e => setManualFase(e.target.value)}
                       >
                         <option value="">Selecciona tu fase...</option>
-                        <option value="Fase Inicial">Fase Inicial (0-3k USD/mes)</option>
-                        <option value="Fase Crecimiento">Fase Crecimiento (3k-10k USD/mes)</option>
-                        <option value="Fase Escalado">Fase Escalado (10k-30k USD/mes)</option>
-                        <option value="Fase Avanzada">Fase Avanzada (+30k USD/mes)</option>
+                        <option value="Fase Inicial">Fase Inicial (menos de $500.000 CLP/mes)</option>
+                        <option value="Fase Crecimiento">Fase Crecimiento ($500.000 - $5.000.000 CLP/mes)</option>
+                        <option value="Fase Escalado">Fase Escalado ($5.000.000 - $25.000.000 CLP/mes)</option>
+                        <option value="Fase Avanzada">Fase Avanzada (más de $25.000.000 CLP/mes)</option>
                       </select>
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1" onClick={saveManualConfig} disabled={savingConfig}>
-                          {savingConfig ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-                          Guardar
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingPhase(false)}>Cancelar</Button>
-                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold">{faseNegocio || <span className="text-muted-foreground text-lg">No configurada</span>}</p>
-                      {!faseNegocio && (
-                        <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => { setTempFase(''); setEditingPhase(true); }}>
-                          + Configurar manualmente
-                        </Button>
-                      )}
-                    </>
                   )}
-                </CardContent>
-              </Card>
 
-              {/* Presupuesto */}
-              <Card className="border-secondary/20 bg-secondary/10">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Coins className="w-4 h-4 text-foreground" />
-                      <span className="text-sm font-semibold text-foreground">Presupuesto mensual de ads</span>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setTempPresupuesto(presupuestoAds); setEditingBudget(true); }}>
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  {editingBudget ? (
-                    <div className="space-y-2">
+                  {!presupuestoAds && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground">Presupuesto mensual de ads</label>
                       <input
                         type="text"
-                        placeholder="Ej: $600 USD/mes"
+                        placeholder="Ej: $300.000 CLP/mes"
                         className="w-full text-sm border border-border rounded-md p-2 bg-background text-foreground"
-                        value={tempPresupuesto}
-                        onChange={e => setTempPresupuesto(e.target.value)}
+                        value={manualPresupuesto}
+                        onChange={e => setManualPresupuesto(e.target.value)}
                       />
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1" onClick={saveManualConfig} disabled={savingConfig}>
-                          {savingConfig ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-                          Guardar
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingBudget(false)}>Cancelar</Button>
-                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-xl font-bold">{presupuestoAds || <span className="text-muted-foreground">No configurado</span>}</p>
-                      {!presupuestoAds && (
-                        <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => { setTempPresupuesto(''); setEditingBudget(true); }}>
-                          + Configurar manualmente
-                        </Button>
-                      )}
-                    </>
                   )}
-                </CardContent>
-              </Card>
-            </div>
 
-            {faseNegocio && (
-              <Card>
-                <CardContent className="p-4 space-y-2">
-                  <p className="text-sm font-semibold">📋 Campaña recomendada para {faseNegocio}:</p>
-                  <p className="text-sm text-muted-foreground">{BUDGET_RECS[faseNegocio]}</p>
-                  {faseNegocio === 'Fase Inicial' && (
-                    <div className="mt-2 p-3 bg-accent border border-border rounded-lg">
-                      <p className="text-xs font-semibold text-accent-foreground">⭐ Recuerda: Siempre pauta con tu producto ancla en Fase Inicial</p>
-                    </div>
-                  )}
+                  <Button
+                    className="w-full"
+                    onClick={saveManualConfig}
+                    disabled={savingConfig || (!manualFase && !faseNegocio) || (!manualPresupuesto && !presupuestoAds)}
+                  >
+                    {savingConfig ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Guardar y continuar
+                  </Button>
                 </CardContent>
               </Card>
             )}
 
-            <Button className="w-full" onClick={() => { setStep('product'); loadProducts(); }}>
-              Continuar — Elegir Producto <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            {/* Values display once configured */}
+            {faseNegocio && presupuestoAds && (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="p-4 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold text-primary">Fase detectada</span>
+                      </div>
+                      <p className="text-2xl font-bold">{faseNegocio}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-secondary/20 bg-secondary/10">
+                    <CardContent className="p-4 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Coins className="w-4 h-4 text-foreground" />
+                        <span className="text-sm font-semibold text-foreground">Presupuesto mensual de ads</span>
+                      </div>
+                      <p className="text-xl font-bold">{presupuestoAds}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardContent className="p-4 space-y-2">
+                    <p className="text-sm font-semibold">📋 Campaña recomendada para {faseNegocio}:</p>
+                    <p className="text-sm text-muted-foreground">{BUDGET_RECS[faseNegocio]}</p>
+                    {faseNegocio === 'Fase Inicial' && (
+                      <div className="mt-2 p-3 bg-accent border border-border rounded-lg">
+                        <p className="text-xs font-semibold text-accent-foreground">⭐ Recuerda: Siempre pauta con tu producto ancla en Fase Inicial</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Button className="w-full" onClick={() => { setStep('product'); loadProducts(); }}>
+                  Continuar — Elegir Producto <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </>
+            )}
           </motion.div>
         )}
 
