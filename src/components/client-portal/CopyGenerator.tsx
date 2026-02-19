@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, Sparkles, Image as ImageIcon, Video, ArrowLeft, ArrowRight,
   RotateCcw, CheckCircle, ThumbsDown, RefreshCw, Edit, Wand2,
-  Coins, AlertCircle, Download, Play
+  Coins, AlertCircle, Download, Play, Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ClientAssetsGallery } from './ClientAssetsGallery';
 import { AdCreativesLibrary } from './AdCreativesLibrary';
+import { MetaAdCreator } from './MetaAdCreator';
 
 interface CopyGeneratorProps { clientId: string; }
 
@@ -38,7 +39,7 @@ const FUNNEL_INFO = {
 const ALL_ANGLES = ['Beneficios', 'Bold Statement', 'Us vs Them', 'Call Out', 'Antes y Después', 'Beneficios Principales', 'Pantalla Dividida', 'Nueva Colección', 'Reviews', 'Detalles de Producto', 'Ugly Ads', 'Cyber/Fechas Especiales', 'Ingredientes/Material', 'Credenciales en Medios', 'Reviews + Beneficios', 'Memes', 'Descuentos/Ofertas', 'Resultados', 'Paquetes', 'Mensajes y Comentarios'];
 
 export function CopyGenerator({ clientId }: CopyGeneratorProps) {
-  const [activeTab, setActiveTab] = useState<'generate' | 'assets' | 'biblioteca'>('generate');
+  const [activeTab, setActiveTab] = useState<'crear' | 'generate' | 'assets' | 'biblioteca'>('crear');
   const [step, setStep] = useState<WizardStep>('funnel');
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [formato, setFormato] = useState<Formato | null>(null);
@@ -298,10 +299,11 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="generate" id="generate-tab-trigger"><Sparkles className="w-4 h-4 mr-2" />Generar</TabsTrigger>
-          <TabsTrigger value="assets" id="assets-tab-trigger"><ImageIcon className="w-4 h-4 mr-2" />Mis Assets</TabsTrigger>
-          <TabsTrigger value="biblioteca"><Play className="w-4 h-4 mr-2" />Biblioteca</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="crear"><Target className="w-4 h-4 mr-1.5" />Crear Anuncio</TabsTrigger>
+          <TabsTrigger value="generate" id="generate-tab-trigger"><Sparkles className="w-4 h-4 mr-1.5" />Generar Copy</TabsTrigger>
+          <TabsTrigger value="assets" id="assets-tab-trigger"><ImageIcon className="w-4 h-4 mr-1.5" />Assets</TabsTrigger>
+          <TabsTrigger value="biblioteca"><Play className="w-4 h-4 mr-1.5" />Biblioteca</TabsTrigger>
         </TabsList>
 
         {/* ─── GENERATE TAB ─── */}
@@ -607,6 +609,10 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
               </motion.div>
             )}
           </AnimatePresence>
+        </TabsContent>
+
+        <TabsContent value="crear" className="mt-6">
+          <MetaAdCreator clientId={clientId} onBack={() => setActiveTab('crear')} />
         </TabsContent>
 
         <TabsContent value="assets" className="mt-6">
