@@ -12,7 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2, CalendarDays } from 'lucide-react';
+
+type DateFilter = 'today' | 'week' | 'all';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -377,6 +379,7 @@ export function SteveKnowledgePanel() {
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [bugs, setBugs] = useState<BugEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('today');
 
   // Knowledge dialog state
   const [showKnowledgeDialog, setShowKnowledgeDialog] = useState(false);
@@ -513,8 +516,32 @@ export function SteveKnowledgePanel() {
 
   // ── Filtered data ───────────────────────────────────────────────────────────
 
-  const filteredKnowledge = knowledge.filter(k => k.categoria === currentCategoria);
-  const filteredBugs = bugs.filter(b => b.categoria === currentCategoria);
+  // Date filter helpers
+  function isWithinFilter(dateStr: string, filter: DateFilter): boolean {
+    if (filter === 'all') return true;
+    const date = new Date(dateStr);
+    const now = new Date();
+    if (filter === 'today') {
+      return date.toDateString() === now.toDateString();
+    }
+    if (filter === 'week') {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 7);
+      return date >= weekAgo;
+    }
+    return true;
+  }
+
+  const filteredKnowledge = knowledge.filter(k =>
+    k.categoria === currentCategoria && isWithinFilter(k.created_at, dateFilter)
+  );
+  const filteredBugs = bugs.filter(b =>
+    b.categoria === currentCategoria && isWithinFilter(b.created_at, dateFilter)
+  );
+
+  // Global counters (across all categories)
+  const totalKnowledge = knowledge.length;
+  const todayKnowledge = knowledge.filter(k => isWithinFilter(k.created_at, 'today')).length;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -529,6 +556,34 @@ export function SteveKnowledgePanel() {
         <p className="text-muted-foreground text-sm mt-1">
           Gestiona el conocimiento y los bugs de Steve por categoría
         </p>
+      </div>
+
+      {/* Date filter + counter */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-border bg-muted/30">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="text-xl">📚</span>
+          <span>
+            <span className="font-semibold text-foreground">{totalKnowledge}</span> entradas totales
+            {todayKnowledge > 0 && (
+              <span className="ml-2 text-primary font-medium">— {todayKnowledge} agregadas hoy</span>
+            )}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <CalendarDays className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground mr-1">Mostrar:</span>
+          {(['today', 'week', 'all'] as DateFilter[]).map((f) => (
+            <Button
+              key={f}
+              size="sm"
+              variant={dateFilter === f ? 'default' : 'ghost'}
+              className="h-7 px-3 text-xs"
+              onClick={() => setDateFilter(f)}
+            >
+              {f === 'today' ? 'Hoy' : f === 'week' ? 'Esta semana' : 'Todo'}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Ad Image Analyzer */}
