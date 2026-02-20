@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2 } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -15,6 +15,7 @@ import { PlatformConnectionsPanel } from '@/components/dashboard/PlatformConnect
 import { ClientMetricsPanel } from '@/components/dashboard/ClientMetricsPanel';
 import { SteveKnowledgePanel } from '@/components/dashboard/SteveKnowledgePanel';
 import { SteveTrainingPanel } from '@/components/dashboard/SteveTrainingPanel';
+import { SteveTrainingChat } from '@/components/dashboard/SteveTrainingChat';
 import logo from '@/assets/logo.jpg';
 
 type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training';
@@ -121,7 +122,28 @@ export default function Dashboard() {
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
           {activeTab === 'training' && (
             <div className="space-y-10">
-              <SteveKnowledgePanel />
+              {/* AI Training Chat */}
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2 mb-2">
+                  <Bot className="w-6 h-6 text-primary" />
+                  🤖 Chat de Entrenamiento
+                </h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Pega cualquier contenido y Claude lo procesará en entradas estructuradas para la Knowledge Base de Steve.
+                </p>
+                <SteveTrainingChat onSaved={() => {}} />
+              </div>
+
+              {/* Knowledge Base Manual */}
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
+                  <Brain className="w-6 h-6 text-primary" />
+                  Knowledge Base Manual
+                </h2>
+                <SteveKnowledgePanel />
+              </div>
+
+              {/* Training Examples */}
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
                   <Brain className="w-6 h-6 text-primary" />
