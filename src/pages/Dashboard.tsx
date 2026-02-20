@@ -122,8 +122,8 @@ export default function Dashboard() {
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
           {activeTab === 'training' && (
             <div className="space-y-10">
-              {/* AI Training Chat */}
-              <div>
+              {/* AI Training Chat — PRIMERO */}
+              <section>
                 <h2 className="text-2xl font-bold flex items-center gap-2 mb-2">
                   <Bot className="w-6 h-6 text-primary" />
                   🤖 Chat de Entrenamiento
@@ -132,25 +132,21 @@ export default function Dashboard() {
                   Pega cualquier contenido y Claude lo procesará en entradas estructuradas para la Knowledge Base de Steve.
                 </p>
                 <SteveTrainingChat onSaved={() => {}} />
-              </div>
+              </section>
 
-              {/* Knowledge Base Manual */}
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
-                  <Brain className="w-6 h-6 text-primary" />
-                  Knowledge Base Manual
-                </h2>
+              {/* Knowledge Base Manual — SEGUNDO */}
+              <section>
                 <SteveKnowledgePanel />
-              </div>
+              </section>
 
-              {/* Training Examples */}
-              <div>
+              {/* Training Examples — TERCERO */}
+              <section>
                 <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
                   <Brain className="w-6 h-6 text-primary" />
                   Entrenamiento de Steve
                 </h2>
                 <SteveTrainingPanel />
-              </div>
+              </section>
             </div>
           )}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
