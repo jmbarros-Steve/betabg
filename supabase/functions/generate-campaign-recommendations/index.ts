@@ -281,20 +281,23 @@ Deno.serve(async (req) => {
         .not('improved_recommendation', 'is', null)
         .limit(10);
 
+      // Filter by platform-relevant category
+      const platformCategoria = connection.platform === 'google' ? 'google_ads' : 'meta_ads';
+
       const [{ data: kbKnowledgeCR }, { data: kbBugsCR }] = await Promise.all([
-        supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }).limit(8),
-        supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true).limit(4),
+        supabase.from('steve_knowledge').select('categoria, titulo, contenido')
+          .in('categoria', [platformCategoria, 'anuncios'])
+          .eq('activo', true).order('orden', { ascending: true }).limit(8),
+        supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
+          .in('categoria', [platformCategoria, 'anuncios'])
+          .eq('activo', true).limit(4),
       ]);
 
-      const campaignKnowledge = kbKnowledgeCR?.filter((k: any) =>
-        ['meta_ads', 'google_ads'].includes(k.categoria)
-      ).map((k: any) =>
+      const campaignKnowledge = kbKnowledgeCR?.map((k: any) =>
         `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
       ).join('\n\n') || '';
 
-      const campaignBugs = kbBugsCR?.filter((b: any) =>
-        ['meta_ads', 'google_ads'].includes(b.categoria)
-      ).map((b: any) =>
+      const campaignBugs = kbBugsCR?.map((b: any) =>
         `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
       ).join('\n\n') || '';
 
