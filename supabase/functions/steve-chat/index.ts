@@ -804,11 +804,13 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
         .from('steve_knowledge')
         .select('categoria, titulo, contenido')
         .eq('activo', true)
-        .order('orden', { ascending: true }),
+        .order('orden', { ascending: true })
+        .limit(10),
       supabase
         .from('steve_bugs')
         .select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
-        .eq('activo', true),
+        .eq('activo', true)
+        .limit(5),
     ]);
 
     const knowledgeContext = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>

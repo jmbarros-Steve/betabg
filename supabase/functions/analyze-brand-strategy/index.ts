@@ -233,8 +233,8 @@ Deno.serve(async (req) => {
 
     // Fetch full knowledge base (all categories)
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
-      supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }),
-      supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true),
+      supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }).limit(10),
+      supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true).limit(5),
     ]);
 
     const knowledgeContext = knowledge?.map((k: any) =>

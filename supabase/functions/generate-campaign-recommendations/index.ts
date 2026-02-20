@@ -282,8 +282,8 @@ Deno.serve(async (req) => {
         .limit(10);
 
       const [{ data: kbKnowledgeCR }, { data: kbBugsCR }] = await Promise.all([
-        supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }),
-        supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true),
+        supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }).limit(8),
+        supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true).limit(4),
       ]);
 
       const campaignKnowledge = kbKnowledgeCR?.filter((k: any) =>
