@@ -546,6 +546,10 @@ export function SteveKnowledgePanel() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
+    <div>
+      <div style={{background: 'red', color: 'white', padding: '20px', fontSize: '24px'}}>
+        FILTRO TEST — SI VES ESTO FUNCIONA
+      </div>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -811,6 +815,7 @@ export function SteveKnowledgePanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }
