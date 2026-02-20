@@ -10,7 +10,16 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { clientId, creativeId, promptGeneracion, fotoBaseUrl } = await req.json();
+    const {
+      clientId,
+      creativeId,
+      promptGeneracion,
+      fotoBaseUrl,
+      logoUrl,
+      productUrl,
+      formato,
+      rechazoTexto,
+    } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -35,19 +44,29 @@ serve(async (req) => {
       });
     }
 
-    // Call Fal.ai Flux Pro
+    // Adjust image_size based on Meta format
+    const imageSize = formato === 'story' ? 'portrait_4_3' :
+                      formato === 'feed' ? 'landscape_16_9' :
+                      'square_hd';
+
+    // Adjust prompt if there's rejection text
+    const promptFinal = rechazoTexto
+      ? `${promptGeneracion}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
+      : promptGeneracion;
+
+    // Call Fal.ai Flux Pro v1.1 Ultra
     const falBody: Record<string, unknown> = {
-      prompt: promptGeneracion,
+      prompt: promptFinal,
       num_images: 1,
-      image_size: 'square_hd',
+      image_size: imageSize,
       enable_safety_checker: true,
     };
 
-    if (fotoBaseUrl) {
-      falBody.image_url = fotoBaseUrl;
-    }
+    if (fotoBaseUrl) falBody.image_url = fotoBaseUrl;
+    if (logoUrl) falBody.logo_url = logoUrl;
+    if (productUrl) falBody.product_url = productUrl;
 
-    const falResponse = await fetch('https://fal.run/fal-ai/flux-pro', {
+    const falResponse = await fetch('https://fal.run/fal-ai/flux-pro/v1.1-ultra', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${FAL_API_KEY}`,
@@ -102,7 +121,7 @@ serve(async (req) => {
 
     await supabase.from('credit_transactions').insert({
       client_id: clientId,
-      accion: 'Generar imagen — Fal.ai Flux Pro',
+      accion: 'Generar imagen — Fal.ai Flux Pro v1.1 Ultra',
       creditos_usados: 2,
       costo_real_usd: 0.05,
     });
