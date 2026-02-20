@@ -319,9 +319,12 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
           return data?.asset_url as string;
         })
       );
+      console.log('Promise.allSettled results:', results);
       const urls = results
         .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
         .map(r => r.value);
+      console.log('URLs generadas:', urls);
+      console.log('Total:', urls.length);
       if (urls.length === 0) throw new Error('No se generaron imágenes');
       setGeneratedAssetUrls(urls);
       // Update dct_imagenes in DB
