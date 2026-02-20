@@ -798,17 +798,29 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
       }
     }
 
-    // Fetch full knowledge base (all categories)
+    // Detect relevant category from user message
+    const mensajeLower = (message || '').toLowerCase();
+    const categoriaRelevante =
+      mensajeLower.includes('meta') || mensajeLower.includes('anuncio') || mensajeLower.includes('campaña') ? 'meta_ads' :
+      mensajeLower.includes('buyer') || mensajeLower.includes('cliente') || mensajeLower.includes('dolor') ? 'buyer_persona' :
+      mensajeLower.includes('seo') || mensajeLower.includes('posicionamiento') ? 'seo' :
+      mensajeLower.includes('google') ? 'google_ads' :
+      mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' :
+      mensajeLower.includes('shopify') || mensajeLower.includes('tienda') ? 'shopify' :
+      'brief';
+
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
       supabase
         .from('steve_knowledge')
         .select('categoria, titulo, contenido')
+        .in('categoria', [categoriaRelevante, 'brief'])
         .eq('activo', true)
         .order('orden', { ascending: true })
-        .limit(10),
+        .limit(8),
       supabase
         .from('steve_bugs')
         .select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
+        .eq('categoria', categoriaRelevante)
         .eq('activo', true)
         .limit(5),
     ]);

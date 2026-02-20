@@ -51,21 +51,26 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
-    // Fetch full knowledge base and filter for copy-relevant categories
+    // Detect relevant category from context
+    const contextoLower = `${funnel || ''} ${angulo || ''} ${instrucciones || ''}`.toLowerCase();
+    const categoriaRelevante =
+      contextoLower.includes('google') ? 'google_ads' :
+      'meta_ads'; // generate-copy is primarily for ads
+
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
-      supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }).limit(8),
-      supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true).limit(4),
+      supabase.from('steve_knowledge').select('categoria, titulo, contenido')
+        .in('categoria', [categoriaRelevante, 'anuncios'])
+        .eq('activo', true).order('orden', { ascending: true }).limit(8),
+      supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
+        .in('categoria', [categoriaRelevante, 'anuncios'])
+        .eq('activo', true).limit(4),
     ]);
 
-    const copyKnowledge = knowledge?.filter((k: any) =>
-      ['anuncios', 'meta_ads', 'google_ads'].includes(k.categoria)
-    ).map((k: any) =>
+    const copyKnowledge = knowledge?.map((k: any) =>
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
     ).join('\n\n') || '';
 
-    const copyBugs = bugs?.filter((b: any) =>
-      ['anuncios', 'meta_ads'].includes(b.categoria)
-    ).map((b: any) =>
+    const copyBugs = bugs?.map((b: any) =>
       `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
     ).join('\n\n') || '';
 
