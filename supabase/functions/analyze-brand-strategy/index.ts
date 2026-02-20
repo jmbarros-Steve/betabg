@@ -231,18 +231,22 @@ Deno.serve(async (req) => {
 
     const { websiteContent, competitorContents, clientProvidedUrls, brandContext, clientName, clientCompany, websiteUrl } = research;
 
-    // Fetch knowledge base
-    const categoria = 'brief';
-    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
-      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
-      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoria).eq('activo', true).order('orden'),
+    // Fetch full knowledge base (all categories)
+    const [{ data: knowledge }, { data: bugs }] = await Promise.all([
+      supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }),
+      supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true),
     ]);
-    const bugSection = kbBugs && kbBugs.length > 0
-      ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n`
-      : '';
-    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0
-      ? `\nCONOCIMIENTO BASE:\n${kbKnowledge.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`
-      : '';
+
+    const knowledgeContext = knowledge?.map((k: any) =>
+      `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
+    ).join('\n\n') || '';
+
+    const bugsContext = bugs?.map((b: any) =>
+      `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
+    ).join('\n\n') || '';
+
+    const knowledgeSection = knowledgeContext ? `\nMETODOLOGÍA Y CONOCIMIENTO:\n${knowledgeContext}\n` : '';
+    const bugSection = bugsContext ? `\nERRORES A EVITAR EN LA ESTRATEGIA:\n${bugsContext}\n` : '';
 
     const phaseRulesSection = fase_negocio
       ? `\nFASE DEL NEGOCIO: ${fase_negocio}\nPRESUPUESTO MENSUAL DE ADS: ${presupuesto_ads || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\nNunca recomendar estrategias que superen el presupuesto disponible.\nSiempre medir GPT no ROAS.\n`
@@ -274,7 +278,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: 'claude-opus-4-6',
         max_tokens: 8000,
-        system: `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un consultor senior de marketing digital. Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
+        system: `Eres un estratega de marketing digital experto en e-commerce latinoamericano.\n${knowledgeSection}${bugSection}${phaseRulesSection}Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
         messages: [{ role: 'user', content: analysisPrompt }],
       }),
     });

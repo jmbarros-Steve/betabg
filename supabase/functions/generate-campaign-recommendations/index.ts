@@ -281,13 +281,25 @@ Deno.serve(async (req) => {
         .not('improved_recommendation', 'is', null)
         .limit(10);
 
-      const categoriaCR = 'meta_ads';
-      const [{ data: kbBugsCR }, { data: kbKnowledgeCR }] = await Promise.all([
-        supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaCR).eq('activo', true),
-        supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaCR).eq('activo', true).order('orden'),
+      const [{ data: kbKnowledgeCR }, { data: kbBugsCR }] = await Promise.all([
+        supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }),
+        supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true),
       ]);
-      const bugSectionCR = kbBugsCR && kbBugsCR.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsCR.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
-      const knowledgeSectionCR = kbKnowledgeCR && kbKnowledgeCR.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeCR.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
+      const campaignKnowledge = kbKnowledgeCR?.filter((k: any) =>
+        ['meta_ads', 'google_ads'].includes(k.categoria)
+      ).map((k: any) =>
+        `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
+      ).join('\n\n') || '';
+
+      const campaignBugs = kbBugsCR?.filter((b: any) =>
+        ['meta_ads', 'google_ads'].includes(b.categoria)
+      ).map((b: any) =>
+        `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
+      ).join('\n\n') || '';
+
+      const bugSectionCR = campaignBugs ? `\nERRORES A EVITAR EN GESTIÓN DE CAMPAÑAS:\n${campaignBugs}\n` : '';
+      const knowledgeSectionCR = campaignKnowledge ? `\nMETODOLOGÍA DE CAMPAÑAS — MÉTODO CHARLIE:\n${campaignKnowledge}\n` : '';
 
       const aiRecommendations = await getAIRecommendations(
         campaigns, 
@@ -417,7 +429,7 @@ Responde SOLO con un JSON array con este formato:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         messages: [
-          { role: 'system', content: `${bugSection}${knowledgeSection}${fase_negocio ? `\nFase del negocio: ${fase_negocio}\nPresupuesto mensual de ads: ${presupuesto_ads || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\nNunca recomendar estrategias que superen el presupuesto disponible.\nSiempre medir GPT no ROAS.\n` : ''}Eres un experto en publicidad digital y optimización de campañas. Responde siempre en español.` },
+          { role: 'system', content: `Eres Steve, consultor experto en gestión de campañas de Meta Ads y Google Ads para e-commerce latinoamericano.\n${knowledgeSection}${bugSection}Responde siempre en español.` },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,

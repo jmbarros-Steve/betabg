@@ -798,28 +798,29 @@ NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
       }
     }
 
-    // Fetch dynamic knowledge and bugs for 'brief' category
-    const [{ data: bugs }, { data: knowledge }] = await Promise.all([
-      supabase
-        .from('steve_bugs')
-        .select('descripcion, ejemplo_malo, ejemplo_bueno')
-        .eq('categoria', 'brief')
-        .eq('activo', true),
+    // Fetch full knowledge base (all categories)
+    const [{ data: knowledge }, { data: bugs }] = await Promise.all([
       supabase
         .from('steve_knowledge')
-        .select('titulo, contenido')
-        .eq('categoria', 'brief')
+        .select('categoria, titulo, contenido')
         .eq('activo', true)
-        .order('orden'),
+        .order('orden', { ascending: true }),
+      supabase
+        .from('steve_bugs')
+        .select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
+        .eq('activo', true),
     ]);
 
-    const bugSection = bugs && bugs.length > 0
-      ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${bugs.map((b: { descripcion: string; ejemplo_malo: string; ejemplo_bueno: string }) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n`
-      : '';
+    const knowledgeContext = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
+      `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
+    ).join('\n\n') || '';
 
-    const knowledgeSection = knowledge && knowledge.length > 0
-      ? `\nCONOCIMIENTO BASE:\n${knowledge.map((k: { titulo: string; contenido: string }) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`
-      : '';
+    const bugsContext = bugs?.map((b: { categoria: string; descripcion: string; ejemplo_malo: string; ejemplo_bueno: string }) =>
+      `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
+    ).join('\n\n') || '';
+
+    const knowledgeSection = knowledgeContext ? `\nCONOCIMIENTO APRENDIDO — ÚSALO EN CADA RESPUESTA:\n${knowledgeContext}\n` : '';
+    const bugSection = bugsContext ? `\nERRORES QUE NUNCA DEBES COMETER:\n${bugsContext}\n` : '';
 
     const phaseContext = faseNegocio ? `\n\n═══ CONTEXTO DE FASE DEL NEGOCIO ═══
 Fase del negocio: ${faseNegocio}
