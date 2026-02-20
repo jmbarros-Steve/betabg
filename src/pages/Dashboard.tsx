@@ -122,31 +122,24 @@ export default function Dashboard() {
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
           {activeTab === 'training' && (
             <div className="space-y-10">
-              {/* AI Training Chat — PRIMERO */}
-              <section>
-                <h2 className="text-2xl font-bold flex items-center gap-2 mb-2">
-                  <Bot className="w-6 h-6 text-primary" />
-                  🤖 Chat de Entrenamiento
-                </h2>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Pega cualquier contenido y Claude lo procesará en entradas estructuradas para la Knowledge Base de Steve.
+
+              {/* CHAT DE ENTRENAMIENTO INLINE */}
+              <div className="border rounded-xl p-6 bg-card min-h-[400px]">
+                <h2 className="text-2xl font-bold mb-2">🤖 Chat de Entrenamiento</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Pega cualquier contenido y Claude lo estructurará en la Knowledge Base de Steve.
                 </p>
-                <SteveTrainingChat onSaved={() => {}} />
-              </section>
+                <textarea
+                  className="w-full h-40 border rounded-lg p-3 text-sm resize-none"
+                  placeholder="Pega aquí artículos, transcripciones, frameworks..."
+                />
+                <button className="mt-3 px-4 py-2 bg-primary text-white rounded-lg text-sm">
+                  Procesar y guardar en Steve
+                </button>
+              </div>
 
-              {/* Knowledge Base Manual — SEGUNDO */}
-              <section>
-                <SteveKnowledgePanel />
-              </section>
+              <SteveKnowledgePanel />
 
-              {/* Training Examples — TERCERO */}
-              <section>
-                <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
-                  <Brain className="w-6 h-6 text-primary" />
-                  Entrenamiento de Steve
-                </h2>
-                <SteveTrainingPanel />
-              </section>
             </div>
           )}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
