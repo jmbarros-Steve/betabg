@@ -133,7 +133,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      text: '¡Hola! Soy el sistema de entrenamiento de Steve. Pega aquí cualquier contenido: artículos, conversaciones, aprendizajes de campañas, estrategias... y lo procesaré para que Steve mejore. ¿Qué quieres que aprenda hoy?',
+      text: '¡Hola! Soy el Chat de Entrenamiento de Steve. Pega cualquier contenido — artículos, transcripciones, frameworks — y lo estructuraré automáticamente en entradas para la Knowledge Base. ¿Qué quieres enseñarle a Steve hoy?',
     },
   ]);
   const [input, setInput] = useState('');
@@ -268,7 +268,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-h-[400px] border rounded-xl p-4 bg-card">
       {/* Chat History */}
       <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
         <AnimatePresence initial={false}>
