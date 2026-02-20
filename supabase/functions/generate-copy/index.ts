@@ -51,20 +51,33 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
-    const categoria = 'anuncios';
-    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
-      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
-      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoria).eq('activo', true).order('orden'),
+    // Fetch full knowledge base and filter for copy-relevant categories
+    const [{ data: knowledge }, { data: bugs }] = await Promise.all([
+      supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }),
+      supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true),
     ]);
-    const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
-    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledge.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
+    const copyKnowledge = knowledge?.filter((k: any) =>
+      ['anuncios', 'meta_ads', 'google_ads'].includes(k.categoria)
+    ).map((k: any) =>
+      `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
+    ).join('\n\n') || '';
+
+    const copyBugs = bugs?.filter((b: any) =>
+      ['anuncios', 'meta_ads'].includes(b.categoria)
+    ).map((b: any) =>
+      `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
+    ).join('\n\n') || '';
+
+    const knowledgeSection = copyKnowledge ? `\nFRAMEWORKS Y CONOCIMIENTO DE ANUNCIOS GANADORES:\n${copyKnowledge}\n` : '';
+    const bugSection = copyBugs ? `\nERRORES A EVITAR EN COPIES:\n${copyBugs}\n` : '';
 
     const competidores = (brief.competitors as string[])?.join(', ') || 'No especificados';
     const photosList = (assetUrls as string[] || []).slice(0, 5).join(', ');
 
     const phaseRulesSection = fase_negocio ? `\nFASE DEL NEGOCIO: ${fase_negocio}\nPRESUPUESTO MENSUAL DE ADS: ${presupuesto_ads || 'No especificado'} CLP\n\nREGLAS POR FASE:\n- Fase Inicial: Broad Retargeting + producto ancla + boosts orgánicos. NUNCA prospección fría.\n- Fase Crecimiento: Broad Retargeting + prospección fría básica.\n- Fase Escalado: Campaña maestra + catálogos dinámicos.\n- Fase Avanzada: Framework completo + Partnership Ads + Advantage+.\n\nNunca recomendar estrategias que superen el presupuesto disponible.\nNunca recomendar estructuras para una fase más avanzada.\nSiempre medir GPT no ROAS.\nEn Fase Inicial, SIEMPRE recomendar producto ancla.\n` : '';
 
-    const systemPrompt = `${bugSection}${knowledgeSection}${phaseRulesSection}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson. Genera copies de alta conversión para Meta Ads basado en los datos del cliente.`;
+    const systemPrompt = `Eres un experto en copywriting para Meta Ads de e-commerce latinoamericano.\n${knowledgeSection}${bugSection}${phaseRulesSection}Genera copies de alta conversión con metodología Sabri Suby + Russell Brunson basado en los datos del cliente.`;
 
     const productoContext = producto_seleccionado
       ? `- Producto específico: ${producto_seleccionado.title} — Precio: ${producto_seleccionado.price} — ${producto_seleccionado.description || ''}`
