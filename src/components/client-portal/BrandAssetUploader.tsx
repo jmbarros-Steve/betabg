@@ -34,9 +34,7 @@ const PERFORMANCE_QUOTES = [
   { quote: "Speed of implementation separates the rich from the broke.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
   { quote: "Your ad creative is dead after 3 days. Refresh or die.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
   { quote: "The offer is the strategy. Everything else is just execution.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
-  { quote: "Whoever can spend the most to acquire a customer wins.", author: "Dan Kennedy", role: "Direct Response Marketing Legend" },
-  { quote: "Creatives are 70% of your ad performance. Test relentlessly.", author: "Andrew Foxwell", role: "Foxwell Digital" },
-  { quote: "If you can't measure it, you can't improve it.", author: "Peter Drucker", role: "Management Consultant" },
+  { quote: "Stop trying to go viral. Start trying to be relevant.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
   { quote: "Your ROAS is a vanity metric. Profit per customer is what matters.", author: "Andrew Wilkinson", role: "Tiny Capital" },
 ];
 
@@ -69,7 +67,9 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
         <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-primary truncate">
-            {progressStep.detail}
+            {progressStep.detail?.includes('Claude') || progressStep.detail?.includes('Opus')
+              ? 'Analizando con equipo de Marketing Steve AI'
+              : progressStep.detail}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Analizando con equipo de Marketing Steve AI.</p>
         </div>
@@ -186,6 +186,9 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     if (statusPollingRef.current) { clearInterval(statusPollingRef.current); }
     console.log('[StatusPoll] Starting status polling every 4s');
     statusPollingRef.current = setInterval(async () => {
+      const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0', 10);
+      const elapsed = Date.now() - startedMs;
+
       const { data } = await supabase
         .from('brand_research')
         .select('research_data, updated_at')
@@ -195,17 +198,39 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
       if (!data) return;
       const status = (data.research_data as any)?.status;
-      // Guard: convert both to numeric ms to avoid JS ISO vs Postgres space-separator comparison bug
       const updatedMs = new Date(data.updated_at || 0).getTime();
-      const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0', 10);
-      console.log('[StatusPoll] status:', status, '| updatedMs:', updatedMs, '| startedMs:', startedMs, '| diff:', updatedMs - startedMs);
 
       if (status === 'complete' && updatedMs > startedMs) {
         console.log('[StatusPoll] ✅ complete detected — closing banner');
         finishAnalysis(true);
-      } else if (status === 'error' && updatedMs > startedMs) {
+        return;
+      }
+      if (status === 'error' && updatedMs > startedMs) {
         console.log('[StatusPoll] ❌ error detected — closing banner');
         finishAnalysis(false);
+        return;
+      }
+
+      // If still pending after 90s, check if we have research data (e.g. strategy wrote summary but status didn't update)
+      if (status === 'pending' && elapsed > 90000) {
+        const { data: rows } = await supabase
+          .from('brand_research')
+          .select('research_type, research_data')
+          .eq('client_id', clientId)
+          .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
+        const hasData = rows?.some((r: any) => {
+          const d = r.research_data;
+          if (!d || typeof d !== 'object') return false;
+          if (r.research_type === 'executive_summary' && (d.summary || d.executive_summary)) return true;
+          if (r.research_type === 'seo_audit' && (d.issues?.length || d.recommendations?.length)) return true;
+          if (r.research_type === 'competitor_analysis' && (d.competitors?.length || d.overview)) return true;
+          if (r.research_type === 'keywords' && (d.recommended?.length || d.competitor_keywords?.length)) return true;
+          return false;
+        });
+        if (hasData) {
+          console.log('[StatusPoll] ⏱️ pending >90s but research data present — treating as complete');
+          finishAnalysis(true);
+        }
       }
     }, 4000);
   }
@@ -397,6 +422,16 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     const savedWebUrl = clientResult.data?.website_url || '';
     if (savedWebUrl) setWebsiteUrl(savedWebUrl);
 
+    function isValidCompetitorUrl(u: string): boolean {
+      try {
+        const full = u.startsWith('http') ? u : `https://${u}`;
+        const host = new URL(full).hostname.replace(/^www\./, '');
+        return host.length >= 8;
+      } catch {
+        return false;
+      }
+    }
+
     let extractedCompUrls: string[] = [];
     if (personaResult.data?.persona_data) {
       const pd = personaResult.data.persona_data as any;
@@ -410,15 +445,30 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         let match: RegExpExecArray | null;
         while ((match = compUrlRegex.exec(raw)) !== null) {
           const u = match[1].trim();
-          if (u && u.length > 4) fromComp.push(u.startsWith('http') ? u : `https://${u}`);
+          if (u && u.length > 4) {
+            const full = u.startsWith('http') ? u : `https://${u}`;
+            if (isValidCompetitorUrl(full)) fromComp.push(full);
+          }
+        }
+        if (fromComp.length === 0) {
+          const webMatches = raw.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
+          for (const m of webMatches) {
+            const url = m.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
+            if (url) {
+              const full = url.startsWith('http') ? url : `https://${url}`;
+              if (isValidCompetitorUrl(full)) fromComp.push(full);
+            }
+          }
         }
         if (fromComp.length === 0) {
           const urlMatches = raw.match(/(?:https?:\/\/)?(?:www\.)?[\w.-]+\.(?:com|cl|mx|ar|co|pe|es|io|store|shop)(?:\/\S*)?/gi) || [];
           const domains = raw.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co|es|io)\b/g) || [];
-          extractedCompUrls = [...urlMatches, ...domains].slice(0, 6).map((u: string) => u.startsWith('http') ? u : `https://${u}`);
-        } else {
-          extractedCompUrls = fromComp.slice(0, 6);
+          for (const u of [...urlMatches, ...domains]) {
+            const full = u.startsWith('http') ? u : `https://${u}`;
+            if (isValidCompetitorUrl(full) && !fromComp.includes(full)) fromComp.push(full);
+          }
         }
+        extractedCompUrls = fromComp.slice(0, 6);
       }
     }
 

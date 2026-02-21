@@ -344,21 +344,9 @@ const PERFORMANCE_QUOTES = [
   { quote: "Make an offer so good, people feel stupid saying no.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
   { quote: "The money is in the list. The fortune is in the follow-up.", author: "Russell Brunson", role: "Co-Founder, ClickFunnels" },
   { quote: "Price is only an issue in the absence of value.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
-  { quote: "The biggest mistake you can make is not testing your offer before scaling your ads.", author: "Russell Brunson", role: "Co-Founder, ClickFunnels" },
   { quote: "Speed of implementation separates the rich from the broke.", author: "Alex Hormozi", role: "Founder, Acquisition.com" },
-  { quote: "The secret to scaling? Make the unit economics work first.", author: "Russell Brunson", role: "Co-Founder, ClickFunnels" },
-  { quote: "Whoever can spend the most to acquire a customer wins.", author: "Dan Kennedy", role: "Direct Response Marketing Legend" },
-  { quote: "Spend 20% of your budget testing, 80% scaling what works.", author: "Neil Patel", role: "Digital Marketing Expert" },
   { quote: "Your ROAS is a vanity metric. Profit per customer is what matters.", author: "Andrew Wilkinson", role: "Tiny Capital" },
-  { quote: "The hook is not to get them to buy. It's to get them to consume the next piece of content.", author: "Gary Vaynerchuk", role: "CEO, VaynerMedia" },
-  { quote: "Attention is the new currency. Own it or buy it.", author: "Gary Vaynerchuk", role: "CEO, VaynerMedia" },
   { quote: "Creatives are 70% of your ad performance. Test relentlessly.", author: "Andrew Foxwell", role: "Foxwell Digital" },
-  { quote: "Your landing page is either a leaky bucket or a money machine. There's no middle ground.", author: "Joanna Wiebe", role: "Copyhackers" },
-  { quote: "If you can't measure it, you can't improve it.", author: "Peter Drucker", role: "Management Consultant" },
-  { quote: "Stop selling. Start helping.", author: "Zig Ziglar", role: "Sales Legend" },
-  { quote: "Don't fall in love with your product. Fall in love with your customer's problem.", author: "Michael Skok", role: "Venture Capitalist" },
-  { quote: "The best marketing doesn't feel like marketing.", author: "Tom Fishburne", role: "Marketoonist" },
-  { quote: "Your ad creative is dead after 3 days. Refresh or die.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
   { quote: "Stop trying to go viral. Start trying to be relevant.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
   { quote: "The offer is the strategy. Everything else is just execution.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
 ];
@@ -395,7 +383,9 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
           <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary truncate">
-              {progressStep?.detail || 'Analizando con equipo de Marketing Steve AI'}
+              {progressStep?.detail?.includes('Claude') || progressStep?.detail?.includes('Opus')
+                ? 'Analizando con equipo de Marketing Steve AI'
+                : (progressStep?.detail || 'Analizando con equipo de Marketing Steve AI')}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Analizando con equipo de Marketing Steve AI.
@@ -696,7 +686,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     return (val == null || val === undefined) ? '' : String(val);
   }
 
-  // Extract competitor URLs from brief Q9 (competitors) — supports comp1_url:, comp2_url:, comp3_url: and URL/domain patterns
+  // Filter out invalid/short competitor URLs (e.g. https://www.co)
+  function isValidCompetitorUrl(u: string): boolean {
+    try {
+      const full = u.startsWith('http') ? u : `https://${u}`;
+      const host = new URL(full).hostname.replace(/^www\./, '');
+      return host.length >= 8;
+    } catch {
+      return false;
+    }
+  }
+
+  // Extract competitor URLs from brief Q9 (competitors) — supports comp1_url:, Web/🌐, and URL/domain patterns; filters bogus URLs
   function extractCompetitorUrlsFromBrief(): string[] {
     if (!briefData?.questions || !briefData?.raw_responses) return [];
     const idx = briefData.questions.indexOf('competitors');
@@ -707,13 +708,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     let m: RegExpExecArray | null;
     while ((m = compUrlRegex.exec(response)) !== null) {
       const url = m[1].trim();
-      if (url && url.length > 4) urls.push(url.startsWith('http') ? url : `https://${url}`);
+      if (url && url.length > 4) {
+        const u = url.startsWith('http') ? url : `https://${url}`;
+        if (isValidCompetitorUrl(u)) urls.push(u);
+      }
     }
     if (urls.length === 0) {
       const urlMatches = response.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
       for (const match of urlMatches) {
         const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
-        if (url) urls.push(url.startsWith('http') ? url : `https://${url}`);
+        if (url) {
+          const u = url.startsWith('http') ? url : `https://${url}`;
+          if (isValidCompetitorUrl(u)) urls.push(u);
+        }
       }
     }
     if (urls.length === 0) {
@@ -721,7 +728,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const domainMatches = response.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co|es|io)\b/g) || [];
       [...fullUrls, ...domainMatches].forEach(d => {
         const u = d.startsWith('http') ? d : `https://${d}`;
-        if (!urls.includes(u)) urls.push(u);
+        if (isValidCompetitorUrl(u) && !urls.includes(u)) urls.push(u);
       });
     }
     return [...new Set(urls)].slice(0, 6);
