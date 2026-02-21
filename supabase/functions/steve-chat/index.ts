@@ -190,12 +190,20 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       commentGuide: 'Evalúa si la prueba social es fuerte o débil. Comenta si el tono elegido es coherente con el buyer persona.',
     },
     {
-      id: 'brand_assets',
-      question: '**Pregunta 15 de 15 — LOGO, FOTOS E IDENTIDAD VISUAL:**\n\n¡Última pregunta! Necesito ver tu marca EN ACCIÓN.\n\n📤 **Sube tu logo y fotos de productos en los botones que aparecen AQUÍ ABAJO en el chat**.\n\nLuego cuéntame:\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n\n⚠️ **SIN LOGO Y SIN FOTOS NO PUEDO COMPLETAR UN BRIEF PROFESIONAL.**',
-      examples: ['Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista — ya subí logo y fotos abajo'],
+      id: 'brand_identity',
+      question: '**Pregunta 15 de 16 — IDENTIDAD VISUAL Y TONO:**\n\nCuéntame sobre la identidad visual de tu marca:\n\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n- ✍️ **¿Tienes un manual de marca o guía de estilo?**',
+      examples: ['Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista', 'No tengo manual de marca pero me gusta el estilo de Apple — limpio y premium'],
+      fields: [],
+      steveIntro: '*saca su paleta de colores* 🎨🐕\n\n',
+      commentGuide: 'Comenta los colores y estilo visual. Si son coherentes con el buyer persona y posicionamiento, valídalo. Si no, sugiere ajustes. NO pidas fotos ni logos aquí.',
+    },
+    {
+      id: 'brand_assets_upload',
+      question: '**Pregunta 16 de 16 — ARCHIVOS VISUALES (OBLIGATORIA):**\n\nPerfecto, tengo todo lo que necesito para tu estrategia.\nAntes de generar el análisis, necesito que subas:\n\n📸 **Logo de tu marca** (PNG o JPG)\n📦 **Fotos de tu producto principal** (mínimo 2)\n🖼 **Referencias visuales de anuncios que te gusten** (opcional)\n\nEstos archivos los usaré para crear tus creatividades y asegurarme que todo refleje tu marca correctamente.\n\n📤 **Usa los botones de subida que aparecen AQUÍ ABAJO en el chat.**\n\nSi no tienes fotos ahora, escribe "no tengo fotos" y continuamos igual.',
+      examples: ['Ya subí mi logo y 3 fotos de productos', 'No tengo fotos ahora pero las subo después'],
       fields: [],
       steveIntro: '*saca la cámara y ladra* 📸🐕\n\n',
-      commentGuide: 'Verifica que hayan subido assets. Comenta los colores y estilo visual en tercera persona profesional. NUNCA incluyas en el brief frases como "subo el logo ahora mismo". Genera el BRIEF COMPLETO.',
+      commentGuide: 'Si el cliente subió assets, confirma que los recibiste y comenta brevemente. Si dice que no tiene fotos, acepta y continúa. En ambos casos, genera el BRIEF COMPLETO. NUNCA incluyas en el brief frases como "subo el logo ahora mismo".',
     },
   ];
 }
@@ -221,9 +229,10 @@ PERSONALIDAD:
 ---
 
 🚨 REGLA ABSOLUTA #1: ORDEN DE PREGUNTAS
-ESTÁS SIGUIENDO UN CUESTIONARIO DE UNA PREGUNTA INICIAL (Q0: URL del sitio web) + 15 PREGUNTAS.
-Las preguntas se hacen EN ORDEN: Q0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.
+ESTÁS SIGUIENDO UN CUESTIONARIO DE UNA PREGUNTA INICIAL (Q0: URL del sitio web) + 16 PREGUNTAS.
+Las preguntas se hacen EN ORDEN: Q0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16.
 NUNCA te saltes una. NUNCA cambies el orden.
+NUNCA pidas fotos, logos ni archivos visuales antes de la Pregunta 16.
 
 Q0 (website_url) es OBLIGATORIA y BLOQUEANTE:
 - Si el cliente escribe "sin web" → RECHAZA. Explica que sin URL no se puede hacer el análisis.
@@ -252,7 +261,8 @@ Cuando la siguiente pregunta tiene FORMULARIO:
 - Q12 = VACA PÚRPURA / GRAN PROMESA (diferenciación, NO logos)
 - Q13 = VILLANO + GARANTÍA
 - Q14 = PRUEBA SOCIAL + TONO
-- Q15 = LOGO, FOTOS, COLORES
+- Q15 = IDENTIDAD VISUAL (colores, estilo — SIN pedir fotos)
+- Q16 = ARCHIVOS VISUALES (logo, fotos productos — última pregunta, OBLIGATORIA antes del análisis)
 
 🚨 REGLA ABSOLUTA #4: DESCRIPCIÓN DEL NEGOCIO
 En el brief SIEMPRE redáctalo en TERCERA PERSONA:
@@ -268,7 +278,8 @@ IMPORTANTE:
 - Sé conciso en comentarios (2-4 oraciones + la siguiente pregunta)
 - Da 2-3 ejemplos de SU industria
 - Si una respuesta es vaga o incoherente, RECHÁZALA
-- NUNCA digas que el brief está terminado antes de Q15`;
+- NUNCA digas que el brief está terminado antes de Q16
+- NUNCA pidas fotos ni logos antes de Q16`;
 }
 
 function getBriefTemplate(): string {
@@ -762,15 +773,15 @@ Deno.serve(async (req) => {
 
     let questionContext = '';
     if (isLastQuestion) {
-      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la PREGUNTA 15 (la última). ${BRIEF_TEMPLATE}`;
+      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la PREGUNTA 16 (la última — archivos visuales). Si el cliente dijo que no tiene fotos, acepta y continúa igual. ${BRIEF_TEMPLATE}`;
     } else {
       const justAnsweredIndex = answeredQuestions - 1;
       const nextQuestionIndex = answeredQuestions;
       const nextQ = BRAND_BRIEF_QUESTIONS[nextQuestionIndex];
       const justAnsweredQ = BRAND_BRIEF_QUESTIONS[justAnsweredIndex];
       const hasFields = nextQ?.fields?.length > 0;
-      const justAnsweredLabel = justAnsweredIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${justAnsweredIndex} de 15 (${justAnsweredQ?.id})`;
-      const nextLabel = nextQuestionIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${nextQuestionIndex} de 15`;
+      const justAnsweredLabel = justAnsweredIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${justAnsweredIndex} de 16 (${justAnsweredQ?.id})`;
+      const nextLabel = nextQuestionIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${nextQuestionIndex} de 16`;
 
       questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══
 PREGUNTA RECIÉN RESPONDIDA: ${justAnsweredLabel}
