@@ -211,8 +211,9 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         return;
       }
 
-      // If still pending after 90s, check if we have research data (e.g. strategy wrote summary but status didn't update)
-      if (status === 'pending' && elapsed > 90000) {
+      // If still pending after 2 min, check if we have research data (strategy phase can take ~60–90s; give it time)
+      const PENDING_COMPLETE_MS = 120000; // 2 min — balance between "complete result" and not waiting forever
+      if (status === 'pending' && elapsed > PENDING_COMPLETE_MS) {
         const { data: rows } = await supabase
           .from('brand_research')
           .select('research_type, research_data')
@@ -228,7 +229,12 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           return false;
         });
         if (hasData) {
-          console.log('[StatusPoll] ⏱️ pending >90s but research data present — treating as complete');
+          console.log('[StatusPoll] ⏱️ pending >2min but research data present — writing complete to DB and closing banner');
+          await supabase.from('brand_research').upsert({
+            client_id: clientId,
+            research_type: 'analysis_status',
+            research_data: { status: 'complete' },
+          }, { onConflict: 'client_id,research_type' });
           finishAnalysis(true);
         }
       }

@@ -470,9 +470,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     };
   }, [clientId]);
 
-  // Track elapsed time while analysis is pending (for emergency button)
+  // Track elapsed time while analysis is pending
+  const hasAutoAppliedAt120Ref = useRef(false);
   useEffect(() => {
     if (analysisStatus === 'pending') {
+      hasAutoAppliedAt120Ref.current = false;
       const start = Date.now();
       setAnalysisPendingSince(start);
       setElapsedSeconds(0);
@@ -486,10 +488,36 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
   }, [analysisStatus]);
 
+  // A los 120 s aplicar automáticamente el análisis en las pestañas (escribir complete + refrescar)
+  useEffect(() => {
+    if (analysisStatus !== 'pending' || elapsedSeconds < 120) return;
+    if (hasAutoAppliedAt120Ref.current) return;
+    hasAutoAppliedAt120Ref.current = true;
+    (async () => {
+      console.log('[BrandBriefView] A los 120s — aplicando análisis automáticamente en las pestañas');
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (progressPollingRef.current) clearInterval(progressPollingRef.current);
+      await supabase.from('brand_research').upsert({
+        client_id: clientId,
+        research_type: 'analysis_status',
+        research_data: { status: 'complete' },
+      }, { onConflict: 'client_id,research_type' });
+      await fetchResearch();
+      setAnalysisStatus('complete');
+      setProgressStep(null);
+      toast.success('Análisis aplicado automáticamente — revisa los tabs SEO, Keywords y Competencia.');
+    })();
+  }, [analysisStatus, elapsedSeconds, clientId]);
+
   async function handleForceShowAnalysis() {
     console.log('[BrandBriefView] 🚨 Emergency force-render triggered after', elapsedSeconds, 's');
-    clearInterval(pollingRef.current!);
-    clearInterval(progressPollingRef.current!);
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    if (progressPollingRef.current) clearInterval(progressPollingRef.current);
+    await supabase.from('brand_research').upsert({
+      client_id: clientId,
+      research_type: 'analysis_status',
+      research_data: { status: 'complete' },
+    }, { onConflict: 'client_id,research_type' });
     await fetchResearch();
     setAnalysisStatus('complete');
     setProgressStep(null);
@@ -1996,19 +2024,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       {analysisStatus === 'pending' && (
         <div className="space-y-3">
           <AnalysisProgressBanner progressStep={progressStep} />
-          {elapsedSeconds >= 60 && (
-            <div className="flex items-center justify-between p-3 rounded-xl border border-amber-400/40 bg-amber-50 dark:bg-amber-950/20">
+          {elapsedSeconds >= 120 && (
+            <div className="flex items-center justify-between p-3 rounded-xl border border-green-400/40 bg-green-50 dark:bg-green-950/20">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  El análisis lleva {elapsedSeconds}s. Si ya terminó en consola, puedes forzar la vista.
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <p className="text-xs text-green-700 dark:text-green-400">
+                  A los 2 min el análisis se aplica automáticamente en las pestañas SEO, Keywords y Competencia. Si no se ha actualizado, pulsa el botón.
                 </p>
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleForceShowAnalysis}
-                className="text-xs border-amber-400 text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30 ml-3 whitespace-nowrap"
+                className="text-xs border-green-500 text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 ml-3 whitespace-nowrap"
               >
                 📊 Ver análisis generado
               </Button>
