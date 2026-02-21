@@ -404,8 +404,21 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       const responses: string[] = pd.raw_responses || [];
       const competitorIdx = questions.indexOf('competitors');
       if (competitorIdx >= 0 && responses[competitorIdx]) {
-        const urlMatches = responses[competitorIdx].match(/(?:https?:\/\/)?(?:www\.)?[\w-]+\.(?:com|cl|mx|ar|co|pe|es|io|store|shop)(?:\/\S*)?/gi) || [];
-        extractedCompUrls = urlMatches.slice(0, 3).map((u: string) => u.startsWith('http') ? u : `https://${u}`);
+        const raw = String(responses[competitorIdx]);
+        const fromComp: string[] = [];
+        const compUrlRegex = /comp[123]_url\s*:\s*([^\s\n,]+)/gi;
+        let match: RegExpExecArray | null;
+        while ((match = compUrlRegex.exec(raw)) !== null) {
+          const u = match[1].trim();
+          if (u && u.length > 4) fromComp.push(u.startsWith('http') ? u : `https://${u}`);
+        }
+        if (fromComp.length === 0) {
+          const urlMatches = raw.match(/(?:https?:\/\/)?(?:www\.)?[\w.-]+\.(?:com|cl|mx|ar|co|pe|es|io|store|shop)(?:\/\S*)?/gi) || [];
+          const domains = raw.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co|es|io)\b/g) || [];
+          extractedCompUrls = [...urlMatches, ...domains].slice(0, 6).map((u: string) => u.startsWith('http') ? u : `https://${u}`);
+        } else {
+          extractedCompUrls = fromComp.slice(0, 6);
+        }
       }
     }
 

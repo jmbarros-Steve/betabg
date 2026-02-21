@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
 
     // Update progress to show AI phase
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Analizando con Claude Opus — generando estrategia completa...', pct: 80, ts: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Analizando con: TEAM ESTRATEGIA', pct: 80, ts: new Date().toISOString() } },
       { onConflict: 'client_id,research_type' }
     );
 
@@ -307,6 +307,27 @@ Deno.serve(async (req) => {
       result = { executive_summary: rawContent, parse_error: true };
     }
 
+    // If AI returned everything inside executive_summary.summary as stringified JSON, parse and use it
+    const es = result.executive_summary;
+    if (es && typeof es === 'object' && typeof es.summary === 'string') {
+      const str = es.summary.trim();
+      if ((str.startsWith('{') && str.includes('"seo_audit"')) || str.includes('"competitor_analysis"')) {
+        try {
+          const parsed = JSON.parse(str);
+          if (parsed.seo_audit || parsed.competitor_analysis || parsed.keywords || parsed.ads_library_analysis) {
+            if (parsed.seo_audit) result.seo_audit = parsed.seo_audit;
+            if (parsed.competitor_analysis) result.competitor_analysis = parsed.competitor_analysis;
+            if (parsed.keywords) result.keywords = parsed.keywords;
+            if (parsed.ads_library_analysis) result.ads_library_analysis = parsed.ads_library_analysis;
+            if (parsed.cost_benchmarks) result.cost_benchmarks = parsed.cost_benchmarks;
+            if (parsed.seo_roadmap) result.seo_roadmap = parsed.seo_roadmap;
+            if (parsed.competitive_domination) result.competitive_domination = parsed.competitive_domination;
+            result.executive_summary = typeof parsed.executive_summary === 'string' ? parsed.executive_summary : (parsed.executive_summary?.summary ?? str.slice(0, 800));
+          }
+        } catch (_) {}
+      }
+    }
+
     // Persist each section
     const researchTypes = ['seo_audit', 'competitor_analysis', 'keywords', 'ads_library_analysis', 'cost_benchmarks', 'seo_roadmap', 'competitive_domination'];
     for (const rt of researchTypes) {
@@ -319,8 +340,13 @@ Deno.serve(async (req) => {
     }
 
     if (result.executive_summary) {
+      const summaryForDb = typeof result.executive_summary === 'string'
+        ? result.executive_summary.slice(0, 12000)
+        : (result.executive_summary?.summary && typeof result.executive_summary.summary === 'string')
+          ? result.executive_summary.summary.slice(0, 12000)
+          : JSON.stringify(result.executive_summary).slice(0, 4000);
       await supabase.from('brand_research').upsert(
-        { client_id, research_type: 'executive_summary', research_data: { summary: result.executive_summary } },
+        { client_id, research_type: 'executive_summary', research_data: { summary: summaryForDb } },
         { onConflict: 'client_id,research_type' }
       );
     }

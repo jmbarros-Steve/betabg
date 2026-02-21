@@ -679,23 +679,35 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     return (val == null || val === undefined) ? '' : String(val);
   }
 
-  // Extract competitor URLs from brief Q9 responses
+  // Extract competitor URLs from brief Q9 (competitors) — supports comp1_url:, comp2_url:, comp3_url: and URL/domain patterns
   function extractCompetitorUrlsFromBrief(): string[] {
     if (!briefData?.questions || !briefData?.raw_responses) return [];
     const idx = briefData.questions.indexOf('competitors');
     if (idx < 0) return [];
     const response = String(briefData.raw_responses[idx] ?? '');
     const urls: string[] = [];
-    const urlMatches = response.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
-    for (const match of urlMatches) {
-      const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
-      if (url) urls.push(url.startsWith('http') ? url : `https://${url}`);
+    const compUrlRegex = /comp[123]_url\s*:\s*([^\s\n,]+)/gi;
+    let m: RegExpExecArray | null;
+    while ((m = compUrlRegex.exec(response)) !== null) {
+      const url = m[1].trim();
+      if (url && url.length > 4) urls.push(url.startsWith('http') ? url : `https://${url}`);
     }
     if (urls.length === 0) {
-      const domainMatches = response.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co)\b/g) || [];
-      domainMatches.forEach(d => urls.push(`https://${d}`));
+      const urlMatches = response.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
+      for (const match of urlMatches) {
+        const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
+        if (url) urls.push(url.startsWith('http') ? url : `https://${url}`);
+      }
     }
-    return [...new Set(urls)].slice(0, 3);
+    if (urls.length === 0) {
+      const fullUrls = response.match(/(?:https?:\/\/)?(?:www\.)?[\w.-]+\.(?:com|cl|mx|ar|co|pe|es|io|store|shop)(?:\/\S*)?/gi) || [];
+      const domainMatches = response.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co|es|io)\b/g) || [];
+      [...fullUrls, ...domainMatches].forEach(d => {
+        const u = d.startsWith('http') ? d : `https://${d}`;
+        if (!urls.includes(u)) urls.push(u);
+      });
+    }
+    return [...new Set(urls)].slice(0, 6);
   }
 
   async function handleReanalyze() {

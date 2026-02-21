@@ -104,28 +104,45 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const briefContext = persona?.persona_data as any || {};
 
-    const briefCompetitorUrls: string[] = [];
+    let briefCompetitorUrls: string[] = [];
     if (briefContext?.raw_responses && briefContext?.questions) {
       const rawResponses: string[] = briefContext.raw_responses || [];
       const questions: string[] = briefContext.questions || [];
       const competitorsIdx = questions.indexOf('competitors');
       if (competitorsIdx >= 0) {
-        const competitorsResponse = rawResponses[competitorsIdx] || '';
-        const urlMatches = competitorsResponse.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
-        for (const match of urlMatches) {
-          const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
-          if (url && !url.includes(client.name?.toLowerCase())) {
+        const competitorsResponse = String(rawResponses[competitorsIdx] ?? '');
+        // 1) comp1_url: cannonhome.cl, comp2_url: https://intime.cl, etc.
+        const compUrlRegex = /comp[123]_url\s*:\s*([^\s\n,]+)/gi;
+        let m: RegExpExecArray | null;
+        while ((m = compUrlRegex.exec(competitorsResponse)) !== null) {
+          const url = m[1].trim();
+          if (url && url.length > 4 && !url.includes(client.name?.toLowerCase())) {
             briefCompetitorUrls.push(url.startsWith('http') ? url : `https://${url}`);
           }
         }
+        // 2) "Web ... : url" or "🌐 url"
         if (briefCompetitorUrls.length === 0) {
-          const domainMatches = competitorsResponse.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co)\b/g) || [];
-          for (const domain of domainMatches) {
-            if (!domain.includes(client.name?.toLowerCase())) {
-              briefCompetitorUrls.push(`https://${domain}`);
+          const urlMatches = competitorsResponse.match(/(?:Web[^:]*:\s*|🌐\s*)([^\s\n,]+\.[a-z]{2,})/gi) || [];
+          for (const match of urlMatches) {
+            const url = match.replace(/^(?:Web[^:]*:\s*|🌐\s*)/i, '').trim();
+            if (url && !url.includes(client.name?.toLowerCase())) {
+              briefCompetitorUrls.push(url.startsWith('http') ? url : `https://${url}`);
             }
           }
         }
+        // 3) Full URLs and bare domains
+        if (briefCompetitorUrls.length === 0) {
+          const fullUrls = competitorsResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w.-]+\.(?:com|cl|mx|ar|co|pe|es|io|store|shop)(?:\/\S*)?/gi) || [];
+          const domainOnly = competitorsResponse.match(/\b[\w-]+\.(?:cl|com|com\.ar|mx|pe|co|es|io)\b/g) || [];
+          const combined = [...fullUrls, ...domainOnly];
+          for (const u of combined) {
+            const url = u.startsWith('http') ? u : `https://${u}`;
+            if (!briefCompetitorUrls.includes(url) && !u.includes(client.name?.toLowerCase())) {
+              briefCompetitorUrls.push(url);
+            }
+          }
+        }
+        briefCompetitorUrls = [...new Set(briefCompetitorUrls)];
       }
     }
 
