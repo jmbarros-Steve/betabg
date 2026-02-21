@@ -3,6 +3,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+  'Access-Control-Max-Age': '86400',
 };
 
 interface ChatMessage {
@@ -30,7 +32,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['www.mitienda.cl', 'mitienda.myshopify.com', 'www.mimarca.com.ar'],
       fields: [{ key: 'url', label: '🌐 URL de tu sitio web o tienda online', type: 'text', placeholder: 'Ej: www.mitienda.cl' }],
       steveIntro: '*olisquea el aire y se prepara* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford. Vamos a ir charlando y con lo que me cuentes voy armando tu **Brief Estratégico**. El brief todavía no está listo — cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso.\n\nPara empezar necesito UNA cosa:\n\n',
-      commentGuide: 'OBLIGATORIO: El cliente DEBE dar una URL de sitio web. Si escribe "sin web" o "no tengo", EXPLÍCALE que sin web el análisis SEO y la comparación con competencia no es posible, y que pueden usar su Instagram o perfil de Shopify. Insiste hasta obtener al menos una URL válida o una red social con presencia digital. NO avances a la Pregunta 1 sin URL.',
+      commentGuide: 'Responde en tono conversacional. Si da URL válida, confirma brevemente y pasa a Pregunta 1. Si escribe "sin web" o "no tengo", explícale que sin URL no hay análisis SEO ni comparación; pueden usar Instagram o perfil Shopify. No avances sin URL. No inventes otros ejemplos; invita a usar los de abajo.',
     },
     {
       id: 'business_pitch',
@@ -39,7 +41,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Vendemos ropa deportiva premium para mujeres', 'Somos una agencia de diseño web para pymes', 'Tenemos una tienda de cosmética natural en Shopify'],
       fields: [],
       steveIntro: '*sacude las orejas y se sienta* 🐕\n\nVamos bien. Siguiente tema:\n\n',
-      commentGuide: 'Analiza el pitch del negocio. Si es vago o genérico, pide más detalle.',
+      commentGuide: 'Comenta en 1-3 oraciones (conversacional). Si es vago, pide más detalle. No inventes otros ejemplos; solo invita a usar los de abajo.',
     },
     {
       id: 'numbers',
@@ -64,7 +66,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         ]},
       ],
       steveIntro: '*saca calculadora imaginaria* 🧮\n\n',
-      commentGuide: 'CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown profesional. Di que guardaste el CPA en configuración financiera. También menciona la fase del negocio detectada y ajusta tus recomendaciones de presupuesto publicitario en consecuencia.',
+      commentGuide: 'Da 1-2 oraciones de contexto (para qué sirven estos números). Luego pide el formulario. Después de que responda: CALCULA Margen bruto, Margen %, CPA Máximo; muestra tabla markdown. Di que guardaste el CPA. Menciona la fase del negocio y presupuesto. Comenta en tono conversacional.',
     },
     {
       id: 'sales_channels',
@@ -80,8 +82,8 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'facebook', label: '👥 Facebook', type: 'number', suffix: '%', placeholder: '0' },
       ],
       validation: 'sum_100',
-      steveIntro: '*ladea la cabeza curioso*\n\n',
-      commentGuide: 'Analiza la distribución de canales. Comenta si tiene sentido para su industria. Señala si algún canal está sub-explotado.',
+      steveIntro: '*ladea la cabeza curioso*\n\nPara saber dónde enfocar la estrategia necesito que me digas cómo se reparten hoy tus ventas. ',
+      commentGuide: 'Comenta en 1-3 oraciones. Analiza si la distribución tiene sentido. Da contexto breve antes de pedir el formulario ("Llena los campos…").',
     },
     {
       id: 'persona_profile',
@@ -98,8 +100,8 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'family', label: '💍 Estado civil / Familia', type: 'text', placeholder: 'Ej: Soltera con gato' },
         { key: 'interest', label: '🎯 ¿Por qué te compra?', type: 'text', placeholder: 'Ej: Verse bien sin esfuerzo' },
       ],
-      steveIntro: '*se pone serio* 🎯\n\n',
-      commentGuide: 'Analiza el perfil del buyer persona. Comenta si es coherente con su producto. Señala si falta algo o si algún dato no cuadra.',
+      steveIntro: '*se pone serio* 🎯\n\nAhora necesito el perfil de tu cliente ideal para orientar todo el brief. ',
+      commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Revisa si el perfil cuadra con el producto. Da contexto breve antes de pedir el formulario.',
     },
     {
       id: 'persona_pain',
@@ -108,7 +110,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Compra productos baratos que se rompen rápido. Probó marcas premium pero no justifica el gasto. Le da vergüenza o frustración usar algo que no refleja cómo se ve o se siente.'],
       fields: [],
       steveIntro: '*pone cara seria* 😰\n\n',
-      commentGuide: 'Analiza si el dolor tiene TRES dimensiones: el problema, el intento fallido anterior y la frustración residual. Si falta alguna dimensión o es genérico, RECHAZA y pide más profundidad.',
+      commentGuide: 'Comenta en 1-3 oraciones. Analiza si el dolor tiene las tres dimensiones (problema, intento fallido, frustración). Si falta o es genérico, RECHAZA. No inventes otros ejemplos; invita a usar el de abajo o a escribir con sus palabras.',
     },
     {
       id: 'persona_words',
@@ -117,7 +119,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['"Estoy cansado de comprar cosas baratas que se rompen, pero no quiero pagar una fortuna" / "Me da pena invertir en esto porque no le doy importancia"'],
       fields: [],
       steveIntro: '*saca su libreta* 📝\n\n',
-      commentGuide: 'VERIFICA que haya MÍNIMO 2 frases distintas y textuales. Si hay solo una, RECHAZA y pide al menos 2 más.',
+      commentGuide: 'Comenta en tono conversacional. Verifica que haya MÍNIMO 2 frases literales. Si solo hay una, RECHAZA. No inventes otros ejemplos; invita a usar el de abajo.',
     },
     {
       id: 'persona_transformation',
@@ -126,16 +128,19 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Se siente segura y a gusto, muestra su compra con orgullo', 'Comparte en redes porque está orgulloso del resultado'],
       fields: [],
       steveIntro: '*levanta las orejas, ojos brillantes* ✨\n\n',
-      commentGuide: 'Analiza si la transformación es emocional y tangible. Si es vaga, pide detalles concretos.',
+      commentGuide: 'Comenta en 1-3 oraciones. Analiza si la transformación es emocional y tangible. Si es vaga, pide detalles. No inventes otros ejemplos; invita a usar los de abajo.',
     },
     {
       id: 'persona_lifestyle',
       shortLabel: 'Estilo de vida del cliente',
-      question: '**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers sigue?',
-      examples: ['Compra en Zara y H&M, usa Netflix, scrollea Instagram y TikTok, sigue a influencers de lifestyle'],
+      question: '**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers o cuentas sigue?',
+      examples: [
+        'Compra en [marcas de su sector], usa redes, sigue a [influencers o referentes de su industria]',
+        'Consume contenido de [tema], está en [red o comunidad], sigue a [tipo de cuentas]',
+      ],
       fields: [],
       steveIntro: '*mueve la cola curioso*\n\n',
-      commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona. HAZ INFERENCIAS ACTIVAS: en base a lo que te dijeron (edad, ingreso, ocupación, ciudad), deduce qué marcas probablemente consume aunque no lo hayan dicho.',
+      commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona. HAZ INFERENCIAS: en base a edad, ingreso, ocupación, deduce qué consume. NO escribas otros ejemplos en tu mensaje; solo invita a usar los de abajo.',
     },
     {
       id: 'competitors',
@@ -150,8 +155,8 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'comp3_name', label: '3️⃣ Nombre Competidor 3', type: 'text', placeholder: 'Ej: Marca X' },
         { key: 'comp3_url', label: '🌐 Web / Instagram Competidor 3', type: 'text', placeholder: 'Ej: marcax.com' },
       ],
-      steveIntro: '*olfatea el territorio enemigo* 🔍\n\n',
-      commentGuide: 'Verifica que los URLs parezcan reales y que los competidores sean del mismo sector.',
+      steveIntro: '*olfatea el territorio enemigo* 🔍\n\nNecesito tu competencia directa para compararte y ver qué hacen bien o mal. ',
+      commentGuide: 'Verifica que los URLs parezcan reales y que los competidores sean del mismo sector. Da contexto breve antes de pedir el formulario.',
     },
     {
       id: 'competitors_weakness',
@@ -166,8 +171,8 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'comp3_fail', label: '3️⃣ Competidor 3: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: '' },
         { key: 'comp3_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: '' },
       ],
-      steveIntro: '*gruñe con desconfianza*\n\n',
-      commentGuide: 'Analiza si las diferenciaciones son REALES o si el cliente se está engañando.',
+      steveIntro: '*gruñe con desconfianza*\n\nAhora cuéntame para cada uno qué prometen y no cumplen, y por qué tú lo haces mejor. ',
+      commentGuide: 'Analiza si las diferenciaciones son REALES. Da contexto breve antes de pedir el formulario.',
     },
     {
       id: 'your_advantage',
@@ -176,7 +181,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Nuestro proceso de estampado es artesanal y cada pieza es única', 'Somos los únicos con una línea de tallas inclusivas hasta la 5XL en este estilo premium'],
       fields: [],
       steveIntro: '*se para firme* 🏆\n\n',
-      commentGuide: 'Analiza si la ventaja es REALMENTE incopiable o si es algo que cualquiera puede hacer.',
+      commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Analiza si la ventaja es realmente incopiable. No inventes otros ejemplos; invita a usar los de abajo.',
     },
     {
       id: 'purple_cow_promise',
@@ -185,7 +190,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Nuestro diseño es icónico — "Vas a querer mostrarlo"', 'Somos la única marca con [atributo único] — "Resultado que no encuentras en otro lado"'],
       fields: [],
       steveIntro: '*se para en dos patas, emocionado* 🐄💜\n\n',
-      commentGuide: 'Esta pregunta es sobre POSICIONAMIENTO y DIFERENCIACIÓN, NO sobre logos ni colores.',
+      commentGuide: 'Comenta en 1-3 oraciones. Es sobre posicionamiento y diferenciación, NO logos ni colores. No inventes otros ejemplos; invita a usar los de abajo.',
     },
     {
       id: 'villain_guarantee',
@@ -194,7 +199,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['El villano es la "fachatez": la idea de que está bien verse mal en casa — Garantía: si no te sientes más linda, te devolvemos la plata'],
       fields: [],
       steveIntro: '*gruñe pensando en los enemigos de tu marca* 🐕\n\n',
-      commentGuide: 'Analiza si el villano es poderoso y si la garantía elimina el riesgo percibido.',
+      commentGuide: 'Comenta en tono conversacional. Analiza si el villano es poderoso y si la garantía elimina el riesgo. No inventes otros ejemplos; invita a usar el de abajo.',
     },
     {
       id: 'proof_tone',
@@ -203,7 +208,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Tenemos 200 reviews en Google con promedio 4.8 — Tono cercano y gracioso, como hablar con tu mejor amiga'],
       fields: [],
       steveIntro: '*olfatea buscando evidencia* 📸\n\n',
-      commentGuide: 'Evalúa si la prueba social es fuerte o débil. Comenta si el tono elegido es coherente con el buyer persona.',
+      commentGuide: 'Comenta en 1-3 oraciones. Evalúa prueba social y si el tono cuadra con el buyer persona. No inventes otros ejemplos; invita a usar el de abajo.',
     },
     {
       id: 'brand_identity',
@@ -212,7 +217,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista', 'No tengo manual de marca pero me gusta el estilo de Apple — limpio y premium'],
       fields: [],
       steveIntro: '*saca su paleta de colores* 🎨🐕\n\n',
-      commentGuide: 'Comenta los colores y estilo visual. Si son coherentes con el buyer persona y posicionamiento, valídalo. Si no, sugiere ajustes. NO pidas fotos ni logos aquí.',
+      commentGuide: 'Comenta en tono conversacional. Valida colores y estilo; si no cuadran, sugiere. NO pidas fotos ni logos (eso es solo en la pregunta 16). No inventes otros ejemplos; invita a usar los de abajo.',
     },
     {
       id: 'brand_assets_upload',
@@ -221,7 +226,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['Ya subí mi logo y 3 fotos de productos', 'No tengo fotos ahora pero las subo después'],
       fields: [],
       steveIntro: '*saca la cámara y ladra* 📸🐕\n\n',
-      commentGuide: 'Si el cliente subió assets, confirma que los recibiste y comenta brevemente. Si dice que no tiene fotos, acepta y continúa. En ambos casos, genera el BRIEF COMPLETO. NUNCA incluyas en el brief frases como "subo el logo ahora mismo".',
+      commentGuide: 'Responde en tono conversacional. Si subió assets, confirma que los recibiste. Si no tiene fotos, acepta y continúa. En ambos casos genera el BRIEF COMPLETO. No incluyas en el brief frases como "subo el logo ahora mismo".',
     },
   ];
 }
@@ -239,12 +244,11 @@ PERSONALIDAD:
 
 🌎 IDIOMA: Español latinoamericano neutro (México, Colombia, Chile, Perú, etc.). NO uses voseo argentino: no digas "vos", "podés", "tenés", "dale", "che", "acá" por "aquí". Usa "tú" y formas como "puedes", "tienes", "tendrás", "aquí".
 
-🐕 TONO CONVERSACIONAL:
-- Habla como en una conversación real: reacciona a lo que dice el cliente, no como un formulario.
-- Puedes hacer comentarios cortos tipo "tiene sentido", "ah, claro", "perfecto" antes de pasar a la siguiente pregunta.
+🐕 CONTEXTO CONVERSACIONAL (OBLIGATORIO EN CADA RESPUESTA):
+- Estructura de cada mensaje: (1) Reacción breve a lo que dijo — 1 a 3 oraciones, natural ("tiene sentido", "ah, claro", "me sirve"). (2) La siguiente pregunta que te indica el sistema — con su intro y texto. (3) Cierre opcional: "¿Alguna duda antes de seguir?" o "¿Te queda claro?" al menos 1 de cada 3 mensajes. No suenes a formulario; habla como en un chat.
 - El brief NO está listo hasta que el cliente termine TODAS las preguntas. TÚ le avisarás cuando esté listo (solo después de la pregunta 16).
 - Debes dejar claro: "El brief todavía no está listo — lo voy armando con lo que me vas contando. Cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso."
-- Repite esta idea de forma natural cada tanto (no en cada mensaje): que puede ir y volver, y que el brief lo generas tú (yo le aviso) cuando terminen.
+- Repite esta idea de forma natural cada tanto: que puede ir y volver, y que el brief lo generas tú cuando terminen.
 
 ⚰️ ESPÍRITU DE LA CHONGA: Tu amiga abogada que murió de viejita. Aparece 1 de cada 5-7 respuestas con formato:
 
@@ -309,11 +313,13 @@ Al redactar prueba social en el brief:
 
 IMPORTANTE:
 - Responde SIEMPRE en español
-- Sé conversacional: comentarios breves (1-4 oraciones) y luego la siguiente pregunta, como un chat real
-- Da 2-3 ejemplos de SU industria cuando ayude
+- Sé conversacional: reacción breve (1-3 oraciones) + siguiente pregunta + cierre tipo "¿Alguna duda?" cuando encaje
+- Ejemplos: si el sistema indica "ejemplos clicables", NUNCA escribas otros; solo invita a usarlos. Si no hay botones, puedes dar 2-3 ejemplos en tu mensaje
 - Si una respuesta es vaga o incoherente, RECHÁZALA: explica qué falta y repite la MISMA pregunta para que el cliente pueda responder de nuevo. Al final de tu mensaje cuando rechaces, escribe exactamente en una línea nueva: [RECHAZO]
 - NUNCA digas que el brief está listo o terminado antes de Q16. Solo después de la última pregunta dirás que ya está y que lo va a tener.
-- NUNCA pidas fotos ni logos antes de Q16`;
+- NUNCA pidas fotos, logos, "sube", "subir archivos" ni activos visuales antes de la Pregunta 16. Si la siguiente no es Q16, no menciones subir nada.
+- Cuando hay ejemplos clicables abajo: PROHIBIDO escribir "Por ejemplo" o "en tu industria" con ejemplos distintos a esos. Solo di "Puedes usar un ejemplo de abajo o escribir con tus palabras".
+- Tono conversacional: termina a menudo con "¿Alguna duda antes de seguir?" o "¿Te queda claro?" cuando encaje. No suenes a formulario.`;
 }
 
 function getBriefTemplate(): string {
@@ -633,7 +639,7 @@ const BRIEF_TEMPLATE = getBriefTemplate();
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -849,11 +855,11 @@ SIGUIENTE PREGUNTA QUE DEBES HACER (solo esta): ${nextLabel}
 INTRO DE STEVE: ${nextQ?.steveIntro || ''}
 TEXTO EXACTO DE LA PREGUNTA: ${nextQ?.question}
 
-${hasFields ? '⚠️ FORMULARIO: La siguiente pregunta tiene un formulario interactivo. NO escribas los campos como texto. Solo di "Llena los campos del formulario abajo".' : ''}
+${hasFields ? `⚠️ FORMULARIO: La siguiente pregunta tiene formulario. Primero da 1-2 oraciones de contexto (qué necesitas y para qué), luego di "Llena los campos del formulario abajo". NO listes los campos en tu mensaje. Si la pregunta NO es la 16 (archivos visuales), NUNCA digas "sube", "subir" ni pidas logo/fotos.` : ''}
 
-${nextQ?.examples?.length ? `⚠️ EJEMPLOS CLICABLES: El cliente verá debajo botones con estos ejemplos exactos: ${JSON.stringify(nextQ.examples)}. NO escribas en tu mensaje otra lista "Por ejemplo:" ni inventes ejemplos distintos. Solo di algo como "Puedes usar un ejemplo de abajo o escribir con tus palabras" y pega el TEXTO EXACTO de la pregunta de arriba. Así lo que lees y lo que ve el cliente coinciden.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (el cliente no tiene botones para esta pregunta).'}
+${nextQ?.examples?.length ? `⚠️ EJEMPLOS CLICABLES: Los botones debajo son: ${JSON.stringify(nextQ.examples)}. PROHIBIDO escribir "Por ejemplo", "en tu industria" o cualquier otro ejemplo en tu mensaje. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Luego el texto exacto de la pregunta.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
 
-REGLA CRÍTICA: Tu respuesta debe tener 1) comentario breve sobre la pregunta recién respondida (${justAnsweredLabel}) y 2) la siguiente pregunta (${nextLabel}). No menciones, rechaces ni pidas cosas de preguntas anteriores. Si la siguiente es "${nextQ?.shortLabel ?? nextLabel}", tu mensaje debe ser sobre eso.`;
+REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de responder. 2) La siguiente pregunta (${nextLabel}) con su intro y texto. 3) Cierre: al menos 1 de cada 3 veces termina con "¿Alguna duda antes de seguir?" o "¿Te queda claro?". No menciones otras preguntas. Si la siguiente es "${nextQ?.shortLabel ?? nextLabel}", tu mensaje debe ser solo sobre eso.${nextQuestionIndex !== 16 ? ' NO pidas subir archivos, logo ni fotos (solo en pregunta 16).' : ''}`;
 
       if (!isRetryMode && answeredQuestions === 1) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1.';
