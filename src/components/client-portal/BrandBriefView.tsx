@@ -398,7 +398,7 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
               {progressStep?.detail || 'Iniciando análisis de marca...'}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Steve está auditando tu sitio, investigando keywords y analizando hasta 6 competidores. 1–2 minutos.
+              Analizando con el equipo de Marketing.
             </p>
           </div>
         </div>
@@ -626,6 +626,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         } else if (!SKIP_TYPES.includes(row.research_type)) {
           (r as any)[row.research_type] = row.research_data;
         }
+      }
+    }
+    // If executive_summary.summary is a stringified JSON (legacy AI response), parse and merge sections so UI shows SEO, competitors, etc.
+    const es = (r as any).executive_summary;
+    if (es && typeof es === 'object' && typeof es.summary === 'string') {
+      const str = es.summary.trim();
+      if (str.startsWith('{') && (str.includes('"seo_audit"') || str.includes('"competitor_analysis"') || str.includes('"keywords"'))) {
+        try {
+          const parsed = JSON.parse(str);
+          if (parsed.seo_audit && !(r as any).seo_audit) (r as any).seo_audit = parsed.seo_audit;
+          if (parsed.competitor_analysis && !(r as any).competitor_analysis) (r as any).competitor_analysis = parsed.competitor_analysis;
+          if (parsed.keywords && !(r as any).keywords) (r as any).keywords = parsed.keywords;
+          if (parsed.ads_library_analysis && !(r as any).ads_library_analysis) (r as any).ads_library_analysis = parsed.ads_library_analysis;
+        } catch (_) { /* ignore parse error */ }
       }
     }
     // Always set both states — research first so render sees data when status changes

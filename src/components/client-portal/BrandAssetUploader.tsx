@@ -71,7 +71,7 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
           <p className="text-sm font-semibold text-primary truncate">
             {progressStep.detail}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Steve está auditando tu sitio, investigando keywords y analizando hasta 6 competidores. 1–2 min.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Analizando con el equipo de Marketing.</p>
         </div>
       </div>
 

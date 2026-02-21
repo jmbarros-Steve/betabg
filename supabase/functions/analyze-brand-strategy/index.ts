@@ -1,8 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 function buildAnalysisPrompt(
@@ -187,7 +189,7 @@ REGLAS:
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -264,7 +266,7 @@ Deno.serve(async (req) => {
 
     // Update progress to show AI phase
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Analizando con: TEAM ESTRATEGIA', pct: 80, ts: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Analizando con el equipo de Marketing', pct: 80, ts: new Date().toISOString() } },
       { onConflict: 'client_id,research_type' }
     );
 
