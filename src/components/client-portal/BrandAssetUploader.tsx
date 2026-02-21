@@ -366,7 +366,16 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
     };
 
+    const debugKey = `analysis_debug_${clientId}`;
+    const setDebug = (updates: Record<string, unknown>) => {
+      try {
+        const prev = JSON.parse(sessionStorage.getItem(debugKey) || '{}');
+        sessionStorage.setItem(debugKey, JSON.stringify({ ...prev, ...updates, at: Date.now() }));
+      } catch (_) {}
+    };
+
     console.log('[launchAnalysis] Phase 1 — research (scraping)');
+    setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
       const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
@@ -381,25 +390,43 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       if (researchRes.ok) {
         const researchData = await researchRes.json();
         research = researchData.research;
+        setDebug({ phase1: 'ok', phase1Status: 200 });
         console.log('[launchAnalysis] Phase 1 complete — competitors scraped:', research?.competitorContents?.length);
       } else {
-        console.error('[launchAnalysis] Phase 1 error:', researchRes.status);
+        const errBody = await researchRes.text();
+        setDebug({ phase1: 'error', phase1Status: researchRes.status, phase1Message: errBody.slice(0, 300) });
+        console.error('[launchAnalysis] Phase 1 error:', researchRes.status, errBody.slice(0, 500));
       }
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      setDebug({ phase1: 'error', phase1Message: msg });
       console.error('[launchAnalysis] Phase 1 failed:', err);
     }
 
-    // Phase 2: fire and forget (polling tracks completion)
+    // Phase 2: await to capture error for diagnóstico
     if (research) {
-      console.log('[launchAnalysis] Phase 2 — strategy (Claude Opus)');
-      fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ client_id: clientId, research }),
-      }).catch((err) => {
-        console.log('[launchAnalysis] Phase 2 ended (polling tracks status):', err?.message);
-      });
+      console.log('[launchAnalysis] Phase 2 — strategy (Steve AI)');
+      setDebug({ phase2: 'running' });
+      try {
+        const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ client_id: clientId, research }),
+        });
+        if (strategyRes.ok) {
+          setDebug({ phase2: 'ok', phase2Status: 200 });
+        } else {
+          const errBody = await strategyRes.text();
+          setDebug({ phase2: 'error', phase2Status: strategyRes.status, phase2Message: errBody.slice(0, 300) });
+          console.error('[launchAnalysis] Phase 2 error:', strategyRes.status, errBody.slice(0, 500));
+        }
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        setDebug({ phase2: 'error', phase2Message: msg });
+        console.error('[launchAnalysis] Phase 2 failed:', err);
+      }
     } else {
+      setDebug({ phase2: 'skipped', phase2Message: 'Fase 1 falló' });
       console.error('[launchAnalysis] Skipping Phase 2 — research failed');
     }
   }

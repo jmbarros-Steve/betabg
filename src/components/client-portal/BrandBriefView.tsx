@@ -459,6 +459,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const [progressStep, setProgressStep] = useState<{ step: string; detail: string; pct: number } | null>(null);
   const [analysisPendingSince, setAnalysisPendingSince] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [diagnostic, setDiagnostic] = useState<{ phase1?: string; phase2?: string; phase1Message?: string; phase2Message?: string; dataInDb?: Record<string, boolean> } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dataCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -487,8 +488,43 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     } else {
       setAnalysisPendingSince(null);
       setElapsedSeconds(0);
+      setDiagnostic(null);
     }
   }, [analysisStatus]);
+
+  // Actualizar diagnóstico (Fase 1/2 + datos en BD) mientras está pending para ver dónde falla
+  useEffect(() => {
+    if (analysisStatus !== 'pending' || elapsedSeconds < 15) return;
+    const debugKey = `analysis_debug_${clientId}`;
+    try {
+      const raw = sessionStorage.getItem(debugKey);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const next: NonNullable<typeof diagnostic> = {};
+      if (parsed.phase1) next.phase1 = parsed.phase1 === 'ok' ? 'OK' : parsed.phase1 === 'error' ? `Error (${parsed.phase1Status || '?'})` : parsed.phase1;
+      if (parsed.phase2) next.phase2 = parsed.phase2 === 'ok' ? 'OK' : parsed.phase2 === 'error' ? `Error (${parsed.phase2Status || '?'})` : parsed.phase2 === 'running' ? 'En curso' : parsed.phase2;
+      if (parsed.phase1Message) next.phase1Message = parsed.phase1Message;
+      if (parsed.phase2Message) next.phase2Message = parsed.phase2Message;
+      setDiagnostic(prev => ({ ...prev, ...next }));
+    } catch (_) {}
+  }, [analysisStatus, elapsedSeconds, clientId]);
+
+  useEffect(() => {
+    if (analysisStatus !== 'pending' || elapsedSeconds < 25) return;
+    (async () => {
+      const { data: rows } = await supabase
+        .from('brand_research')
+        .select('research_type, research_data')
+        .eq('client_id', clientId)
+        .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
+      const dataInDb: Record<string, boolean> = {};
+      for (const r of rows ?? []) {
+        const d = (r as any).research_data;
+        const has = !!d && (Array.isArray(d) ? d.length > 0 : typeof d === 'object' ? Object.keys(d).length > 0 : !!d);
+        dataInDb[(r as any).research_type] = has;
+      }
+      setDiagnostic(prev => ({ ...prev, dataInDb }));
+    })();
+  }, [analysisStatus, elapsedSeconds, clientId]);
 
   // A los 120 s aplicar automáticamente solo si ya hay datos de research (SEO, keywords, competencia). Si no, seguir comprobando cada 8s.
   useEffect(() => {
@@ -840,7 +876,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
     };
 
+    const debugKey = `analysis_debug_${clientId}`;
+    const setDebug = (updates: Record<string, unknown>) => {
+      try {
+        const prev = JSON.parse(sessionStorage.getItem(debugKey) || '{}');
+        sessionStorage.setItem(debugKey, JSON.stringify({ ...prev, ...updates, at: Date.now() }));
+      } catch (_) {}
+    };
+
     // Phase 1: scraping (fast, ~30s)
+    setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
       const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
@@ -851,28 +896,39 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (researchRes.ok) {
         const researchData = await researchRes.json();
         research = researchData.research;
+        setDebug({ phase1: 'ok', phase1Status: 200 });
       } else {
-        console.error('analyze-brand-research error:', researchRes.status);
+        const errBody = await researchRes.text();
+        setDebug({ phase1: 'error', phase1Status: researchRes.status, phase1Message: errBody.slice(0, 300) });
+        console.error('analyze-brand-research error:', researchRes.status, errBody.slice(0, 500));
       }
-    } catch (err) {
+    } catch (err: any) {
+      setDebug({ phase1: 'error', phase1Message: err?.message || String(err) });
       console.error('analyze-brand-research failed:', err);
     }
 
-    // Phase 2: strategy (Claude Opus, ~60s) — fire and forget so UI keeps polling
+    // Phase 2: strategy — await to capture error for diagnóstico
     if (research) {
-      fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ client_id: clientId, research }),
-      }).then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          if (res.status !== 429) console.error('analyze-brand-strategy error:', res.status, body);
+      setDebug({ phase2: 'running' });
+      try {
+        const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ client_id: clientId, research }),
+        });
+        if (strategyRes.ok) {
+          setDebug({ phase2: 'ok', phase2Status: 200 });
+        } else {
+          const errBody = await strategyRes.text();
+          setDebug({ phase2: 'error', phase2Status: strategyRes.status, phase2Message: errBody.slice(0, 300) });
+          if (strategyRes.status !== 429) console.error('analyze-brand-strategy error:', strategyRes.status, errBody.slice(0, 500));
         }
-      }).catch((err) => {
+      } catch (err: any) {
+        setDebug({ phase2: 'error', phase2Message: err?.message || String(err) });
         console.log('analyze-brand-strategy ended (polling tracks status):', err?.message);
-      });
+      }
     } else {
+      setDebug({ phase2: 'skipped', phase2Message: 'Fase 1 falló' });
       console.error('Skipping strategy phase — research phase failed');
     }
   }
@@ -2064,6 +2120,22 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       {analysisStatus === 'pending' && (
         <div className="space-y-3">
           <AnalysisProgressBanner progressStep={progressStep} />
+          {diagnostic && elapsedSeconds >= 15 && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs font-mono space-y-1">
+              <p className="font-semibold text-foreground">Diagnóstico (para localizar la falla):</p>
+              <p className="text-muted-foreground">
+                Fase 1 (scraping): {diagnostic.phase1 ?? '—'} {diagnostic.phase1Message && <span className="text-amber-600">→ {diagnostic.phase1Message}</span>}
+              </p>
+              <p className="text-muted-foreground">
+                Fase 2 (estrategia IA): {diagnostic.phase2 ?? '—'} {diagnostic.phase2Message && <span className="text-amber-600">→ {diagnostic.phase2Message}</span>}
+              </p>
+              {diagnostic.dataInDb && (
+                <p className="text-muted-foreground">
+                  Datos en BD: executive_summary={diagnostic.dataInDb.executive_summary ? 'sí' : 'no'}, seo_audit={diagnostic.dataInDb.seo_audit ? 'sí' : 'no'}, competitor_analysis={diagnostic.dataInDb.competitor_analysis ? 'sí' : 'no'}, keywords={diagnostic.dataInDb.keywords ? 'sí' : 'no'}
+                </p>
+              )}
+            </div>
+          )}
           {elapsedSeconds >= 120 && (
             <div className="flex items-center justify-between p-3 rounded-xl border border-green-400/40 bg-green-50 dark:bg-green-950/20">
               <div className="flex items-center gap-2">
