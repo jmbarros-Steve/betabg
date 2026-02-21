@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2 } from 'lucide-react';
@@ -26,25 +25,6 @@ export default function Dashboard() {
   const { isSuperAdmin, isShopifyUser, isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [contenido, setContenido] = useState('');
-  const [procesando, setProcesando] = useState(false);
-
-  const procesarContenido = async () => {
-    if (!contenido.trim()) return;
-    setProcesando(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('train-steve', {
-        body: { contenido, categoriaHint: '' },
-      });
-      if (error) throw error;
-      alert(`✅ ${data.resumen}`);
-      setContenido('');
-    } catch (err) {
-      alert('Error procesando contenido');
-    } finally {
-      setProcesando(false);
-    }
-  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -142,30 +122,8 @@ export default function Dashboard() {
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
           {activeTab === 'training' && (
             <div className="space-y-10">
-
-              {/* CHAT DE ENTRENAMIENTO INLINE */}
-              <div className="border rounded-xl p-6 bg-card min-h-[400px]">
-                <h2 className="text-2xl font-bold mb-2">🤖 Chat de Entrenamiento</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Pega cualquier contenido y Claude lo estructurará en la Knowledge Base de Steve.
-                </p>
-                <textarea
-                  value={contenido}
-                  onChange={(e) => setContenido(e.target.value)}
-                  className="w-full h-40 border rounded-lg p-3 text-sm resize-none"
-                  placeholder="Pega aquí artículos, transcripciones, frameworks..."
-                />
-                <button
-                  onClick={procesarContenido}
-                  disabled={procesando || !contenido.trim()}
-                  className="mt-3 px-4 py-2 bg-primary text-white rounded-lg text-sm disabled:opacity-50"
-                >
-                  {procesando ? 'Procesando...' : 'Procesar y guardar en Steve'}
-                </button>
-              </div>
-
+              <SteveTrainingChat />
               <SteveKnowledgePanel />
-
             </div>
           )}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}

@@ -22,6 +22,7 @@ import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDe
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
 type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
@@ -62,6 +63,16 @@ export default function ClientPortal() {
       }
     }
   }, [user, isClient, isAdminView]);
+
+  // Claridad de sesión: mostrar una vez al entrar al portal que la sesión está activa
+  useEffect(() => {
+    if (!user || !isClient || isAdminView || roleLoading) return;
+    const key = 'bg_portal_session_toast';
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, 'true');
+      toast.success('Has iniciado sesión correctamente. Bienvenido a tu portal.');
+    }
+  }, [user, isClient, isAdminView, roleLoading]);
 
   const handleCompleteOnboarding = () => {
     if (user) {

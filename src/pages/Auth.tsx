@@ -121,7 +121,7 @@ export default function Auth() {
             toast.error(error.message);
           }
         } else {
-          toast.success('¡Bienvenido de nuevo!');
+          toast.success('Sesión iniciada. Redirigiendo...');
         }
       } else {
         const { error } = await signUp(email, password);

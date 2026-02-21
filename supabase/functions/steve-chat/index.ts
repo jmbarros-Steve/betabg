@@ -27,7 +27,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       question: '**Antes de empezar — NECESITO TU PÁGINA WEB:**\n\nSin tu URL no puedo hacer el análisis SEO, compararte con la competencia ni generar el brief completo. 🌐\n\n**¿Cuál es tu sitio web o tienda online?**\n\n(Si todavía no tienes, escribe "sin web" y te explico qué hacemos en ese caso)',
       examples: ['www.mitienda.cl', 'mitienda.myshopify.com', 'www.mimarca.com.ar'],
       fields: [{ key: 'url', label: '🌐 URL de tu sitio web o tienda online', type: 'text', placeholder: 'Ej: www.mitienda.cl' }],
-      steveIntro: '*olisquea el aire y se prepara* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford.\n\nAntes de empezar con las **15 preguntas del Brief Estratégico**, necesito UNA sola cosa:\n\n',
+      steveIntro: '*olisquea el aire y se prepara* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford. Vamos a ir charlando y con lo que me cuentes voy armando tu **Brief Estratégico**. El brief todavía no está listo — cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso.\n\nPara empezar necesito UNA cosa:\n\n',
       commentGuide: 'OBLIGATORIO: El cliente DEBE dar una URL de sitio web. Si escribe "sin web" o "no tengo", EXPLÍCALE que sin web el análisis SEO y la comparación con competencia no es posible, y que pueden usar su Instagram o perfil de Shopify. Insiste hasta obtener al menos una URL válida o una red social con presencia digital. NO avances a la Pregunta 1 sin URL.',
     },
     {
@@ -35,7 +35,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       question: '**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.',
       examples: ['Vendemos ropa deportiva premium para mujeres', 'Somos una agencia de diseño web para pymes', 'Tenemos una tienda de cosmética natural en Shopify'],
       fields: [],
-      steveIntro: '*sacude las orejas y se sienta profesionalmente* 🐕\n\nExcelente. Ahora vamos a armar tu **Brief Estratégico en 15 preguntas** (ni una más, ni una menos). Al final vas a tener un documento que vale ORO.\n\n',
+      steveIntro: '*sacude las orejas y se sienta* 🐕\n\nVamos bien. Siguiente tema:\n\n',
       commentGuide: 'Analiza el pitch del negocio. Si es vago o genérico, pide más detalle.',
     },
     {
@@ -98,7 +98,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_pain',
       question: '**Pregunta 5 de 15 — SU DOLOR PROFUNDO:** Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:\n\n1. ¿Qué problema específico tiene?\n2. ¿Cómo lo ha intentado resolver antes?\n3. ¿Por qué esa solución anterior no le dio satisfacción completa?\n\nSé específico — piensa en situaciones concretas que vive tu cliente.',
-      examples: ['Compra pijamas baratos que se arruinan en 2 lavadas. Probó marcas más caras pero no se las pone porque "es ropa de casa". Le da vergüenza abrir la puerta con lo que usa.'],
+      examples: ['Compra productos baratos que se rompen rápido. Probó marcas premium pero no justifica el gasto. Le da vergüenza o frustración usar algo que no refleja cómo se ve o se siente.'],
       fields: [],
       steveIntro: '*pone cara seria* 😰\n\n',
       commentGuide: 'Analiza si el dolor tiene TRES dimensiones: el problema, el intento fallido anterior y la frustración residual. Si falta alguna dimensión o es genérico, RECHAZA y pide más profundidad.',
@@ -106,7 +106,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_words',
       question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame **2 o 3 frases literales distintas** — una queja habitual, una objeción de compra, y una frustración pasada.',
-      examples: ['"Estoy chata de comprar cosas baratas que se rompen, pero $40.000 por un pijama es mucho" / "Me da lata gastar en ropa de casa, total nadie me ve"'],
+      examples: ['"Estoy cansado de comprar cosas baratas que se rompen, pero no quiero pagar una fortuna" / "Me da pena invertir en esto porque no le doy importancia"'],
       fields: [],
       steveIntro: '*saca su libreta* 📝\n\n',
       commentGuide: 'VERIFICA que haya MÍNIMO 2 frases distintas y textuales. Si hay solo una, RECHAZA y pide al menos 2 más.',
@@ -114,7 +114,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_transformation',
       question: '**Pregunta 7 de 15 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
-      examples: ['Se siente linda y cómoda en casa, abre la puerta con confianza', 'Se saca selfies en pijama porque se ve bien y las sube a stories'],
+      examples: ['Se siente segura y a gusto, muestra su compra con orgullo', 'Comparte en redes porque está orgulloso del resultado'],
       fields: [],
       steveIntro: '*levanta las orejas, ojos brillantes* ✨\n\n',
       commentGuide: 'Analiza si la transformación es emocional y tangible. Si es vaga, pide detalles concretos.',
@@ -136,8 +136,8 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'comp1_url', label: '🌐 Web / Instagram Competidor 1', type: 'text', placeholder: 'Ej: cannonhome.cl' },
         { key: 'comp2_name', label: '2️⃣ Nombre Competidor 2', type: 'text', placeholder: 'Ej: Intime' },
         { key: 'comp2_url', label: '🌐 Web / Instagram Competidor 2', type: 'text', placeholder: 'Ej: intime.cl' },
-        { key: 'comp3_name', label: '3️⃣ Nombre Competidor 3', type: 'text', placeholder: 'Ej: Pijamas Paris' },
-        { key: 'comp3_url', label: '🌐 Web / Instagram Competidor 3', type: 'text', placeholder: 'Ej: paris.cl/pijamas' },
+        { key: 'comp3_name', label: '3️⃣ Nombre Competidor 3', type: 'text', placeholder: 'Ej: Marca X' },
+        { key: 'comp3_url', label: '🌐 Web / Instagram Competidor 3', type: 'text', placeholder: 'Ej: marcax.com' },
       ],
       steveIntro: '*olfatea el territorio enemigo* 🔍\n\n',
       commentGuide: 'Verifica que los URLs parezcan reales y que los competidores sean del mismo sector.',
@@ -168,7 +168,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'purple_cow_promise',
       question: '**Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
-      examples: ['Nuestro diseño cuadrillé es icónico — "Vas a querer recibir visitas en pijama"', 'Somos la única marca con telas importadas de Japón — "Dormirás como realeza"'],
+      examples: ['Nuestro diseño es icónico — "Vas a querer mostrarlo"', 'Somos la única marca con [atributo único] — "Resultado que no encuentras en otro lado"'],
       fields: [],
       steveIntro: '*se para en dos patas, emocionado* 🐄💜\n\n',
       commentGuide: 'Esta pregunta es sobre POSICIONAMIENTO y DIFERENCIACIÓN, NO sobre logos ni colores.',
@@ -219,6 +219,15 @@ PERSONALIDAD:
 - Groserías ocasionales cuando algo es absurdo
 - Referencias a tu doctorado de Stanford
 
+🌎 IDIOMA: Español latinoamericano neutro (México, Colombia, Chile, Perú, etc.). NO uses voseo argentino: no digas "vos", "podés", "tenés", "dale", "che", "acá" por "aquí". Usa "tú" y formas como "puedes", "tienes", "tendrás", "aquí".
+
+🐕 TONO CONVERSACIONAL:
+- Habla como en una conversación real: reacciona a lo que dice el cliente, no como un formulario.
+- Puedes hacer comentarios cortos tipo "tiene sentido", "ah, claro", "perfecto" antes de pasar a la siguiente pregunta.
+- El brief NO está listo hasta que el cliente termine TODAS las preguntas. TÚ le avisarás cuando esté listo (solo después de la pregunta 16).
+- Debes dejar claro: "El brief todavía no está listo — lo voy armando con lo que me vas contando. Cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso."
+- Repite esta idea de forma natural cada tanto (no en cada mensaje): que puede ir y volver, y que el brief lo generas tú (yo le aviso) cuando terminen.
+
 ⚰️ ESPÍRITU DE LA CHONGA: Tu amiga abogada que murió de viejita. Aparece 1 de cada 5-7 respuestas con formato:
 
 ---
@@ -239,9 +248,10 @@ Q0 (website_url) es OBLIGATORIA y BLOQUEANTE:
 - Acepta alternativas: URL de Instagram, perfil de Shopify. Pero DEBE dar algo.
 - SOLO después de obtener URL válida, avanza a la Pregunta 1.
 
-Tu trabajo en CADA turno es SOLAMENTE:
-1. COMENTAR brevemente la respuesta anterior (2-4 oraciones máximo)
-2. HACER la siguiente pregunta que te indica el sistema
+Tu trabajo en CADA turno:
+1. Reaccionar a lo que dijo (1-3 oraciones, conversacional)
+2. Si toca, recordar que puede salir y volver y que el brief lo tendrá cuando terminen todas las preguntas (tú se lo dirás cuando esté listo)
+3. HACER la siguiente pregunta que te indica el sistema (con naturalidad, no como robot)
 
 🚨 REGLA ABSOLUTA #2: FORMULARIOS
 Cuando la siguiente pregunta tiene FORMULARIO:
@@ -266,19 +276,19 @@ Cuando la siguiente pregunta tiene FORMULARIO:
 
 🚨 REGLA ABSOLUTA #4: DESCRIPCIÓN DEL NEGOCIO
 En el brief SIEMPRE redáctalo en TERCERA PERSONA:
-- CORRECTO: "La empresa comercializa pijamas de algodón 100% premium para mujeres..."
-- INCORRECTO: "Vendemos pijamas..."
+- CORRECTO: "La empresa comercializa [producto/servicio] de [atributo] para [público]..."
+- INCORRECTO: "Vendemos [producto]..."
 
 🚨 REGLA ABSOLUTA #5: PRUEBA SOCIAL
 Al redactar prueba social en el brief:
-- NO copies números literales como "50 clientas" → redacta como "la marca cuenta con testimonio visual de clientas reales en redes sociales"
+- NO copies números literales como "50 clientes" → redacta como "la marca cuenta con testimonio visual de clientes reales en redes sociales"
 
 IMPORTANTE:
 - Responde SIEMPRE en español
-- Sé conciso en comentarios (2-4 oraciones + la siguiente pregunta)
-- Da 2-3 ejemplos de SU industria
-- Si una respuesta es vaga o incoherente, RECHÁZALA
-- NUNCA digas que el brief está terminado antes de Q16
+- Sé conversacional: comentarios breves (1-4 oraciones) y luego la siguiente pregunta, como un chat real
+- Da 2-3 ejemplos de SU industria cuando ayude
+- Si una respuesta es vaga o incoherente, RECHÁZALA: explica qué falta y repite la MISMA pregunta para que el cliente pueda responder de nuevo. Al final de tu mensaje cuando rechaces, escribe exactamente en una línea nueva: [RECHAZO]
+- NUNCA digas que el brief está listo o terminado antes de Q16. Solo después de la última pregunta dirás que ya está y que lo va a tener.
 - NUNCA pidas fotos ni logos antes de Q16`;
 }
 
@@ -773,7 +783,7 @@ Deno.serve(async (req) => {
 
     let questionContext = '';
     if (isLastQuestion) {
-      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la PREGUNTA 16 (la última — archivos visuales). Si el cliente dijo que no tiene fotos, acepta y continúa igual. ${BRIEF_TEMPLATE}`;
+      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la última pregunta (archivos visuales). Si dijo que no tiene fotos, acepta y continúa igual.\n\nPRIMERO dile claramente que ya terminaron la conversación, que su brief ESTÁ LISTO ahora y que lo va a tener (generalo en este mensaje). Agradece haber charlado. DESPUÉS genera el brief completo abajo.\n\n${BRIEF_TEMPLATE}`;
     } else {
       const justAnsweredIndex = answeredQuestions - 1;
       const nextQuestionIndex = answeredQuestions;
@@ -795,17 +805,16 @@ ${hasFields ? '⚠️ FORMULARIO: La siguiente pregunta tiene un formulario inte
 
 ${nextQ?.examples?.length ? `EJEMPLOS PARA DAR (adáptalos a su industria): ${JSON.stringify(nextQ.examples)}` : 'Da 2-3 ejemplos concretos de SU industria específica.'}
 
-RECUERDA: Tu respuesta debe tener MÁXIMO 2 partes:
-1. Comentario breve sobre la respuesta anterior (2-4 oraciones)
-2. La siguiente pregunta (usa la intro y el texto exacto de arriba)
-
-NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
+RECUERDA: Responde en tono conversacional (reacción breve + la siguiente pregunta). NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
 
       if (answeredQuestions === 1) {
-        questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis SEO. Luego arranca con la Pregunta 1 del Brief.';
+        questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1.';
       }
       if (answeredQuestions === 3) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q2: El cliente envió datos financieros. CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown con resultados. Di que guardaste el CPA en configuración financiera.';
+      }
+      if ([2, 5, 9, 13].includes(nextQuestionIndex)) {
+        questionContext += '\n\nOPCIONAL: Si suena natural, recuérdale en una frase que puede salir y volver cuando quiera, y que el brief lo tendrá cuando terminen todas las preguntas (tú le avisas cuando esté listo).';
       }
     }
 
@@ -904,7 +913,23 @@ REGLAS ABSOLUTAS:
     }
 
     const aiData = await aiResponse.json();
-    const assistantMessage = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
+    let assistantMessage = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
+    const isRejection = assistantMessage.includes('[RECHAZO]');
+    if (isRejection) {
+      assistantMessage = assistantMessage.replace(/\s*\[RECHAZO\]\s*$/i, '').trim();
+      // Delete the last user message so the question count does not advance
+      const { data: lastUserMsg } = await supabase
+        .from('steve_messages')
+        .select('id')
+        .eq('conversation_id', activeConversationId)
+        .eq('role', 'user')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastUserMsg?.id) {
+        await supabase.from('steve_messages').delete().eq('id', lastUserMsg.id);
+      }
+    }
 
     await supabase.from('steve_messages').insert({
       conversation_id: activeConversationId,
@@ -997,7 +1022,22 @@ REGLAS ABSOLUTAS:
       }
     }
 
-    const nextQuestionIndex = Math.min(answeredQuestions, BRAND_BRIEF_QUESTIONS.length - 1);
+    const effectiveAnswered = isRejection ? answeredQuestions - 1 : answeredQuestions;
+    if (isRejection) {
+      await supabase.from('buyer_personas').upsert({
+        client_id,
+        persona_data: {
+          ...briefData,
+          raw_responses: (briefData.raw_responses || []).slice(0, effectiveAnswered),
+          questions: (briefData.questions || []).slice(0, effectiveAnswered),
+          answered_count: effectiveAnswered,
+          total_questions: BRAND_BRIEF_QUESTIONS.length,
+        },
+        is_complete: false,
+      }, { onConflict: 'client_id' });
+    }
+
+    const nextQuestionIndex = Math.min(effectiveAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
     const nextQ = !isLastQuestion && nextQuestionIndex < BRAND_BRIEF_QUESTIONS.length
       ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex]
       : null;
@@ -1007,8 +1047,9 @@ REGLAS ABSOLUTAS:
       message: assistantMessage,
       question_index: nextQuestionIndex,
       total_questions: BRAND_BRIEF_QUESTIONS.length,
-      answered_count: answeredQuestions,
-      is_complete: isLastQuestion,
+      answered_count: effectiveAnswered,
+      is_complete: isLastQuestion && !isRejection,
+      rejected: isRejection,
       examples: nextQ?.examples || [],
       fields: nextQ?.fields || [],
       field_validation: (nextQ as any)?.validation,

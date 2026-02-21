@@ -302,6 +302,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
           setCurrentFields(data.fields);
           setFieldValidation(data.field_validation);
         }
+        if (data.rejected) {
+          setShowInteraction(true);
+          toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
+        }
         if (data.is_complete) {
           setIsComplete(true);
           setShowAssetUpload(false);
