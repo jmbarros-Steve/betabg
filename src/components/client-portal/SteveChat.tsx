@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Send, User, Sparkles, RefreshCw, Upload, X, Loader2 } from 'lucide-react';
+import { Send, User, Sparkles, RefreshCw, Upload, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
@@ -58,6 +58,27 @@ function parseMessageWithChonga(content: string) {
   return parts;
 }
 
+// Orden igual que en steve-chat (17 preguntas). Para "Ahora: X" y resumen "Lo que ya respondiste".
+const BRIEF_QUESTION_LABELS = [
+  'URL de tu sitio web',
+  'Tu negocio (pitch)',
+  'Números (precio, costo, fase)',
+  'Canales de venta',
+  'Cliente ideal (buyer persona)',
+  'Dolor del cliente',
+  'Palabras y objeciones del cliente',
+  'La transformación (después de usarte)',
+  'Estilo de vida del cliente',
+  '3 competidores (con URLs)',
+  'Análisis de competidores',
+  'Tu ventaja incopiable',
+  'Vaca púrpura y gran promesa',
+  'Villano y garantía',
+  'Prueba social y tono',
+  'Identidad visual (colores, estilo)',
+  'Archivos visuales (logo y fotos)',
+];
+
 interface SteveChatProps {
   clientId: string;
 }
@@ -79,8 +100,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [uploadedAssets, setUploadedAssets] = useState<{ logo: string[]; products: string[] }>({ logo: [], products: [] });
   // Delay showing the next interaction block so user can read Steve's response
   const [showInteraction, setShowInteraction] = useState(true);
-  // Track the last question context label for display
-  const [lastQuestionLabel, setLastQuestionLabel] = useState<string | null>(null);
+  const [currentQuestionLabel, setCurrentQuestionLabel] = useState<string | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -206,7 +227,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
         if (existingMessages && existingMessages.length > 0) {
           setMessages(existingMessages as Message[]);
           const userMsgCount = existingMessages.filter(m => m.role === 'user').length;
-          setProgress({ answered: userMsgCount, total: 15 });
+          setProgress({ answered: userMsgCount, total: 17 });
+          setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(userMsgCount, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
           
           const { data: persona } = await supabase
             .from('buyer_personas')
@@ -251,7 +273,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
           content: WELCOME_MESSAGE,
           created_at: new Date().toISOString(),
         }]);
-        setProgress({ answered: 0, total: data.total_questions || 15 });
+        setProgress({ answered: 0, total: data.total_questions ?? 17 });
+        setCurrentQuestionLabel(data.current_question_label ?? BRIEF_QUESTION_LABELS[0]);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -295,8 +318,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
         };
         setMessages(prev => [...prev, assistantMsg]);
         if (data.answered_count !== undefined) {
-          setProgress({ answered: data.answered_count, total: data.total_questions || 15 });
+          setProgress({ answered: data.answered_count, total: data.total_questions ?? 17 });
         }
+        if (data.current_question_label != null) setCurrentQuestionLabel(data.current_question_label);
+        else if (data.answered_count != null && !data.is_complete) setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(data.answered_count, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
         if (data.examples?.length) setExamples(data.examples);
         if (data.fields?.length) {
           setCurrentFields(data.fields);
@@ -347,7 +372,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setMessages([]);
     setConversationId(null);
     setIsComplete(false);
-    setProgress({ answered: 0, total: 15 });
+    setProgress({ answered: 0, total: 17 });
     setExamples([]);
     setCurrentFields([]);
     setFieldValidation(undefined);
@@ -363,9 +388,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const progressPercent = Math.round((progress.answered / progress.total) * 100);
   const hasStructuredFields = currentFields.length > 0 && !isLoading && !isComplete;
 
-  // Get the last user message for context reference
+  const userMessagesOrdered = messages.filter(m => m.role === 'user');
+  const summaryItems = userMessagesOrdered.map((msg, i) => ({
+    label: BRIEF_QUESTION_LABELS[i] ?? `Pregunta ${i + 1}`,
+    content: msg.content,
+    excerpt: msg.content.length > 60 ? msg.content.slice(0, 60).trim() + '…' : msg.content,
+  }));
+
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
-  // Get the last assistant message before any loading state
   const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
 
   if (isInitializing) {
@@ -423,9 +453,36 @@ export function SteveChat({ clientId }: SteveChatProps) {
               <span className="font-medium text-foreground">{progressPercent}% ({progress.answered}/{progress.total})</span>
             </div>
             <Progress value={progressPercent} className="h-2" />
+            {currentQuestionLabel && (
+              <p className="text-xs text-primary font-medium mt-1.5">Ahora: {currentQuestionLabel}</p>
+            )}
           </div>
         )}
       </CardHeader>
+
+      {/* Resumen de lo que ya respondiste — colapsable */}
+      {summaryItems.length > 0 && !isComplete && (
+        <div className="border-b px-4 py-2 flex-shrink-0 bg-muted/30">
+          <button
+            type="button"
+            onClick={() => setShowSummary(!showSummary)}
+            className="flex items-center gap-2 w-full text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            {showSummary ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            Lo que ya respondiste ({summaryItems.length})
+          </button>
+          {showSummary && (
+            <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
+              {summaryItems.map((item, i) => (
+                <div key={i} className="text-xs">
+                  <span className="font-medium text-foreground">{i + 1}. {item.label}</span>
+                  <p className="text-muted-foreground truncate pl-0.5">{item.excerpt}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -619,6 +676,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
       {/* Input */}
       <div className="p-4 border-t flex-shrink-0">
+        {!isComplete && currentQuestionLabel && (
+          <p className="text-xs text-muted-foreground mb-2">Responde sobre: <span className="font-medium text-foreground">{currentQuestionLabel}</span></p>
+        )}
         {isComplete ? (
           <div className="text-center py-2">
             <p className="text-sm text-muted-foreground mb-2">
@@ -639,7 +699,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe tu respuesta..."
+              placeholder={examples.length > 0 ? "Usa un ejemplo de arriba o escribe con tus palabras..." : "Escribe tu respuesta..."}
               disabled={isLoading}
               className="flex-1"
             />

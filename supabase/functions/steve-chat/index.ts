@@ -12,6 +12,7 @@ interface ChatMessage {
 
 interface BriefQuestion {
   id: string;
+  shortLabel: string; // Para UI: "Ahora: [shortLabel]"
   question: string;
   examples: string[];
   fields: Array<{ key: string; label: string; type: string; placeholder?: string; prefix?: string; suffix?: string }>;
@@ -24,6 +25,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
   return [
     {
       id: 'website_url',
+      shortLabel: 'URL de tu sitio web',
       question: '**Antes de empezar — NECESITO TU PÁGINA WEB:**\n\nSin tu URL no puedo hacer el análisis SEO, compararte con la competencia ni generar el brief completo. 🌐\n\n**¿Cuál es tu sitio web o tienda online?**\n\n(Si todavía no tienes, escribe "sin web" y te explico qué hacemos en ese caso)',
       examples: ['www.mitienda.cl', 'mitienda.myshopify.com', 'www.mimarca.com.ar'],
       fields: [{ key: 'url', label: '🌐 URL de tu sitio web o tienda online', type: 'text', placeholder: 'Ej: www.mitienda.cl' }],
@@ -32,6 +34,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'business_pitch',
+      shortLabel: 'Tu negocio (pitch)',
       question: '**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.',
       examples: ['Vendemos ropa deportiva premium para mujeres', 'Somos una agencia de diseño web para pymes', 'Tenemos una tienda de cosmética natural en Shopify'],
       fields: [],
@@ -40,6 +43,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'numbers',
+      shortLabel: 'Números (precio, costo, fase)',
       question: '**Pregunta 2 de 15 — LOS NÚMEROS:**\n\nNecesito la carne de tu negocio. **Llena los campos del formulario que aparece abajo** y yo calculo tu **Margen Bruto** y tu **CPA Máximo Viable**. 💰',
       examples: [],
       fields: [
@@ -64,6 +68,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'sales_channels',
+      shortLabel: 'Canales de venta',
       question: '**Pregunta 3 de 15 — CANALES DE VENTA:**\n\nPonle porcentaje a cada canal en los campos del formulario abajo. **Deben sumar 100%.** Si no usas un canal, déjalo en 0. 🐕📝',
       examples: [],
       fields: [
@@ -80,6 +85,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'persona_profile',
+      shortLabel: 'Cliente ideal (buyer persona)',
       question: '**Pregunta 4 de 15 — TU CLIENTE IDEAL (Buyer Persona):**\n\nLlena los 8 campos del formulario abajo para construir el perfil de tu cliente ideal.',
       examples: [],
       fields: [
@@ -97,6 +103,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'persona_pain',
+      shortLabel: 'Dolor del cliente',
       question: '**Pregunta 5 de 15 — SU DOLOR PROFUNDO:** Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:\n\n1. ¿Qué problema específico tiene?\n2. ¿Cómo lo ha intentado resolver antes?\n3. ¿Por qué esa solución anterior no le dio satisfacción completa?\n\nSé específico — piensa en situaciones concretas que vive tu cliente.',
       examples: ['Compra productos baratos que se rompen rápido. Probó marcas premium pero no justifica el gasto. Le da vergüenza o frustración usar algo que no refleja cómo se ve o se siente.'],
       fields: [],
@@ -105,6 +112,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'persona_words',
+      shortLabel: 'Palabras y objeciones del cliente',
       question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame **2 o 3 frases literales distintas** — una queja habitual, una objeción de compra, y una frustración pasada.',
       examples: ['"Estoy cansado de comprar cosas baratas que se rompen, pero no quiero pagar una fortuna" / "Me da pena invertir en esto porque no le doy importancia"'],
       fields: [],
@@ -113,6 +121,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'persona_transformation',
+      shortLabel: 'La transformación (después de usarte)',
       question: '**Pregunta 7 de 15 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
       examples: ['Se siente segura y a gusto, muestra su compra con orgullo', 'Comparte en redes porque está orgulloso del resultado'],
       fields: [],
@@ -121,6 +130,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'persona_lifestyle',
+      shortLabel: 'Estilo de vida del cliente',
       question: '**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers sigue?',
       examples: ['Compra en Zara y H&M, usa Netflix, scrollea Instagram y TikTok, sigue a influencers de lifestyle'],
       fields: [],
@@ -129,6 +139,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'competitors',
+      shortLabel: '3 competidores (con URLs)',
       question: '**Pregunta 9 de 15 — COMPETENCIA:**\n\nNecesito **EXACTAMENTE 3 competidores** con su página web o Instagram. Llena los campos del formulario abajo.\n\n⚠️ **Sin 3 competidores con URLs NO avanzamos.**',
       examples: [],
       fields: [
@@ -144,6 +155,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'competitors_weakness',
+      shortLabel: 'Análisis de competidores',
       question: '**Pregunta 10 de 15 — ANÁLISIS COMPETITIVO:**\n\nPara cada uno de tus 3 competidores, llena los campos del formulario abajo: qué promete y no cumple, y por qué TÚ lo haces mejor.',
       examples: [],
       fields: [
@@ -159,6 +171,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'your_advantage',
+      shortLabel: 'Tu ventaja incopiable',
       question: '**Pregunta 11 de 15 — TU VENTAJA INCOPIABLE:** ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?',
       examples: ['Nuestro proceso de estampado es artesanal y cada pieza es única', 'Somos los únicos con una línea de tallas inclusivas hasta la 5XL en este estilo premium'],
       fields: [],
@@ -167,6 +180,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'purple_cow_promise',
+      shortLabel: 'Vaca púrpura y gran promesa',
       question: '**Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
       examples: ['Nuestro diseño es icónico — "Vas a querer mostrarlo"', 'Somos la única marca con [atributo único] — "Resultado que no encuentras en otro lado"'],
       fields: [],
@@ -175,6 +189,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'villain_guarantee',
+      shortLabel: 'Villano y garantía',
       question: '**Pregunta 13 de 15 — EL VILLANO:** ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea quieres erradicar del mercado?\n\n¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?',
       examples: ['El villano es la "fachatez": la idea de que está bien verse mal en casa — Garantía: si no te sientes más linda, te devolvemos la plata'],
       fields: [],
@@ -183,6 +198,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'proof_tone',
+      shortLabel: 'Prueba social y tono',
       question: '**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes)\n\n¿Y qué TONO de comunicación conecta con tu cliente?',
       examples: ['Tenemos 200 reviews en Google con promedio 4.8 — Tono cercano y gracioso, como hablar con tu mejor amiga'],
       fields: [],
@@ -191,6 +207,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'brand_identity',
+      shortLabel: 'Identidad visual (colores, estilo)',
       question: '**Pregunta 15 de 16 — IDENTIDAD VISUAL Y TONO:**\n\nCuéntame sobre la identidad visual de tu marca:\n\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n- ✍️ **¿Tienes un manual de marca o guía de estilo?**',
       examples: ['Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista', 'No tengo manual de marca pero me gusta el estilo de Apple — limpio y premium'],
       fields: [],
@@ -199,6 +216,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     },
     {
       id: 'brand_assets_upload',
+      shortLabel: 'Archivos visuales (logo y fotos)',
       question: '**Pregunta 16 de 16 — ARCHIVOS VISUALES (OBLIGATORIA):**\n\nPerfecto, tengo todo lo que necesito para tu estrategia.\nAntes de generar el análisis, necesito que subas:\n\n📸 **Logo de tu marca** (PNG o JPG)\n📦 **Fotos de tu producto principal** (mínimo 2)\n🖼 **Referencias visuales de anuncios que te gusten** (opcional)\n\nEstos archivos los usaré para crear tus creatividades y asegurarme que todo refleje tu marca correctamente.\n\n📤 **Usa los botones de subida que aparecen AQUÍ ABAJO en el chat.**\n\nSi no tienes fotos ahora, escribe "no tengo fotos" y continuamos igual.',
       examples: ['Ya subí mi logo y 3 fotos de productos', 'No tengo fotos ahora pero las subo después'],
       fields: [],
@@ -250,8 +268,10 @@ Q0 (website_url) es OBLIGATORIA y BLOQUEANTE:
 
 Tu trabajo en CADA turno:
 1. Reaccionar a lo que dijo (1-3 oraciones, conversacional)
-2. Si toca, recordar que puede salir y volver y que el brief lo tendrá cuando terminen todas las preguntas (tú se lo dirás cuando esté listo)
-3. HACER la siguiente pregunta que te indica el sistema (con naturalidad, no como robot)
+2. Si el cliente hace una pregunta o pide aclaración, respóndele brevemente y luego sigue con la siguiente pregunta del cuestionario. La conversación puede fluir (preguntas suyas, dudas) pero siempre basada en las preguntas tipo en orden.
+3. Puedes ofrecer: "¿Tienes alguna duda sobre esto antes de seguir?" cuando tenga sentido. Si dice que no, pasa a la siguiente pregunta.
+4. Si toca, recordar que puede salir y volver y que el brief lo tendrá cuando terminen todas las preguntas (tú se lo dirás cuando esté listo)
+5. HACER la siguiente pregunta que te indica el sistema (con naturalidad, no como robot)
 
 🚨 REGLA ABSOLUTA #2: FORMULARIOS
 Cuando la siguiente pregunta tiene FORMULARIO:
@@ -707,6 +727,8 @@ Deno.serve(async (req) => {
         message: introMessage,
         question_index: 0,
         total_questions: BRAND_BRIEF_QUESTIONS.length,
+        current_question_id: firstQ.id,
+        current_question_label: firstQ.shortLabel,
         examples: firstQ.examples,
         fields: firstQ.fields,
         field_validation: (firstQ as any).validation,
@@ -718,6 +740,15 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // CRITICAL: If last turn was a rejection, we're in "retry" mode — same question, don't advance
+    const { data: convRow } = await supabase
+      .from('steve_conversations')
+      .select('pending_question_index')
+      .eq('id', activeConversationId)
+      .maybeSingle();
+    const pendingQuestionIndex = convRow?.pending_question_index ?? null;
+    const isRetryMode = pendingQuestionIndex != null;
 
     await supabase.from('steve_messages').insert({
       conversation_id: activeConversationId,
@@ -739,13 +770,17 @@ Deno.serve(async (req) => {
 
     const userMessages = messages?.filter(m => m.role === 'user') || [];
     const answeredQuestions = userMessages.length;
-    const isLastQuestion = answeredQuestions >= BRAND_BRIEF_QUESTIONS.length;
+    const effectiveAnswered = isRetryMode ? pendingQuestionIndex! : answeredQuestions;
+    const isLastQuestion = effectiveAnswered >= BRAND_BRIEF_QUESTIONS.length;
+
+    // Use only accepted answers for brief (when retry, don't include the retry until accepted)
+    const acceptedResponses = userMessages.slice(0, effectiveAnswered);
 
     // Extract fase_negocio and presupuesto_ads from Q2 response (index 2 = after Q0 + Q1 + Q2)
     let faseNegocio = '';
     let presupuestoAds = '';
-    if (userMessages.length >= 3) {
-      const q2Resp = userMessages[2]?.content || '';
+    if (acceptedResponses.length >= 3) {
+      const q2Resp = acceptedResponses[2]?.content || '';
       const faseMatch = q2Resp.match(/Fase\s+(Inicial|Crecimiento|Escalado|Avanzada)/i);
       if (faseMatch) faseNegocio = `Fase ${faseMatch[1]}`;
       const presupuestoMatch = q2Resp.match(/(?:Menos de \$100\.000|(?:\$100\.000\s*-\s*\$500\.000)|(?:\$500\.000\s*-\s*\$2\.000\.000)|Más de \$2\.000\.000)\s*CLP/i);
@@ -753,9 +788,9 @@ Deno.serve(async (req) => {
     }
 
     const briefData = {
-      raw_responses: userMessages.map(m => m.content),
-      questions: BRAND_BRIEF_QUESTIONS.slice(0, answeredQuestions).map(q => q.id),
-      answered_count: answeredQuestions,
+      raw_responses: acceptedResponses.map(m => m.content),
+      questions: BRAND_BRIEF_QUESTIONS.slice(0, effectiveAnswered).map(q => q.id),
+      answered_count: effectiveAnswered,
       total_questions: BRAND_BRIEF_QUESTIONS.length,
       fase_negocio: faseNegocio || undefined,
       presupuesto_ads: presupuestoAds || undefined,
@@ -767,9 +802,9 @@ Deno.serve(async (req) => {
       is_complete: isLastQuestion,
     }, { onConflict: 'client_id' });
 
-    if (answeredQuestions === 1) {
+    if (effectiveAnswered === 1) {
       try {
-        const urlResponse = userMessages[0]?.content || '';
+        const urlResponse = acceptedResponses[0]?.content || '';
         const urlMatch = urlResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+(?:\.[\w-]+)+(?:\/\S*)?/i);
         if (urlMatch) {
           await supabase.from('clients').update({
@@ -785,15 +820,22 @@ Deno.serve(async (req) => {
     if (isLastQuestion) {
       questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la última pregunta (archivos visuales). Si dijo que no tiene fotos, acepta y continúa igual.\n\nPRIMERO dile claramente que ya terminaron la conversación, que su brief ESTÁ LISTO ahora y que lo va a tener (generalo en este mensaje). Agradece haber charlado. DESPUÉS genera el brief completo abajo.\n\n${BRIEF_TEMPLATE}`;
     } else {
-      const justAnsweredIndex = answeredQuestions - 1;
-      const nextQuestionIndex = answeredQuestions;
+      const justAnsweredIndex = isRetryMode ? effectiveAnswered : answeredQuestions - 1;
+      const nextQuestionIndex = isRetryMode ? effectiveAnswered : answeredQuestions;
       const nextQ = BRAND_BRIEF_QUESTIONS[nextQuestionIndex];
       const justAnsweredQ = BRAND_BRIEF_QUESTIONS[justAnsweredIndex];
       const hasFields = nextQ?.fields?.length > 0;
       const justAnsweredLabel = justAnsweredIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${justAnsweredIndex} de 16 (${justAnsweredQ?.id})`;
       const nextLabel = nextQuestionIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${nextQuestionIndex} de 16`;
 
-      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══
+      const retryBlock = isRetryMode ? `
+🚨 RETRY: La respuesta anterior del cliente a esta pregunta fue RECHAZADA. Su ÚLTIMO mensaje es un NUEVO intento para la MISMA pregunta (${justAnsweredLabel}).
+- EVALÚA ese último mensaje. Si está bien: comenta brevemente y haz la SIGUIENTE pregunta (${nextLabel}).
+- Si sigue incompleto o vago: explica qué falta y repite la MISMA pregunta. Al final escribe [RECHAZO].
+- NO avances a la siguiente pregunta hasta que aceptes su respuesta.` : '';
+
+      questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══${retryBlock}
+
 PREGUNTA RECIÉN RESPONDIDA: ${justAnsweredLabel}
 GUÍA PARA COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
 
@@ -805,12 +847,12 @@ ${hasFields ? '⚠️ FORMULARIO: La siguiente pregunta tiene un formulario inte
 
 ${nextQ?.examples?.length ? `EJEMPLOS PARA DAR (adáptalos a su industria): ${JSON.stringify(nextQ.examples)}` : 'Da 2-3 ejemplos concretos de SU industria específica.'}
 
-RECUERDA: Responde en tono conversacional (reacción breve + la siguiente pregunta). NO preguntes NADA que no sea la ${nextLabel}. NO anticipes temas futuros.`;
+RECUERDA: Responde en tono conversacional. Puedes preguntar "¿Tienes alguna duda sobre esto antes de seguir?" si aplica. NO preguntes NADA que no sea la ${nextLabel} (o aclarar esta misma). NO anticipes temas futuros.`;
 
-      if (answeredQuestions === 1) {
+      if (!isRetryMode && answeredQuestions === 1) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1.';
       }
-      if (answeredQuestions === 3) {
+      if (!isRetryMode && answeredQuestions === 3) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q2: El cliente envió datos financieros. CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown con resultados. Di que guardaste el CPA en configuración financiera.';
       }
       if ([2, 5, 9, 13].includes(nextQuestionIndex)) {
@@ -879,7 +921,7 @@ REGLAS ABSOLUTAS:
       ...messages!.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
-    console.log(`Steve chat: conversation ${activeConversationId}, answered ${answeredQuestions}/${BRAND_BRIEF_QUESTIONS.length}`);
+    console.log(`Steve chat: conversation ${activeConversationId}, effectiveAnswered ${effectiveAnswered}${isRetryMode ? ' (retry)' : ''}/${BRAND_BRIEF_QUESTIONS.length}`);
 
     const maxTokens = isLastQuestion ? 8000 : 1200;
 
@@ -917,7 +959,6 @@ REGLAS ABSOLUTAS:
     const isRejection = assistantMessage.includes('[RECHAZO]');
     if (isRejection) {
       assistantMessage = assistantMessage.replace(/\s*\[RECHAZO\]\s*$/i, '').trim();
-      // Delete the last user message so the question count does not advance
       const { data: lastUserMsg } = await supabase
         .from('steve_messages')
         .select('id')
@@ -929,6 +970,9 @@ REGLAS ABSOLUTAS:
       if (lastUserMsg?.id) {
         await supabase.from('steve_messages').delete().eq('id', lastUserMsg.id);
       }
+      await supabase.from('steve_conversations').update({ pending_question_index: effectiveAnswered }).eq('id', activeConversationId);
+    } else {
+      await supabase.from('steve_conversations').update({ pending_question_index: null }).eq('id', activeConversationId);
     }
 
     await supabase.from('steve_messages').insert({
@@ -937,7 +981,8 @@ REGLAS ABSOLUTAS:
       content: assistantMessage,
     });
 
-    if (answeredQuestions === 3) {
+    const finalAnswered = isRejection ? effectiveAnswered : (isRetryMode ? effectiveAnswered + 1 : answeredQuestions);
+    if (finalAnswered >= 3 && !isRejection) {
       try {
         const q2Response = userMessages[2]?.content || '';
         const numbers = q2Response.match(/\$?\d[\d.,]*/g)?.map((n: string) => parseFloat(n.replace(/[$.]/g, '').replace(',', '.'))) || [];
@@ -960,9 +1005,15 @@ REGLAS ABSOLUTAS:
       }
     }
 
-    if (isLastQuestion) {
+    if (finalAnswered >= BRAND_BRIEF_QUESTIONS.length && !isRejection) {
+      const completedBriefData = {
+        raw_responses: userMessages.slice(0, finalAnswered).map(m => m.content),
+        questions: BRAND_BRIEF_QUESTIONS.slice(0, finalAnswered).map(q => q.id),
+        answered_count: finalAnswered,
+        total_questions: BRAND_BRIEF_QUESTIONS.length,
+      };
       await supabase.from('buyer_personas').update({
-        persona_data: { ...briefData, summary: assistantMessage, completed_at: new Date().toISOString() },
+        persona_data: { ...completedBriefData, summary: assistantMessage, completed_at: new Date().toISOString() },
         is_complete: true,
       }).eq('client_id', client_id);
 
@@ -1022,7 +1073,6 @@ REGLAS ABSOLUTAS:
       }
     }
 
-    const effectiveAnswered = isRejection ? answeredQuestions - 1 : answeredQuestions;
     if (isRejection) {
       await supabase.from('buyer_personas').upsert({
         client_id,
@@ -1035,10 +1085,23 @@ REGLAS ABSOLUTAS:
         },
         is_complete: false,
       }, { onConflict: 'client_id' });
+    } else if (isRetryMode && finalAnswered > effectiveAnswered) {
+      await supabase.from('buyer_personas').upsert({
+        client_id,
+        persona_data: {
+          raw_responses: userMessages.slice(0, finalAnswered).map(m => m.content),
+          questions: BRAND_BRIEF_QUESTIONS.slice(0, finalAnswered).map(q => q.id),
+          answered_count: finalAnswered,
+          total_questions: BRAND_BRIEF_QUESTIONS.length,
+        },
+        is_complete: false,
+      }, { onConflict: 'client_id' });
     }
 
-    const nextQuestionIndex = Math.min(effectiveAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
-    const nextQ = !isLastQuestion && nextQuestionIndex < BRAND_BRIEF_QUESTIONS.length
+    const returnAnswered = isRejection ? effectiveAnswered : finalAnswered;
+    const nextQuestionIndex = Math.min(returnAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
+    const isComplete = returnAnswered >= BRAND_BRIEF_QUESTIONS.length;
+    const nextQ = !isComplete && nextQuestionIndex < BRAND_BRIEF_QUESTIONS.length
       ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex]
       : null;
 
@@ -1047,9 +1110,11 @@ REGLAS ABSOLUTAS:
       message: assistantMessage,
       question_index: nextQuestionIndex,
       total_questions: BRAND_BRIEF_QUESTIONS.length,
-      answered_count: effectiveAnswered,
-      is_complete: isLastQuestion && !isRejection,
+      answered_count: returnAnswered,
+      is_complete: isComplete,
       rejected: isRejection,
+      current_question_id: nextQ?.id ?? null,
+      current_question_label: nextQ?.shortLabel ?? null,
       examples: nextQ?.examples || [],
       fields: nextQ?.fields || [],
       field_validation: (nextQ as any)?.validation,
