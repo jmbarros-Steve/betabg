@@ -227,15 +227,15 @@ export function SteveChat({ clientId }: SteveChatProps) {
         if (existingMessages && existingMessages.length > 0) {
           setMessages(existingMessages as Message[]);
           const userMsgCount = existingMessages.filter(m => m.role === 'user').length;
-          setProgress({ answered: userMsgCount, total: 17 });
-          setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(userMsgCount, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
-          
           const { data: persona } = await supabase
             .from('buyer_personas')
-            .select('is_complete')
+            .select('is_complete, persona_data')
             .eq('client_id', clientId)
             .maybeSingle();
-          
+          const acceptedCount = (persona?.persona_data as { answered_count?: number } | null)?.answered_count;
+          const progressAnswered = typeof acceptedCount === 'number' ? acceptedCount : userMsgCount;
+          setProgress({ answered: progressAnswered, total: 17 });
+          setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(progressAnswered, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
           setIsComplete(persona?.is_complete || false);
         } else {
           await startNewConversation();
@@ -265,8 +265,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
       if (data?.conversation_id) {
         setConversationId(data.conversation_id);
-        // Show the hardcoded welcome message immediately (don't use the LLM-generated one
-        // to guarantee the exact text specified in requirements).
         setMessages([{
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -275,6 +273,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
         }]);
         setProgress({ answered: 0, total: data.total_questions ?? 17 });
         setCurrentQuestionLabel(data.current_question_label ?? BRIEF_QUESTION_LABELS[0]);
+        setExamples(data.examples ?? []);
+        setCurrentFields(data.fields ?? []);
+        setFieldValidation(data.field_validation);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);

@@ -273,12 +273,16 @@ Tu trabajo en CADA turno:
 4. Si toca, recordar que puede salir y volver y que el brief lo tendrá cuando terminen todas las preguntas (tú se lo dirás cuando esté listo)
 5. HACER la siguiente pregunta que te indica el sistema (con naturalidad, no como robot)
 
-🚨 REGLA ABSOLUTA #2: FORMULARIOS
+🚨 REGLA ABSOLUTA #2: FORMULARIOS Y EJEMPLOS
 Cuando la siguiente pregunta tiene FORMULARIO:
 - NUNCA escribas campos vacíos, tablas para rellenar
 - Solo di "Llena los campos del formulario abajo"
+Cuando el sistema te indica que hay "ejemplos clicables" debajo para el cliente:
+- NO escribas en tu mensaje una lista "Por ejemplo:" con otros ejemplos. El cliente ya verá botones con ejemplos fijos.
+- Solo invita a usarlos: "Puedes usar un ejemplo de abajo o escribir con tus palabras". Así tu texto y los botones coinciden.
 
-🚨 REGLA ABSOLUTA #3: NO CONFUNDAS CATEGORÍAS
+🚨 REGLA ABSOLUTA #3: NO CONFUNDAS PREGUNTAS NI TEMAS
+- Tu mensaje debe coincidir SIEMPRE con la pregunta que el sistema te indica como "SIGUIENTE PREGUNTA". Si la siguiente es Competidores (3 nombres + URLs), tu texto debe pedir ESO; si es Transformación, pedir ESO. NUNCA comentes ni rechaces algo de una pregunta anterior cuando ya estás en otra (ej. si la siguiente es Competidores, NO hables de transformación, dolor ni números).
 - Q0 = URL del sitio web (BLOQUEANTE)
 - Q1 = PITCH DEL NEGOCIO
 - Q5 = DOLOR del cliente
@@ -836,18 +840,20 @@ Deno.serve(async (req) => {
 
       questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══${retryBlock}
 
-PREGUNTA RECIÉN RESPONDIDA: ${justAnsweredLabel}
+⚠️ COINCIDE CON LO QUE VERÁ EL CLIENTE: Debajo el cliente verá el formulario o la caja de respuesta para la pregunta "${nextQ?.shortLabel ?? nextLabel}". Tu mensaje DEBE pedir exactamente eso. Si debajo hay campos de "Competidores" (nombres + URLs), tu texto debe pedir competidores; si hay campo libre, comenta solo la respuesta anterior y haz la siguiente pregunta. NUNCA hables de otro tema (ej. no pidas "más transformación" si la siguiente pregunta del sistema es Competidores).
+
+PREGUNTA RECIÉN RESPONDIDA (comenta solo esta): ${justAnsweredLabel}
 GUÍA PARA COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
 
-SIGUIENTE PREGUNTA QUE DEBES HACER: ${nextLabel}
+SIGUIENTE PREGUNTA QUE DEBES HACER (solo esta): ${nextLabel}
 INTRO DE STEVE: ${nextQ?.steveIntro || ''}
 TEXTO EXACTO DE LA PREGUNTA: ${nextQ?.question}
 
 ${hasFields ? '⚠️ FORMULARIO: La siguiente pregunta tiene un formulario interactivo. NO escribas los campos como texto. Solo di "Llena los campos del formulario abajo".' : ''}
 
-${nextQ?.examples?.length ? `EJEMPLOS PARA DAR (adáptalos a su industria): ${JSON.stringify(nextQ.examples)}` : 'Da 2-3 ejemplos concretos de SU industria específica.'}
+${nextQ?.examples?.length ? `⚠️ EJEMPLOS CLICABLES: El cliente verá debajo botones con estos ejemplos exactos: ${JSON.stringify(nextQ.examples)}. NO escribas en tu mensaje otra lista "Por ejemplo:" ni inventes ejemplos distintos. Solo di algo como "Puedes usar un ejemplo de abajo o escribir con tus palabras" y pega el TEXTO EXACTO de la pregunta de arriba. Así lo que lees y lo que ve el cliente coinciden.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (el cliente no tiene botones para esta pregunta).'}
 
-RECUERDA: Responde en tono conversacional. Puedes preguntar "¿Tienes alguna duda sobre esto antes de seguir?" si aplica. NO preguntes NADA que no sea la ${nextLabel} (o aclarar esta misma). NO anticipes temas futuros.`;
+REGLA CRÍTICA: Tu respuesta debe tener 1) comentario breve sobre la pregunta recién respondida (${justAnsweredLabel}) y 2) la siguiente pregunta (${nextLabel}). No menciones, rechaces ni pidas cosas de preguntas anteriores. Si la siguiente es "${nextQ?.shortLabel ?? nextLabel}", tu mensaje debe ser sobre eso.`;
 
       if (!isRetryMode && answeredQuestions === 1) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1.';
@@ -1099,11 +1105,9 @@ REGLAS ABSOLUTAS:
     }
 
     const returnAnswered = isRejection ? effectiveAnswered : finalAnswered;
-    const nextQuestionIndex = Math.min(returnAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
     const isComplete = returnAnswered >= BRAND_BRIEF_QUESTIONS.length;
-    const nextQ = !isComplete && nextQuestionIndex < BRAND_BRIEF_QUESTIONS.length
-      ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex]
-      : null;
+    const nextQuestionIndex = isComplete ? BRAND_BRIEF_QUESTIONS.length - 1 : Math.min(returnAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
+    const nextQ = !isComplete ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex] : null;
 
     return new Response(JSON.stringify({
       conversation_id: activeConversationId,
