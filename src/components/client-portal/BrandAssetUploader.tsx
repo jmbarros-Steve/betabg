@@ -71,7 +71,7 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
           <p className="text-sm font-semibold text-primary truncate">
             {progressStep.detail}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Analizando con el equipo de Marketing.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Analizando con equipo de Marketing Steve AI.</p>
         </div>
       </div>
 

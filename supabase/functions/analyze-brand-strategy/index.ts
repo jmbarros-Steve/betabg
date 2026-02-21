@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
 
     // Update progress to show AI phase
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Analizando con el equipo de Marketing', pct: 80, ts: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Analizando con equipo de Marketing Steve AI', pct: 80, ts: new Date().toISOString() } },
       { onConflict: 'client_id,research_type' }
     );
 

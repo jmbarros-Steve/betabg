@@ -395,10 +395,10 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
           <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary truncate">
-              {progressStep?.detail || 'Iniciando análisis de marca...'}
+              {progressStep?.detail || 'Analizando con equipo de Marketing Steve AI'}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Analizando con el equipo de Marketing.
+              Analizando con equipo de Marketing Steve AI.
             </p>
           </div>
         </div>
@@ -630,18 +630,21 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     // If executive_summary.summary is a stringified JSON (legacy AI response), parse and merge sections so UI shows SEO, competitors, etc.
     const es = (r as any).executive_summary;
+    let normalizedFromSummary = false;
     if (es && typeof es === 'object' && typeof es.summary === 'string') {
       const str = es.summary.trim();
       if (str.startsWith('{') && (str.includes('"seo_audit"') || str.includes('"competitor_analysis"') || str.includes('"keywords"'))) {
         try {
           const parsed = JSON.parse(str);
-          if (parsed.seo_audit && !(r as any).seo_audit) (r as any).seo_audit = parsed.seo_audit;
-          if (parsed.competitor_analysis && !(r as any).competitor_analysis) (r as any).competitor_analysis = parsed.competitor_analysis;
-          if (parsed.keywords && !(r as any).keywords) (r as any).keywords = parsed.keywords;
+          if (parsed.seo_audit && !(r as any).seo_audit) { (r as any).seo_audit = parsed.seo_audit; normalizedFromSummary = true; }
+          if (parsed.competitor_analysis && !(r as any).competitor_analysis) { (r as any).competitor_analysis = parsed.competitor_analysis; normalizedFromSummary = true; }
+          if (parsed.keywords && !(r as any).keywords) { (r as any).keywords = parsed.keywords; normalizedFromSummary = true; }
           if (parsed.ads_library_analysis && !(r as any).ads_library_analysis) (r as any).ads_library_analysis = parsed.ads_library_analysis;
         } catch (_) { /* ignore parse error */ }
       }
     }
+    // If we had to normalize from embedded JSON, treat as complete so the analysis is shown (backend may have failed to set status)
+    if (normalizedFromSummary && newStatus === 'pending') newStatus = 'complete';
     // Always set both states — research first so render sees data when status changes
     setResearch(r);
     if (newStatus) setAnalysisStatus(newStatus);
@@ -1940,7 +1943,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const answeredCount = briefData?.answered_count || responses.length;
   const totalQuestions = briefData?.total_questions || 15;
   const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
-  console.log('Research completo:', JSON.stringify(research));
   const hasResearch = Object.keys(research).length > 0;
   const hasSEO = !!research.seo_audit;
   const hasKeywords = !!research.keywords;
