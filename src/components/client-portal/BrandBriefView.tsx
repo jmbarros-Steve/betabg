@@ -461,12 +461,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dataCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchAll();
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
       if (progressPollingRef.current) clearInterval(progressPollingRef.current);
+      if (dataCheckIntervalRef.current) clearInterval(dataCheckIntervalRef.current);
     };
   }, [clientId]);
 
@@ -488,13 +490,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
   }, [analysisStatus]);
 
-  // A los 120 s aplicar automáticamente el análisis en las pestañas (escribir complete + refrescar)
+  // A los 120 s aplicar automáticamente solo si ya hay datos de research (SEO, keywords, competencia). Si no, seguir comprobando cada 8s.
   useEffect(() => {
     if (analysisStatus !== 'pending' || elapsedSeconds < 120) return;
     if (hasAutoAppliedAt120Ref.current) return;
     hasAutoAppliedAt120Ref.current = true;
-    (async () => {
-      console.log('[BrandBriefView] A los 120s — aplicando análisis automáticamente en las pestañas');
+
+    async function hasResearchData(): Promise<boolean> {
+      const { data: rows } = await supabase
+        .from('brand_research')
+        .select('research_type, research_data')
+        .eq('client_id', clientId)
+        .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
+      return (rows ?? []).some((r: any) => {
+        const d = r.research_data;
+        if (!d || typeof d !== 'object') return false;
+        if (r.research_type === 'executive_summary' && (d.summary || d.executive_summary)) return true;
+        if (r.research_type === 'seo_audit' && (d.issues?.length || d.recommendations?.length || d.score != null)) return true;
+        if (r.research_type === 'competitor_analysis' && (d.competitors?.length || d.overview)) return true;
+        if (r.research_type === 'keywords' && (d.recommended?.length || d.primary?.length || d.competitor_keywords?.length)) return true;
+        return false;
+      });
+    }
+
+    async function applyComplete() {
+      if (dataCheckIntervalRef.current) {
+        clearInterval(dataCheckIntervalRef.current);
+        dataCheckIntervalRef.current = null;
+      }
       if (pollingRef.current) clearInterval(pollingRef.current);
       if (progressPollingRef.current) clearInterval(progressPollingRef.current);
       await supabase.from('brand_research').upsert({
@@ -506,6 +529,23 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       setAnalysisStatus('complete');
       setProgressStep(null);
       toast.success('Análisis aplicado automáticamente — revisa los tabs SEO, Keywords y Competencia.');
+    }
+
+    (async () => {
+      const hasData = await hasResearchData();
+      if (hasData) {
+        console.log('[BrandBriefView] A los 120s — hay datos, aplicando análisis en las pestañas');
+        await applyComplete();
+        return;
+      }
+      console.log('[BrandBriefView] A los 120s — aún no hay datos, esperando resultados del backend…');
+      toast.info('El análisis está tardando. Se aplicará automáticamente cuando haya resultados.');
+      dataCheckIntervalRef.current = setInterval(async () => {
+        if (await hasResearchData()) {
+          console.log('[BrandBriefView] Datos de análisis detectados — aplicando en las pestañas');
+          await applyComplete();
+        }
+      }, 8000);
     })();
   }, [analysisStatus, elapsedSeconds, clientId]);
 
