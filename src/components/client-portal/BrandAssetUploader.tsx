@@ -343,6 +343,13 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     }, { onConflict: 'client_id,research_type' });
     console.log('[launchAnalysis] DB status set to pending ✓');
 
+    // Clear stale research sections from any previous analysis so StatusPoll
+    // doesn't find old data and prematurely close the banner
+    await supabase.from('brand_research').delete()
+      .eq('client_id', clientId)
+      .in('research_type', ['seo_audit', 'competitor_analysis', 'keywords', 'executive_summary']);
+    console.log('[launchAnalysis] Cleared stale research sections ✓');
+
     await supabase.from('brand_research').upsert({
       client_id: clientId,
       research_type: 'analysis_progress',
