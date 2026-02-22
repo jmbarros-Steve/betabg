@@ -875,7 +875,7 @@ SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN (no está respondiendo, solo preg
 
 ${hasFields ? `⚠️ FORMULARIO: La siguiente pregunta tiene formulario. Primero da 1-2 oraciones de contexto (qué necesitas y para qué), luego di "Llena los campos del formulario abajo". NO listes los campos en tu mensaje. Si la pregunta NO es la 16 (archivos visuales), NUNCA digas "sube", "subir" ni pidas logo/fotos.` : ''}
 
-${nextQ?.examples?.length ? `⚠️ EJEMPLOS DINÁMICOS: La siguiente pregunta tiene ejemplos genéricos predefinidos, pero el cliente ya describió su negocio. GENERA 2-3 ejemplos ESPECÍFICOS para su industria/producto real. Al final de tu mensaje (después de todo el texto visible, en una línea separada), escribe EXACTAMENTE: [EJEMPLOS: ejemplo1 || ejemplo2 || ejemplo3]. No menciones al cliente que añadiste esta línea. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Los ejemplos genéricos de referencia (para que veas el formato esperado): ${JSON.stringify(nextQ.examples)}.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
+${nextQ?.examples?.length ? `⚠️ EJEMPLOS DINÁMICOS: La siguiente pregunta tiene ejemplos genéricos predefinidos, pero el cliente ya describió su negocio. GENERA 2-3 ejemplos ESPECÍFICOS para SU INDUSTRIA Y PRODUCTO REAL. NEGOCIO DEL CLIENTE (usa esto para personalizar los ejemplos): "${storedRawResponses[1] || acceptedResponses[1]?.content || 'no disponible aún'}". Al final de tu mensaje (después de todo el texto visible, en una línea separada), escribe EXACTAMENTE: [EJEMPLOS: ejemplo1 || ejemplo2 || ejemplo3]. No menciones al cliente que añadiste esta línea. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Los ejemplos genéricos de referencia (para que veas el formato esperado): ${JSON.stringify(nextQ.examples)}.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
 
 REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de responder. 2) Si avanzas: la siguiente pregunta (${nextLabel}) con su intro y texto + [AVANZAR] al final. 3) Cierre: al menos 1 de cada 3 veces termina con "¿Alguna duda antes de seguir?" o "¿Te queda claro?". No menciones otras preguntas.${nextQuestionIndex !== 16 ? ' NO pidas subir archivos, logo ni fotos (solo en pregunta 16).' : ''}`;
 
@@ -951,7 +951,7 @@ REGLAS ABSOLUTAS:
       ...messages!.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
-    console.log(`Steve chat: conversation ${activeConversationId}, effectiveAnswered ${effectiveAnswered}${isRetryMode ? ' (retry)' : ''}/${BRAND_BRIEF_QUESTIONS.length}`);
+    console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}/${BRAND_BRIEF_QUESTIONS.length}`);
 
     const maxTokens = isLastQuestion ? 8000 : 1200;
 
@@ -997,7 +997,9 @@ REGLAS ABSOLUTAS:
 
     // ── BUG 4: Parse [AVANZAR] — only increment counter when Steve genuinely advances ──
     const isRejection = assistantMessage.includes('[RECHAZO]');
-    const hasAdvanced = !isRejection && assistantMessage.includes('[AVANZAR]');
+    // BUG 1 FIX: On the last question (Q16) Steve generates the full brief and never includes [AVANZAR],
+    // so treat any non-rejection on the last question as an implicit advance.
+    const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion);
     // Strip control tags from visible message
     assistantMessage = assistantMessage
       .replace(/\s*\[RECHAZO\]\s*$/i, '')
@@ -1037,27 +1039,41 @@ REGLAS ABSOLUTAS:
       content: assistantMessage,
     });
 
-    // ── BUG 6: Save competitors to competitor_tracking when Q9 is accepted ──
+    // ── BUG 5 FIX: Save competitors — DELETE all existing first, then INSERT fresh ones ──
+    // Using delete+insert instead of upsert prevents stale old competitors from persisting
+    // when the user changes their competitors (e.g. swaps one out or corrects a URL).
     if (hasAdvanced && currentQuestionIndex === 9) {
       try {
         // message IS the Q9 answer (competitor form formatted by StructuredFieldsForm)
         const compNames = [...message.matchAll(/Nombre Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
         const compUrls = [...message.matchAll(/Web \/ Instagram Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
-        for (let i = 0; i < Math.min(compNames.length, compUrls.length, 3); i++) {
+        console.log(`[steve-chat] Competitor parser found ${compNames.length} names, ${compUrls.length} URLs in Q9 message`);
+
+        // Delete ALL existing competitors for this client so we start fresh
+        const { error: delErr } = await supabase.from('competitor_tracking').delete().eq('client_id', client_id);
+        if (delErr) console.error('[steve-chat] Error deleting old competitors:', delErr);
+
+        const total = Math.min(compNames.length, compUrls.length, 3);
+        for (let i = 0; i < total; i++) {
           const rawUrl = compUrls[i];
           const name = compNames[i];
-          if (!rawUrl || !name) continue;
+          if (!rawUrl || !name) {
+            console.warn(`[steve-chat] Skipping competitor ${i + 1}: missing name="${name}" url="${rawUrl}"`);
+            continue;
+          }
           const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
           const handle = rawUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].toLowerCase();
-          await supabase.from('competitor_tracking').upsert({
+          const { error: insErr } = await supabase.from('competitor_tracking').insert({
             client_id,
             ig_handle: handle,
             display_name: name,
             store_url: fullUrl,
             is_active: true,
-          }, { onConflict: 'client_id,ig_handle' });
+          });
+          if (insErr) console.error(`[steve-chat] Error inserting competitor ${i + 1}:`, insErr);
+          else console.log(`[steve-chat] Saved competitor ${i + 1}: ${name} → ${handle}`);
         }
-        console.log(`[steve-chat] Saved ${Math.min(compNames.length, 3)} competitors to competitor_tracking`);
+        console.log(`[steve-chat] Saved ${total} competitors to competitor_tracking`);
       } catch (compErr) {
         console.error('[steve-chat] Error saving competitors:', compErr);
       }

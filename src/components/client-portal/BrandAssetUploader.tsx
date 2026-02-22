@@ -211,15 +211,19 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         return;
       }
 
-      // If still pending after 2 min, check if we have research data (strategy phase can take ~60–90s; give it time)
-      const PENDING_COMPLETE_MS = 120000; // 2 min — balance between "complete result" and not waiting forever
+      // BUG 7 FIX: If still pending after 4 min, check if ALL required sections have real data.
+      // Previously used .some() which fired the moment ANY section existed — before Phase 2 finished.
+      // Now require ALL 4 sections to have content before declaring success.
+      const PENDING_COMPLETE_MS = 240000; // 4 min — enough time for Phase 1 (~30s) + Phase 2 (~60-90s) + buffer
       if (status === 'pending' && elapsed > PENDING_COMPLETE_MS) {
         const { data: rows } = await supabase
           .from('brand_research')
           .select('research_type, research_data')
           .eq('client_id', clientId)
           .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
-        const hasData = rows?.some((r: any) => {
+        // Require ALL 4 sections to be present and have real content
+        const REQUIRED_TYPES = ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords'];
+        const hasAllData = rows && rows.length === REQUIRED_TYPES.length && rows.every((r: any) => {
           const d = r.research_data;
           if (!d || typeof d !== 'object') return false;
           if (r.research_type === 'executive_summary' && (d.summary || d.executive_summary)) return true;
@@ -228,14 +232,16 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           if (r.research_type === 'keywords' && (d.recommended?.length || d.competitor_keywords?.length)) return true;
           return false;
         });
-        if (hasData) {
-          console.log('[StatusPoll] ⏱️ pending >2min but research data present — writing complete to DB and closing banner');
+        if (hasAllData) {
+          console.log('[StatusPoll] ⏱️ pending >4min and ALL research sections present — writing complete to DB and closing banner');
           await supabase.from('brand_research').upsert({
             client_id: clientId,
             research_type: 'analysis_status',
             research_data: { status: 'complete' },
           }, { onConflict: 'client_id,research_type' });
           finishAnalysis(true);
+        } else {
+          console.log(`[StatusPoll] ⏱️ pending >4min but only ${rows?.length ?? 0}/${REQUIRED_TYPES.length} sections ready — waiting`);
         }
       }
     }, 4000);
@@ -520,12 +526,20 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       });
     }
 
-    // Auto-trigger if no research exists yet (and not already launching)
+    // BUG 6 FIX: Auto-trigger analysis when brief is complete but analysis hasn't run/completed yet.
+    // Previously only triggered when NO research existed — but steve-chat sets analysis_status='pending'
+    // synchronously, so existingResearch.length > 0 and the old trigger never fired.
     if (savedWebUrl && !autoTriggered && !isLaunchingRef.current) {
-      const { data: existingResearch } = await supabase
-        .from('brand_research').select('id').eq('client_id', clientId).limit(1);
-      if (!existingResearch || existingResearch.length === 0) {
-        console.log('[loadAssets] No research found, auto-triggering analysis');
+      const [statusResult, personaResult] = await Promise.all([
+        supabase.from('brand_research').select('research_data').eq('client_id', clientId).eq('research_type', 'analysis_status').maybeSingle(),
+        supabase.from('buyer_personas').select('is_complete').eq('client_id', clientId).maybeSingle(),
+      ]);
+      const analysisStatus = (statusResult.data?.research_data as any)?.status;
+      const isBriefDone = personaResult.data?.is_complete === true;
+      // Trigger if brief is complete AND analysis has not started or previously errored
+      const shouldTrigger = isBriefDone && (!statusResult.data || analysisStatus === 'error');
+      if (shouldTrigger) {
+        console.log('[loadAssets] Brief complete but analysis not started/errored — auto-triggering. status:', analysisStatus);
         setAutoTriggered(true);
         setTimeout(() => launchAnalysis(savedWebUrl, extractedCompUrls), 800);
       }
