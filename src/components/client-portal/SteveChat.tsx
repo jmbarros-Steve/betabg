@@ -323,11 +323,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
         }
         if (data.current_question_label != null) setCurrentQuestionLabel(data.current_question_label);
         else if (data.answered_count != null && !data.is_complete) setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(data.answered_count, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
-        if (data.examples?.length) setExamples(data.examples);
-        if (data.fields?.length) {
-          setCurrentFields(data.fields);
-          setFieldValidation(data.field_validation);
-        }
+        // Always sync examples and fields from response so they never show stale data
+        setExamples(data.examples ?? []);
+        setCurrentFields(data.fields ?? []);
+        setFieldValidation(data.field_validation);
         if (data.rejected) {
           setShowInteraction(true);
           toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
@@ -690,17 +689,19 @@ export function SteveChat({ clientId }: SteveChatProps) {
               Crear nuevo Brief
             </Button>
           </div>
-        ) : hasStructuredFields && showInteraction ? (
-          <p className="text-xs text-center text-muted-foreground py-2">
-            ☝️ Completa los campos arriba para continuar
-          </p>
         ) : (
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <Input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={examples.length > 0 ? "Usa un ejemplo de arriba o escribe con tus palabras..." : "Escribe tu respuesta..."}
+              placeholder={
+                hasStructuredFields && showInteraction
+                  ? "¿Tienes alguna pregunta para Steve? Escribe aquí..."
+                  : examples.length > 0
+                  ? "Usa un ejemplo de arriba o escribe con tus palabras..."
+                  : "Escribe tu respuesta..."
+              }
               disabled={isLoading}
               className="flex-1"
             />

@@ -319,7 +319,8 @@ IMPORTANTE:
 - NUNCA digas que el brief está listo o terminado antes de Q16. Solo después de la última pregunta dirás que ya está y que lo va a tener.
 - NUNCA pidas fotos, logos, "sube", "subir archivos" ni activos visuales antes de la Pregunta 16. Si la siguiente no es Q16, no menciones subir nada.
 - Cuando hay ejemplos clicables abajo: PROHIBIDO escribir "Por ejemplo" o "en tu industria" con ejemplos distintos a esos. Solo di "Puedes usar un ejemplo de abajo o escribir con tus palabras".
-- Tono conversacional: termina a menudo con "¿Alguna duda antes de seguir?" o "¿Te queda claro?" cuando encaje. No suenes a formulario.`;
+- Tono conversacional: termina a menudo con "¿Alguna duda antes de seguir?" o "¿Te queda claro?" cuando encaje. No suenes a formulario.
+- CONTROL DE AVANCE (CRÍTICO): Cuando aceptas la respuesta del cliente y haces la SIGUIENTE pregunta del cuestionario, escribe [AVANZAR] en una línea nueva al final de tu mensaje. Si el cliente hace una pregunta de aclaración y tú respondes sin avanzar al siguiente tema del cuestionario, NO incluyas [AVANZAR]. Tampoco incluyas [AVANZAR] junto a [RECHAZO]. Este tag es invisible para el cliente y controla el progreso interno del brief.`;
 }
 
 function getBriefTemplate(): string {
@@ -779,12 +780,30 @@ Deno.serve(async (req) => {
     }
 
     const userMessages = messages?.filter(m => m.role === 'user') || [];
-    const answeredQuestions = userMessages.length;
-    const effectiveAnswered = isRetryMode ? pendingQuestionIndex! : answeredQuestions;
-    const isLastQuestion = effectiveAnswered >= BRAND_BRIEF_QUESTIONS.length;
 
-    // Use only accepted answers for brief (when retry, don't include the retry until accepted)
-    const acceptedResponses = userMessages.slice(0, effectiveAnswered);
+    // BUG 4 FIX: Use stored answered_count as source of truth.
+    // This prevents clarification messages from advancing the question counter.
+    const { data: existingPersona } = await supabase
+      .from('buyer_personas')
+      .select('persona_data')
+      .eq('client_id', client_id)
+      .maybeSingle();
+    const dbAnsweredCount: number | null = (existingPersona?.persona_data as any)?.answered_count ?? null;
+
+    // currentQuestionIndex = the question the user is currently answering (before this turn)
+    const currentQuestionIndex = isRetryMode
+      ? pendingQuestionIndex!
+      : (dbAnsweredCount !== null ? dbAnsweredCount : Math.max(0, userMessages.length - 1));
+
+    const isLastQuestion = currentQuestionIndex >= BRAND_BRIEF_QUESTIONS.length - 1;
+
+    // Accepted responses = those corresponding to already-answered questions (up to currentQuestionIndex)
+    // We use the stored raw_responses from buyer_personas so clarification messages are excluded
+    const storedRawResponses: string[] = (existingPersona?.persona_data as any)?.raw_responses ?? [];
+    // Supplement with current user messages for questions not yet in persona (e.g. first message ever)
+    const acceptedResponses = storedRawResponses.length >= currentQuestionIndex
+      ? storedRawResponses.slice(0, currentQuestionIndex).map(c => ({ content: c }))
+      : userMessages.slice(0, currentQuestionIndex);
 
     // Extract fase_negocio and presupuesto_ads from Q2 response (index 2 = after Q0 + Q1 + Q2)
     let faseNegocio = '';
@@ -799,20 +818,16 @@ Deno.serve(async (req) => {
 
     const briefData = {
       raw_responses: acceptedResponses.map(m => m.content),
-      questions: BRAND_BRIEF_QUESTIONS.slice(0, effectiveAnswered).map(q => q.id),
-      answered_count: effectiveAnswered,
+      questions: BRAND_BRIEF_QUESTIONS.slice(0, currentQuestionIndex).map(q => q.id),
+      answered_count: currentQuestionIndex,
       total_questions: BRAND_BRIEF_QUESTIONS.length,
       fase_negocio: faseNegocio || undefined,
       presupuesto_ads: presupuestoAds || undefined,
     };
 
-    await supabase.from('buyer_personas').upsert({
-      client_id,
-      persona_data: { ...briefData, completed_at: isLastQuestion ? new Date().toISOString() : null },
-      is_complete: isLastQuestion,
-    }, { onConflict: 'client_id' });
+    // We'll update buyer_personas after parsing [AVANZAR] from the AI response (see below)
 
-    if (effectiveAnswered === 1) {
+    if (currentQuestionIndex === 1) {
       try {
         const urlResponse = acceptedResponses[0]?.content || '';
         const urlMatch = urlResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+(?:\.[\w-]+)+(?:\/\S*)?/i);
@@ -830,44 +845,47 @@ Deno.serve(async (req) => {
     if (isLastQuestion) {
       questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la última pregunta (archivos visuales). Si dijo que no tiene fotos, acepta y continúa igual.\n\nPRIMERO dile claramente que ya terminaron la conversación, que su brief ESTÁ LISTO ahora y que lo va a tener (generalo en este mensaje). Agradece haber charlado. DESPUÉS genera el brief completo abajo.\n\n${BRIEF_TEMPLATE}`;
     } else {
-      const justAnsweredIndex = isRetryMode ? effectiveAnswered : answeredQuestions - 1;
-      const nextQuestionIndex = isRetryMode ? effectiveAnswered : answeredQuestions;
+      // currentQuestionIndex = question being answered right now
+      // nextQuestionIndex    = question Steve should ask AFTER accepting
+      const justAnsweredIndex = currentQuestionIndex;
+      const nextQuestionIndex = currentQuestionIndex + 1;
       const nextQ = BRAND_BRIEF_QUESTIONS[nextQuestionIndex];
       const justAnsweredQ = BRAND_BRIEF_QUESTIONS[justAnsweredIndex];
-      const hasFields = nextQ?.fields?.length > 0;
+      const hasFields = (nextQ?.fields?.length ?? 0) > 0;
       const justAnsweredLabel = justAnsweredIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${justAnsweredIndex} de 16 (${justAnsweredQ?.id})`;
       const nextLabel = nextQuestionIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${nextQuestionIndex} de 16`;
 
       const retryBlock = isRetryMode ? `
 🚨 RETRY: La respuesta anterior del cliente a esta pregunta fue RECHAZADA. Su ÚLTIMO mensaje es un NUEVO intento para la MISMA pregunta (${justAnsweredLabel}).
-- EVALÚA ese último mensaje. Si está bien: comenta brevemente y haz la SIGUIENTE pregunta (${nextLabel}).
-- Si sigue incompleto o vago: explica qué falta y repite la MISMA pregunta. Al final escribe [RECHAZO].
+- EVALÚA ese último mensaje. Si está bien: comenta brevemente, haz la SIGUIENTE pregunta (${nextLabel}) e incluye [AVANZAR] al final.
+- Si sigue incompleto o vago: explica qué falta, repite la MISMA pregunta y escribe [RECHAZO] al final.
 - NO avances a la siguiente pregunta hasta que aceptes su respuesta.` : '';
 
       questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══${retryBlock}
 
 ⚠️ COINCIDE CON LO QUE VERÁ EL CLIENTE: Debajo el cliente verá el formulario o la caja de respuesta para la pregunta "${nextQ?.shortLabel ?? nextLabel}". Tu mensaje DEBE pedir exactamente eso. Si debajo hay campos de "Competidores" (nombres + URLs), tu texto debe pedir competidores; si hay campo libre, comenta solo la respuesta anterior y haz la siguiente pregunta. NUNCA hables de otro tema (ej. no pidas "más transformación" si la siguiente pregunta del sistema es Competidores).
 
-PREGUNTA RECIÉN RESPONDIDA (comenta solo esta): ${justAnsweredLabel}
-GUÍA PARA COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
+PREGUNTA QUE EL CLIENTE ESTÁ RESPONDIENDO AHORA: ${justAnsweredLabel}
+GUÍA PARA EVALUAR Y COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
 
-SIGUIENTE PREGUNTA QUE DEBES HACER (solo esta): ${nextLabel}
-INTRO DE STEVE: ${nextQ?.steveIntro || ''}
-TEXTO EXACTO DE LA PREGUNTA: ${nextQ?.question}
+SI EL CLIENTE RESPONDIÓ BIEN → incluye [AVANZAR] al final de tu mensaje Y haz esta SIGUIENTE PREGUNTA:
+${nextLabel} — INTRO: ${nextQ?.steveIntro || ''} — TEXTO: ${nextQ?.question}
+
+SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN (no está respondiendo, solo pregunta algo) → respóndela brevemente, recuérdale la pregunta actual, NO incluyas [AVANZAR] ni [RECHAZO].
 
 ${hasFields ? `⚠️ FORMULARIO: La siguiente pregunta tiene formulario. Primero da 1-2 oraciones de contexto (qué necesitas y para qué), luego di "Llena los campos del formulario abajo". NO listes los campos en tu mensaje. Si la pregunta NO es la 16 (archivos visuales), NUNCA digas "sube", "subir" ni pidas logo/fotos.` : ''}
 
-${nextQ?.examples?.length ? `⚠️ EJEMPLOS CLICABLES: Los botones debajo son: ${JSON.stringify(nextQ.examples)}. PROHIBIDO escribir "Por ejemplo", "en tu industria" o cualquier otro ejemplo en tu mensaje. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Luego el texto exacto de la pregunta.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
+${nextQ?.examples?.length ? `⚠️ EJEMPLOS DINÁMICOS: La siguiente pregunta tiene ejemplos genéricos predefinidos, pero el cliente ya describió su negocio. GENERA 2-3 ejemplos ESPECÍFICOS para su industria/producto real. Al final de tu mensaje (después de todo el texto visible, en una línea separada), escribe EXACTAMENTE: [EJEMPLOS: ejemplo1 || ejemplo2 || ejemplo3]. No menciones al cliente que añadiste esta línea. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Los ejemplos genéricos de referencia (para que veas el formato esperado): ${JSON.stringify(nextQ.examples)}.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
 
-REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de responder. 2) La siguiente pregunta (${nextLabel}) con su intro y texto. 3) Cierre: al menos 1 de cada 3 veces termina con "¿Alguna duda antes de seguir?" o "¿Te queda claro?". No menciones otras preguntas. Si la siguiente es "${nextQ?.shortLabel ?? nextLabel}", tu mensaje debe ser solo sobre eso.${nextQuestionIndex !== 16 ? ' NO pidas subir archivos, logo ni fotos (solo en pregunta 16).' : ''}`;
+REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de responder. 2) Si avanzas: la siguiente pregunta (${nextLabel}) con su intro y texto + [AVANZAR] al final. 3) Cierre: al menos 1 de cada 3 veces termina con "¿Alguna duda antes de seguir?" o "¿Te queda claro?". No menciones otras preguntas.${nextQuestionIndex !== 16 ? ' NO pidas subir archivos, logo ni fotos (solo en pregunta 16).' : ''}`;
 
-      if (!isRetryMode && answeredQuestions === 1) {
-        questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1.';
+      if (!isRetryMode && currentQuestionIndex === 0) {
+        questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1. Incluye [AVANZAR] al final.';
       }
-      if (!isRetryMode && answeredQuestions === 3) {
+      if (!isRetryMode && currentQuestionIndex === 2) {
         questionContext += '\n\nINSTRUCCIÓN EXTRA Q2: El cliente envió datos financieros. CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown con resultados. Di que guardaste el CPA en configuración financiera.';
       }
-      if ([2, 5, 9, 13].includes(nextQuestionIndex)) {
+      if ([2, 5, 9, 13].includes(currentQuestionIndex + 1)) {
         questionContext += '\n\nOPCIONAL: Si suena natural, recuérdale en una frase que puede salir y volver cuando quiera, y que el brief lo tendrá cuando terminen todas las preguntas (tú le avisas cuando esté listo).';
       }
     }
@@ -968,9 +986,35 @@ REGLAS ABSOLUTAS:
 
     const aiData = await aiResponse.json();
     let assistantMessage = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
+
+    // Parse dynamic examples tag [EJEMPLOS: ej1 || ej2 || ej3] — strip from visible message
+    let dynamicExamples: string[] | null = null;
+    const ejemplosMatch = assistantMessage.match(/\[EJEMPLOS:\s*([^\]]+)\]/i);
+    if (ejemplosMatch) {
+      dynamicExamples = ejemplosMatch[1].split('||').map((e: string) => e.trim()).filter(Boolean);
+      assistantMessage = assistantMessage.replace(/\n?\[EJEMPLOS:[^\]]*\]/i, '').trim();
+    }
+
+    // ── BUG 4: Parse [AVANZAR] — only increment counter when Steve genuinely advances ──
     const isRejection = assistantMessage.includes('[RECHAZO]');
+    const hasAdvanced = !isRejection && assistantMessage.includes('[AVANZAR]');
+    // Strip control tags from visible message
+    assistantMessage = assistantMessage
+      .replace(/\s*\[RECHAZO\]\s*$/i, '')
+      .replace(/\s*\[AVANZAR\]\s*/gi, '')
+      .trim();
+
+    // newAnsweredCount: only advances when [AVANZAR] detected (not on clarifications)
+    const newAnsweredCount = isRejection
+      ? currentQuestionIndex
+      : (hasAdvanced ? currentQuestionIndex + 1 : currentQuestionIndex);
+
+    // Build updated raw_responses: append current message only if accepted
+    const newRawResponses = hasAdvanced
+      ? [...storedRawResponses.slice(0, currentQuestionIndex), message]
+      : storedRawResponses.slice(0, currentQuestionIndex);
+
     if (isRejection) {
-      assistantMessage = assistantMessage.replace(/\s*\[RECHAZO\]\s*$/i, '').trim();
       const { data: lastUserMsg } = await supabase
         .from('steve_messages')
         .select('id')
@@ -982,7 +1026,7 @@ REGLAS ABSOLUTAS:
       if (lastUserMsg?.id) {
         await supabase.from('steve_messages').delete().eq('id', lastUserMsg.id);
       }
-      await supabase.from('steve_conversations').update({ pending_question_index: effectiveAnswered }).eq('id', activeConversationId);
+      await supabase.from('steve_conversations').update({ pending_question_index: currentQuestionIndex }).eq('id', activeConversationId);
     } else {
       await supabase.from('steve_conversations').update({ pending_question_index: null }).eq('id', activeConversationId);
     }
@@ -993,11 +1037,36 @@ REGLAS ABSOLUTAS:
       content: assistantMessage,
     });
 
-    const finalAnswered = isRejection ? effectiveAnswered : (isRetryMode ? effectiveAnswered + 1 : answeredQuestions);
-    if (finalAnswered >= 3 && !isRejection) {
+    // ── BUG 6: Save competitors to competitor_tracking when Q9 is accepted ──
+    if (hasAdvanced && currentQuestionIndex === 9) {
       try {
-        const q2Response = userMessages[2]?.content || '';
-        const numbers = q2Response.match(/\$?\d[\d.,]*/g)?.map((n: string) => parseFloat(n.replace(/[$.]/g, '').replace(',', '.'))) || [];
+        // message IS the Q9 answer (competitor form formatted by StructuredFieldsForm)
+        const compNames = [...message.matchAll(/Nombre Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
+        const compUrls = [...message.matchAll(/Web \/ Instagram Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
+        for (let i = 0; i < Math.min(compNames.length, compUrls.length, 3); i++) {
+          const rawUrl = compUrls[i];
+          const name = compNames[i];
+          if (!rawUrl || !name) continue;
+          const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+          const handle = rawUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].toLowerCase();
+          await supabase.from('competitor_tracking').upsert({
+            client_id,
+            ig_handle: handle,
+            display_name: name,
+            store_url: fullUrl,
+            is_active: true,
+          }, { onConflict: 'client_id,ig_handle' });
+        }
+        console.log(`[steve-chat] Saved ${Math.min(compNames.length, 3)} competitors to competitor_tracking`);
+      } catch (compErr) {
+        console.error('[steve-chat] Error saving competitors:', compErr);
+      }
+    }
+
+    // Save financial config when Q2 (numbers) is accepted (currentQuestionIndex === 2)
+    if (hasAdvanced && currentQuestionIndex === 2) {
+      try {
+        const numbers = message.match(/\$?\d[\d.,]*/g)?.map((n: string) => parseFloat(n.replace(/[$.]/g, '').replace(',', '.'))) || [];
         if (numbers.length >= 2) {
           const price = numbers[0], cost = numbers[1], shipping = numbers.length >= 3 ? numbers[2] : 0;
           const margin = price - cost - shipping;
@@ -1017,29 +1086,40 @@ REGLAS ABSOLUTAS:
       }
     }
 
-    if (finalAnswered >= BRAND_BRIEF_QUESTIONS.length && !isRejection) {
-      const completedBriefData = {
-        raw_responses: userMessages.slice(0, finalAnswered).map(m => m.content),
+    const finalAnswered = newAnsweredCount;
+    const isBriefComplete = finalAnswered >= BRAND_BRIEF_QUESTIONS.length && !isRejection;
+
+    // Persist updated buyer_personas with accurate answered_count
+    await supabase.from('buyer_personas').upsert({
+      client_id,
+      persona_data: {
+        raw_responses: newRawResponses,
         questions: BRAND_BRIEF_QUESTIONS.slice(0, finalAnswered).map(q => q.id),
         answered_count: finalAnswered,
         total_questions: BRAND_BRIEF_QUESTIONS.length,
-      };
-      await supabase.from('buyer_personas').update({
-        persona_data: { ...completedBriefData, summary: assistantMessage, completed_at: new Date().toISOString() },
-        is_complete: true,
-      }).eq('client_id', client_id);
+        fase_negocio: briefData.fase_negocio || undefined,
+        presupuesto_ads: briefData.presupuesto_ads || undefined,
+        ...(isBriefComplete ? { summary: assistantMessage, completed_at: new Date().toISOString() } : {}),
+      },
+      is_complete: isBriefComplete,
+    }, { onConflict: 'client_id' });
 
+    // ── BUG 5 + 7: Trigger two-phase analysis (research → strategy) instead of deprecated analyze-brand ──
+    if (isBriefComplete) {
       try {
         const { data: clientData } = await supabase.from('clients').select('website_url').eq('id', client_id).single();
-        const q1Response = userMessages[0]?.content || '';
-        const urlMatch = q1Response.match(/https?:\/\/[^\s,]+|www\.[^\s,]+|\b\w+\.(cl|com|net|store|shop|myshopify\.com)\b/i);
-        const websiteUrl = clientData?.website_url || (urlMatch ? urlMatch[0] : null);
+        const q0Response = newRawResponses[0] || '';
+        const urlMatch = q0Response.match(/https?:\/\/[^\s,]+|www\.[^\s,]+|\b\w+\.(cl|com|net|store|shop|myshopify\.com)\b/i);
+        const websiteUrl = clientData?.website_url || (urlMatch ? (urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`) : null);
 
-        const q9Response = userMessages[8]?.content || '';
+        // Competitor URLs from the saved competitor_tracking (populated in BUG 6 fix above)
+        // Also extract from Q9 raw response as fallback
+        const q9Resp = newRawResponses[9] || '';
         const competitorUrls: string[] = [];
-        const urlMatches = q9Response.match(/https?:\/\/[^\s,]+|www\.[^\s,]+|\b\w+\.(cl|com|net|store|shop|myshopify\.com)\b/gi) || [];
-        for (const u of urlMatches.slice(0, 3)) {
-          competitorUrls.push(u.startsWith('http') ? u : `https://${u}`);
+        const urlMatches = q9Resp.match(/Web \/ Instagram Competidor \d+:\s*([^\n]+)/g) || [];
+        for (const line of urlMatches.slice(0, 3)) {
+          const u = line.replace(/Web \/ Instagram Competidor \d+:\s*/i, '').trim();
+          if (u) competitorUrls.push(u.startsWith('http') ? u : `https://${u}`);
         }
 
         await supabase.from('brand_research').upsert({
@@ -1049,69 +1129,46 @@ REGLAS ABSOLUTAS:
         }, { onConflict: 'client_id,research_type' });
 
         const projectId = supabaseUrl.replace('https://', '').split('.')[0];
-        const analyzeUrl = `https://${projectId}.supabase.co/functions/v1/analyze-brand`;
+        const serviceKey = supabaseServiceKey;
 
-        fetch(analyzeUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ client_id, website_url: websiteUrl, competitor_urls: competitorUrls, research_type: 'full_analysis' }),
-        }).then(async (r) => {
-          if (r.ok) {
-            console.log(`Auto analyze-brand completed for client ${client_id}`);
-          } else {
-            const errText = await r.text();
-            console.error(`Auto analyze-brand failed: ${r.status}`, errText);
+        // Fire-and-forget two-phase chain: research (~30s) → strategy (~20-30s with sonnet)
+        (async () => {
+          try {
+            const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ client_id, website_url: websiteUrl, competitor_urls: competitorUrls }),
+            });
+            if (!researchRes.ok) throw new Error(`Research failed: ${researchRes.status}`);
+            const researchJson = await researchRes.json();
+            const research = researchJson.research;
+            if (!research) throw new Error('No research data returned');
+
+            const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ client_id, research }),
+            });
+            if (!strategyRes.ok) throw new Error(`Strategy failed: ${strategyRes.status}`);
+            console.log(`[steve-chat] Auto-analysis complete for client ${client_id}`);
+          } catch (err) {
+            console.error('[steve-chat] Auto-analysis error:', err);
             await supabase.from('brand_research').upsert({
               client_id,
               research_type: 'analysis_status',
-              research_data: { status: 'error', error: `HTTP ${r.status}` },
+              research_data: { status: 'error', error: String(err) },
             }, { onConflict: 'client_id,research_type' });
           }
-        }).catch(async (err) => {
-          console.error('Auto analyze-brand error:', err);
-          await supabase.from('brand_research').upsert({
-            client_id,
-            research_type: 'analysis_status',
-            research_data: { status: 'error', error: String(err) },
-          }, { onConflict: 'client_id,research_type' });
-        });
+        })();
 
-        console.log(`Auto analyze-brand triggered for client ${client_id}`);
+        console.log(`[steve-chat] Auto-analysis triggered for client ${client_id}`);
       } catch (autoAnalyzeErr) {
-        console.error('Error triggering auto analyze-brand:', autoAnalyzeErr);
+        console.error('[steve-chat] Error triggering auto-analysis:', autoAnalyzeErr);
       }
     }
 
-    if (isRejection) {
-      await supabase.from('buyer_personas').upsert({
-        client_id,
-        persona_data: {
-          ...briefData,
-          raw_responses: (briefData.raw_responses || []).slice(0, effectiveAnswered),
-          questions: (briefData.questions || []).slice(0, effectiveAnswered),
-          answered_count: effectiveAnswered,
-          total_questions: BRAND_BRIEF_QUESTIONS.length,
-        },
-        is_complete: false,
-      }, { onConflict: 'client_id' });
-    } else if (isRetryMode && finalAnswered > effectiveAnswered) {
-      await supabase.from('buyer_personas').upsert({
-        client_id,
-        persona_data: {
-          raw_responses: userMessages.slice(0, finalAnswered).map(m => m.content),
-          questions: BRAND_BRIEF_QUESTIONS.slice(0, finalAnswered).map(q => q.id),
-          answered_count: finalAnswered,
-          total_questions: BRAND_BRIEF_QUESTIONS.length,
-        },
-        is_complete: false,
-      }, { onConflict: 'client_id' });
-    }
-
-    const returnAnswered = isRejection ? effectiveAnswered : finalAnswered;
-    const isComplete = returnAnswered >= BRAND_BRIEF_QUESTIONS.length;
+    const returnAnswered = finalAnswered;
+    const isComplete = isBriefComplete;
     const nextQuestionIndex = isComplete ? BRAND_BRIEF_QUESTIONS.length - 1 : Math.min(returnAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
     const nextQ = !isComplete ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex] : null;
 
@@ -1125,7 +1182,7 @@ REGLAS ABSOLUTAS:
       rejected: isRejection,
       current_question_id: nextQ?.id ?? null,
       current_question_label: nextQ?.shortLabel ?? null,
-      examples: nextQ?.examples || [],
+      examples: dynamicExamples ?? nextQ?.examples ?? [],
       fields: nextQ?.fields || [],
       field_validation: (nextQ as any)?.validation,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
