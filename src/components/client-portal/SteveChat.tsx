@@ -318,11 +318,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
           created_at: new Date().toISOString(),
         };
         setMessages(prev => [...prev, assistantMsg]);
-        if (data.answered_count !== undefined) {
-          setProgress({ answered: data.answered_count, total: data.total_questions ?? 17 });
+        // BUG 1 FIX: Never update progress/label on rejection — the user stays on the same question
+        if (!data.rejected) {
+          if (data.answered_count !== undefined) {
+            setProgress({ answered: data.answered_count, total: data.total_questions ?? 17 });
+          }
+          if (data.current_question_label != null) setCurrentQuestionLabel(data.current_question_label);
+          else if (data.answered_count != null && !data.is_complete) setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(data.answered_count, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
         }
-        if (data.current_question_label != null) setCurrentQuestionLabel(data.current_question_label);
-        else if (data.answered_count != null && !data.is_complete) setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(data.answered_count, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
         // Always sync examples and fields from response so they never show stale data
         setExamples(data.examples ?? []);
         setCurrentFields(data.fields ?? []);

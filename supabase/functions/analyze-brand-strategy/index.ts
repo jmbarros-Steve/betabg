@@ -389,6 +389,12 @@ Deno.serve(async (req) => {
       await supabase.from('clients').update({ website_url: websiteUrl }).eq('id', client_id);
     }
 
+    // BUG 5 FIX 1: Save brand_strategy marker — used by StatusPoll fallback to confirm Phase 2 finished
+    await supabase.from('brand_research').upsert(
+      { client_id, research_type: 'brand_strategy', research_data: { completed_at: new Date().toISOString(), sections: savedSections } },
+      { onConflict: 'client_id,research_type' }
+    );
+
     // Mark complete
     await supabase.from('brand_research').upsert(
       { client_id, research_type: 'analysis_status', research_data: { status: 'complete', completed_at: new Date().toISOString() } },

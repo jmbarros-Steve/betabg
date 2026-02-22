@@ -211,29 +211,21 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         return;
       }
 
-      // BUG 7 FIX: If still pending after 4 min, check if ALL required sections have real data.
-      // Previously used .some() which fired the moment ANY section existed — before Phase 2 finished.
-      // Now require ALL 4 sections to have content before declaring success.
-      const PENDING_COMPLETE_MS = 240000; // 4 min — enough time for Phase 1 (~30s) + Phase 2 (~60-90s) + buffer
+      // BUG 5 FIX 1: Only declare fallback-complete after 8 min AND Phase 2 marker (brand_strategy) exists.
+      // Phase 1 (~3-4 min scraping) + Phase 2 (~3-4 min Claude) = up to 8 min total.
+      // analyze-brand-strategy saves a 'brand_strategy' record as a Phase 2 completion marker.
+      const PENDING_COMPLETE_MS = 480000; // 8 min — full two-phase budget
       if (status === 'pending' && elapsed > PENDING_COMPLETE_MS) {
-        const { data: rows } = await supabase
+        // Check for brand_strategy record (Phase 2 completion marker)
+        const { data: strategyRow } = await supabase
           .from('brand_research')
-          .select('research_type, research_data')
+          .select('research_data')
           .eq('client_id', clientId)
-          .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
-        // Require ALL 4 sections to be present and have real content
-        const REQUIRED_TYPES = ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords'];
-        const hasAllData = rows && rows.length === REQUIRED_TYPES.length && rows.every((r: any) => {
-          const d = r.research_data;
-          if (!d || typeof d !== 'object') return false;
-          if (r.research_type === 'executive_summary' && (d.summary || d.executive_summary)) return true;
-          if (r.research_type === 'seo_audit' && (d.issues?.length || d.recommendations?.length)) return true;
-          if (r.research_type === 'competitor_analysis' && (d.competitors?.length || d.overview)) return true;
-          if (r.research_type === 'keywords' && (d.recommended?.length || d.competitor_keywords?.length)) return true;
-          return false;
-        });
-        if (hasAllData) {
-          console.log('[StatusPoll] ⏱️ pending >4min and ALL research sections present — writing complete to DB and closing banner');
+          .eq('research_type', 'brand_strategy')
+          .maybeSingle();
+        const hasBrandStrategy = !!strategyRow?.research_data;
+        if (hasBrandStrategy) {
+          console.log('[StatusPoll] ⏱️ pending >8min and brand_strategy marker found — Phase 2 ran. Writing complete.');
           await supabase.from('brand_research').upsert({
             client_id: clientId,
             research_type: 'analysis_status',
@@ -241,7 +233,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           }, { onConflict: 'client_id,research_type' });
           finishAnalysis(true);
         } else {
-          console.log(`[StatusPoll] ⏱️ pending >4min but only ${rows?.length ?? 0}/${REQUIRED_TYPES.length} sections ready — waiting`);
+          console.log('[StatusPoll] ⏱️ pending >8min but no brand_strategy marker yet — still waiting for Phase 2');
         }
       }
     }, 4000);

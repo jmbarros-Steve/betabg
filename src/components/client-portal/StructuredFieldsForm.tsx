@@ -37,7 +37,11 @@ export function StructuredFieldsForm({ fields, validation, onSubmit, isLoading }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const emptyFields = fields.filter(f => !values[f.key]?.trim());
+    // BUG 3 FIX: For sum_100 forms (channel percentages), empty = 0 is valid.
+    // Only enforce "no empty fields" for non-sum forms.
+    const emptyFields = validation === 'sum_100'
+      ? []
+      : fields.filter(f => !values[f.key]?.trim());
     if (emptyFields.length > 0) {
       toast.error(`Faltan campos por completar`);
       return;

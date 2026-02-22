@@ -107,7 +107,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'persona_pain',
       shortLabel: 'Dolor del cliente',
       question: '**Pregunta 5 de 15 — SU DOLOR PROFUNDO:** Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:\n\n1. ¿Qué problema específico tiene?\n2. ¿Cómo lo ha intentado resolver antes?\n3. ¿Por qué esa solución anterior no le dio satisfacción completa?\n\nSé específico — piensa en situaciones concretas que vive tu cliente.',
-      examples: ['Compra productos baratos que se rompen rápido. Probó marcas premium pero no justifica el gasto. Le da vergüenza o frustración usar algo que no refleja cómo se ve o se siente.'],
+      examples: [],
       fields: [],
       steveIntro: '*pone cara seria* 😰\n\n',
       commentGuide: 'Comenta en 1-3 oraciones. Analiza si el dolor tiene las tres dimensiones (problema, intento fallido, frustración). Si falta o es genérico, RECHAZA. No inventes otros ejemplos; invita a usar el de abajo o a escribir con sus palabras.',
@@ -116,7 +116,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'persona_words',
       shortLabel: 'Palabras y objeciones del cliente',
       question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame **2 o 3 frases literales distintas** — una queja habitual, una objeción de compra, y una frustración pasada.',
-      examples: ['"Estoy cansado de comprar cosas baratas que se rompen, pero no quiero pagar una fortuna" / "Me da pena invertir en esto porque no le doy importancia"'],
+      examples: [],
       fields: [],
       steveIntro: '*saca su libreta* 📝\n\n',
       commentGuide: 'Comenta en tono conversacional. Verifica que haya MÍNIMO 2 frases literales. Si solo hay una, RECHAZA. No inventes otros ejemplos; invita a usar el de abajo.',
@@ -125,7 +125,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'persona_transformation',
       shortLabel: 'La transformación (después de usarte)',
       question: '**Pregunta 7 de 15 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
-      examples: ['Se siente segura y a gusto, muestra su compra con orgullo', 'Comparte en redes porque está orgulloso del resultado'],
+      examples: [],
       fields: [],
       steveIntro: '*levanta las orejas, ojos brillantes* ✨\n\n',
       commentGuide: 'Comenta en 1-3 oraciones. Analiza si la transformación es emocional y tangible. Si es vaga, pide detalles. No inventes otros ejemplos; invita a usar los de abajo.',
@@ -134,10 +134,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'persona_lifestyle',
       shortLabel: 'Estilo de vida del cliente',
       question: '**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers o cuentas sigue?',
-      examples: [
-        'Compra en [marcas de su sector], usa redes, sigue a [influencers o referentes de su industria]',
-        'Consume contenido de [tema], está en [red o comunidad], sigue a [tipo de cuentas]',
-      ],
+      examples: [],
       fields: [],
       steveIntro: '*mueve la cola curioso*\n\n',
       commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona. HAZ INFERENCIAS: en base a edad, ingreso, ocupación, deduce qué consume. NO escribas otros ejemplos en tu mensaje; solo invita a usar los de abajo.',
@@ -178,7 +175,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'your_advantage',
       shortLabel: 'Tu ventaja incopiable',
       question: '**Pregunta 11 de 15 — TU VENTAJA INCOPIABLE:** ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?',
-      examples: ['Nuestro proceso de estampado es artesanal y cada pieza es única', 'Somos los únicos con una línea de tallas inclusivas hasta la 5XL en este estilo premium'],
+      examples: [],
       fields: [],
       steveIntro: '*se para firme* 🏆\n\n',
       commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Analiza si la ventaja es realmente incopiable. No inventes otros ejemplos; invita a usar los de abajo.',
@@ -187,7 +184,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'purple_cow_promise',
       shortLabel: 'Vaca púrpura y gran promesa',
       question: '**Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
-      examples: ['Nuestro diseño es icónico — "Vas a querer mostrarlo"', 'Somos la única marca con [atributo único] — "Resultado que no encuentras en otro lado"'],
+      examples: [],
       fields: [],
       steveIntro: '*se para en dos patas, emocionado* 🐄💜\n\n',
       commentGuide: 'Comenta en 1-3 oraciones. Es sobre posicionamiento y diferenciación, NO logos ni colores. No inventes otros ejemplos; invita a usar los de abajo.',
@@ -196,7 +193,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'villain_guarantee',
       shortLabel: 'Villano y garantía',
       question: '**Pregunta 13 de 15 — EL VILLANO:** ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea quieres erradicar del mercado?\n\n¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?',
-      examples: ['El villano es la "fachatez": la idea de que está bien verse mal en casa — Garantía: si no te sientes más linda, te devolvemos la plata'],
+      examples: [],
       fields: [],
       steveIntro: '*gruñe pensando en los enemigos de tu marca* 🐕\n\n',
       commentGuide: 'Comenta en tono conversacional. Analiza si el villano es poderoso y si la garantía elimina el riesgo. No inventes otros ejemplos; invita a usar el de abajo.',
@@ -205,7 +202,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'proof_tone',
       shortLabel: 'Prueba social y tono',
       question: '**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes)\n\n¿Y qué TONO de comunicación conecta con tu cliente?',
-      examples: ['Tenemos 200 reviews en Google con promedio 4.8 — Tono cercano y gracioso, como hablar con tu mejor amiga'],
+      examples: [],
       fields: [],
       steveIntro: '*olfatea buscando evidencia* 📸\n\n',
       commentGuide: 'Comenta en 1-3 oraciones. Evalúa prueba social y si el tono cuadra con el buyer persona. No inventes otros ejemplos; invita a usar el de abajo.',
@@ -214,7 +211,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       id: 'brand_identity',
       shortLabel: 'Identidad visual (colores, estilo)',
       question: '**Pregunta 15 de 16 — IDENTIDAD VISUAL Y TONO:**\n\nCuéntame sobre la identidad visual de tu marca:\n\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n- ✍️ **¿Tienes un manual de marca o guía de estilo?**',
-      examples: ['Mis colores son azul marino (#1a237e) y dorado, estilo elegante y minimalista', 'No tengo manual de marca pero me gusta el estilo de Apple — limpio y premium'],
+      examples: [],
       fields: [],
       steveIntro: '*saca su paleta de colores* 🎨🐕\n\n',
       commentGuide: 'Comenta en tono conversacional. Valida colores y estilo; si no cuadran, sugiere. NO pidas fotos ni logos (eso es solo en la pregunta 16). No inventes otros ejemplos; invita a usar los de abajo.',
@@ -1006,10 +1003,13 @@ REGLAS ABSOLUTAS:
       .replace(/\s*\[AVANZAR\]\s*/gi, '')
       .trim();
 
-    // newAnsweredCount: only advances when [AVANZAR] detected (not on clarifications)
+    // BUG 6 FIX: newAnsweredCount can only ever be currentQuestionIndex or currentQuestionIndex + 1.
+    // Math.min caps it at total questions to prevent any off-by-one from skipping questions.
     const newAnsweredCount = isRejection
       ? currentQuestionIndex
-      : (hasAdvanced ? currentQuestionIndex + 1 : currentQuestionIndex);
+      : (hasAdvanced
+          ? Math.min(currentQuestionIndex + 1, BRAND_BRIEF_QUESTIONS.length)
+          : currentQuestionIndex);
 
     // Build updated raw_responses: append current message only if accepted
     const newRawResponses = hasAdvanced
@@ -1033,21 +1033,30 @@ REGLAS ABSOLUTAS:
       await supabase.from('steve_conversations').update({ pending_question_index: null }).eq('id', activeConversationId);
     }
 
+    // BUG 5 FIX 2: Prepend analysis-pending notice before the brief so the client knows
+    // the analysis is running and can take up to 8 minutes.
+    if (newAnsweredCount >= BRAND_BRIEF_QUESTIONS.length && !isRejection) {
+      const avisoText = `⏳ *saca termo y se prepara para el análisis* 🐕\n\n¡WOOF! Tu brief ya está listo. Además estoy lanzando el análisis automático de tu sitio web y el de tu competencia ahora mismo. Puede demorar hasta 8 minutos — anda por un café y cuando vuelvas tendrás el análisis completo de SEO, Keywords y Competencia en las pestañas correspondientes. ¡No cierres la sesión!\n\n---\n\n`;
+      assistantMessage = avisoText + assistantMessage;
+    }
+
     await supabase.from('steve_messages').insert({
       conversation_id: activeConversationId,
       role: 'assistant',
       content: assistantMessage,
     });
 
-    // ── BUG 5 FIX: Save competitors — DELETE all existing first, then INSERT fresh ones ──
+    // ── BUG 4+5 FIX: Save competitors — DELETE all existing first, then INSERT fresh ones ──
     // Using delete+insert instead of upsert prevents stale old competitors from persisting
     // when the user changes their competitors (e.g. swaps one out or corrects a URL).
     if (hasAdvanced && currentQuestionIndex === 9) {
       try {
         // message IS the Q9 answer (competitor form formatted by StructuredFieldsForm)
+        // BUG 4 FIX: Log full raw message so we can debug parse failures
+        console.log('[steve-chat] Q9 raw message (for parser debug):\n', JSON.stringify(message));
         const compNames = [...message.matchAll(/Nombre Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
         const compUrls = [...message.matchAll(/Web \/ Instagram Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
-        console.log(`[steve-chat] Competitor parser found ${compNames.length} names, ${compUrls.length} URLs in Q9 message`);
+        console.log(`[steve-chat] Competitor parser — names: ${JSON.stringify(compNames)} | urls: ${JSON.stringify(compUrls)}`);
 
         // Delete ALL existing competitors for this client so we start fresh
         const { error: delErr } = await supabase.from('competitor_tracking').delete().eq('client_id', client_id);
@@ -1166,6 +1175,18 @@ REGLAS ABSOLUTAS:
               body: JSON.stringify({ client_id, research }),
             });
             if (!strategyRes.ok) throw new Error(`Strategy failed: ${strategyRes.status}`);
+            // BUG 5 FIX 3: Explicitly write 'complete' after BOTH phases finish successfully.
+            // analyze-brand-strategy also writes it internally, but we write it here too as a
+            // safety net in case the function's internal write was interrupted by Deno's lifecycle.
+            await supabase.from('brand_research').upsert({
+              client_id,
+              research_type: 'analysis_status',
+              research_data: {
+                status: 'complete',
+                research_completed_at: new Date().toISOString(),
+                strategy_completed_at: new Date().toISOString(),
+              },
+            }, { onConflict: 'client_id,research_type' });
             console.log(`[steve-chat] Auto-analysis complete for client ${client_id}`);
           } catch (err) {
             console.error('[steve-chat] Auto-analysis error:', err);
