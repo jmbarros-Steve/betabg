@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-opus-4-6',
-        max_tokens: 8000,
+        max_tokens: 16000,
         system: `Eres un estratega de marketing digital experto en e-commerce latinoamericano.\n${knowledgeSection}${bugSection}${phaseRulesSection}Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
         messages: [{ role: 'user', content: analysisPrompt }],
       }),
@@ -298,14 +298,37 @@ Deno.serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
+    const stopReason = aiData.stop_reason;
     let rawContent = aiData.content?.[0]?.text || '{}';
+
+    if (stopReason === 'max_tokens') {
+      console.warn(`[analyze-brand-strategy] Claude response hit max_tokens limit (${rawContent.length} chars) — JSON may be truncated`);
+    }
+
+    // Strip markdown fences, then extract the outermost JSON object to handle any preamble/postamble text
     rawContent = rawContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const firstBrace = rawContent.indexOf('{');
+    if (firstBrace > 0) rawContent = rawContent.slice(firstBrace);
+    // Find matching closing brace
+    (() => {
+      let depth = 0, inStr = false, esc = false;
+      for (let i = 0; i < rawContent.length; i++) {
+        const ch = rawContent[i];
+        if (esc) { esc = false; continue; }
+        if (ch === '\\' && inStr) { esc = true; continue; }
+        if (ch === '"') inStr = !inStr;
+        if (!inStr) {
+          if (ch === '{') depth++;
+          if (ch === '}') { depth--; if (depth === 0) { rawContent = rawContent.slice(0, i + 1); return; } }
+        }
+      }
+    })();
 
     let result: any = {};
     try {
       result = JSON.parse(rawContent);
     } catch (parseErr) {
-      console.error('JSON parse error:', parseErr, 'Raw:', rawContent.slice(0, 500));
+      console.error('JSON parse error:', parseErr, 'stop_reason:', stopReason, 'Raw (first 500):', rawContent.slice(0, 500));
       result = { executive_summary: rawContent, parse_error: true };
     }
 
@@ -332,14 +355,23 @@ Deno.serve(async (req) => {
 
     // Persist each section
     const researchTypes = ['seo_audit', 'competitor_analysis', 'keywords', 'ads_library_analysis', 'cost_benchmarks', 'seo_roadmap', 'competitive_domination'];
+    const savedSections: string[] = [];
     for (const rt of researchTypes) {
       if (result[rt]) {
-        await supabase.from('brand_research').upsert(
+        const { error: upsertErr } = await supabase.from('brand_research').upsert(
           { client_id, research_type: rt, research_data: result[rt] },
           { onConflict: 'client_id,research_type' }
         );
+        if (upsertErr) {
+          console.error(`[analyze-brand-strategy] Failed to save ${rt}:`, upsertErr.message);
+        } else {
+          savedSections.push(rt);
+        }
+      } else {
+        console.warn(`[analyze-brand-strategy] Section missing in AI response: ${rt}`);
       }
     }
+    console.log(`[analyze-brand-strategy] Saved sections: ${savedSections.join(', ') || 'none'} | parse_error: ${!!result.parse_error}`);
 
     if (result.executive_summary) {
       const summaryForDb = typeof result.executive_summary === 'string'
