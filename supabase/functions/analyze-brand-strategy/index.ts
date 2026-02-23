@@ -433,36 +433,41 @@ Deno.serve(async (req) => {
 
     const phaseSection = fase_negocio ? `\nFASE: ${fase_negocio} | PRESUPUESTO: ${presupuesto_ads || 'N/A'} CLP` : '';
 
-    // Build structured research context with ALL competitor data
-    const websiteSection = websiteContent ? `SITIO WEB DEL CLIENTE (${websiteUrl || 'URL no proporcionada'}):\n${websiteContent.slice(0, 4000)}` : 'SITIO WEB: No disponible';
+    // Build structured research data with client + 6 competitors
+    const numUserProvided = clientProvidedUrls?.length || 0;
+    const userCompetitors: { url: string; scraping: unknown }[] = [];
+    const autoCompetitors: { url: string; scraping: unknown }[] = [];
 
-    // Build competitor sections with clear labeling
-    let competitorSection = '';
     if (competitorContents?.length > 0) {
-      const competitorParts: string[] = [];
       for (let i = 0; i < competitorContents.length; i++) {
-        const content = competitorContents[i];
-        const url = clientProvidedUrls?.[i] || '';
-        const label = i < (clientProvidedUrls?.length || 0) ? 'INGRESADO POR USUARIO' : 'DETECTADO AUTOMÁTICAMENTE';
-        competitorParts.push(`### COMPETIDOR ${i + 1} (${label})${url ? ` — ${url}` : ''}\n${typeof content === 'string' ? content.slice(0, 2500) : JSON.stringify(content).slice(0, 2500)}`);
+        const entry = {
+          url: clientProvidedUrls?.[i] || `competidor_${i + 1}`,
+          scraping: competitorContents[i],
+        };
+        if (i < numUserProvided) {
+          userCompetitors.push(entry);
+        } else {
+          autoCompetitors.push(entry);
+        }
       }
-      competitorSection = `COMPETIDORES ANALIZADOS (${competitorContents.length} total):\n\n${competitorParts.join('\n\n')}`;
-    } else {
-      competitorSection = 'COMPETIDORES: No proporcionados';
     }
 
-    const researchContext = `MARCA: ${clientName} (${clientCompany || 'Sin empresa'})
-WEBSITE: ${websiteUrl || 'No proporcionado'}
+    const researchData = {
+      client: {
+        name: clientName,
+        company: clientCompany || null,
+        url: websiteUrl || null,
+        scraping: websiteContent || null,
+        brief: brandContext || null,
+        fase_negocio: fase_negocio || null,
+        presupuesto_ads: presupuesto_ads || null,
+      },
+      user_competitors: userCompetitors,
+      auto_competitors: autoCompetitors,
+    };
 
-${websiteSection}
-
-${competitorSection}
-
-BRIEF DEL CLIENTE:
-${brandContext || 'Sin contexto adicional'}`;
-
-    // Truncate to 20,000 chars to fit all competitor data
-    const truncatedResearch = researchContext.slice(0, 20000);
+    // Truncate to 20,000 chars — prioritize: client complete > user competitors > auto competitors
+    const truncatedResearch = JSON.stringify(researchData).slice(0, 20_000);
 
     // Update progress
     await supabase.from('brand_research').upsert(
