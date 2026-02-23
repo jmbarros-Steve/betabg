@@ -201,6 +201,8 @@ async function extractUrlContent(url: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+  let queueId: string | null = null;
+
   try {
     const { sourceType, content, autoSave = false, title } = await req.json();
     console.log(`[Step 0] Received request — sourceType: ${sourceType}, contentLength: ${content?.length || 0}, autoSave: ${autoSave}`);
@@ -240,7 +242,7 @@ Deno.serve(async (req) => {
       console.error('[Step 1] Queue insert error:', queueErr);
     }
 
-    const queueId = queueRow?.id;
+    queueId = queueRow?.id || null;
     console.log(`[Step 1] Queue record created: ${queueId}`);
 
     // ── Step 2: Extract text based on source type ────────────────────────────
@@ -392,31 +394,23 @@ Deno.serve(async (req) => {
     console.error('learn-from-source error:', errorMessage);
     console.error('Full error:', err);
 
-    // Try to update queue record with error — use specific ID
-    try {
-      const body = await req.clone().json().catch(() => ({}));
-      if (body.sourceType) {
+    // Update queue record with error using the queueId from outer scope
+    if (queueId) {
+      try {
         const supabase = createClient(
           Deno.env.get('SUPABASE_URL')!,
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
         );
-        // Find the most recent processing record and update by ID
-        const { data: pendingRows } = await supabase
-          .from('learning_queue')
-          .select('id')
-          .eq('status', 'processing')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (pendingRows && pendingRows.length > 0) {
-          await supabase.from('learning_queue').update({
-            status: 'error',
-            error_message: errorMessage,
-            processed_at: new Date().toISOString(),
-          }).eq('id', pendingRows[0].id);
-        }
+        await supabase.from('learning_queue').update({
+          status: 'error',
+          error_message: errorMessage,
+          processed_at: new Date().toISOString(),
+        }).eq('id', queueId);
+        console.log(`[Error Handler] Queue record ${queueId} marked as error`);
+      } catch (updateErr) {
+        console.error('[Error Handler] Failed to update queue:', updateErr);
       }
-    } catch { /* ignore */ }
+    }
 
     return new Response(
       JSON.stringify({ error: errorMessage }),
