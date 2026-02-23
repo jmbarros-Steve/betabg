@@ -64,62 +64,34 @@ Responde con JSON válido: { "consumer_profile": { ... } }`,
     id: 'competitive_analysis',
     keys: ['competitive_analysis'],
     maxTokens: 3000,
-    prompt: `Eres un estratega competitivo senior. Tienes los datos de scraping del sitio web del cliente Y de sus competidores. Genera ÚNICAMENTE la sección "competitive_analysis".
-
-Debe incluir:
-
-a) "competitors": Array — análisis INDIVIDUAL de CADA competidor:
-   Para CADA competidor genera un objeto con:
-   - "name": Nombre/URL del competidor
-   - "url": URL del competidor
-   - "value_proposition": Propuesta de valor principal (extraída de su sitio, cita frases reales)
-   - "strengths": Fortalezas detectadas (array, mínimo 2, basadas en datos reales)
-   - "weaknesses": Debilidades detectadas (array, mínimo 2)
-   - "positioning": Posicionamiento detectado en su contenido
-   - "ad_strategy_inferred": Estrategia publicitaria inferida del sitio
-   - "attack_vector": Cómo el cliente puede quitarles clientes
-   - "seo_score": número de 0 a 100 basado en meta tags y contenido
-   - "price_positioning": Posicionamiento de precios detectado
-   - "threat_level": "alto", "medio" o "bajo" con justificación
-
-b) "market_gaps": Gaps de mercado que NINGÚN competidor cubre (array)
-c) "competitive_advantage": Ventajas competitivas del cliente que debe explotar
-d) "market_trends": Tendencias del mercado inferidas del análisis
-
-CRÍTICO: Analiza CADA competidor individualmente con datos REALES. NUNCA dejes competidores sin analizar.
-
-Responde ÚNICAMENTE con JSON válido: { "competitive_analysis": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "competitive_analysis". Debe incluir:
+a) Análisis INDIVIDUAL de CADA uno de los 6 competidores:
+   Para CADA competidor: Nombre/URL, Propuesta de valor principal (cita frases reales si las hay), Fortalezas detectadas (mínimo 2), Debilidades detectadas (mínimo 2), Qué hacen MEJOR que el cliente, Qué hace el cliente MEJOR que ellos, Estrategia de contenido observada, Nivel de amenaza: "alto", "medio" o "bajo" con justificación
+b) Matriz comparativa: Tabla resumen de los 6 competidores vs el cliente
+c) Insights estratégicos: Gaps de mercado que NINGÚN competidor cubre, Ventajas competitivas del cliente que debe explotar, Tendencias del mercado inferidas
+CRÍTICO: Analiza CADA competidor individualmente con datos REALES de su sitio. NUNCA dejes competidores sin analizar.
+Responde con JSON válido: { "competitive_analysis": { ... } }`,
   },
   {
     id: 'positioning_strategy',
     keys: ['positioning_strategy'],
     maxTokens: 2500,
-    prompt: `Eres un experto en posicionamiento de marca y estrategia. Con base en los datos del cliente y sus competidores, genera ÚNICAMENTE la sección "positioning_strategy".
-
-Debe incluir:
-- "current_positioning": Posicionamiento actual del cliente (percibido del sitio)
-- "competitor_positioning": Posicionamiento de cada competidor en 1 línea
-- "perceptual_map": Mapa perceptual con 2 ejes relevantes y ubicación de cada player
-- "desired_positioning": Posicionamiento recomendado basado en gaps competitivos
-- "differentiation": Diferenciación principal recomendada
-- "value_proposition": Statement de posicionamiento: "Para [audiencia], [marca] es [categoría] que [beneficio] porque [razón]"
-- "messaging_pillars": Mensajes clave diferenciadores (array de 3-5)
-- "communication_territories": Territorios de comunicación que debe "adueñarse"
-
-IMPORTANTE: El posicionamiento debe basarse en los gaps reales detectados. No propongas posicionamiento genérico.
-
-Responde ÚNICAMENTE con JSON válido: { "positioning_strategy": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "positioning_strategy". Debe incluir:
+- Posicionamiento actual del cliente: cómo se percibe según su sitio web
+- Posicionamiento de cada competidor: en 1 línea, cómo se posiciona cada uno
+- Mapa perceptual: 2 ejes recomendados relevantes para este mercado, ubicación del cliente y cada competidor
+- Posicionamiento recomendado: dónde debería posicionarse basado en gaps competitivos
+- Statement de posicionamiento: "Para [audiencia], [marca] es [categoría] que [beneficio diferencial] porque [razón para creer]"
+- Mensajes clave diferenciadores (3-5 mensajes que debe usar consistentemente)
+- Territorios de comunicación que debe "adueñarse"
+El posicionamiento debe basarse en los gaps reales detectados del análisis competitivo.
+Responde con JSON válido: { "positioning_strategy": { ... } }`,
   },
   {
     id: 'action_plan',
     keys: ['action_plan'],
     maxTokens: 3500,
-    prompt: `Eres un consultor estratégico senior. Con base en TODOS los datos de research del cliente y sus competidores, genera ÚNICAMENTE la sección "action_plan".
-
-Debe contener exactamente 7 accionables estratégicos usando el framework SCR:
-
+    prompt: `Genera ÚNICAMENTE la sección "action_plan". Debe contener exactamente 7 accionables estratégicos usando framework SCR.
 Para CADA uno de los 7 accionables:
 - "title": Nombre claro y accionable
 - "situation": La situación actual con datos reales del análisis
@@ -128,43 +100,22 @@ Para CADA uno de los 7 accionables:
 - "priority": "alta", "media" o "baja"
 - "timeline": Tiempo estimado de implementación
 - "expected_impact": Impacto esperado cuantificado
-
-Los 7 accionables deben cubrir: 1) Branding/Identidad, 2) Contenido/Content marketing, 3) SEO, 4) Paid media, 5) Conversión/CRO, 6) Retención/Fidelización, 7) Crecimiento/Escalamiento.
-
-CRÍTICO: Cada accionable debe ser ESPECÍFICO al cliente y basado en datos reales. NADA genérico.
-
-Responde ÚNICAMENTE con JSON válido: { "action_plan": [...] }
-Sin markdown, sin backticks, sin texto adicional.`,
+Los 7 accionables deben cubrir: 1) Branding, 2) Contenido, 3) SEO, 4) Paid media, 5) Conversión/CRO, 6) Retención, 7) Crecimiento
+Cada accionable debe ser ESPECÍFICO al cliente basado en datos reales. NADA genérico.
+Responde con JSON válido: { "action_plan": [...] }`,
   },
   {
     id: 'seo_audit',
     keys: ['seo_audit'],
     maxTokens: 3000,
-    prompt: `Eres un experto SEO técnico y estratégico. Tienes los datos de scraping del sitio web del cliente Y de sus competidores. Genera ÚNICAMENTE la sección "seo_audit".
-
-Debe incluir:
-
-a) "score": número de 0 a 100. Calcula basándote en:
-   - Presencia y calidad de meta tags (20 pts)
-   - Estructura de headings H1-H3 (15 pts)
-   - Calidad del contenido (20 pts)
-   - URLs y navegación (15 pts)
-   - Contenido duplicado o thin content (15 pts)
-   - Schema markup y técnicos (15 pts)
-   SOLO da 0 si LITERALMENTE no hay ningún dato del sitio.
-
-b) "meta_analysis": Meta titles y descriptions encontrados, evaluación de calidad
-c) "content_structure": Estructura de headings H1/H2/H3, evaluación de jerarquía
-d) "issues": Problemas detectados priorizados por impacto (array de strings)
-e) "recommendations": Acciones prioritarias con impacto estimado (array de strings)
-f) "technical_seo_priority": Top 3 acciones técnicas SEO
-g) "competitive_seo_gap": Qué hacen bien los competidores en SEO que el cliente NO hace
-h) "competitor_comparison": Para cada competidor con datos: sus meta tags vs las del cliente, estructura comparada, oportunidades SEO que explotan
-
-CRÍTICO: Usa los datos de scraping REALES. Analiza meta tags, títulos y contenido que realmente están en los datos.
-
-Responde ÚNICAMENTE con JSON válido: { "seo_audit": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "seo_audit". Debe incluir:
+a) SCORE SEO (0-100): Calcula basado en datos disponibles. SOLO da 0 si literalmente NO hay ningún dato. Si tienes meta tags, títulos o contenido, analízalos y da un score real con justificación.
+b) Análisis del sitio del CLIENTE: Meta titles y evaluación, Meta descriptions y evaluación, Estructura de headings H1/H2/H3, Contenido (densidad, relevancia), Estructura de URLs, Schema markup (presencia o ausencia)
+c) Análisis SEO COMPARATIVO con los 6 competidores: Para cada competidor con datos: qué hacen bien en SEO que el cliente NO hace, meta tags comparadas, estructura de contenido comparada
+d) Problemas detectados (lista priorizada por impacto)
+e) Acciones prioritarias (lista priorizada con impacto estimado y esfuerzo)
+CRÍTICO: Usa los datos de scraping REALES. Si los competidores tienen mejor SEO, muestra específicamente POR QUÉ.
+Responde con JSON válido: { "seo_audit": { ... } }`,
   },
   {
     id: 'keywords',
