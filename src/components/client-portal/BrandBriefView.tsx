@@ -1415,21 +1415,23 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       checkPage(12);
       const rowH = 11;
       const rowX = margin;
+      // Auto-scale columns to fit maxWidth
+      const totalW = colWidths.reduce((a, b) => a + b, 0);
+      const scale = totalW > maxWidth ? maxWidth / totalW : 1;
+      const scaledWidths = colWidths.map(w => w * scale);
       let cx = rowX;
       if (header) {
         doc.setFillColor(brandR, brandG, brandB);
       } else {
         doc.setFillColor(rowIdx % 2 === 0 ? 255 : 247, rowIdx % 2 === 0 ? 255 : 248, rowIdx % 2 === 0 ? 255 : 254);
       }
-      // fill background with rounded corners for first/last row
       doc.rect(rowX, y, maxWidth, rowH, 'F');
-      // subtle border
       doc.setDrawColor(header ? brandR : 215, header ? brandG : 218, header ? brandB : 228);
       doc.setLineWidth(header ? 0 : 0.15);
       if (!header) doc.line(rowX, y + rowH, rowX + maxWidth, y + rowH);
       cx = rowX;
       doc.setFont('helvetica', header ? 'bold' : 'normal');
-      doc.setFontSize(header ? 8.5 : 8);
+      doc.setFontSize(header ? 8 : 7.5);
       doc.setTextColor(header ? 255 : 40, header ? 255 : 40, header ? 255 : 40);
       for (let i = 0; i < cells.length; i++) {
         if (i > 0 && !header) {
@@ -1437,9 +1439,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           doc.setLineWidth(0.15);
           doc.line(cx, y + 2, cx, y + rowH - 2);
         }
-        const txt = String(cells[i] ?? '').slice(0, 55);
-        doc.text(txt, cx + 4, y + 7);
-        cx += colWidths[i];
+        // Truncate text to fit column
+        const colW = scaledWidths[i];
+        let txt = String(cells[i] ?? '');
+        while (txt.length > 3 && doc.getTextWidth(txt) > colW - 6) {
+          txt = txt.slice(0, -1);
+        }
+        doc.text(txt, cx + 3, y + 7);
+        cx += colW;
       }
       y += rowH;
     };
