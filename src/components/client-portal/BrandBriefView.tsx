@@ -1302,59 +1302,48 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       .replace(/#{1,4}\s*/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
       .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
       .replace(/[\u{2600}-\u{27BF}]/gu, '')
-      .replace(/[⚠️✅❌★→•]/g, '')
+      .replace(/[⚠️✅❌★•]/g, '')
+      .replace(/->/g, '•')
       .replace(/1️⃣|2️⃣|3️⃣|⭐|🔴|🟡|🟢/g, '')
       .trim();
 
-    const addBody = (text: string, indent = 0, lineH = 5.2) => {
+    const addBody = (text: string, indent = 0, lineH = 5) => {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(55, 55, 55);
-      const clean = stripEmojis(text).replace(/->/g, '•');
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      const clean = stripEmojis(text);
       const lines = doc.splitTextToSize(clean, maxWidth - indent - 4);
       for (const line of lines) {
         checkPage(lineH + 1);
         doc.text(line, margin + indent + 2, y);
         y += lineH;
       }
-      y += 3;
+      y += 2;
     };
 
     const addSubTitle = (title: string) => {
-      checkPage(14);
-      y += 3;
+      checkPage(12);
+      y += 4;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.setTextColor(accentR, accentG, accentB);
+      doc.setTextColor(brandR, brandG, brandB);
       doc.text(title, margin + 2, y);
       doc.setTextColor(0, 0, 0);
-      y += 5;
-      // thin gold separator
-      doc.setDrawColor(accentR, accentG, accentB);
-      doc.setLineWidth(0.3);
-      doc.line(margin, y, margin + 60, y);
-      y += 5;
+      y += 7;
     };
 
     const addSectionHeader = (num: string, title: string) => {
-      checkPage(22);
-      y += 16; // generous spacing before section
-      // Circle number
-      doc.setFillColor(accentR, accentG, accentB);
-      doc.circle(margin + 5, y + 3, 5.5, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text(num, margin + 5, y + 5.5, { align: 'center' });
-      // Title bar
+      checkPage(20);
+      y += 10;
+      // Full-width navy bar with integrated number
       doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(margin + 13, y - 2, maxWidth - 13, 13, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, 12, 2, 2, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
+      doc.setFontSize(12);
       doc.setTextColor(255, 255, 255);
-      doc.text(title, margin + 18, y + 7);
+      doc.text(`${num}. ${title}`, margin + 6, y + 8);
       doc.setTextColor(0, 0, 0);
-      y += 20;
+      y += 18;
     };
 
     const addInsightBox = (text: string) => {
@@ -1399,9 +1388,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setTextColor(50, 50, 50);
       const lines = doc.splitTextToSize(`•  ${stripEmojis(text)}`, maxWidth - indent - 4);
       for (const line of lines) {
-        checkPage(5.5);
+        checkPage(5);
         doc.text(line, margin + indent + 2, y);
-        y += 5.2;
+        y += 5;
       }
       y += 1;
     };
@@ -1458,12 +1447,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFillColor(accentR, accentG, accentB);
     doc.rect(0, bandY, pageWidth, 3, 'F');
 
-    // Logo centrado arriba
-    try {
-      const logoSrc = clientInfo?.logo_url || assets.logo[0] || logo;
-      const logoBase64 = await loadImageAsBase64(logoSrc);
-      doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 20, 25, 40, 16);
-    } catch {}
+    // Text-based logo — clean and crisp, no pixelated image
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text('STEVE.IO', pageWidth / 2, 36, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 210);
+    doc.text('PERFORMANCE MARKETING CON IA', pageWidth / 2, 43, { align: 'center' });
 
     // Business name as main title, user name as subtitle
     const businessName_cover = clientInfo?.company || clientInfo?.name || 'Cliente';
@@ -1519,12 +1511,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.text('DASHBOARD EJECUTIVO DE KPIs', pageWidth / 2, 11, { align: 'center' });
     y = 24;
 
+    // Helper to format numbers in CLP
+    const fmtCLP = (val: number) => '$' + Math.round(val).toLocaleString('es-CL') + ' CLP';
+    const cpaMaxCLP = margin !== null ? fmtCLP(Math.round(Number(cpaMax) * 950)) : null;
+
     const kpiData = [
-      { label: 'Ticket Promedio', value: financials ? formatCurrency(financials.price) : 'N/D', dark: true },
-      { label: 'CPA Maximo Viable', value: cpaMax ? `$${cpaMax}` : 'N/D', dark: false },
+      { label: 'Ticket Promedio', value: financials ? fmtCLP(financials.price) : 'N/D', dark: true },
+      { label: 'CPA Maximo Viable', value: cpaMax ? `$${cpaMax} USD (${cpaMaxCLP || ''})` : 'N/D', dark: false },
       { label: 'ROAS Objetivo', value: '3x - 5x', dark: true },
       { label: 'Margen Bruto', value: marginPct ? `${marginPct}%` : 'N/D', dark: false },
-      { label: 'Presupuesto Mes 1', value: '$600 USD', dark: true },
+      { label: 'Presupuesto Mes 1', value: '$600 USD (~$570.000 CLP)', dark: true },
       { label: 'Tasa de Recompra', value: '40%', dark: false },
     ];
 
@@ -1585,12 +1581,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
       {
         title: 'SOLUCION',
-        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en $${cpaMax || 'N/D'}, keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia con IA en tiempo real.`,
+        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en $${cpaMax || 'N/D'} USD (${cpaMaxCLP || 'N/D'}), keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia con IA en tiempo real.`,
         col: 1, row: 0,
       },
       {
         title: 'INVERSION REQUERIDA',
-        text: 'Presupuesto inicial recomendado: $600 USD/mes (Fase 1, 0-30 dias). Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.',
+        text: 'Presupuesto inicial recomendado: $600 USD/mes (~$570.000 CLP) (Fase 1, 0-30 dias). Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.',
         col: 0, row: 1,
       },
       {
@@ -1634,11 +1630,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     if (financials && margin !== null) {
       addSubTitle('Indicadores Financieros Clave');
-      addKeyValue('Precio de Venta', formatCurrency(financials.price));
-      addKeyValue('Costo del Producto', formatCurrency(financials.cost));
-      addKeyValue('Costo de Envio', formatCurrency(financials.shipping));
-      addKeyValue('Margen Bruto', `${formatCurrency(financials.price - financials.cost - financials.shipping)} (${marginPct}%)`);
-      addKeyValue('CPA Maximo Viable', `$${cpaMax}`);
+      addKeyValue('Precio de Venta', fmtCLP(financials.price));
+      addKeyValue('Costo del Producto', fmtCLP(financials.cost));
+      addKeyValue('Costo de Envio', fmtCLP(financials.shipping));
+      addKeyValue('Margen Bruto', `${fmtCLP(financials.price - financials.cost - financials.shipping)} (${marginPct}%)`);
+      addKeyValue('CPA Maximo Viable', `$${cpaMax} USD (${cpaMaxCLP || ''})`);
       // CPA explanation box
       if (cpaMax && margin !== null) {
         checkPage(22);
@@ -1651,7 +1647,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(60, 40, 0);
-        const cpaExplain = `Por que $${cpaMax}? Tu margen bruto unitario es de ${formatCurrency(margin)}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
+        const cpaExplain = `Por que $${cpaMax} USD (${cpaMaxCLP || ''})? Tu margen bruto unitario es de ${fmtCLP(Number(margin))}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
         const cpaLines = doc.splitTextToSize(cpaExplain, maxWidth - 10);
         doc.text(cpaLines.slice(0, 4), margin + 5, y + 6);
         y += 24;
@@ -1741,13 +1737,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         if (!trimmed || trimmed.match(/^\|[\s-:]+\|$/)) continue;
         if (trimmed.match(/^Accionable\s+\d+/i) || (trimmed.match(/^\d+\.\s/) && trimmed.length < 80)) {
           accionableNum++;
-          checkPage(12);
-          doc.setFillColor(accentR, accentG, accentB);
-          doc.circle(margin + 4, y - 1, 3.5, 'F');
+          checkPage(10);
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(10);
           doc.setTextColor(brandR, brandG, brandB);
-          doc.text(trimmed, margin + 11, y + 1);
+          doc.text(`${accionableNum}. ${trimmed}`, margin + 4, y);
           doc.setTextColor(0, 0, 0);
           y += 6;
         } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
@@ -2214,7 +2208,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       'Instalar Meta Pixel y Google Tag en el sitio web',
       'Conectar Shopify, Meta Ads y Google Ads al portal STEVE.IO',
       'Definir y aprobar el Buyer Persona con el equipo',
-      `Verificar que el CPA objetivo sea <= $${cpaMax || 'N/D'} antes de lanzar`,
+      `Verificar que el CPA objetivo sea <= $${cpaMax || 'N/D'} USD (${cpaMaxCLP || 'N/D'}) antes de lanzar`,
       'Crear o revisar la landing page de producto principal',
       'Activar flujo de abandono de carrito en Klaviyo',
       'Solicitar 3 testimonios reales a clientes actuales',
@@ -2240,9 +2234,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     y += 6;
 
     // ─── SECCIÓN: GLOSARIO COMPACTO ─────────────────────────────────────────────
-    doc.addPage();
-    y = 20;
-    addWatermark();
+    // No forced page break — let content flow naturally
+    checkPage(30);
     addSectionHeader('15', 'GLOSARIO COMPACTO DE PERFORMANCE MARKETING');
 
     const compactGlossary = [
@@ -2299,11 +2292,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFillColor(accentR, accentG, accentB);
     doc.rect(0, pageHeight * 0.2 - 1.5, pageWidth, 3, 'F');
 
-    // Logo
-    try {
-      const logoBase64 = await loadImageAsBase64(logo);
-      doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 18, 20, 36, 14);
-    } catch {}
+    // Text-based logo on final page — no pixelated image
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.text('STEVE.IO', pageWidth / 2, 32, { align: 'center' });
 
     // Title
     doc.setFont('helvetica', 'bold');
@@ -2334,7 +2327,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(accentR + 40, accentG + 40, 80);
-      doc.text(`-> ${sp}`, pageWidth / 2, steveY, { align: 'center' });
+      doc.text(`•  ${sp}`, pageWidth / 2, steveY, { align: 'center' });
       steveY += 7;
     }
 
@@ -2345,7 +2338,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text(`Tu CPA maximo viable es $${cpaMax || 'N/D'}. Steve Ads esta calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
+    doc.text(`Tu CPA maximo viable es $${cpaMax || 'N/D'} USD (${cpaMaxCLP || 'N/D'}). Steve Ads esta calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
     steveY += 26;
 
     // CTA
