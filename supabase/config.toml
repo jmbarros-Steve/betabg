@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.check-video-status]
 verify_jwt = false
+
+[functions.learn-from-source]
+verify_jwt = false
