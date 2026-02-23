@@ -27,6 +27,7 @@ interface KnowledgeRule {
   titulo: string;
   contenido: string;
   categoria: string;
+  linked_by_time?: boolean;
 }
 
 type SourceFilter = 'all' | 'youtube' | 'pdf' | 'url' | 'text';
@@ -147,7 +148,7 @@ export function LearningHistory() {
     if (data && data.length > 0) {
       setExpandedRules(data as KnowledgeRule[]);
     } else if (item.processed_at || item.created_at) {
-      // Fallback: wide window from item creation to well after processing
+      // Fallback 1: wide window from item creation to well after processing
       const startTime = item.created_at
         ? new Date(new Date(item.created_at).getTime() - 60 * 1000) // 1 min before creation
         : new Date(new Date(item.processed_at!).getTime() - 30 * 60 * 1000); // 30 min before processing
@@ -164,7 +165,27 @@ export function LearningHistory() {
         .order('created_at', { ascending: true })
         .limit(50);
 
-      setExpandedRules((fallbackData as KnowledgeRule[]) || []);
+      if (fallbackData && fallbackData.length > 0) {
+        setExpandedRules((fallbackData as KnowledgeRule[]).map(r => ({ ...r, linked_by_time: true })));
+      } else if (item.processed_at) {
+        // Fallback 2 (final): orphan rules in ±10 minutes around processed_at
+        const processedTime = new Date(item.processed_at);
+        const tenMinStart = new Date(processedTime.getTime() - 10 * 60 * 1000).toISOString();
+        const tenMinEnd = new Date(processedTime.getTime() + 10 * 60 * 1000).toISOString();
+
+        const { data: finalFallbackData } = await supabase
+          .from('steve_knowledge')
+          .select('id, titulo, contenido, categoria')
+          .is('source_id', null)
+          .gte('created_at', tenMinStart)
+          .lte('created_at', tenMinEnd)
+          .order('created_at', { ascending: true })
+          .limit(100);
+
+        setExpandedRules(((finalFallbackData as KnowledgeRule[]) || []).map(r => ({ ...r, linked_by_time: true })));
+      } else {
+        setExpandedRules([]);
+      }
     } else {
       setExpandedRules([]);
     }
@@ -345,7 +366,9 @@ function HistoryRow({
                       {r.categoria}
                     </Badge>
                     <div className="min-w-0">
-                      <p className="font-medium">{r.titulo}</p>
+                      <p className="font-medium">
+                        {r.titulo} {r.linked_by_time ? <span className="text-muted-foreground">(vinculada por tiempo)</span> : null}
+                      </p>
                       <p className="text-muted-foreground line-clamp-2 mt-0.5">{r.contenido}</p>
                     </div>
                   </div>
