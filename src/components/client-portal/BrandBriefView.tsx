@@ -1789,7 +1789,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         if (parts) {
           addTableRow([parts[1].trim(), parts[2].trim()], chColWs, chi + 1);
         } else {
-          addTableRow([clean, ''], chColWs, chi + 1);
+          // No percentage found — show 0%
+          addTableRow([clean, '0%'], chColWs, chi + 1);
         }
       }
       y += 6;
@@ -1898,6 +1899,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       let accionableNum = 0;
       let currentTitle = '';
       let currentSCR: { s: string; c: string; r: string } = { s: '', c: '', r: '' };
+      let currentImpacto = '';
       const scrColors: Record<string, { bg: [number,number,number]; fg: [number,number,number]; label: string }> = {
         s: { bg: [230, 240, 255], fg: [27, 42, 74], label: 'SITUACION' },
         c: { bg: [255, 243, 230], fg: [180, 100, 20], label: 'COMPLICACION' },
@@ -1906,13 +1908,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
       const flushSCR = () => {
         if (accionableNum === 0) return;
-        checkPage(50);
+        // Measure dynamic card height
+        const scrEntries = (['s', 'c', 'r'] as const).filter(k => currentSCR[k]);
+        const scrBlockH = scrEntries.length * 10;
+        const titleClean = stripEmojis(currentTitle.replace(/^(Accionable\s*\d+[:.]\s*|\d+[:.]\s*)/i, ''));
+        const cardH = 18 + scrBlockH + (currentImpacto ? 12 : 0) + 4;
+        checkPage(cardH + 4);
         // Card container
         doc.setFillColor(250, 250, 254);
-        doc.roundedRect(margin, y, maxWidth, 48, 2, 2, 'F');
+        doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'F');
         doc.setDrawColor(midBlueR, midBlueG, midBlueB);
         doc.setLineWidth(0.5);
-        doc.roundedRect(margin, y, maxWidth, 48, 2, 2, 'S');
+        doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'S');
         // Number circle
         doc.setFillColor(brandR, brandG, brandB);
         doc.circle(margin + 8, y + 8, 5, 'F');
@@ -1920,11 +1927,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         doc.setFontSize(11);
         doc.setTextColor(255, 255, 255);
         doc.text(String(accionableNum), margin + 8, y + 9.5, { align: 'center' });
-        // Title
+        // Title — stripped of redundant numbering
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(brandR, brandG, brandB);
-        const titleLines = doc.splitTextToSize(currentTitle, maxWidth - 24);
+        const titleLines = doc.splitTextToSize(titleClean, maxWidth - 24);
         doc.text(titleLines[0] || '', margin + 16, y + 9);
         let sy = y + 16;
         // SCR sections
@@ -1945,7 +1952,24 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           doc.text(scrLines[0] || '', margin + 7, sy + 7);
           sy += 10;
         }
-        y += 52;
+        // Impacto de Negocio — styled colored block
+        if (currentImpacto) {
+          doc.setFillColor(253, 248, 240);
+          doc.roundedRect(margin + 4, sy, maxWidth - 8, 10, 1, 1, 'F');
+          doc.setFillColor(accentR, accentG, accentB);
+          doc.rect(margin + 4, sy, 2, 10, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(accentR, accentG, accentB);
+          doc.text('IMPACTO DE NEGOCIO', margin + 9, sy + 3.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(60, 40, 0);
+          const impLines = doc.splitTextToSize(stripEmojis(currentImpacto), maxWidth - 22);
+          doc.text(impLines[0] || '', margin + 9, sy + 7.5);
+          sy += 12;
+        }
+        y += cardH + 4;
       };
 
       for (const line of filteredPlanLines) {
@@ -1956,6 +1980,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           accionableNum++;
           currentTitle = trimmed;
           currentSCR = { s: '', c: '', r: '' };
+          currentImpacto = '';
+        } else if (trimmed.toLowerCase().startsWith('impacto de negocio') || trimmed.toLowerCase().startsWith('impacto:')) {
+          currentImpacto = trimmed.replace(/^[^:]*:\s*/, '');
         } else if (trimmed.toLowerCase().startsWith('situaci')) {
           currentSCR.s = trimmed.replace(/^[^:]*:\s*/, '');
         } else if (trimmed.toLowerCase().startsWith('complic')) {
@@ -2265,18 +2292,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
       y += 6;
 
-      // Detailed comparison table
+      // Detailed comparison table — wider with more data
       addSubTitle('Tabla Comparativa Detallada');
-      const colWs = [40, 18, 25, 45, 42];
-      addTableRow(['Marca', 'Score', 'Precio', 'Posicionamiento', 'Estrategia Ads'], colWs, 0, true);
+      const colWs = [34, 14, 30, 44, 44];
+      addTableRow(['Marca', 'SEO', 'Rango Precios', 'Posicionamiento', 'Estrategia Ads'], colWs, 0, true);
       const clientName = clientInfo?.name || 'Tu Marca';
       addTableRow(
         [
-          clientName + ' *',
+          clientName.slice(0, 20) + ' *',
           String(clientScore),
-          'Tu marca',
-          (seo?.content_quality || 'Ver auditoria').slice(0, 30),
-          'STEVE.IO optimizado',
+          financials ? fmtCLP(financials.price) : 'N/D',
+          (seo?.content_quality || 'Optimizando').slice(0, 28),
+          'STEVE.IO IA',
         ],
         colWs, 1
       );
@@ -2284,21 +2311,43 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         const cscore = c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -8 : 7)));
         addTableRow(
           [
-            String(c.name || c.url || 'Competidor').slice(0, 22),
+            String(c.name || c.url || 'Competidor').slice(0, 20),
             String(cscore),
-            c.price_positioning || 'N/D',
-            String(c.positioning || c.value_proposition || '').slice(0, 30),
-            String(c.ad_strategy_inferred || 'No detectada').slice(0, 25),
+            c.price_positioning || c.rango_precios || 'N/D',
+            String(c.positioning || c.value_proposition || c.propuesta_valor || 'N/D').slice(0, 28),
+            String(c.ad_strategy_inferred || c.estrategia_ads || 'No detectada').slice(0, 24),
           ],
           colWs, i + 2
         );
       });
-      y += 6;
+      y += 4;
+
+      // Detailed SEO metrics if available
+      if (seo?.meta_description || seo?.h1 || seo?.schema_markup !== undefined) {
+        addSubTitle('Detalle Tecnico SEO');
+        const seoDetailCols = [50, 60, 60];
+        addTableRow(['Metrica', 'Tu Sitio', 'Recomendacion'], seoDetailCols, 0, true);
+        const seoDetails = [
+          ['H1 Tag', seo?.h1 ? 'Detectado' : 'No detectado', 'Unico, con keyword principal'],
+          ['Meta Description', seo?.meta_description ? 'Presente' : 'Ausente', '<160 caracteres, CTA incluido'],
+          ['Schema Markup', seo?.schema_markup ? 'Implementado' : 'No detectado', 'Product, Organization, FAQ'],
+          ['Mobile Friendly', seo?.mobile_friendly ? 'Si' : 'Revisar', 'Responsive design obligatorio'],
+          ['Velocidad', seo?.page_speed || 'No medida', '<3 segundos carga completa'],
+        ];
+        for (let si2 = 0; si2 < seoDetails.length; si2++) {
+          addTableRow(seoDetails[si2], seoDetailCols, si2 + 1);
+        }
+        y += 4;
+      }
 
       // SEO issues summary
       if (seo?.issues?.length > 0) {
         addSubTitle('Problemas SEO Detectados en Tu Sitio');
-        for (const issue of seo.issues.slice(0, 3)) { addArrowBullet(issue); }
+        for (const issue of seo.issues.slice(0, 5)) { addArrowBullet(issue); }
+      }
+      if (seo?.recommendations?.length > 0) {
+        addSubTitle('Recomendaciones SEO Prioritarias');
+        for (const rec of seo.recommendations.slice(0, 5)) { addArrowBullet(rec); }
       }
 
       if (seo?.competitive_seo_gap) { addSubTitle('Gap Analysis SEO'); addBody(seo.competitive_seo_gap); }
@@ -2412,23 +2461,57 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
     ];
 
-    // Meta Ads table — use addTableRow for consistent styling and margin safety
+    // Meta Ads — premium styled cards instead of plain table
     addSubTitle('Meta Ads — Copies Listos');
-    checkPage(10 + metaAds.length * 12);
-    const metaColWs = [30, 70, 30, 40];
-    addTableRow(['Anuncio', 'Texto Principal', 'CTA', 'Audiencia'], metaColWs, 0, true);
+    const metaFunnelColors: [number,number,number][] = [
+      [27, 42, 74],   // TOFU navy
+      [45, 74, 122],  // MOFU mid-blue
+      [200, 163, 90], // BOFU gold
+    ];
     for (let mi = 0; mi < metaAds.length; mi++) {
       const ad = metaAds[mi];
-      addTableRow([
-        ad.title.replace('Meta Ad ', ''),
-        stripEmojis(ad.texto).slice(0, 55),
-        ad.cta,
-        ad.audiencia.slice(0, 28),
-      ], metaColWs, mi + 1);
+      const mColor = metaFunnelColors[mi % metaFunnelColors.length];
+      checkPage(36);
+      // Card bg
+      doc.setFillColor(250, 250, 254);
+      doc.roundedRect(margin, y, maxWidth, 32, 2, 2, 'F');
+      doc.setDrawColor(...mColor);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(margin, y, maxWidth, 32, 2, 2, 'S');
+      // Header bar
+      doc.setFillColor(...mColor);
+      doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
+      doc.rect(margin, y + 5, maxWidth, 4, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(ad.title, margin + 5, y + 6.5);
+      // CTA badge
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.roundedRect(pageWidth - margin - 30, y + 2, 28, 5, 2, 2, 'F');
+      doc.setFontSize(6.5);
+      doc.text(ad.cta, pageWidth - margin - 16, y + 5.5, { align: 'center' });
+      // Body text
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(40, 40, 50);
+      const adTextLines = doc.splitTextToSize(stripEmojis(ad.texto), maxWidth - 12);
+      for (let tli = 0; tli < Math.min(adTextLines.length, 3); tli++) {
+        doc.text(adTextLines[tli], margin + 5, y + 14 + tli * 4.5);
+      }
+      // Audiencia tag
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 120);
+      doc.text('Audiencia: ', margin + 5, y + 28);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 70);
+      doc.text(ad.audiencia, margin + 5 + doc.getTextWidth('Audiencia: '), y + 28);
+      y += 35;
     }
-    y += 8;
+    y += 4;
 
-    // Google Ads copies — rendered as proper visual table
+    // Google Ads copies — premium styled cards
     const googleStrategy = (research as any).google_ads_strategy || research.ads_library_analysis?.google_ads_strategy;
     addSubTitle('Google Ads — Copies Listos');
     checkPage(10 + 3 * 11);
@@ -2444,16 +2527,37 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         url: clientInfo?.website_url || 'tusitio.com',
       },
     ];
-    // Google Ads table — use addTableRow for consistent styling and margin safety
-    const gColWs = [50, 80, 40];
-    addTableRow(['Headline (30 car.)', 'Descripcion (90 car.)', 'URL display'], gColWs, 0, true);
     for (let gi2 = 0; gi2 < googleAds.length; gi2++) {
       const gad = googleAds[gi2];
-      addTableRow([
-        stripEmojis(gad.headline).slice(0, 30),
-        stripEmojis(gad.desc).slice(0, 60),
-        gad.url.replace(/^https?:\/\//, '').slice(0, 30),
-      ], gColWs, gi2 + 1);
+      checkPage(28);
+      // Card
+      doc.setFillColor(248, 249, 255);
+      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, 'F');
+      doc.setDrawColor(brandR, brandG, brandB);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, 'S');
+      // Google blue accent
+      doc.setFillColor(66, 133, 244);
+      doc.rect(margin, y, 3, 24, 'F');
+      // Headline
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(66, 133, 244);
+      doc.text(stripEmojis(gad.headline).slice(0, 40), margin + 7, y + 7);
+      // URL
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(22, 130, 50);
+      doc.text(gad.url.replace(/^https?:\/\//, '').slice(0, 40), margin + 7, y + 12);
+      // Description
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(50, 50, 50);
+      const descLines = doc.splitTextToSize(stripEmojis(gad.desc), maxWidth - 14);
+      for (let dli = 0; dli < Math.min(descLines.length, 2); dli++) {
+        doc.text(descLines[dli], margin + 7, y + 17 + dli * 4);
+      }
+      y += 27;
     }
     y += 8;
 
