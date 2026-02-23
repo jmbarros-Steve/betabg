@@ -1302,12 +1302,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       .replace(/#{1,4}\s*/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
       .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
       .replace(/[\u{2600}-\u{27BF}]/gu, '')
-      .replace(/[⚠️✅❌★•]/g, '')
-      .replace(/->/g, '•')
+      .replace(/[⚠️✅❌★]/g, '')
       .replace(/1️⃣|2️⃣|3️⃣|⭐|🔴|🟡|🟢/g, '')
+      // Replace -> with bullet
+      .replace(/->/g, ' - ')
+      // Fix "1ã", "2ã" etc. (encoding artifact) → "1.", "2." etc.
+      .replace(/(\d)ã/g, '$1.')
       // Strip problematic Unicode chars that cause jsPDF font fallback to monospace
       .replace(/[\u0080-\u00FF]/g, (ch) => {
-        // Map common latin-1 supplement chars to ASCII equivalents
         const map: Record<string, string> = {
           'ã': 'a', 'Ã': 'A', 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
           'ñ': 'n', 'Ñ': 'N', 'ü': 'u', 'Ü': 'U', 'à': 'a', 'è': 'e', 'ì': 'i',
@@ -1317,8 +1319,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         };
         return map[ch] || '';
       })
-      // Strip any remaining chars outside basic ASCII + common punctuation
-      .replace(/[^\x20-\x7E\n\r\t]/g, '')
+      // Strip remaining non-ASCII except bullet
+      .replace(/[^\x20-\x7E\n\r\t•]/g, '')
       .trim();
 
     const addBody = (text: string, indent = 0, lineH = 5) => {
