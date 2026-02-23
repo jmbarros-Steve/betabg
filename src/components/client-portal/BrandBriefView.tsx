@@ -276,6 +276,13 @@ interface ResearchData {
   executive_summary?: any;
   competitive_domination?: any;
   cost_benchmarks?: any;
+  meta_ads_strategy?: any;
+  google_ads_strategy?: any;
+  action_plan?: any;
+  brand_identity?: any;
+  financial_analysis?: any;
+  consumer_profile?: any;
+  positioning_strategy?: any;
 }
 
 const QUESTION_CONFIG: Record<string, { label: string; icon: React.ReactNode; section: string }> = {
@@ -877,6 +884,42 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         if (mp.common_messages) patterns.push(`Mensajes comunes: ${mp.common_messages}`);
         if (patterns.length > 0) ads.winning_patterns = patterns;
       }
+    }
+
+    // ── META ADS STRATEGY: creativos_recomendados → hooks[], primary_texts[] for PDF ──
+    if (r.meta_ads_strategy && typeof r.meta_ads_strategy === 'object') {
+      const mas = r.meta_ads_strategy;
+      if (Array.isArray(mas.creativos_recomendados) && !Array.isArray(mas.hooks)) {
+        mas.hooks = mas.creativos_recomendados.map((c: any) => c.hook || '').filter(Boolean);
+        mas.primary_texts = mas.creativos_recomendados.map((c: any) => c.copy || '').filter(Boolean);
+      }
+    }
+
+    // ── GOOGLE ADS STRATEGY: ad_copies[].headline1/2/3 → headlines[], descriptions[] for PDF ──
+    if (r.google_ads_strategy && typeof r.google_ads_strategy === 'object') {
+      const gas = r.google_ads_strategy;
+      if (Array.isArray(gas.ad_copies) && !Array.isArray(gas.headlines)) {
+        gas.headlines = gas.ad_copies.flatMap((c: any) => [c.headline1, c.headline2, c.headline3].filter(Boolean));
+        gas.descriptions = gas.ad_copies.flatMap((c: any) => [c.description1, c.description2].filter(Boolean));
+      }
+    }
+
+    // ── ACTION PLAN: array of objects → ensure each item has string fields ──
+    if (Array.isArray(r.action_plan)) {
+      r.action_plan = r.action_plan.map((item: any) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+          return {
+            ...item,
+            title: item.title || '',
+            priority: item.priority || '',
+            timeline: item.timeline || '',
+            situation: typeof item.situation === 'string' ? item.situation : JSON.stringify(item.situation || ''),
+            resolution: typeof item.resolution === 'string' ? item.resolution : JSON.stringify(item.resolution || ''),
+          };
+        }
+        return String(item ?? '');
+      });
     }
 
     return r;
@@ -1907,7 +1950,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     addSectionHeader('12', 'PLANTILLAS DE COPY LISTAS PARA USAR');
 
     // Meta Ads copies — rendered as proper visual table
-    const metaStrategy = research.ads_library_analysis?.meta_ads_strategy;
+    const metaStrategy = (research as any).meta_ads_strategy || research.ads_library_analysis?.meta_ads_strategy;
     // Use business name from brief (not client name/owner name)
     const businessName = stripEmojis(getResponse('business_pitch')).split(/[.,\n]/)[0].slice(0, 40).trim() || clientInfo?.company || clientInfo?.name || 'Tu Marca';
     const metaAds = [
@@ -1970,7 +2013,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     y += 8;
 
     // Google Ads copies — rendered as proper visual table
-    const googleStrategy = research.ads_library_analysis?.google_ads_strategy;
+    const googleStrategy = (research as any).google_ads_strategy || research.ads_library_analysis?.google_ads_strategy;
     addSubTitle('Google Ads — Copies Listos');
     checkPage(10 + 3 * 11);
     const googleAds = [
