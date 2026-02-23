@@ -15,8 +15,6 @@ serve(async (req) => {
       creativeId,
       promptGeneracion,
       fotoBaseUrl,
-      logoUrl,
-      productUrl,
       formato,
       rechazoTexto,
     } = await req.json();
@@ -50,9 +48,12 @@ serve(async (req) => {
                       'square_hd';
 
     // Adjust prompt if there's rejection text
-    const promptFinal = rechazoTexto
+    const promptBase = rechazoTexto
       ? `${promptGeneracion}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
       : promptGeneracion;
+
+    // Add photography quality suffix
+    const promptFinal = `${promptBase}, shot on Canon EOS R5, 85mm f/1.4 lens, natural window lighting, editorial style`;
 
     // Call Fal.ai Flux Pro v1.1 Ultra
     const falBody: Record<string, unknown> = {
@@ -62,9 +63,11 @@ serve(async (req) => {
       enable_safety_checker: true,
     };
 
-    if (fotoBaseUrl) falBody.image_url = fotoBaseUrl;
-    if (logoUrl) falBody.logo_url = logoUrl;
-    if (productUrl) falBody.product_url = productUrl;
+    // Use product photo as style reference with low influence (not a copy)
+    if (fotoBaseUrl) {
+      falBody.image_url = fotoBaseUrl;
+      falBody.image_prompt_strength = 0.3;
+    }
 
     const falResponse = await fetch('https://fal.run/fal-ai/flux-pro/v1.1-ultra', {
       method: 'POST',
