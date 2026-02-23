@@ -30,6 +30,54 @@ interface ClientAsset { id: string; url: string; nombre: string; tipo: string; c
 interface BriefVisual { tipo: string; [key: string]: unknown; }
 interface Credits { creditos_disponibles: number; creditos_usados: number; plan: string; }
 
+// Smart renderer for brief visual fields — handles objects like texto_overlay, colores, escenas
+const renderBriefField = (key: string, val: unknown): React.ReactNode => {
+  if (val == null) return <p className="text-sm text-muted-foreground">—</p>;
+  if (typeof val !== 'object') return <p className="text-sm">{String(val)}</p>;
+  if (Array.isArray(val)) {
+    return (
+      <ul className="space-y-1">
+        {val.map((item, i) => (
+          <li key={i} className="text-sm">
+            {typeof item === 'object' && item !== null
+              ? <div className="pl-2 border-l-2 border-primary/20 space-y-0.5">
+                  {Object.entries(item).map(([k, v]) => (
+                    <p key={k}><span className="font-medium text-muted-foreground text-xs uppercase">{k.replace(/_/g, ' ')}:</span> {String(v)}</p>
+                  ))}
+                </div>
+              : String(item)}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  const entries = Object.entries(val as Record<string, unknown>);
+  const isColorObj = key.toLowerCase().includes('color') || entries.some(([, v]) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v as string));
+  if (isColorObj) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex items-center gap-1.5 text-sm">
+            <div className="w-5 h-5 rounded border border-border shrink-0" style={{ backgroundColor: String(v) }} />
+            <span className="text-muted-foreground text-xs">{k.replace(/_/g, ' ')}:</span>
+            <span className="font-mono text-xs">{String(v)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      {entries.map(([k, v]) => (
+        <div key={k}>
+          <span className="font-medium text-muted-foreground text-xs uppercase">{k.replace(/_/g, ' ')}:</span>{' '}
+          {typeof v === 'object' ? <span className="text-sm">{JSON.stringify(v)}</span> : <span className="text-sm">{String(v)}</span>}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const FUNNEL_INFO = {
   tofu: { emoji: '🎯', label: 'TOFU', subtitle: 'Audiencia Fría', desc: 'No te conocen. Hay que educar y generar curiosidad.', border: 'border-blue-400', bg: 'bg-blue-50 hover:bg-blue-100', activeBg: 'bg-blue-500 text-white border-blue-500', recomienda: ['Call Out', 'Bold Statement', 'Ugly Ads', 'Memes'] },
   mofu: { emoji: '🔥', label: 'MOFU', subtitle: 'Audiencia Tibia', desc: 'Te consideran. Hay que construir confianza.', border: 'border-amber-400', bg: 'bg-amber-50 hover:bg-amber-100', activeBg: 'bg-amber-500 text-white border-amber-500', recomienda: ['Reviews', 'Us vs Them', 'Credenciales en Medios', 'Reviews + Beneficios'] },
@@ -505,9 +553,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                       {Object.entries(briefVisual).filter(([k]) => k !== 'tipo').map(([key, val]) => (
                         <div key={key} className="p-3 rounded-lg border border-border bg-card">
                           <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-1">{key.replace(/_/g, ' ')}</p>
-                          {typeof val === 'object' ? (
-                            <pre className="text-xs whitespace-pre-wrap font-mono text-foreground/80">{JSON.stringify(val, null, 2)}</pre>
-                          ) : <p className="text-sm">{String(val)}</p>}
+                          {renderBriefField(key, val)}
                         </div>
                       ))}
                     </div>
