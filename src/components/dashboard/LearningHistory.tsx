@@ -353,7 +353,7 @@ function HistoryRow({
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                No se encontraron reglas vinculadas. Las reglas pudieron haberse guardado fuera de la ventana de tiempo de procesamiento.
+                No hay reglas vinculadas a esta fuente en la base de conocimiento. Si la extracción mostró reglas pero no aparecen aquí, probablemente no se guardaron o se guardaron sin vincular `source_id`.
               </p>
             )}
           </TableCell>
