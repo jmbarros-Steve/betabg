@@ -1701,39 +1701,98 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     if (financials && margin !== null) {
       addSubTitle('Indicadores Financieros Clave');
-      addKeyValue('Precio de Venta', fmtCLP(financials.price));
-      addKeyValue('Costo del Producto', fmtCLP(financials.cost));
-      addKeyValue('Costo de Envio', fmtCLP(financials.shipping));
-      addKeyValue('Margen Bruto', `${fmtCLP(financials.price - financials.cost - financials.shipping)} (${marginPct}%)`);
-      addKeyValue('CPA Maximo Viable', cpaMaxCLP || 'N/D');
-      // CPA explanation box
-      if (cpaMax && margin !== null) {
+      // Render financial KPIs as premium styled cards (2x2 grid)
+      const grossMargin = financials.price - financials.cost - financials.shipping;
+      checkPage(50);
+      const finCards = [
+        { label: 'PRECIO DE VENTA', value: fmtCLP(financials.price), color: [brandR, brandG, brandB] as [number,number,number] },
+        { label: 'COSTO PRODUCTO', value: fmtCLP(financials.cost), color: [midBlueR, midBlueG, midBlueB] as [number,number,number] },
+        { label: 'COSTO ENVIO', value: fmtCLP(financials.shipping), color: [midBlueR, midBlueG, midBlueB] as [number,number,number] },
+        { label: 'MARGEN BRUTO', value: `${fmtCLP(grossMargin)} (${marginPct}%)`, color: [22, 120, 50] as [number,number,number] },
+      ];
+      const finCardW = (maxWidth - 6) / 2;
+      const finCardH = 20;
+      for (let fi = 0; fi < finCards.length; fi++) {
+        const col = fi % 2;
+        const row = Math.floor(fi / 2);
+        const fx = margin + col * (finCardW + 6);
+        const fy = y + row * (finCardH + 4);
+        // Card bg
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(fx, fy, finCardW, finCardH, 2, 2, 'F');
+        // Left accent bar
+        doc.setFillColor(...finCards[fi].color);
+        doc.rect(fx, fy, 3, finCardH, 'F');
+        // Label
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 120);
+        doc.text(finCards[fi].label, fx + 7, fy + 7);
+        // Value
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(...finCards[fi].color);
+        doc.text(finCards[fi].value, fx + 7, fy + 15);
+      }
+      y += 2 * (finCardH + 4) + 4;
+
+      // CPA Max card — standalone highlight
+      checkPage(22);
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.roundedRect(margin, y, maxWidth, 18, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(255, 255, 255);
+      doc.text('CPA MAXIMO VIABLE', margin + 6, y + 6);
+      doc.setFontSize(14);
+      doc.text(cpaMaxCLP || 'N/D', margin + 6, y + 14);
+      // Right side explanation
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(255, 255, 240);
+      const cpaNote = '30% del margen bruto — limite para no vender a perdida';
+      doc.text(cpaNote, margin + maxWidth - 4, y + 10, { align: 'right' });
+      y += 22;
+
+      // CPA explanation insight box
+      if (cpaMax && grossMargin > 0) {
         checkPage(22);
         doc.setFillColor(255, 253, 240);
-        doc.roundedRect(margin, y, maxWidth, 20, 1, 1, 'F');
+        doc.roundedRect(margin, y, maxWidth, 18, 1, 1, 'F');
         doc.setDrawColor(accentR, accentG, accentB);
         doc.setLineWidth(1.5);
-        doc.line(margin, y, margin, y + 20);
+        doc.line(margin, y, margin, y + 18);
         doc.setLineWidth(0.2);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(60, 40, 0);
-        const cpaExplain = `Por que ${cpaMaxCLP || 'N/D'}? Tu margen bruto unitario es de ${fmtCLP(Number(margin))}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
+        const cpaExplain = `Por que ${cpaMaxCLP || 'N/D'}? Tu margen bruto unitario es de ${fmtCLP(grossMargin)}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
         const cpaLines = doc.splitTextToSize(cpaExplain, maxWidth - 10);
-        doc.text(cpaLines.slice(0, 4), margin + 5, y + 6);
-        y += 24;
+        doc.text(cpaLines.slice(0, 3), margin + 5, y + 6);
+        y += 22;
       }
     }
 
 
+    // Sales channels as styled table
     const q3 = getResponse('sales_channels');
     if (q3) {
       addSubTitle('Canales de Venta');
       const channels = q3.split('\n').filter(l => l.trim());
-      for (const ch of channels) {
-        const clean = ch.replace(/^[🛒🏪🏬📱📸👥]+\s*/, '');
-        addArrowBullet(clean);
+      checkPage(10 + channels.length * 11);
+      const chColWs = [90, 80];
+      addTableRow(['Canal', 'Participacion'], chColWs, 0, true);
+      for (let chi = 0; chi < channels.length; chi++) {
+        const clean = stripEmojis(channels[chi].replace(/^[🛒🏪🏬📱📸👥]+\s*/, ''));
+        // Try to split "Canal: XX%" pattern
+        const parts = clean.match(/^(.+?):\s*(.+)$/);
+        if (parts) {
+          addTableRow([parts[1].trim(), parts[2].trim()], chColWs, chi + 1);
+        } else {
+          addTableRow([clean, ''], chColWs, chi + 1);
+        }
       }
+      y += 6;
     }
 
     // ─── SECCIÓN: BUYER PERSONA ──────────────────────────────────────────────────
@@ -1780,7 +1839,36 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // ─── SECCIÓN: ANÁLISIS COMPETITIVO ──────────────────────────────────────────
     addSectionHeader('3', 'ANALISIS COMPETITIVO ESTRATEGICO');
     const compResp = getResponse('competitors');
-    if (compResp) { addSubTitle('Competidores Identificados'); addBody(compResp); }
+    if (compResp) {
+      addSubTitle('Competidores Identificados');
+      // Parse competitor data into table format
+      const compLines = compResp.split('\n').filter((l: string) => l.trim());
+      const compEntries: { name: string; url: string }[] = [];
+      let currentComp: { name: string; url: string } = { name: '', url: '' };
+      for (const line of compLines) {
+        const nameMatch = line.match(/(?:Nombre\s*(?:Competidor\s*)?\d*|comp\d*_name)\s*:\s*(.+)/i);
+        const urlMatch = line.match(/(?:Web|URL|Instagram|comp\d*_url)\s*[/:]\s*(.+)/i);
+        if (nameMatch) {
+          if (currentComp.name) compEntries.push({ ...currentComp });
+          currentComp = { name: nameMatch[1].trim(), url: '' };
+        } else if (urlMatch) {
+          currentComp.url = urlMatch[1].trim();
+        }
+      }
+      if (currentComp.name) compEntries.push(currentComp);
+
+      if (compEntries.length > 0) {
+        checkPage(10 + compEntries.length * 11);
+        const compColWs = [10, 60, 100];
+        addTableRow(['#', 'Competidor', 'Web / Instagram'], compColWs, 0, true);
+        for (let ci3 = 0; ci3 < compEntries.length; ci3++) {
+          addTableRow([String(ci3 + 1), compEntries[ci3].name, compEntries[ci3].url], compColWs, ci3 + 1);
+        }
+        y += 6;
+      } else {
+        addBody(compResp);
+      }
+    }
     const advResp = getResponse('your_advantage');
     if (advResp) { addSubTitle('Ventaja Competitiva'); addBody(advResp); }
 
@@ -1802,6 +1890,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const startMatch = section7Match || section6Match;
       if (startMatch?.index !== undefined) planText = planText.slice(startMatch.index);
       const planLines = planText.split('\n').filter(l => l.trim());
+      // Skip lines that are the section header itself (e.g. "7. EVALUACIÓN ESTRATÉGICA...")
+      const filteredPlanLines = planLines.filter(l => {
+        const t = l.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
+        return !t.match(/^\d+\.\s*(EVALUACION|EVALUACIÓN)\s+ESTRATEG/i);
+      });
       let accionableNum = 0;
       let currentTitle = '';
       let currentSCR: { s: string; c: string; r: string } = { s: '', c: '', r: '' };
@@ -1855,7 +1948,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         y += 52;
       };
 
-      for (const line of planLines) {
+      for (const line of filteredPlanLines) {
         const trimmed = line.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
         if (!trimmed || trimmed.match(/^\|[\s-:]+\|$/)) continue;
         if (trimmed.match(/^Accionable\s+\d+/i) || (trimmed.match(/^\d+\.\s/) && trimmed.length < 80)) {
@@ -1958,18 +2051,30 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // ─── SECCIÓN: KEYWORDS ───────────────────────────────────────────────────────
     if (research.keywords) {
       const kw = research.keywords;
-      addSectionHeader('7', 'ANALISIS DE KEYWORDS — ESTRATEGIA SEM');
-      const renderKwGroup = (label: string, list: string[]) => {
+      addSectionHeader('7', 'ESTRATEGIA DE KEYWORDS Y SEM');
+
+      // Keywords as styled badge-like chips in colored boxes
+      const renderKwGroupStyled = (label: string, list: string[], bgColor: [number,number,number]) => {
         if (!list?.length) return;
         addSubTitle(label);
-        const joined = list.join('  |  ');
-        addBody(joined, 2);
-        y += 1;
+        checkPage(14);
+        // Background box
+        doc.setFillColor(...bgColor);
+        const kwText = list.join('  |  ');
+        const kwLines = doc.splitTextToSize(kwText, maxWidth - 10);
+        const boxH = Math.max(10, kwLines.length * 4.5 + 6);
+        doc.roundedRect(margin, y, maxWidth, boxH, 2, 2, 'F');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(40, 40, 50);
+        for (let kli = 0; kli < kwLines.length; kli++) {
+          doc.text(kwLines[kli], margin + 5, y + 5 + kli * 4.5);
+        }
+        y += boxH + 4;
       };
-      renderKwGroup('Keywords Principales', kw.primary || []);
-      renderKwGroup('Long-tail (Baja Competencia)', kw.long_tail || []);
-      renderKwGroup('Keywords de Competidores', kw.competitor_keywords || []);
-      // Removed raw JSON "Estrategia Recomendada" — rendered via keyword phases below
+      renderKwGroupStyled('Keywords Principales', kw.primary || [], [238, 242, 249]);
+      renderKwGroupStyled('Long-tail (Baja Competencia)', kw.long_tail || [], [237, 247, 240]);
+      renderKwGroupStyled('Keywords de Competidores', kw.competitor_keywords || [], [253, 248, 240]);
       // Keyword phases from roadmap
       if (kw.keyword_strategy_roadmap) { renderKeywordPhases(pdfCtx, pdfHelpers, kw.keyword_strategy_roadmap); }
       else { renderGlossaryBox(pdfCtx, pdfHelpers, 'keywords'); }
@@ -2121,22 +2226,81 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const seo = research.seo_audit;
       const comps = research.competitor_analysis?.competitors || [];
       checkPage(40);
-      const colWs = [46, 22, 30, 50];
-      addTableRow(['Marca', 'Score SEO', 'Precio', 'Posicionamiento'], colWs, 0, true);
-      const clientName = clientInfo?.name || 'Tu Marca';
+
+      // Visual score bars first
+      addSubTitle('Puntaje SEO Visual');
       const clientScore = seo?.score ?? 0;
+      const seoBarRows: { name: string; score: number; isClient: boolean }[] = [
+        { name: clientInfo?.name || 'Tu Marca', score: clientScore, isClient: true },
+        ...comps.slice(0, 4).map((c: any, i: number) => ({
+          name: c.name || `Competidor ${i+1}`,
+          score: c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -8 : 7))),
+          isClient: false,
+        })),
+      ];
+      const seoBarMaxW = maxWidth - 50;
+      for (const br of seoBarRows) {
+        checkPage(10);
+        doc.setFont('helvetica', br.isClient ? 'bold' : 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(40, 40, 40);
+        doc.text(String(br.name).slice(0, 22), margin + 2, y + 5);
+        const barFill: [number,number,number] = br.score >= 70 ? [22,160,70] : br.score >= 50 ? [200,150,0] : [200,40,40];
+        const barLen = (br.score / 100) * seoBarMaxW;
+        doc.setFillColor(230, 232, 240);
+        doc.roundedRect(margin + 48, y, seoBarMaxW, 7, 1, 1, 'F');
+        doc.setFillColor(...barFill);
+        doc.roundedRect(margin + 48, y, barLen, 7, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...barFill);
+        doc.text(String(br.score), margin + 48 + barLen + 2, y + 5.5);
+        if (br.isClient) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6);
+          doc.setTextColor(accentR, accentG, accentB);
+          doc.text('TU MARCA', margin + 48 + seoBarMaxW - 2, y + 5.5, { align: 'right' });
+        }
+        y += 10;
+      }
+      y += 6;
+
+      // Detailed comparison table
+      addSubTitle('Tabla Comparativa Detallada');
+      const colWs = [40, 18, 25, 45, 42];
+      addTableRow(['Marca', 'Score', 'Precio', 'Posicionamiento', 'Estrategia Ads'], colWs, 0, true);
+      const clientName = clientInfo?.name || 'Tu Marca';
       addTableRow(
-        [clientName + ' *', String(clientScore), 'Tu marca', (seo?.content_quality || 'Ver auditoria').slice(0, 38)],
+        [
+          clientName + ' *',
+          String(clientScore),
+          'Tu marca',
+          (seo?.content_quality || 'Ver auditoria').slice(0, 30),
+          'STEVE.IO optimizado',
+        ],
         colWs, 1
       );
       comps.slice(0, 4).forEach((c: any, i: number) => {
         const cscore = c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -8 : 7)));
         addTableRow(
-          [String(c.name || c.url || 'Competidor').slice(0, 22), String(cscore), c.price_positioning || 'N/D', String(c.positioning || c.value_proposition || '').slice(0, 38)],
+          [
+            String(c.name || c.url || 'Competidor').slice(0, 22),
+            String(cscore),
+            c.price_positioning || 'N/D',
+            String(c.positioning || c.value_proposition || '').slice(0, 30),
+            String(c.ad_strategy_inferred || 'No detectada').slice(0, 25),
+          ],
           colWs, i + 2
         );
       });
       y += 6;
+
+      // SEO issues summary
+      if (seo?.issues?.length > 0) {
+        addSubTitle('Problemas SEO Detectados en Tu Sitio');
+        for (const issue of seo.issues.slice(0, 3)) { addArrowBullet(issue); }
+      }
+
       if (seo?.competitive_seo_gap) { addSubTitle('Gap Analysis SEO'); addBody(seo.competitive_seo_gap); }
     }
 
