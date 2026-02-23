@@ -99,49 +99,68 @@ export function renderGlossaryBox(
   const { doc, margin, maxWidth, pageHeight } = ctx;
   let y = helpers.getY();
 
-  // Check space for header + at least 2 items
-  const neededH = 14 + items.length * 10;
-  if (y + 30 > pageHeight - 25) {
-    doc.addPage();
-    y = 20;
-    helpers.setY(y);
-  }
+  y += 6;
 
-  // Box background
-  const boxH = Math.min(items.length * 9.5 + 16, 120);
-  doc.setFillColor(245, 246, 250);
-  doc.roundedRect(margin, y, maxWidth, boxH, 2, 2, 'F');
-  doc.setDrawColor(180, 180, 190);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(margin, y, maxWidth, boxH, 2, 2, 'S');
-
-  // Title
+  // Render each term as a flowing block — no fixed-height box
+  // Title bar
+  helpers.checkPage(14);
+  y = helpers.getY();
+  doc.setFillColor(240, 241, 248);
+  doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(80, 80, 100);
-  doc.text('GLOSARIO', margin + 5, y + 7);
+  doc.text('GLOSARIO', margin + 5, y + 6.2);
   y += 12;
+  helpers.setY(y);
 
-  // Terms in 2 columns
-  const colW = (maxWidth - 10) / 2;
   for (let i = 0; i < items.length; i++) {
-    const isLeft = i % 2 === 0;
-    const gx = isLeft ? margin + 5 : margin + 5 + colW + 4;
-    const gy = y + Math.floor(i / 2) * 9.5;
-    if (gy > helpers.getY() + boxH - 4) break;
+    const fullText = `${items[i].term} — ${items[i].def}`;
+    const lines = doc.splitTextToSize(fullText, maxWidth - 10);
+    const blockH = lines.length * 4.2 + 2;
+    helpers.checkPage(blockH + 2);
+    y = helpers.getY();
+
+    // Alternating subtle background
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 249, 253);
+      doc.rect(margin, y - 1.5, maxWidth, blockH, 'F');
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(50, 50, 70);
-    doc.text(items[i].term + ':', gx, gy);
-    const termW = doc.getTextWidth(items[i].term + ': ');
+    const termStr = items[i].term + ' — ';
+    doc.text(termStr, margin + 5, y);
+    const termW = doc.getTextWidth(termStr);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    const defLines = doc.splitTextToSize(items[i].def, colW - termW - 2);
-    doc.text(defLines[0], gx + termW, gy);
+    doc.setTextColor(70, 70, 80);
+
+    // First line: after the bold term
+    const firstLineDef = doc.splitTextToSize(items[i].def, maxWidth - 10 - termW);
+    doc.text(firstLineDef[0], margin + 5 + termW, y);
+    y += 4.2;
+
+    // Remaining lines of definition (wrapped)
+    if (firstLineDef.length > 1) {
+      for (let li = 1; li < firstLineDef.length; li++) {
+        helpers.checkPage(5);
+        y = helpers.getY();
+        doc.text(firstLineDef[li], margin + 5 + termW, y);
+        y += 4.2;
+      }
+    }
+    y += 1;
+    helpers.setY(y);
   }
 
-  helpers.setY(y + Math.ceil(items.length / 2) * 9.5 + 8);
+  // Bottom border
+  y = helpers.getY();
+  doc.setDrawColor(200, 200, 215);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, margin + maxWidth, y);
+  y += 6;
+  helpers.setY(y);
 }
 
 // ─── BRAND IDENTITY SECTION ──────────────────────────────────────────────────
@@ -511,7 +530,7 @@ export function renderKeywordPhases(
     }
     if (Array.isArray(phase.acciones_concretas) && phase.acciones_concretas.length > 0) {
       for (const a of phase.acciones_concretas.slice(0, 3)) {
-        helpers.addBody(`    -> ${helpers.stripEmojis(String(a))}`, 10, 4.5);
+        helpers.addBody(`    • ${helpers.stripEmojis(String(a))}`, 10, 4.5);
       }
     }
   }
