@@ -15,7 +15,7 @@ import {
   renderBrandIdentity, renderFinancialAnalysis, renderConsumerProfile,
   renderPositioningStrategy, renderActionPlan, renderCompetitorCards,
   renderKeywordPhases, renderMetaAdsStrategy, renderGoogleAdsStrategy,
-  renderAdsLibraryAnalysis,
+  renderAdsLibraryAnalysis, renderBudgetAndFunnel,
 } from './briefPdfSections';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -351,6 +351,7 @@ interface ResearchData {
   financial_analysis?: any;
   consumer_profile?: any;
   positioning_strategy?: any;
+  budget_and_funnel?: any;
 }
 
 const QUESTION_CONFIG: Record<string, { label: string; icon: React.ReactNode; section: string }> = {
@@ -2158,9 +2159,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // Ads Library full analysis
     renderAdsLibraryAnalysis(pdfCtx, pdfHelpers, (research as any).ads_library_analysis);
 
-    // Section 9 (SEO Comparativo) removed — already covered in SEO Audit section above
+    // Budget & Funnel (Charlie Methodology) — dynamic from backend
+    renderBudgetAndFunnel(pdfCtx, pdfHelpers, (research as any).budget_and_funnel);
 
-    // ─── SECCIÓN: EMBUDO TOFU-MOFU-BOFU ─────────────────────────────────────────
+    // ─── SECCIÓN: EMBUDO TOFU-MOFU-BOFU (fallback when no budget_and_funnel) ──
+    if (!(research as any).budget_and_funnel) {
     checkPage(55);
     addSectionHeader('9', 'ESTRATEGIA DE EMBUDO — TOFU / MOFU / BOFU');
     // Use dynamic funnel distribution from meta_ads_strategy if available
@@ -2244,8 +2247,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       addTableRow([calChannels[ci], calActions[ci][0], calActions[ci][1], calActions[ci][2]], calColWs, ci + 1);
     }
     y += 6;
+    } // end fallback (no budget_and_funnel)
 
-    // ─── SECCIÓN: TEMPLATES DE COPY ─────────────────────────────────────────────
+
     addSectionHeader('11', 'PLANTILLAS DE COPY LISTAS PARA USAR');
 
     // Meta Ads copies — rendered as proper visual table
@@ -2373,37 +2377,36 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     y += 8;
 
-    // ─── SECCIÓN: PRESUPUESTO RECOMENDADO ────────────────────────────────────────
-    addSectionHeader('12', 'PRESUPUESTO RECOMENDADO');
-    checkPage(60);
+    // ─── SECCIÓN: PRESUPUESTO RECOMENDADO (fallback when no budget_and_funnel) ──
+    if (!(research as any).budget_and_funnel) {
+      addSectionHeader('12', 'PRESUPUESTO RECOMENDADO');
+      checkPage(60);
 
-    // Try to get budget from research data
-    const metaBudgetObj = (research as any).meta_ads_strategy?.presupuesto_sugerido;
-    const googleBudgetObj = (research as any).google_ads_strategy?.presupuesto_sugerido;
-    const hasDynamicBudget = metaBudgetObj || googleBudgetObj;
+      const metaBudgetObj = (research as any).meta_ads_strategy?.presupuesto_sugerido;
+      const googleBudgetObj = (research as any).google_ads_strategy?.presupuesto_sugerido;
+      const hasDynamicBudget = metaBudgetObj || googleBudgetObj;
 
-    if (hasDynamicBudget && typeof metaBudgetObj === 'object') {
-      // Render dynamic budget from research
-      addSubTitle('Distribucion de Presupuesto por Canal');
-      const dynBudgetCols = ['Canal', 'Presupuesto Sugerido'];
-      const dynBudgetColWs = [70, 100];
-      addTableRow(dynBudgetCols, dynBudgetColWs, 0, true);
-      let budgetRowIdx = 1;
-      for (const [key, val] of Object.entries(metaBudgetObj)) {
-        addTableRow([key.replace(/_/g, ' '), String(val)], dynBudgetColWs, budgetRowIdx++);
-      }
-      if (googleBudgetObj && typeof googleBudgetObj === 'object') {
-        for (const [key, val] of Object.entries(googleBudgetObj)) {
-          addTableRow([`Google: ${key.replace(/_/g, ' ')}`, String(val)], dynBudgetColWs, budgetRowIdx++);
+      if (hasDynamicBudget && typeof metaBudgetObj === 'object') {
+        addSubTitle('Distribucion de Presupuesto por Canal');
+        const dynBudgetCols = ['Canal', 'Presupuesto Sugerido'];
+        const dynBudgetColWs = [70, 100];
+        addTableRow(dynBudgetCols, dynBudgetColWs, 0, true);
+        let budgetRowIdx = 1;
+        for (const [key, val] of Object.entries(metaBudgetObj)) {
+          addTableRow([key.replace(/_/g, ' '), String(val)], dynBudgetColWs, budgetRowIdx++);
         }
+        if (googleBudgetObj && typeof googleBudgetObj === 'object') {
+          for (const [key, val] of Object.entries(googleBudgetObj)) {
+            addTableRow([`Google: ${key.replace(/_/g, ' ')}`, String(val)], dynBudgetColWs, budgetRowIdx++);
+          }
+        }
+      } else {
+        addInsightBox('El presupuesto detallado se define en funcion del CPA maximo viable y los objetivos de ROAS. Consulte con su estratega para una propuesta personalizada basada en los datos de este brief.');
       }
-    } else {
-      // Fallback: generic budget framework (no fake numbers)
-      addInsightBox('El presupuesto detallado se define en funcion del CPA maximo viable y los objetivos de ROAS. Consulte con su estratega para una propuesta personalizada basada en los datos de este brief.');
+      y += 8;
     }
-    y += 8;
 
-    // cost benchmarks — show as insight box only if it has named fields, not raw JSON
+    // cost benchmarks
     if (research.cost_benchmarks && typeof research.cost_benchmarks === 'object') {
       const cb = research.cost_benchmarks as Record<string, any>;
       const cbKeys = Object.keys(cb).slice(0, 4);

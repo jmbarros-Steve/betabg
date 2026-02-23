@@ -167,6 +167,90 @@ Responde con JSON válido: { "meta_ads_strategy": { ... } }`,
 CRÍTICO: ads_library_analysis NO PUEDE estar vacía.
 Responde con JSON válido: { "google_ads_strategy": { ... }, "ads_library_analysis": { ... } }`,
   },
+  {
+    id: 'budget_and_funnel',
+    keys: ['budget_and_funnel'],
+    maxTokens: 5000,
+    prompt: `Genera la estrategia de inversión publicitaria y distribución de presupuesto REAL para este cliente.
+
+IMPORTANTE: Para la estrategia de Meta Ads, prioriza las siguientes reglas de tu knowledge base:
+- Adopción Total del Algoritmo (Advantage+ Shopping / Advantage+ Audience)
+- Consolidación Extrema de Ad Sets (1 Ad Set consolidado, no múltiples)
+- Open Targeting cuando hay historial de conversiones
+- Fusión de Tráfico Frío y Cálido en el mismo Ad Set
+- Audiencias Web de Máximo Volumen (180 días, sin fragmentar)
+- Respeto a la Fase de Aprendizaje (no editar constantemente)
+- Unit Economics: CPA máximo = 30% del margen bruto
+
+Estructura de campañas Meta Ads:
+- Campaña 1: TESTING (Advantage+ o CBO consolidado) — para testear creativos y encontrar ganadores. Presupuesto mínimo por Ad Set = 2x CPA máximo viable. Kill rule: si gasta 2x CPA sin compra, apagar.
+- Campaña 2: SCALING — mover creativos ganadores del testing. Subir presupuesto 20% cada 48hrs si ROAS se mantiene.
+- Campaña 3: RETARGETING — audiencias web 180 días + interacciones sociales 365 días. Creativos diferentes a prospecting.
+
+Calcula TODO basándote en los datos reales del cliente (presupuesto mensual, margen bruto, CPA máximo viable, industria). NO inventes números genéricos.
+
+Responde SOLO con JSON válido:
+{
+  "budget_and_funnel": {
+    "monthly_budget_clp": número,
+    "channel_distribution": {
+      "meta_ads": { "percentage": número, "amount_clp": número, "justification": "por qué este % para este cliente específico" },
+      "google_ads": { "percentage": número, "amount_clp": número, "justification": "por qué" },
+      "seo_content": { "percentage": número, "amount_clp": número, "justification": "por qué" },
+      "ugc_influencers": { "percentage": número, "amount_clp": número, "justification": "por qué" }
+    },
+    "meta_ads_structure": {
+      "testing": {
+        "budget_percentage": número,
+        "budget_clp": número,
+        "campaign_type": "Advantage+ Shopping o CBO consolidado",
+        "ad_sets": [
+          { "name": "nombre descriptivo", "variable_tested": "qué se testea", "budget_per_adset_clp": número, "kill_rule": "regla específica con números del cliente", "audiences": ["descripción"] }
+        ],
+        "success_metrics": { "hook_rate": ">25%", "hold_rate": ">15%", "ctr": ">1.5%", "cpa_target_clp": número }
+      },
+      "scaling": {
+        "budget_percentage": número,
+        "budget_clp": número,
+        "rules": "Reglas específicas para este cliente",
+        "scale_method": "Incremento 20% cada 48hrs si ROAS > Xx"
+      },
+      "retargeting": {
+        "budget_percentage": número,
+        "budget_clp": número,
+        "audiences": [
+          { "name": "Web visitors 180d", "message": "mensaje específico para este cliente" },
+          { "name": "Social engagement 365d", "message": "mensaje específico" },
+          { "name": "ATC sin compra 14d", "message": "mensaje específico" }
+        ]
+      }
+    },
+    "google_ads_structure": {
+      "search_brand": { "budget_percentage": número, "budget_clp": número, "keywords": ["kw1", "kw2"] },
+      "search_competitors": { "budget_percentage": número, "budget_clp": número, "keywords": ["kw1", "kw2"] },
+      "search_generic": { "budget_percentage": número, "budget_clp": número, "keywords": ["kw1", "kw2"] },
+      "display_remarketing": { "budget_percentage": número, "budget_clp": número }
+    },
+    "roas_projection": {
+      "day_30": { "roas": "texto", "phase": "Testing", "reasoning": "por qué para este cliente" },
+      "day_60": { "roas": "texto", "phase": "Scaling", "reasoning": "por qué" },
+      "day_90": { "roas": "texto", "phase": "Optimización", "reasoning": "por qué" }
+    },
+    "implementation_calendar": {
+      "phase_1": { "days": "0-30", "focus": "Testing y validación", "meta_ads": "acción específica", "google_ads": "acción", "seo": "acción", "email": "acción", "ugc": "acción" },
+      "phase_2": { "days": "30-60", "focus": "Scaling ganadores", "meta_ads": "acción", "google_ads": "acción", "seo": "acción", "email": "acción", "ugc": "acción" },
+      "phase_3": { "days": "60-90", "focus": "Optimización full", "meta_ads": "acción", "google_ads": "acción", "seo": "acción", "email": "acción", "ugc": "acción" }
+    },
+    "weekly_optimization_checklist": [
+      "checklist item 1 específico",
+      "checklist item 2 específico",
+      "checklist item 3 específico",
+      "checklist item 4 específico",
+      "checklist item 5 específico"
+    ]
+  }
+}`,
+  },
 ];
 
 // ── Llamada individual a Claude ──
@@ -323,7 +407,7 @@ Deno.serve(async (req) => {
 
     // Update progress
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Ejecutando 11 análisis en paralelo...', pct: 60, ts: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Ejecutando 12 análisis en paralelo...', pct: 60, ts: new Date().toISOString() } },
       { onConflict: 'client_id,research_type' }
     );
 
@@ -334,7 +418,7 @@ Deno.serve(async (req) => {
 
     const wave1 = SECTIONS.slice(0, 4);   // secciones 1-4
     const wave2 = SECTIONS.slice(4, 8);   // secciones 5-8
-    const wave3 = SECTIONS.slice(8, 11);  // secciones 9-11
+    const wave3 = SECTIONS.slice(8, 12);  // secciones 9-12
 
     console.log(`[analyze-brand-strategy] Wave 1: starting ${wave1.map(s => s.id).join(', ')}`);
     const results1 = await Promise.allSettled(
@@ -387,7 +471,7 @@ Deno.serve(async (req) => {
     // Log resumen
     const fulfilled = results.filter(r => r.status === 'fulfilled').length;
     const rejected = results.filter(r => r.status === 'rejected').length;
-    console.log(`[analyze-brand-strategy] SUMMARY: ${fulfilled}/11 OK, ${rejected}/11 FAILED`);
+    console.log(`[analyze-brand-strategy] SUMMARY: ${fulfilled}/12 OK, ${rejected}/12 FAILED`);
 
     // ── Consolidar resultados ──
     const finalBrief: Record<string, unknown> = {};
@@ -473,7 +557,7 @@ Deno.serve(async (req) => {
       { onConflict: 'client_id,research_type' }
     );
 
-    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (status=${status}, saved=${completedSections.length}/11)`);
+    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (status=${status}, saved=${completedSections.length}/12)`);
 
     return new Response(JSON.stringify({ success: true, status, data: finalBrief, completed_sections: completedSections, failed_sections: failedSections, errors }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

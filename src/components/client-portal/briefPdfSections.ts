@@ -978,3 +978,253 @@ export function renderAdsLibraryAnalysis(
 
   renderGlossaryBox(ctx, helpers, 'ads_library');
 }
+
+// ─── BUDGET & FUNNEL SECTION (Charlie Methodology) ──────────────────────────
+export function renderBudgetAndFunnel(
+  ctx: PdfContext,
+  helpers: PdfHelpers,
+  budgetData: any
+) {
+  if (!budgetData || typeof budgetData !== 'object') return;
+
+  const { doc, margin, maxWidth, brandR, brandG, brandB, accentR, accentG, accentB } = ctx;
+
+  helpers.addSectionHeader('I', 'ESTRATEGIA DE INVERSION PUBLICITARIA');
+
+  // Monthly budget highlight
+  if (budgetData.monthly_budget_clp) {
+    helpers.checkPage(18);
+    let y = helpers.getY();
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.roundedRect(margin, y, maxWidth, 16, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(255, 255, 255);
+    doc.text('PRESUPUESTO MENSUAL TOTAL', margin + 6, y + 5.5);
+    doc.setFontSize(13);
+    doc.text('$' + Math.round(budgetData.monthly_budget_clp).toLocaleString('es-CL') + ' CLP', margin + 6, y + 13);
+    helpers.setY(y + 19);
+  }
+
+  // Channel distribution table
+  if (budgetData.channel_distribution) {
+    helpers.addSubTitle('Distribucion por Canal');
+    const cd = budgetData.channel_distribution;
+    const channels = Object.entries(cd);
+    const colWs = [40, 20, 35, 75];
+    helpers.addTableRow(['Canal', '%', 'Monto CLP', 'Justificacion'], colWs, 0, true);
+    for (let i = 0; i < channels.length; i++) {
+      const [key, val] = channels[i] as [string, any];
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const pct = val?.percentage ? `${val.percentage}%` : '';
+      const amount = val?.amount_clp ? '$' + Math.round(val.amount_clp).toLocaleString('es-CL') : '';
+      const just = helpers.stripEmojis(val?.justification || '').slice(0, 45);
+      helpers.addTableRow([label, pct, amount, just], colWs, i + 1);
+    }
+  }
+
+  // Meta Ads Structure — Testing / Scaling / Retargeting cards
+  if (budgetData.meta_ads_structure) {
+    helpers.addSubTitle('Estructura de Campanas Meta Ads — Metodo Charlie');
+    const mas = budgetData.meta_ads_structure;
+    const campaigns: { key: string; label: string; color: [number,number,number]; icon: string }[] = [
+      { key: 'testing', label: 'TESTING', color: [27, 42, 74], icon: 'LAB' },
+      { key: 'scaling', label: 'SCALING', color: [22, 120, 50], icon: 'UP' },
+      { key: 'retargeting', label: 'RETARGETING', color: [200, 163, 90], icon: 'RT' },
+    ];
+
+    for (const camp of campaigns) {
+      const data = mas[camp.key];
+      if (!data || typeof data !== 'object') continue;
+
+      helpers.checkPage(45);
+      let y = helpers.getY();
+
+      // Card header
+      doc.setFillColor(...camp.color);
+      doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
+      doc.rect(margin, y + 6, maxWidth, 4, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      const budgetPct = data.budget_percentage ? ` — ${data.budget_percentage}%` : '';
+      const budgetAmt = data.budget_clp ? ` ($${Math.round(data.budget_clp).toLocaleString('es-CL')} CLP)` : '';
+      doc.text(`${camp.label}${budgetPct}${budgetAmt}`, margin + 5, y + 7);
+      y += 12;
+      helpers.setY(y);
+
+      // Campaign type
+      if (data.campaign_type) {
+        helpers.addKeyValue('Tipo de Campana', helpers.stripEmojis(String(data.campaign_type)));
+      }
+
+      // Ad sets (testing)
+      if (Array.isArray(data.ad_sets)) {
+        for (const adSet of data.ad_sets.slice(0, 3)) {
+          if (typeof adSet !== 'object') continue;
+          helpers.checkPage(14);
+          y = helpers.getY();
+          doc.setFillColor(245, 246, 252);
+          doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 12, 1, 1, 'F');
+          doc.setFillColor(...camp.color);
+          doc.rect(margin + 2, y - 1, 2, 12, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(...camp.color);
+          doc.text(helpers.stripEmojis(adSet.name || '').slice(0, 40), margin + 7, y + 2.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(60, 60, 70);
+          if (adSet.variable_tested) doc.text(`Variable: ${helpers.stripEmojis(adSet.variable_tested).slice(0, 50)}`, margin + 7, y + 6.5);
+          if (adSet.kill_rule) doc.text(`Kill rule: ${helpers.stripEmojis(adSet.kill_rule).slice(0, 50)}`, margin + 7, y + 10);
+          helpers.setY(y + 13);
+        }
+      }
+
+      // Success metrics (testing)
+      if (data.success_metrics && typeof data.success_metrics === 'object') {
+        const metrics = Object.entries(data.success_metrics);
+        if (metrics.length > 0) {
+          helpers.checkPage(10);
+          y = helpers.getY();
+          const chipW = (maxWidth - 8) / Math.min(metrics.length, 4);
+          for (let mi = 0; mi < Math.min(metrics.length, 4); mi++) {
+            const cx = margin + 2 + mi * chipW;
+            doc.setFillColor(245, 246, 252);
+            doc.roundedRect(cx, y, chipW - 2, 8, 1, 1, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(6.5);
+            doc.setTextColor(100, 100, 120);
+            doc.text(String(metrics[mi][0]).replace(/_/g, ' ').toUpperCase(), cx + 2, y + 3);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(...camp.color);
+            doc.text(String(metrics[mi][1]), cx + 2, y + 7);
+          }
+          helpers.setY(y + 10);
+        }
+      }
+
+      // Rules (scaling)
+      if (data.rules) helpers.addBody(`  Reglas: ${helpers.stripEmojis(String(data.rules))}`, 4, 4.5);
+      if (data.scale_method) helpers.addBody(`  Metodo: ${helpers.stripEmojis(String(data.scale_method))}`, 4, 4.5);
+
+      // Audiences (retargeting)
+      if (Array.isArray(data.audiences)) {
+        for (const aud of data.audiences.slice(0, 4)) {
+          if (typeof aud === 'object') {
+            helpers.addArrowBullet(`${aud.name || ''}: ${helpers.stripEmojis(aud.message || '')}`);
+          } else {
+            helpers.addArrowBullet(String(aud));
+          }
+        }
+      }
+
+      y = helpers.getY();
+      y += 4;
+      helpers.setY(y);
+    }
+  }
+
+  // Google Ads Structure
+  if (budgetData.google_ads_structure) {
+    helpers.addSubTitle('Estructura Google Ads');
+    const gas = budgetData.google_ads_structure;
+    const gasCols = [40, 20, 35, 75];
+    helpers.addTableRow(['Campana', '%', 'Monto CLP', 'Keywords'], gasCols, 0, true);
+    let gasIdx = 1;
+    for (const [key, val] of Object.entries(gas)) {
+      const v = val as any;
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const pct = v?.budget_percentage ? `${v.budget_percentage}%` : '';
+      const amt = v?.budget_clp ? '$' + Math.round(v.budget_clp).toLocaleString('es-CL') : '';
+      const kws = Array.isArray(v?.keywords) ? v.keywords.slice(0, 3).join(', ') : '';
+      helpers.addTableRow([label, pct, amt, kws], gasCols, gasIdx++);
+    }
+  }
+
+  // ROAS Projection
+  if (budgetData.roas_projection) {
+    helpers.addSubTitle('Proyeccion de ROAS a 90 Dias');
+    const rp = budgetData.roas_projection;
+    const rpPhases = [
+      { key: 'day_30', color: [27, 42, 74] as [number,number,number] },
+      { key: 'day_60', color: [45, 74, 122] as [number,number,number] },
+      { key: 'day_90', color: [22, 120, 50] as [number,number,number] },
+    ];
+    for (const phase of rpPhases) {
+      const pd = rp[phase.key];
+      if (!pd || typeof pd !== 'object') continue;
+      helpers.checkPage(12);
+      let y = helpers.getY();
+      doc.setFillColor(245, 246, 252);
+      doc.roundedRect(margin, y, maxWidth, 10, 1, 1, 'F');
+      doc.setFillColor(...phase.color);
+      doc.rect(margin, y, 3, 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...phase.color);
+      doc.text(`${pd.phase || phase.key} — ROAS: ${pd.roas || 'N/D'}`, margin + 6, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(60, 60, 70);
+      if (pd.reasoning) {
+        const rl = doc.splitTextToSize(helpers.stripEmojis(String(pd.reasoning)), maxWidth - 14);
+        doc.text(rl[0] || '', margin + 6, y + 8);
+      }
+      helpers.setY(y + 12);
+    }
+  }
+
+  // Implementation Calendar
+  if (budgetData.implementation_calendar) {
+    helpers.addSubTitle('Calendario de Implementacion — 90 Dias');
+    const cal = budgetData.implementation_calendar;
+    const calPhaseStyles: { label: string; color: [number,number,number] }[] = [
+      { label: 'FASE 1', color: [27, 42, 74] },
+      { label: 'FASE 2', color: [45, 74, 122] },
+      { label: 'FASE 3', color: [22, 120, 50] },
+    ];
+    const calChannelKeys = ['meta_ads', 'google_ads', 'seo', 'email', 'ugc'];
+    const calChannelLabels: Record<string, string> = {
+      meta_ads: 'Meta Ads', google_ads: 'Google Ads', seo: 'SEO', email: 'Email/Klaviyo', ugc: 'UGC/Influencers'
+    };
+    const calPhases = Object.entries(cal);
+    for (let pi = 0; pi < Math.min(calPhases.length, 3); pi++) {
+      const [, phaseData] = calPhases[pi] as [string, any];
+      if (!phaseData || typeof phaseData !== 'object') continue;
+      const style = calPhaseStyles[pi % calPhaseStyles.length];
+      helpers.checkPage(20);
+      let y = helpers.getY();
+      // Phase header
+      doc.setFillColor(...style.color);
+      doc.roundedRect(margin, y, maxWidth, 8, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      const days = phaseData.days || '';
+      const focus = phaseData.focus || '';
+      doc.text(`${style.label} (${days}) — ${focus}`, margin + 5, y + 5.5);
+      y += 10;
+      helpers.setY(y);
+      // Channel actions
+      for (const chKey of calChannelKeys) {
+        const action = phaseData[chKey];
+        if (action) {
+          helpers.addKeyValue(calChannelLabels[chKey] || chKey, helpers.stripEmojis(String(action)).slice(0, 60));
+        }
+      }
+      y = helpers.getY();
+      y += 3;
+      helpers.setY(y);
+    }
+  }
+
+  // Weekly Optimization Checklist
+  if (Array.isArray(budgetData.weekly_optimization_checklist) && budgetData.weekly_optimization_checklist.length > 0) {
+    helpers.addSubTitle('Checklist Semanal de Optimizacion');
+    for (const item of budgetData.weekly_optimization_checklist.slice(0, 6)) {
+      helpers.addArrowBullet(helpers.stripEmojis(String(item)));
+    }
+  }
+}
