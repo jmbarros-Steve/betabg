@@ -180,6 +180,8 @@ async function callClaude(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
 
+  console.log(`[callClaude] Starting request — maxTokens: ${maxTokens}, researchLength: ${researchData.length}`);
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -210,6 +212,7 @@ async function callClaude(
     const data = await res.json();
     const text = data.content?.[0]?.text ?? "{}";
     const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
+    console.log(`[callClaude] Response OK — textLength: ${text.length}, cleanedLength: ${cleaned.length}`);
     return JSON.parse(cleaned);
   } catch (error) {
     if (error.name === "AbortError") {
@@ -337,6 +340,23 @@ Deno.serve(async (req) => {
         return { sectionId: section.id, keys: section.keys, data };
       })
     );
+
+    // Log detallado de cada resultado
+    for (let i = 0; i < results.length; i++) {
+      const section = SECTIONS[i];
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        const keys = Object.keys(result.value.data || {});
+        console.log(`[analyze-brand-strategy] ✅ Section "${section.id}" OK — keys: [${keys.join(', ')}]`);
+      } else {
+        console.log(`[analyze-brand-strategy] ❌ Section "${section.id}" FAILED — error: ${result.reason?.message || result.reason}`);
+      }
+    }
+
+    // Log resumen
+    const fulfilled = results.filter(r => r.status === 'fulfilled').length;
+    const rejected = results.filter(r => r.status === 'rejected').length;
+    console.log(`[analyze-brand-strategy] SUMMARY: ${fulfilled}/11 OK, ${rejected}/11 FAILED`);
 
     // ── Consolidar resultados ──
     const finalBrief: Record<string, unknown> = {};
