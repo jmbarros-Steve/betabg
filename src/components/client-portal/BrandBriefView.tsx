@@ -1350,16 +1350,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     const addSectionHeader = (num: string, title: string) => {
       checkPage(20);
-      y += 10;
+      y += 5;
       // Full-width navy bar with integrated number
       doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(margin, y, maxWidth, 12, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setTextColor(255, 255, 255);
-      doc.text(`${num}. ${title}`, margin + 6, y + 8);
+      doc.text(`${num}. ${title}`, margin + 5, y + 7);
       doc.setTextColor(0, 0, 0);
-      y += 18;
+      y += 14;
     };
 
     const addInsightBox = (text: string) => {
