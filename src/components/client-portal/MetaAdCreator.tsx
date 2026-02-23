@@ -49,6 +49,38 @@ const ANGLES_BY_PHASE: Record<string, string[]> = {
 
 const ALL_ANGLES = ['Beneficios', 'Bold Statement', 'Us vs Them', 'Call Out', 'Antes y Después', 'Beneficios Principales', 'Pantalla Dividida', 'Nueva Colección', 'Reviews', 'Detalles de Producto', 'Ugly Ads', 'Cyber/Fechas Especiales', 'Ingredientes/Material', 'Credenciales en Medios', 'Reviews + Beneficios', 'Memes', 'Descuentos/Ofertas', 'Resultados', 'Paquetes', 'Mensajes y Comentarios'];
 
+const ANGLE_EXPLANATIONS: Record<string, Record<string, string>> = {
+  retargeting: {
+    'Call Out': 'Esta audiencia ya te conoce. El llamado directo reactiva su interés y los hace sentir identificados.',
+    'Bold Statement': 'Una afirmación fuerte recuerda tu propuesta de valor a quienes ya interactuaron contigo.',
+    'Us vs Them': 'Compara tu producto vs alternativas para audiencias que están evaluando opciones.',
+    'Reviews': 'Testimonios reales refuerzan la decisión de compra en personas que ya consideraron tu marca.',
+    'Descuentos/Ofertas': 'Oferta directa para convertir a quienes ya mostraron interés pero no compraron.',
+  },
+  prospecting: {
+    'Bold Statement': 'Necesitas interrumpir el scroll. Una afirmación impactante genera curiosidad inmediata.',
+    'Call Out': 'Identifica a tu audiencia directamente para que sientan que el anuncio les habla a ellos.',
+    'Antes y Después': 'Muestra la transformación que logra tu producto para generar deseo desde cero.',
+    'Ugly Ads': 'Contenido orgánico genera más confianza en audiencias frías que no conocen tu marca.',
+    'Beneficios': 'Presenta el beneficio principal de forma clara para captar atención de nuevas audiencias.',
+  },
+  seasonal: {
+    'Descuentos/Ofertas': 'En fechas especiales la audiencia busca activamente ofertas. Sé directo con el descuento.',
+    'Urgencia': 'Contador de tiempo o stock limitado acelera la decisión en temporada de compras.',
+    'Paquetes': 'Bundles con descuento aumentan el ticket promedio en temporadas de alto tráfico.',
+  },
+  cart: {
+    'Descuentos/Ofertas': 'Un incentivo extra puede ser lo que falta para cerrar la venta abandonada.',
+    'Reviews': 'Testimonios eliminan la última duda de quienes ya agregaron al carrito.',
+    'Urgencia': 'Recuerda que el producto sigue disponible pero por tiempo limitado.',
+  },
+};
+
+const getAngleExplanation = (campaign: string | null, angle: string): string | null => {
+  if (!campaign) return null;
+  return ANGLE_EXPLANATIONS[campaign]?.[angle] || null;
+};
+
 const BUDGET_RECS: Record<string, string> = {
   'Fase Inicial': 'Enfocado en Broad Retargeting + producto ancla. Sin prospección fría.',
   'Fase Crecimiento': 'Retargeting + prospección fría básica. Estructura simple.',
@@ -675,16 +707,24 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">⭐ Recomendados para {faseNegocio}</p>
                 <div className="grid gap-2">
-                  {recommendedAngles.map(a => (
-                    <div
-                      key={a}
-                      onClick={() => { setSelectedAngle(a); setShowCustomAngle(false); }}
-                      className={`cursor-pointer p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${selectedAngle === a && !showCustomAngle ? 'border-primary bg-primary/5' : 'hover:border-primary/40'}`}
-                    >
-                      <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                      <span className="text-sm font-semibold">{a}</span>
-                    </div>
-                  ))}
+                  {recommendedAngles.map(a => {
+                    const explanation = getAngleExplanation(selectedCampaign, a);
+                    return (
+                      <div
+                        key={a}
+                        onClick={() => { setSelectedAngle(a); setShowCustomAngle(false); }}
+                        className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${selectedAngle === a && !showCustomAngle ? 'border-primary bg-primary/5' : 'hover:border-primary/40'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                          <span className="text-sm font-semibold">{a}</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1 ml-6">
+                          {explanation || 'Ángulo versátil que funciona en múltiples etapas del funnel.'}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
