@@ -146,19 +146,23 @@ export function LearningHistory() {
 
     if (data && data.length > 0) {
       setExpandedRules(data as KnowledgeRule[]);
-    } else if (item.processed_at) {
-      // Fallback: find rules created around the same time as processing
-      const processedTime = new Date(item.processed_at);
-      const windowStart = new Date(processedTime.getTime() - 2 * 60 * 1000).toISOString(); // 2 min before
-      const windowEnd = new Date(processedTime.getTime() + 2 * 60 * 1000).toISOString(); // 2 min after
+    } else if (item.processed_at || item.created_at) {
+      // Fallback: wide window from item creation to well after processing
+      const startTime = item.created_at
+        ? new Date(new Date(item.created_at).getTime() - 60 * 1000) // 1 min before creation
+        : new Date(new Date(item.processed_at!).getTime() - 30 * 60 * 1000); // 30 min before processing
+      const endTime = item.processed_at
+        ? new Date(new Date(item.processed_at).getTime() + 5 * 60 * 1000) // 5 min after processing
+        : new Date(new Date(item.created_at!).getTime() + 60 * 60 * 1000); // 1 hour after creation
 
       const { data: fallbackData } = await supabase
         .from('steve_knowledge')
         .select('id, titulo, contenido, categoria')
-        .gte('created_at', windowStart)
-        .lte('created_at', windowEnd)
+        .gte('created_at', startTime.toISOString())
+        .lte('created_at', endTime.toISOString())
         .is('source_id', null)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(50);
 
       setExpandedRules((fallbackData as KnowledgeRule[]) || []);
     } else {
