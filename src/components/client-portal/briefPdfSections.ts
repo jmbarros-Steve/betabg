@@ -570,24 +570,87 @@ export function renderKeywordPhases(
     k.toLowerCase().includes('phase') || k.toLowerCase().includes('fase')
   ).sort();
 
-  for (const key of phaseKeys) {
-    const phase = roadmap[key];
+  const phaseStyles: { label: string; color: [number,number,number]; bg: [number,number,number] }[] = [
+    { label: 'FASE 1 — Quick Wins', color: [27, 42, 74], bg: [230, 240, 255] },
+    { label: 'FASE 2 — Growth', color: [45, 74, 122], bg: [237, 247, 240] },
+    { label: 'FASE 3 — Dominance', color: [22, 120, 50], bg: [253, 248, 240] },
+  ];
+
+  const { doc, margin, maxWidth, accentR, accentG, accentB } = ctx;
+
+  for (let pi = 0; pi < phaseKeys.length; pi++) {
+    const phase = roadmap[phaseKeys[pi]];
     if (!phase || typeof phase !== 'object') continue;
 
-    const label = key.replace(/_/g, ' ').replace(/phase/i, 'Fase');
-    helpers.addKeyValue(label, `${phase.focus || ''} — ${phase.timeline || ''}`);
+    const style = phaseStyles[pi % phaseStyles.length];
+    const focus = phase.focus || '';
+    const timeline = phase.timeline || '';
+
+    // Phase header bar
+    helpers.checkPage(16);
+    let y = helpers.getY();
+    doc.setFillColor(...style.color);
+    doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.rect(margin, y + 9, maxWidth, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    const phaseTitle = `${style.label}${focus ? ': ' + focus : ''}${timeline ? ' — ' + timeline : ''}`;
+    doc.text(phaseTitle, margin + 5, y + 7);
+    y += 13;
+    helpers.setY(y);
+
+    // Phase content on colored background
+    helpers.checkPage(10);
+    y = helpers.getY();
+    const contentStartY = y;
 
     if (Array.isArray(phase.keywords) && phase.keywords.length > 0) {
-      helpers.addBody(`  Keywords: ${phase.keywords.join(', ')}`, 6, 4.5);
+      // Keywords as inline badges
+      doc.setFillColor(...style.bg);
+      const kwText = 'Keywords: ' + phase.keywords.join(', ');
+      const kwLines = doc.splitTextToSize(kwText, maxWidth - 12);
+      const kwBoxH = kwLines.length * 4.5 + 5;
+      doc.roundedRect(margin, y, maxWidth, kwBoxH, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...style.color);
+      doc.text('Keywords:', margin + 4, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(40, 40, 50);
+      for (let kli = 0; kli < kwLines.length; kli++) {
+        doc.text(kwLines[kli], margin + 4, y + 4 + kli * 4.5);
+      }
+      y += kwBoxH + 2;
+      helpers.setY(y);
     }
     if (Array.isArray(phase.kpis) && phase.kpis.length > 0) {
-      helpers.addBody(`  KPIs: ${phase.kpis.join(', ')}`, 6, 4.5);
+      helpers.checkPage(8);
+      y = helpers.getY();
+      doc.setFillColor(248, 248, 252);
+      const kpiText = 'KPIs: ' + phase.kpis.join(', ');
+      const kpiLines = doc.splitTextToSize(kpiText, maxWidth - 12);
+      const kpiBoxH = kpiLines.length * 4.5 + 4;
+      doc.roundedRect(margin, y, maxWidth, kpiBoxH, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 100, 120);
+      for (let kli = 0; kli < kpiLines.length; kli++) {
+        doc.text(kpiLines[kli], margin + 4, y + 4 + kli * 4.5);
+      }
+      y += kpiBoxH + 2;
+      helpers.setY(y);
     }
     if (Array.isArray(phase.acciones_concretas) && phase.acciones_concretas.length > 0) {
       for (const a of phase.acciones_concretas.slice(0, 3)) {
-        helpers.addBody(`    • ${helpers.stripEmojis(String(a))}`, 10, 4.5);
+        helpers.addBody(`  • ${helpers.stripEmojis(String(a))}`, 6, 4.5);
       }
     }
+    y = helpers.getY();
+    y += 4;
+    helpers.setY(y);
   }
 
   renderGlossaryBox(ctx, helpers, 'keywords');
@@ -705,14 +768,48 @@ export function renderGoogleAdsStrategy(
 
   if (googleStrategy.ad_copies?.length > 0) {
     helpers.addSubTitle('Copies de Anuncios');
-    for (const copy of googleStrategy.ad_copies.slice(0, 3)) {
-      if (typeof copy === 'object') {
-        const variant = copy.variant || '';
-        helpers.addKeyValue(`Variante ${variant}`, '');
-        if (copy.headline1) helpers.addBody(`  H1: ${copy.headline1} | H2: ${copy.headline2 || ''} | H3: ${copy.headline3 || ''}`, 4, 4.5);
-        if (copy.description1) helpers.addBody(`  D1: ${copy.description1}`, 4, 4.5);
-        if (copy.description2) helpers.addBody(`  D2: ${copy.description2}`, 4, 4.5);
+    const { doc, margin, maxWidth, accentR, accentG, accentB, brandR, brandG, brandB } = ctx;
+    const copyColors: [number,number,number][] = [
+      [66, 133, 244], // Google blue
+      [52, 168, 83],  // Google green
+      [234, 67, 53],  // Google red
+    ];
+    for (let ci = 0; ci < Math.min(googleStrategy.ad_copies.length, 3); ci++) {
+      const copy = googleStrategy.ad_copies[ci];
+      if (typeof copy !== 'object') continue;
+      const cColor = copyColors[ci % copyColors.length];
+      helpers.checkPage(28);
+      let y = helpers.getY();
+      // Card
+      doc.setFillColor(248, 249, 255);
+      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, 'F');
+      doc.setFillColor(...cColor);
+      doc.rect(margin, y, 3, 24, 'F');
+      // Variant label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...cColor);
+      doc.text(`Variante ${copy.variant || ci + 1}`, margin + 7, y + 5);
+      // Headlines
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(40, 40, 50);
+      const headlines = [copy.headline1, copy.headline2, copy.headline3].filter(Boolean).join(' | ');
+      const hLines = doc.splitTextToSize(helpers.stripEmojis(headlines), maxWidth - 12);
+      doc.text(hLines[0] || '', margin + 7, y + 11);
+      // Descriptions
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(60, 60, 70);
+      if (copy.description1) {
+        const d1Lines = doc.splitTextToSize(helpers.stripEmojis(copy.description1), maxWidth - 12);
+        doc.text(d1Lines[0] || '', margin + 7, y + 17);
       }
+      if (copy.description2) {
+        const d2Lines = doc.splitTextToSize(helpers.stripEmojis(copy.description2), maxWidth - 12);
+        doc.text(d2Lines[0] || '', margin + 7, y + 21);
+      }
+      helpers.setY(y + 27);
     }
   }
 
