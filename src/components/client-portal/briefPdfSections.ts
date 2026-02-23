@@ -87,7 +87,7 @@ export const GLOSSARIES: Record<string, { term: string; def: string }[]> = {
   ],
 };
 
-// ─── GLOSSARY BOX RENDERER ──────────────────────────────────────────────────
+// ─── GLOSSARY BOX RENDERER (Premium: gold left border, styled entries) ──────
 export function renderGlossaryBox(
   ctx: PdfContext,
   helpers: PdfHelpers,
@@ -96,66 +96,71 @@ export function renderGlossaryBox(
   const items = GLOSSARIES[sectionKey];
   if (!items || items.length === 0) return;
 
-  const { doc, margin, maxWidth, pageHeight } = ctx;
+  const { doc, margin, maxWidth, pageHeight, accentR, accentG, accentB } = ctx;
   let y = helpers.getY();
 
   y += 6;
 
-  // Render each term as a flowing block — no fixed-height box
-  // Title bar
+  // Title bar with gold accent
   helpers.checkPage(14);
   y = helpers.getY();
-  doc.setFillColor(240, 241, 248);
+  doc.setFillColor(250, 248, 242);
   doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
+  // Gold left border
+  doc.setFillColor(accentR, accentG, accentB);
+  doc.rect(margin, y, 3, 9, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(80, 80, 100);
-  doc.text('GLOSARIO', margin + 5, y + 6.2);
+  doc.setTextColor(accentR, accentG, accentB);
+  doc.text('GLOSARIO', margin + 8, y + 6.2);
   y += 12;
   helpers.setY(y);
 
   for (let i = 0; i < items.length; i++) {
-    // Measure definition lines for block height
+    // Measure definition for block height
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    const defLines = doc.splitTextToSize(items[i].def, maxWidth - 12);
+    const defLines = doc.splitTextToSize(items[i].def, maxWidth - 14);
     const blockH = 4.5 + defLines.length * 4 + 2;
     helpers.checkPage(blockH + 2);
     y = helpers.getY();
 
-    // Alternating subtle background
-    if (i % 2 === 0) {
-      doc.setFillColor(248, 249, 253);
-      doc.rect(margin, y - 1.5, maxWidth, blockH, 'F');
-    }
+    // Gold left border stripe for each entry
+    doc.setFillColor(252, 250, 245);
+    doc.rect(margin, y - 1.5, maxWidth, blockH, 'F');
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.rect(margin, y - 1.5, 2, blockH, 'F');
 
-    // Term in bold on its own
+    // Term in bold gold
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(50, 50, 70);
-    doc.text(items[i].term, margin + 5, y);
+    doc.setTextColor(accentR, accentG, accentB);
+    doc.text(items[i].term, margin + 6, y);
     y += 4.5;
 
-    // Definition in normal weight, wrapped
+    // Definition in dark gray, wrapped
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.setTextColor(70, 70, 80);
+    doc.setTextColor(60, 60, 70);
     for (let li = 0; li < defLines.length; li++) {
       helpers.checkPage(5);
       y = helpers.getY();
-      doc.text(defLines[li], margin + 5, y);
+      doc.text(defLines[li], margin + 6, y);
       y += 4;
     }
-    y += 1;
+
+    // Fine separator line between entries
+    if (i < items.length - 1) {
+      doc.setDrawColor(220, 215, 200);
+      doc.setLineWidth(0.15);
+      doc.line(margin + 6, y, margin + maxWidth - 4, y);
+    }
+    y += 1.5;
     helpers.setY(y);
   }
 
-  // Bottom border
   y = helpers.getY();
-  doc.setDrawColor(200, 200, 215);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y, margin + maxWidth, y);
-  y += 6;
+  y += 4;
   helpers.setY(y);
 }
 
@@ -375,7 +380,7 @@ export function renderActionPlan(
   }
 }
 
-// ─── ENHANCED COMPETITOR CARDS IN PDF ────────────────────────────────────────
+// ─── ENHANCED COMPETITOR CARDS (Premium styled) ─────────────────────────────
 export function renderCompetitorCards(
   ctx: PdfContext,
   helpers: PdfHelpers,
@@ -390,36 +395,46 @@ export function renderCompetitorCards(
     const { doc, margin, maxWidth, accentR, accentG, accentB, brandR, brandG, brandB } = ctx;
     let y = helpers.getY();
 
-    // Header bar with name and threat level
-    if (y + 60 > ctx.pageHeight - 25) {
-      doc.addPage();
-      y = 20;
-      helpers.setY(y);
-    }
+    // Card container with border
+    helpers.checkPage(65);
+    y = helpers.getY();
 
-    doc.setFillColor(230, 233, 245);
-    doc.roundedRect(margin, y, maxWidth, 9, 1, 1, 'F');
+    // Card background
+    doc.setFillColor(252, 252, 255);
+    doc.roundedRect(margin, y, maxWidth, 8, 2, 2, 'F'); // just header for now
+    doc.setDrawColor(brandR, brandG, brandB);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, y, maxWidth, 8, 2, 2, 'S');
+
+    // Header bar with navy bg
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
+    // Gold accent line
+    doc.setFillColor(accentR, accentG, accentB);
+    doc.rect(margin, y + 9, maxWidth, 1, 'F');
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setTextColor(brandR, brandG, brandB);
-    doc.text(`${i + 1}. ${String(comp.name || comp.url || 'Competidor').slice(0, 35)}`, margin + 3, y + 6);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`${i + 1}. ${String(comp.name || comp.url || 'Competidor').slice(0, 35)}`, margin + 5, y + 7);
 
     // Threat badge
     const threat = String(comp.nivel_amenaza || '').toLowerCase();
     if (threat) {
       const threatColor: [number, number, number] = threat.includes('alto') || threat.includes('high')
         ? [200, 40, 40] : threat.includes('medio') || threat.includes('medium')
-        ? [200, 150, 0] : [22, 160, 70];
-      const threatLabel = threat.charAt(0).toUpperCase() + threat.slice(1);
+        ? [220, 170, 30] : [22, 160, 70];
+      const threatLabel = threat.includes('alto') || threat.includes('high') ? 'ALTO'
+        : threat.includes('medio') || threat.includes('medium') ? 'MEDIO' : 'BAJO';
       doc.setFillColor(...threatColor);
-      doc.roundedRect(ctx.pageWidth - margin - 30, y + 1.5, 28, 6, 1, 1, 'F');
+      doc.roundedRect(ctx.pageWidth - margin - 28, y + 2, 24, 6, 2, 2, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7);
       doc.setTextColor(255, 255, 255);
-      doc.text(`Amenaza: ${threatLabel}`, ctx.pageWidth - margin - 28, y + 5.8);
+      doc.text(threatLabel, ctx.pageWidth - margin - 16, y + 6, { align: 'center' });
     }
 
-    y += 12;
+    y += 13;
     helpers.setY(y);
 
     if (comp.url) helpers.addKeyValue('URL', String(comp.url));
@@ -427,30 +442,34 @@ export function renderCompetitorCards(
       helpers.addKeyValue('Propuesta de Valor', String(comp.value_proposition || comp.propuesta_valor));
     }
 
-    // Strengths
+    // Strengths with green indicator
     const strengths = comp.strengths || comp.fortalezas || [];
     if (Array.isArray(strengths) && strengths.length > 0) {
       y = helpers.getY();
+      doc.setFillColor(230, 250, 235);
+      doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.setTextColor(22, 160, 70);
-      doc.text('Fortalezas:', margin + 4, y);
-      y += 4;
+      doc.setTextColor(22, 120, 50);
+      doc.text('FORTALEZAS', margin + 5, y + 2.5);
+      y += 6;
       helpers.setY(y);
       for (const s of strengths.slice(0, 4)) {
         helpers.addBody(`  + ${helpers.stripEmojis(String(s))}`, 4, 4.5);
       }
     }
 
-    // Weaknesses
+    // Weaknesses with red indicator
     const weaknesses = comp.weaknesses || comp.debilidades || [];
     if (Array.isArray(weaknesses) && weaknesses.length > 0) {
       y = helpers.getY();
+      doc.setFillColor(255, 235, 235);
+      doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.setTextColor(200, 40, 40);
-      doc.text('Debilidades:', margin + 4, y);
-      y += 4;
+      doc.setTextColor(180, 40, 40);
+      doc.text('DEBILIDADES', margin + 5, y + 2.5);
+      y += 6;
       helpers.setY(y);
       for (const w of weaknesses.slice(0, 4)) {
         helpers.addBody(`  - ${helpers.stripEmojis(String(w))}`, 4, 4.5);
@@ -460,11 +479,13 @@ export function renderCompetitorCards(
     // What they do better
     if (comp.que_hacen_mejor) {
       y = helpers.getY();
+      doc.setFillColor(255, 248, 230);
+      doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.setTextColor(200, 150, 0);
-      doc.text('Que hacen mejor:', margin + 4, y);
-      y += 4;
+      doc.setTextColor(180, 120, 0);
+      doc.text('QUE HACEN MEJOR', margin + 5, y + 2.5);
+      y += 6;
       helpers.setY(y);
       helpers.addBody(`  ${helpers.stripEmojis(String(comp.que_hacen_mejor))}`, 4, 4.5);
     }
@@ -472,26 +493,30 @@ export function renderCompetitorCards(
     // What client does better
     if (comp.que_hace_cliente_mejor) {
       y = helpers.getY();
+      doc.setFillColor(230, 240, 255);
+      doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.setTextColor(22, 100, 180);
-      doc.text('Que hacemos mejor:', margin + 4, y);
-      y += 4;
+      doc.setTextColor(22, 80, 160);
+      doc.text('NUESTRA VENTAJA', margin + 5, y + 2.5);
+      y += 6;
       helpers.setY(y);
       helpers.addBody(`  ${helpers.stripEmojis(String(comp.que_hace_cliente_mejor))}`, 4, 4.5);
     }
 
-    // Content strategy
     if (comp.estrategia_contenido) {
       helpers.addKeyValue('Estrategia de Contenido', String(comp.estrategia_contenido));
     }
-
-    // Justification
     if (comp.justificacion_amenaza) {
       helpers.addBody(`Justificacion: ${helpers.stripEmojis(String(comp.justificacion_amenaza))}`, 4, 4.5);
     }
 
-    helpers.setY(helpers.getY() + 4);
+    // Card bottom border
+    y = helpers.getY();
+    doc.setDrawColor(accentR, accentG, accentB);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y + 1, margin + maxWidth, y + 1);
+    helpers.setY(y + 5);
   }
 
   renderGlossaryBox(ctx, helpers, 'competitive');
@@ -713,18 +738,81 @@ export function renderAdsLibraryAnalysis(
 
   if (adsLibrary.creative_concepts?.length > 0) {
     helpers.addSubTitle('5 Conceptos Creativos');
+    const conceptColors: [number, number, number][] = [
+      [27, 42, 74], [45, 74, 122], [200, 163, 90], [22, 120, 80], [120, 60, 140],
+    ];
     for (let i = 0; i < Math.min(adsLibrary.creative_concepts.length, 5); i++) {
       const cc = adsLibrary.creative_concepts[i];
-      if (typeof cc === 'object') {
-        helpers.addKeyValue(`Concepto ${i + 1}`, String(cc.nombre || cc.name || ''));
-        if (cc.hook) helpers.addBody(`  Hook: ${cc.hook}`, 6, 4.5);
-        if (cc.formato || cc.format) helpers.addBody(`  Formato: ${cc.formato || cc.format}`, 6, 4.5);
-        if (cc.copy) helpers.addBody(`  Copy: ${cc.copy}`, 6, 4.5);
-        if (cc.cta) helpers.addBody(`  CTA: ${cc.cta}`, 6, 4.5);
-        if (cc.justificacion) helpers.addBody(`  Por que: ${cc.justificacion}`, 6, 4.5);
-      } else {
-        helpers.addArrowBullet(String(cc));
+      if (typeof cc !== 'object') { helpers.addArrowBullet(String(cc)); continue; }
+      const { doc, margin, maxWidth, accentR, accentG, accentB } = ctx;
+      helpers.checkPage(40);
+      let y = helpers.getY();
+
+      // Card container
+      doc.setFillColor(252, 252, 255);
+      doc.roundedRect(margin, y, maxWidth, 36, 2, 2, 'F');
+      doc.setDrawColor(200, 200, 215);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, maxWidth, 36, 2, 2, 'S');
+
+      // Colored header bar
+      const cColor = conceptColors[i % conceptColors.length];
+      doc.setFillColor(...cColor);
+      doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
+      // Fix bottom corners
+      doc.rect(margin, y + 5, maxWidth, 4, 'F');
+
+      // Concept name
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Concepto ${i + 1}: ${String(cc.nombre || cc.name || '').slice(0, 40)}`, margin + 4, y + 6);
+
+      // Format badge
+      const fmt = String(cc.formato || cc.format || '').toUpperCase();
+      if (fmt) {
+        doc.setFillColor(accentR, accentG, accentB);
+        doc.roundedRect(ctx.pageWidth - margin - 26, y + 2, 24, 5, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(fmt.slice(0, 12), ctx.pageWidth - margin - 14, y + 5.5, { align: 'center' });
       }
+
+      y += 12;
+      // Hook in bold
+      if (cc.hook) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(40, 40, 50);
+        const hookLines = doc.splitTextToSize(`"${cc.hook}"`, maxWidth - 12);
+        doc.text(hookLines[0] || '', margin + 5, y);
+        y += 5;
+      }
+      // Copy
+      if (cc.copy) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(60, 60, 70);
+        const copyLines = doc.splitTextToSize(cc.copy, maxWidth - 12);
+        for (const cl of copyLines.slice(0, 2)) {
+          doc.text(cl, margin + 5, y);
+          y += 4;
+        }
+      }
+      // CTA as button-like element
+      if (cc.cta) {
+        y += 1;
+        doc.setFillColor(...cColor);
+        doc.roundedRect(margin + 5, y, 40, 6, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(255, 255, 255);
+        doc.text(String(cc.cta).slice(0, 20), margin + 25, y + 4, { align: 'center' });
+        y += 8;
+      }
+
+      helpers.setY(y + 3);
     }
   }
 

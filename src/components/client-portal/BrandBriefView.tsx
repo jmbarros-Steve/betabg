@@ -1265,10 +1265,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     let y = 15;
 
     // ─── COLOR PALETTE ────────────────────────────────────────────────────────
-    const brandR = 26, brandG = 35, brandB = 126;   // #1a237e navy
-    const accentR = 161, accentG = 120, accentB = 25; // #a17819 gold
+    const brandR = 27, brandG = 42, brandB = 74;   // #1B2A4A navy
+    const accentR = 200, accentG = 163, accentB = 90; // #C8A35A gold
+    const midBlueR = 45, midBlueG = 74, midBlueB = 122; // #2D4A7A
     const lightGray = [245, 246, 252] as [number,number,number];
     const midGray   = [200, 200, 210] as [number,number,number];
+
+    // Rotating section backgrounds for visual variety
+    const sectionBgs: [number, number, number][] = [
+      [238, 242, 249], // azul claro #EEF2F9
+      [253, 248, 240], // crema #FDF8F0
+      [237, 247, 240], // verde agua #EDF7F0
+      [243, 239, 248], // lavanda #F3EFF8
+    ];
+    let sectionBgIdx = 0;
 
     // ─── HELPERS ──────────────────────────────────────────────────────────────
     const checkPage = (needed: number) => {
@@ -1338,51 +1348,77 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     };
 
     const addSubTitle = (title: string) => {
-      checkPage(12);
-      y += 4;
+      checkPage(14);
+      y += 5;
+      // Gold accent dot + mid-blue text
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.circle(margin + 3, y - 1.5, 1.5, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.setTextColor(brandR, brandG, brandB);
-      doc.text(title, margin + 2, y);
+      doc.setTextColor(midBlueR, midBlueG, midBlueB);
+      doc.text(title, margin + 8, y);
+      // Subtle underline
+      doc.setDrawColor(accentR, accentG, accentB);
+      doc.setLineWidth(0.3);
+      doc.line(margin + 8, y + 1.5, margin + 8 + Math.min(doc.getTextWidth(title), maxWidth - 12), y + 1.5);
       doc.setTextColor(0, 0, 0);
-      y += 7;
+      y += 8;
     };
 
     const addSectionHeader = (num: string, title: string) => {
-      checkPage(20);
-      y += 5;
-      // Full-width navy bar with integrated number
+      checkPage(24);
+      y += 6;
+      // Rotating background band
+      const bg = sectionBgs[sectionBgIdx % sectionBgs.length];
+      sectionBgIdx++;
+      doc.setFillColor(...bg);
+      doc.rect(0, y - 2, pageWidth, 16, 'F');
+      // Navy bar
       doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, 12, 2, 2, 'F');
+      // Gold accent line at top
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.rect(margin, y, maxWidth, 1.5, 'F');
+      // Number circle in gold
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.circle(margin + 8, y + 7, 4.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(brandR, brandG, brandB);
+      doc.text(num, margin + 8, y + 8.5, { align: 'center' });
+      // Title text in white
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(255, 255, 255);
-      doc.text(`${num}. ${title}`, margin + 5, y + 7);
+      doc.text(title, margin + 16, y + 8);
       doc.setTextColor(0, 0, 0);
-      y += 14;
+      y += 18;
     };
 
     const addInsightBox = (text: string) => {
-      checkPage(18);
-      doc.setFillColor(249, 246, 235);
-      doc.roundedRect(margin, y, maxWidth, 14, 1, 1, 'F');
-      doc.setDrawColor(accentR, accentG, accentB);
-      doc.setLineWidth(1);
-      doc.line(margin, y, margin, y + 14);
-      doc.setLineWidth(0.2);
+      checkPage(20);
+      // Cream background with thick gold left border
+      doc.setFillColor(253, 248, 240);
+      doc.roundedRect(margin, y, maxWidth, 16, 1.5, 1.5, 'F');
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.rect(margin, y, 3, 16, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(accentR, accentG, accentB);
+      doc.text('*', margin + 7, y + 6);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(60, 40, 0);
-      const lines = doc.splitTextToSize(stripEmojis(text), maxWidth - 10);
-      doc.text(lines.slice(0, 3), margin + 5, y + 5);
-      y += 17;
+      const lines = doc.splitTextToSize(stripEmojis(text), maxWidth - 14);
+      doc.text(lines.slice(0, 3), margin + 11, y + 6);
+      y += 19;
     };
 
     const addKeyValue = (label: string, value: string) => {
       checkPage(7);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.setTextColor(80, 80, 80);
+      doc.setTextColor(midBlueR, midBlueG, midBlueB);
       doc.text(`${label}:`, margin + 4, y);
       const labelWidth = doc.getTextWidth(`${label}: `);
       doc.setFont('helvetica', 'normal');
@@ -1399,13 +1435,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     const addArrowBullet = (text: string, indent = 0) => {
       checkPage(6);
+      // Gold bullet
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.circle(margin + indent + 4, y - 1, 1, 'F');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(50, 50, 50);
-      const lines = doc.splitTextToSize(`•  ${stripEmojis(text)}`, maxWidth - indent - 4);
+      const lines = doc.splitTextToSize(stripEmojis(text), maxWidth - indent - 10);
       for (const line of lines) {
         checkPage(5);
-        doc.text(line, margin + indent + 2, y);
+        doc.text(line, margin + indent + 8, y);
         y += 5;
       }
       y += 1;
@@ -1415,7 +1454,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       checkPage(12);
       const rowH = 11;
       const rowX = margin;
-      // Auto-scale columns to fit maxWidth
       const totalW = colWidths.reduce((a, b) => a + b, 0);
       const scale = totalW > maxWidth ? maxWidth / totalW : 1;
       const scaledWidths = colWidths.map(w => w * scale);
@@ -1423,28 +1461,32 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (header) {
         doc.setFillColor(brandR, brandG, brandB);
       } else {
-        doc.setFillColor(rowIdx % 2 === 0 ? 255 : 247, rowIdx % 2 === 0 ? 255 : 248, rowIdx % 2 === 0 ? 255 : 254);
+        const altBg: [number,number,number] = rowIdx % 2 === 0 ? [255, 255, 255] : [238, 242, 249];
+        doc.setFillColor(...altBg);
       }
       doc.rect(rowX, y, maxWidth, rowH, 'F');
-      doc.setDrawColor(header ? brandR : 215, header ? brandG : 218, header ? brandB : 228);
+      doc.setDrawColor(midBlueR, midBlueG, midBlueB);
       doc.setLineWidth(header ? 0 : 0.15);
-      if (!header) doc.line(rowX, y + rowH, rowX + maxWidth, y + rowH);
+      if (!header) {
+        doc.setDrawColor(215, 218, 228);
+        doc.line(rowX, y + rowH, rowX + maxWidth, y + rowH);
+      }
       cx = rowX;
       doc.setFont('helvetica', header ? 'bold' : 'normal');
       doc.setFontSize(header ? 8 : 7.5);
       doc.setTextColor(header ? 255 : 40, header ? 255 : 40, header ? 255 : 40);
       for (let i = 0; i < cells.length; i++) {
-        if (i > 0 && !header) {
-          doc.setDrawColor(220, 222, 232);
+        if (i > 0) {
+          doc.setDrawColor(header ? 60 : 200, header ? 80 : 205, header ? 120 : 220);
           doc.setLineWidth(0.15);
-          doc.line(cx, y + 2, cx, y + rowH - 2);
+          doc.line(cx, y + 1, cx, y + rowH - 1);
         }
-        // Truncate text to fit column
         const colW = scaledWidths[i];
         let txt = String(cells[i] ?? '');
         while (txt.length > 3 && doc.getTextWidth(txt) > colW - 6) {
           txt = txt.slice(0, -1);
         }
+        if (txt.length < String(cells[i] ?? '').length && txt.length > 3) txt = txt.slice(0, -2) + '..';
         doc.text(txt, cx + 3, y + 7);
         cx += colW;
       }
@@ -1751,7 +1793,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const proofResp = getResponse('proof_tone');
     if (proofResp) { addSubTitle('Prueba Social y Tono de Comunicacion'); addBody(proofResp); }
 
-    // ─── SECCIÓN: EVALUACIÓN ESTRATÉGICA — ACCIONABLES ──────────────────────────
+    // ─── SECCIÓN: EVALUACIÓN ESTRATÉGICA — ACCIONABLES (SCR Cards) ─────────────
     if (briefData.summary) {
       addSectionHeader('5', 'EVALUACION ESTRATEGICA — 7 ACCIONABLES');
       let planText = briefData.summary;
@@ -1761,52 +1803,145 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (startMatch?.index !== undefined) planText = planText.slice(startMatch.index);
       const planLines = planText.split('\n').filter(l => l.trim());
       let accionableNum = 0;
+      let currentTitle = '';
+      let currentSCR: { s: string; c: string; r: string } = { s: '', c: '', r: '' };
+      const scrColors: Record<string, { bg: [number,number,number]; fg: [number,number,number]; label: string }> = {
+        s: { bg: [230, 240, 255], fg: [27, 42, 74], label: 'SITUACION' },
+        c: { bg: [255, 243, 230], fg: [180, 100, 20], label: 'COMPLICACION' },
+        r: { bg: [230, 250, 235], fg: [22, 120, 50], label: 'RESOLUCION' },
+      };
+
+      const flushSCR = () => {
+        if (accionableNum === 0) return;
+        checkPage(50);
+        // Card container
+        doc.setFillColor(250, 250, 254);
+        doc.roundedRect(margin, y, maxWidth, 48, 2, 2, 'F');
+        doc.setDrawColor(midBlueR, midBlueG, midBlueB);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(margin, y, maxWidth, 48, 2, 2, 'S');
+        // Number circle
+        doc.setFillColor(brandR, brandG, brandB);
+        doc.circle(margin + 8, y + 8, 5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.text(String(accionableNum), margin + 8, y + 9.5, { align: 'center' });
+        // Title
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(brandR, brandG, brandB);
+        const titleLines = doc.splitTextToSize(currentTitle, maxWidth - 24);
+        doc.text(titleLines[0] || '', margin + 16, y + 9);
+        let sy = y + 16;
+        // SCR sections
+        for (const key of ['s', 'c', 'r'] as const) {
+          const scr = scrColors[key];
+          const text = currentSCR[key] || '';
+          if (!text) continue;
+          doc.setFillColor(...scr.bg);
+          doc.roundedRect(margin + 4, sy, maxWidth - 8, 9, 1, 1, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(...scr.fg);
+          doc.text(scr.label, margin + 7, sy + 3.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(40, 40, 40);
+          const scrLines = doc.splitTextToSize(stripEmojis(text), maxWidth - 18);
+          doc.text(scrLines[0] || '', margin + 7, sy + 7);
+          sy += 10;
+        }
+        y += 52;
+      };
+
       for (const line of planLines) {
         const trimmed = line.trim().replace(/^#+\s*/, '').replace(/\*\*/g, '');
         if (!trimmed || trimmed.match(/^\|[\s-:]+\|$/)) continue;
         if (trimmed.match(/^Accionable\s+\d+/i) || (trimmed.match(/^\d+\.\s/) && trimmed.length < 80)) {
+          if (accionableNum > 0) flushSCR();
           accionableNum++;
-          checkPage(10);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(brandR, brandG, brandB);
-          doc.text(`${accionableNum}. ${trimmed}`, margin + 4, y);
-          doc.setTextColor(0, 0, 0);
-          y += 6;
+          currentTitle = trimmed;
+          currentSCR = { s: '', c: '', r: '' };
+        } else if (trimmed.toLowerCase().startsWith('situaci')) {
+          currentSCR.s = trimmed.replace(/^[^:]*:\s*/, '');
+        } else if (trimmed.toLowerCase().startsWith('complic')) {
+          currentSCR.c = trimmed.replace(/^[^:]*:\s*/, '');
+        } else if (trimmed.toLowerCase().startsWith('resolu')) {
+          currentSCR.r = trimmed.replace(/^[^:]*:\s*/, '');
         } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
-          addArrowBullet(trimmed.replace(/^[-•]\s*/, ''), 6);
+          // Attach to last SCR field
+          if (currentSCR.r) currentSCR.r += ' ' + trimmed.replace(/^[-•]\s*/, '');
+          else if (currentSCR.c) currentSCR.c += ' ' + trimmed.replace(/^[-•]\s*/, '');
+          else currentSCR.s += ' ' + trimmed.replace(/^[-•]\s*/, '');
         } else {
           addBody(trimmed, 4);
         }
       }
+      flushSCR();
     }
 
     // ─── SECCIÓN: AUDITORÍA SEO ──────────────────────────────────────────────────
     if (research.seo_audit) {
       const seo = research.seo_audit;
       addSectionHeader('6', 'AUDITORIA SEO — ' + (clientInfo?.website_url || ''));
-      checkPage(22);
-      // Score box
+      checkPage(38);
+      // ── SEO GAUGE ──
+      const score = seo.score || 0;
+      const gaugeX = margin + maxWidth / 2;
+      const gaugeY = y + 20;
+      const gaugeR = 18;
+      // Background arc (gray)
+      doc.setDrawColor(220, 222, 235);
+      doc.setLineWidth(5);
+      // Draw as segmented arcs — red, orange, yellow, green
+      const gaugeSegments: { start: number; end: number; color: [number,number,number] }[] = [
+        { start: 180, end: 234, color: [200, 40, 40] },   // 0-30
+        { start: 234, end: 270, color: [230, 160, 30] },   // 31-50
+        { start: 270, end: 306, color: [220, 200, 40] },   // 51-70
+        { start: 306, end: 360, color: [22, 160, 70] },     // 71-100
+      ];
+      for (const seg of gaugeSegments) {
+        doc.setDrawColor(...seg.color);
+        doc.setLineWidth(4);
+        // Approximate arc with lines
+        const steps = 12;
+        for (let si = 0; si < steps; si++) {
+          const a1 = ((seg.start + (seg.end - seg.start) * si / steps) * Math.PI) / 180;
+          const a2 = ((seg.start + (seg.end - seg.start) * (si + 1) / steps) * Math.PI) / 180;
+          doc.line(
+            gaugeX + Math.cos(a1) * gaugeR, gaugeY + Math.sin(a1) * gaugeR,
+            gaugeX + Math.cos(a2) * gaugeR, gaugeY + Math.sin(a2) * gaugeR
+          );
+        }
+      }
+      // Needle position (score maps 0→180° to 100→360°)
+      const needleAngle = (180 + (score / 100) * 180) * Math.PI / 180;
+      doc.setDrawColor(brandR, brandG, brandB);
+      doc.setLineWidth(1.5);
+      doc.line(gaugeX, gaugeY, gaugeX + Math.cos(needleAngle) * (gaugeR - 3), gaugeY + Math.sin(needleAngle) * (gaugeR - 3));
       doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(margin, y, 36, 16, 1, 1, 'F');
+      doc.circle(gaugeX, gaugeY, 2, 'F');
+      // Score value
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.setTextColor(255, 255, 255);
-      doc.text(String(seo.score || '?'), margin + 10, y + 10);
+      doc.setFontSize(20);
+      const scoreColor: [number,number,number] = score >= 70 ? [22,160,70] : score >= 50 ? [200,150,0] : score >= 30 ? [230,160,30] : [200,40,40];
+      doc.setTextColor(...scoreColor);
+      doc.text(String(score), gaugeX, gaugeY + 10, { align: 'center' });
       doc.setFontSize(8);
-      doc.text('/100', margin + 22, y + 10);
-      const scoreLabel = (seo.score || 0) >= 70 ? 'BUENO' : (seo.score || 0) >= 50 ? 'REGULAR' : 'CRITICO';
-      const scoreFg: [number,number,number] = (seo.score || 0) >= 70 ? [22,160,70] : (seo.score || 0) >= 50 ? [200,150,0] : [200,40,40];
-      doc.setFillColor(...scoreFg);
-      doc.circle(margin + 44, y + 5, 5, 'F');
-      doc.setTextColor(...scoreFg);
-      doc.setFontSize(10);
-      doc.text(scoreLabel, margin + 52, y + 7);
+      doc.text('/100', gaugeX + 10, gaugeY + 10);
+      // Label
+      const scoreLabel = score >= 70 ? 'BUENO' : score >= 50 ? 'REGULAR' : 'CRITICO';
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...scoreColor);
+      doc.text(scoreLabel, gaugeX, gaugeY + 16, { align: 'center' });
+      // Problems & recs count
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setTextColor(60, 60, 60);
-      doc.text(`${seo.issues?.length || 0} problemas  •  ${seo.recommendations?.length || 0} recomendaciones`, margin + 52, y + 13);
-      y += 22;
+      doc.text(`${seo.issues?.length || 0} problemas  |  ${seo.recommendations?.length || 0} recomendaciones`, gaugeX, gaugeY + 21, { align: 'center' });
+      y = gaugeY + 26;
 
       if (seo.issues?.length > 0) {
         addSubTitle('Problemas Detectados');
