@@ -2116,7 +2116,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // Meta Ads table
     addSubTitle('Meta Ads — Copies Listos');
     checkPage(10 + metaAds.length * 11);
-    const metaColWs = [55, 75, 28, 40];
+    const metaColWs = [30, 70, 30, 40];
     const metaHeaders = ['Anuncio', 'Texto Principal', 'CTA', 'Audiencia'];
     addTableRow(metaHeaders, metaColWs, 0, true);
     for (let mi = 0; mi < metaAds.length; mi++) {
@@ -2167,7 +2167,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         url: clientInfo?.website_url || 'tusitio.com',
       },
     ];
-    const gColWs = [60, 90, 50];
+    const gColWs = [50, 80, 40];
     const gHeaders = ['Headline (30 car.)', 'Descripcion (90 car.)', 'URL display'];
     addTableRow(gHeaders, gColWs, 0, true);
     for (let gi2 = 0; gi2 < googleAds.length; gi2++) {
