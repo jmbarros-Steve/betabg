@@ -1,0 +1,1 @@
+ALTER TABLE public.steve_knowledge ADD COLUMN source_id uuid REFERENCES public.learning_queue(id);
