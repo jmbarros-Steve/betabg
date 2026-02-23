@@ -2707,6 +2707,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* SEO Comparative Analysis */}
+                {(research.seo_audit.competitive_seo_gap || research.seo_audit.meta_analysis || research.seo_audit.content_structure) && (
+                  <Card className="border-primary/20">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Trophy className="h-4 w-4 text-primary" /> Análisis SEO Comparativo vs Competencia</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
+                      {research.seo_audit.competitive_seo_gap && (
+                        <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                          <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">Gap SEO vs Competencia</p>
+                          <p className="text-xs leading-relaxed">{String(research.seo_audit.competitive_seo_gap)}</p>
+                        </div>
+                      )}
+                      {research.seo_audit.meta_analysis && (
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Meta Tags: Cliente vs Competidores</p>
+                          <p className="text-xs leading-relaxed">{String(research.seo_audit.meta_analysis)}</p>
+                        </div>
+                      )}
+                      {research.seo_audit.content_structure && (
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Estructura de Contenido</p>
+                          <p className="text-xs leading-relaxed">{String(research.seo_audit.content_structure)}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {research.seo_audit.issues?.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">⚠️ Problemas Detectados</CardTitle></CardHeader>
@@ -3182,7 +3210,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 )}
 
                 {/* Ads Library Analysis */}
-                {research.ads_library_analysis && (
+                {research.ads_library_analysis ? (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -3191,6 +3219,53 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Competitor Strategies */}
+                      {research.ads_library_analysis.competitor_strategies?.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-primary uppercase tracking-wide">🎯 Estrategia Publicitaria por Competidor</p>
+                          {research.ads_library_analysis.competitor_strategies.map((cs: any, i: number) => (
+                            <div key={i} className="border border-border rounded-lg p-3 space-y-2">
+                              <p className="font-semibold text-sm">{cs.name || `Competidor ${i + 1}`}</p>
+                              {cs.messaging_approach && <div className="text-xs"><span className="text-muted-foreground">Mensajes:</span> {cs.messaging_approach}</div>}
+                              {cs.value_proposition_promoted && <div className="text-xs"><span className="text-muted-foreground">Propuesta:</span> {cs.value_proposition_promoted}</div>}
+                              {cs.probable_formats && <div className="text-xs"><span className="text-muted-foreground">Formatos:</span> {cs.probable_formats}</div>}
+                              {cs.cta_used && <div className="text-xs"><span className="text-muted-foreground">CTAs:</span> {cs.cta_used}</div>}
+                              {cs.sales_angles && <div className="text-xs"><span className="text-muted-foreground">Ángulos:</span> {cs.sales_angles}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Market Patterns */}
+                      {research.ads_library_analysis.market_patterns && (
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                          <p className="text-xs font-semibold text-primary uppercase tracking-wide">📊 Patrones del Mercado</p>
+                          {research.ads_library_analysis.market_patterns.dominant_content_type && <div className="text-xs"><span className="text-muted-foreground">Contenido dominante:</span> {research.ads_library_analysis.market_patterns.dominant_content_type}</div>}
+                          {research.ads_library_analysis.market_patterns.probable_formats && <div className="text-xs"><span className="text-muted-foreground">Formatos más usados:</span> {research.ads_library_analysis.market_patterns.probable_formats}</div>}
+                          {research.ads_library_analysis.market_patterns.common_messages && <div className="text-xs"><span className="text-muted-foreground">Mensajes comunes:</span> {research.ads_library_analysis.market_patterns.common_messages}</div>}
+                        </div>
+                      )}
+
+                      {/* Creative Concepts */}
+                      {research.ads_library_analysis.creative_concepts?.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-primary uppercase tracking-wide">💡 Conceptos Creativos Recomendados</p>
+                          {research.ads_library_analysis.creative_concepts.map((cc: any, i: number) => (
+                            <div key={i} className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">{i + 1}</Badge>
+                                <span className="font-semibold text-sm">{cc.concept || cc.hook || `Concepto ${i + 1}`}</span>
+                                {cc.format && <Badge variant="outline" className="text-xs ml-auto">{cc.format}</Badge>}
+                              </div>
+                              {cc.copy && <p className="text-xs italic text-foreground">"{cc.copy}"</p>}
+                              {cc.cta && <div className="text-xs"><span className="text-muted-foreground">CTA:</span> <span className="font-semibold text-primary">{cc.cta}</span></div>}
+                              {cc.rationale && <div className="text-xs text-muted-foreground">💡 {cc.rationale}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Legacy fields - backward compatible */}
                       {research.ads_library_analysis.winning_patterns?.length > 0 && (
                         <div>
                           <p className="text-xs font-semibold text-primary mb-2">🏆 Patrones Ganadores Detectados</p>
@@ -3211,15 +3286,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           ))}</ul>
                         </div>
                       )}
-                      {research.ads_library_analysis.cta_analysis && (
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <p className="text-xs font-semibold text-primary mb-1">📢 Análisis de CTAs</p>
-                          <p className="text-sm">{research.ads_library_analysis.cta_analysis}</p>
-                        </div>
-                      )}
                       {research.ads_library_analysis.creative_recommendations?.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-primary mb-2">💡 Recomendaciones Creativas</p>
+                          <p className="text-xs font-semibold text-primary mb-2">✅ Recomendaciones Creativas</p>
                           <ul className="space-y-1">{research.ads_library_analysis.creative_recommendations.map((r: string, i: number) => (
                             <li key={i} className="text-sm flex items-start gap-2">
                               <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" /> {r}
@@ -3227,14 +3296,21 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           ))}</ul>
                         </div>
                       )}
-                      {research.ads_library_analysis.estimated_ad_types?.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          <p className="w-full text-xs font-semibold text-primary mb-1">📐 Formatos Recomendados</p>
-                          {research.ads_library_analysis.recommended_formats?.map((f: string, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs">{f}</Badge>
-                          ))}
+
+                      {/* Creative Calendar */}
+                      {research.ads_library_analysis.creative_calendar && (
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-primary mb-1">📅 Calendario Creativo</p>
+                          <p className="text-sm">{research.ads_library_analysis.creative_calendar}</p>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="text-center py-8">
+                    <CardContent>
+                      <Megaphone className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">Análisis de Ads Library no disponible. Ejecuta el análisis de marca para generar esta sección.</p>
                     </CardContent>
                   </Card>
                 )}
