@@ -60,69 +60,131 @@ type TabId = typeof TABS[number]['id'];
 const emptyKnowledge = { titulo: '', contenido: '', orden: 0 };
 const emptyBug = { descripcion: '', ejemplo_malo: '', ejemplo_bueno: '' };
 
-// ─── Ad Image Analyzer ─────────────────────────────────────────────────────────
+// ─── Ad Image Analyzer (Batch) ─────────────────────────────────────────────────
+
+interface QueueItem {
+  id: string;
+  file: File;
+  previewUrl: string;
+  base64: string;
+  mediaType: string;
+  status: 'pending' | 'analyzing' | 'done' | 'error';
+  analysis?: string;
+  error?: string;
+}
 
 function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<string>('image/jpeg');
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [performance, setPerformance] = useState<string>('no_se');
   const [context, setContext] = useState<string>('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
   const [saveCategory, setSaveCategory] = useState<string>('anuncios');
   const [saving, setSaving] = useState(false);
+  const [autoSave, setAutoSave] = useState(true);
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('La imagen no puede superar 10MB');
-      return;
+  const doneCount = queue.filter(q => q.status === 'done').length;
+  const errorCount = queue.filter(q => q.status === 'error').length;
+  const totalCount = queue.length;
+
+  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+
+    const oversized = files.filter(f => f.size > 10 * 1024 * 1024);
+    if (oversized.length) {
+      toast.error(`${oversized.length} archivo(s) superan 10MB y fueron omitidos`);
     }
-    setMediaType(file.type || 'image/jpeg');
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      setPreview(result);
-      setImageBase64(result.split(',')[1]);
-    };
-    reader.readAsDataURL(file);
-    setAnalysis(null);
+
+    const valid = files.filter(f => f.size <= 10 * 1024 * 1024);
+
+    valid.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result as string;
+        const item: QueueItem = {
+          id: crypto.randomUUID(),
+          file,
+          previewUrl: result,
+          base64: result.split(',')[1],
+          mediaType: file.type || 'image/jpeg',
+          status: 'pending',
+        };
+        setQueue(prev => [...prev, item]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input so same files can be re-selected
+    if (fileRef.current) fileRef.current.value = '';
   }
 
-  async function analyze() {
-    if (!imageBase64) return;
-    setAnalyzing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-ad-image', {
-        body: { imageBase64, mediaType, performance, context },
-      });
-      if (error) throw error;
-      setAnalysis(data.analysis);
-    } catch (err) {
-      console.error(err);
-      toast.error('Error al analizar la imagen');
-    } finally {
-      setAnalyzing(false);
-    }
+  function removeFromQueue(id: string) {
+    setQueue(prev => prev.filter(q => q.id !== id));
   }
 
-  async function saveToKnowledge() {
-    if (!analysis) return;
+  function clearQueue() {
+    setQueue([]);
+  }
+
+  async function processQueue() {
+    const pending = queue.filter(q => q.status === 'pending');
+    if (!pending.length) return;
+    setProcessing(true);
+
+    for (const item of pending) {
+      setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'analyzing' } : q));
+
+      try {
+        const { data, error } = await supabase.functions.invoke('analyze-ad-image', {
+          body: { imageBase64: item.base64, mediaType: item.mediaType, performance, context },
+        });
+        if (error) throw error;
+
+        const analysis = data.analysis as string;
+        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'done', analysis } : q));
+
+        // Auto-save if enabled
+        if (autoSave) {
+          const date = new Date().toLocaleDateString('es-CL');
+          await supabase.from('steve_knowledge').insert({
+            titulo: `Análisis de anuncio — ${item.file.name} — ${date}`,
+            contenido: analysis,
+            categoria: saveCategory,
+            activo: true,
+            orden: 0,
+          });
+        }
+      } catch (err) {
+        console.error('Error analyzing:', item.file.name, err);
+        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: err instanceof Error ? err.message : 'Error' } : q));
+      }
+
+      // Small delay to avoid rate limits on Claude Vision
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    setProcessing(false);
+    if (autoSave) onSaved();
+    toast.success(`Análisis completado: ${pending.length} imagen(es) procesadas`);
+  }
+
+  async function saveAllUnsaved() {
+    const unsaved = queue.filter(q => q.status === 'done' && q.analysis);
+    if (!unsaved.length) return;
     setSaving(true);
     try {
       const date = new Date().toLocaleDateString('es-CL');
-      const { error } = await supabase.from('steve_knowledge').insert({
-        titulo: `Análisis de anuncio — ${date}`,
-        contenido: analysis,
-        categoria: saveCategory,
-        activo: true,
-        orden: 0,
-      });
-      if (error) throw error;
-      toast.success('Análisis guardado en Knowledge Base');
+      await Promise.all(unsaved.map(item =>
+        supabase.from('steve_knowledge').insert({
+          titulo: `Análisis de anuncio — ${item.file.name} — ${date}`,
+          contenido: item.analysis!,
+          categoria: saveCategory,
+          activo: true,
+          orden: 0,
+        })
+      ));
+      toast.success(`${unsaved.length} análisis guardados en Knowledge Base`);
       onSaved();
     } catch (err) {
       console.error(err);
@@ -140,7 +202,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
           🖼 Análisis de Anuncios con IA
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Sube un anuncio y Claude Vision extrae patrones, copy y ángulos creativos para la Knowledge Base.
+          Sube múltiples anuncios y Claude Vision los analiza en lote. Puedes seleccionar cientos de imágenes a la vez.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -151,90 +213,137 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
-            onChange={handleFile}
+            onChange={handleFiles}
+            multiple
           />
           <Button variant="outline" onClick={() => fileRef.current?.click()} className="w-full">
             <Upload className="w-4 h-4 mr-2" />
-            Subir anuncio para analizar
+            {queue.length ? `Agregar más imágenes (${queue.length} en cola)` : 'Seleccionar imágenes para analizar'}
           </Button>
-          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP — máximo 10MB</p>
+          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP — máximo 10MB cada una — selección múltiple habilitada</p>
         </div>
 
-        {/* Preview */}
-        {preview && (
-          <div className="rounded-lg overflow-hidden border border-border max-h-72 flex items-center justify-center bg-muted/30">
-            <img src={preview} alt="Preview" className="max-h-72 object-contain" />
-          </div>
-        )}
-
-        {/* Context fields — shown once image is loaded */}
-        {imageBase64 && (
-          <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/20">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">¿Este anuncio funcionó?</Label>
-              <Select value={performance} onValueChange={setPerformance}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="funciono">✅ Sí funcionó</SelectItem>
-                  <SelectItem value="no_funciono">❌ No funcionó</SelectItem>
-                  <SelectItem value="no_se">🤷 No sé</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Contexto opcional</Label>
-              <Textarea
-                rows={2}
-                value={context}
-                onChange={e => setContext(e.target.value)}
-                placeholder="Escribe métricas reales si las tienes (CTR, ROAS, CPA, etc)"
-                className="text-sm resize-none"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Analyze button */}
-        {imageBase64 && (
-          <Button onClick={analyze} disabled={analyzing} className="w-full">
-            {analyzing ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analizando con Claude Vision…</>
-            ) : (
-              <><Sparkles className="w-4 h-4 mr-2" />Analizar con Claude Vision</>
-            )}
-          </Button>
-        )}
-
-        {/* Analysis output */}
-        {analysis && (
+        {/* Queue preview */}
+        {queue.length > 0 && (
           <div className="space-y-3">
-            <div className="bg-muted/40 rounded-lg p-4 text-sm whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto border border-border">
-              {analysis}
-            </div>
-
-            {/* Save section */}
-            <div className="flex gap-2 items-end">
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">Categoría para guardar</Label>
-                <Select value={saveCategory} onValueChange={setSaveCategory}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="anuncios">🎯 Anuncios</SelectItem>
-                    <SelectItem value="meta">📘 Meta Ads</SelectItem>
-                    <SelectItem value="google">🟡 Google Ads</SelectItem>
-                    <SelectItem value="analisis">📊 Generación de Análisis</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* Stats bar */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex gap-3">
+                <span className="text-muted-foreground">{totalCount} imagen(es)</span>
+                {doneCount > 0 && <span className="text-green-600">✅ {doneCount} listas</span>}
+                {errorCount > 0 && <span className="text-destructive">❌ {errorCount} errores</span>}
               </div>
-              <Button onClick={saveToKnowledge} disabled={saving} size="sm">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-                Guardar en Knowledge Base
+              <Button variant="ghost" size="sm" onClick={clearQueue} className="text-xs h-7">
+                <X className="w-3 h-3 mr-1" /> Limpiar cola
               </Button>
             </div>
+
+            {/* Thumbnail grid */}
+            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1.5 max-h-48 overflow-y-auto">
+              {queue.map(item => (
+                <div key={item.id} className="relative group aspect-square rounded border border-border overflow-hidden">
+                  <img src={item.previewUrl} alt="" className="w-full h-full object-cover" />
+                  {/* Status overlay */}
+                  <div className={`absolute inset-0 flex items-center justify-center ${
+                    item.status === 'analyzing' ? 'bg-primary/30' :
+                    item.status === 'done' ? 'bg-green-500/20' :
+                    item.status === 'error' ? 'bg-destructive/30' :
+                    ''
+                  }`}>
+                    {item.status === 'analyzing' && <Loader2 className="w-4 h-4 animate-spin text-primary-foreground" />}
+                    {item.status === 'done' && <span className="text-sm">✅</span>}
+                    {item.status === 'error' && <span className="text-sm">❌</span>}
+                  </div>
+                  {/* Remove button */}
+                  {item.status === 'pending' && (
+                    <button
+                      onClick={() => removeFromQueue(item.id)}
+                      className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-bl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Config before processing */}
+            <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/20">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">¿Estos anuncios funcionaron?</Label>
+                  <Select value={performance} onValueChange={setPerformance}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="funciono">✅ Sí funcionaron</SelectItem>
+                      <SelectItem value="no_funciono">❌ No funcionaron</SelectItem>
+                      <SelectItem value="no_se">🤷 No sé / Mixto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Categoría</Label>
+                  <Select value={saveCategory} onValueChange={setSaveCategory}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anuncios">🎯 Anuncios</SelectItem>
+                      <SelectItem value="meta">📘 Meta Ads</SelectItem>
+                      <SelectItem value="google">🟡 Google Ads</SelectItem>
+                      <SelectItem value="analisis">📊 Análisis</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Contexto (aplica a todas)</Label>
+                <Textarea
+                  rows={2}
+                  value={context}
+                  onChange={e => setContext(e.target.value)}
+                  placeholder="Métricas, plataforma, marca, etc. (opcional)"
+                  className="text-sm resize-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={autoSave} onCheckedChange={setAutoSave} />
+                <Label className="text-xs">Auto-guardar cada análisis en Knowledge Base</Label>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <Button
+                onClick={processQueue}
+                disabled={processing || !queue.some(q => q.status === 'pending')}
+                className="flex-1"
+              >
+                {processing ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analizando {doneCount + errorCount + 1}/{totalCount}…</>
+                ) : (
+                  <><Sparkles className="w-4 h-4 mr-2" />Analizar {queue.filter(q => q.status === 'pending').length} imagen(es) con Claude Vision</>
+                )}
+              </Button>
+              {!autoSave && doneCount > 0 && (
+                <Button onClick={saveAllUnsaved} disabled={saving} variant="outline">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                  Guardar {doneCount}
+                </Button>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            {processing && (
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${((doneCount + errorCount) / totalCount) * 100}%` }}
+                />
+              </div>
+            )}
           </div>
         )}
       </CardContent>
