@@ -1308,52 +1308,53 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     const addBody = (text: string, indent = 0, lineH = 5.2) => {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(50, 50, 50);
-      const clean = stripEmojis(text);
+      doc.setFontSize(9.5);
+      doc.setTextColor(55, 55, 55);
+      const clean = stripEmojis(text).replace(/->/g, '•');
       const lines = doc.splitTextToSize(clean, maxWidth - indent - 4);
       for (const line of lines) {
         checkPage(lineH + 1);
         doc.text(line, margin + indent + 2, y);
         y += lineH;
       }
-      y += 2;
+      y += 3;
     };
 
     const addSubTitle = (title: string) => {
-      checkPage(12);
+      checkPage(14);
+      y += 3;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
+      doc.setFontSize(12);
       doc.setTextColor(accentR, accentG, accentB);
       doc.text(title, margin + 2, y);
       doc.setTextColor(0, 0, 0);
-      y += 6;
+      y += 5;
       // thin gold separator
       doc.setDrawColor(accentR, accentG, accentB);
       doc.setLineWidth(0.3);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 4;
+      doc.line(margin, y, margin + 60, y);
+      y += 5;
     };
 
     const addSectionHeader = (num: string, title: string) => {
-      checkPage(18);
-      y += 14; // increased spacing before section
+      checkPage(22);
+      y += 16; // generous spacing before section
       // Circle number
       doc.setFillColor(accentR, accentG, accentB);
-      doc.circle(margin + 5, y + 3, 5, 'F');
+      doc.circle(margin + 5, y + 3, 5.5, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setTextColor(255, 255, 255);
       doc.text(num, margin + 5, y + 5.5, { align: 'center' });
       // Title bar
       doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(margin + 12, y - 1, maxWidth - 12, 11, 1, 1, 'F');
+      doc.roundedRect(margin + 13, y - 2, maxWidth - 13, 13, 2, 2, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
+      doc.setFontSize(13);
       doc.setTextColor(255, 255, 255);
-      doc.text(title, margin + 17, y + 7);
+      doc.text(title, margin + 18, y + 7);
       doc.setTextColor(0, 0, 0);
-      y += 17;
+      y += 20;
     };
 
     const addInsightBox = (text: string) => {
@@ -1396,47 +1397,43 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(50, 50, 50);
-      const lines = doc.splitTextToSize(`-> ${stripEmojis(text)}`, maxWidth - indent - 4);
+      const lines = doc.splitTextToSize(`•  ${stripEmojis(text)}`, maxWidth - indent - 4);
       for (const line of lines) {
         checkPage(5.5);
         doc.text(line, margin + indent + 2, y);
         y += 5.2;
       }
+      y += 1;
     };
 
     const addTableRow = (cells: string[], colWidths: number[], rowIdx: number, header = false) => {
-      checkPage(10);
-      const rowH = 9;
+      checkPage(12);
+      const rowH = 11;
       const rowX = margin;
       let cx = rowX;
       if (header) {
         doc.setFillColor(brandR, brandG, brandB);
       } else {
-        if (rowIdx % 2 === 0) {
-          doc.setFillColor(255, 255, 255);
-        } else {
-          doc.setFillColor(245, 246, 252);
-        }
+        doc.setFillColor(rowIdx % 2 === 0 ? 255 : 247, rowIdx % 2 === 0 ? 255 : 248, rowIdx % 2 === 0 ? 255 : 254);
       }
-      // fill background
+      // fill background with rounded corners for first/last row
       doc.rect(rowX, y, maxWidth, rowH, 'F');
-      // cell borders
-      doc.setDrawColor(204, 204, 204);
-      doc.setLineWidth(0.2);
-      doc.rect(rowX, y, maxWidth, rowH, 'S');
+      // subtle border
+      doc.setDrawColor(header ? brandR : 215, header ? brandG : 218, header ? brandB : 228);
+      doc.setLineWidth(header ? 0 : 0.15);
+      if (!header) doc.line(rowX, y + rowH, rowX + maxWidth, y + rowH);
       cx = rowX;
       doc.setFont('helvetica', header ? 'bold' : 'normal');
-      doc.setFontSize(header ? 9 : 8.5);
+      doc.setFontSize(header ? 8.5 : 8);
       doc.setTextColor(header ? 255 : 40, header ? 255 : 40, header ? 255 : 40);
       for (let i = 0; i < cells.length; i++) {
-        // vertical divider between cells
-        if (i > 0) {
-          doc.setDrawColor(204, 204, 204);
-          doc.setLineWidth(0.2);
-          doc.line(cx, y, cx, y + rowH);
+        if (i > 0 && !header) {
+          doc.setDrawColor(220, 222, 232);
+          doc.setLineWidth(0.15);
+          doc.line(cx, y + 2, cx, y + rowH - 2);
         }
-        const txt = String(cells[i] ?? '').slice(0, 50);
-        doc.text(txt, cx + 6, y + 6);
+        const txt = String(cells[i] ?? '').slice(0, 55);
+        doc.text(txt, cx + 4, y + 7);
         cx += colWidths[i];
       }
       y += rowH;
@@ -1468,15 +1465,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.addImage(logoBase64, 'JPEG', pageWidth / 2 - 20, 25, 40, 16);
     } catch {}
 
-    // Client name
+    // Business name as main title, user name as subtitle
+    const businessName_cover = clientInfo?.company || clientInfo?.name || 'Cliente';
+    const userName_cover = clientInfo?.name || '';
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(28);
+    doc.setFontSize(32);
     doc.setTextColor(255, 255, 255);
-    doc.text(clientInfo?.name || 'Cliente', pageWidth / 2, bandY + 22, { align: 'center' });
-    if (clientInfo?.company) {
-      doc.setFontSize(14);
-      doc.setTextColor(255, 255, 255);
-      doc.text(clientInfo.company, pageWidth / 2, bandY + 32, { align: 'center' });
+    doc.text(businessName_cover, pageWidth / 2, bandY + 22, { align: 'center' });
+    if (userName_cover && userName_cover !== businessName_cover) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(200, 200, 220);
+      doc.text(`Preparado para ${userName_cover} — ${businessName_cover}`, pageWidth / 2, bandY + 32, { align: 'center' });
     }
 
     // Report title in gold
@@ -1529,31 +1529,38 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     ];
 
     const kpiCols = 3;
-    const kpiW = (maxWidth - 8) / kpiCols;
-    const kpiH = 28;
+    const kpiGap = 6;
+    const kpiW = (maxWidth - kpiGap * (kpiCols - 1)) / kpiCols;
+    const kpiH = 32;
     let kpiIdx = 0;
     for (let row = 0; row < 2; row++) {
       for (let col = 0; col < kpiCols; col++) {
         const kpi = kpiData[kpiIdx++];
-        const kx = margin + col * (kpiW + 4);
-        const ky = y + row * (kpiH + 6);
+        const kx = margin + col * (kpiW + kpiGap);
+        const ky = y + row * (kpiH + 8);
+        // Card shadow effect
+        doc.setFillColor(220, 222, 235);
+        doc.roundedRect(kx + 0.5, ky + 0.5, kpiW, kpiH, 3, 3, 'F');
+        // Card background
         if (kpi.dark) {
           doc.setFillColor(brandR, brandG, brandB);
-          doc.setTextColor(255, 255, 255);
         } else {
           doc.setFillColor(accentR, accentG, accentB);
-          doc.setTextColor(255, 255, 255);
         }
-        doc.roundedRect(kx, ky, kpiW, kpiH, 2, 2, 'F');
+        doc.roundedRect(kx, ky, kpiW, kpiH, 3, 3, 'F');
+        // Value
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(22);
-        doc.text(kpi.value, kx + kpiW / 2, ky + 14, { align: 'center' });
-        doc.setFontSize(8);
+        doc.setFontSize(24);
+        doc.setTextColor(255, 255, 255);
+        doc.text(kpi.value, kx + kpiW / 2, ky + 16, { align: 'center' });
+        // Label
+        doc.setFontSize(7.5);
         doc.setFont('helvetica', 'normal');
-        doc.text(kpi.label, kx + kpiW / 2, ky + 22, { align: 'center' });
+        doc.setTextColor(220, 220, 240);
+        doc.text(kpi.label.toUpperCase(), kx + kpiW / 2, ky + 24, { align: 'center' });
       }
     }
-    y += 2 * (kpiH + 6) + 10;
+    y += 2 * (kpiH + 8) + 12;
 
     // (SEO semáforo moved to SEO audit section — removed from KPI dashboard)
 
@@ -1804,7 +1811,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       renderKwGroup('Keywords Principales', kw.primary || []);
       renderKwGroup('Long-tail (Baja Competencia)', kw.long_tail || []);
       renderKwGroup('Keywords de Competidores', kw.competitor_keywords || []);
-      if (kw.recommended_strategy) { addSubTitle('Estrategia Recomendada'); addBody(kw.recommended_strategy); }
+      // Removed raw JSON "Estrategia Recomendada" — rendered via keyword phases below
       // Keyword phases from roadmap
       if (kw.keyword_strategy_roadmap) { renderKeywordPhases(pdfCtx, pdfHelpers, kw.keyword_strategy_roadmap); }
       else { renderGlossaryBox(pdfCtx, pdfHelpers, 'keywords'); }
