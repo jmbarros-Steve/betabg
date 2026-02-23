@@ -180,10 +180,33 @@ export function renderBrandIdentity(
 
   if (bi.tono_y_voz) {
     helpers.addSubTitle('Tono y Voz');
-    if (bi.tono_y_voz.estilo) helpers.addKeyValue('Estilo', String(bi.tono_y_voz.estilo));
-    if (bi.tono_y_voz.enfoque) helpers.addKeyValue('Enfoque', String(bi.tono_y_voz.enfoque));
-    if (bi.tono_y_voz.lenguaje) helpers.addKeyValue('Lenguaje', String(bi.tono_y_voz.lenguaje));
-    if (bi.tono_y_voz.personalidad) helpers.addKeyValue('Personalidad', String(bi.tono_y_voz.personalidad));
+    const tonoFields: [string, string][] = [
+      ['Estilo', bi.tono_y_voz.estilo],
+      ['Enfoque', bi.tono_y_voz.enfoque],
+      ['Lenguaje', bi.tono_y_voz.lenguaje],
+      ['Personalidad', bi.tono_y_voz.personalidad],
+    ];
+    // Render as styled rows to avoid monospace font fallback from special chars
+    const { doc, margin, maxWidth } = ctx;
+    for (const [label, val] of tonoFields) {
+      if (!val) continue;
+      helpers.checkPage(10);
+      const y0 = helpers.getY();
+      doc.setFillColor(245, 246, 252);
+      doc.roundedRect(margin, y0 - 2, maxWidth, 8, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(ctx.accentR, ctx.accentG, ctx.accentB);
+      doc.text(`${label}:`, margin + 4, y0 + 3);
+      const labelW = doc.getTextWidth(`${label}: `);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(40, 40, 50);
+      const cleanVal = helpers.stripEmojis(String(val));
+      const valLines = doc.splitTextToSize(cleanVal, maxWidth - labelW - 10);
+      doc.text(valLines[0] || '', margin + 4 + labelW, y0 + 3);
+      helpers.setY(y0 + 8);
+    }
   }
 
   if (bi.gaps_de_identidad?.length > 0) {
@@ -228,11 +251,19 @@ export function renderFinancialAnalysis(
 
   if (fa.products_services?.length > 0) {
     helpers.addSubTitle('Productos / Servicios');
-    for (const prod of fa.products_services.slice(0, 5)) {
+    // Render as styled table
+    const prodColWs = [60, 30, 80];
+    helpers.addTableRow(['Producto', 'Precio', 'Descripcion'], prodColWs, 0, true);
+    for (let pi = 0; pi < Math.min(fa.products_services.length, 5); pi++) {
+      const prod = fa.products_services[pi];
       if (typeof prod === 'object') {
-        helpers.addKeyValue(prod.name || 'Producto', `${prod.price || ''} — ${prod.description || ''}`);
+        helpers.addTableRow([
+          helpers.stripEmojis(prod.name || 'Producto').slice(0, 35),
+          helpers.stripEmojis(String(prod.price || 'N/D')).slice(0, 20),
+          helpers.stripEmojis(prod.description || '').slice(0, 50),
+        ], prodColWs, pi + 1);
       } else {
-        helpers.addArrowBullet(String(prod));
+        helpers.addTableRow([helpers.stripEmojis(String(prod)).slice(0, 35), '', ''], prodColWs, pi + 1);
       }
     }
   }
