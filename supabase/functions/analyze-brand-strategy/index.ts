@@ -338,74 +338,93 @@ Deno.serve(async (req) => {
       })
     );
 
-    // ── Consolidar y guardar resultados ──
-    const fullResult: Record<string, unknown> = {};
-    const savedSections: string[] = [];
+    // ── Consolidar resultados ──
+    const finalBrief: Record<string, unknown> = {};
     const errors: string[] = [];
+    const completedSections: string[] = [];
+    const failedSections: string[] = [];
 
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
+    for (const result of results) {
       if (result.status === 'fulfilled') {
         const { sectionId, keys, data } = result.value;
+        // Si keys tiene múltiples valores (como google_ads_and_creative que genera 2 keys)
         for (const key of keys) {
-          // Extract the value: try wrapped { "key": value } first, then use data directly
-          const value = data[key] ?? (keys.length === 1 ? data : undefined);
-          if (value) {
-            const researchData = key === 'executive_summary'
-              ? { summary: typeof value === 'string' ? (value as string).slice(0, 12000) : JSON.stringify(value).slice(0, 4000), ...((typeof value === 'object' && value !== null) ? value as Record<string, unknown> : {}) }
-              : value;
-
-            const { error: upsertErr } = await supabase.from('brand_research').upsert(
-              { client_id, research_type: key, research_data: researchData },
-              { onConflict: 'client_id,research_type' }
-            );
-            if (!upsertErr) {
-              savedSections.push(key);
-              fullResult[key] = value;
-            } else {
-              console.error(`[${sectionId}] Failed to save ${key}:`, upsertErr.message);
-            }
+          if (data[key]) {
+            finalBrief[key] = data[key];
+            completedSections.push(key);
           }
         }
+        // Si Claude respondió sin wrapper (el JSON directo sin la key), asignar a la primera key
+        if (keys.length === 1 && !data[keys[0]]) {
+          finalBrief[keys[0]] = data;
+          completedSections.push(keys[0]);
+        }
       } else {
-        const sectionId = SECTIONS[i]?.id || 'unknown';
-        const errMsg = result.reason?.message || 'Unknown error';
-        console.error(`[analyze-brand-strategy] Section "${sectionId}" FAILED:`, errMsg);
-        errors.push(`${sectionId}: ${errMsg}`);
+        const sectionIndex = results.indexOf(result);
+        const section = SECTIONS[sectionIndex];
+        const sectionId = section?.id ?? 'unknown';
+        errors.push(`${sectionId}: ${result.reason?.message ?? 'Unknown error'}`);
+        failedSections.push(sectionId);
       }
     }
 
-    console.log(`[analyze-brand-strategy] Saved ${savedSections.length} sections: ${savedSections.join(', ')}`);
-    if (errors.length > 0) console.log(`[analyze-brand-strategy] Errors: ${errors.join('; ')}`);
+    // Determinar status
+    const status = errors.length === 0
+      ? 'completed'
+      : completedSections.length > 0
+      ? 'partial'
+      : 'failed';
 
-    // Save ads_library_analysis for backward compatibility if not already saved
-    if (!savedSections.includes('ads_library_analysis') && (fullResult.meta_ads_strategy || fullResult.google_ads_strategy)) {
-      await supabase.from('brand_research').upsert(
-        { client_id, research_type: 'ads_library_analysis', research_data: { meta_ads_strategy: fullResult.meta_ads_strategy, google_ads_strategy: fullResult.google_ads_strategy } },
+    console.log(`[analyze-brand-strategy] Status: ${status}, completed: ${completedSections.join(', ')}, failed: ${failedSections.join(', ')}`);
+
+    // Guardar cada sección individualmente en brand_research
+    for (const key of completedSections) {
+      const value = finalBrief[key];
+      const researchData = key === 'executive_summary'
+        ? { summary: typeof value === 'string' ? (value as string).slice(0, 12000) : JSON.stringify(value).slice(0, 4000), ...((typeof value === 'object' && value !== null) ? value as Record<string, unknown> : {}) }
+        : value;
+
+      const { error: upsertErr } = await supabase.from('brand_research').upsert(
+        { client_id, research_type: key, research_data: researchData },
         { onConflict: 'client_id,research_type' }
       );
+      if (upsertErr) {
+        console.error(`[analyze-brand-strategy] Failed to save ${key}:`, upsertErr.message);
+      }
     }
 
+    // Update client website if provided
     if (websiteUrl) {
       await supabase.from('clients').update({ website_url: websiteUrl }).eq('id', client_id);
     }
 
-    // Save brand_strategy marker
-    const isPartial = errors.length > 0;
+    // Save brand_strategy marker with status
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'brand_strategy', research_data: { completed_at: new Date().toISOString(), sections: savedSections, partial: isPartial, errors: errors.length > 0 ? errors : undefined } },
+      { client_id, research_type: 'brand_strategy', research_data: {
+        status,
+        completed_at: new Date().toISOString(),
+        completed_sections: completedSections,
+        failed_sections: failedSections.length > 0 ? failedSections : null,
+        errors: errors.length > 0 ? errors : null,
+      }},
       { onConflict: 'client_id,research_type' }
     );
 
-    // Mark complete
+    // Mark analysis_status complete
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_status', research_data: { status: 'complete', completed_at: new Date().toISOString(), partial: isPartial, sections_saved: savedSections.length, errors: errors.length > 0 ? errors : undefined } },
+      { client_id, research_type: 'analysis_status', research_data: {
+        status: status === 'failed' ? 'error' : 'complete',
+        completed_at: new Date().toISOString(),
+        partial: status === 'partial',
+        sections_saved: completedSections.length,
+        errors: errors.length > 0 ? errors : undefined,
+      }},
       { onConflict: 'client_id,research_type' }
     );
 
-    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (partial=${isPartial}, saved=${savedSections.length}/11)`);
+    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (status=${status}, saved=${completedSections.length}/11)`);
 
-    return new Response(JSON.stringify({ success: true, partial: isPartial, data: fullResult, sections: savedSections, errors }), {
+    return new Response(JSON.stringify({ success: true, status, data: finalBrief, completed_sections: completedSections, failed_sections: failedSections, errors }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
