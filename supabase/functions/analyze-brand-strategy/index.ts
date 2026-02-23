@@ -270,20 +270,38 @@ Deno.serve(async (req) => {
       { onConflict: 'client_id,research_type' }
     );
 
-    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 16000,
-        system: `Eres un estratega de marketing digital experto en e-commerce latinoamericano.\n${knowledgeSection}${bugSection}${phaseRulesSection}Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
-        messages: [{ role: 'user', content: analysisPrompt }],
-      }),
-    });
+    // Use AbortController to prevent edge function timeout (wall time ~150s)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s
+    let aiResponse: Response;
+    try {
+      aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'x-api-key': anthropicApiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 10000,
+          system: `Eres un estratega de marketing digital experto en e-commerce latinoamericano.\n${knowledgeSection}${bugSection}${phaseRulesSection}Responde SOLO en JSON válido sin markdown. Nunca uses \`\`\`json ni \`\`\`. Solo el JSON puro y completo.`,
+          messages: [{ role: 'user', content: analysisPrompt }],
+        }),
+      });
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutId);
+      console.error('[analyze-brand-strategy] Fetch timeout or network error:', fetchErr.name, fetchErr.message);
+      await supabase.from('brand_research').upsert(
+        { client_id, research_type: 'analysis_status', research_data: { status: 'error', error: `AI timeout: ${fetchErr.message}` } },
+        { onConflict: 'client_id,research_type' }
+      );
+      return new Response(JSON.stringify({ error: 'AI request timed out' }), {
+        status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    clearTimeout(timeoutId);
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
@@ -300,6 +318,7 @@ Deno.serve(async (req) => {
     const aiData = await aiResponse.json();
     const stopReason = aiData.stop_reason;
     let rawContent = aiData.content?.[0]?.text || '{}';
+    console.log(`[analyze-brand-strategy] AI responded: stop_reason=${stopReason}, content_length=${rawContent.length}`);
 
     if (stopReason === 'max_tokens') {
       console.warn(`[analyze-brand-strategy] Claude response hit max_tokens limit (${rawContent.length} chars) — JSON may be truncated`);
@@ -409,6 +428,20 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('analyze-brand-strategy error:', error);
+    // Try to mark analysis as failed so frontend stops polling
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const sb = createClient(supabaseUrl, supabaseServiceKey);
+      const body = await new Response(req.clone?.()?.body).text().catch(() => '{}');
+      const clientId = JSON.parse(body)?.client_id;
+      if (clientId) {
+        await sb.from('brand_research').upsert(
+          { client_id: clientId, research_type: 'analysis_status', research_data: { status: 'error', error: String(error) } },
+          { onConflict: 'client_id,research_type' }
+        );
+      }
+    } catch (_) {}
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
