@@ -1513,14 +1513,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     // Helper to format numbers in CLP
     const fmtCLP = (val: number) => '$' + Math.round(val).toLocaleString('es-CL') + ' CLP';
-    const cpaMaxCLP = margin !== null ? fmtCLP(Math.round(Number(cpaMax) * 950)) : null;
+    // CPA is already in CLP (margin is in CLP), no USD conversion needed
+    const cpaMaxCLP = cpaMax ? fmtCLP(Number(cpaMax)) : null;
 
     const kpiData = [
       { label: 'Ticket Promedio', value: financials ? fmtCLP(financials.price) : 'N/D', dark: true },
-      { label: 'CPA Maximo Viable', value: cpaMax ? `$${cpaMax} USD (${cpaMaxCLP || ''})` : 'N/D', dark: false },
+      { label: 'CPA Maximo Viable', value: cpaMaxCLP || 'N/D', dark: false },
       { label: 'ROAS Objetivo', value: '3x - 5x', dark: true },
       { label: 'Margen Bruto', value: marginPct ? `${marginPct}%` : 'N/D', dark: false },
-      { label: 'Presupuesto Mes 1', value: '$600 USD (~$570.000 CLP)', dark: true },
+      { label: 'Presupuesto Mes 1', value: fmtCLP(570000), dark: true },
       { label: 'Tasa de Recompra', value: '40%', dark: false },
     ];
 
@@ -1586,12 +1587,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
       {
         title: 'SOLUCION',
-        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en $${cpaMax || 'N/D'} USD (${cpaMaxCLP || 'N/D'}), keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia con IA en tiempo real.`,
+        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en ${cpaMaxCLP || 'N/D'}, keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia con IA en tiempo real.`,
         col: 1, row: 0,
       },
       {
         title: 'INVERSION REQUERIDA',
-        text: 'Presupuesto inicial recomendado: $600 USD/mes (~$570.000 CLP) (Fase 1, 0-30 dias). Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.',
+        text: 'Presupuesto inicial recomendado: $570.000 CLP/mes (Fase 1, 0-30 dias). Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.',
         col: 0, row: 1,
       },
       {
@@ -1639,7 +1640,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       addKeyValue('Costo del Producto', fmtCLP(financials.cost));
       addKeyValue('Costo de Envio', fmtCLP(financials.shipping));
       addKeyValue('Margen Bruto', `${fmtCLP(financials.price - financials.cost - financials.shipping)} (${marginPct}%)`);
-      addKeyValue('CPA Maximo Viable', `$${cpaMax} USD (${cpaMaxCLP || ''})`);
+      addKeyValue('CPA Maximo Viable', cpaMaxCLP || 'N/D');
       // CPA explanation box
       if (cpaMax && margin !== null) {
         checkPage(22);
@@ -1652,7 +1653,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(60, 40, 0);
-        const cpaExplain = `Por que $${cpaMax} USD (${cpaMaxCLP || ''})? Tu margen bruto unitario es de ${fmtCLP(Number(margin))}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
+        const cpaExplain = `Por que ${cpaMaxCLP || 'N/D'}? Tu margen bruto unitario es de ${fmtCLP(Number(margin))}. El CPA maximo viable corresponde al 30% de ese margen, lo que garantiza rentabilidad incluso en campanas de adquisicion nuevas. Superar este umbral significa vender a perdida.`;
         const cpaLines = doc.splitTextToSize(cpaExplain, maxWidth - 10);
         doc.text(cpaLines.slice(0, 4), margin + 5, y + 6);
         y += 24;
@@ -2134,7 +2135,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const googleAds = [
       {
         headline: googleStrategy?.headlines?.[0] || `${businessName.slice(0, 25)} | Oficial`,
-        desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis. ${cpaMax ? `CPA: $${cpaMax}.` : ''}`,
+        desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis. ${cpaMaxCLP ? `CPA: ${cpaMaxCLP}.` : ''}`,
         url: clientInfo?.website_url || 'tusitio.com',
       },
       {
@@ -2183,11 +2184,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const budgetCols = ['Canal', 'Conservador', 'Agresivo'];
     const budgetColWs = [50, 60, 60];
     const budgetData = [
-      ['Meta Ads', '$200/mes', '$500/mes'],
-      ['Google Ads', '$100/mes', '$300/mes'],
-      ['SEO/Contenido', '$100/mes', '$200/mes'],
-      ['Influencers/UGC', '$100/mes', '$300/mes'],
-      ['Total mensual', '$500/mes', '$1,300/mes'],
+      ['Meta Ads', '$190.000/mes', '$475.000/mes'],
+      ['Google Ads', '$95.000/mes', '$285.000/mes'],
+      ['SEO/Contenido', '$95.000/mes', '$190.000/mes'],
+      ['Influencers/UGC', '$95.000/mes', '$285.000/mes'],
+      ['Total mensual', '$475.000/mes', '$1.235.000/mes'],
       ['ROAS esperado', '2x - 3x', '4x - 6x'],
     ];
     addTableRow(budgetCols, budgetColWs, 0, true);
@@ -2213,7 +2214,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       'Instalar Meta Pixel y Google Tag en el sitio web',
       'Conectar Shopify, Meta Ads y Google Ads al portal STEVE.IO',
       'Definir y aprobar el Buyer Persona con el equipo',
-      `Verificar que el CPA objetivo sea <= $${cpaMax || 'N/D'} USD (${cpaMaxCLP || 'N/D'}) antes de lanzar`,
+      `Verificar que el CPA objetivo sea <= ${cpaMaxCLP || 'N/D'} antes de lanzar`,
       'Crear o revisar la landing page de producto principal',
       'Activar flujo de abandono de carrito en Klaviyo',
       'Solicitar 3 testimonios reales a clientes actuales',
@@ -2343,7 +2344,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text(`Tu CPA maximo viable es $${cpaMax || 'N/D'} USD (${cpaMaxCLP || 'N/D'}). Steve Ads esta calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
+    doc.text(`Tu CPA maximo viable es ${cpaMaxCLP || 'N/D'}. Steve Ads esta calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
     steveY += 26;
 
     // CTA
