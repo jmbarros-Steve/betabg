@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Trash2, Download, ChevronDown, ChevronUp, ImageIcon, Video, Play, Rocket, X, CheckCircle } from 'lucide-react';
+import { Loader2, Trash2, Download, ChevronDown, ChevronUp, ImageIcon, Video, Play, Rocket, X, CheckCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface AdCreative {
@@ -42,8 +43,44 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
   const [publishModal, setPublishModal] = useState<AdCreative | null>(null);
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishedAdSetId, setPublishedAdSetId] = useState<string | null>(null);
+  const [hasMetaConnection, setHasMetaConnection] = useState(false);
+  const [cpaMaximo, setCpaMaximo] = useState<number | null>(null);
 
-  useEffect(() => { fetchCreatives(); }, [clientId]);
+  useEffect(() => { fetchCreatives(); loadMetaStatus(); loadCpaData(); }, [clientId]);
+
+  const loadMetaStatus = async () => {
+    try {
+      const { data } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'meta')
+        .eq('is_active', true)
+        .maybeSingle();
+      setHasMetaConnection(!!data);
+    } catch { /* ignore */ }
+  };
+
+  const loadCpaData = async () => {
+    try {
+      const { data: research } = await supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId);
+      if (!research) return;
+      for (const r of research) {
+        const d = r.research_data as Record<string, unknown>;
+        const precio = Number(d?.precio_venta || d?.precio || 0);
+        const costo = Number(d?.costo_producto || d?.costo || 0);
+        const envio = Number(d?.costo_envio || 0);
+        if (precio > 0) {
+          const margen = precio - costo - envio;
+          setCpaMaximo(Math.round(margen * 0.3));
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+  };
 
   const fetchCreatives = async () => {
     setLoading(true);
@@ -269,14 +306,43 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                           </div>
                         )}
 
+                        {/* Plan de Acción DCT */}
+                        {isDct && hasDctImages && (
+                          <div className="rounded-lg border-l-[3px] border-l-blue-500 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-2">
+                            <p className="text-[13px] font-bold text-blue-900 dark:text-blue-300">📊 Plan de Acción DCT — Método Charlie</p>
+                            <div className="space-y-1.5 text-[13px] text-blue-800 dark:text-blue-200">
+                              <p>• <strong>Tipo de campaña:</strong> Testing DCT — Advantage+ Shopping</p>
+                              <p>• <strong>Presupuesto diario sugerido:</strong> {cpaMaximo ? `$${(cpaMaximo * 2).toLocaleString('es-CL')} CLP` : <span className="text-amber-600">Completar brief para calcular</span>}</p>
+                              <p>• <strong>Duración del test:</strong> 5-7 días</p>
+                              <p>• <strong>Kill rule:</strong> Si gasta ${cpaMaximo ? `$${(cpaMaximo * 2).toLocaleString('es-CL')}` : '[CPA×2]'} sin compra → pausar este creativo</p>
+                              <p>• <strong>Métricas a revisar día 3:</strong> Hook Rate &gt;25% · Hold Rate &gt;15% · CTR &gt;1.5%</p>
+                              <p>• <strong>Próxima revisión:</strong> {format(addDays(new Date(), 7), "d 'de' MMMM yyyy", { locale: es })}</p>
+                              <p>• <strong>Acción post-test:</strong> Si cumple métricas → mover a Scaling con +20% presupuesto cada 48hrs</p>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Publicar en Meta — shown when DCT has images and estado is aprobado */}
                         {isDct && hasDctImages && creative.estado === 'aprobado' && (
-                          <Button
-                            className="w-full"
-                            onClick={() => { setPublishModal(creative); setPublishedAdSetId(null); }}
-                          >
-                            <Rocket className="w-4 h-4 mr-2" />🚀 Publicar DCT en Meta
-                          </Button>
+                          hasMetaConnection ? (
+                            <Button
+                              className="w-full"
+                              onClick={() => { setPublishModal(creative); setPublishedAdSetId(null); }}
+                            >
+                              <Rocket className="w-4 h-4 mr-2" />🚀 Publicar DCT en Meta
+                            </Button>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button className="w-full" disabled>
+                                  <Lock className="w-4 h-4 mr-2" />🔒 Publicar en Meta (Próximamente)
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Conexión con Meta Ads disponible en marzo 2026</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )
                         )}
 
                         <div className="flex flex-wrap gap-2">

@@ -686,7 +686,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         </TabsContent>
 
         <TabsContent value="crear" className="mt-6">
-          <MetaAdCreator clientId={clientId} onBack={() => setActiveTab('crear')} />
+          <MetaAdCreator clientId={clientId} onBack={() => setActiveTab('crear')} onGoToLibrary={() => setActiveTab('biblioteca')} />
         </TabsContent>
 
         <TabsContent value="assets" className="mt-6">
