@@ -17,7 +17,7 @@ interface BriefQuestion {
   shortLabel: string; // Para UI: "Ahora: [shortLabel]"
   question: string;
   examples: string[];
-  fields: Array<{ key: string; label: string; type: string; placeholder?: string; prefix?: string; suffix?: string }>;
+  fields: Array<{ key: string; label: string; type: string; placeholder?: string; prefix?: string; suffix?: string; options?: Array<{ value: string; label: string }> }>;
   steveIntro?: string;
   commentGuide: string;
   validation?: string;
