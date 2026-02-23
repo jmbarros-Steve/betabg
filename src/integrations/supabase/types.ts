@@ -829,6 +829,42 @@ export type Database = {
           },
         ]
       }
+      learning_queue: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          rules_extracted: number | null
+          source_content: string
+          source_title: string | null
+          source_type: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          rules_extracted?: number | null
+          source_content: string
+          source_title?: string | null
+          source_type: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          rules_extracted?: number | null
+          source_content?: string
+          source_title?: string | null
+          source_type?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
       oauth_states: {
         Row: {
           created_at: string
