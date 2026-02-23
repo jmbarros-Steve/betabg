@@ -82,21 +82,24 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
   const [saveCategory, setSaveCategory] = useState<string>('anuncios');
   const [saving, setSaving] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
+  const [dragging, setDragging] = useState(false);
 
   const doneCount = queue.filter(q => q.status === 'done').length;
   const errorCount = queue.filter(q => q.status === 'error').length;
   const totalCount = queue.length;
 
-  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+  function addFiles(files: File[]) {
     if (!files.length) return;
-
-    const oversized = files.filter(f => f.size > 10 * 1024 * 1024);
+    const imageFiles = files.filter(f => /^image\/(jpeg|png|webp)$/i.test(f.type));
+    const oversized = imageFiles.filter(f => f.size > 10 * 1024 * 1024);
     if (oversized.length) {
       toast.error(`${oversized.length} archivo(s) superan 10MB y fueron omitidos`);
     }
-
-    const valid = files.filter(f => f.size <= 10 * 1024 * 1024);
+    const valid = imageFiles.filter(f => f.size <= 10 * 1024 * 1024);
+    if (!valid.length) {
+      toast.error('No se encontraron imágenes válidas (JPG, PNG, WEBP)');
+      return;
+    }
 
     valid.forEach(file => {
       const reader = new FileReader();
@@ -115,8 +118,21 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
       reader.readAsDataURL(file);
     });
 
+    toast.success(`${valid.length} imagen(es) agregadas a la cola`);
+  }
+
+  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    addFiles(files);
     // Reset input so same files can be re-selected
     if (fileRef.current) fileRef.current.value = '';
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    addFiles(files);
   }
 
   function removeFromQueue(id: string) {
@@ -206,21 +222,29 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Upload */}
-        <div>
+        {/* Upload area with drag & drop */}
+        <div
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+            dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+          }`}
+          onClick={() => fileRef.current?.click()}
+        >
           <input
             ref={fileRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={handleFiles}
-            multiple
+            multiple={true}
           />
-          <Button variant="outline" onClick={() => fileRef.current?.click()} className="w-full">
-            <Upload className="w-4 h-4 mr-2" />
-            {queue.length ? `Agregar más imágenes (${queue.length} en cola)` : 'Seleccionar imágenes para analizar'}
-          </Button>
-          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP — máximo 10MB cada una — selección múltiple habilitada</p>
+          <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm font-medium">
+            {queue.length ? `Agregar más imágenes (${queue.length} en cola)` : 'Arrastra imágenes aquí o haz clic para seleccionar'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP — máximo 10MB — selección múltiple y drag & drop</p>
         </div>
 
         {/* Queue preview */}
