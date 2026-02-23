@@ -29,12 +29,30 @@ serve(async (req) => {
     if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
     const categoria = 'anuncios';
-    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
+    const [{ data: kbBugs }, { data: kbKnowledge }, { data: adReferences }] = await Promise.all([
       supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
       supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoria).eq('activo', true).order('orden'),
+      supabase.from('ad_references').select('visual_patterns, quality_score, image_url')
+        .eq('angulo', angulo)
+        .order('quality_score', { ascending: false })
+        .limit(3),
     ]);
     const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
     const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledge.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+
+    // Build visual references section from ad_references
+    let referencesSection = '';
+    if (adReferences && adReferences.length > 0) {
+      const refEntries = adReferences.map((ref: any, i: number) => {
+        const patterns = ref.visual_patterns || {};
+        return `Referencia ${i + 1} (quality: ${ref.quality_score}/10):\n${patterns.raw_analysis ? patterns.raw_analysis.slice(0, 800) : 'Sin análisis disponible'}`;
+      }).join('\n\n');
+
+      referencesSection = `\nREFERENCIAS VISUALES REALES (usa estos patrones para tu prompt_generacion):
+${refEntries}
+
+Tu prompt_generacion DEBE seguir los patrones de composición, iluminación, estilo fotográfico y paleta de colores de estas referencias reales. No inventes un estilo nuevo — replica el estilo que ya funcionó.\n`;
+    }
 
     const photosList = (assetUrls as string[] || []).slice(0, 5).join(', ');
     const copyText = `Título: ${variacionElegida?.titulo}\nTexto: ${variacionElegida?.texto_principal}\nDescripción: ${variacionElegida?.descripcion}\nCTA: ${variacionElegida?.cta}`;
@@ -120,7 +138,7 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1500,
-        system: `${bugSection}${knowledgeSection}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Cuando generes prompt_generacion, SIEMPRE sigue las reglas de estilo fotográfico del ángulo creativo indicado.`,
+        system: `${bugSection}${knowledgeSection}${referencesSection}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Cuando generes prompt_generacion, SIEMPRE sigue las reglas de estilo fotográfico del ángulo creativo indicado.${adReferences && adReferences.length > 0 ? ' PRIORIZA replicar los patrones de las referencias visuales reales proporcionadas.' : ''}`,
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });
