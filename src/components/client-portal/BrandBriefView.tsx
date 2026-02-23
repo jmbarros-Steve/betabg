@@ -871,6 +871,27 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido || '',
           positioning: comp.positioning || comp.propuesta_valor || '',
           attack_vector: comp.attack_vector || comp.que_hace_cliente_mejor || '',
+          que_hacen_mejor: comp.que_hacen_mejor || '',
+          que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
+          estrategia_contenido: comp.estrategia_contenido || '',
+          justificacion_amenaza: comp.justificacion_amenaza || '',
+          nivel_amenaza: comp.nivel_amenaza || '',
+          source: comp.source || (comp.name?.includes('autodetectado') ? 'auto' : 'user'),
+        }));
+      }
+      // Also enrich existing competitors array with missing fields
+      if (Array.isArray(ca.competitors)) {
+        ca.competitors = ca.competitors.map((comp: any) => ({
+          ...comp,
+          strengths: comp.strengths || comp.fortalezas || [],
+          weaknesses: comp.weaknesses || comp.debilidades || [],
+          value_proposition: comp.value_proposition || comp.propuesta_valor || '',
+          que_hacen_mejor: comp.que_hacen_mejor || '',
+          que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
+          estrategia_contenido: comp.estrategia_contenido || '',
+          justificacion_amenaza: comp.justificacion_amenaza || '',
+          nivel_amenaza: comp.nivel_amenaza || '',
+          source: comp.source || (comp.name?.includes('autodetectado') ? 'auto' : 'user'),
         }));
       }
       // benchmark_summary from matriz_comparativa
@@ -3360,91 +3381,138 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </Card>
                 )}
 
-                {/* Competitor Cards */}
+                {/* Competitor Cards — Full Detail */}
                 {research.competitor_analysis?.competitors && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Trophy className="h-4 w-4 text-primary" /> Análisis por Competidor
+                      <Trophy className="h-4 w-4 text-primary" /> Análisis por Competidor ({research.competitor_analysis.competitors.length})
                     </h3>
-                    {research.competitor_analysis.competitors.map((comp: any, i: number) => (
-                      <Card key={i}>
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
-                            <h4 className="font-bold text-base">{comp.name || comp.url}</h4>
-                            {comp.nivel_amenaza && (
-                              <Badge className={`text-xs ${
-                                comp.nivel_amenaza === 'alto' ? 'bg-destructive text-destructive-foreground' :
-                                comp.nivel_amenaza === 'medio' ? 'bg-warning text-foreground' :
-                                'bg-muted text-muted-foreground'
-                              }`}>
-                                {comp.nivel_amenaza === 'alto' ? '🔴' : comp.nivel_amenaza === 'medio' ? '🟡' : '🟢'} Amenaza {comp.nivel_amenaza}
-                              </Badge>
+                    {/* Group by source */}
+                    {(() => {
+                      const comps = research.competitor_analysis.competitors as any[];
+                      const userComps = comps.filter((c: any) => c.source === 'user');
+                      const autoComps = comps.filter((c: any) => c.source === 'auto');
+                      const renderComp = (comp: any, i: number) => (
+                        <Card key={i} className="overflow-hidden">
+                          <CardHeader className="pb-3 bg-muted/30">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
+                              <h4 className="font-bold text-base">{comp.name || comp.url}</h4>
+                              {comp.nivel_amenaza && (
+                                <Badge className={`text-xs ${
+                                  comp.nivel_amenaza === 'alto' ? 'bg-destructive text-destructive-foreground' :
+                                  comp.nivel_amenaza === 'medio' ? 'bg-yellow-500 text-white' :
+                                  'bg-green-500 text-white'
+                                }`}>
+                                  {comp.nivel_amenaza === 'alto' ? '🔴' : comp.nivel_amenaza === 'medio' ? '🟡' : '🟢'} Amenaza {comp.nivel_amenaza}
+                                </Badge>
+                              )}
+                              {comp.source === 'auto' && (
+                                <Badge variant="secondary" className="text-[10px]">🤖 Detectado por IA</Badge>
+                              )}
+                              {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
+                            </div>
+                            {comp.justificacion_amenaza && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">{comp.justificacion_amenaza}</p>
                             )}
-                            {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
-                          </div>
-                          {comp.positioning && <p className="text-xs text-muted-foreground italic mt-1">"{comp.positioning}"</p>}
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {comp.value_proposition && (
-                            <div className="bg-primary/5 rounded p-2">
-                              <p className="text-xs font-semibold text-primary mb-1">Propuesta de Valor</p>
-                              <p className="text-xs">{comp.value_proposition}</p>
-                            </div>
-                          )}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <p className="text-xs font-medium text-primary flex items-center gap-1 mb-1"><TrendingUp className="h-3 w-3" /> Fortalezas</p>
-                              <ul className="text-xs space-y-1">{comp.strengths?.map((s: string, j: number) => (
-                                <li key={j} className="flex items-start gap-1"><span className="text-primary">•</span> {s}</li>
-                              ))}</ul>
-                            </div>
-                            <div>
-                              <p className="text-xs font-medium text-destructive flex items-center gap-1 mb-1"><TrendingDown className="h-3 w-3" /> Debilidades</p>
-                              <ul className="text-xs space-y-1">{comp.weaknesses?.map((w: string, j: number) => (
-                                <li key={j} className="flex items-start gap-1"><span className="text-destructive">•</span> {w}</li>
-                              ))}</ul>
-                            </div>
-                          </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3 pt-4">
+                            {/* Propuesta de Valor */}
+                            {comp.value_proposition && (
+                              <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+                                <p className="text-xs font-semibold text-primary mb-1">Propuesta de Valor</p>
+                                <p className="text-sm leading-relaxed">{comp.value_proposition}</p>
+                              </div>
+                            )}
 
-                          {/* Ads Strategy & Attack Vector — full width */}
-                          {(comp.ad_strategy_inferred || comp.ad_strategy) && (
-                            <div className="bg-muted/40 rounded-lg p-3 border border-border">
-                              <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Estrategia de Ads</p>
-                              <p className="text-xs leading-relaxed">{comp.ad_strategy_inferred || comp.ad_strategy}</p>
+                            {/* Fortalezas & Debilidades */}
+                            <div className="grid grid-cols-2 gap-3">
+                              {comp.strengths?.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium flex items-center gap-1 mb-1.5">✅ Fortalezas</p>
+                                  <ul className="text-xs space-y-1">{comp.strengths.map((s: string, j: number) => (
+                                    <li key={j} className="flex items-start gap-1.5"><span className="text-green-500 flex-shrink-0">✓</span> {s}</li>
+                                  ))}</ul>
+                                </div>
+                              )}
+                              {comp.weaknesses?.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium flex items-center gap-1 mb-1.5">❌ Debilidades</p>
+                                  <ul className="text-xs space-y-1">{comp.weaknesses.map((w: string, j: number) => (
+                                    <li key={j} className="flex items-start gap-1.5"><span className="text-destructive flex-shrink-0">✗</span> {w}</li>
+                                  ))}</ul>
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {comp.attack_vector && (
-                            <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
-                              <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">⚔️ Táctica para Quitarles Clientes</p>
-                              <p className="text-xs leading-relaxed text-foreground">{comp.attack_vector}</p>
-                            </div>
-                          )}
 
-                          {/* Badges row */}
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            {comp.price_positioning && (
-                              <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
-                                <span className="text-muted-foreground text-[10px]">Precio:</span>
-                                <span className="font-semibold">{comp.price_positioning}</span>
+                            {/* Qué hacen mejor vs Qué hacemos mejor */}
+                            <div className="grid grid-cols-2 gap-3">
+                              {comp.que_hacen_mejor && (
+                                <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
+                                  <p className="text-xs font-semibold flex items-center gap-1 mb-1">⚠️ Qué Hacen Mejor</p>
+                                  <p className="text-xs leading-relaxed">{comp.que_hacen_mejor}</p>
+                                </div>
+                              )}
+                              {comp.que_hace_cliente_mejor && (
+                                <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                                  <p className="text-xs font-semibold flex items-center gap-1 mb-1">💪 Qué Hacemos Mejor</p>
+                                  <p className="text-xs leading-relaxed">{comp.que_hace_cliente_mejor}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Estrategia de Contenido */}
+                            {comp.estrategia_contenido && (
+                              <div className="bg-muted/40 rounded-lg p-3 border border-border">
+                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">📝 Estrategia de Contenido</p>
+                                <p className="text-xs leading-relaxed">{comp.estrategia_contenido}</p>
                               </div>
                             )}
-                            {comp.tech_stack && (
-                              <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
-                                <span className="text-muted-foreground text-[10px]">Tech:</span>
-                                <span className="font-semibold">{comp.tech_stack}</span>
+
+                            {/* Attack Vector */}
+                            {comp.attack_vector && comp.attack_vector !== comp.que_hace_cliente_mejor && (
+                              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                                <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">⚔️ Cómo Atacarlos</p>
+                                <p className="text-xs leading-relaxed text-foreground">{comp.attack_vector}</p>
                               </div>
                             )}
-                            {comp.seo_score && (
-                              <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
-                                <span className="text-muted-foreground text-[10px]">SEO Score:</span>
-                                <span className="font-semibold">{comp.seo_score}/100</span>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+
+                            {/* Badges row */}
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {comp.price_positioning && (
+                                <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
+                                  <span className="text-muted-foreground text-[10px]">Precio:</span>
+                                  <span className="font-semibold">{comp.price_positioning}</span>
+                                </div>
+                              )}
+                              {comp.seo_score && (
+                                <div className="bg-muted/50 rounded px-2 py-1 flex items-center gap-1">
+                                  <span className="text-muted-foreground text-[10px]">SEO:</span>
+                                  <span className="font-semibold">{comp.seo_score}/100</span>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                      return (
+                        <>
+                          {userComps.length > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-xs text-muted-foreground font-medium">👤 Competidores ingresados por ti</p>
+                              {userComps.map(renderComp)}
+                            </div>
+                          )}
+                          {autoComps.length > 0 && (
+                            <div className="space-y-3 mt-4">
+                              <p className="text-xs text-muted-foreground font-medium">🤖 Competidores detectados automáticamente</p>
+                              {autoComps.map((c, i) => renderComp(c, i + userComps.length))}
+                            </div>
+                          )}
+                          {userComps.length === 0 && autoComps.length === 0 && comps.map(renderComp)}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -3470,6 +3538,106 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <div className="mt-3 pt-3 border-t border-border">
                           <p className="text-xs font-semibold text-primary mb-1">Ventaja Competitiva Recomendada</p>
                           <p className="text-sm">{research.competitor_analysis.competitive_advantage}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Positioning Strategy */}
+                {research.positioning_strategy && typeof research.positioning_strategy === 'object' && (
+                  <Card className="border-primary/20 overflow-hidden">
+                    <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3">
+                      <h3 className="text-sm font-bold text-primary-foreground flex items-center gap-2">
+                        <Target className="h-4 w-4" /> Estrategia de Posicionamiento
+                      </h3>
+                    </div>
+                    <CardContent className="space-y-4 pt-4">
+                      {/* Statement */}
+                      {(research.positioning_strategy as any).statement_posicionamiento && (
+                        <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Positioning Statement</p>
+                          <p className="text-sm leading-relaxed font-medium italic">"{(research.positioning_strategy as any).statement_posicionamiento}"</p>
+                        </div>
+                      )}
+
+                      {/* Posicionamiento Recomendado */}
+                      {(research.positioning_strategy as any).posicionamiento_recomendado && (
+                        <div className="bg-muted/50 rounded-lg p-3 border border-border">
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">🎯 Posicionamiento Recomendado</p>
+                          <p className="text-xs leading-relaxed">{(research.positioning_strategy as any).posicionamiento_recomendado}</p>
+                        </div>
+                      )}
+
+                      {/* Posicionamiento Actual */}
+                      {(research.positioning_strategy as any).posicionamiento_actual && (
+                        <div className="bg-muted/50 rounded-lg p-3 border border-border">
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">📍 Posicionamiento Actual</p>
+                          <p className="text-xs leading-relaxed">{(research.positioning_strategy as any).posicionamiento_actual}</p>
+                        </div>
+                      )}
+
+                      {/* Territorios de Comunicación */}
+                      {Array.isArray((research.positioning_strategy as any).territorios_comunicacion) && (research.positioning_strategy as any).territorios_comunicacion.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">🏷️ Territorios de Comunicación</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(research.positioning_strategy as any).territorios_comunicacion.map((t: string, i: number) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Mensajes Clave Diferenciadores */}
+                      {Array.isArray((research.positioning_strategy as any).mensajes_clave_diferenciadores) && (research.positioning_strategy as any).mensajes_clave_diferenciadores.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">💬 Mensajes Clave</p>
+                          <ul className="space-y-2">
+                            {(research.positioning_strategy as any).mensajes_clave_diferenciadores.map((m: string, i: number) => (
+                              <li key={i} className="flex items-start gap-2 text-xs bg-muted/40 rounded-lg p-2.5 border border-border">
+                                <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                                <span className="leading-relaxed">{m}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Mapa Perceptual */}
+                      {(research.positioning_strategy as any).mapa_perceptual && (
+                        <div className="bg-muted/30 rounded-lg p-4 border border-border">
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">📊 Mapa Perceptual</p>
+                          <div className="grid grid-cols-2 gap-2 mb-3">
+                            <div className="text-xs"><span className="text-muted-foreground">Eje X:</span> <span className="font-medium">{(research.positioning_strategy as any).mapa_perceptual.eje_x}</span></div>
+                            <div className="text-xs"><span className="text-muted-foreground">Eje Y:</span> <span className="font-medium">{(research.positioning_strategy as any).mapa_perceptual.eje_y}</span></div>
+                          </div>
+                          {(research.positioning_strategy as any).mapa_perceptual.posiciones && (
+                            <div className="space-y-2">
+                              {Object.entries((research.positioning_strategy as any).mapa_perceptual.posiciones).map(([key, val]: [string, any]) => (
+                                <div key={key} className="flex items-center gap-3 text-xs bg-background rounded p-2 border border-border">
+                                  <Badge variant="outline" className="text-[10px] capitalize">{key}</Badge>
+                                  <span className="text-muted-foreground">({val.x}, {val.y})</span>
+                                  <span className="flex-1">{val.descripcion}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Posicionamiento de Competidores */}
+                      {(research.positioning_strategy as any).posicionamiento_competidores && typeof (research.positioning_strategy as any).posicionamiento_competidores === 'object' && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">🏆 Cómo se Posicionan los Competidores</p>
+                          <div className="space-y-2">
+                            {Object.entries((research.positioning_strategy as any).posicionamiento_competidores).map(([name, desc]: [string, any]) => (
+                              <div key={name} className="flex items-start gap-2 text-xs border-l-2 border-muted pl-3 py-1">
+                                <span className="font-semibold capitalize min-w-[80px]">{name}:</span>
+                                <span className="text-muted-foreground">{typeof desc === 'string' ? desc : JSON.stringify(desc)}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </CardContent>
