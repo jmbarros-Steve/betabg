@@ -259,7 +259,13 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         {creative.brief_visual && (
                           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <p className="text-xs font-semibold text-amber-700 mb-1">📋 Brief Visual disponible</p>
-                            <p className="text-xs text-amber-700">{(creative.brief_visual as Record<string, unknown>).concepto as string || 'Ver en descarga'}</p>
+                            <p className="text-xs text-amber-700">
+                              {typeof (creative.brief_visual as Record<string, unknown>).concepto === 'string'
+                                ? (creative.brief_visual as Record<string, unknown>).concepto as string
+                                : typeof (creative.brief_visual as Record<string, unknown>).concepto === 'object'
+                                  ? Object.values((creative.brief_visual as Record<string, unknown>).concepto as Record<string, unknown>).join(' · ')
+                                  : 'Ver en descarga'}
+                            </p>
                           </div>
                         )}
 
