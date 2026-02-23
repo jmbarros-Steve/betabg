@@ -2248,41 +2248,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
     ];
 
-    // Meta Ads table
+    // Meta Ads table — use addTableRow for consistent styling and margin safety
     addSubTitle('Meta Ads — Copies Listos');
-    checkPage(10 + metaAds.length * 11);
+    checkPage(10 + metaAds.length * 12);
     const metaColWs = [30, 70, 30, 40];
-    const metaHeaders = ['Anuncio', 'Texto Principal', 'CTA', 'Audiencia'];
-    addTableRow(metaHeaders, metaColWs, 0, true);
+    addTableRow(['Anuncio', 'Texto Principal', 'CTA', 'Audiencia'], metaColWs, 0, true);
     for (let mi = 0; mi < metaAds.length; mi++) {
       const ad = metaAds[mi];
-      checkPage(12);
-      const rowH = 11;
-      const rowIdx = mi + 1;
-      doc.setFillColor(rowIdx % 2 === 0 ? 255 : 245, rowIdx % 2 === 0 ? 255 : 246, rowIdx % 2 === 0 ? 255 : 252);
-      doc.rect(margin, y, maxWidth, rowH, 'F');
-      doc.setDrawColor(204, 204, 204);
-      doc.setLineWidth(0.2);
-      doc.rect(margin, y, maxWidth, rowH, 'S');
-      const mCols = [
+      addTableRow([
         ad.title.replace('Meta Ad ', ''),
         stripEmojis(ad.texto).slice(0, 55),
         ad.cta,
         ad.audiencia.slice(0, 28),
-      ];
-      let mcx = margin;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(40, 40, 40);
-      for (let ci = 0; ci < mCols.length; ci++) {
-        if (ci > 0) {
-          doc.setDrawColor(204, 204, 204);
-          doc.line(mcx, y, mcx, y + rowH);
-        }
-        doc.text(mCols[ci], mcx + 4, y + 7);
-        mcx += metaColWs[ci];
-      }
-      y += rowH;
+      ], metaColWs, mi + 1);
     }
     y += 8;
 
@@ -2302,37 +2280,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         url: clientInfo?.website_url || 'tusitio.com',
       },
     ];
+    // Google Ads table — use addTableRow for consistent styling and margin safety
     const gColWs = [50, 80, 40];
-    const gHeaders = ['Headline (30 car.)', 'Descripcion (90 car.)', 'URL display'];
-    addTableRow(gHeaders, gColWs, 0, true);
+    addTableRow(['Headline (30 car.)', 'Descripcion (90 car.)', 'URL display'], gColWs, 0, true);
     for (let gi2 = 0; gi2 < googleAds.length; gi2++) {
       const gad = googleAds[gi2];
-      checkPage(12);
-      const rowH = 11;
-      const rowIdx = gi2 + 1;
-      doc.setFillColor(rowIdx % 2 === 0 ? 255 : 245, rowIdx % 2 === 0 ? 255 : 246, rowIdx % 2 === 0 ? 255 : 252);
-      doc.rect(margin, y, maxWidth, rowH, 'F');
-      doc.setDrawColor(204, 204, 204);
-      doc.setLineWidth(0.2);
-      doc.rect(margin, y, maxWidth, rowH, 'S');
-      const gCells = [
+      addTableRow([
         stripEmojis(gad.headline).slice(0, 30),
         stripEmojis(gad.desc).slice(0, 60),
         gad.url.replace(/^https?:\/\//, '').slice(0, 30),
-      ];
-      let gcx = margin;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(40, 40, 40);
-      for (let ci = 0; ci < gCells.length; ci++) {
-        if (ci > 0) {
-          doc.setDrawColor(204, 204, 204);
-          doc.line(gcx, y, gcx, y + rowH);
-        }
-        doc.text(gCells[ci], gcx + 4, y + 7);
-        gcx += gColWs[ci];
-      }
-      y += rowH;
+      ], gColWs, gi2 + 1);
     }
     y += 8;
 

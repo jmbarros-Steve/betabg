@@ -121,7 +121,7 @@ export function renderGlossaryBox(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     const defLines = doc.splitTextToSize(items[i].def, maxWidth - 14);
-    const blockH = 4.5 + defLines.length * 4 + 2;
+    const blockH = 6 + defLines.length * 4 + 3;
     helpers.checkPage(blockH + 2);
     y = helpers.getY();
 
@@ -131,18 +131,21 @@ export function renderGlossaryBox(
     doc.setFillColor(accentR, accentG, accentB);
     doc.rect(margin, y - 1.5, 2, blockH, 'F');
 
-    // Term in bold gold
+    // Term in bold gold — on its own line
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(accentR, accentG, accentB);
     doc.text(items[i].term, margin + 6, y);
-    y += 4.5;
+    y += 6;
+    // CRITICAL: sync y to helpers before any checkPage call
+    helpers.setY(y);
 
-    // Definition in dark gray, wrapped
+    // Definition in dark gray, wrapped — clearly below term
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(60, 60, 70);
     for (let li = 0; li < defLines.length; li++) {
+      helpers.setY(y);
       helpers.checkPage(5);
       y = helpers.getY();
       doc.text(defLines[li], margin + 6, y);
@@ -155,7 +158,7 @@ export function renderGlossaryBox(
       doc.setLineWidth(0.15);
       doc.line(margin + 6, y, margin + maxWidth - 4, y);
     }
-    y += 1.5;
+    y += 2;
     helpers.setY(y);
   }
 
