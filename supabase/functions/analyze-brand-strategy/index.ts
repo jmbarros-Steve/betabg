@@ -321,67 +321,54 @@ Sin markdown, sin backticks, sin texto adicional.`,
 ];
 
 // ── Llamada individual a Claude ──
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
+
 async function callClaude(
-  anthropicApiKey: string,
   systemPrompt: string,
-  userPrompt: string,
-  maxTokens: number = 2500,
-): Promise<{ data: Record<string, unknown>; stopReason: string }> {
+  researchData: string,
+  maxTokens: number = 2500
+): Promise<Record<string, unknown>> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000);
+  const timeout = setTimeout(() => controller.abort(), 120_000);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controller.signal,
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
       headers: {
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model: "claude-opus-4-6",
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          {
+            role: "user",
+            content: `Aquí están los datos de research del sitio web del cliente y sus competidores. Analízalos a fondo:\n\n${researchData}\n\nResponde ÚNICAMENTE con JSON válido. Sin markdown, sin backticks, sin texto antes o después del JSON.`,
+          },
+        ],
       }),
+      signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
-
     if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`AI error ${res.status}: ${errText.slice(0, 200)}`);
+      const errorBody = await res.text();
+      throw new Error(`Claude API error ${res.status}: ${errorBody}`);
     }
 
-    const aiData = await res.json();
-    const stopReason = aiData.stop_reason || 'unknown';
-    let raw = aiData.content?.[0]?.text || '{}';
-
-    // Clean markdown fences and extract JSON
-    raw = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const firstBrace = raw.indexOf('{');
-    if (firstBrace > 0) raw = raw.slice(firstBrace);
-
-    // Find matching closing brace
-    let depth = 0, inStr = false, esc = false;
-    for (let i = 0; i < raw.length; i++) {
-      const ch = raw[i];
-      if (esc) { esc = false; continue; }
-      if (ch === '\\' && inStr) { esc = true; continue; }
-      if (ch === '"') inStr = !inStr;
-      if (!inStr) {
-        if (ch === '{') depth++;
-        if (ch === '}') { depth--; if (depth === 0) { raw = raw.slice(0, i + 1); break; } }
-      }
+    const data = await res.json();
+    const text = data.content?.[0]?.text ?? "{}";
+    const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Claude API timeout after 120s");
     }
-
-    const data = JSON.parse(raw);
-    return { data, stopReason };
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('AI request timed out (120s)');
-    throw err;
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -393,9 +380,8 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
-    if (!anthropicApiKey) {
+    if (!ANTHROPIC_API_KEY) {
       return new Response(JSON.stringify({ error: 'AI not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -491,10 +477,9 @@ ${brandContext || 'Sin contexto adicional'}`;
 
     const results = await Promise.allSettled(
       SECTIONS.map(async (section) => {
-        const systemPrompt = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}\nResponde SOLO JSON válido sin markdown.`;
-        const userPrompt = `Aquí están los datos de research del sitio web del cliente y sus competidores. Analízalos a fondo:\n\n${truncatedResearch}\n\n${section.prompt}\n\nREGLAS: Solo JSON válido. Sé conciso pero específico. Usa datos reales del contenido proporcionado.`;
-        const { data, stopReason } = await callClaude(anthropicApiKey, systemPrompt, userPrompt, section.maxTokens);
-        console.log(`[analyze-brand-strategy] Section "${section.id}" OK: stop=${stopReason}, keys=${Object.keys(data).join(',')}`);
+        const fullSystemPrompt = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`;
+        const data = await callClaude(fullSystemPrompt, truncatedResearch, section.maxTokens);
+        console.log(`[analyze-brand-strategy] Section "${section.id}" OK: keys=${Object.keys(data).join(',')}`);
         return { sectionId: section.id, keys: section.keys, data };
       })
     );
