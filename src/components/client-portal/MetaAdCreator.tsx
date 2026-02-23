@@ -16,6 +16,7 @@ import { useBriefContext } from '@/hooks/useBriefContext';
 interface MetaAdCreatorProps {
   clientId: string;
   onBack: () => void;
+  onGoToLibrary?: () => void;
 }
 
 interface ShopifyProduct {
@@ -32,7 +33,7 @@ interface Variacion {
 }
 interface GeneratedVariaciones { explicacion: string; variaciones: Variacion[]; }
 
-type AdStep = 'strategy' | 'product' | 'campaign' | 'angle' | 'instrucciones' | 'variaciones' | 'brief' | 'publish' | 'charlie';
+type AdStep = 'strategy' | 'product' | 'campaign' | 'angle' | 'instrucciones' | 'variaciones' | 'brief' | 'publish' | 'charlie' | 'completed';
 
 const CAMPAIGN_OPTIONS = [
   { id: 'retargeting', label: 'Broad Retargeting', emoji: '🎯', desc: 'Recuperar audiencia que ya te conoce' },
@@ -89,7 +90,7 @@ const BUDGET_RECS: Record<string, string> = {
   'Fase Avanzada': 'Framework completo: Advantage+, Partnership Ads, catálogos.',
 };
 
-export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
+export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreatorProps) {
   const [step, setStep] = useState<AdStep>('strategy');
   const [faseNegocio, setFaseNegocio] = useState('');
   const [presupuestoAds, setPresupuestoAds] = useState('');
@@ -1079,9 +1080,14 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
                         ))}
                       </div>
                     )}
-                    <Button className="w-full mt-2" onClick={() => setStep('publish')}>
-                      <Rocket className="w-4 h-4 mr-2" />Continuar — Publicar Ad Set en Meta
-                    </Button>
+                    <div className="flex gap-3 mt-2">
+                      <Button className="flex-1" onClick={() => setStep('completed')}>
+                        <CheckCircle className="w-4 h-4 mr-2" />✅ Finalizar y ver resumen
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={() => setStep('publish')}>
+                        <Rocket className="w-4 h-4 mr-2" />Publicar en Meta
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1216,6 +1222,51 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
               </Button>
               <Button className="flex-1" onClick={onBack}>
                 Ver panel de campañas
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* STEP: COMPLETED — success confirmation */}
+        {step === 'completed' && (
+          <motion.div key="completed" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+            <div className="text-center py-8 space-y-4">
+              <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+                <CheckCircle className="w-10 h-10 text-green-500" />
+              </div>
+              <h3 className="text-2xl font-bold">¡Anuncio creado exitosamente! 🎉</h3>
+              <p className="text-muted-foreground">Tu creativo ya está en la Biblioteca con su Plan de Acción DCT listo.</p>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-muted/50 rounded-xl p-5 space-y-3 border border-border">
+              <p className="text-sm font-semibold">Resumen del anuncio</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Título</p>
+                  <p className="font-medium truncate">{selectedVariacion?.titulo || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Ángulo creativo</p>
+                  <p className="font-medium">{effectiveAngle}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Campaña</p>
+                  <p className="font-medium">{CAMPAIGN_OPTIONS.find(c => c.id === selectedCampaign)?.label}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Imágenes generadas</p>
+                  <p className="font-medium">{generatedAssetUrls.length}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Button className="w-full" size="lg" onClick={() => onGoToLibrary ? onGoToLibrary() : onBack()}>
+                📚 Ir a Biblioteca
+              </Button>
+              <Button variant="outline" className="w-full" onClick={reset}>
+                ➕ Crear otro anuncio
               </Button>
             </div>
           </motion.div>
