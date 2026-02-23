@@ -542,9 +542,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         const d = r.research_data;
         if (!d || typeof d !== 'object') return false;
         if (r.research_type === 'executive_summary' && (d.summary || d.executive_summary)) return true;
-        if (r.research_type === 'seo_audit' && (d.issues?.length || d.recommendations?.length || d.score != null)) return true;
-        if (r.research_type === 'competitor_analysis' && (d.competitors?.length || d.overview)) return true;
-        if (r.research_type === 'keywords' && (d.recommended?.length || d.primary?.length || d.competitor_keywords?.length)) return true;
+        if (r.research_type === 'seo_audit' && (d.issues?.length || d.recommendations?.length || d.score != null || d.score_seo != null || d.problemas_detectados?.length || d.acciones_prioritarias?.length)) return true;
+        if (r.research_type === 'competitor_analysis' && (d.competitors?.length || d.individual_analysis?.length || d.overview)) return true;
+        if (r.research_type === 'keywords' && (d.recommended?.length || d.primary?.length || d.primary_keywords?.length || d.competitor_keywords?.length)) return true;
         return false;
       });
     }
@@ -698,6 +698,190 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
   }
 
+  // ─── Normalization layer: maps backend Spanish keys / complex objects to frontend expected format ───
+  function normalizeResearchData(r: ResearchData): ResearchData {
+    const s = (v: any): string => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
+
+    // ── SEO AUDIT: score_seo → score, problemas_detectados → issues, acciones_prioritarias → recommendations ──
+    if (r.seo_audit && typeof r.seo_audit === 'object') {
+      const seo = r.seo_audit;
+      // score
+      if (seo.score == null && seo.score_seo != null) seo.score = seo.score_seo;
+      // issues: object[] → string[]
+      if (!Array.isArray(seo.issues) && Array.isArray(seo.problemas_detectados)) {
+        seo.issues = seo.problemas_detectados.map((p: any) =>
+          typeof p === 'string' ? p : [p.problema, p.impacto, p.solucion].filter(Boolean).map(s).join(' — ')
+        );
+      }
+      // recommendations: object[] → string[]
+      if (!Array.isArray(seo.recommendations) && Array.isArray(seo.acciones_prioritarias)) {
+        seo.recommendations = seo.acciones_prioritarias.map((a: any) =>
+          typeof a === 'string' ? a : [a.accion, a.impacto_esperado ? `(${a.impacto_esperado})` : '', a.plazo ? `[${a.plazo}]` : ''].filter(Boolean).join(' ')
+        );
+      }
+      // competitive_seo_gap from analisis_competidores
+      if (!seo.competitive_seo_gap && seo.analisis_competidores) {
+        if (typeof seo.analisis_competidores === 'string') {
+          seo.competitive_seo_gap = seo.analisis_competidores;
+        } else if (typeof seo.analisis_competidores === 'object') {
+          // Summarize the competitor analysis object into a readable string
+          const parts: string[] = [];
+          for (const [key, val] of Object.entries(seo.analisis_competidores)) {
+            if (typeof val === 'string') parts.push(val);
+            else if (Array.isArray(val)) parts.push(val.map(s).join(', '));
+          }
+          if (parts.length > 0) seo.competitive_seo_gap = parts.join('. ');
+        }
+      }
+      // meta_analysis from analisis_cliente.meta_titles / meta_descriptions
+      if (!seo.meta_analysis && seo.analisis_cliente) {
+        const ac = seo.analisis_cliente;
+        const metaParts: string[] = [];
+        if (ac.meta_titles) metaParts.push(`Títulos: ${ac.meta_titles.evaluacion || ''} — ${ac.meta_titles.mejora || ''}`);
+        if (ac.meta_descriptions) metaParts.push(`Descripciones: ${ac.meta_descriptions.evaluacion || ''} — ${ac.meta_descriptions.mejora || ''}`);
+        if (metaParts.length > 0) seo.meta_analysis = metaParts.join('. ');
+      }
+      // content_structure from analisis_cliente.headings / contenido
+      if (!seo.content_structure && seo.analisis_cliente) {
+        const ac = seo.analisis_cliente;
+        const csParts: string[] = [];
+        if (ac.headings) csParts.push(`H1: ${ac.headings.h1_detectado || ''} — ${ac.headings.evaluacion || ''} — ${ac.headings.mejora || ''}`);
+        if (ac.contenido) csParts.push(`Contenido: ${ac.contenido.evaluacion || ''} — Fortalezas: ${ac.contenido.fortalezas || ''} — Mejora: ${ac.contenido.mejora || ''}`);
+        if (csParts.length > 0) seo.content_structure = csParts.join('. ');
+      }
+    }
+
+    // ── KEYWORDS: primary_keywords → primary, longtail_keywords → long_tail, keyword_strategy_roadmap → recommended_strategy ──
+    if (r.keywords && typeof r.keywords === 'object') {
+      const kw = r.keywords;
+      // primary: object[] → string[] (extract .keyword)
+      if (!Array.isArray(kw.primary) && Array.isArray(kw.primary_keywords)) {
+        kw.primary = kw.primary_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
+      }
+      // long_tail: object[] → string[]
+      if (!Array.isArray(kw.long_tail) && Array.isArray(kw.longtail_keywords)) {
+        kw.long_tail = kw.longtail_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
+      }
+      // negative_keywords: object[] → string[]
+      if (Array.isArray(kw.negative_keywords)) {
+        kw.negative_keywords = kw.negative_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
+      }
+      // competitor_keywords: object[] → string[]
+      if (Array.isArray(kw.competitor_keywords)) {
+        kw.competitor_keywords = kw.competitor_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
+      }
+      // recommended_strategy from keyword_strategy_roadmap (object with fase_1/2/3)
+      if (!kw.recommended_strategy && kw.keyword_strategy_roadmap) {
+        const road = kw.keyword_strategy_roadmap;
+        if (typeof road === 'string') {
+          kw.recommended_strategy = road;
+        } else if (typeof road === 'object') {
+          const phases: string[] = [];
+          for (const [key, val] of Object.entries(road)) {
+            const label = key.replace(/_/g, ' ').replace(/fase/i, 'Fase');
+            phases.push(`${label}: ${typeof val === 'string' ? val : s(val)}`);
+          }
+          kw.recommended_strategy = phases.join('. ');
+        }
+      }
+      // Also create a strategy field for KeywordStrategyTimeline if roadmap has phases
+      if (!kw.strategy && kw.keyword_strategy_roadmap && typeof kw.keyword_strategy_roadmap === 'object') {
+        const road = kw.keyword_strategy_roadmap;
+        const phaseTexts: string[] = [];
+        const phaseMap: Record<string, string> = { fase_1: 'Fase 1 (0-30 días)', fase_2: 'Fase 2 (30-60 días)', fase_3: 'Fase 3 (60-90 días)' };
+        for (const [key, val] of Object.entries(road)) {
+          const label = phaseMap[key] || key.replace(/_/g, ' ').replace(/fase/i, 'Fase');
+          phaseTexts.push(`${label}: ${typeof val === 'string' ? val : s(val)}`);
+        }
+        if (phaseTexts.length > 0) kw.strategy = phaseTexts.join('\n\n');
+      }
+    }
+
+    // ── COMPETITIVE ANALYSIS: individual_analysis → competitors (fortalezas→strengths, debilidades→weaknesses, etc.) ──
+    if (r.competitor_analysis && typeof r.competitor_analysis === 'object') {
+      const ca = r.competitor_analysis;
+      if (!Array.isArray(ca.competitors) && Array.isArray(ca.individual_analysis)) {
+        ca.competitors = ca.individual_analysis.map((comp: any) => ({
+          ...comp,
+          strengths: comp.strengths || comp.fortalezas || [],
+          weaknesses: comp.weaknesses || comp.debilidades || [],
+          value_proposition: comp.value_proposition || comp.propuesta_valor || '',
+          ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido || '',
+          positioning: comp.positioning || comp.propuesta_valor || '',
+          attack_vector: comp.attack_vector || comp.que_hace_cliente_mejor || '',
+        }));
+      }
+      // benchmark_summary from matriz_comparativa
+      if (!ca.benchmark_summary && ca.matriz_comparativa) {
+        const mc = ca.matriz_comparativa;
+        if (typeof mc === 'string') {
+          ca.benchmark_summary = mc;
+        } else if (mc.headers && mc.rows) {
+          const headers = mc.headers as string[];
+          const rows = mc.rows as string[][];
+          ca.benchmark_summary = rows.map((row: string[]) => row.map((cell: string, ci: number) => `${headers[ci]}: ${cell}`).join(' | ')).join('\n');
+        }
+      }
+      // market_gaps from general analysis
+      if (!Array.isArray(ca.market_gaps) && ca.competitors?.length > 0) {
+        // Extract weaknesses as market gaps
+        const gaps: string[] = [];
+        for (const comp of ca.competitors) {
+          if (comp.attack_vector) gaps.push(`${comp.name}: ${comp.attack_vector}`);
+        }
+        if (gaps.length > 0) ca.market_gaps = gaps;
+      }
+    }
+
+    // ── ADS LIBRARY ANALYSIS: normalize creative_concepts keys, calendar, market_patterns ──
+    if (r.ads_library_analysis && typeof r.ads_library_analysis === 'object') {
+      const ads = r.ads_library_analysis;
+      // creative_concepts: primary_copy → copy, why_it_works → rationale
+      if (Array.isArray(ads.creative_concepts)) {
+        ads.creative_concepts = ads.creative_concepts.map((cc: any) => ({
+          ...cc,
+          copy: cc.copy || cc.primary_copy || '',
+          rationale: cc.rationale || cc.why_it_works || '',
+        }));
+      }
+      // market_patterns: dominant_content → dominant_content_type
+      if (ads.market_patterns && typeof ads.market_patterns === 'object') {
+        if (!ads.market_patterns.dominant_content_type && ads.market_patterns.dominant_content) {
+          ads.market_patterns.dominant_content_type = ads.market_patterns.dominant_content;
+        }
+      }
+      // creative_calendar: object → string
+      if (ads.creative_calendar && typeof ads.creative_calendar === 'object') {
+        const cal = ads.creative_calendar;
+        const calParts: string[] = [];
+        for (const [weekKey, weekVal] of Object.entries(cal)) {
+          const label = weekKey.replace(/_/g, ' ').replace(/week/i, 'Semana');
+          if (typeof weekVal === 'string') {
+            calParts.push(`${label}: ${weekVal}`);
+          } else if (typeof weekVal === 'object' && weekVal !== null) {
+            const wv = weekVal as any;
+            const details: string[] = [];
+            if (wv.launch) details.push(`Lanzar: ${wv.launch}`);
+            if (Array.isArray(wv.test_variables)) details.push(`Test: ${wv.test_variables.join(', ')}`);
+            calParts.push(`${label}: ${details.join(' | ')}`);
+          }
+        }
+        ads.creative_calendar = calParts.join(' ── ');
+      }
+      // winning_patterns from market_patterns (generate if missing)
+      if (!Array.isArray(ads.winning_patterns) && ads.market_patterns) {
+        const mp = ads.market_patterns;
+        const patterns: string[] = [];
+        if (mp.dominant_content_type || mp.dominant_content) patterns.push(`Contenido dominante: ${mp.dominant_content_type || mp.dominant_content}`);
+        if (mp.probable_formats) patterns.push(`Formatos más usados: ${mp.probable_formats}`);
+        if (mp.common_messages) patterns.push(`Mensajes comunes: ${mp.common_messages}`);
+        if (patterns.length > 0) ads.winning_patterns = patterns;
+      }
+    }
+
+    return r;
+  }
+
   async function fetchResearch() {
     const { data, error } = await supabase
       .from('brand_research')
@@ -739,8 +923,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     // If we had to normalize from embedded JSON, treat as complete so the analysis is shown (backend may have failed to set status)
     if (normalizedFromSummary && newStatus === 'pending') newStatus = 'complete';
+
+    // ─── Apply normalization: map backend keys → frontend expected format ───
+    const normalized = normalizeResearchData(r);
+
     // Always set both states — research first so render sees data when status changes
-    setResearch(r);
+    setResearch(normalized);
     if (newStatus) setAnalysisStatus(newStatus);
   }
 
