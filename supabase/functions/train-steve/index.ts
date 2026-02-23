@@ -124,9 +124,9 @@ ${contenido}`,
 
         if (!kErr) savedKnowledge++;
 
-        if (entrada.bugs?.length > 0) {
+        if (entrada.bugs && entrada.bugs.length > 0) {
           await Promise.all(
-            entrada.bugs.map(async (bug) => {
+            entrada.bugs.map(async (bug: any) => {
               const { error: bErr } = await supabase.from('steve_bugs').insert({
                 categoria: entrada.categoria,
                 descripcion: bug.descripcion,

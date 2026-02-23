@@ -53,7 +53,7 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
  * Validate the OAuth state parameter against stored nonces (CSRF protection)
  */
 async function validateState(
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: any,
   stateParam: string | null,
   shopDomain: string
 ): Promise<{ valid: boolean; error?: string }> {
