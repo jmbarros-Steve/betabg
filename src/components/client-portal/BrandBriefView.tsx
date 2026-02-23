@@ -1544,10 +1544,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           doc.setFillColor(accentR, accentG, accentB);
         }
         doc.roundedRect(kx, ky, kpiW, kpiH, 3, 3, 'F');
-        // Value
+        // Value — auto-scale font to fit card width
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(24);
         doc.setTextColor(255, 255, 255);
+        let valSize = 22;
+        doc.setFontSize(valSize);
+        while (valSize > 10 && doc.getTextWidth(kpi.value) > kpiW - 6) {
+          valSize -= 1;
+          doc.setFontSize(valSize);
+        }
         doc.text(kpi.value, kx + kpiW / 2, ky + 16, { align: 'center' });
         // Label
         doc.setFontSize(7.5);
