@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2, CalendarDays } from 'lucide-react';
+import { LearningCenter } from './LearningCenter';
 
 type DateFilter = 'today' | 'week' | 'all';
 
@@ -780,10 +781,6 @@ export function SteveKnowledgePanel() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div>
-      <div style={{background: 'red', color: 'white', padding: '20px', fontSize: '24px'}}>
-        FILTRO TEST — SI VES ESTO FUNCIONA
-      </div>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -823,6 +820,9 @@ export function SteveKnowledgePanel() {
           ))}
         </div>
       </div>
+
+      {/* Learning Center */}
+      <LearningCenter onSaved={fetchAll} />
 
       {/* Ad Image Analyzer */}
       <AdImageAnalyzer onSaved={fetchAll} />
@@ -1049,7 +1049,6 @@ export function SteveKnowledgePanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
     </div>
   );
 }
