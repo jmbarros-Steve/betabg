@@ -7,98 +7,72 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Max-Age': '86400',
 };
 
-function buildPromptCall1(
-  clientName: string,
-  clientCompany: string,
-  websiteUrl: string,
-  websiteContent: string,
-  competitorContents: string[],
-  brandContext: string
-): string {
-  const websiteSection = websiteContent
-    ? `=== SITIO WEB ===\n${websiteContent.slice(0, 4000)}`
-    : '=== SITIO WEB: No disponible ===';
-
-  const competitorSection = competitorContents.length > 0
-    ? `=== COMPETIDORES (${competitorContents.length}) ===\n${competitorContents.join('\n\n').slice(0, 6000)}`
-    : '=== COMPETIDORES: No proporcionados ===';
-
-  return `MARCA: ${clientName} (${clientCompany || 'Sin empresa'})
-WEBSITE: ${websiteUrl || 'No proporcionado'}
-
-${websiteSection}
-
-${competitorSection}
-
-=== BRIEF ===
-${brandContext}
-
-Genera JSON con estas 6 secciones. SOLO JSON válido, sin markdown:
-
+// ── 6 grupos de secciones para llamadas paralelas ──
+const SECTION_GROUPS = [
+  {
+    id: 'brand_core',
+    sections: ['executive_summary', 'brand_identity'],
+    prompt: `Genera SOLO estas 2 secciones en JSON:
 {
   "executive_summary": "Resumen ejecutivo 2 párrafos: situación actual y top 3 acciones inmediatas",
-  "brand_identity": {"essence":"","values":["3"],"personality":"","tone_of_voice":"","visual_identity":""},
+  "brand_identity": {"essence":"","values":["3 valores"],"personality":"","tone_of_voice":"","visual_identity":""}
+}`,
+  },
+  {
+    id: 'market_analysis',
+    sections: ['financial_analysis', 'consumer_profile'],
+    prompt: `Genera SOLO estas 2 secciones en JSON:
+{
   "financial_analysis": {"current_situation":"","revenue_drivers":["3"],"cost_optimization":["2"],"growth_forecast":""},
-  "consumer_profile": {"primary_audience":"","demographics":"","psychographics":"","pain_points":["3"],"buying_triggers":["3"]},
+  "consumer_profile": {"primary_audience":"","demographics":"","psychographics":"","pain_points":["3"],"buying_triggers":["3"]}
+}`,
+  },
+  {
+    id: 'competitive',
+    sections: ['competitive_analysis', 'positioning_strategy'],
+    prompt: `Genera SOLO estas 2 secciones en JSON:
+{
   "competitive_analysis": {"competitors":[{"name":"","strengths":["2"],"weaknesses":["2"],"positioning":""}],"market_gaps":["3"],"competitive_advantage":""},
   "positioning_strategy": {"current_positioning":"","desired_positioning":"","differentiation":"","value_proposition":"","messaging_pillars":["3"]}
-}
-
-REGLAS: Solo JSON. Sé conciso (1-2 frases por campo). Usa datos reales del contenido.`;
-}
-
-function buildPromptCall2(
-  clientName: string,
-  clientCompany: string,
-  websiteUrl: string,
-  websiteContent: string,
-  competitorContents: string[],
-  clientProvidedUrls: string[],
-  brandContext: string
-): string {
-  const allUrls = competitorContents.map(c => c.split('\n')[0].replace('## ', '').trim());
-  const urlListStr = allUrls.map((u, i) => `  ${i + 1}. ${u}${i < clientProvidedUrls.length ? ' ← cliente' : ' ← auto'}`).join('\n');
-
-  const websiteSection = websiteContent
-    ? `=== SITIO WEB ===\n${websiteContent.slice(0, 3000)}`
-    : '=== SITIO WEB: No disponible ===';
-
-  const competitorSection = competitorContents.length > 0
-    ? `=== COMPETIDORES (${competitorContents.length}) ===\nURLs:\n${urlListStr}\n\n${competitorContents.join('\n\n').slice(0, 5000)}`
-    : '=== COMPETIDORES: No proporcionados ===';
-
-  return `MARCA: ${clientName} (${clientCompany || 'Sin empresa'})
-WEBSITE: ${websiteUrl || 'No proporcionado'}
-
-${websiteSection}
-
-${competitorSection}
-
-=== BRIEF ===
-${brandContext}
-
-Genera JSON con estas 6 secciones. SOLO JSON válido, sin markdown:
-
+}`,
+  },
+  {
+    id: 'action_plan',
+    sections: ['action_plan'],
+    prompt: `Genera SOLO esta sección en JSON:
 {
-  "action_plan": [{"action":"","channel":"","timeline":"","kpi":"","priority":"alta/media/baja"}],
-  "seo_audit": {"score":0,"issues":["5"],"recommendations":["5"],"technical_seo_priority":"Top 3 acciones"},
-  "keywords": {"primary":["5"],"long_tail":["5"],"negative_keywords":["3"],"strategy":"Estrategia 3 fases"},
-  "competitor_analysis": {"competitors":[{"name":"","url":"","strengths":["2"],"weaknesses":["2"],"attack_vector":""}],"market_gaps":["3"]},
+  "action_plan": [{"action":"","channel":"","timeline":"","kpi":"","priority":"alta/media/baja"}]
+}
+Incluye 7 accionables concretos usando framework SCR (Situación, Complicación, Resolución).`,
+  },
+  {
+    id: 'seo',
+    sections: ['seo_audit', 'keywords'],
+    prompt: `Genera SOLO estas 2 secciones en JSON:
+{
+  "seo_audit": {"score":0,"issues":["5 problemas"],"recommendations":["5"],"technical_seo_priority":"Top 3 acciones"},
+  "keywords": {"primary":["5"],"long_tail":["5"],"negative_keywords":["3"],"strategy":"Estrategia 3 fases"}
+}`,
+  },
+  {
+    id: 'paid_media',
+    sections: ['meta_ads_strategy', 'google_ads_strategy'],
+    prompt: `Genera SOLO estas 2 secciones en JSON:
+{
   "meta_ads_strategy": {"funnel_structure":"TOFU-MOFU-BOFU","copy_hooks":["4"],"cta_recommendations":["3"],"audience_targeting":{"cold":"","warm":"","hot":""}},
   "google_ads_strategy": {"campaign_structure":"","headlines_examples":["5 de 30 chars"],"descriptions_examples":["2 de 90 chars"],"bidding_strategy":""}
-}
+}`,
+  },
+];
 
-REGLAS: Solo JSON. Sé conciso. El array competitors debe incluir ${competitorContents.length} competidores. Keywords en idioma del mercado.`;
-}
-
+// ── Llamada individual a Claude ──
 async function callClaude(
   anthropicApiKey: string,
   systemPrompt: string,
   userPrompt: string,
-  timeoutMs: number = 60000
-): Promise<{ data: any; raw: string; stopReason: string }> {
+): Promise<{ data: Record<string, unknown>; stopReason: string }> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s por llamada
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -111,7 +85,7 @@ async function callClaude(
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 3000,
+        max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -128,11 +102,11 @@ async function callClaude(
     const stopReason = aiData.stop_reason || 'unknown';
     let raw = aiData.content?.[0]?.text || '{}';
 
-    // Clean markdown fences and extract JSON object
+    // Clean markdown fences and extract JSON
     raw = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const firstBrace = raw.indexOf('{');
     if (firstBrace > 0) raw = raw.slice(firstBrace);
-    // Find matching closing brace
+
     let depth = 0, inStr = false, esc = false;
     for (let i = 0; i < raw.length; i++) {
       const ch = raw[i];
@@ -146,12 +120,10 @@ async function callClaude(
     }
 
     const data = JSON.parse(raw);
-    return { data, raw, stopReason };
+    return { data, stopReason };
   } catch (err: any) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('AI request timed out');
-    }
+    if (err.name === 'AbortError') throw new Error('AI request timed out');
     throw err;
   }
 }
@@ -174,6 +146,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Auth check
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -182,7 +155,6 @@ Deno.serve(async (req) => {
     }
     const token = authHeader.replace('Bearer ', '');
     const isInternalCall = token === supabaseServiceKey;
-
     if (!isInternalCall) {
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !user) {
@@ -216,104 +188,88 @@ Deno.serve(async (req) => {
       `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
     ).join('\n\n') || '';
 
-    const knowledgeSection = knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}\n` : '';
-    const bugSection = bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}\n` : '';
+    const phaseSection = fase_negocio ? `\nFASE: ${fase_negocio} | PRESUPUESTO: ${presupuesto_ads || 'N/A'} CLP` : '';
 
-    const phaseSection = fase_negocio
-      ? `\nFASE: ${fase_negocio} | PRESUPUESTO: ${presupuesto_ads || 'N/A'} CLP\n`
-      : '';
+    const systemPrompt = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}\nResponde SOLO JSON válido sin markdown.`;
 
-    const systemPrompt = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeSection}${bugSection}${phaseSection}Responde SOLO JSON válido sin markdown.`;
+    // Build research context string (truncated)
+    const websiteSection = websiteContent ? `SITIO WEB:\n${websiteContent.slice(0, 3000)}` : 'SITIO WEB: No disponible';
+    const competitorSection = (competitorContents?.length > 0)
+      ? `COMPETIDORES (${competitorContents.length}):\n${competitorContents.join('\n\n').slice(0, 5000)}`
+      : 'COMPETIDORES: No proporcionados';
+
+    const researchContext = `MARCA: ${clientName} (${clientCompany || 'Sin empresa'})
+WEBSITE: ${websiteUrl || 'No proporcionado'}
+
+${websiteSection}
+
+${competitorSection}
+
+BRIEF:
+${brandContext || 'Sin contexto adicional'}`;
 
     // Update progress
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Llamada 1/2: Fundamentos de marca', pct: 60, ts: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Ejecutando 6 análisis en paralelo...', pct: 60, ts: new Date().toISOString() } },
       { onConflict: 'client_id,research_type' }
     );
 
-    // ========== LLAMADA 1: Fundamentos ==========
-    const prompt1 = buildPromptCall1(clientName, clientCompany, websiteUrl, websiteContent || '', competitorContents || [], brandContext || '');
-    let result1: any;
-    try {
-      const { data, stopReason } = await callClaude(anthropicApiKey, systemPrompt, prompt1, 60000);
-      result1 = data;
-      console.log(`[analyze-brand-strategy] Call 1 OK: stop=${stopReason}, keys=${Object.keys(data).join(',')}`);
-    } catch (err: any) {
-      console.error('[analyze-brand-strategy] Call 1 FAILED:', err.message);
-      await supabase.from('brand_research').upsert(
-        { client_id, research_type: 'analysis_status', research_data: { status: 'error', error: `Call 1: ${err.message}` } },
-        { onConflict: 'client_id,research_type' }
-      );
-      return new Response(JSON.stringify({ error: `Call 1 failed: ${err.message}` }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // ══════════════════════════════════════════════
+    //  6 LLAMADAS EN PARALELO con Promise.allSettled
+    // ══════════════════════════════════════════════
+    console.log(`[analyze-brand-strategy] Starting 6 parallel calls for client ${client_id}`);
 
-    // Save Call 1 results immediately
-    const call1Types = ['executive_summary', 'brand_identity', 'financial_analysis', 'consumer_profile', 'competitive_analysis', 'positioning_strategy'];
+    const results = await Promise.allSettled(
+      SECTION_GROUPS.map(async (group) => {
+        const userPrompt = `${researchContext}\n\n${group.prompt}\n\nREGLAS: Solo JSON válido. Sé conciso (1-2 frases por campo). Usa datos reales del contenido.`;
+        const { data, stopReason } = await callClaude(anthropicApiKey, systemPrompt, userPrompt);
+        console.log(`[analyze-brand-strategy] Group "${group.id}" OK: stop=${stopReason}, keys=${Object.keys(data).join(',')}`);
+        return { groupId: group.id, sections: group.sections, data };
+      })
+    );
+
+    // ── Consolidar y guardar resultados ──
+    const fullResult: Record<string, unknown> = {};
     const savedSections: string[] = [];
-    for (const rt of call1Types) {
-      if (result1[rt]) {
-        const researchData = rt === 'executive_summary'
-          ? { summary: typeof result1[rt] === 'string' ? result1[rt].slice(0, 12000) : JSON.stringify(result1[rt]).slice(0, 4000) }
-          : result1[rt];
-        const { error: upsertErr } = await supabase.from('brand_research').upsert(
-          { client_id, research_type: rt, research_data: researchData },
-          { onConflict: 'client_id,research_type' }
-        );
-        if (!upsertErr) savedSections.push(rt);
-        else console.error(`[Call1] Failed to save ${rt}:`, upsertErr.message);
+    const errors: string[] = [];
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { groupId, sections, data } = result.value;
+        for (const rt of sections) {
+          if (data[rt]) {
+            const researchData = rt === 'executive_summary'
+              ? { summary: typeof data[rt] === 'string' ? (data[rt] as string).slice(0, 12000) : JSON.stringify(data[rt]).slice(0, 4000) }
+              : data[rt];
+
+            const { error: upsertErr } = await supabase.from('brand_research').upsert(
+              { client_id, research_type: rt, research_data: researchData },
+              { onConflict: 'client_id,research_type' }
+            );
+            if (!upsertErr) {
+              savedSections.push(rt);
+              fullResult[rt] = data[rt];
+            } else {
+              console.error(`[${groupId}] Failed to save ${rt}:`, upsertErr.message);
+            }
+          }
+        }
+      } else {
+        const groupIdx = results.indexOf(result);
+        const groupId = SECTION_GROUPS[groupIdx]?.id || 'unknown';
+        const errMsg = result.reason?.message || 'Unknown error';
+        console.error(`[analyze-brand-strategy] Group "${groupId}" FAILED:`, errMsg);
+        errors.push(`${groupId}: ${errMsg}`);
       }
     }
-    console.log(`[analyze-brand-strategy] Call 1 saved: ${savedSections.join(', ')}`);
 
-    // Update progress for Call 2
-    await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Llamada 2/2: Estrategia y SEO', pct: 80, ts: new Date().toISOString() } },
-      { onConflict: 'client_id,research_type' }
-    );
+    console.log(`[analyze-brand-strategy] Saved ${savedSections.length}/11 sections: ${savedSections.join(', ')}`);
+    if (errors.length > 0) console.log(`[analyze-brand-strategy] Errors: ${errors.join('; ')}`);
 
-    // ========== LLAMADA 2: Estrategia ==========
-    const prompt2 = buildPromptCall2(clientName, clientCompany, websiteUrl, websiteContent || '', competitorContents || [], clientProvidedUrls || [], brandContext || '');
-    let result2: any;
-    try {
-      const { data, stopReason } = await callClaude(anthropicApiKey, systemPrompt, prompt2, 60000);
-      result2 = data;
-      console.log(`[analyze-brand-strategy] Call 2 OK: stop=${stopReason}, keys=${Object.keys(data).join(',')}`);
-    } catch (err: any) {
-      console.error('[analyze-brand-strategy] Call 2 FAILED:', err.message);
-      // Call 1 data is already saved — mark partial completion
+    // Save ads_library_analysis for backward compatibility
+    if (fullResult.meta_ads_strategy || fullResult.google_ads_strategy) {
       await supabase.from('brand_research').upsert(
-        { client_id, research_type: 'brand_strategy', research_data: { completed_at: new Date().toISOString(), sections: savedSections, partial: true } },
-        { onConflict: 'client_id,research_type' }
-      );
-      await supabase.from('brand_research').upsert(
-        { client_id, research_type: 'analysis_status', research_data: { status: 'complete', completed_at: new Date().toISOString(), partial: true, error_call2: err.message } },
-        { onConflict: 'client_id,research_type' }
-      );
-      return new Response(JSON.stringify({ success: true, partial: true, data: result1 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Save Call 2 results
-    const call2Types = ['action_plan', 'seo_audit', 'keywords', 'competitor_analysis', 'meta_ads_strategy', 'google_ads_strategy'];
-    for (const rt of call2Types) {
-      if (result2[rt]) {
-        const { error: upsertErr } = await supabase.from('brand_research').upsert(
-          { client_id, research_type: rt, research_data: result2[rt] },
-          { onConflict: 'client_id,research_type' }
-        );
-        if (!upsertErr) savedSections.push(rt);
-        else console.error(`[Call2] Failed to save ${rt}:`, upsertErr.message);
-      }
-    }
-    console.log(`[analyze-brand-strategy] Call 2 saved. All sections: ${savedSections.join(', ')}`);
-
-    // Also save ads_library_analysis as a combined view for backward compatibility
-    if (result2.meta_ads_strategy || result2.google_ads_strategy) {
-      await supabase.from('brand_research').upsert(
-        { client_id, research_type: 'ads_library_analysis', research_data: { meta_ads_strategy: result2.meta_ads_strategy, google_ads_strategy: result2.google_ads_strategy } },
+        { client_id, research_type: 'ads_library_analysis', research_data: { meta_ads_strategy: fullResult.meta_ads_strategy, google_ads_strategy: fullResult.google_ads_strategy } },
         { onConflict: 'client_id,research_type' }
       );
     }
@@ -323,21 +279,21 @@ Deno.serve(async (req) => {
     }
 
     // Save brand_strategy marker
+    const isPartial = errors.length > 0;
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'brand_strategy', research_data: { completed_at: new Date().toISOString(), sections: savedSections } },
+      { client_id, research_type: 'brand_strategy', research_data: { completed_at: new Date().toISOString(), sections: savedSections, partial: isPartial, errors: errors.length > 0 ? errors : undefined } },
       { onConflict: 'client_id,research_type' }
     );
 
     // Mark complete
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_status', research_data: { status: 'complete', completed_at: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_status', research_data: { status: 'complete', completed_at: new Date().toISOString(), partial: isPartial, sections_saved: savedSections.length, errors: errors.length > 0 ? errors : undefined } },
       { onConflict: 'client_id,research_type' }
     );
 
-    console.log('analyze-brand-strategy: complete for client', client_id);
+    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (partial=${isPartial})`);
 
-    const fullResult = { ...result1, ...result2 };
-    return new Response(JSON.stringify({ success: true, data: fullResult }), {
+    return new Response(JSON.stringify({ success: true, partial: isPartial, data: fullResult, sections: savedSections, errors }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
