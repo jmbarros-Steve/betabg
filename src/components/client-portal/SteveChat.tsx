@@ -403,7 +403,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   if (isInitializing) {
     return (
-      <Card className="h-[750px]">
+      <Card className="h-[900px]">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -417,7 +417,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   return (
-    <Card className="h-[800px] flex flex-col">
+    <Card className="h-[calc(100vh-120px)] min-h-[700px] max-h-[1100px] flex flex-col">
       {/* Header */}
       <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
@@ -488,8 +488,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-5">
+      <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>
+        <div className="space-y-6">
           {messages.map((message, msgIndex) => (
             <div key={message.id}>
               {message.role === 'user' ? (
@@ -527,19 +527,21 @@ export function SteveChat({ clientId }: SteveChatProps) {
                     </Avatar>
                     
                     <div className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-3 text-sm rounded-bl-md shadow-sm",
+                      "max-w-[85%] rounded-2xl px-5 py-4 text-[0.9rem] rounded-bl-md shadow-sm",
                       part.type === 'chonga' 
                         ? "bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800" 
                         : "bg-muted"
                     )}>
                       {part.type === 'chonga' && (
-                        <div className="flex items-center gap-1 mb-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                        <div className="flex items-center gap-1 mb-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
                           <span>👻</span>
                           <span>Espíritu de La Chonga</span>
                         </div>
                       )}
-                      <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed">
-                        <ReactMarkdown>{part.content}</ReactMarkdown>
+                      <div className="max-h-[400px] overflow-y-auto pr-1 scrollbar-thin">
+                        <div className="prose prose-sm dark:prose-invert max-w-none leading-[1.75] [&>p]:mb-3 [&>p:last-child]:mb-0 [&>ul]:my-3 [&>ol]:my-3 [&>ul>li]:mb-1.5 [&>ol>li]:mb-1.5 [&>h1]:text-base [&>h2]:text-sm [&>h3]:text-sm [&>h1]:mt-4 [&>h2]:mt-3 [&>h3]:mt-3 [&>h1]:mb-2 [&>h2]:mb-2 [&>h3]:mb-2 [&>blockquote]:border-l-primary [&>blockquote]:pl-3 [&>blockquote]:italic [&>hr]:my-3 [&_strong]:text-foreground [&_table]:text-xs [&_table]:my-3 [&_th]:px-2 [&_th]:py-1.5 [&_td]:px-2 [&_td]:py-1.5">
+                          <ReactMarkdown>{part.content}</ReactMarkdown>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -554,11 +556,11 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 <AvatarImage src={avatarSteve} alt="Steve" />
                 <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
-              <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="bg-muted rounded-2xl rounded-bl-md px-5 py-4">
+                <div className="flex gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             </div>
