@@ -10,6 +10,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import {
+  PdfContext, PdfHelpers, renderGlossaryBox,
+  renderBrandIdentity, renderFinancialAnalysis, renderConsumerProfile,
+  renderPositioningStrategy, renderActionPlan, renderCompetitorCards,
+  renderKeywordPhases, renderMetaAdsStrategy, renderGoogleAdsStrategy,
+  renderAdsLibraryAnalysis,
+} from './briefPdfSections';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BrandAssetUploader } from './BrandAssetUploader';
@@ -1435,6 +1442,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       y += rowH;
     };
 
+    // ─── PDF CONTEXT & HELPERS for external section renderers ─────────────────
+    const pdfCtx: PdfContext = { doc, y, pageWidth, pageHeight, margin, maxWidth, brandR, brandG, brandB, accentR, accentG, accentB, lightGray };
+    const pdfHelpers: PdfHelpers = {
+      checkPage, addWatermark, addBody, addSubTitle, addSectionHeader, addInsightBox,
+      addKeyValue, addArrowBullet, addTableRow, stripEmojis,
+      getY: () => y,
+      setY: (val: number) => { y = val; },
+    };
+
     // ─── PAGE 1: PORTADA (FULL NAVY) ────────────────────────────────────────────
     doc.setFillColor(brandR, brandG, brandB);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
@@ -1771,6 +1787,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         for (const rec of seo.recommendations.slice(0, 5)) { addArrowBullet(rec); }
       }
       if (seo.competitive_seo_gap) { addSubTitle('GAP SEO vs Competencia'); addBody(seo.competitive_seo_gap); }
+      renderGlossaryBox(pdfCtx, pdfHelpers, 'seo');
     }
 
     // ─── SECCIÓN: KEYWORDS ───────────────────────────────────────────────────────
@@ -1788,6 +1805,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       renderKwGroup('Long-tail (Baja Competencia)', kw.long_tail || []);
       renderKwGroup('Keywords de Competidores', kw.competitor_keywords || []);
       if (kw.recommended_strategy) { addSubTitle('Estrategia Recomendada'); addBody(kw.recommended_strategy); }
+      // Keyword phases from roadmap
+      if (kw.keyword_strategy_roadmap) { renderKeywordPhases(pdfCtx, pdfHelpers, kw.keyword_strategy_roadmap); }
+      else { renderGlossaryBox(pdfCtx, pdfHelpers, 'keywords'); }
     }
 
     // ─── SECCIÓN: INTELIGENCIA COMPETITIVA ──────────────────────────────────────
@@ -1898,6 +1918,37 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         }
       }
     }
+
+    // ─── NEW RESEARCH-BASED SECTIONS ────────────────────────────────────────────
+    // Enhanced competitor cards with full details
+    const compsForCards = research.competitor_analysis?.competitors || [];
+    if (compsForCards.length > 0) {
+      renderCompetitorCards(pdfCtx, pdfHelpers, compsForCards);
+    }
+
+    // Brand Identity
+    renderBrandIdentity(pdfCtx, pdfHelpers, (research as any).brand_identity);
+
+    // Financial Analysis
+    renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis);
+
+    // Consumer Profile
+    renderConsumerProfile(pdfCtx, pdfHelpers, (research as any).consumer_profile);
+
+    // Positioning Strategy
+    renderPositioningStrategy(pdfCtx, pdfHelpers, (research as any).positioning_strategy);
+
+    // Action Plan
+    renderActionPlan(pdfCtx, pdfHelpers, (research as any).action_plan);
+
+    // Meta Ads Strategy
+    renderMetaAdsStrategy(pdfCtx, pdfHelpers, (research as any).meta_ads_strategy);
+
+    // Google Ads Strategy
+    renderGoogleAdsStrategy(pdfCtx, pdfHelpers, (research as any).google_ads_strategy);
+
+    // Ads Library full analysis
+    renderAdsLibraryAnalysis(pdfCtx, pdfHelpers, (research as any).ads_library_analysis);
 
     // ─── SECCIÓN: ANÁLISIS SEO COMPARATIVO ──────────────────────────────────────
     if (research.seo_audit || research.competitor_analysis) {
