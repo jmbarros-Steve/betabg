@@ -26,7 +26,7 @@ CRÍTICO: El array "competitors" en tu respuesta JSON DEBE contener EXACTAMENTE 
 URLs a analizar (${competitorContents.length} total):
 ${urlListStr}
 
-Contenido scrapeado de cada competidor:
+Contenido analizado de cada competidor:
 ${competitorContents.join('\n\n').slice(0, 12000)}`
     : '=== COMPETIDORES: No proporcionados ===';
 

@@ -212,7 +212,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       }
 
       // BUG 5 FIX 1: Only declare fallback-complete after 8 min AND Phase 2 marker (brand_strategy) exists.
-      // Phase 1 (~3-4 min scraping) + Phase 2 (~3-4 min Claude) = up to 8 min total.
+      // Phase 1 (~3-4 min data analysis) + Phase 2 (~3-4 min Claude) = up to 8 min total.
       // analyze-brand-strategy saves a 'brand_strategy' record as a Phase 2 completion marker.
       const PENDING_COMPLETE_MS = 480000; // 8 min — full two-phase budget
       if (status === 'pending' && elapsed > PENDING_COMPLETE_MS) {
@@ -361,7 +361,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     // Subscribe Realtime as bonus
     subscribeToStatus();
 
-    // Two-phase analysis: research (scraping ~30s) → strategy (Claude Opus ~60s)
+    // Two-phase analysis: research (data analysis ~30s) → strategy (Claude Opus ~60s)
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     const projectId = 'jnqivntlkemzcpomkvwv';
@@ -379,7 +379,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       } catch (_) {}
     };
 
-    console.log('[launchAnalysis] Phase 1 — research (scraping)');
+    console.log('[launchAnalysis] Phase 1 — research (data analysis)');
     setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
@@ -396,7 +396,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         const researchData = await researchRes.json();
         research = researchData.research;
         setDebug({ phase1: 'ok', phase1Status: 200 });
-        console.log('[launchAnalysis] Phase 1 complete — competitors scraped:', research?.competitorContents?.length);
+        console.log('[launchAnalysis] Phase 1 complete — competitors analyzed:', research?.competitorContents?.length);
       } else {
         const errBody = await researchRes.text();
         setDebug({ phase1: 'error', phase1Status: researchRes.status, phase1Message: errBody.slice(0, 300) });

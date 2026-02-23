@@ -864,7 +864,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
     toast.info('Iniciando análisis — Steve está investigando tus competidores...');
 
-    // Two-phase analysis: research (scraping) → strategy (Claude Opus)
+    // Two-phase analysis: research (data analysis) → strategy (AI strategy)
     // Each phase fits within the 150s edge function timeout
     const competitorUrls = extractCompetitorUrlsFromBrief();
     const { data: { session } } = await supabase.auth.getSession();
@@ -884,7 +884,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       } catch (_) {}
     };
 
-    // Phase 1: scraping (fast, ~30s)
+    // Phase 1: data analysis (fast, ~30s)
     setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
@@ -2124,7 +2124,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs font-mono space-y-1">
               <p className="font-semibold text-foreground">Diagnóstico (para localizar la falla):</p>
               <p className="text-muted-foreground">
-                Fase 1 (scraping): {diagnostic.phase1 ?? '—'} {diagnostic.phase1Message && <span className="text-amber-600">→ {diagnostic.phase1Message}</span>}
+                Fase 1 (análisis de datos): {diagnostic.phase1 ?? '—'} {diagnostic.phase1Message && <span className="text-amber-600">→ {diagnostic.phase1Message}</span>}
               </p>
               <p className="text-muted-foreground">
                 Fase 2 (estrategia IA): {diagnostic.phase2 ?? '—'} {diagnostic.phase2Message && <span className="text-amber-600">→ {diagnostic.phase2Message}</span>}

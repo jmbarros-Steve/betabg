@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await updateProgress('ia', `Scraping completado — iniciando análisis estratégico con IA (${competitorContents.length} competidores)...`, 75);
+    await updateProgress('ia', `Análisis de datos completado — iniciando análisis estratégico con IA (${competitorContents.length} competidores)...`, 75);
 
     // Save research data so strategy function can read it
     const researchPayload = {
