@@ -60,6 +60,23 @@ type TabId = typeof TABS[number]['id'];
 const emptyKnowledge = { titulo: '', contenido: '', orden: 0 };
 const emptyBug = { descripcion: '', ejemplo_malo: '', ejemplo_bueno: '' };
 
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const ANGULOS_CREATIVOS = [
+  { value: 'call_out', label: '📣 Call Out' },
+  { value: 'bold_statement', label: '💥 Bold Statement' },
+  { value: 'us_vs_them', label: '⚔️ Us vs Them' },
+  { value: 'antes_despues', label: '🔄 Antes y Después' },
+  { value: 'reviews', label: '⭐ Reviews' },
+  { value: 'ugly_ads', label: '📱 Ugly Ads' },
+  { value: 'beneficios', label: '✨ Beneficios' },
+  { value: 'resultados', label: '📈 Resultados' },
+  { value: 'descuentos', label: '🏷️ Descuentos/Ofertas' },
+  { value: 'paquetes', label: '📦 Paquetes' },
+  { value: 'memes', label: '😂 Memes' },
+  { value: 'credenciales', label: '📰 Credenciales en Medios' },
+];
+
 // ─── Ad Image Analyzer (Batch) ─────────────────────────────────────────────────
 
 interface QueueItem {
@@ -77,6 +94,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [performance, setPerformance] = useState<string>('no_se');
+  const [angulo, setAngulo] = useState<string>('');
   const [context, setContext] = useState<string>('');
   const [processing, setProcessing] = useState(false);
   const [saveCategory, setSaveCategory] = useState<string>('anuncios');
@@ -124,7 +142,6 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
   function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     addFiles(files);
-    // Reset input so same files can be re-selected
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -143,9 +160,74 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
     setQueue([]);
   }
 
+  // Upload image to Storage and save reference to ad_references table
+  async function saveReference(item: QueueItem, analysis: string) {
+    try {
+      // Convert base64 to blob for upload
+      const byteChars = atob(item.base64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArr], { type: item.mediaType });
+
+      const ext = item.mediaType.split('/')[1] || 'jpg';
+      const filePath = `${angulo}/${Date.now()}_${item.id.slice(0, 8)}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('ad-references')
+        .upload(filePath, blob, { contentType: item.mediaType });
+
+      if (uploadErr) {
+        console.error('Upload error:', uploadErr);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('ad-references')
+        .getPublicUrl(filePath);
+
+      // Extract visual patterns from analysis (simple extraction)
+      const visualPatterns = {
+        raw_analysis: analysis.slice(0, 2000),
+        angulo_label: ANGULOS_CREATIVOS.find(a => a.value === angulo)?.label || angulo,
+        performance,
+      };
+
+      const qualityScore = performance === 'funciono' ? 8 : performance === 'no_funciono' ? 3 : 5;
+
+      // Get client_id from session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('id')
+        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!clientData) return;
+
+      await supabase.from('ad_references').insert({
+        client_id: clientData.id,
+        angulo,
+        image_url: urlData.publicUrl,
+        visual_patterns: visualPatterns,
+        quality_score: qualityScore,
+      });
+    } catch (err) {
+      console.error('Error saving reference:', err);
+    }
+  }
+
   async function processQueue() {
     const pending = queue.filter(q => q.status === 'pending');
     if (!pending.length) return;
+
+    if (!angulo) {
+      toast.error('Selecciona un ángulo creativo antes de analizar');
+      return;
+    }
+
     setProcessing(true);
 
     for (const item of pending) {
@@ -160,29 +242,33 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
         const analysis = data.analysis as string;
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'done', analysis } : q));
 
-        // Auto-save if enabled
+        // Auto-save knowledge + reference
         if (autoSave) {
           const date = new Date().toLocaleDateString('es-CL');
+          const anguloLabel = ANGULOS_CREATIVOS.find(a => a.value === angulo)?.label || angulo;
           await supabase.from('steve_knowledge').insert({
-            titulo: `Análisis de anuncio — ${item.file.name} — ${date}`,
+            titulo: `Análisis [${anguloLabel}] — ${item.file.name} — ${date}`,
             contenido: analysis,
             categoria: saveCategory,
             activo: true,
             orden: 0,
           });
         }
+
+        // Always save as visual reference
+        await saveReference(item, analysis);
       } catch (err) {
         console.error('Error analyzing:', item.file.name, err);
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: err instanceof Error ? err.message : 'Error' } : q));
       }
 
-      // Small delay to avoid rate limits on Claude Vision
+      // Delay to avoid rate limits
       await new Promise(r => setTimeout(r, 2000));
     }
 
     setProcessing(false);
     if (autoSave) onSaved();
-    toast.success(`Análisis completado: ${pending.length} imagen(es) procesadas`);
+    toast.success(`Análisis completado: ${pending.length} imagen(es) procesadas y guardadas como referencia`);
   }
 
   async function saveAllUnsaved() {
@@ -191,9 +277,10 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
     setSaving(true);
     try {
       const date = new Date().toLocaleDateString('es-CL');
+      const anguloLabel = ANGULOS_CREATIVOS.find(a => a.value === angulo)?.label || angulo;
       await Promise.all(unsaved.map(item =>
         supabase.from('steve_knowledge').insert({
-          titulo: `Análisis de anuncio — ${item.file.name} — ${date}`,
+          titulo: `Análisis [${anguloLabel}] — ${item.file.name} — ${date}`,
           contenido: item.analysis!,
           categoria: saveCategory,
           activo: true,
@@ -218,7 +305,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
           🖼 Análisis de Anuncios con IA
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Sube múltiples anuncios y Claude Vision los analiza en lote. Puedes seleccionar cientos de imágenes a la vez.
+          Sube múltiples anuncios, clasifícalos por ángulo creativo y Claude Vision los analiza en lote. Las imágenes se guardan como referencias visuales para futuras generaciones.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -267,7 +354,6 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
               {queue.map(item => (
                 <div key={item.id} className="relative group aspect-square rounded border border-border overflow-hidden">
                   <img src={item.previewUrl} alt="" className="w-full h-full object-cover" />
-                  {/* Status overlay */}
                   <div className={`absolute inset-0 flex items-center justify-center ${
                     item.status === 'analyzing' ? 'bg-primary/30' :
                     item.status === 'done' ? 'bg-green-500/20' :
@@ -278,7 +364,6 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
                     {item.status === 'done' && <span className="text-sm">✅</span>}
                     {item.status === 'error' && <span className="text-sm">❌</span>}
                   </div>
-                  {/* Remove button */}
                   {item.status === 'pending' && (
                     <button
                       onClick={() => removeFromQueue(item.id)}
@@ -293,6 +378,22 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
 
             {/* Config before processing */}
             <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/20">
+              {/* Ángulo creativo — OBLIGATORIO */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-primary">🎯 Ángulo creativo de estos anuncios *</Label>
+                <Select value={angulo} onValueChange={setAngulo}>
+                  <SelectTrigger className={`h-9 ${!angulo ? 'border-destructive' : ''}`}>
+                    <SelectValue placeholder="Selecciona el ángulo creativo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ANGULOS_CREATIVOS.map(a => (
+                      <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!angulo && <p className="text-xs text-destructive">Obligatorio: clasifica las imágenes por ángulo</p>}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">¿Estos anuncios funcionaron?</Label>
@@ -308,7 +409,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Categoría</Label>
+                  <Label className="text-xs font-semibold">Categoría KB</Label>
                   <Select value={saveCategory} onValueChange={setSaveCategory}>
                     <SelectTrigger className="h-9">
                       <SelectValue />
@@ -342,7 +443,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
             <div className="flex gap-2">
               <Button
                 onClick={processQueue}
-                disabled={processing || !queue.some(q => q.status === 'pending')}
+                disabled={processing || !angulo || !queue.some(q => q.status === 'pending')}
                 className="flex-1"
               >
                 {processing ? (

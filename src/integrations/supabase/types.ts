@@ -134,6 +134,47 @@ export type Database = {
         }
         Relationships: []
       }
+      ad_references: {
+        Row: {
+          angulo: string
+          client_id: string | null
+          copy_patterns: Json | null
+          created_at: string | null
+          id: string
+          image_url: string
+          quality_score: number | null
+          visual_patterns: Json | null
+        }
+        Insert: {
+          angulo: string
+          client_id?: string | null
+          copy_patterns?: Json | null
+          created_at?: string | null
+          id?: string
+          image_url: string
+          quality_score?: number | null
+          visual_patterns?: Json | null
+        }
+        Update: {
+          angulo?: string
+          client_id?: string | null
+          copy_patterns?: Json | null
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          quality_score?: number | null
+          visual_patterns?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_references_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blog_posts: {
         Row: {
           category: string | null
