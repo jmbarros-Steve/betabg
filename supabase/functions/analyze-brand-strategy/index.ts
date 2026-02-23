@@ -13,80 +13,52 @@ const SECTIONS = [
     id: 'executive_summary',
     keys: ['executive_summary'],
     maxTokens: 2000,
-    prompt: `Eres un estratega de marketing senior con 15 años de experiencia. Con base en los datos de research del sitio web del cliente y sus competidores, genera ÚNICAMENTE la sección "executive_summary".
-
-Debe incluir:
+    prompt: `Genera ÚNICAMENTE la sección "executive_summary". Debe incluir:
 - Situación actual de la marca basada en los datos reales del sitio (qué venden, cómo se presentan, qué propuesta de valor comunican)
-- Posición relativa frente a los competidores analizados (en qué están mejor, en qué están peor)
+- Posición relativa frente a los 6 competidores analizados (en qué están mejor, en qué están peor)
 - Las 3 oportunidades más importantes detectadas del análisis competitivo
 - Las 3 amenazas más importantes
 - Top 3 recomendaciones priorizadas con impacto estimado
-
-IMPORTANTE: Basa TODO en los datos reales proporcionados. Cita ejemplos específicos del sitio web y de los competidores. No inventes datos.
-
-Responde ÚNICAMENTE con JSON válido: { "executive_summary": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+Basa TODO en los datos reales proporcionados. Cita ejemplos específicos del sitio web y de los competidores.
+Responde con JSON válido: { "executive_summary": { ... } }`,
   },
   {
     id: 'brand_identity',
     keys: ['brand_identity'],
     maxTokens: 2000,
-    prompt: `Eres un experto en branding y estrategia de marca. Analiza los datos de research del sitio web del cliente y sus competidores para generar ÚNICAMENTE la sección "brand_identity".
-
-Debe incluir:
-- "essence": Propuesta de valor actual: qué promete la marca según su sitio web (extrae frases exactas)
-- "values": Valores de marca identificados del contenido (array de strings)
-- "personality": Personalidad de marca (arquetipos)
-- "tone_of_voice": Tono y voz: analiza el lenguaje del sitio (formal/informal, técnico/accesible, emocional/racional)
-- "visual_identity": Identidad visual observada (colores, estilo, fotografía si hay datos)
-- "differentiators": Diferenciadores vs los competidores: qué dice esta marca que NO dicen los competidores
-- "identity_gaps": Gaps de identidad: qué deberían comunicar y no lo hacen (basado en lo que sí comunican los competidores)
-
-IMPORTANTE: Extrae información REAL del contenido del sitio. Cita frases o secciones específicas que hayas encontrado en los datos.
-
-Responde ÚNICAMENTE con JSON válido: { "brand_identity": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "brand_identity". Debe incluir:
+- Propuesta de valor actual: qué promete la marca según su sitio web (extrae las frases exactas que usan)
+- Tono y voz: analiza el lenguaje del sitio (formal/informal, técnico/accesible, emocional/racional)
+- Valores de marca identificados del contenido
+- Personalidad de marca (arquetipos)
+- Diferenciadores vs los 6 competidores: qué dice esta marca que NO dicen los competidores
+- Gaps de identidad: qué deberían comunicar y no lo hacen
+Extrae información REAL del contenido del sitio. Cita frases o secciones específicas.
+Responde con JSON válido: { "brand_identity": { ... } }`,
   },
   {
     id: 'financial_analysis',
     keys: ['financial_analysis'],
     maxTokens: 2000,
-    prompt: `Eres un analista de mercado y modelo de negocio. Con base en los datos del sitio web del cliente y sus competidores, genera ÚNICAMENTE la sección "financial_analysis".
-
-Debe incluir:
-- "current_situation": Modelo de negocio identificado (e-commerce, SaaS, servicios, etc.)
-- "products_detected": Productos/servicios detectados en el sitio con sus precios si están visibles
-- "pricing_comparison": Rango de precios del cliente vs competidores
-- "pricing_strategy": Estrategia de pricing detectada (premium, low-cost, freemium, basada en valor)
-- "revenue_drivers": Fuentes de ingreso identificadas o inferidas (array)
-- "growth_forecast": Oportunidades de monetización no explotadas
-- "cost_optimization": Oportunidades de optimización (array)
-- "benchmarks": Cómo se comparan las ofertas del cliente vs competidores
-
-IMPORTANTE: Si los precios no son visibles en el scraping, indícalo claramente. No inventes precios.
-
-Responde ÚNICAMENTE con JSON válido: { "financial_analysis": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "financial_analysis". Debe incluir:
+- Modelo de negocio identificado (e-commerce, SaaS, servicios, infoproducto, marketplace, etc.)
+- Productos/servicios detectados en el sitio con sus precios si están visibles
+- Rango de precios del cliente vs lo que ofrecen los competidores
+- Estrategia de pricing detectada (premium, low-cost, freemium, basada en valor)
+- Oportunidades de monetización no explotadas (comparando con lo que hacen los competidores)
+Si los precios no son visibles en el scraping, indícalo claramente y analiza lo que SÍ puedes inferir.
+Responde con JSON válido: { "financial_analysis": { ... } }`,
   },
   {
     id: 'consumer_profile',
     keys: ['consumer_profile'],
     maxTokens: 2000,
-    prompt: `Eres un experto en investigación de consumidor y buyer personas. Con base en los datos del sitio web del cliente y sus competidores, genera ÚNICAMENTE la sección "consumer_profile".
-
-Debe incluir:
-- "primary_audience": Buyer persona principal con nombre ficticio, demografía (edad, género, ubicación, NSE), psicografía (valores, intereses, estilo de vida), comportamiento digital, pain points, motivadores de compra, barreras/objeciones, frase que lo define
-- "secondary_audience": Buyer persona secundario (mismo formato, más breve)
-- "demographics": Datos demográficos inferidos del contenido
-- "psychographics": Datos psicográficos inferidos
-- "pain_points": Pain points principales (array, basados en lo que el sitio promete resolver)
-- "buying_triggers": Motivadores de compra (array)
-- "purchase_journey": Journey de compra estimado: descubrimiento, consideración, decisión, post-compra
-
-IMPORTANTE: Infiere los buyer personas del CONTENIDO del sitio (a quién le hablan, qué lenguaje usan, qué problemas mencionan).
-
-Responde ÚNICAMENTE con JSON válido: { "consumer_profile": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "consumer_profile". Debe incluir:
+- Buyer persona principal: nombre ficticio, demografía, psicografía, comportamiento digital, pain points, motivadores de compra, barreras/objeciones, frase que lo define
+- Buyer persona secundario (mismo formato pero más breve)
+- Journey de compra: Descubrimiento (cómo llegan), Consideración (qué evalúan), Decisión (qué los convence), Post-compra (qué esperan después)
+Infiere los buyer personas del CONTENIDO del sitio (a quién le hablan, qué lenguaje usan, qué problemas mencionan).
+Responde con JSON válido: { "consumer_profile": { ... } }`,
   },
   {
     id: 'competitive_analysis',
