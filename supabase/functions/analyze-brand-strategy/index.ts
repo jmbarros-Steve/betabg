@@ -121,125 +121,51 @@ Responde con JSON válido: { "seo_audit": { ... } }`,
     id: 'keywords',
     keys: ['keywords'],
     maxTokens: 2500,
-    prompt: `Eres un experto en keyword research y estrategia de contenido. Tienes los datos de scraping del sitio del cliente Y de sus competidores. Genera ÚNICAMENTE la sección "keywords".
-
-Debe incluir:
-
-a) "primary": Array de 5-6 keywords principales. Cada una con:
-   - "keyword": la keyword exacta
-   - "search_intent": "transaccional", "informacional", "comercial" o "navegacional"
-   - "rationale": por qué es estratégica (qué competidores la usan, dónde aparece)
-   - "estimated_difficulty": "alta", "media" o "baja"
-
-b) "long_tail": Array de 5 keywords long-tail. Cada una con:
-   - "keyword": la keyword exacta
-   - "search_intent": tipo de intención
-   - "rationale": por qué es oportunidad (gaps que competidores NO cubren)
-   - "buyer_persona_match": a cuál buyer persona apunta
-
-c) "negative_keywords": Array de 3 keywords negativas. Cada una con:
-   - "keyword": la keyword a excluir
-   - "reason": por qué excluirla
-
-d) "competitor_keywords": Keywords que los competidores usan en sus títulos y metas (array)
-
-e) "strategy": Hoja de ruta por fases:
-   - "phase_1": Quick wins (mes 1-2) — keywords, acciones, KPIs
-   - "phase_2": Growth (mes 3-4) — keywords, acciones, KPIs
-   - "phase_3": Dominance (mes 5-6) — keywords, acciones, KPIs
-
-f) "recommended_strategy": Resumen de la estrategia basada en análisis competitivo
-
-CRÍTICO: Las keywords DEBEN estar basadas en análisis real del contenido de los competidores.
-
-Responde ÚNICAMENTE con JSON válido: { "keywords": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "keywords". Debe incluir:
+a) "primary_keywords": 5-6 keywords principales. Para cada una: keyword, search_intent (transaccional/informacional/comercial/navegacional), rationale (por qué es estratégica, qué competidores la usan), estimated_difficulty (alta/media/baja), priority (invertir inmediatamente o monitorear)
+b) "longtail_keywords": 5 keywords long-tail de baja competencia. Para cada una: keyword, search_intent, rationale (gaps que los competidores NO cubren), buyer_persona_match
+c) "negative_keywords": 3 keywords negativas para ads. Para cada una: keyword, reason
+d) "keyword_strategy_roadmap": Hoja de ruta por fases:
+   - phase_1 (mes 1-2): Quick wins — keywords fáciles con acciones rápidas
+   - phase_2 (mes 3-4): Growth — keywords de dificultad media
+   - phase_3 (mes 5-6): Dominance — keywords competitivas a largo plazo
+   Para cada fase: keywords objetivo, acciones concretas, KPIs
+Las keywords DEBEN estar basadas en el análisis real del contenido de los competidores.
+Responde con JSON válido: { "keywords": { ... } }`,
   },
   {
     id: 'meta_ads_strategy',
     keys: ['meta_ads_strategy'],
     maxTokens: 2500,
-    prompt: `Eres un experto en Meta Ads (Facebook + Instagram) con experiencia en performance marketing. Con los datos del cliente y sus competidores, genera ÚNICAMENTE la sección "meta_ads_strategy".
-
-Debe incluir:
-
-a) "funnel_structure": Estructura de campañas TOF/MOF/BOF detallada
-
-b) "audience_targeting": {
-   "cold": Segmentación para audiencias frías (intereses, demografía, lookalikes),
-   "warm": Segmentación para retargeting (visitantes, engagement),
-   "hot": Segmentación para conversión (remarketing, carrito abandonado)
-}
-
-c) "copy_hooks": Array de 3 hooks creativos ESPECÍFICOS para el cliente (no genéricos), cada uno con formato recomendado
-
-d) "primary_texts": Array de 2 textos principales de ejemplo para anuncios
-
-e) "cta_recommendations": Array de 3 CTAs recomendados con justificación
-
-f) "hooks": Array de 3 hooks de video de 3 segundos
-
-g) "budget_distribution": Distribución recomendada por funnel (ej: 60% TOF, 25% MOF, 15% BOF)
-
-h) "kpis": KPIs objetivo por etapa de funnel
-
-IMPORTANTE: Hooks y creativos ESPECÍFICOS al negocio del cliente, basados en su propuesta de valor y diferenciadores.
-
-Responde ÚNICAMENTE con JSON válido: { "meta_ads_strategy": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE la sección "meta_ads_strategy". Debe incluir:
+a) Objetivos de campaña recomendados por etapa de funnel
+b) Estructura de campañas: TOF (objetivo, audiencia, contenido), MOF (objetivo, retargeting, contenido), BOF (objetivo, audiencia, contenido)
+c) Segmentación de audiencias: fría (intereses, demografía, lookalikes), tibia (visitantes, engagement), caliente (remarketing, carrito abandonado)
+d) Creativos recomendados: 3 hooks creativos ESPECÍFICOS para el cliente (no genéricos), formato para cada uno (video, carrusel, imagen), copy de ejemplo, CTA recomendado
+e) Budget y distribución recomendada por funnel (ej: 60% TOF, 25% MOF, 15% BOF)
+f) KPIs objetivo por etapa de funnel
+Los hooks y creativos deben ser ESPECÍFICOS al negocio del cliente basados en su propuesta de valor.
+Responde con JSON válido: { "meta_ads_strategy": { ... } }`,
   },
   {
     id: 'google_ads_and_creative',
     keys: ['google_ads_strategy', 'ads_library_analysis'],
     maxTokens: 3500,
-    prompt: `Eres un experto en Google Ads y estrategia creativa publicitaria. Con los datos del sitio del cliente y sus competidores, genera ÚNICAMENTE estas 2 secciones:
-
-1. "google_ads_strategy": {
-   "campaign_structure": Tipos de campaña recomendados (Search, Display, YouTube, PMax) con estructura,
-   "headlines": Array de 5 headlines de máximo 30 caracteres,
-   "descriptions": Array de 2 descripciones de máximo 90 caracteres,
-   "extensions": Extensiones de anuncio recomendadas (sitelinks, callouts, snippets),
-   "bidding_strategy": Estrategia de bidding con justificación,
-   "budget_distribution": Budget recomendado y distribución por tipo,
-   "landing_recommendations": Recomendaciones para landing pages basadas en el sitio actual
-}
-
-2. "ads_library_analysis": {
-   "competitor_strategies": Array — para CADA competidor con datos:
-   {
-     "name": Nombre del competidor,
-     "messaging_approach": Tipo de mensajes que usan basado en su sitio,
-     "value_proposition_promoted": Propuesta de valor que promueven,
-     "probable_formats": Formatos creativos probables (video, carrusel, imagen),
-     "cta_used": CTAs encontrados en su sitio,
-     "sales_angles": Ángulos de venta detectados en su contenido,
-     "creative_strength": "alta", "media" o "baja"
-   },
-   "market_patterns": {
-     "dominant_content_type": Qué tipo de contenido/ofertas dominan,
-     "probable_formats": Formatos más utilizados,
-     "common_messages": Mensajes más utilizados por los competidores
-   },
-   "creative_concepts": Array de 5 conceptos creativos — para CADA uno:
-   {
-     "concept": nombre del concepto,
-     "hook": gancho principal (1 frase),
-     "format": formato recomendado (video, carrusel, imagen, UGC),
-     "copy": texto principal del anuncio,
-     "cta": llamado a acción,
-     "rationale": por qué funcionaría basado en análisis competitivo,
-     "platform": dónde usarlo (Meta, Google, ambos)
-   },
-   "winning_patterns": Array de 3 patrones ganadores del mercado,
-   "hook_ideas": Array de 4 ideas de hook/gancho,
-   "creative_recommendations": Array de 3 recomendaciones creativas diferenciadas,
-   "creative_calendar": Calendario creativo mensual (semana 1-2, semana 3-4, testing)
-}
-
-CRÍTICO: ads_library_analysis NO PUEDE estar vacía. Analiza los sitios de los competidores para inferir su estrategia publicitaria.
-
-Responde ÚNICAMENTE con JSON válido: { "google_ads_strategy": { ... }, "ads_library_analysis": { ... } }
-Sin markdown, sin backticks, sin texto adicional.`,
+    prompt: `Genera ÚNICAMENTE estas 2 secciones en un solo JSON:
+1. "google_ads_strategy": Estrategia de Google Ads con:
+   - Tipos de campaña recomendados (Search, Display, YouTube, Performance Max)
+   - Copy de anuncios: 3 variantes de Search Ads con headlines (máx 30 chars) y descriptions (máx 90 chars)
+   - Extensiones recomendadas (sitelinks, callouts, structured snippets)
+   - Estrategia de bidding con justificación
+   - Budget recomendado por tipo de campaña
+   - Landing page recommendations
+2. "ads_library_analysis": Análisis de estrategia publicitaria competitiva con:
+   a) Para CADA competidor: tipo de mensajes que usan, propuesta de valor que promueven, CTAs detectados en su sitio, ángulos de venta, fortaleza creativa estimada (alta/media/baja)
+   b) Patrones creativos del mercado: qué contenido domina, mensajes comunes, formatos probables
+   c) 5 conceptos creativos para el cliente. Para CADA uno: concept, hook, format (video/carrusel/imagen/UGC), primary_copy, cta, why_it_works, platform (Meta/Google/ambos)
+   d) Calendario creativo mensual: semana 1-2 y semana 3-4 qué lanzar, qué variables testear
+CRÍTICO: ads_library_analysis NO PUEDE estar vacía.
+Responde con JSON válido: { "google_ads_strategy": { ... }, "ads_library_analysis": { ... } }`,
   },
 ];
 
