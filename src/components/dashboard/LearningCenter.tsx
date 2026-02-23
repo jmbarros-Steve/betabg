@@ -14,6 +14,7 @@ import {
   Brain, Youtube, FileText, Globe, Type, Upload, Loader2,
   Check, X, ChevronDown, ChevronUp, Save, Plus, ListPlus,
 } from 'lucide-react';
+import { LearningQueue } from './LearningQueue';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -472,6 +473,9 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
                 ))}
               </div>
             )}
+
+            {/* ── Learning Queue section ── */}
+            <LearningQueue />
           </>
         )}
       </CardContent>
