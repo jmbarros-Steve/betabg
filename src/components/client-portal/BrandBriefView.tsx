@@ -149,46 +149,13 @@ function ExpandableAccionables({ blocks }: { blocks: string[] }) {
   );
 }
 
-// Keyword Strategy Timeline component — renders Fase 1/2/3 as a visual timeline
-function KeywordStrategyTimeline({ strategy }: { strategy: string }) {
-  // Parse phases from the strategy text
-  const phases: { num: string; label: string; content: string }[] = [];
-
-  // Split by "Fase X" pattern
-  const faseRegex = /Fase\s*(\d+)\s*[:\-–(]?\s*([^:.\n]*)?[:.]/gi;
-  const parts = strategy.split(/(?=Fase\s*\d)/i);
-
-  for (const part of parts) {
-    if (!part.trim()) continue;
-    const header = part.match(/^Fase\s*(\d+)\s*(?:\(([^)]+)\))?[:\s-]*/i);
-    if (header) {
-      const num = header[1];
-      const labelInParens = header[2] || '';
-      const rest = part.slice(header[0].length).trim();
-      // Extract time label from content if not in parens
-      const timeMatch = rest.match(/^\(?(\d+-\d+\s*d[íi]as?)\)?[:\s-]*/i);
-      const timeLabel = labelInParens || (timeMatch ? timeMatch[1] : `Fase ${num}`);
-      const content = timeMatch ? rest.slice(timeMatch[0].length).trim() : rest;
-      phases.push({ num, label: timeLabel, content });
-    }
-  }
-
-  // Fallback: if no phases parsed, show as plain text
-  if (phases.length === 0) {
-    return (
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Estrategia de Keywords Completa
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm leading-relaxed">{strategy}</p>
-        </CardContent>
-      </Card>
-    );
-  }
+// Keyword Strategy Roadmap component — renders structured phase data as visual cards
+function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
+  // Accept either the raw roadmap object or a stringified version
+  if (!roadmap || typeof roadmap !== 'object') return null;
+  
+  const phaseKeys = Object.keys(roadmap).filter(k => k.startsWith('phase_') || k.startsWith('fase_')).sort();
+  if (phaseKeys.length === 0) return null;
 
   const phaseConfig = [
     { bg: 'bg-blue-500', light: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-400', text: 'text-blue-700 dark:text-blue-300', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', icon: <Zap className="h-4 w-4" /> },
@@ -198,51 +165,82 @@ function KeywordStrategyTimeline({ strategy }: { strategy: string }) {
 
   return (
     <Card className="border-primary/20 overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-primary-foreground" />
         <h3 className="text-sm font-bold text-primary-foreground">Estrategia de Keywords — Hoja de Ruta por Fases</h3>
       </div>
-
       <CardContent className="p-4">
-        {/* Timeline */}
         <div className="relative">
-          {/* Connecting line */}
-          {phases.length > 1 && (
+          {phaseKeys.length > 1 && (
             <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gradient-to-b from-blue-400 via-violet-400 to-emerald-500 opacity-40" />
           )}
-
           <div className="space-y-4">
-            {phases.map((phase, i) => {
+            {phaseKeys.map((key, i) => {
+              const phase = roadmap[key];
+              if (!phase || typeof phase !== 'object') return null;
               const cfg = phaseConfig[i % phaseConfig.length];
-              // Parse bullet points from content
-              const bullets = phase.content.split(/(?:\.\s+(?=[A-ZÁÉÍÓÚ])|(?<=\.)\s*\n)/).filter(b => b.trim().length > 10);
+              const phaseNum = i + 1;
+              const focus = phase.focus || '';
+              const timeline = phase.timeline || '';
+              const keywords: string[] = Array.isArray(phase.keywords) ? phase.keywords : [];
+              const kpis: string[] = Array.isArray(phase.kpis) ? phase.kpis : [];
+              const actions: string[] = Array.isArray(phase.acciones_concretas) ? phase.acciones_concretas : [];
 
               return (
-                <div key={i} className="relative flex gap-3">
-                  {/* Circle indicator */}
+                <div key={key} className="relative flex gap-3">
                   <div className={`relative z-10 flex-shrink-0 h-10 w-10 rounded-full ${cfg.bg} flex items-center justify-center text-white shadow-md`}>
                     {cfg.icon}
                   </div>
-
-                  {/* Content */}
-                  <div className={`flex-1 ${cfg.light} rounded-xl border ${cfg.border} p-3 min-w-0`}>
+                  <div className={`flex-1 ${cfg.light} rounded-xl border ${cfg.border} p-4 min-w-0`}>
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${cfg.badge}`}>
-                        FASE {phase.num}
+                        FASE {phaseNum}
                       </span>
-                      <span className={`text-xs font-semibold ${cfg.text}`}>{phase.label}</span>
+                      {focus && <span className={`text-xs font-semibold ${cfg.text}`}>{focus}</span>}
+                      {timeline && <span className="text-[10px] text-muted-foreground ml-auto">📅 {timeline}</span>}
                     </div>
-                    <div className="space-y-1.5">
-                      {bullets.length > 1 ? bullets.map((b, bi) => (
-                        <div key={bi} className="flex gap-2 text-xs text-foreground leading-relaxed">
-                          <ArrowRight className={`h-3 w-3 flex-shrink-0 mt-0.5 ${cfg.text}`} />
-                          <span>{b.trim().replace(/^[.\s]+/, '')}</span>
+
+                    {/* Keywords as badges */}
+                    {keywords.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Keywords</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {keywords.map((kw, ki) => (
+                            <Badge key={ki} variant="secondary" className="text-xs">{kw}</Badge>
+                          ))}
                         </div>
-                      )) : (
-                        <p className="text-xs text-foreground leading-relaxed">{phase.content}</p>
-                      )}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* KPIs as checklist */}
+                    {kpis.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">KPIs</p>
+                        <ul className="space-y-1">
+                          {kpis.map((kpi, ki) => (
+                            <li key={ki} className="flex items-start gap-2 text-xs">
+                              <CheckCircle2 className={`h-3.5 w-3.5 flex-shrink-0 mt-0.5 ${cfg.text}`} />
+                              <span>{kpi}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Actions as numbered list */}
+                    {actions.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Acciones Concretas</p>
+                        <ol className="space-y-1.5">
+                          {actions.map((action, ai) => (
+                            <li key={ai} className="flex gap-2 text-xs leading-relaxed">
+                              <span className={`font-bold flex-shrink-0 ${cfg.text}`}>{ai + 1}.</span>
+                              <span>{action}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -251,6 +249,69 @@ function KeywordStrategyTimeline({ strategy }: { strategy: string }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Creative Calendar Timeline component — renders week blocks visually
+function CreativeCalendarTimeline({ calendar }: { calendar: any }) {
+  if (!calendar || typeof calendar !== 'object') return null;
+  const weekKeys = Object.keys(calendar).sort();
+  if (weekKeys.length === 0) return null;
+
+  const weekColors = [
+    { bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-300', dot: 'bg-amber-500' },
+    { bg: 'bg-sky-50 dark:bg-sky-950/30', border: 'border-sky-300', dot: 'bg-sky-500' },
+    { bg: 'bg-rose-50 dark:bg-rose-950/30', border: 'border-rose-300', dot: 'bg-rose-500' },
+    { bg: 'bg-teal-50 dark:bg-teal-950/30', border: 'border-teal-300', dot: 'bg-teal-500' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-2">📅 Calendario Creativo</p>
+      <div className="relative">
+        {weekKeys.length > 1 && (
+          <div className="absolute left-3 top-4 bottom-4 w-0.5 bg-border" />
+        )}
+        <div className="space-y-3">
+          {weekKeys.map((key, i) => {
+            const week = calendar[key];
+            const cfg = weekColors[i % weekColors.length];
+            const label = key.replace(/_/g, ' ').replace(/week/i, 'Semana');
+            const launch = typeof week === 'string' ? week : week?.launch;
+            const testVars: string[] = typeof week === 'object' && Array.isArray(week?.test_variables) ? week.test_variables : [];
+
+            return (
+              <div key={key} className="relative flex gap-3 items-start pl-1">
+                <div className={`relative z-10 flex-shrink-0 h-6 w-6 rounded-full ${cfg.dot} flex items-center justify-center`}>
+                  <span className="text-[10px] font-bold text-white">{i + 1}</span>
+                </div>
+                <div className={`flex-1 ${cfg.bg} border ${cfg.border} rounded-lg p-3`}>
+                  <p className="text-xs font-bold text-foreground mb-1 capitalize">{label}</p>
+                  {launch && (
+                    <div className="mb-2">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Lanzar:</span>
+                      <p className="text-xs text-foreground">{launch}</p>
+                    </div>
+                  )}
+                  {testVars.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Variables a testear:</span>
+                      <ul className="mt-1 space-y-0.5">
+                        {testVars.map((tv, ti) => (
+                          <li key={ti} className="text-xs flex items-start gap-1.5">
+                            <span className="text-muted-foreground">•</span> {tv}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -769,15 +830,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (!Array.isArray(kw.long_tail) && Array.isArray(kw.longtail_keywords)) {
         kw.long_tail = kw.longtail_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
       }
-      // negative_keywords: object[] → string[]
+      // negative_keywords: preserve {keyword, reason} objects — don't flatten to strings
       if (Array.isArray(kw.negative_keywords)) {
+        kw.negative_keywords_rich = kw.negative_keywords.map((k: any) => {
+          if (typeof k === 'string') return { keyword: k, reason: '' };
+          return { keyword: k?.keyword || s(k), reason: k?.reason || '' };
+        });
         kw.negative_keywords = kw.negative_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
       }
       // competitor_keywords: object[] → string[]
       if (Array.isArray(kw.competitor_keywords)) {
         kw.competitor_keywords = kw.competitor_keywords.map((k: any) => typeof k === 'string' ? k : (k?.keyword || s(k)));
       }
-      // recommended_strategy from keyword_strategy_roadmap (object with fase_1/2/3)
+      // Keep raw roadmap object for structured rendering
+      // recommended_strategy from keyword_strategy_roadmap (object with phase_1/2/3) — text fallback for PDF
       if (!kw.recommended_strategy && kw.keyword_strategy_roadmap) {
         const road = kw.keyword_strategy_roadmap;
         if (typeof road === 'string') {
@@ -785,22 +851,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         } else if (typeof road === 'object') {
           const phases: string[] = [];
           for (const [key, val] of Object.entries(road)) {
-            const label = key.replace(/_/g, ' ').replace(/fase/i, 'Fase');
+            const label = key.replace(/_/g, ' ').replace(/phase/i, 'Fase').replace(/fase/i, 'Fase');
             phases.push(`${label}: ${typeof val === 'string' ? val : s(val)}`);
           }
           kw.recommended_strategy = phases.join('. ');
         }
-      }
-      // Also create a strategy field for KeywordStrategyTimeline if roadmap has phases
-      if (!kw.strategy && kw.keyword_strategy_roadmap && typeof kw.keyword_strategy_roadmap === 'object') {
-        const road = kw.keyword_strategy_roadmap;
-        const phaseTexts: string[] = [];
-        const phaseMap: Record<string, string> = { fase_1: 'Fase 1 (0-30 días)', fase_2: 'Fase 2 (30-60 días)', fase_3: 'Fase 3 (60-90 días)' };
-        for (const [key, val] of Object.entries(road)) {
-          const label = phaseMap[key] || key.replace(/_/g, ' ').replace(/fase/i, 'Fase');
-          phaseTexts.push(`${label}: ${typeof val === 'string' ? val : s(val)}`);
-        }
-        if (phaseTexts.length > 0) kw.strategy = phaseTexts.join('\n\n');
       }
     }
 
@@ -857,33 +912,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           ads.market_patterns.dominant_content_type = ads.market_patterns.dominant_content;
         }
       }
-      // creative_calendar: object → string
-      if (ads.creative_calendar && typeof ads.creative_calendar === 'object') {
-        const cal = ads.creative_calendar;
-        const calParts: string[] = [];
-        for (const [weekKey, weekVal] of Object.entries(cal)) {
-          const label = weekKey.replace(/_/g, ' ').replace(/week/i, 'Semana');
-          if (typeof weekVal === 'string') {
-            calParts.push(`${label}: ${weekVal}`);
-          } else if (typeof weekVal === 'object' && weekVal !== null) {
-            const wv = weekVal as any;
-            const details: string[] = [];
-            if (wv.launch) details.push(`Lanzar: ${wv.launch}`);
-            if (Array.isArray(wv.test_variables)) details.push(`Test: ${wv.test_variables.join(', ')}`);
-            calParts.push(`${label}: ${details.join(' | ')}`);
-          }
-        }
-        ads.creative_calendar = calParts.join(' ── ');
-      }
-      // winning_patterns from market_patterns (generate if missing)
-      if (!Array.isArray(ads.winning_patterns) && ads.market_patterns) {
-        const mp = ads.market_patterns;
-        const patterns: string[] = [];
-        if (mp.dominant_content_type || mp.dominant_content) patterns.push(`Contenido dominante: ${mp.dominant_content_type || mp.dominant_content}`);
-        if (mp.probable_formats) patterns.push(`Formatos más usados: ${mp.probable_formats}`);
-        if (mp.common_messages) patterns.push(`Mensajes comunes: ${mp.common_messages}`);
-        if (patterns.length > 0) ads.winning_patterns = patterns;
-      }
+      // creative_calendar: keep raw object for structured rendering, don't flatten to string
+      // (CreativeCalendarTimeline component handles the rendering)
+      // No transformation needed — keep ads.creative_calendar as-is
+      // winning_patterns: only keep if they came from the backend (not auto-generated from market_patterns)
+      // Don't auto-generate — it duplicates market_patterns display
     }
 
     // ── META ADS STRATEGY: creativos_recomendados → hooks[], primary_texts[] for PDF ──
@@ -3123,32 +3156,26 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     </CardContent>
                   </Card>
                 )}
-                {Array.isArray(research.keywords?.negative_keywords) && research.keywords.negative_keywords.length > 0 && (
+                {Array.isArray(research.keywords?.negative_keywords_rich) && research.keywords.negative_keywords_rich.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">🚫 Keywords Negativas</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap gap-1.5">
-                        {research.keywords.negative_keywords.map((kw: any, i: number) => (
-                          <Badge key={i} variant="outline" className="text-xs text-muted-foreground">{kw == null ? '' : String(kw)}</Badge>
+                      <div className="space-y-2">
+                        {research.keywords.negative_keywords_rich.map((kw: any, i: number) => (
+                          <div key={i} className="flex items-start gap-2 text-xs">
+                            <Badge variant="outline" className="text-xs text-muted-foreground flex-shrink-0">{kw?.keyword || String(kw)}</Badge>
+                            {kw?.reason && <span className="text-muted-foreground italic">— {kw.reason}</span>}
+                          </div>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
                 )}
-                {research.keywords?.recommended_strategy && (
-                  <Card className="bg-primary/5 border-primary/20">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Estrategia Recomendada</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm leading-relaxed">{String(research.keywords.recommended_strategy)}</p>
-                    </CardContent>
-                  </Card>
-                )}
-                {research.keywords?.strategy && (
-                  <KeywordStrategyTimeline strategy={String(research.keywords.strategy)} />
+                {/* Keyword Strategy Roadmap — structured phases */}
+                {research.keywords?.keyword_strategy_roadmap && typeof research.keywords.keyword_strategy_roadmap === 'object' && (
+                  <KeywordStrategyRoadmap roadmap={research.keywords.keyword_strategy_roadmap} />
                 )}
 
                 {/* Estrategia por Competidor */}
@@ -3345,6 +3372,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs font-bold">{i + 1}</Badge>
                             <h4 className="font-bold text-base">{comp.name || comp.url}</h4>
+                            {comp.nivel_amenaza && (
+                              <Badge className={`text-xs ${
+                                comp.nivel_amenaza === 'alto' ? 'bg-destructive text-destructive-foreground' :
+                                comp.nivel_amenaza === 'medio' ? 'bg-warning text-foreground' :
+                                'bg-muted text-muted-foreground'
+                              }`}>
+                                {comp.nivel_amenaza === 'alto' ? '🔴' : comp.nivel_amenaza === 'medio' ? '🟡' : '🟢'} Amenaza {comp.nivel_amenaza}
+                              </Badge>
+                            )}
                             {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
                           </div>
                           {comp.positioning && <p className="text-xs text-muted-foreground italic mt-1">"{comp.positioning}"</p>}
@@ -3528,11 +3564,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         </div>
                       )}
 
-                      {/* Creative Calendar */}
-                      {research.ads_library_analysis.creative_calendar && (
+                      {/* Creative Calendar — structured timeline */}
+                      {research.ads_library_analysis.creative_calendar && typeof research.ads_library_analysis.creative_calendar === 'object' ? (
+                        <CreativeCalendarTimeline calendar={research.ads_library_analysis.creative_calendar} />
+                      ) : research.ads_library_analysis.creative_calendar && (
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs font-semibold text-primary mb-1">📅 Calendario Creativo</p>
-                          <p className="text-sm">{research.ads_library_analysis.creative_calendar}</p>
+                          <p className="text-sm">{String(research.ads_library_analysis.creative_calendar)}</p>
                         </div>
                       )}
                     </CardContent>
