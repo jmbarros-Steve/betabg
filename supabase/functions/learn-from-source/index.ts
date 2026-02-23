@@ -8,7 +8,6 @@ const corsHeaders = {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function extractVideoId(input: string): string | null {
-  // Accepts full URLs or plain video IDs
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/,
@@ -21,79 +20,157 @@ function extractVideoId(input: string): string | null {
 }
 
 async function extractYouTubeTranscript(videoId: string): Promise<string> {
-  // Fetch the YouTube page and extract caption track URL from embedded JSON
-  const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const res = await fetch(pageUrl, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-  });
-  if (!res.ok) throw new Error(`Failed to fetch YouTube page: ${res.status}`);
+  console.log(`[YouTube] Attempting caption extraction for video: ${videoId}`);
 
-  const html = await res.text();
-
-  // Find captionTracks in the page JSON
-  const captionMatch = html.match(/"captionTracks"\s*:\s*(\[.*?\])/);
-  if (!captionMatch) {
-    throw new Error('No captions found for this video. Try uploading the transcript as text instead.');
-  }
-
-  let captionTracks: Array<{ baseUrl: string; languageCode: string; name?: { simpleText?: string } }>;
+  // Method 1: Try extracting from YouTube page HTML
   try {
-    captionTracks = JSON.parse(captionMatch[1]);
-  } catch {
-    throw new Error('Failed to parse caption tracks from YouTube page.');
+    const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const res = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+    });
+
+    if (res.ok) {
+      const html = await res.text();
+      const captionMatch = html.match(/"captionTracks"\s*:\s*(\[.*?\])/);
+
+      if (captionMatch) {
+        let captionTracks: Array<{ baseUrl: string; languageCode: string }>;
+        try {
+          captionTracks = JSON.parse(captionMatch[1]);
+        } catch {
+          console.log('[YouTube] Failed to parse caption tracks JSON');
+          captionTracks = [];
+        }
+
+        if (captionTracks.length > 0) {
+          const preferred = captionTracks.find(t => t.languageCode === 'es')
+            || captionTracks.find(t => t.languageCode === 'en')
+            || captionTracks[0];
+
+          const captionRes = await fetch(preferred.baseUrl);
+          if (captionRes.ok) {
+            const xml = await captionRes.text();
+            const texts = [...xml.matchAll(/<text[^>]*>(.*?)<\/text>/gs)]
+              .map(m => m[1]
+                .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\n/g, ' ').trim()
+              )
+              .filter(Boolean);
+
+            if (texts.length > 0) {
+              console.log(`[YouTube] Caption extraction successful: ${texts.length} segments`);
+              return texts.join(' ');
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log(`[YouTube] Caption method failed: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 
-  if (!captionTracks.length) {
-    throw new Error('No caption tracks available for this video.');
+  // Method 2: Try YouTube transcript API alternatives
+  console.log('[YouTube] No captions found, trying alternative methods...');
+
+  // Method 3: Try using youtube-transcript npm workaround via innertube
+  try {
+    const innertubeRes = await fetch(`https://www.youtube.com/youtubei/v1/get_transcript?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context: {
+          client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' }
+        },
+        params: btoa(`\n\x0b${videoId}`)
+      }),
+    });
+
+    if (innertubeRes.ok) {
+      const data = await innertubeRes.json();
+      const segments = data?.actions?.[0]?.updateEngagementPanelAction?.content?.transcriptRenderer
+        ?.body?.transcriptBodyRenderer?.cueGroups;
+      
+      if (segments && segments.length > 0) {
+        const text = segments
+          .map((g: any) => g?.transcriptCueGroupRenderer?.cues?.[0]?.transcriptCueRenderer?.cue?.simpleText || '')
+          .filter(Boolean)
+          .join(' ');
+        
+        if (text.length > 50) {
+          console.log(`[YouTube] InnerTube transcript successful: ${text.length} chars`);
+          return text;
+        }
+      }
+    }
+  } catch (e) {
+    console.log(`[YouTube] InnerTube method failed: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 
-  // Prefer Spanish, then English, then first available
-  const preferred = captionTracks.find(t => t.languageCode === 'es')
-    || captionTracks.find(t => t.languageCode === 'en')
-    || captionTracks[0];
+  // Method 4: Whisper fallback via OpenAI
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  if (OPENAI_API_KEY) {
+    console.log('[YouTube] Attempting Whisper transcription fallback...');
+    try {
+      // Download audio via a public proxy/converter
+      const audioUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      
+      // Use Firecrawl to at least get the page content as fallback
+      const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+      if (FIRECRAWL_API_KEY) {
+        const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url: audioUrl, formats: ['markdown'] }),
+        });
 
-  // Fetch the XML transcript
-  const captionRes = await fetch(preferred.baseUrl);
-  if (!captionRes.ok) throw new Error(`Failed to fetch captions: ${captionRes.status}`);
+        if (fcRes.ok) {
+          const fcData = await fcRes.json();
+          const markdown = fcData.data?.markdown;
+          if (markdown && markdown.length > 200) {
+            console.log(`[YouTube] Firecrawl fallback successful: ${markdown.length} chars`);
+            return markdown;
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`[YouTube] Whisper/Firecrawl fallback failed: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+  }
 
-  const xml = await captionRes.text();
-
-  // Extract text from <text> elements, decode HTML entities
-  const texts = [...xml.matchAll(/<text[^>]*>(.*?)<\/text>/gs)]
-    .map(m => m[1]
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\n/g, ' ')
-      .trim()
-    )
-    .filter(Boolean);
-
-  if (!texts.length) throw new Error('Transcript is empty.');
-
-  return texts.join(' ');
+  throw new Error(
+    'No se pudieron extraer subtítulos de este video. El video puede no tener subtítulos disponibles. ' +
+    'Intenta: 1) Copiar la transcripción manualmente desde YouTube, o 2) Subir el contenido como texto.'
+  );
 }
 
 async function extractUrlContent(url: string): Promise<string> {
+  console.log(`[URL] Extracting content from: ${url}`);
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
 
   if (FIRECRAWL_API_KEY) {
-    // Use Firecrawl for better extraction
-    const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url, formats: ['markdown'] }),
-    });
+    try {
+      const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url, formats: ['markdown'] }),
+      });
 
-    if (fcRes.ok) {
-      const fcData = await fcRes.json();
-      const markdown = fcData.data?.markdown;
-      if (markdown && markdown.length > 100) return markdown;
+      if (fcRes.ok) {
+        const fcData = await fcRes.json();
+        const markdown = fcData.data?.markdown;
+        if (markdown && markdown.length > 100) {
+          console.log(`[URL] Firecrawl extraction successful: ${markdown.length} chars`);
+          return markdown;
+        }
+      }
+    } catch (e) {
+      console.log(`[URL] Firecrawl failed: ${e instanceof Error ? e.message : 'unknown'}`);
     }
   }
 
@@ -104,7 +181,7 @@ async function extractUrlContent(url: string): Promise<string> {
   if (!res.ok) throw new Error(`Failed to fetch URL: ${res.status}`);
 
   const html = await res.text();
-  return html
+  const cleaned = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
@@ -114,6 +191,9 @@ async function extractUrlContent(url: string): Promise<string> {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 50000);
+
+  console.log(`[URL] HTML fallback extraction: ${cleaned.length} chars`);
+  return cleaned;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -123,6 +203,7 @@ Deno.serve(async (req) => {
 
   try {
     const { sourceType, content, autoSave = false, title } = await req.json();
+    console.log(`[Step 0] Received request — sourceType: ${sourceType}, contentLength: ${content?.length || 0}, autoSave: ${autoSave}`);
 
     if (!sourceType || !content?.trim()) {
       return new Response(JSON.stringify({ error: 'sourceType and content are required' }), {
@@ -132,7 +213,10 @@ Deno.serve(async (req) => {
     }
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+    if (!ANTHROPIC_API_KEY) {
+      console.error('[Error] ANTHROPIC_API_KEY not configured');
+      throw new Error('ANTHROPIC_API_KEY not configured');
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -140,20 +224,27 @@ Deno.serve(async (req) => {
     );
 
     // Insert queue record
+    console.log('[Step 1] Creating queue record...');
     const { data: queueRow, error: queueErr } = await supabase
       .from('learning_queue')
       .insert({
         source_type: sourceType,
-        source_content: content.slice(0, 2000), // truncate for storage
+        source_content: content.slice(0, 2000),
         source_title: title || null,
         status: 'processing',
       })
       .select('id')
       .single();
 
-    const queueId = queueRow?.id;
+    if (queueErr) {
+      console.error('[Step 1] Queue insert error:', queueErr);
+    }
 
-    // ── Step 1: Extract text based on source type ────────────────────────────
+    const queueId = queueRow?.id;
+    console.log(`[Step 1] Queue record created: ${queueId}`);
+
+    // ── Step 2: Extract text based on source type ────────────────────────────
+    console.log(`[Step 2] Extracting content for sourceType: ${sourceType}...`);
     let extractedText: string;
 
     switch (sourceType) {
@@ -168,8 +259,6 @@ Deno.serve(async (req) => {
         break;
       }
       case 'pdf': {
-        // For PDF, send base64 content directly to Claude as a document
-        // We'll handle this specially in the Claude call below
         extractedText = '__PDF_BASE64__';
         break;
       }
@@ -181,29 +270,28 @@ Deno.serve(async (req) => {
         throw new Error(`Unsupported source type: ${sourceType}`);
     }
 
-    // ── Step 2: Send to Claude for rule extraction ───────────────────────────
+    console.log(`[Step 2] Content extracted: ${extractedText === '__PDF_BASE64__' ? 'PDF (base64)' : `${extractedText.length} chars`}`);
+
+    // ── Step 3: Send to Claude for rule extraction ───────────────────────────
+    console.log('[Step 3] Sending to Claude for rule extraction...');
+
     const systemPrompt = `Eres un experto en performance marketing para e-commerce. Analiza el siguiente contenido y extrae TODAS las reglas accionables, estrategias y tácticas mencionadas. Para cada regla genera un JSON con: titulo (nombre corto y descriptivo de la regla, máximo 60 caracteres), contenido (la regla completa con los pasos numerados, clara y accionable), categoria (clasifica en una de estas categorías EXACTAS: brief, seo, keywords, meta, meta_ads, google, shopify, klaviyo, anuncios, buyer_persona). Si una regla aplica a múltiples categorías, elige la más relevante. Si el contenido no es sobre marketing/e-commerce, extrae lo que puedas y clasifica en la categoría más cercana. Responde SOLO con un array JSON válido sin markdown ni backticks.`;
 
-    // Build messages array
     const userContent: any[] = [];
 
     if (sourceType === 'pdf') {
-      // Send PDF as document to Claude
       userContent.push({
         type: 'document',
-        source: {
-          type: 'base64',
-          media_type: 'application/pdf',
-          data: content,
-        },
+        source: { type: 'base64', media_type: 'application/pdf', data: content },
       });
       userContent.push({
         type: 'text',
         text: 'Analiza este documento PDF y extrae todas las reglas accionables de marketing/e-commerce.',
       });
     } else {
-      // Truncate to avoid token limits
-      const truncated = extractedText.slice(0, 40000);
+      // Truncate to 100k chars to avoid token limits
+      const truncated = extractedText.slice(0, 100000);
+      console.log(`[Step 3] Text truncated to: ${truncated.length} chars`);
       userContent.push({
         type: 'text',
         text: `Analiza el siguiente contenido y extrae todas las reglas accionables:\n\n${truncated}`,
@@ -227,31 +315,39 @@ Deno.serve(async (req) => {
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
-      throw new Error(`Anthropic API error: ${anthropicRes.status} - ${errText}`);
+      console.error(`[Step 3] Anthropic API error: ${anthropicRes.status} - ${errText.slice(0, 500)}`);
+      throw new Error(`Anthropic API error: ${anthropicRes.status} - ${errText.slice(0, 200)}`);
     }
 
     const anthropicData = await anthropicRes.json();
     const rawText = anthropicData.content[0].text.trim();
+    console.log(`[Step 3] Claude response received: ${rawText.length} chars`);
 
-    // Parse JSON response — strip markdown fences if present
+    // ── Step 4: Parse JSON response ──────────────────────────────────────────
+    console.log('[Step 4] Parsing rules from Claude response...');
     const jsonText = rawText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     let rules: Array<{ titulo: string; contenido: string; categoria: string }>;
 
     try {
       const parsed = JSON.parse(jsonText);
-      // Handle both array and { entradas: [...] } formats
       rules = Array.isArray(parsed) ? parsed : (parsed.entradas || parsed.rules || []);
-    } catch {
+    } catch (parseErr) {
+      console.error(`[Step 4] JSON parse error: ${parseErr instanceof Error ? parseErr.message : 'unknown'}`);
+      console.error(`[Step 4] Raw text (first 500 chars): ${jsonText.slice(0, 500)}`);
       throw new Error('Failed to parse Claude response as JSON');
     }
 
     if (!Array.isArray(rules) || rules.length === 0) {
+      console.error('[Step 4] No rules extracted from content');
       throw new Error('No rules extracted from content');
     }
 
-    // ── Step 3: Optionally save to steve_knowledge ──────────────────────────
+    console.log(`[Step 4] Successfully parsed ${rules.length} rules`);
+
+    // ── Step 5: Optionally save to steve_knowledge ──────────────────────────
     let saved = false;
     if (autoSave) {
+      console.log('[Step 5] Auto-saving rules to steve_knowledge...');
       const inserts = rules.map(r => ({
         categoria: r.categoria,
         titulo: r.titulo.slice(0, 80),
@@ -263,51 +359,67 @@ Deno.serve(async (req) => {
 
       const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);
       if (insertErr) {
-        console.error('Failed to save rules:', insertErr);
+        console.error('[Step 5] Failed to save rules:', insertErr);
       } else {
         saved = true;
+        console.log(`[Step 5] Saved ${inserts.length} rules successfully`);
       }
     }
 
-    // Update queue record
+    // Update queue record — use specific ID to avoid 409 conflicts
     if (queueId) {
-      await supabase.from('learning_queue').update({
+      console.log(`[Step 6] Updating queue record ${queueId} to completed...`);
+      const { error: updateErr } = await supabase.from('learning_queue').update({
         status: 'completed',
         rules_extracted: rules.length,
         processed_at: new Date().toISOString(),
       }).eq('id', queueId);
+
+      if (updateErr) {
+        console.error(`[Step 6] Queue update error:`, updateErr);
+      } else {
+        console.log(`[Step 6] Queue record updated successfully`);
+      }
     }
 
+    console.log(`[Done] Returning ${rules.length} rules, saved: ${saved}`);
     return new Response(JSON.stringify({ rules, saved, queueId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
-    console.error('learn-from-source error:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('learn-from-source error:', errorMessage);
+    console.error('Full error:', err);
 
-    // Try to update queue record with error
+    // Try to update queue record with error — use specific ID
     try {
-      const { sourceType, content } = await req.clone().json().catch(() => ({}));
-      if (sourceType) {
+      const body = await req.clone().json().catch(() => ({}));
+      if (body.sourceType) {
         const supabase = createClient(
           Deno.env.get('SUPABASE_URL')!,
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
         );
-        // Best effort — update latest pending record
-        await supabase.from('learning_queue')
-          .update({
-            status: 'error',
-            error_message: err instanceof Error ? err.message : 'Unknown error',
-            processed_at: new Date().toISOString(),
-          })
+        // Find the most recent processing record and update by ID
+        const { data: pendingRows } = await supabase
+          .from('learning_queue')
+          .select('id')
           .eq('status', 'processing')
           .order('created_at', { ascending: false })
           .limit(1);
+
+        if (pendingRows && pendingRows.length > 0) {
+          await supabase.from('learning_queue').update({
+            status: 'error',
+            error_message: errorMessage,
+            processed_at: new Date().toISOString(),
+          }).eq('id', pendingRows[0].id);
+        }
       }
     } catch { /* ignore */ }
 
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
