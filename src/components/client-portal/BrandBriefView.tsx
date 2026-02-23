@@ -1305,6 +1305,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       .replace(/[⚠️✅❌★•]/g, '')
       .replace(/->/g, '•')
       .replace(/1️⃣|2️⃣|3️⃣|⭐|🔴|🟡|🟢/g, '')
+      // Strip problematic Unicode chars that cause jsPDF font fallback to monospace
+      .replace(/[\u0080-\u00FF]/g, (ch) => {
+        // Map common latin-1 supplement chars to ASCII equivalents
+        const map: Record<string, string> = {
+          'ã': 'a', 'Ã': 'A', 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+          'ñ': 'n', 'Ñ': 'N', 'ü': 'u', 'Ü': 'U', 'à': 'a', 'è': 'e', 'ì': 'i',
+          'ò': 'o', 'ù': 'u', 'â': 'a', 'ê': 'e', 'î': 'i', 'ô': 'o', 'û': 'u',
+          'ä': 'a', 'ë': 'e', 'ï': 'i', 'ö': 'o', '–': '-', '—': '-', '´': "'",
+          '°': 'o', '©': '(c)', '®': '(R)', '¿': '?', '¡': '!',
+        };
+        return map[ch] || '';
+      })
+      // Strip any remaining chars outside basic ASCII + common punctuation
+      .replace(/[^\x20-\x7E\n\r\t]/g, '')
       .trim();
 
     const addBody = (text: string, indent = 0, lineH = 5) => {
