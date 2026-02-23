@@ -787,6 +787,41 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const dbAnsweredCount: number | null = (existingPersona?.persona_data as any)?.answered_count ?? null;
 
+    // ── GUARD: If the brief is already complete, respond as free-chat Steve (no brief logic) ──
+    if (dbAnsweredCount !== null && dbAnsweredCount >= BRAND_BRIEF_QUESTIONS.length) {
+      const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+      if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+
+      const postBriefSystem = SYSTEM_PROMPT + `\n\nEl brief de marca de este cliente YA ESTÁ COMPLETO. No hagas más preguntas del brief. Responde como un consultor amigable que puede ayudar con preguntas generales de marketing, estrategia, o cualquier duda. Si el cliente pregunta por su brief, dile que ya está listo y que puede verlo en la pestaña "Brief de Marca".`;
+      const chatMsgs = messages!.filter(m => m.role !== 'system').map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+      const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1200, system: postBriefSystem, messages: chatMsgs }),
+      });
+
+      if (!aiResp.ok) {
+        console.error('Post-brief AI error:', aiResp.status);
+        return new Response(JSON.stringify({ error: 'AI service error' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const aiData = await aiResp.json();
+      const reply = aiData.content?.[0]?.text || '¡Woof! Tu brief ya está listo. ¿En qué más puedo ayudarte?';
+      await supabase.from('steve_messages').insert({ conversation_id: activeConversationId, role: 'assistant', content: reply });
+
+      return new Response(JSON.stringify({
+        conversation_id: activeConversationId,
+        message: reply,
+        answered_count: dbAnsweredCount,
+        total_questions: BRAND_BRIEF_QUESTIONS.length,
+        is_complete: true,
+        rejected: false,
+        examples: [],
+        fields: [],
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // currentQuestionIndex = the question the user is currently answering (before this turn)
     const currentQuestionIndex = isRetryMode
       ? pendingQuestionIndex!
