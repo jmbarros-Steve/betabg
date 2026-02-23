@@ -15,6 +15,7 @@ import {
   Check, X, ChevronDown, ChevronUp, Save, Plus, ListPlus,
 } from 'lucide-react';
 import { LearningQueue } from './LearningQueue';
+import { LearningHistory } from './LearningHistory';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -476,6 +477,9 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
             {/* ── Learning Queue section ── */}
             <LearningQueue />
+
+            {/* ── Learning History section ── */}
+            <LearningHistory />
           </>
         )}
       </CardContent>

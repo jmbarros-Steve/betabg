@@ -258,6 +258,7 @@ Deno.serve(async (req) => {
         contenido: r.contenido,
         activo: true,
         orden: 99,
+        source_id: queueId || null,
       }));
 
       const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);

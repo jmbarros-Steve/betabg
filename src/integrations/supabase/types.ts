@@ -1194,6 +1194,7 @@ export type Database = {
           created_at: string | null
           id: string
           orden: number | null
+          source_id: string | null
           titulo: string
         }
         Insert: {
@@ -1203,6 +1204,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           orden?: number | null
+          source_id?: string | null
           titulo: string
         }
         Update: {
@@ -1212,9 +1214,18 @@ export type Database = {
           created_at?: string | null
           id?: string
           orden?: number | null
+          source_id?: string | null
           titulo?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "steve_knowledge_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "learning_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       steve_messages: {
         Row: {
