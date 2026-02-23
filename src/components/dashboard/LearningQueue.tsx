@@ -214,26 +214,41 @@ export function LearningQueue() {
     toast.info('Pausando después del item actual...');
   }
 
-  async function clearCompleted() {
-    const completedIds = items
-      .filter(i => i.status === 'completed' || i.status === 'done')
+  async function clearItems(statusFilter: string[]) {
+    const targetIds = items
+      .filter(i => statusFilter.includes(i.status || ''))
       .map(i => i.id);
-    if (completedIds.length === 0) return;
+    if (targetIds.length === 0) return;
+
+    // First, nullify FK references in steve_knowledge to avoid 409 conflict
+    await supabase
+      .from('steve_knowledge')
+      .update({ source_id: null })
+      .in('source_id', targetIds);
 
     const { error } = await supabase
       .from('learning_queue')
       .delete()
-      .in('id', completedIds);
+      .in('id', targetIds);
 
     if (!error) {
-      toast.success(`${completedIds.length} items completados eliminados`);
+      toast.success(`${targetIds.length} items eliminados`);
       fetchQueue();
+    } else {
+      toast.error('Error al eliminar: ' + error.message);
     }
   }
 
   async function deleteItem(id: string) {
+    // Nullify FK references first
+    await supabase
+      .from('steve_knowledge')
+      .update({ source_id: null })
+      .eq('source_id', id);
+
     const { error } = await supabase.from('learning_queue').delete().eq('id', id);
     if (!error) fetchQueue();
+    else toast.error('Error al eliminar: ' + error.message);
   }
 
   // ── Status badge ──
@@ -351,12 +366,21 @@ export function LearningQueue() {
             </Button>
           )}
           <Button
-            onClick={clearCompleted}
+            onClick={() => clearItems(['completed', 'done'])}
             disabled={completed === 0}
             size="sm"
             variant="outline"
           >
             <Trash2 className="w-4 h-4 mr-1" /> Limpiar completados
+          </Button>
+          <Button
+            onClick={() => clearItems(['error'])}
+            disabled={items.filter(i => i.status === 'error').length === 0}
+            size="sm"
+            variant="outline"
+            className="border-destructive/30 text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="w-4 h-4 mr-1" /> Limpiar errores
           </Button>
         </div>
 
@@ -389,7 +413,7 @@ export function LearningQueue() {
                       {item.created_at ? format(new Date(item.created_at), 'dd/MM HH:mm') : '-'}
                     </TableCell>
                     <TableCell className="py-2">
-                      {item.status === 'pending' && (
+                      {(item.status === 'pending' || item.status === 'error') && (
                         <Button
                           variant="ghost"
                           size="sm"
