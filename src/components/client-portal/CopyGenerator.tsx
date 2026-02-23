@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ClientAssetsGallery } from './ClientAssetsGallery';
 import { AdCreativesLibrary } from './AdCreativesLibrary';
 import { MetaAdCreator } from './MetaAdCreator';
+import { useBriefContext } from '@/hooks/useBriefContext';
 
 interface CopyGeneratorProps { clientId: string; }
 
@@ -98,6 +99,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const [assets, setAssets] = useState<ClientAsset[]>([]);
   const [credits, setCredits] = useState<Credits | null>(null);
   const [hasBrief, setHasBrief] = useState<boolean | null>(null);
+  const { chips: briefChips, activeChips, toggleChip, getActiveChipsText } = useBriefContext(clientId);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -155,8 +157,10 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     else setIsGenerating(true);
 
     try {
+      const chipsText = getActiveChipsText();
+      const fullInstrucciones = [instrucciones.trim(), chipsText].filter(Boolean).join('. ') || undefined;
       const { data, error } = await supabase.functions.invoke('generate-copy', {
-        body: { clientId, funnel, formato, angulo: efectiveAngulo, instrucciones: instrucciones.trim() || undefined, assetUrls: assets.slice(0, 5).map(a => a.url) },
+        body: { clientId, funnel, formato, angulo: efectiveAngulo, instrucciones: fullInstrucciones, assetUrls: assets.slice(0, 5).map(a => a.url) },
       });
 
       if (error) throw error;
@@ -477,6 +481,27 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                 <div>
                   <h3 className="text-lg font-semibold mb-1">Instrucciones adicionales</h3>
                   <p className="text-sm text-muted-foreground mb-3">Opcional — ofertas específicas, temporadas, productos destacados, etc.</p>
+                  {briefChips.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📋 Contexto del brief — click para incluir/excluir</p>
+                      <div className="flex flex-wrap gap-2">
+                        {briefChips.map(chip => (
+                          <button
+                            key={chip.key}
+                            type="button"
+                            onClick={() => toggleChip(chip.key)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all max-w-[300px] truncate ${
+                              activeChips.has(chip.key)
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:border-primary/40'
+                            }`}
+                          >
+                            {chip.emoji} {chip.label}: {chip.value}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <Textarea value={instrucciones} onChange={e => setInstrucciones(e.target.value)} placeholder="Ej: Tenemos 30% OFF esta semana. El producto estrella es el set premium de 3 piezas." className="min-h-[100px]" />
                 </div>
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 text-xs text-muted-foreground">
