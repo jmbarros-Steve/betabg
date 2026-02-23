@@ -429,10 +429,13 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">⭐ Recomendados para {funnel.toUpperCase()}</p>
                   <div className="flex flex-wrap gap-2">
                     {recommendedAngles.map(a => (
-                      <button key={a} onClick={() => { setAngulo(a); setShowCustomAngulo(false); }}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${angulo === a && !showCustomAngulo ? 'border-primary bg-primary text-primary-foreground' : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}>
-                        ⭐ {a}
-                      </button>
+                      <div key={a} className="flex flex-col">
+                        <button onClick={() => { setAngulo(a); setShowCustomAngulo(false); }}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${angulo === a && !showCustomAngulo ? 'border-primary bg-primary text-primary-foreground' : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}>
+                          ⭐ {a}
+                        </button>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 px-2 max-w-[200px]">Ángulo versátil que funciona en múltiples etapas del funnel.</p>
+                      </div>
                     ))}
                   </div>
                 </div>
