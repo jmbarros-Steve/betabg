@@ -191,7 +191,7 @@ async function callClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-6",
+        model: "claude-sonnet-4-20250514",
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [
@@ -345,8 +345,8 @@ Deno.serve(async (req) => {
       ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
     );
 
-    console.log(`[analyze-brand-strategy] Wave 1 done. Waiting 15s for rate limit reset...`);
-    await new Promise(resolve => setTimeout(resolve, 15000));
+    console.log(`[analyze-brand-strategy] Wave 1 done. Waiting 5s for rate limit reset...`);
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     console.log(`[analyze-brand-strategy] Wave 2: starting ${wave2.map(s => s.id).join(', ')}`);
     const results2 = await Promise.allSettled(
@@ -357,8 +357,8 @@ Deno.serve(async (req) => {
       ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
     );
 
-    console.log(`[analyze-brand-strategy] Wave 2 done. Waiting 15s for rate limit reset...`);
-    await new Promise(resolve => setTimeout(resolve, 15000));
+    console.log(`[analyze-brand-strategy] Wave 2 done. Waiting 5s for rate limit reset...`);
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     console.log(`[analyze-brand-strategy] Wave 3: starting ${wave3.map(s => s.id).join(', ')}`);
     const results3 = await Promise.allSettled(
