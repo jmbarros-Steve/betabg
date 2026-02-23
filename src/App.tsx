@@ -26,6 +26,7 @@ import SteveAppInfo from "./pages/SteveAppInfo";
 import ShopifyApp from "./pages/ShopifyApp";
 import ConnectShopify from "./pages/ConnectShopify";
 import GoogleAdsDesignDoc from "./pages/GoogleAdsDesignDoc";
+import TestFixes from "./pages/TestFixes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,7 @@ const App = () => (
             <Route path="/shopify" element={<ShopifyApp />} />
             <Route path="/connect-shopify" element={<ConnectShopify />} />
             <Route path="/google-ads-design-doc" element={<GoogleAdsDesignDoc />} />
+            <Route path="/test-fixes" element={<TestFixes />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
