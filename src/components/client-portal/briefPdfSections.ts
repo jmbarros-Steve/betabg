@@ -115,9 +115,9 @@ export function renderGlossaryBox(
   helpers.setY(y);
 
   for (let i = 0; i < items.length; i++) {
-    const fullText = `${items[i].term} — ${items[i].def}`;
-    const lines = doc.splitTextToSize(fullText, maxWidth - 10);
-    const blockH = lines.length * 4.2 + 2;
+    // Render term bold, then full definition on next line(s) for clarity
+    const defLines = doc.splitTextToSize(items[i].def, maxWidth - 12);
+    const blockH = (defLines.length + 1) * 4.2 + 2;
     helpers.checkPage(blockH + 2);
     y = helpers.getY();
 
@@ -127,28 +127,22 @@ export function renderGlossaryBox(
       doc.rect(margin, y - 1.5, maxWidth, blockH, 'F');
     }
 
+    // Term (bold)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(50, 50, 70);
-    const termStr = items[i].term + ' — ';
-    doc.text(termStr, margin + 5, y);
-    const termW = doc.getTextWidth(termStr);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(70, 70, 80);
-
-    // First line: after the bold term
-    const firstLineDef = doc.splitTextToSize(items[i].def, maxWidth - 10 - termW);
-    doc.text(firstLineDef[0], margin + 5 + termW, y);
+    doc.text(items[i].term, margin + 5, y);
     y += 4.2;
 
-    // Remaining lines of definition (wrapped)
-    if (firstLineDef.length > 1) {
-      for (let li = 1; li < firstLineDef.length; li++) {
-        helpers.checkPage(5);
-        y = helpers.getY();
-        doc.text(firstLineDef[li], margin + 5 + termW, y);
-        y += 4.2;
-      }
+    // Definition (normal, full width)
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(70, 70, 80);
+    for (const line of defLines) {
+      helpers.checkPage(5);
+      y = helpers.getY();
+      doc.text(line, margin + 5, y);
+      y += 4.2;
     }
     y += 1;
     helpers.setY(y);
