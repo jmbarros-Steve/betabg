@@ -577,13 +577,54 @@ export function renderMetaAdsStrategy(
   }
 
   if (metaStrategy.kpis_objetivo) {
-    helpers.addSubTitle('KPIs Objetivo');
-    for (const stage of ['tofu', 'mofu', 'bofu']) {
+    helpers.addSubTitle('KPIs Objetivo por Etapa del Funnel');
+    const { doc, margin, maxWidth } = ctx;
+    const stages = ['tofu', 'mofu', 'bofu'] as const;
+    const stageLabels: Record<string, string> = { tofu: 'TOFU (Awareness)', mofu: 'MOFU (Consideracion)', bofu: 'BOFU (Conversion)' };
+    // Render as mini-tables per stage
+    for (const stage of stages) {
       const kpis = metaStrategy.kpis_objetivo[stage];
-      if (kpis && typeof kpis === 'object') {
-        const parts = Object.entries(kpis).map(([k, v]) => `${k}: ${v}`).join(' | ');
-        helpers.addKeyValue(stage.toUpperCase(), parts);
+      if (!kpis || typeof kpis !== 'object') continue;
+      const entries = Object.entries(kpis);
+      if (entries.length === 0) continue;
+      // Stage label
+      helpers.checkPage(10);
+      let y = helpers.getY();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(ctx.brandR, ctx.brandG, ctx.brandB);
+      doc.text(stageLabels[stage] || stage.toUpperCase(), margin + 2, y);
+      y += 5;
+      helpers.setY(y);
+      // KPI chips in a grid
+      const chipW = (maxWidth - 8) / Math.min(entries.length, 3);
+      let cx = margin + 2;
+      let row = 0;
+      for (let ei = 0; ei < entries.length; ei++) {
+        if (ei > 0 && ei % 3 === 0) {
+          row++;
+          cx = margin + 2;
+        }
+        helpers.checkPage(12);
+        y = helpers.getY();
+        const chipY = y + row * 11;
+        // Chip background
+        doc.setFillColor(245, 246, 252);
+        doc.roundedRect(cx, chipY, chipW - 3, 9, 1, 1, 'F');
+        // Metric name
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 120);
+        const metricName = String(entries[ei][0]).replace(/_/g, ' ').toUpperCase();
+        doc.text(metricName, cx + 2, chipY + 3.5);
+        // Metric value
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(ctx.brandR, ctx.brandG, ctx.brandB);
+        doc.text(String(entries[ei][1]), cx + 2, chipY + 7.5);
+        cx += chipW;
       }
+      helpers.setY(y + (row + 1) * 11 + 3);
     }
   }
 
