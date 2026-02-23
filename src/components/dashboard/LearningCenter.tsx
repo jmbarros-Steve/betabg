@@ -75,6 +75,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
   const [rules, setRules] = useState<ExtractedRule[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [savingAll, setSavingAll] = useState(false);
+  const [currentQueueId, setCurrentQueueId] = useState<string | null>(null);
 
   // Input states
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -151,6 +152,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
         ...r,
         active: true,
       }));
+      setCurrentQueueId(data.queueId || null);
 
       setRules(extracted);
       setPhase('done');
@@ -257,6 +259,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
         contenido: r.contenido,
         activo: true,
         orden: 99,
+        source_id: currentQueueId || null,
       }));
 
       const { error } = await supabase.from('steve_knowledge').insert(inserts);
@@ -264,6 +267,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
       toast.success(`${toSave.length} reglas guardadas en Knowledge Base`);
       setRules([]);
+      setCurrentQueueId(null);
       setPhase('idle');
       onSaved();
     } catch (err) {
