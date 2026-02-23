@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2, CalendarDays } from 'lucide-react';
 import { LearningCenter } from './LearningCenter';
+import { LearningHistory } from './LearningHistory';
 
 type DateFilter = 'today' | 'week' | 'all';
 
@@ -826,6 +827,9 @@ export function SteveKnowledgePanel() {
 
       {/* Ad Image Analyzer */}
       <AdImageAnalyzer onSaved={fetchAll} />
+
+      {/* Learning History (visible también aquí para acceso directo) */}
+      <LearningHistory />
 
       {/* Category tabs */}
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as TabId)}>
