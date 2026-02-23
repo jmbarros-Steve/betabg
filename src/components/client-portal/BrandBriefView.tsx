@@ -1581,13 +1581,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // CPA is already in CLP (margin is in CLP), no USD conversion needed
     const cpaMaxCLP = cpaMax ? fmtCLP(Number(cpaMax)) : null;
 
+    // Dynamic budget from meta_ads_strategy or financial config
+    const metaBudget = (research as any).meta_ads_strategy?.presupuesto_sugerido;
+    const totalBudget = typeof metaBudget === 'object' && metaBudget?.total
+      ? metaBudget.total : typeof metaBudget === 'string' ? metaBudget : null;
+    const roasObj = (research as any).meta_ads_strategy?.kpis_objetivo?.bofu?.roas
+      || (research as any).google_ads_strategy?.target_roas || null;
+
     const kpiData = [
       { label: 'Ticket Promedio', value: financials ? fmtCLP(financials.price) : 'N/D', dark: true },
       { label: 'CPA Maximo Viable', value: cpaMaxCLP || 'N/D', dark: false },
-      { label: 'ROAS Objetivo', value: '3x - 5x', dark: true },
+      { label: 'ROAS Objetivo', value: roasObj ? String(roasObj) : (marginPct && Number(marginPct) > 50 ? '3x - 5x' : '2x - 3x'), dark: true },
       { label: 'Margen Bruto', value: marginPct ? `${marginPct}%` : 'N/D', dark: false },
-      { label: 'Presupuesto Mes 1', value: fmtCLP(570000), dark: true },
-      { label: 'Tasa de Recompra', value: '40%', dark: false },
+      { label: 'Presupuesto Sugerido', value: totalBudget ? (typeof totalBudget === 'number' ? fmtCLP(totalBudget) : String(totalBudget)) : 'A definir', dark: true },
+      { label: 'SEO Score', value: research.seo_audit?.score ? `${research.seo_audit.score}/100` : 'N/D', dark: false },
     ];
 
     const kpiCols = 3;
@@ -1657,12 +1664,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
       {
         title: 'INVERSION REQUERIDA',
-        text: 'Presupuesto inicial recomendado: $570.000 CLP/mes (Fase 1, 0-30 dias). Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.',
+        text: `Presupuesto inicial recomendado: ${totalBudget ? (typeof totalBudget === 'number' ? fmtCLP(totalBudget) : totalBudget) + '/mes' : 'A definir con el equipo'}. Distribuido en Meta Ads, Google Ads y SEO para maximizar cobertura del funnel completo.`,
         col: 0, row: 1,
       },
       {
         title: 'RETORNO ESPERADO',
-        text: `ROAS Fase 1: 1x-2x (aprendizaje). Fase 2: 3x (escala). Fase 3: 5x+ (optimizacion). LTV proyectado: tasa de recompra 40%. Margen bruto actual: ${marginPct ? marginPct + '%' : 'N/D'}.`,
+        text: `ROAS Fase 1: 1x-2x (aprendizaje). Fase 2: 3x (escala). Fase 3: 5x+ (optimizacion). Margen bruto actual: ${marginPct ? marginPct + '%' : 'N/D'}. SEO score: ${research.seo_audit?.score || 'pendiente'}/100.`,
         col: 1, row: 1,
       },
     ];
@@ -2110,108 +2117,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // ─── SECCIÓN: INTELIGENCIA COMPETITIVA ──────────────────────────────────────
     if (research.competitor_analysis) {
       addSectionHeader('8', 'INTELIGENCIA COMPETITIVA');
-      const comps = research.competitor_analysis?.competitors || [];
 
-      // Barras horizontales SEO comparativo
-      if (comps.length > 0 || research.seo_audit) {
-        checkPage(40);
-        addSubTitle('Score SEO Comparativo');
-        const clientScore = research.seo_audit?.score ?? 50;
-        const barRows: { name: string; score: number; isClient: boolean }[] = [
-          { name: clientInfo?.name || 'Tu Marca', score: clientScore, isClient: true },
-          ...comps.slice(0, 4).map((c: any, i: number) => ({
-            name: c.name || `Competidor ${i+1}`,
-            score: c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -10 : 8) * (i + 1))),
-            isClient: false,
-          })),
-        ];
-        const maxBarW = maxWidth - 50;
-        for (const br of barRows) {
-          checkPage(10);
-          doc.setFont('helvetica', br.isClient ? 'bold' : 'normal');
-          doc.setFontSize(8.5);
-          doc.setTextColor(40, 40, 40);
-          doc.text(String(br.name).slice(0, 22), margin + 2, y + 5);
-          const barFill: [number,number,number] = br.score >= 70 ? [22,160,70] : br.score >= 50 ? [200,150,0] : [200,40,40];
-          const barLen = (br.score / 100) * maxBarW;
-          doc.setFillColor(230, 232, 240);
-          doc.roundedRect(margin + 48, y, maxBarW, 7, 1, 1, 'F');
-          doc.setFillColor(...barFill);
-          doc.roundedRect(margin + 48, y, barLen, 7, 1, 1, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.setTextColor(...barFill);
-          doc.text(String(br.score), margin + 48 + barLen + 2, y + 5.5);
-          y += 10;
-        }
-        y += 4;
-      }
-
-      for (let i = 0; i < Math.min(comps.length, 5); i++) {
-        const comp = comps[i];
-        checkPage(30);
-        doc.setFillColor(230, 233, 245);
-        doc.roundedRect(margin, y, maxWidth, 9, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(brandR, brandG, brandB);
-        // Fix #6: use helvetica to avoid character-spaced monospace rendering
-        const compDisplayName = String(comp.name || comp.url || 'Competidor');
-        doc.text(`${i + 1}. ${compDisplayName}`, margin + 3, y + 6);
-        if (comp.seo_score) {
-          const sc = comp.seo_score;
-          const scColor: [number,number,number] = sc >= 70 ? [22,160,70] : sc >= 50 ? [200,150,0] : [200,40,40];
-          doc.setFillColor(...scColor);
-          doc.roundedRect(pageWidth - margin - 18, y + 1.5, 16, 6, 1, 1, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.setTextColor(255, 255, 255);
-          doc.text(`SEO: ${sc}`, pageWidth - margin - 16, y + 5.8);
-        }
-        y += 12;
-        if (comp.positioning) addKeyValue('Posicionamiento', comp.positioning);
-        if (comp.ad_strategy_inferred) addKeyValue('Estrategia de Ads', comp.ad_strategy_inferred);
-        if (comp.attack_vector) {
-          checkPage(10);
-          doc.setFillColor(255, 240, 240);
-          doc.roundedRect(margin, y, maxWidth, 12, 1, 1, 'F');
-          doc.setDrawColor(180, 30, 30);
-          doc.setLineWidth(1);
-          doc.line(margin, y, margin, y + 12);
-          doc.setLineWidth(0.2);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(180, 30, 30);
-          const atkLines = doc.splitTextToSize(`Como atacarlos: ${stripEmojis(comp.attack_vector)}`, maxWidth - 10);
-          doc.text(atkLines.slice(0, 2), margin + 5, y + 5);
-          y += 15;
-        }
-        // vulnerability map entry
-        const vulnEntry = research.competitive_domination?.vulnerability_map?.find(
-          (e: any) => e.competitor === comp.name
-        );
-        if (vulnEntry) {
-          addInsightBox(`Tactica: ${vulnEntry.attack_tactic || ''} | Canal: ${vulnEntry.channel || ''}`);
-        }
-        y += 2;
-      }
-
+      // Market gaps as strategic opportunities
       if (research.competitor_analysis?.market_gaps?.length > 0) {
         addSubTitle('Oportunidades de Mercado');
         for (const gap of research.competitor_analysis.market_gaps.slice(0, 5)) {
           addArrowBullet(gap);
-        }
-      }
-
-      // Ads Library
-      if (research.ads_library_analysis) {
-        addSubTitle('Patrones Ganadores — Meta Ads Library');
-        for (const p of (research.ads_library_analysis.winning_patterns || []).slice(0, 4)) {
-          addArrowBullet(p);
-        }
-        if (research.ads_library_analysis.hook_ideas?.length > 0) {
-          addSubTitle('Ideas de Hook para Anuncios');
-          for (const h of research.ads_library_analysis.hook_ideas.slice(0, 3)) { addArrowBullet(h); }
         }
       }
     }
@@ -2247,116 +2158,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // Ads Library full analysis
     renderAdsLibraryAnalysis(pdfCtx, pdfHelpers, (research as any).ads_library_analysis);
 
-    // ─── SECCIÓN: ANÁLISIS SEO COMPARATIVO ──────────────────────────────────────
-    if (research.seo_audit || research.competitor_analysis) {
-      addSectionHeader('9', 'ANALISIS SEO COMPARATIVO — TU MARCA VS COMPETENCIA');
-      const seo = research.seo_audit;
-      const comps = research.competitor_analysis?.competitors || [];
-      checkPage(40);
-
-      // Visual score bars first
-      addSubTitle('Puntaje SEO Visual');
-      const clientScore = seo?.score ?? 0;
-      const seoBarRows: { name: string; score: number; isClient: boolean }[] = [
-        { name: clientInfo?.name || 'Tu Marca', score: clientScore, isClient: true },
-        ...comps.slice(0, 4).map((c: any, i: number) => ({
-          name: c.name || `Competidor ${i+1}`,
-          score: c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -8 : 7))),
-          isClient: false,
-        })),
-      ];
-      const seoBarMaxW = maxWidth - 50;
-      for (const br of seoBarRows) {
-        checkPage(10);
-        doc.setFont('helvetica', br.isClient ? 'bold' : 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(40, 40, 40);
-        doc.text(String(br.name).slice(0, 22), margin + 2, y + 5);
-        const barFill: [number,number,number] = br.score >= 70 ? [22,160,70] : br.score >= 50 ? [200,150,0] : [200,40,40];
-        const barLen = (br.score / 100) * seoBarMaxW;
-        doc.setFillColor(230, 232, 240);
-        doc.roundedRect(margin + 48, y, seoBarMaxW, 7, 1, 1, 'F');
-        doc.setFillColor(...barFill);
-        doc.roundedRect(margin + 48, y, barLen, 7, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(...barFill);
-        doc.text(String(br.score), margin + 48 + barLen + 2, y + 5.5);
-        if (br.isClient) {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(6);
-          doc.setTextColor(accentR, accentG, accentB);
-          doc.text('TU MARCA', margin + 48 + seoBarMaxW - 2, y + 5.5, { align: 'right' });
-        }
-        y += 10;
-      }
-      y += 6;
-
-      // Detailed comparison table — wider with more data
-      addSubTitle('Tabla Comparativa Detallada');
-      const colWs = [34, 14, 30, 44, 44];
-      addTableRow(['Marca', 'SEO', 'Rango Precios', 'Posicionamiento', 'Estrategia Ads'], colWs, 0, true);
-      const clientName = clientInfo?.name || 'Tu Marca';
-      addTableRow(
-        [
-          clientName.slice(0, 20) + ' *',
-          String(clientScore),
-          financials ? fmtCLP(financials.price) : 'N/D',
-          (seo?.content_quality || 'Optimizando').slice(0, 28),
-          'STEVE.IO IA',
-        ],
-        colWs, 1
-      );
-      comps.slice(0, 4).forEach((c: any, i: number) => {
-        const cscore = c.seo_score ?? Math.max(20, Math.min(85, clientScore + (i % 2 === 0 ? -8 : 7)));
-        addTableRow(
-          [
-            String(c.name || c.url || 'Competidor').slice(0, 20),
-            String(cscore),
-            c.price_positioning || c.rango_precios || 'N/D',
-            String(c.positioning || c.value_proposition || c.propuesta_valor || 'N/D').slice(0, 28),
-            String(c.ad_strategy_inferred || c.estrategia_ads || 'No detectada').slice(0, 24),
-          ],
-          colWs, i + 2
-        );
-      });
-      y += 4;
-
-      // Detailed SEO metrics if available
-      if (seo?.meta_description || seo?.h1 || seo?.schema_markup !== undefined) {
-        addSubTitle('Detalle Tecnico SEO');
-        const seoDetailCols = [50, 60, 60];
-        addTableRow(['Metrica', 'Tu Sitio', 'Recomendacion'], seoDetailCols, 0, true);
-        const seoDetails = [
-          ['H1 Tag', seo?.h1 ? 'Detectado' : 'No detectado', 'Unico, con keyword principal'],
-          ['Meta Description', seo?.meta_description ? 'Presente' : 'Ausente', '<160 caracteres, CTA incluido'],
-          ['Schema Markup', seo?.schema_markup ? 'Implementado' : 'No detectado', 'Product, Organization, FAQ'],
-          ['Mobile Friendly', seo?.mobile_friendly ? 'Si' : 'Revisar', 'Responsive design obligatorio'],
-          ['Velocidad', seo?.page_speed || 'No medida', '<3 segundos carga completa'],
-        ];
-        for (let si2 = 0; si2 < seoDetails.length; si2++) {
-          addTableRow(seoDetails[si2], seoDetailCols, si2 + 1);
-        }
-        y += 4;
-      }
-
-      // SEO issues summary
-      if (seo?.issues?.length > 0) {
-        addSubTitle('Problemas SEO Detectados en Tu Sitio');
-        for (const issue of seo.issues.slice(0, 5)) { addArrowBullet(issue); }
-      }
-      if (seo?.recommendations?.length > 0) {
-        addSubTitle('Recomendaciones SEO Prioritarias');
-        for (const rec of seo.recommendations.slice(0, 5)) { addArrowBullet(rec); }
-      }
-
-      if (seo?.competitive_seo_gap) { addSubTitle('Gap Analysis SEO'); addBody(seo.competitive_seo_gap); }
-    }
+    // Section 9 (SEO Comparativo) removed — already covered in SEO Audit section above
 
     // ─── SECCIÓN: EMBUDO TOFU-MOFU-BOFU ─────────────────────────────────────────
     checkPage(55);
-    addSectionHeader('10', 'ESTRATEGIA DE EMBUDO — TOFU / MOFU / BOFU');
-    const funnelLabels = ['TOFU — Awareness (40%)', 'MOFU — Consideracion (40%)', 'BOFU — Conversion (20%)'];
+    addSectionHeader('9', 'ESTRATEGIA DE EMBUDO — TOFU / MOFU / BOFU');
+    // Use dynamic funnel distribution from meta_ads_strategy if available
+    const funnelDist = (research as any).meta_ads_strategy?.distribucion_presupuesto || {};
+    const tofuPct = funnelDist.tofu || '40%';
+    const mofuPct = funnelDist.mofu || '40%';
+    const bofuPct = funnelDist.bofu || '20%';
+    const funnelLabels = [`TOFU — Awareness (${tofuPct})`, `MOFU — Consideracion (${mofuPct})`, `BOFU — Conversion (${bofuPct})`];
     const funnelColors: [number,number,number][] = [
       [brandR, brandG, brandB],
       [accentR - 20, accentG + 10, accentB + 80],
@@ -2415,13 +2227,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     y = chartStartY + 14;
 
     // ─── SECCIÓN: CALENDARIO DE IMPLEMENTACIÓN 90 DÍAS ──────────────────────────
-    addSectionHeader('11', 'CALENDARIO DE IMPLEMENTACION — 90 DIAS');
+    addSectionHeader('10', 'CALENDARIO DE IMPLEMENTACION — 90 DIAS');
     checkPage(70);
     const calChannels = ['Meta Ads', 'Google Ads', 'SEO', 'Email/Klaviyo', 'UGC/Influencers'];
     const calActions = [
-      ['Campanas TOFU cold audiences $200', 'MOFU retargeting + LLA $250', 'BOFU retargeting caliente + upsell'],
-      ['Search campaña marca $100', 'Shopping + Display $200', 'Performance Max escala'],
-      ['Auditoría y fichas tecnicas', 'Blog posts keywords principales', 'Link building + featured snippets'],
+      ['Campanas TOFU cold audiences', 'MOFU retargeting + Lookalike', 'BOFU retargeting caliente + upsell'],
+      ['Search campana de marca', 'Shopping + Display remarketing', 'Performance Max escala'],
+      ['Auditoria tecnica y fichas', 'Blog posts keywords principales', 'Link building + featured snippets'],
       ['Welcome + abandono carrito', 'Post-compra + recompra', 'Segmentacion VIP + winback'],
       ['1 creator micro-influencer', '3 UGC videos para ads', 'Programa embajadores'],
     ];
@@ -2434,7 +2246,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     y += 6;
 
     // ─── SECCIÓN: TEMPLATES DE COPY ─────────────────────────────────────────────
-    addSectionHeader('12', 'PLANTILLAS DE COPY LISTAS PARA USAR');
+    addSectionHeader('11', 'PLANTILLAS DE COPY LISTAS PARA USAR');
 
     // Meta Ads copies — rendered as proper visual table
     const metaStrategy = (research as any).meta_ads_strategy || research.ads_library_analysis?.meta_ads_strategy;
@@ -2562,21 +2374,32 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     y += 8;
 
     // ─── SECCIÓN: PRESUPUESTO RECOMENDADO ────────────────────────────────────────
-    addSectionHeader('13', 'PRESUPUESTO RECOMENDADO');
+    addSectionHeader('12', 'PRESUPUESTO RECOMENDADO');
     checkPage(60);
-    const budgetCols = ['Canal', 'Conservador', 'Agresivo'];
-    const budgetColWs = [50, 60, 60];
-    const budgetData = [
-      ['Meta Ads', '$190.000/mes', '$475.000/mes'],
-      ['Google Ads', '$95.000/mes', '$285.000/mes'],
-      ['SEO/Contenido', '$95.000/mes', '$190.000/mes'],
-      ['Influencers/UGC', '$95.000/mes', '$285.000/mes'],
-      ['Total mensual', '$475.000/mes', '$1.235.000/mes'],
-      ['ROAS esperado', '2x - 3x', '4x - 6x'],
-    ];
-    addTableRow(budgetCols, budgetColWs, 0, true);
-    for (let bi = 0; bi < budgetData.length; bi++) {
-      addTableRow(budgetData[bi], budgetColWs, bi + 1);
+
+    // Try to get budget from research data
+    const metaBudgetObj = (research as any).meta_ads_strategy?.presupuesto_sugerido;
+    const googleBudgetObj = (research as any).google_ads_strategy?.presupuesto_sugerido;
+    const hasDynamicBudget = metaBudgetObj || googleBudgetObj;
+
+    if (hasDynamicBudget && typeof metaBudgetObj === 'object') {
+      // Render dynamic budget from research
+      addSubTitle('Distribucion de Presupuesto por Canal');
+      const dynBudgetCols = ['Canal', 'Presupuesto Sugerido'];
+      const dynBudgetColWs = [70, 100];
+      addTableRow(dynBudgetCols, dynBudgetColWs, 0, true);
+      let budgetRowIdx = 1;
+      for (const [key, val] of Object.entries(metaBudgetObj)) {
+        addTableRow([key.replace(/_/g, ' '), String(val)], dynBudgetColWs, budgetRowIdx++);
+      }
+      if (googleBudgetObj && typeof googleBudgetObj === 'object') {
+        for (const [key, val] of Object.entries(googleBudgetObj)) {
+          addTableRow([`Google: ${key.replace(/_/g, ' ')}`, String(val)], dynBudgetColWs, budgetRowIdx++);
+        }
+      }
+    } else {
+      // Fallback: generic budget framework (no fake numbers)
+      addInsightBox('El presupuesto detallado se define en funcion del CPA maximo viable y los objetivos de ROAS. Consulte con su estratega para una propuesta personalizada basada en los datos de este brief.');
     }
     y += 8;
 
@@ -2591,7 +2414,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
 
     // ─── SECCIÓN: CHECKLIST DE ACCION INMEDIATA ─────────────────────────────────
-    addSectionHeader('14', 'CHECKLIST DE ACCION INMEDIATA — ESTA SEMANA');
+    addSectionHeader('13', 'CHECKLIST DE ACCION INMEDIATA — ESTA SEMANA');
     checkPage(70);
     const checklist = [
       'Instalar Meta Pixel y Google Tag en el sitio web',
@@ -2625,7 +2448,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // ─── SECCIÓN: GLOSARIO COMPACTO ─────────────────────────────────────────────
     // No forced page break — let content flow naturally
     checkPage(30);
-    addSectionHeader('15', 'GLOSARIO COMPACTO DE PERFORMANCE MARKETING');
+    addSectionHeader('14', 'GLOSARIO COMPACTO DE PERFORMANCE MARKETING');
 
     const compactGlossary = [
       { term: 'ROAS', def: 'Return On Ad Spend. Ingresos / Gasto en Ads. Benchmark: >= 3x.' },
