@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useBriefContext } from '@/hooks/useBriefContext';
 
 interface MetaAdCreatorProps {
   clientId: string;
@@ -112,6 +113,7 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
   const [customAngle, setCustomAngle] = useState('');
   const [showCustomAngle, setShowCustomAngle] = useState(false);
   const [instrucciones, setInstrucciones] = useState('');
+  const { chips: briefChips, activeChips, toggleChip, getActiveChipsText } = useBriefContext(clientId);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedVariaciones, setGeneratedVariaciones] = useState<GeneratedVariaciones | null>(null);
@@ -191,13 +193,15 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
     else setIsGenerating(true);
 
     try {
+      const chipsText = getActiveChipsText();
+      const fullInstrucciones = [instrucciones.trim(), chipsText].filter(Boolean).join('. ') || undefined;
       const { data, error } = await supabase.functions.invoke('generate-copy', {
         body: {
           clientId,
           funnel,
           formato: 'static',
           angulo: effectiveAngle,
-          instrucciones: instrucciones.trim() || undefined,
+          instrucciones: fullInstrucciones,
           assetUrls: [],
           fase_negocio: faseNegocio || undefined,
           presupuesto_ads: presupuestoAds || undefined,
@@ -777,6 +781,27 @@ export function MetaAdCreator({ clientId, onBack }: MetaAdCreatorProps) {
           <motion.div key="instrucciones" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
             <Button variant="ghost" size="sm" onClick={() => setStep('angle')}><ArrowLeft className="w-4 h-4 mr-1" />Volver</Button>
             <h3 className="text-lg font-semibold">Instrucciones adicionales (opcional)</h3>
+            {briefChips.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📋 Contexto del brief — click para incluir/excluir</p>
+                <div className="flex flex-wrap gap-2">
+                  {briefChips.map(chip => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => toggleChip(chip.key)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all max-w-[300px] truncate ${
+                        activeChips.has(chip.key)
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/40'
+                      }`}
+                    >
+                      {chip.emoji} {chip.label}: {chip.value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <Textarea
               value={instrucciones}
               onChange={e => setInstrucciones(e.target.value)}
