@@ -106,37 +106,101 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
     console.log(`[YouTube] InnerTube method failed: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 
-  // Method 4: Whisper fallback via OpenAI
+  // Method 4: Whisper transcription via audio download
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   if (OPENAI_API_KEY) {
-    console.log('[YouTube] Attempting Whisper transcription fallback...');
+    console.log('[YouTube] Attempting audio download + Whisper transcription...');
     try {
-      // Download audio via a public proxy/converter
-      const audioUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      
-      // Use Firecrawl to at least get the page content as fallback
-      const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-      if (FIRECRAWL_API_KEY) {
-        const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url: audioUrl, formats: ['markdown'] }),
-        });
+      // Try cobalt API to get audio URL
+      const cobaltRes = await fetch('https://api.cobalt.tools/', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          downloadMode: 'audio',
+          audioFormat: 'mp3',
+          audioBitrate: '96',
+        }),
+      });
 
-        if (fcRes.ok) {
-          const fcData = await fcRes.json();
-          const markdown = fcData.data?.markdown;
-          if (markdown && markdown.length > 200) {
-            console.log(`[YouTube] Firecrawl fallback successful: ${markdown.length} chars`);
-            return markdown;
+      if (cobaltRes.ok) {
+        const cobaltData = await cobaltRes.json();
+        const audioUrl = cobaltData?.url;
+
+        if (audioUrl) {
+          console.log(`[YouTube] Audio URL obtained, downloading...`);
+          const audioRes = await fetch(audioUrl);
+
+          if (audioRes.ok) {
+            const audioBlob = await audioRes.blob();
+            console.log(`[YouTube] Audio downloaded: ${(audioBlob.size / 1024 / 1024).toFixed(1)} MB`);
+
+            // Limit to 25MB (Whisper API limit)
+            if (audioBlob.size <= 25 * 1024 * 1024) {
+              const formData = new FormData();
+              formData.append('file', audioBlob, 'audio.mp3');
+              formData.append('model', 'whisper-1');
+              formData.append('language', 'es');
+
+              const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+                body: formData,
+              });
+
+              if (whisperRes.ok) {
+                const whisperData = await whisperRes.json();
+                if (whisperData.text && whisperData.text.length > 50) {
+                  console.log(`[YouTube] Whisper transcription successful: ${whisperData.text.length} chars`);
+                  return whisperData.text;
+                }
+              } else {
+                const errText = await whisperRes.text();
+                console.log(`[YouTube] Whisper API error: ${whisperRes.status} - ${errText.slice(0, 200)}`);
+              }
+            } else {
+              console.log(`[YouTube] Audio too large for Whisper: ${(audioBlob.size / 1024 / 1024).toFixed(1)} MB`);
+            }
           }
+        }
+      } else {
+        console.log(`[YouTube] Cobalt API returned ${cobaltRes.status}`);
+      }
+    } catch (e) {
+      console.log(`[YouTube] Whisper fallback failed: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+  }
+
+  // Method 5: Firecrawl as last resort (page scraping)
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  if (FIRECRAWL_API_KEY) {
+    console.log('[YouTube] Attempting Firecrawl page scraping as last resort...');
+    try {
+      const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          formats: ['markdown'],
+        }),
+      });
+
+      if (fcRes.ok) {
+        const fcData = await fcRes.json();
+        const markdown = fcData.data?.markdown;
+        if (markdown && markdown.length > 200) {
+          console.log(`[YouTube] Firecrawl fallback successful: ${markdown.length} chars`);
+          return markdown;
         }
       }
     } catch (e) {
-      console.log(`[YouTube] Whisper/Firecrawl fallback failed: ${e instanceof Error ? e.message : 'unknown'}`);
+      console.log(`[YouTube] Firecrawl fallback failed: ${e instanceof Error ? e.message : 'unknown'}`);
     }
   }
 
