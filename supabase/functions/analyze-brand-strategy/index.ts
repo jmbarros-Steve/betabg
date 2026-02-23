@@ -12,7 +12,7 @@ const SECTIONS = [
   {
     id: 'executive_summary',
     keys: ['executive_summary'],
-    maxTokens: 2000,
+    maxTokens: 4000,
     prompt: `Genera ÚNICAMENTE la sección "executive_summary". Debe incluir:
 - Situación actual de la marca basada en los datos reales del sitio (qué venden, cómo se presentan, qué propuesta de valor comunican)
 - Posición relativa frente a los 6 competidores analizados (en qué están mejor, en qué están peor)
@@ -25,7 +25,7 @@ Responde con JSON válido: { "executive_summary": { ... } }`,
   {
     id: 'brand_identity',
     keys: ['brand_identity'],
-    maxTokens: 2000,
+    maxTokens: 4000,
     prompt: `Genera ÚNICAMENTE la sección "brand_identity". Debe incluir:
 - Propuesta de valor actual: qué promete la marca según su sitio web (extrae las frases exactas que usan)
 - Tono y voz: analiza el lenguaje del sitio (formal/informal, técnico/accesible, emocional/racional)
@@ -39,7 +39,7 @@ Responde con JSON válido: { "brand_identity": { ... } }`,
   {
     id: 'financial_analysis',
     keys: ['financial_analysis'],
-    maxTokens: 2000,
+    maxTokens: 4000,
     prompt: `Genera ÚNICAMENTE la sección "financial_analysis". Debe incluir:
 - Modelo de negocio identificado (e-commerce, SaaS, servicios, infoproducto, marketplace, etc.)
 - Productos/servicios detectados en el sitio con sus precios si están visibles
@@ -52,7 +52,7 @@ Responde con JSON válido: { "financial_analysis": { ... } }`,
   {
     id: 'consumer_profile',
     keys: ['consumer_profile'],
-    maxTokens: 2000,
+    maxTokens: 4000,
     prompt: `Genera ÚNICAMENTE la sección "consumer_profile". Debe incluir:
 - Buyer persona principal: nombre ficticio, demografía, psicografía, comportamiento digital, pain points, motivadores de compra, barreras/objeciones, frase que lo define
 - Buyer persona secundario (mismo formato pero más breve)
@@ -63,7 +63,7 @@ Responde con JSON válido: { "consumer_profile": { ... } }`,
   {
     id: 'competitive_analysis',
     keys: ['competitive_analysis'],
-    maxTokens: 3000,
+    maxTokens: 6000,
     prompt: `Genera ÚNICAMENTE la sección "competitive_analysis". Debe incluir:
 a) Análisis INDIVIDUAL de CADA uno de los 6 competidores:
    Para CADA competidor: Nombre/URL, Propuesta de valor principal (cita frases reales si las hay), Fortalezas detectadas (mínimo 2), Debilidades detectadas (mínimo 2), Qué hacen MEJOR que el cliente, Qué hace el cliente MEJOR que ellos, Estrategia de contenido observada, Nivel de amenaza: "alto", "medio" o "bajo" con justificación
@@ -75,7 +75,7 @@ Responde con JSON válido: { "competitive_analysis": { ... } }`,
   {
     id: 'positioning_strategy',
     keys: ['positioning_strategy'],
-    maxTokens: 2500,
+    maxTokens: 5000,
     prompt: `Genera ÚNICAMENTE la sección "positioning_strategy". Debe incluir:
 - Posicionamiento actual del cliente: cómo se percibe según su sitio web
 - Posicionamiento de cada competidor: en 1 línea, cómo se posiciona cada uno
@@ -90,7 +90,7 @@ Responde con JSON válido: { "positioning_strategy": { ... } }`,
   {
     id: 'action_plan',
     keys: ['action_plan'],
-    maxTokens: 3500,
+    maxTokens: 7000,
     prompt: `Genera ÚNICAMENTE la sección "action_plan". Debe contener exactamente 7 accionables estratégicos usando framework SCR.
 Para CADA uno de los 7 accionables:
 - "title": Nombre claro y accionable
@@ -107,7 +107,7 @@ Responde con JSON válido: { "action_plan": [...] }`,
   {
     id: 'seo_audit',
     keys: ['seo_audit'],
-    maxTokens: 3000,
+    maxTokens: 6000,
     prompt: `Genera ÚNICAMENTE la sección "seo_audit". Debe incluir:
 a) SCORE SEO (0-100): Calcula basado en datos disponibles. SOLO da 0 si literalmente NO hay ningún dato. Si tienes meta tags, títulos o contenido, analízalos y da un score real con justificación.
 b) Análisis del sitio del CLIENTE: Meta titles y evaluación, Meta descriptions y evaluación, Estructura de headings H1/H2/H3, Contenido (densidad, relevancia), Estructura de URLs, Schema markup (presencia o ausencia)
@@ -120,7 +120,7 @@ Responde con JSON válido: { "seo_audit": { ... } }`,
   {
     id: 'keywords',
     keys: ['keywords'],
-    maxTokens: 2500,
+    maxTokens: 5000,
     prompt: `Genera ÚNICAMENTE la sección "keywords". Debe incluir:
 a) "primary_keywords": 5-6 keywords principales. Para cada una: keyword, search_intent (transaccional/informacional/comercial/navegacional), rationale (por qué es estratégica, qué competidores la usan), estimated_difficulty (alta/media/baja), priority (invertir inmediatamente o monitorear)
 b) "longtail_keywords": 5 keywords long-tail de baja competencia. Para cada una: keyword, search_intent, rationale (gaps que los competidores NO cubren), buyer_persona_match
@@ -136,7 +136,7 @@ Responde con JSON válido: { "keywords": { ... } }`,
   {
     id: 'meta_ads_strategy',
     keys: ['meta_ads_strategy'],
-    maxTokens: 2500,
+    maxTokens: 5000,
     prompt: `Genera ÚNICAMENTE la sección "meta_ads_strategy". Debe incluir:
 a) Objetivos de campaña recomendados por etapa de funnel
 b) Estructura de campañas: TOF (objetivo, audiencia, contenido), MOF (objetivo, retargeting, contenido), BOF (objetivo, audiencia, contenido)
@@ -150,7 +150,7 @@ Responde con JSON válido: { "meta_ads_strategy": { ... } }`,
   {
     id: 'google_ads_and_creative',
     keys: ['google_ads_strategy', 'ads_library_analysis'],
-    maxTokens: 3500,
+    maxTokens: 7000,
     prompt: `Genera ÚNICAMENTE estas 2 secciones en un solo JSON:
 1. "google_ads_strategy": Estrategia de Google Ads con:
    - Tipos de campaña recomendados (Search, Display, YouTube, Performance Max)
@@ -328,18 +328,49 @@ Deno.serve(async (req) => {
     );
 
     // ══════════════════════════════════════════════
-    //  11 LLAMADAS EN PARALELO con Promise.allSettled
+    //  11 LLAMADAS EN 3 OLEADAS (rate limit friendly)
     // ══════════════════════════════════════════════
-    console.log(`[analyze-brand-strategy] Starting 11 parallel calls for client ${client_id}`);
+    const fullSystemBase = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
 
-    const results = await Promise.allSettled(
-      SECTIONS.map(async (section) => {
-        const fullSystemPrompt = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`;
-        const data = await callClaude(fullSystemPrompt, truncatedResearch, section.maxTokens);
-        console.log(`[analyze-brand-strategy] Section "${section.id}" OK: keys=${Object.keys(data).join(',')}`);
-        return { sectionId: section.id, keys: section.keys, data };
-      })
+    const wave1 = SECTIONS.slice(0, 4);   // secciones 1-4
+    const wave2 = SECTIONS.slice(4, 8);   // secciones 5-8
+    const wave3 = SECTIONS.slice(8, 11);  // secciones 9-11
+
+    console.log(`[analyze-brand-strategy] Wave 1: starting ${wave1.map(s => s.id).join(', ')}`);
+    const results1 = await Promise.allSettled(
+      wave1.map(section => callClaude(
+        `${fullSystemBase}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`,
+        truncatedResearch,
+        section.maxTokens
+      ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
     );
+
+    console.log(`[analyze-brand-strategy] Wave 1 done. Waiting 15s for rate limit reset...`);
+    await new Promise(resolve => setTimeout(resolve, 15000));
+
+    console.log(`[analyze-brand-strategy] Wave 2: starting ${wave2.map(s => s.id).join(', ')}`);
+    const results2 = await Promise.allSettled(
+      wave2.map(section => callClaude(
+        `${fullSystemBase}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`,
+        truncatedResearch,
+        section.maxTokens
+      ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
+    );
+
+    console.log(`[analyze-brand-strategy] Wave 2 done. Waiting 15s for rate limit reset...`);
+    await new Promise(resolve => setTimeout(resolve, 15000));
+
+    console.log(`[analyze-brand-strategy] Wave 3: starting ${wave3.map(s => s.id).join(', ')}`);
+    const results3 = await Promise.allSettled(
+      wave3.map(section => callClaude(
+        `${fullSystemBase}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`,
+        truncatedResearch,
+        section.maxTokens
+      ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
+    );
+
+    const results = [...results1, ...results2, ...results3];
+    console.log(`[analyze-brand-strategy] All 3 waves complete.`);
 
     // Log detallado de cada resultado
     for (let i = 0; i < results.length; i++) {
