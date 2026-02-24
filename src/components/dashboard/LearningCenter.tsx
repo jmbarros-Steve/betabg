@@ -138,26 +138,31 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
     try {
       // Small delay for UX
       await new Promise(r => setTimeout(r, 500));
-      setPhase('analyzing');
-      setPhaseMessage('Analizando con Claude... extrayendo reglas accionables');
+      setPhaseMessage('Encolando procesamiento...');
 
       const { data, error } = await supabase.functions.invoke('learn-from-source', {
-        body: { sourceType, content, autoSave: false, title },
+        body: { sourceType, content, title },
       });
 
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
 
-      const extracted: ExtractedRule[] = (data.rules || []).map((r: any) => ({
-        ...r,
-        active: true,
-      }));
+      if (!data?.queueId) {
+        throw new Error('No se pudo crear el item de cola');
+      }
+
       setCurrentQueueId(data.queueId || null);
 
-      setRules(extracted);
+      void supabase.functions.invoke('process-queue-item', {
+        body: { queueId: data.queueId },
+      }).catch((invokeErr) => {
+        console.error('process-queue-item invoke error:', invokeErr);
+      });
+
+      setRules([]);
       setPhase('done');
-      setPhaseMessage(`✅ ${extracted.length} reglas extraídas`);
-      toast.success(`${extracted.length} reglas extraídas exitosamente`);
+      setPhaseMessage('✅ Fuente en procesamiento. Revisa el estado en la cola/historial.');
+      toast.success('Fuente enviada a procesamiento en background');
     } catch (err) {
       console.error('Learning error:', err);
       setPhase('error');
