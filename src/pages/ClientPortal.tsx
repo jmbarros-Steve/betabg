@@ -279,7 +279,7 @@ export default function ClientPortal() {
           )}
           {activeTab === 'strategy' && effectiveClientId && (
             <div className="max-w-2xl mx-auto">
-              <SteveStrategyChat clientId={effectiveClientId} />
+              <SteveStrategyChat clientId={effectiveClientId} onGoToBrief={() => setActiveTab('steve')} />
             </div>
           )}
           {activeTab === 'copies' && effectiveClientId && (
