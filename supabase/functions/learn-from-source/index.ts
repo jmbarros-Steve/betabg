@@ -23,6 +23,22 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // ── Duplicate check ──
+    if (!queueId) {
+      const { data: existing } = await supabase
+        .from('learning_queue')
+        .select('id, status')
+        .eq('source_content', content.trim())
+        .in('status', ['pending', 'processing'])
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        return new Response(JSON.stringify({ status: 'duplicate', queueId: existing[0].id, message: 'Este contenido ya está en la cola' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     let resolvedQueueId = queueId as string | undefined;
 
     if (resolvedQueueId) {
