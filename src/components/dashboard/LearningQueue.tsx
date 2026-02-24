@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Youtube, FileText, Globe, Type, Loader2, Play, Pause, Trash2,
-  Clock, CheckCircle2, AlertCircle, ListPlus,
+  Clock, CheckCircle2, AlertCircle, ListPlus, RotateCcw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -165,22 +165,47 @@ export function LearningQueue() {
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
+
+        // Handle duplicate response — skip, don't retry
+        if (data?.status === 'duplicate') {
+          await supabase.from('learning_queue').update({
+            status: 'completed',
+            error_message: 'Duplicado — ya existía en la cola',
+            processed_at: new Date().toISOString(),
+            rules_extracted: 0,
+          }).eq('id', item.id);
+          await fetchQueue();
+          continue;
+        }
+
         if (data?.status !== 'processing' || !data?.queueId) {
           throw new Error('Respuesta inválida al encolar procesamiento');
         }
 
         setCurrentItemTitle(`${item.source_title || 'Fuente'} — procesamiento en background...`);
 
-        // Fire-and-forget: dispara trabajo pesado sin bloquear respuesta inicial
+        // Fire-and-forget
         void supabase.functions.invoke('process-queue-item', {
           body: { queueId: data.queueId },
         }).catch((invokeErr) => {
           console.error('process-queue-item invoke error:', invokeErr);
         });
 
-        // Polling cada 5s hasta completar/error
+        // Polling cada 5s hasta completar/error — with max timeout (10 min)
+        const maxPollTime = 10 * 60 * 1000;
+        const pollStart = Date.now();
         while (!pauseRef.current) {
           await new Promise(r => setTimeout(r, 5000));
+
+          if (Date.now() - pollStart > maxPollTime) {
+            // Timeout — mark as error, DON'T retry
+            await supabase.from('learning_queue').update({
+              status: 'error',
+              error_message: 'Timeout — procesamiento excedió 10 minutos',
+              processed_at: new Date().toISOString(),
+            }).eq('id', item.id);
+            break;
+          }
 
           const { data: refreshed, error: pollErr } = await supabase
             .from('learning_queue')
@@ -188,15 +213,12 @@ export function LearningQueue() {
             .eq('id', data.queueId)
             .maybeSingle();
 
-          if (pollErr) throw pollErr;
-          if (!refreshed) throw new Error('No se encontró el item en cola durante polling');
-
+          if (pollErr || !refreshed) break;
           if (refreshed.status === 'completed' || refreshed.status === 'done') break;
-          if (refreshed.status === 'error') {
-            throw new Error(refreshed.error_message || 'Error desconocido en process-queue-item');
-          }
+          if (refreshed.status === 'error') break; // Don't throw — just skip to next
         }
       } catch (err) {
+        // Mark as error but DON'T retry — advance to next item
         console.error('Queue processing error:', err);
         await supabase
           .from('learning_queue')
@@ -253,15 +275,26 @@ export function LearningQueue() {
   }
 
   async function deleteItem(id: string) {
-    // Nullify FK references first
-    await supabase
-      .from('steve_knowledge')
-      .update({ source_id: null })
-      .eq('source_id', id);
-
+    await supabase.from('steve_knowledge').update({ source_id: null }).eq('source_id', id);
     const { error } = await supabase.from('learning_queue').delete().eq('id', id);
     if (!error) fetchQueue();
     else toast.error('Error al eliminar: ' + error.message);
+  }
+
+  async function retryItem(id: string) {
+    // Reset to pending so the queue picks it up again
+    const { error } = await supabase.from('learning_queue').update({
+      status: 'pending',
+      error_message: null,
+      processed_at: null,
+      rules_extracted: null,
+    }).eq('id', id);
+    if (!error) {
+      toast.success('Item reencolado para reintentar');
+      fetchQueue();
+    } else {
+      toast.error('Error al reintentar: ' + error.message);
+    }
   }
 
   // ── Status badge ──
@@ -425,7 +458,18 @@ export function LearningQueue() {
                     <TableCell className="py-2 text-xs text-muted-foreground">
                       {item.created_at ? format(new Date(item.created_at), 'dd/MM HH:mm') : '-'}
                     </TableCell>
-                    <TableCell className="py-2">
+                    <TableCell className="py-2 flex gap-1">
+                      {item.status === 'error' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => retryItem(item.id)}
+                          title="Reintentar"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                        </Button>
+                      )}
                       {(item.status === 'pending' || item.status === 'error') && (
                         <Button
                           variant="ghost"
