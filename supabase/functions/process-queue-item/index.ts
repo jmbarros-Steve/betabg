@@ -211,15 +211,44 @@ Deno.serve(async (req) => {
 
     if (allRules.length === 0) throw new Error('No rules extracted from content');
 
+    // ── Deduplicate within extracted rules (normalize: lowercase, no accents) ──
+    const normalize = (s: string) =>
+      (s || '').toLowerCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
     const seen = new Set<string>();
     const uniqueRules = allRules.filter(r => {
-      const key = `${(r.titulo || '').toLowerCase().trim()}::${(r.categoria || '').toLowerCase().trim()}`;
+      const key = `${normalize(r.titulo)}::${normalize(r.categoria)}`;
       if (!r.titulo || !r.contenido || !r.categoria || seen.has(key)) return false;
       seen.add(key);
       return true;
     });
 
-    const inserts = uniqueRules.map(r => ({
+    // ── Deduplicate against existing steve_knowledge ──
+    const { data: existingRules } = await supabase
+      .from('steve_knowledge')
+      .select('titulo');
+
+    const existingTitles = new Set(
+      (existingRules || []).map((r: { titulo: string }) => normalize(r.titulo))
+    );
+
+    const newRules = uniqueRules.filter(r => !existingTitles.has(normalize(r.titulo)));
+
+    if (newRules.length === 0) {
+      await supabase.from('learning_queue').update({
+        status: 'completed',
+        rules_extracted: 0,
+        processed_at: new Date().toISOString(),
+        error_message: 'Todas las reglas extraídas ya existían en la base de conocimiento',
+      }).eq('id', queueId);
+
+      return new Response(JSON.stringify({ status: 'completed', queueId, rulesSaved: 0, skippedDuplicates: uniqueRules.length }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const inserts = newRules.map(r => ({
       categoria: r.categoria,
       titulo: r.titulo.slice(0, 80),
       contenido: r.contenido,
