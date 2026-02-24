@@ -140,10 +140,12 @@ export function LearningHistory() {
     setLoadingRules(true);
 
     // Try by source_id first
-    const { data } = await supabase
+    const { data, error: queryErr } = await supabase
       .from('steve_knowledge')
       .select('id, titulo, contenido, categoria')
       .eq('source_id', item.id);
+
+    console.log('[LearningHistory] Rules query for source_id:', item.id, '→', data?.length, 'rules, error:', queryErr);
 
     if (data && data.length > 0) {
       setExpandedRules(data as KnowledgeRule[]);
