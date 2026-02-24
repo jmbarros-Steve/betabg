@@ -840,6 +840,7 @@ export type Database = {
           source_title: string | null
           source_type: string
           status: string | null
+          transcription: string | null
         }
         Insert: {
           created_at?: string | null
@@ -851,6 +852,7 @@ export type Database = {
           source_title?: string | null
           source_type: string
           status?: string | null
+          transcription?: string | null
         }
         Update: {
           created_at?: string | null
@@ -862,6 +864,7 @@ export type Database = {
           source_title?: string | null
           source_type?: string
           status?: string | null
+          transcription?: string | null
         }
         Relationships: []
       }

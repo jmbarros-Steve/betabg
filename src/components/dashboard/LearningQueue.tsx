@@ -160,6 +160,7 @@ export function LearningQueue() {
       await fetchQueue();
 
       try {
+        // Step 1: Extract content (learn-from-source)
         const { data, error } = await supabase.functions.invoke('learn-from-source', {
           body: {
             sourceType: item.source_type,
@@ -172,16 +173,33 @@ export function LearningQueue() {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
-        const rulesCount = data?.rules?.length || 0;
+        // Step 2: If content was too long, process-transcription handles chunking
+        if (data?.status === 'transcribed' && data?.queueId) {
+          setCurrentItemTitle(`${item.source_title || 'Video'} — procesando chunks...`);
+          await fetchQueue();
 
-        await supabase
-          .from('learning_queue')
-          .update({
-            status: 'completed',
-            rules_extracted: rulesCount,
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', item.id);
+          const { data: procData, error: procError } = await supabase.functions.invoke('process-transcription', {
+            body: { queueId: data.queueId },
+          });
+
+          if (procError) throw procError;
+          if (procData?.error) throw new Error(procData.error);
+
+          console.log(`Chunked processing done: ${procData?.rules?.length || 0} rules from ${procData?.chunksProcessed || 1} chunks`);
+        } else {
+          // Short content was processed inline
+          const rulesCount = data?.rules?.length || 0;
+          if (!data?.saved && data?.queueId) {
+            await supabase
+              .from('learning_queue')
+              .update({
+                status: 'completed',
+                rules_extracted: rulesCount,
+                processed_at: new Date().toISOString(),
+              })
+              .eq('id', item.id);
+          }
+        }
 
       } catch (err) {
         console.error('Queue processing error:', err);

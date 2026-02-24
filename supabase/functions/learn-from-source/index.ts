@@ -69,18 +69,14 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
     console.log(`[YouTube] Caption method failed: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 
-  // Method 2: Try YouTube transcript API alternatives
+  // Method 2: InnerTube API
   console.log('[YouTube] No captions found, trying alternative methods...');
-
-  // Method 3: Try using youtube-transcript npm workaround via innertube
   try {
     const innertubeRes = await fetch(`https://www.youtube.com/youtubei/v1/get_transcript?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        context: {
-          client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' }
-        },
+        context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } },
         params: btoa(`\n\x0b${videoId}`)
       }),
     });
@@ -106,18 +102,14 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
     console.log(`[YouTube] InnerTube method failed: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 
-  // Method 4: Whisper transcription via audio download
+  // Method 3: Whisper transcription
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   if (OPENAI_API_KEY) {
     console.log('[YouTube] Attempting audio download + Whisper transcription...');
     try {
-      // Try cobalt API to get audio URL
       const cobaltRes = await fetch('https://api.cobalt.tools/', {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: `https://www.youtube.com/watch?v=${videoId}`,
           downloadMode: 'audio',
@@ -138,7 +130,6 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
             const audioBlob = await audioRes.blob();
             console.log(`[YouTube] Audio downloaded: ${(audioBlob.size / 1024 / 1024).toFixed(1)} MB`);
 
-            // Limit to 25MB (Whisper API limit)
             if (audioBlob.size <= 25 * 1024 * 1024) {
               const formData = new FormData();
               formData.append('file', audioBlob, 'audio.mp3');
@@ -174,21 +165,15 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
     }
   }
 
-  // Method 5: Firecrawl as last resort (page scraping)
+  // Method 4: Firecrawl
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
   if (FIRECRAWL_API_KEY) {
     console.log('[YouTube] Attempting Firecrawl page scraping as last resort...');
     try {
       const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: `https://www.youtube.com/watch?v=${videoId}`,
-          formats: ['markdown'],
-        }),
+        headers: { 'Authorization': `Bearer ${FIRECRAWL_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${videoId}`, formats: ['markdown'] }),
       });
 
       if (fcRes.ok) {
@@ -218,10 +203,7 @@ async function extractUrlContent(url: string): Promise<string> {
     try {
       const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${FIRECRAWL_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, formats: ['markdown'] }),
       });
 
@@ -238,7 +220,6 @@ async function extractUrlContent(url: string): Promise<string> {
     }
   }
 
-  // Fallback: simple fetch + strip HTML
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SteveBot/1.0)' },
   });
@@ -261,6 +242,9 @@ async function extractUrlContent(url: string): Promise<string> {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
+// Phase 1: Extract content and save transcription to learning_queue.
+// Phase 2 (process-transcription) handles Claude chunking.
+// For short content (<=50k chars), we do everything in one shot for speed.
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -269,7 +253,7 @@ Deno.serve(async (req) => {
 
   try {
     const { sourceType, content, autoSave = false, title } = await req.json();
-    console.log(`[Step 0] Received request — sourceType: ${sourceType}, contentLength: ${content?.length || 0}, autoSave: ${autoSave}`);
+    console.log(`[Step 0] sourceType: ${sourceType}, contentLength: ${content?.length || 0}, autoSave: ${autoSave}`);
 
     if (!sourceType || !content?.trim()) {
       return new Response(JSON.stringify({ error: 'sourceType and content are required' }), {
@@ -279,18 +263,14 @@ Deno.serve(async (req) => {
     }
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
-      console.error('[Error] ANTHROPIC_API_KEY not configured');
-      throw new Error('ANTHROPIC_API_KEY not configured');
-    }
+    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Insert queue record
-    console.log('[Step 1] Creating queue record...');
+    // Step 1: Create queue record
     const { data: queueRow, error: queueErr } = await supabase
       .from('learning_queue')
       .insert({
@@ -302,16 +282,14 @@ Deno.serve(async (req) => {
       .select('id')
       .single();
 
-    if (queueErr) {
-      console.error('[Step 1] Queue insert error:', queueErr);
-    }
-
+    if (queueErr) console.error('[Step 1] Queue insert error:', queueErr);
     queueId = queueRow?.id || null;
-    console.log(`[Step 1] Queue record created: ${queueId}`);
+    console.log(`[Step 1] Queue record: ${queueId}`);
 
-    // ── Step 2: Extract text based on source type ────────────────────────────
-    console.log(`[Step 2] Extracting content for sourceType: ${sourceType}...`);
+    // Step 2: Extract text
+    console.log(`[Step 2] Extracting content...`);
     let extractedText: string;
+    let isPdf = false;
 
     switch (sourceType) {
       case 'youtube': {
@@ -320,32 +298,56 @@ Deno.serve(async (req) => {
         extractedText = await extractYouTubeTranscript(videoId);
         break;
       }
-      case 'url': {
+      case 'url':
         extractedText = await extractUrlContent(content.trim());
         break;
-      }
-      case 'pdf': {
-        extractedText = '__PDF_BASE64__';
+      case 'pdf':
+        extractedText = content.trim(); // base64
+        isPdf = true;
         break;
-      }
-      case 'text': {
+      case 'text':
         extractedText = content.trim();
         break;
-      }
       default:
         throw new Error(`Unsupported source type: ${sourceType}`);
     }
 
-    console.log(`[Step 2] Content extracted: ${extractedText === '__PDF_BASE64__' ? 'PDF (base64)' : `${extractedText.length} chars`}`);
+    const textLength = isPdf ? 0 : extractedText.length;
+    console.log(`[Step 2] Extracted: ${isPdf ? 'PDF (base64)' : `${textLength} chars`}`);
 
-    // ── Step 3: Send to Claude for rule extraction ───────────────────────────
-    console.log('[Step 3] Sending to Claude for rule extraction...');
+    // ── Decision: short content → process inline; long → save & defer ──
+    const MAX_INLINE_CHARS = 50000;
+    const needsChunking = !isPdf && textLength > MAX_INLINE_CHARS;
+
+    if (needsChunking) {
+      // Save transcription and return immediately — frontend will call process-transcription
+      console.log(`[Step 3] Content too long (${textLength} chars), saving transcription for chunked processing...`);
+
+      if (queueId) {
+        await supabase.from('learning_queue').update({
+          transcription: extractedText,
+          status: 'transcribed',
+        }).eq('id', queueId);
+      }
+
+      return new Response(JSON.stringify({
+        status: 'transcribed',
+        queueId,
+        textLength,
+        message: `Transcripción guardada (${textLength} caracteres). Se procesará en chunks.`,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── Short content: process inline (original flow) ──
+    console.log('[Step 3] Short content, processing inline with Claude...');
 
     const systemPrompt = `Eres un experto en performance marketing para e-commerce. Analiza el siguiente contenido y extrae TODAS las reglas accionables, estrategias y tácticas mencionadas. Para cada regla genera un JSON con: titulo (nombre corto y descriptivo de la regla, máximo 60 caracteres), contenido (la regla completa con los pasos numerados, clara y accionable), categoria (clasifica en una de estas categorías EXACTAS: brief, seo, keywords, meta, meta_ads, google, shopify, klaviyo, anuncios, buyer_persona). Si una regla aplica a múltiples categorías, elige la más relevante. Si el contenido no es sobre marketing/e-commerce, extrae lo que puedas y clasifica en la categoría más cercana. Responde SOLO con un array JSON válido sin markdown ni backticks.`;
 
     const userContent: any[] = [];
 
-    if (sourceType === 'pdf') {
+    if (isPdf) {
       userContent.push({
         type: 'document',
         source: { type: 'base64', media_type: 'application/pdf', data: content },
@@ -355,12 +357,9 @@ Deno.serve(async (req) => {
         text: 'Analiza este documento PDF y extrae todas las reglas accionables de marketing/e-commerce.',
       });
     } else {
-      // Truncate to 100k chars to avoid token limits
-      const truncated = extractedText.slice(0, 100000);
-      console.log(`[Step 3] Text truncated to: ${truncated.length} chars`);
       userContent.push({
         type: 'text',
-        text: `Analiza el siguiente contenido y extrae todas las reglas accionables:\n\n${truncated}`,
+        text: `Analiza el siguiente contenido y extrae todas las reglas accionables:\n\n${extractedText}`,
       });
     }
 
@@ -381,39 +380,30 @@ Deno.serve(async (req) => {
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
-      console.error(`[Step 3] Anthropic API error: ${anthropicRes.status} - ${errText.slice(0, 500)}`);
       throw new Error(`Anthropic API error: ${anthropicRes.status} - ${errText.slice(0, 200)}`);
     }
 
     const anthropicData = await anthropicRes.json();
     const rawText = anthropicData.content[0].text.trim();
-    console.log(`[Step 3] Claude response received: ${rawText.length} chars`);
 
-    // ── Step 4: Parse JSON response ──────────────────────────────────────────
-    console.log('[Step 4] Parsing rules from Claude response...');
+    // Parse rules
     const jsonText = rawText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     let rules: Array<{ titulo: string; contenido: string; categoria: string }>;
 
     try {
       const parsed = JSON.parse(jsonText);
       rules = Array.isArray(parsed) ? parsed : (parsed.entradas || parsed.rules || []);
-    } catch (parseErr) {
-      console.error(`[Step 4] JSON parse error: ${parseErr instanceof Error ? parseErr.message : 'unknown'}`);
-      console.error(`[Step 4] Raw text (first 500 chars): ${jsonText.slice(0, 500)}`);
+    } catch {
       throw new Error('Failed to parse Claude response as JSON');
     }
 
-    if (!Array.isArray(rules) || rules.length === 0) {
-      console.error('[Step 4] No rules extracted from content');
-      throw new Error('No rules extracted from content');
-    }
+    if (!Array.isArray(rules) || rules.length === 0) throw new Error('No rules extracted from content');
 
-    console.log(`[Step 4] Successfully parsed ${rules.length} rules`);
+    console.log(`[Step 4] Parsed ${rules.length} rules`);
 
-    // ── Step 5: Optionally save to steve_knowledge ──────────────────────────
+    // Save rules
     let saved = false;
     if (autoSave) {
-      console.log('[Step 5] Auto-saving rules to steve_knowledge...');
       const inserts = rules.map(r => ({
         categoria: r.categoria,
         titulo: r.titulo.slice(0, 80),
@@ -424,31 +414,19 @@ Deno.serve(async (req) => {
       }));
 
       const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);
-      if (insertErr) {
-        console.error('[Step 5] Failed to save rules:', insertErr);
-      } else {
-        saved = true;
-        console.log(`[Step 5] Saved ${inserts.length} rules successfully`);
-      }
+      if (!insertErr) saved = true;
+      else console.error('[Step 5] Failed to save rules:', insertErr);
     }
 
-    // Update queue record — use specific ID to avoid 409 conflicts
+    // Update queue
     if (queueId) {
-      console.log(`[Step 6] Updating queue record ${queueId} to completed...`);
-      const { error: updateErr } = await supabase.from('learning_queue').update({
+      await supabase.from('learning_queue').update({
         status: 'completed',
         rules_extracted: rules.length,
         processed_at: new Date().toISOString(),
       }).eq('id', queueId);
-
-      if (updateErr) {
-        console.error(`[Step 6] Queue update error:`, updateErr);
-      } else {
-        console.log(`[Step 6] Queue record updated successfully`);
-      }
     }
 
-    console.log(`[Done] Returning ${rules.length} rules, saved: ${saved}`);
     return new Response(JSON.stringify({ rules, saved, queueId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -456,9 +434,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('learn-from-source error:', errorMessage);
-    console.error('Full error:', err);
 
-    // Update queue record with error using the queueId from outer scope
     if (queueId) {
       try {
         const supabase = createClient(
@@ -470,10 +446,7 @@ Deno.serve(async (req) => {
           error_message: errorMessage,
           processed_at: new Date().toISOString(),
         }).eq('id', queueId);
-        console.log(`[Error Handler] Queue record ${queueId} marked as error`);
-      } catch (updateErr) {
-        console.error('[Error Handler] Failed to update queue:', updateErr);
-      }
+      } catch {}
     }
 
     return new Response(

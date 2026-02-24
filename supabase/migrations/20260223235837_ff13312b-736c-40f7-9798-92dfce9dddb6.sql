@@ -1,0 +1,1 @@
+ALTER TABLE public.learning_queue ADD COLUMN IF NOT EXISTS transcription text;
