@@ -16,6 +16,7 @@ import { ClientMetricsPanel } from '@/components/dashboard/ClientMetricsPanel';
 import { SteveKnowledgePanel } from '@/components/dashboard/SteveKnowledgePanel';
 import { SteveTrainingPanel } from '@/components/dashboard/SteveTrainingPanel';
 import { SteveTrainingChat } from '@/components/dashboard/SteveTrainingChat';
+import { KnowledgeRulesExplorer } from '@/components/dashboard/KnowledgeRulesExplorer';
 import logo from '@/assets/logo.jpg';
 
 type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training';
@@ -123,6 +124,7 @@ export default function Dashboard() {
           {activeTab === 'training' && (
             <div className="space-y-10">
               <SteveTrainingChat />
+              <KnowledgeRulesExplorer />
               <SteveKnowledgePanel />
             </div>
           )}
