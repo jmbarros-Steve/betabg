@@ -76,6 +76,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [savingAll, setSavingAll] = useState(false);
   const [currentQueueId, setCurrentQueueId] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   // Input states
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -126,6 +127,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
     setRules([]);
     setPhase('extracting');
+    setIsSending(true);
 
     const phaseMessages: Record<SourceTab, string> = {
       youtube: 'Descargando transcripción del video...',
@@ -136,7 +138,6 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
     setPhaseMessage(phaseMessages[sourceType]);
 
     try {
-      // Small delay for UX
       await new Promise(r => setTimeout(r, 500));
       setPhaseMessage('Encolando procesamiento...');
 
@@ -146,6 +147,13 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      if (data?.status === 'duplicate') {
+        toast.info('Este contenido ya está en la cola');
+        setPhase('idle');
+        setPhaseMessage('');
+        return;
+      }
 
       if (!data?.queueId) {
         throw new Error('No se pudo crear el item de cola');
@@ -168,6 +176,8 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
       setPhase('error');
       setPhaseMessage(err instanceof Error ? err.message : 'Error desconocido');
       toast.error('Error al procesar la fuente');
+    } finally {
+      setIsSending(false);
     }
   }
 
@@ -308,7 +318,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
   };
 
   const activeRulesCount = rules.filter(r => r.active).length;
-  const isProcessing = phase === 'extracting' || phase === 'analyzing';
+  const isProcessing = phase === 'extracting' || phase === 'analyzing' || isSending;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
