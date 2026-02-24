@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -21,11 +21,12 @@ import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPane
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
+import { SteveStrategyChat } from '@/components/client-portal/SteveStrategyChat';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'copies' | 'google' | 'klaviyo' | 'config';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'strategy' | 'copies' | 'google' | 'klaviyo' | 'config';
 interface ClientInfo {
   id: string;
   name: string;
@@ -173,6 +174,7 @@ export default function ClientPortal() {
     { id: 'competitors', label: 'Competencia', icon: Instagram },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
     { id: 'steve', label: 'Steve', icon: Bot },
+    { id: 'strategy', label: 'Steve Estrategia', icon: MessageSquare },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
@@ -273,6 +275,11 @@ export default function ClientPortal() {
           {activeTab === 'steve' && effectiveClientId && (
             <div className="max-w-2xl mx-auto">
               <SteveChat clientId={effectiveClientId} />
+            </div>
+          )}
+          {activeTab === 'strategy' && effectiveClientId && (
+            <div className="max-w-2xl mx-auto">
+              <SteveStrategyChat clientId={effectiveClientId} />
             </div>
           )}
           {activeTab === 'copies' && effectiveClientId && (
