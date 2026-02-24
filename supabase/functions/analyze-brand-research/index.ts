@@ -152,9 +152,75 @@ Deno.serve(async (req) => {
     const fillFromBrief = briefCompetitorUrls
       .filter(u => !explicitUrls.some((e: string) => e.includes(u.replace(/https?:\/\//, '').split('/')[0])))
       .slice(0, remainingSlots);
-    const allCompetitorUrls = [...new Set([...explicitUrls, ...fillFromBrief])].slice(0, 3);
+    let allCompetitorUrls = [...new Set([...explicitUrls, ...fillFromBrief])].slice(0, 3);
 
-    console.log('Competitor URLs to analyze:', allCompetitorUrls);
+    console.log('Competitor URLs before AI detection:', allCompetitorUrls);
+
+    // 2b. AI auto-detection of competitors when we have fewer than 3
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (allCompetitorUrls.length < 3 && anthropicApiKey && (websiteContent || briefContext)) {
+      await updateProgress('auto_competidores', 'Detectando competidores automáticamente con IA...', 18);
+      try {
+        const slotsNeeded = 3 - allCompetitorUrls.length;
+        const existingDomains = allCompetitorUrls.map(u => {
+          try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace('www.', ''); } catch { return u; }
+        });
+        const clientDomain = website_url ? (() => { try { return new URL(website_url.startsWith('http') ? website_url : `https://${website_url}`).hostname.replace('www.', ''); } catch { return ''; } })() : '';
+
+        const aiPrompt = `Eres un experto en e-commerce y marketing digital en Chile/LATAM.
+Basándote en la siguiente información de un negocio, identifica exactamente ${slotsNeeded} competidores directos que vendan productos similares en el mismo mercado.
+
+MARCA: ${client.name || ''} ${client.company || ''}
+WEB: ${website_url || 'no disponible'}
+CONTENIDO DEL SITIO (resumen): ${(websiteContent || '').slice(0, 2000)}
+CONTEXTO DEL BRIEF: ${JSON.stringify(briefContext).slice(0, 1500)}
+
+COMPETIDORES YA IDENTIFICADOS (NO repetir): ${existingDomains.join(', ')}
+DOMINIO DEL CLIENTE (NO incluir): ${clientDomain}
+
+Responde SOLO con un JSON array de objetos con "url" (dominio completo con https://) y "reason" (1 línea por qué es competidor directo).
+Ejemplo: [{"url": "https://competidor.cl", "reason": "Vende ropa de cama premium en Chile"}]
+Solo dominios reales de tiendas que existan. NO inventes dominios.`;
+
+        const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicApiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 500,
+            messages: [{ role: 'user', content: aiPrompt }],
+          }),
+        });
+
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          const aiText = aiData.content?.[0]?.text || '';
+          const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const detected: { url: string; reason: string }[] = JSON.parse(jsonMatch[0]);
+            for (const comp of detected) {
+              if (allCompetitorUrls.length >= 3) break;
+              const compUrl = comp.url.startsWith('http') ? comp.url : `https://${comp.url}`;
+              const compDomain = new URL(compUrl).hostname.replace('www.', '');
+              if (compDomain !== clientDomain && !existingDomains.includes(compDomain)) {
+                allCompetitorUrls.push(compUrl);
+                existingDomains.push(compDomain);
+                console.log(`[AI auto-detect] Found competitor: ${compUrl} — ${comp.reason}`);
+              }
+            }
+          }
+        }
+      } catch (aiErr) {
+        console.error('AI competitor auto-detection error:', aiErr);
+        // Non-fatal — continue with whatever competitors we have
+      }
+    }
+
+    console.log('Final competitor URLs to analyze:', allCompetitorUrls);
 
     // 3. Scrape each competitor (max 3, sequentially)
     const competitorContents: string[] = [];
