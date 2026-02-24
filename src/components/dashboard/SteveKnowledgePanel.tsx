@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2, CalendarDays } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2, CalendarDays, RefreshCw } from 'lucide-react';
 import { LearningCenter } from './LearningCenter';
 import { LearningHistory } from './LearningHistory';
 
@@ -629,11 +629,9 @@ export function SteveKnowledgePanel() {
 
   const currentCategoria = TABS.find(t => t.id === activeTab)?.categoria ?? activeTab;
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
 
-  async function fetchAll() {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     const [kRes, bRes] = await Promise.all([
       supabase.from('steve_knowledge').select('*').order('orden').order('created_at'),
@@ -642,7 +640,24 @@ export function SteveKnowledgePanel() {
     if (kRes.data) setKnowledge(kRes.data as KnowledgeEntry[]);
     if (bRes.data) setBugs(bRes.data as BugEntry[]);
     setLoading(false);
+  }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+    toast.success('Datos actualizados');
   }
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  // Auto-refresh every 30 seconds to pick up background changes
+  useEffect(() => {
+    const interval = setInterval(fetchAll, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
 
   // ── Knowledge CRUD ──────────────────────────────────────────────────────────
 
@@ -796,7 +811,7 @@ export function SteveKnowledgePanel() {
 
       {/* Date filter + counter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-border bg-muted/30">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="text-xl">📚</span>
           <span>
             <span className="font-semibold text-foreground">{totalKnowledge}</span> entradas totales
@@ -804,6 +819,9 @@ export function SteveKnowledgePanel() {
               <span className="ml-2 text-primary font-medium">— {todayKnowledge} agregadas hoy</span>
             )}
           </span>
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
         <div className="flex items-center gap-1.5">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
