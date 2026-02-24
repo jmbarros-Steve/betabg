@@ -151,56 +151,51 @@ export function LearningQueue() {
       setCurrentIndex(idx);
       setCurrentItemTitle(item.source_title || item.source_content.slice(0, 60));
 
-      // Update to processing
-      await supabase
-        .from('learning_queue')
-        .update({ status: 'processing' })
-        .eq('id', item.id);
-
       await fetchQueue();
 
       try {
-        // Step 1: Extract content (learn-from-source)
         const { data, error } = await supabase.functions.invoke('learn-from-source', {
           body: {
             sourceType: item.source_type,
             content: item.source_content,
-            autoSave: true,
             title: item.source_title,
+            queueId: item.id,
           },
         });
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-
-        // Step 2: If content was too long, process-transcription handles chunking
-        if (data?.status === 'transcribed' && data?.queueId) {
-          setCurrentItemTitle(`${item.source_title || 'Video'} — procesando chunks...`);
-          await fetchQueue();
-
-          const { data: procData, error: procError } = await supabase.functions.invoke('process-transcription', {
-            body: { queueId: data.queueId },
-          });
-
-          if (procError) throw procError;
-          if (procData?.error) throw new Error(procData.error);
-
-          console.log(`Chunked processing done: ${procData?.rules?.length || 0} rules from ${procData?.chunksProcessed || 1} chunks`);
-        } else {
-          // Short content was processed inline
-          const rulesCount = data?.rules?.length || 0;
-          if (!data?.saved && data?.queueId) {
-            await supabase
-              .from('learning_queue')
-              .update({
-                status: 'completed',
-                rules_extracted: rulesCount,
-                processed_at: new Date().toISOString(),
-              })
-              .eq('id', item.id);
-          }
+        if (data?.status !== 'processing' || !data?.queueId) {
+          throw new Error('Respuesta inválida al encolar procesamiento');
         }
 
+        setCurrentItemTitle(`${item.source_title || 'Fuente'} — procesamiento en background...`);
+
+        // Fire-and-forget: dispara trabajo pesado sin bloquear respuesta inicial
+        void supabase.functions.invoke('process-queue-item', {
+          body: { queueId: data.queueId },
+        }).catch((invokeErr) => {
+          console.error('process-queue-item invoke error:', invokeErr);
+        });
+
+        // Polling cada 5s hasta completar/error
+        while (!pauseRef.current) {
+          await new Promise(r => setTimeout(r, 5000));
+
+          const { data: refreshed, error: pollErr } = await supabase
+            .from('learning_queue')
+            .select('status, error_message')
+            .eq('id', data.queueId)
+            .maybeSingle();
+
+          if (pollErr) throw pollErr;
+          if (!refreshed) throw new Error('No se encontró el item en cola durante polling');
+
+          if (refreshed.status === 'completed' || refreshed.status === 'done') break;
+          if (refreshed.status === 'error') {
+            throw new Error(refreshed.error_message || 'Error desconocido en process-queue-item');
+          }
+        }
       } catch (err) {
         console.error('Queue processing error:', err);
         await supabase
