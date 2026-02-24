@@ -172,6 +172,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
         if (error) throw error;
         const { data: urlData } = supabase.storage.from('client-assets').getPublicUrl(path);
         newUrls.push(urlData.publicUrl);
+
+        // Also save to client_assets table so it appears in the Assets gallery
+        await supabase.from('client_assets').insert({
+          client_id: clientId,
+          url: urlData.publicUrl,
+          nombre: file.name,
+          tipo: category === 'logo' ? 'logo' : 'producto',
+        });
       }
       setUploadedAssets(prev => ({ ...prev, [category]: [...prev[category], ...newUrls] }));
       if (category === 'logo' && newUrls.length > 0) {
@@ -180,7 +188,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       toast.success(`${files.length} archivo(s) subido(s)`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Error al subir archivo');
+      toast.error('Error al subir archivo. Verifica que el archivo sea menor a 5MB.');
     } finally {
       setUploadingAssets(null);
     }
@@ -334,9 +342,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
           setShowInteraction(true);
           toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
         }
-        if (data.is_complete) {
+      if (data.is_complete) {
           setIsComplete(true);
-          setShowAssetUpload(false);
+          // Keep asset upload visible so user can still upload after completion
           toast.success('¡Brief de Marca completado! 🎉');
         }
       }
@@ -582,7 +590,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
           )}
 
           {/* Asset Upload for Q15 — inline in chat */}
-          {showAssetUpload && !isComplete && !isLoading && (
+          {showAssetUpload && !isLoading && (
             <div className="px-4 pb-2 flex-shrink-0 border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <p className="text-xs font-medium text-muted-foreground mb-2">📸 Sube tus archivos aquí (obligatorio para el brief):</p>
               <div className="grid grid-cols-2 gap-3 mb-3">
