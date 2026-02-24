@@ -59,11 +59,14 @@ serve(async (req) => {
 
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
       supabase.from('steve_knowledge').select('categoria, titulo, contenido')
-        .in('categoria', [categoriaRelevante, 'anuncios'])
-        .eq('activo', true).order('orden', { ascending: true }).limit(8),
+        .in('categoria', [categoriaRelevante, 'anuncios', 'meta_ads'])
+        .eq('activo', true)
+        .order('orden', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(20),
       supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
         .in('categoria', [categoriaRelevante, 'anuncios'])
-        .eq('activo', true).limit(4),
+        .eq('activo', true).limit(5),
     ]);
 
     const copyKnowledge = knowledge?.map((k: any) =>
@@ -74,7 +77,7 @@ serve(async (req) => {
       `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
     ).join('\n\n') || '';
 
-    const knowledgeSection = copyKnowledge ? `\nFRAMEWORKS Y CONOCIMIENTO DE ANUNCIOS GANADORES:\n${copyKnowledge}\n` : '';
+    const knowledgeSection = copyKnowledge ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n${copyKnowledge}\n` : '';
     const bugSection = copyBugs ? `\nERRORES A EVITAR EN COPIES:\n${copyBugs}\n` : '';
 
     const competidores = (brief.competitors as string[])?.join(', ') || 'No especificados';

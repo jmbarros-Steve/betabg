@@ -936,11 +936,12 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
       supabase
         .from('steve_knowledge')
-        .select('categoria, titulo, contenido')
-        .in('categoria', [categoriaRelevante, 'brief'])
+        .select('categoria, titulo, contenido, orden')
+        .in('categoria', [categoriaRelevante, 'brief', 'anuncios'])
         .eq('activo', true)
-        .order('orden', { ascending: true })
-        .limit(8),
+        .order('orden', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(30),
       supabase
         .from('steve_bugs')
         .select('categoria, descripcion, ejemplo_malo, ejemplo_bueno')
@@ -957,7 +958,7 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       `❌ EVITAR: ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`
     ).join('\n\n') || '';
 
-    const knowledgeSection = knowledgeContext ? `\nCONOCIMIENTO APRENDIDO — ÚSALO EN CADA RESPUESTA:\n${knowledgeContext}\n` : '';
+    const knowledgeSection = knowledgeContext ? `\nKNOWLEDGE BASE ACTUALIZADO (usa esta información para responder):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n${knowledgeContext}\n` : '';
     const bugSection = bugsContext ? `\nERRORES QUE NUNCA DEBES COMETER:\n${bugsContext}\n` : '';
 
     const phaseContext = faseNegocio ? `\n\n═══ CONTEXTO DE FASE DEL NEGOCIO ═══
