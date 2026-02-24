@@ -708,10 +708,10 @@ Deno.serve(async (req) => {
       const categoriaVar = 'meta_ads';
       const [{ data: kbBugsVar }, { data: kbKnowledgeVar }] = await Promise.all([
         supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaVar).eq('activo', true),
-        supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaVar).eq('activo', true).order('orden'),
+        supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
       ]);
       const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
-      const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeVar.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+      const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledgeVar.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
       const prompt = `${bugSectionVar}${knowledgeSectionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
 
@@ -768,10 +768,10 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       const categoriaBV = 'anuncios';
       const [{ data: kbBugsBV }, { data: kbKnowledgeBV }] = await Promise.all([
         supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaBV).eq('activo', true),
-        supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaBV).eq('activo', true).order('orden'),
+        supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['anuncios', 'meta_ads']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(15),
       ]);
       const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
-      const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeBV.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+      const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
       const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
 
@@ -1003,10 +1003,10 @@ las preferencias específicas de cada cliente cuando las conozco.
     const categoriaLegacy = 'meta_ads';
     const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }] = await Promise.all([
       supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaLegacy).eq('activo', true),
-      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaLegacy).eq('activo', true).order('orden'),
+      supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
     ]);
     const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
-    const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeLegacy.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+    const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nREGLAS APRENDIDAS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto.\n${kbKnowledgeLegacy.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
     const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
 

@@ -355,7 +355,12 @@ Deno.serve(async (req) => {
 
     // Fetch knowledge base
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
-      supabase.from('steve_knowledge').select('categoria, titulo, contenido').eq('activo', true).order('orden', { ascending: true }).limit(10),
+      supabase.from('steve_knowledge').select('categoria, titulo, contenido')
+        .in('categoria', ['meta_ads', 'brief', 'anuncios', 'google', 'seo', 'shopify', 'klaviyo'])
+        .eq('activo', true)
+        .order('orden', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(20),
       supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true).limit(5),
     ]);
 
@@ -414,7 +419,7 @@ Deno.serve(async (req) => {
     // ══════════════════════════════════════════════
     //  11 LLAMADAS EN 3 OLEADAS (rate limit friendly)
     // ══════════════════════════════════════════════
-    const fullSystemBase = `Eres un estratega de marketing digital experto en e-commerce LATAM.${knowledgeContext ? `\nMETODOLOGÍA:\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
+    const fullSystemBase = `Eres un estratega de marketing digital experto en e-commerce LATAM.\n\nREGLA DE PRIORIDAD: Si hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n${knowledgeContext ? `\nREGLAS APRENDIDAS (aplicar obligatoriamente):\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
 
     const wave1 = SECTIONS.slice(0, 4);   // secciones 1-4
     const wave2 = SECTIONS.slice(4, 8);   // secciones 5-8

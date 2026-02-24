@@ -31,14 +31,19 @@ serve(async (req) => {
     const categoria = 'anuncios';
     const [{ data: kbBugs }, { data: kbKnowledge }, { data: adReferences }] = await Promise.all([
       supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
-      supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoria).eq('activo', true).order('orden'),
+      supabase.from('steve_knowledge').select('titulo, contenido')
+        .in('categoria', ['anuncios', 'meta_ads'])
+        .eq('activo', true)
+        .order('orden', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(15),
       supabase.from('ad_references').select('visual_patterns, quality_score, image_url')
         .eq('angulo', angulo)
         .order('quality_score', { ascending: false })
         .limit(3),
     ]);
     const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
-    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledge.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
+    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledge.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
     // Build visual references section from ad_references
     let referencesSection = '';
