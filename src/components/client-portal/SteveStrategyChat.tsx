@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Send, User, Sparkles, Trash2 } from 'lucide-react';
+import { Send, User, Sparkles, Trash2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
@@ -18,9 +18,10 @@ interface Message {
 
 interface SteveStrategyChatProps {
   clientId: string;
+  onGoToBrief?: () => void;
 }
 
-export function SteveStrategyChat({ clientId }: SteveStrategyChatProps) {
+export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -128,10 +129,16 @@ export function SteveStrategyChat({ clientId }: SteveStrategyChatProps) {
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">🐕</AvatarFallback>
               </Avatar>
               <h3 className="text-lg font-semibold mb-2">¡Woof! Soy Steve 🐕</h3>
-              <p className="text-sm text-muted-foreground max-w-md mb-6">
+              <p className="text-sm text-muted-foreground max-w-md mb-4">
                 Pregúntame sobre Meta Ads, Google Ads, SEO, Klaviyo, Shopify, creativos, estrategia... 
                 lo que necesites. Uso todo lo que aprendí para darte respuestas accionables.
               </p>
+              {onGoToBrief && (
+                <Button variant="outline" size="sm" className="mb-6" onClick={onGoToBrief}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  ¿Quieres hacer tu Brief Estratégico? Ir a Steve Brief
+                </Button>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {suggestions.map((s, i) => (
                   <button
