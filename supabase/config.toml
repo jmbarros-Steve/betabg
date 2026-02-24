@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.learn-from-source]
 verify_jwt = false
+
+[functions.process-transcription]
+verify_jwt = false
