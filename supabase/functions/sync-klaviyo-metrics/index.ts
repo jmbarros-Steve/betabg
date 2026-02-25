@@ -310,16 +310,24 @@ Deno.serve(async (req) => {
     const listCounts = await Promise.all(
       klaviyoLists.map(async (list: any) => {
         try {
+          console.log(`[klaviyo] Counting profiles for list ${list.id} "${list.name}"...`);
           const r = await fetch(
             `https://a.klaviyo.com/api/lists/${list.id}/profiles/?page[size]=1000&fields[profile]=email`,
             { headers: makeHeaders(apiKey) }
           );
-          if (!r.ok) return { id: list.id, count: 0, hasMore: false };
+          console.log(`[klaviyo] List ${list.id} response status: ${r.status}`);
+          if (!r.ok) {
+            const errText = await r.text();
+            console.error(`[klaviyo] List ${list.id} error body:`, errText);
+            return { id: list.id, count: 0, hasMore: false };
+          }
           const d = await r.json();
           const count = (d.data || []).length;
           const hasMore = !!d.links?.next;
+          console.log(`[klaviyo] List "${list.name}": ${count} profiles, hasMore: ${hasMore}`);
           return { id: list.id, count, hasMore };
-        } catch {
+        } catch (e: any) {
+          console.error(`[klaviyo] List ${list.id} exception:`, e.message);
           return { id: list.id, count: 0, hasMore: false };
         }
       })
@@ -329,16 +337,24 @@ Deno.serve(async (req) => {
     const segCounts = await Promise.all(
       klaviyoSegments.map(async (seg: any) => {
         try {
+          console.log(`[klaviyo] Counting profiles for segment ${seg.id} "${seg.name}"...`);
           const r = await fetch(
             `https://a.klaviyo.com/api/segments/${seg.id}/profiles/?page[size]=1000&fields[profile]=email`,
             { headers: makeHeaders(apiKey) }
           );
-          if (!r.ok) return { id: seg.id, count: 0, hasMore: false };
+          console.log(`[klaviyo] Segment ${seg.id} response status: ${r.status}`);
+          if (!r.ok) {
+            const errText = await r.text();
+            console.error(`[klaviyo] Segment ${seg.id} error body:`, errText);
+            return { id: seg.id, count: 0, hasMore: false };
+          }
           const d = await r.json();
           const count = (d.data || []).length;
           const hasMore = !!d.links?.next;
+          console.log(`[klaviyo] Segment "${seg.name}": ${count} profiles, hasMore: ${hasMore}`);
           return { id: seg.id, count, hasMore };
-        } catch {
+        } catch (e: any) {
+          console.error(`[klaviyo] Segment ${seg.id} exception:`, e.message);
           return { id: seg.id, count: 0, hasMore: false };
         }
       })
@@ -424,6 +440,10 @@ Deno.serve(async (req) => {
       conversionMetricId: conversionMetricId || null,
     };
 
+    console.log('=== LIST COUNTS ===');
+    listsWithCounts.forEach((l: any) => console.log(`"${l.name}": ${l.profile_count}`));
+    console.log('=== SEGMENT COUNTS ===');
+    segmentsWithCounts.forEach((s: any) => console.log(`"${s.name}": ${s.profile_count}`));
     console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, ${listsWithCounts.length} lists, ${segmentsWithCounts.length} segments, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
 
     return new Response(
