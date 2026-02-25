@@ -627,10 +627,11 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
   const mode = p.productMode || 'fixed';
 
   const dynamicTypes = [
-    { key: 'catalog_feed', label: '📋 Feed del catálogo', desc: 'Productos del feed de Klaviyo', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{{ item.price|floatformat:0 }}', link: '{{ item.url }}' } },
-    { key: 'lastViewed', label: '👁️ Último producto visto', desc: 'El último producto que el cliente visitó', vars: { name: '{{ event.extra.title }}', imageUrl: '{{ event.extra.image_url }}', price: '{{ event.extra.price }}', link: '{{ event.extra.url }}' } },
-    { key: 'abandonedCart', label: '🛒 Producto del carrito', desc: 'Productos del carrito abandonado', vars: { name: '{{ item.product.title }}', imageUrl: '{{ item.product.image }}', price: '{{ item.product.price|floatformat:0 }}', link: '{{ item.product.url }}' } },
-    { key: 'recommended', label: '⭐ Recomendado', desc: 'Productos recomendados por Klaviyo', vars: { name: '{{ recommended_products.0.title }}', imageUrl: '{{ recommended_products.0.image }}', price: '{{ recommended_products.0.price }}', link: '{{ recommended_products.0.url }}' } },
+    { key: 'catalog_feed', label: '📋 Feed del catálogo (recomendado)', desc: 'Klaviyo elige productos del catálogo para cada persona', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{% if item.metadata.__variant_compare_at_price and item.metadata.__variant_compare_at_price != item.metadata.__variant_price %}{{ item.metadata.__variant_compare_at_price|floatformat:0 }}{% endif %}{{ item.metadata.__variant_price|floatformat:0 }}', link: '{{ item.url }}' } },
+    { key: 'last_viewed', label: '👁️ Último producto visto', desc: 'El último producto que visitó en tu tienda', vars: { name: '{{ event.extra.title }}', imageUrl: '{{ event.extra.image_url }}', price: '{{ event.extra.price }}', link: '{{ event.extra.url }}' } },
+    { key: 'cart_item', label: '🛒 Producto del carrito abandonado', desc: 'Productos que dejó en el carrito', vars: { name: '{{ item.product.title }}', imageUrl: '{{ item.product.image }}', price: '{{ item.product.price|floatformat:0 }}', link: '{{ item.product.url }}' } },
+    { key: 'recommended', label: '⭐ Recomendado por Klaviyo', desc: 'Klaviyo recomienda según historial del cliente', vars: { name: '{{ recommended_products.0.title }}', imageUrl: '{{ recommended_products.0.image }}', price: '{{ recommended_products.0.price }}', link: '{{ recommended_products.0.url }}' } },
+    { key: 'collection_dynamic', label: '📁 Colección dinámica', desc: 'Productos de una colección específica, Klaviyo los rota', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{{ item.metadata.__variant_price|floatformat:0 }}', link: '{{ item.url }}' } },
   ];
 
   return (
@@ -686,6 +687,14 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
           <div><Label className="text-xs font-medium">Descripción</Label><Textarea value={p.description || ''} onChange={e => set('description', e.target.value)} rows={3} className="text-sm mt-1.5" /></div>
           <div><Label className="text-xs font-medium">Link del producto</Label><Input value={p.link || ''} onChange={e => set('link', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="{{shop_url}}/products/handle" /></div>
           <div><Label className="text-xs font-medium">Texto del botón</Label><Input value={p.buttonText || 'Comprar'} onChange={e => set('buttonText', e.target.value)} className="h-9 text-sm mt-1.5" /></div>
+
+          <Separator />
+          <SectionTitle>Opciones de visualización</SectionTitle>
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2"><Checkbox checked={p.showPrice !== false} onCheckedChange={v => set('showPrice', !!v)} /><Label className="text-xs">Mostrar precio</Label></div>
+            <div className="flex items-center gap-2"><Checkbox checked={p.showDescription !== false} onCheckedChange={v => set('showDescription', !!v)} /><Label className="text-xs">Mostrar descripción</Label></div>
+            <div className="flex items-center gap-2"><Checkbox checked={p.showButton !== false} onCheckedChange={v => set('showButton', !!v)} /><Label className="text-xs">Mostrar botón</Label></div>
+          </div>
         </TabsContent>
 
         <TabsContent value="dynamic" className="mt-4 space-y-3">
@@ -702,7 +711,7 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
                   set('link', opt.vars.link);
                 }}
                 className={`w-full text-left p-3 rounded-lg border transition-all ${
-                  (p.dynamicType || 'lastViewed') === opt.key
+                  p.dynamicType === opt.key
                     ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                     : 'hover:bg-muted/80'
                 }`}
@@ -714,15 +723,51 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
           </div>
 
           {p.dynamicType && (
-            <div className="p-3 bg-muted/50 rounded-lg border border-dashed space-y-1.5">
-              <p className="text-[11px] font-semibold text-muted-foreground">Variables que se usarán:</p>
-              <div className="space-y-0.5">
-                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Título:</span><code className="text-[10px] font-mono">{p.name}</code></div>
-                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Imagen:</span><code className="text-[10px] font-mono truncate max-w-[180px]">{p.imageUrl}</code></div>
-                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Precio:</span><code className="text-[10px] font-mono">{p.price}</code></div>
-                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Link:</span><code className="text-[10px] font-mono truncate max-w-[180px]">{p.link}</code></div>
+            <>
+              <div className="p-3 bg-muted/50 rounded-lg border border-dashed space-y-1.5">
+                <p className="text-[11px] font-semibold text-muted-foreground">Variables que se usarán:</p>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Título:</span><code className="text-[10px] font-mono">{p.name}</code></div>
+                  <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Imagen:</span><code className="text-[10px] font-mono truncate max-w-[180px]">{p.imageUrl}</code></div>
+                  <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Precio:</span><code className="text-[10px] font-mono">{p.price}</code></div>
+                  <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Link:</span><code className="text-[10px] font-mono truncate max-w-[180px]">{p.link}</code></div>
+                </div>
               </div>
-            </div>
+
+              <Separator />
+              <SectionTitle>Cantidad y disposición</SectionTitle>
+              <div>
+                <Label className="text-xs font-medium">¿Cuántos productos mostrar?</Label>
+                <div className="flex gap-1 mt-1.5">
+                  {[1, 2, 3, 4, 6].map(n => (
+                    <Button key={n} variant={(p.productsCount || 3) === n ? 'default' : 'outline'} size="sm" className="flex-1 h-9 text-xs" onClick={() => set('productsCount', n)}>
+                      {n}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium">Disposición</Label>
+                <div className="flex gap-1 mt-1.5">
+                  <Button variant={(p.productLayout || 'horizontal') === 'horizontal' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('productLayout', 'horizontal')}>
+                    ⬛⬛⬛ Horizontal
+                  </Button>
+                  <Button variant={p.productLayout === 'vertical' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('productLayout', 'vertical')}>
+                    Vertical
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+              <SectionTitle>Opciones de visualización</SectionTitle>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2"><Checkbox checked={p.showPrice !== false} onCheckedChange={v => set('showPrice', !!v)} /><Label className="text-xs">Mostrar precio</Label></div>
+                <div className="flex items-center gap-2"><Checkbox checked={p.showImage !== false} onCheckedChange={v => set('showImage', !!v)} /><Label className="text-xs">Mostrar imagen</Label></div>
+                <div className="flex items-center gap-2"><Checkbox checked={p.showButton !== false} onCheckedChange={v => set('showButton', !!v)} /><Label className="text-xs">Mostrar botón</Label></div>
+                <div className="flex items-center gap-2"><Checkbox checked={p.showDescription === true} onCheckedChange={v => set('showDescription', !!v)} /><Label className="text-xs">Mostrar descripción</Label></div>
+              </div>
+            </>
           )}
 
           <div className="flex items-start gap-2 p-2.5 bg-accent/50 rounded-lg text-[11px] text-accent-foreground">
@@ -745,48 +790,41 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
             </div>
           )}
 
+          <Separator />
+          <SectionTitle>Cantidad y disposición</SectionTitle>
           <div>
             <Label className="text-xs font-medium">Productos a mostrar</Label>
             <div className="flex gap-1 mt-1.5">
-              {[2, 3, 4].map(n => (
-                <Button key={n} variant={(p.collectionCount || 2) === n ? 'default' : 'outline'} size="sm" className="flex-1 h-9 text-xs" onClick={() => set('collectionCount', n)}>
-                  {n} productos
+              {[2, 3, 4, 6].map(n => (
+                <Button key={n} variant={(p.productsCount || 3) === n ? 'default' : 'outline'} size="sm" className="flex-1 h-9 text-xs" onClick={() => set('productsCount', n)}>
+                  {n}
                 </Button>
               ))}
             </div>
           </div>
           <div>
-            <Label className="text-xs font-medium">Layout</Label>
+            <Label className="text-xs font-medium">Disposición</Label>
             <div className="flex gap-1 mt-1.5">
-              <Button variant={(p.collectionLayout || 'grid') === 'grid' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('collectionLayout', 'grid')}>Grid</Button>
-              <Button variant={p.collectionLayout === 'list' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('collectionLayout', 'list')}>Lista</Button>
+              <Button variant={(p.productLayout || 'horizontal') === 'horizontal' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('productLayout', 'horizontal')}>
+                ⬛⬛⬛ Lado a lado
+              </Button>
+              <Button variant={p.productLayout === 'vertical' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('productLayout', 'vertical')}>
+                Uno bajo otro
+              </Button>
             </div>
           </div>
+
+          <Separator />
+          <SectionTitle>Opciones de visualización</SectionTitle>
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2"><Checkbox checked={p.showPrice !== false} onCheckedChange={v => set('showPrice', !!v)} /><Label className="text-xs">Mostrar precio</Label></div>
+            <div className="flex items-center gap-2"><Checkbox checked={p.showImage !== false} onCheckedChange={v => set('showImage', !!v)} /><Label className="text-xs">Mostrar imagen</Label></div>
+            <div className="flex items-center gap-2"><Checkbox checked={p.showButton !== false} onCheckedChange={v => set('showButton', !!v)} /><Label className="text-xs">Mostrar botón</Label></div>
+          </div>
+
           <div><Label className="text-xs font-medium">Texto del botón</Label><Input value={p.buttonText || 'Ver colección'} onChange={e => set('buttonText', e.target.value)} className="h-9 text-sm mt-1.5" /></div>
         </TabsContent>
       </Tabs>
-
-      <Separator />
-      <SectionTitle>Opciones</SectionTitle>
-      <div>
-        <Label className="text-xs font-medium">Layout</Label>
-        <div className="flex gap-1 mt-1.5">
-          {[
-            { v: 'image-top', label: 'Img arriba' },
-            { v: 'image-left', label: 'Img izq' },
-            { v: 'image-right', label: 'Img der' },
-          ].map(l => (
-            <Button key={l.v} variant={p.layout === l.v ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('layout', l.v)}>
-              {l.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-      <div className="space-y-2.5">
-        <div className="flex items-center gap-2"><Checkbox checked={p.showPrice !== false} onCheckedChange={v => set('showPrice', !!v)} /><Label className="text-xs">Mostrar precio</Label></div>
-        <div className="flex items-center gap-2"><Checkbox checked={p.showDescription !== false} onCheckedChange={v => set('showDescription', !!v)} /><Label className="text-xs">Mostrar descripción</Label></div>
-        <div className="flex items-center gap-2"><Checkbox checked={p.showButton !== false} onCheckedChange={v => set('showButton', !!v)} /><Label className="text-xs">Mostrar botón</Label></div>
-      </div>
     </div>
   );
 }
