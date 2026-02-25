@@ -61,7 +61,40 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
     case 'spacer':
       return `<div style="height:${p.height || 30}px;"></div>`;
 
-    case 'product':
+    case 'product': {
+      const mode = p.productMode || 'fixed';
+      if (mode === 'dynamic') {
+        const typeLabels: Record<string, string> = {
+          lastViewed: 'Último producto visto',
+          abandonedCart: 'Producto del carrito abandonado',
+          recommended: 'Producto recomendado',
+        };
+        return `<div style="padding:20px;font-family:${font};text-align:center;border:2px dashed #d1d5db;border-radius:8px;background:#f9fafb;">
+          <p style="margin:0 0 4px;font-size:11px;color:#9ca3af;">🔄 PRODUCTO DINÁMICO</p>
+          <p style="margin:0;font-size:14px;font-weight:600;color:#374151;">${typeLabels[p.dynamicType || 'lastViewed']}</p>
+          <p style="margin:8px 0 0;font-size:11px;color:#6b7280;">Klaviyo insertará los datos reales al enviar</p>
+        </div>`;
+      }
+      if (mode === 'collection') {
+        const count = p.collectionCount || 2;
+        const cols = Array.from({ length: count }, (_, i) =>
+          `<td style="width:${Math.floor(100/count)}%;vertical-align:top;padding:8px;text-align:center;">
+            <div style="background:#f3f4f6;border-radius:8px;padding:16px;">
+              <div style="width:80px;height:80px;background:#e5e7eb;border-radius:8px;margin:0 auto 8px;"></div>
+              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111;">Producto ${i+1}</p>
+              <p style="margin:0 0 8px;font-size:12px;color:#666;">$XX.XXX</p>
+            </div>
+          </td>`
+        ).join('');
+        return `<div style="padding:16px 0;font-family:${font};">
+          <h3 style="margin:0 0 12px;font-size:18px;color:#111;text-align:center;">${p.collectionName || 'Colección'}</h3>
+          <table style="width:100%;border-collapse:collapse;"><tr>${cols}</tr></table>
+          <div style="text-align:center;margin-top:12px;">
+            <a href="{{shop_url}}/collections/${p.collectionHandle || ''}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;">${p.buttonText || 'Ver colección'}</a>
+          </div>
+        </div>`;
+      }
+      // Fixed mode (default)
       return `<div style="padding:16px 0;font-family:${font};">
         ${p.imageUrl ? `<div style="text-align:center;margin-bottom:12px;"><img src="${p.imageUrl}" alt="${p.name || ''}" style="max-width:100%;border-radius:8px;" /></div>` : ''}
         <h3 style="margin:0 0 8px;font-size:18px;color:#111;">${p.name || 'Producto'}</h3>
@@ -69,14 +102,18 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
         ${p.showDescription !== false && p.description ? `<p style="margin:0 0 12px;font-size:14px;color:#666;">${p.description}</p>` : ''}
         ${p.showButton !== false ? `<div style="text-align:center;"><a href="${p.link || '#'}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;">${p.buttonText || 'Comprar'}</a></div>` : ''}
       </div>`;
+    }
 
-    case 'coupon':
+    case 'coupon': {
+      const discountUrl = `{{shop_url}}/discount/${p.code || 'CÓDIGO'}`;
       return `<div style="border:2px dashed #ccc;border-radius:8px;padding:24px;text-align:center;background:#f9fafb;font-family:${font};">
         <p style="margin:0 0 8px;font-size:13px;color:#666;">${p.description || ''}</p>
         <p style="margin:0 0 12px;font-size:28px;font-weight:800;color:#111;letter-spacing:3px;">${p.code || 'CÓDIGO'}</p>
         ${p.expiresAt ? `<p style="margin:0 0 12px;font-size:12px;color:#999;">Válido hasta: ${p.expiresAt}</p>` : ''}
-        <a href="${p.shopUrl || '#'}/discount/${p.code || ''}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;">${p.buttonText || 'Usar cupón'}</a>
+        <a href="${discountUrl}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;">${p.buttonText || 'Usar cupón'}</a>
+        <p style="margin:8px 0 0;font-size:10px;color:#9ca3af;">El descuento se aplica automáticamente</p>
       </div>`;
+    }
 
     case 'table': {
       const data = p.data || [['', ''], ['', '']];

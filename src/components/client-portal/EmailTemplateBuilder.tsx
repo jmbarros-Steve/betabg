@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid } from 'lucide-react';
+import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid, Download, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import EmailBlockEditor from './email-blocks/EmailBlockEditor';
 import type { EmailBlock } from './email-blocks/blockTypes';
 import { format } from 'date-fns';
@@ -67,6 +68,10 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
   const [editing, setEditing] = useState<EmailTemplate | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [klaviyoTemplates, setKlaviyoTemplates] = useState<any[]>([]);
+  const [importingId, setImportingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetsInputRef = useRef<HTMLInputElement>(null);
 
@@ -211,6 +216,71 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     toast.success('URL copiada');
   };
 
+  const loadKlaviyoTemplates = async () => {
+    setImportLoading(true);
+    try {
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      if (!conn) { toast.error('No hay conexión activa de Klaviyo'); setImportLoading(false); return; }
+      const { data, error } = await supabase.functions.invoke('import-klaviyo-templates', {
+        body: { connectionId: conn.id, action: 'list' },
+      });
+      if (error) { toast.error('Error cargando templates de Klaviyo'); return; }
+      setKlaviyoTemplates(data?.templates || []);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const importKlaviyoTemplate = async (templateId: string, name: string) => {
+    setImportingId(templateId);
+    try {
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      if (!conn) return;
+      const { data, error } = await supabase.functions.invoke('import-klaviyo-templates', {
+        body: { connectionId: conn.id, action: 'get', templateId },
+      });
+      if (error || !data?.template) { toast.error('Error importando template'); return; }
+
+      const colors = data.template.extractedColors || [];
+      const payload = {
+        client_id: clientId,
+        name: `[Klaviyo] ${name}`,
+        description: 'Importado desde Klaviyo',
+        base_html: data.template.html,
+        primary_color: colors[0] || '#000000',
+        secondary_color: colors[1] || '#ffffff',
+        accent_color: colors[2] || '#4F46E5',
+        button_color: colors[3] || '#000000',
+        button_text_color: colors[4] || '#ffffff',
+      };
+      const { error: insertErr } = await supabase.from('email_templates').insert(payload as any);
+      if (insertErr) { toast.error('Error guardando template importado'); return; }
+      toast.success('Template importado exitosamente');
+      setImportOpen(false);
+      loadTemplates();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setImportingId(null);
+    }
+  };
+
   const previewHtml = generatePreview(form);
 
   // LIST VIEW
@@ -219,9 +289,43 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Email Templates</h3>
-          <Button onClick={startNew} size="sm">
-            <Plus className="w-4 h-4 mr-1.5" /> Crear Template
-          </Button>
+          <div className="flex gap-2">
+            <Dialog open={importOpen} onOpenChange={v => { setImportOpen(v); if (v) loadKlaviyoTemplates(); }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-1.5" /> Importar desde Klaviyo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader><DialogTitle>📥 Importar Template de Klaviyo</DialogTitle></DialogHeader>
+                {importLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : klaviyoTemplates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No se encontraron templates en Klaviyo</p>
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {klaviyoTemplates.map(t => (
+                      <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                        <div>
+                          <p className="text-sm font-medium">{t.name}</p>
+                          {t.created && <p className="text-[10px] text-muted-foreground">{format(new Date(t.created), 'dd/MM/yyyy')}</p>}
+                        </div>
+                        <Button size="sm" variant="outline" disabled={importingId === t.id} onClick={() => importKlaviyoTemplate(t.id, t.name)}>
+                          {importingId === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
+                          Importar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+            <Button onClick={startNew} size="sm">
+              <Plus className="w-4 h-4 mr-1.5" /> Crear Template
+            </Button>
+          </div>
         </div>
 
         {loading ? (

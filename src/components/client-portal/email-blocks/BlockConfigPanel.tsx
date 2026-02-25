@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { type EmailBlock, type BlockType } from './blockTypes';
+import KlaviyoVariablePicker, { PRODUCT_DYNAMIC_VARIABLES } from './KlaviyoVariablePicker';
 
 interface BlockConfigProps {
   block: EmailBlock;
@@ -74,20 +77,13 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 // ============ BLOCK CONFIGS ============
 
 function TextConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) {
-  const variables = ['{{ first_name }}', '{{ last_name }}', '{{ email }}', '{{ organization }}'];
   return (
     <div className="space-y-3">
       <div>
         <Label className="text-xs">Contenido</Label>
         <Textarea value={p.content?.replace(/<[^>]+>/g, '') || ''} onChange={e => set('content', `<p>${e.target.value}</p>`)} rows={5} className="text-sm" />
       </div>
-      <div className="flex flex-wrap gap-1">
-        {variables.map(v => (
-          <Button key={v} variant="outline" size="sm" className="text-xs h-6 px-2" onClick={() => set('content', (p.content || '') + v)}>
-            {v}
-          </Button>
-        ))}
-      </div>
+      <KlaviyoVariablePicker onSelect={v => set('content', (p.content || '') + v)} />
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label className="text-xs">Alineación</Label>
@@ -221,6 +217,7 @@ function HeaderBarConfig({ p, set }: { p: any; set: (k: string, v: any) => void 
   return (
     <div className="space-y-3">
       <div><Label className="text-xs">Texto</Label><Input value={p.text || ''} onChange={e => set('text', e.target.value)} className="h-8 text-xs" /></div>
+      <KlaviyoVariablePicker compact onSelect={v => set('text', (p.text || '') + ' ' + v)} />
       <div><Label className="text-xs">Ícono (opcional)</Label><Input value={p.icon || ''} onChange={e => set('icon', e.target.value)} placeholder="🔥" className="h-8 text-xs" /></div>
       <div className="grid grid-cols-2 gap-2">
         <ColorField label="Fondo" value={p.bgColor || '#000'} onChange={v => set('bgColor', v)} />
@@ -324,27 +321,84 @@ function SocialConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) 
   );
 }
 
+// ============ PRODUCT CONFIG (3 modes) ============
+
 function ProductConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) {
+  const mode = p.productMode || 'fixed';
+
   return (
     <div className="space-y-3">
-      <div><Label className="text-xs">Nombre</Label><Input value={p.name || ''} onChange={e => set('name', e.target.value)} className="h-8 text-xs" /></div>
-      <div><Label className="text-xs">URL imagen</Label><Input value={p.imageUrl || ''} onChange={e => set('imageUrl', e.target.value)} className="h-8 text-xs" /></div>
-      <div><Label className="text-xs">Precio</Label><Input value={p.price || ''} onChange={e => set('price', e.target.value)} placeholder="$29.990" className="h-8 text-xs" /></div>
-      <div><Label className="text-xs">Descripción</Label><Textarea value={p.description || ''} onChange={e => set('description', e.target.value)} rows={2} className="text-xs" /></div>
-      <div><Label className="text-xs">Link producto</Label><Input value={p.link || ''} onChange={e => set('link', e.target.value)} className="h-8 text-xs" /></div>
-      <div><Label className="text-xs">Texto botón</Label><Input value={p.buttonText || 'Comprar'} onChange={e => set('buttonText', e.target.value)} className="h-8 text-xs" /></div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-xs">Layout</Label>
-          <Select value={p.layout || 'image-top'} onValueChange={v => set('layout', v)}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="image-top">Imagen arriba</SelectItem>
-              <SelectItem value="image-left">Imagen izq</SelectItem>
-              <SelectItem value="image-right">Imagen der</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <Tabs value={mode} onValueChange={v => set('productMode', v)}>
+        <TabsList className="grid w-full grid-cols-3 h-8">
+          <TabsTrigger value="fixed" className="text-[10px] px-1">📌 Fijo</TabsTrigger>
+          <TabsTrigger value="dynamic" className="text-[10px] px-1">🔄 Dinámico</TabsTrigger>
+          <TabsTrigger value="collection" className="text-[10px] px-1">📁 Colección</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="fixed" className="mt-3 space-y-3">
+          <div><Label className="text-xs">Nombre</Label><Input value={p.name || ''} onChange={e => set('name', e.target.value)} className="h-8 text-xs" placeholder="Nombre del producto" /></div>
+          <div><Label className="text-xs">URL imagen</Label><Input value={p.imageUrl || ''} onChange={e => set('imageUrl', e.target.value)} className="h-8 text-xs" /></div>
+          <div><Label className="text-xs">Precio</Label><Input value={p.price || ''} onChange={e => set('price', e.target.value)} placeholder="$29.990" className="h-8 text-xs" /></div>
+          <div><Label className="text-xs">Descripción</Label><Textarea value={p.description || ''} onChange={e => set('description', e.target.value)} rows={2} className="text-xs" /></div>
+          <div><Label className="text-xs">Link producto</Label><Input value={p.link || ''} onChange={e => set('link', e.target.value)} className="h-8 text-xs" placeholder="{{shop_url}}/products/handle" /></div>
+          <div><Label className="text-xs">Texto botón</Label><Input value={p.buttonText || 'Comprar'} onChange={e => set('buttonText', e.target.value)} className="h-8 text-xs" /></div>
+        </TabsContent>
+
+        <TabsContent value="dynamic" className="mt-3 space-y-3">
+          <div>
+            <Label className="text-xs">Tipo de variable dinámica</Label>
+            <Select value={p.dynamicType || 'lastViewed'} onValueChange={v => set('dynamicType', v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lastViewed">👁️ Último producto visto</SelectItem>
+                <SelectItem value="abandonedCart">🛒 Carrito abandonado</SelectItem>
+                <SelectItem value="recommended">✨ Producto recomendado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
+            <p className="text-[10px] font-semibold text-muted-foreground mb-2">Variables que se usarán:</p>
+            {(PRODUCT_DYNAMIC_VARIABLES[p.dynamicType as keyof typeof PRODUCT_DYNAMIC_VARIABLES] || PRODUCT_DYNAMIC_VARIABLES.lastViewed).map(v => (
+              <div key={v.key} className="flex items-center justify-between py-0.5">
+                <span className="text-[10px] text-muted-foreground">{v.label}</span>
+                <code className="text-[9px] font-mono bg-background px-1 rounded">{v.key}</code>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-start gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded text-[10px] text-blue-700 dark:text-blue-300">
+            <span>💡</span>
+            <span>Klaviyo resolverá estas variables al enviar el email con los datos reales del cliente.</span>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="collection" className="mt-3 space-y-3">
+          <div><Label className="text-xs">Handle de la colección</Label><Input value={p.collectionHandle || ''} onChange={e => set('collectionHandle', e.target.value)} className="h-8 text-xs" placeholder="ej: summer-sale" /></div>
+          <div><Label className="text-xs">Nombre colección</Label><Input value={p.collectionName || ''} onChange={e => set('collectionName', e.target.value)} className="h-8 text-xs" placeholder="ej: Sale de Verano" /></div>
+          <div>
+            <Label className="text-xs">Productos a mostrar</Label>
+            <Select value={String(p.collectionCount || 2)} onValueChange={v => set('collectionCount', +v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[2, 3, 4].map(n => <SelectItem key={n} value={String(n)}>{n} productos</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label className="text-xs">Texto botón</Label><Input value={p.buttonText || 'Ver colección'} onChange={e => set('buttonText', e.target.value)} className="h-8 text-xs" /></div>
+          <p className="text-[10px] text-muted-foreground">Link del botón: {'{{shop_url}}/collections/' + (p.collectionHandle || '{handle}')}</p>
+        </TabsContent>
+      </Tabs>
+
+      {/* Common options */}
+      <div>
+        <Label className="text-xs">Layout</Label>
+        <Select value={p.layout || 'image-top'} onValueChange={v => set('layout', v)}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="image-top">Imagen arriba</SelectItem>
+            <SelectItem value="image-left">Imagen izq</SelectItem>
+            <SelectItem value="image-right">Imagen der</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-2">
         <div className="flex items-center gap-2"><Checkbox checked={p.showPrice !== false} onCheckedChange={v => set('showPrice', !!v)} /><Label className="text-xs">Mostrar precio</Label></div>
@@ -355,14 +409,27 @@ function ProductConfig({ p, set }: { p: any; set: (k: string, v: any) => void })
   );
 }
 
+// ============ COUPON CONFIG (improved) ============
+
 function CouponConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) {
+  const discountUrl = `{{shop_url}}/discount/${p.code || 'CÓDIGO'}`;
+
   return (
     <div className="space-y-3">
-      <div><Label className="text-xs">Código cupón</Label><Input value={p.code || ''} onChange={e => set('code', e.target.value.toUpperCase())} className="h-8 text-xs font-mono" /></div>
-      <div><Label className="text-xs">Descripción</Label><Input value={p.description || ''} onChange={e => set('description', e.target.value)} className="h-8 text-xs" /></div>
-      <div><Label className="text-xs">Vencimiento</Label><Input type="date" value={p.expiresAt || ''} onChange={e => set('expiresAt', e.target.value)} className="h-8 text-xs" /></div>
-      <div><Label className="text-xs">URL tienda</Label><Input value={p.shopUrl || ''} onChange={e => set('shopUrl', e.target.value)} placeholder="https://tu-tienda.myshopify.com" className="h-8 text-xs" /></div>
+      <div><Label className="text-xs">Código cupón</Label><Input value={p.code || ''} onChange={e => set('code', e.target.value.toUpperCase())} className="h-8 text-xs font-mono" placeholder="VERANO20" /></div>
+      <div><Label className="text-xs">Descripción</Label><Input value={p.description || ''} onChange={e => set('description', e.target.value)} className="h-8 text-xs" placeholder="20% de descuento en toda la tienda" /></div>
+      <div><Label className="text-xs">Vencimiento (opcional)</Label><Input type="date" value={p.expiresAt || ''} onChange={e => set('expiresAt', e.target.value)} className="h-8 text-xs" /></div>
       <div><Label className="text-xs">Texto botón</Label><Input value={p.buttonText || 'Usar cupón'} onChange={e => set('buttonText', e.target.value)} className="h-8 text-xs" /></div>
+
+      <div className="p-2.5 bg-muted/50 rounded-lg border border-dashed space-y-1.5">
+        <p className="text-[10px] font-semibold text-muted-foreground">🔗 URL de descuento automático:</p>
+        <code className="text-[10px] font-mono block break-all">{discountUrl}</code>
+      </div>
+
+      <div className="flex items-start gap-2 p-2 bg-green-50 dark:bg-green-950/30 rounded text-[10px] text-green-700 dark:text-green-300">
+        <span>✅</span>
+        <span>El cliente recibirá el descuento automáticamente al hacer click. Shopify aplica el cupón sin que el cliente tenga que ingresarlo manualmente.</span>
+      </div>
     </div>
   );
 }
