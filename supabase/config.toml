@@ -113,3 +113,9 @@ verify_jwt = false
 
 [functions.import-klaviyo-templates]
 verify_jwt = false
+
+[functions.generate-mass-campaigns]
+verify_jwt = false
+
+[functions.upload-klaviyo-drafts]
+verify_jwt = false
