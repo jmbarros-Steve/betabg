@@ -41,7 +41,6 @@ serve(async (req) => {
       });
     }
 
-    // Get Klaviyo API key
     const { data: conn } = await supabase
       .from('platform_connections')
       .select('api_key_encrypted')
@@ -65,46 +64,25 @@ serve(async (req) => {
       'revision': '2024-10-15',
     };
 
-    // Paginate through ALL templates
-    let allTemplates: any[] = [];
-    let nextUrl: string | null = 'https://a.klaviyo.com/api/templates/';
-
-    while (nextUrl) {
-      console.log('Fetching templates page:', nextUrl.substring(0, 100));
-      const resp = await fetch(nextUrl, { headers });
-
-      if (!resp.ok) {
-        const errText = await resp.text();
-        console.log('Templates page error:', resp.status, errText);
-        break;
-      }
-
-      const data = await resp.json();
-      const pageTemplates = data.data || [];
-      allTemplates = [...allTemplates, ...pageTemplates];
-      console.log(`Page returned ${pageTemplates.length} templates. Total so far: ${allTemplates.length}`);
-
-      nextUrl = data.links?.next || null;
-
-      if (nextUrl) {
-        await new Promise(r => setTimeout(r, 500));
-      }
+    // Fetch ONLY the first page — API already returns most recent first
+    const resp = await fetch('https://a.klaviyo.com/api/templates/', { headers });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      return new Response(JSON.stringify({ error: `Klaviyo API error: ${resp.status}`, details: errText }), {
+        status: resp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    console.log(`Total templates fetched: ${allTemplates.length}`);
+    const templatesData = await resp.json();
+    const allTemplates = templatesData.data || [];
+    console.log('Templates in first page:', allTemplates.length);
 
-    // Sort by updated (most recent first), fallback to created
-    const sorted = allTemplates.sort((a: any, b: any) => {
-      const dateA = new Date(a.attributes?.updated || a.attributes?.created || 0).getTime();
-      const dateB = new Date(b.attributes?.updated || b.attributes?.created || 0).getTime();
-      return dateB - dateA;
-    });
+    // Take the FIRST 10 (already most recent)
+    const top10 = allTemplates.slice(0, 10);
+    console.log('Top 10 (most recent):');
+    top10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - ${t.attributes?.updated || t.attributes?.created}`));
 
-    const top10 = sorted.slice(0, 10);
-    console.log('Top 10 most recent:');
-    top10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - updated: ${t.attributes?.updated} - created: ${t.attributes?.created}`));
-
-    // Fetch full HTML for each of the top 10
+    // Fetch full HTML for each
     const templates = [];
     for (const t of top10) {
       try {
