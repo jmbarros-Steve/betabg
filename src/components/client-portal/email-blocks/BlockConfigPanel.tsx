@@ -164,6 +164,7 @@ function ButtonConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) 
   return (
     <div className="space-y-3">
       <div><Label className="text-xs">Texto del botón</Label><Input value={p.text || ''} onChange={e => set('text', e.target.value)} className="h-8 text-xs" /></div>
+      <KlaviyoVariablePicker compact onSelect={v => set('text', (p.text || '') + ' ' + v)} />
       <div><Label className="text-xs">URL destino</Label><Input value={p.url || ''} onChange={e => set('url', e.target.value)} className="h-8 text-xs" /></div>
       <div className="flex flex-wrap gap-1">
         {shortcuts.map(s => (
@@ -418,6 +419,7 @@ function CouponConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) 
     <div className="space-y-3">
       <div><Label className="text-xs">Código cupón</Label><Input value={p.code || ''} onChange={e => set('code', e.target.value.toUpperCase())} className="h-8 text-xs font-mono" placeholder="VERANO20" /></div>
       <div><Label className="text-xs">Descripción</Label><Input value={p.description || ''} onChange={e => set('description', e.target.value)} className="h-8 text-xs" placeholder="20% de descuento en toda la tienda" /></div>
+      <KlaviyoVariablePicker compact onSelect={v => set('description', (p.description || '') + ' ' + v)} />
       <div><Label className="text-xs">Vencimiento (opcional)</Label><Input type="date" value={p.expiresAt || ''} onChange={e => set('expiresAt', e.target.value)} className="h-8 text-xs" /></div>
       <div><Label className="text-xs">Texto botón</Label><Input value={p.buttonText || 'Usar cupón'} onChange={e => set('buttonText', e.target.value)} className="h-8 text-xs" /></div>
 

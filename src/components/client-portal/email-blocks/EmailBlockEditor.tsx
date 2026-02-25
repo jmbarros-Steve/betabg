@@ -117,7 +117,7 @@ export default function EmailBlockEditor({ blocks, onChange, templateColors, ass
   const previewHtml = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
 
   return (
-    <div className="grid grid-cols-12 gap-3 h-[calc(100vh-280px)] min-h-[700px]">
+    <div className="grid grid-cols-12 gap-3 h-[calc(100vh-180px)] min-h-[800px]">
       {/* LEFT SIDEBAR — Block palette */}
       <div className="col-span-3 border rounded-lg overflow-hidden flex flex-col">
         <div className="p-2 border-b bg-muted/50">
