@@ -65,67 +65,83 @@ serve(async (req) => {
       'revision': '2024-10-15',
     };
 
-    // Fetch templates - try with sort first, fallback without
-    let templatesData: any;
-    try {
-      const resp = await fetch('https://a.klaviyo.com/api/templates/?sort=-created&page%5Bsize%5D=10', { headers });
-      if (!resp.ok) throw new Error(`Status ${resp.status}`);
-      templatesData = await resp.json();
-    } catch {
-      // Fallback: fetch without sort and sort manually
-      const resp = await fetch('https://a.klaviyo.com/api/templates/', { headers });
+    // Paginate through ALL templates
+    let allTemplates: any[] = [];
+    let nextUrl: string | null = 'https://a.klaviyo.com/api/templates/';
+
+    while (nextUrl) {
+      console.log('Fetching templates page:', nextUrl.substring(0, 100));
+      const resp = await fetch(nextUrl, { headers });
+
       if (!resp.ok) {
         const errText = await resp.text();
-        return new Response(JSON.stringify({ error: `Klaviyo API error: ${resp.status}`, details: errText }), {
-          status: resp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        console.log('Templates page error:', resp.status, errText);
+        break;
       }
-      templatesData = await resp.json();
-      // Sort by created desc and take 10
-      if (templatesData.data) {
-        templatesData.data = templatesData.data
-          .sort((a: any, b: any) => new Date(b.attributes?.created || 0).getTime() - new Date(a.attributes?.created || 0).getTime())
-          .slice(0, 10);
+
+      const data = await resp.json();
+      const pageTemplates = data.data || [];
+      allTemplates = [...allTemplates, ...pageTemplates];
+      console.log(`Page returned ${pageTemplates.length} templates. Total so far: ${allTemplates.length}`);
+
+      nextUrl = data.links?.next || null;
+
+      if (nextUrl) {
+        await new Promise(r => setTimeout(r, 500));
       }
     }
 
+    console.log(`Total templates fetched: ${allTemplates.length}`);
 
+    // Sort by updated (most recent first), fallback to created
+    const sorted = allTemplates.sort((a: any, b: any) => {
+      const dateA = new Date(a.attributes?.updated || a.attributes?.created || 0).getTime();
+      const dateB = new Date(b.attributes?.updated || b.attributes?.created || 0).getTime();
+      return dateB - dateA;
+    });
 
-    console.log('Templates count:', templatesData.data?.length || 0);
+    const top10 = sorted.slice(0, 10);
+    console.log('Top 10 most recent:');
+    top10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - updated: ${t.attributes?.updated} - created: ${t.attributes?.created}`));
 
-    // Fetch full HTML for each template
+    // Fetch full HTML for each of the top 10
     const templates = [];
-    for (const t of (templatesData.data || [])) {
+    for (const t of top10) {
       try {
         const detailResp = await fetch(`https://a.klaviyo.com/api/templates/${t.id}/`, { headers });
-        const detail = await detailResp.json();
-        const html = detail.data?.attributes?.html || '';
-        const text = detail.data?.attributes?.text || '';
+        if (detailResp.ok) {
+          const detail = await detailResp.json();
+          const html = detail.data?.attributes?.html || '';
+          const colorMatches = html.match(/#[0-9a-fA-F]{6}/g) || [];
+          const uniqueColors = [...new Set(colorMatches)].slice(0, 10);
 
-        // Extract colors from HTML
-        const colorMatches = html.match(/#[0-9a-fA-F]{6}/g) || [];
-        const uniqueColors = [...new Set(colorMatches)].slice(0, 10);
-
-        templates.push({
-          id: t.id,
-          name: detail.data?.attributes?.name || t.attributes?.name || 'Sin nombre',
-          html,
-          text,
-          hasHtml: html.length > 0,
-          htmlLength: html.length,
-          created: detail.data?.attributes?.created || t.attributes?.created,
-          updated: detail.data?.attributes?.updated || t.attributes?.updated,
-          extractedColors: uniqueColors,
-        });
-        console.log(`Template "${t.attributes?.name}": HTML length ${html.length}`);
+          templates.push({
+            id: t.id,
+            name: detail.data?.attributes?.name || t.attributes?.name || 'Sin nombre',
+            html,
+            text: detail.data?.attributes?.text || '',
+            hasHtml: html.length > 0,
+            htmlLength: html.length,
+            created: t.attributes?.created,
+            updated: t.attributes?.updated,
+            extractedColors: uniqueColors,
+          });
+          console.log(`Template "${t.attributes?.name}": HTML ${html.length} chars`);
+        } else {
+          const errText = await detailResp.text();
+          console.log(`Template ${t.id} detail error: ${detailResp.status}`, errText);
+        }
       } catch (e: any) {
         console.log(`Error fetching template ${t.id}:`, e.message);
       }
-      // Rate limit
       await new Promise(r => setTimeout(r, 500));
     }
 
-    return new Response(JSON.stringify({ templates }), {
+    return new Response(JSON.stringify({
+      templates,
+      total: allTemplates.length,
+      showing: templates.length,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
