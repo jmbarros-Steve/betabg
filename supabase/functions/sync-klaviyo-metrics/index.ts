@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const KLAVIYO_REVISION = '2024-10-15';
+const KLAVIYO_REVISION = '2025-01-15';
 
 function makeHeaders(apiKey: string) {
   return {
