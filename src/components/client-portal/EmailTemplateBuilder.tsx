@@ -88,6 +88,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     logo_url: '' as string | null,
     header_html: '',
     footer_html: '',
+    base_html: '' as string,
     assets: [] as { url: string; name: string }[],
     is_default: false,
   });
@@ -112,7 +113,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       name: '', description: '', primary_color: '#000000', secondary_color: '#ffffff',
       accent_color: '#4F46E5', button_color: '#000000', button_text_color: '#ffffff',
       font_family: 'Arial, sans-serif', logo_url: null, header_html: '', footer_html: '',
-      assets: [], is_default: false,
+      base_html: '', assets: [], is_default: false,
     });
     setEditing(null);
     setIsNew(true);
@@ -125,6 +126,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       button_color: t.button_color, button_text_color: t.button_text_color,
       font_family: t.font_family, logo_url: t.logo_url, header_html: t.header_html || '',
       footer_html: t.footer_html || '',
+      base_html: t.base_html || '',
       assets: Array.isArray(t.assets) ? t.assets : [],
       is_default: t.is_default,
     });
@@ -149,7 +151,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       logo_url: form.logo_url,
       header_html: form.header_html || null,
       footer_html: form.footer_html || null,
-      base_html: editing?.base_html || null,
+      base_html: form.base_html || null,
       assets: form.assets as any,
       is_default: form.is_default,
     };
@@ -576,7 +578,26 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
             )}
           </div>
 
-          {/* Header HTML */}
+          {/* Base HTML Editor (for imported templates) */}
+          {form.base_html && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Code className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-base font-semibold">📝 Contenido HTML (plantilla importada)</Label>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Edita directamente el HTML de la plantilla importada. Los cambios se reflejan en el preview en tiempo real.
+              </p>
+              <Textarea
+                value={form.base_html}
+                onChange={e => setForm(p => ({ ...p, base_html: e.target.value }))}
+                placeholder="HTML de la plantilla..."
+                rows={16}
+                className="font-mono text-xs"
+              />
+            </div>
+          )}
+
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Code className="w-4 h-4 text-muted-foreground" />
@@ -632,9 +653,9 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
               <Label className="text-base font-semibold">Preview en vivo</Label>
             </div>
             <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
-              {editing?.base_html ? (
+              {form.base_html ? (
                 <iframe
-                  srcDoc={editing.base_html}
+                  srcDoc={form.base_html}
                   className="w-full border-0"
                   style={{ minHeight: '500px' }}
                   sandbox="allow-same-origin"
