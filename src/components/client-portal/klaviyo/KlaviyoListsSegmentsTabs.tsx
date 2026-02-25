@@ -1,21 +1,12 @@
-import { useState } from 'react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
-import { ChevronDown, ChevronRight, List, Target, Mail } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { List, Target, Users } from 'lucide-react';
 
 export interface KlaviyoListItem {
   id: string;
   name: string;
-  profile_count?: number;
+  profile_count: number | null; // null = not counted, -1 = 1000+, -2 = error
   created: string | null;
   updated: string | null;
-}
-
-interface ProfilePreview {
-  email: string;
-  name: string;
-  created: string;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -23,92 +14,18 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function ListSegmentRow({ item, type, connectionId }: { item: KlaviyoListItem; type: 'list' | 'segment'; connectionId: string }) {
-  const [open, setOpen] = useState(false);
-  const [profiles, setProfiles] = useState<ProfilePreview[] | null>(null);
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
-
-  const handleToggle = async (isOpen: boolean) => {
-    setOpen(isOpen);
-    if (isOpen && profiles === null) {
-      setLoadingProfiles(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
-          body: { connectionId, action: 'list-profiles', entityType: type, entityId: item.id },
-        });
-        if (!error && data?.profiles) {
-          setProfiles(data.profiles);
-        } else {
-          setProfiles([]);
-        }
-      } catch {
-        setProfiles([]);
-      } finally {
-        setLoadingProfiles(false);
-      }
-    }
-  };
-
-  const Icon = type === 'list' ? List : Target;
-
-  return (
-    <Collapsible open={open} onOpenChange={handleToggle}>
-      <CollapsibleTrigger asChild>
-        <button className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors text-left cursor-pointer">
-          <div className="flex items-center gap-3 min-w-0">
-            {open ? <ChevronDown className="w-4 h-4 shrink-0 text-primary" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
-            <Icon className="w-4 h-4 shrink-0 text-primary" />
-            <div className="min-w-0">
-              <span className="text-sm font-medium truncate block">{item.name}</span>
-              <span className="text-[10px] text-muted-foreground">
-                Creada: {formatDate(item.created)} · Actualizada: {formatDate(item.updated)}
-              </span>
-            </div>
-          </div>
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="px-10 pb-3">
-          {loadingProfiles ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
-            </div>
-          ) : profiles && profiles.length > 0 ? (
-            <div className="border border-border/50 rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="text-left p-2 font-medium text-muted-foreground">Email</th>
-                    <th className="text-left p-2 font-medium text-muted-foreground">Nombre</th>
-                    <th className="text-left p-2 font-medium text-muted-foreground">Creado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {profiles.map((p, i) => (
-                    <tr key={i} className="border-t border-border/30">
-                      <td className="p-2 font-mono">
-                        <div className="flex items-center gap-1.5">
-                          <Mail className="w-3 h-3 text-muted-foreground" />
-                          {p.email}
-                        </div>
-                      </td>
-                      <td className="p-2">{p.name || '—'}</td>
-                      <td className="p-2 text-muted-foreground">{formatDate(p.created)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Sin perfiles disponibles para previsualizar</p>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
+function ProfileCountBadge({ count }: { count: number | null }) {
+  if (count === null) return <Badge variant="outline" className="text-xs text-muted-foreground">—</Badge>;
+  if (count === -2) return <Badge variant="outline" className="text-xs text-muted-foreground">error</Badge>;
+  if (count === -1) return <Badge className="text-xs bg-green-600 hover:bg-green-700">1,000+</Badge>;
+  if (count >= 1000) return <Badge className="text-xs bg-green-600 hover:bg-green-700">{count.toLocaleString('es-CL')}</Badge>;
+  if (count >= 100) return <Badge className="text-xs bg-yellow-600 hover:bg-yellow-700">{count.toLocaleString('es-CL')}</Badge>;
+  return <Badge variant="secondary" className="text-xs">{count.toLocaleString('es-CL')}</Badge>;
 }
 
-export function KlaviyoListsContent({ items, type, connectionId }: { items: KlaviyoListItem[]; type: 'list' | 'segment'; connectionId: string }) {
+export function KlaviyoListsContent({ items, type }: { items: KlaviyoListItem[]; type: 'list' | 'segment'; connectionId: string }) {
+  const Icon = type === 'list' ? List : Target;
+
   if (items.length === 0) {
     return (
       <p className="text-muted-foreground text-sm text-center py-6">
@@ -118,10 +35,34 @@ export function KlaviyoListsContent({ items, type, connectionId }: { items: Klav
   }
 
   return (
-    <div className="space-y-1 max-h-[400px] overflow-y-auto">
-      {items.map(item => (
-        <ListSegmentRow key={item.id} item={item} type={type} connectionId={connectionId} />
-      ))}
+    <div className="border border-border/50 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-muted/50">
+            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Nombre</th>
+            <th className="text-center p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Perfiles</th>
+            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden sm:table-cell">Creada</th>
+            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden sm:table-cell">Actualizada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(item => (
+            <tr key={item.id} className="border-t border-border/30 hover:bg-muted/30 transition-colors">
+              <td className="p-3">
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4 shrink-0 text-primary" />
+                  <span className="font-medium truncate">{item.name}</span>
+                </div>
+              </td>
+              <td className="p-3 text-center">
+                <ProfileCountBadge count={item.profile_count} />
+              </td>
+              <td className="p-3 text-muted-foreground text-xs hidden sm:table-cell">{formatDate(item.created)}</td>
+              <td className="p-3 text-muted-foreground text-xs hidden sm:table-cell">{formatDate(item.updated)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
