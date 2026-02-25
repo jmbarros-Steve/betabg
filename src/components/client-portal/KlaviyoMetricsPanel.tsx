@@ -365,6 +365,23 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               <Search className="w-3 h-3 mr-1" />
               Debug
             </Button>
+            <Button variant="outline" size="sm" onClick={async () => {
+              setDebugResult('🧪 Testing Klaviyo API directamente...');
+              try {
+                const startTime = Date.now();
+                const { data, error } = await supabase.functions.invoke('test-klaviyo');
+                const elapsed = Date.now() - startTime;
+                if (error) {
+                  setDebugResult(JSON.stringify({ error, elapsed_ms: elapsed }, null, 2));
+                } else {
+                  setDebugResult(JSON.stringify({ elapsed_ms: elapsed, ...data }, null, 2));
+                }
+              } catch (e: any) {
+                setDebugResult(`Error: ${e.message}`);
+              }
+            }} className="text-xs text-orange-500 border-orange-500/30">
+              🧪 Test Klaviyo API
+            </Button>
           </div>
         </div>
       </CardHeader>
