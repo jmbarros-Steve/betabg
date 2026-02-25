@@ -223,15 +223,18 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
         }
         return [firstLine, ...extraLines].filter(Boolean).join(' ');
       };
+      const name = getValue('Nombre');
+      const subject = getValue('Asunto');
+      const content = getMultiLineValue('Contenido');
       const audienceName = getValue('Audiencia');
       const aud = audiences.find(a => a.name.toLowerCase().includes(audienceName.toLowerCase()));
       return {
         id: crypto.randomUUID(),
-        name: getValue('Nombre'),
-        subject: getValue('Asunto'),
+        name: name || subject || `Campaña ${Date.now()}`,
+        subject: subject || name || '',
         audienceId: aud?.id || '',
         audienceName: aud?.name || audienceName,
-        content: getMultiLineValue('Contenido'),
+        content: content || '',
       };
     }).filter(c => c.name || c.subject || c.content);
 
@@ -239,6 +242,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
       toast.error('No se pudieron parsear mails. Revisa el formato.');
       return;
     }
+    console.log('parseBulkText — parsed:', parsed.map(c => ({ name: c.name, subject: c.subject, content: c.content?.substring(0, 40) })));
     setCampaigns(parsed.slice(0, 30));
     toast.success(`${parsed.length} mail(s) parseados`);
   }
@@ -275,9 +279,11 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
 
   // Step 3 - Generate with Claude
   async function generateAll() {
-    if (!selectedTemplate) return;
-    const validCampaigns = campaigns.filter(c => c.name && c.content);
-    if (validCampaigns.length === 0) { toast.error('Agrega al menos un mail con nombre y contenido'); return; }
+    if (!selectedTemplate) { toast.error('Selecciona una plantilla primero'); return; }
+    // Accept campaigns with name OR content (either is enough to generate)
+    const validCampaigns = campaigns.filter(c => (c.name?.trim()) || (c.content?.trim()));
+    console.log('generateAll — validCampaigns:', validCampaigns.length, 'of', campaigns.length, validCampaigns.map(c => ({ name: c.name, content: c.content?.substring(0, 40) })));
+    if (validCampaigns.length === 0) { toast.error('Agrega al menos un mail con nombre o contenido'); return; }
 
     setGenerating(true);
     setGenProgress(0);
