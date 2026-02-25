@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import {
   RefreshCw, Mail, Users, DollarSign,
   Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3, ShoppingCart,
-  TrendingUp, MousePointerClick
+  TrendingUp, MousePointerClick, Search
 } from 'lucide-react';
 
 interface KlaviyoMetricsPanelProps {
@@ -231,6 +231,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
   const [timeframe, setTimeframe] = useState('last_90_days');
+  const [debugResult, setDebugResult] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnection();
@@ -324,10 +325,46 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               {globalStats ? 'Actualizar' : 'Cargar'}
             </Button>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              if (!connectionId) return;
+              setDebugResult('Cargando...');
+              try {
+                const startTime = Date.now();
+                const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+                  body: { connectionId, timeframe },
+                });
+                const elapsed = Date.now() - startTime;
+                if (error) {
+                  setDebugResult(JSON.stringify({ error, elapsed_ms: elapsed }, null, 2));
+                } else {
+                  setDebugResult(JSON.stringify({
+                    elapsed_ms: elapsed,
+                    globalStats: data?.globalStats,
+                    _debug: data?._debug,
+                    flows_count: data?.flows?.length,
+                    campaigns_count: data?.campaigns?.length,
+                  }, null, 2));
+                }
+              } catch (e: any) {
+                setDebugResult(`Error: ${e.message}`);
+              }
+            }} className="text-xs">
+              <Search className="w-3 h-3 mr-1" />
+              Debug
+            </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
+        {debugResult && (
+          <div className="mb-4 p-3 bg-muted rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-mono font-bold">🔍 Debug Output</span>
+              <Button variant="ghost" size="sm" onClick={() => setDebugResult(null)} className="text-xs h-6">✕</Button>
+            </div>
+            <pre className="text-[10px] font-mono whitespace-pre-wrap overflow-auto max-h-[400px]">{debugResult}</pre>
+          </div>
+        )}
         {!globalStats && !loading ? (
           <div className="text-center py-8 text-muted-foreground">
             <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-50" />
