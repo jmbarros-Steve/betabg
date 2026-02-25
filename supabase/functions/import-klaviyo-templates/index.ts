@@ -68,12 +68,12 @@ serve(async (req) => {
     // Fetch templates - try with sort first, fallback without
     let templatesData: any;
     try {
-      const resp = await fetch('https://a.klaviyo.com/api/templates/?sort=-created&page[size]=10', { headers });
+      const resp = await fetch('https://a.klaviyo.com/api/templates/?sort=-created&page%5Bsize%5D=10', { headers });
       if (!resp.ok) throw new Error(`Status ${resp.status}`);
       templatesData = await resp.json();
     } catch {
-      // Fallback: fetch more and sort manually
-      const resp = await fetch('https://a.klaviyo.com/api/templates/?page[size]=50', { headers });
+      // Fallback: fetch without sort and sort manually
+      const resp = await fetch('https://a.klaviyo.com/api/templates/', { headers });
       if (!resp.ok) {
         const errText = await resp.text();
         return new Response(JSON.stringify({ error: `Klaviyo API error: ${resp.status}`, details: errText }), {
@@ -88,6 +88,8 @@ serve(async (req) => {
           .slice(0, 10);
       }
     }
+
+
 
     console.log('Templates count:', templatesData.data?.length || 0);
 
