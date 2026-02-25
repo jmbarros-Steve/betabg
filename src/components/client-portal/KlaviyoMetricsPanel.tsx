@@ -4,14 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  RefreshCw, Mail, TrendingUp, Users, DollarSign, MousePointerClick,
-  Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3
+  RefreshCw, Mail, Users, DollarSign, MousePointerClick,
+  Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3, ShoppingCart
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface KlaviyoMetricsPanelProps {
   clientId: string;
@@ -23,14 +23,15 @@ interface FlowMetrics {
   clicks: number;
   revenue: number;
   unsubscribes: number;
+  recipients: number;
   open_rate: number;
   click_rate: number;
   conversion_rate: number;
+  conversions: number;
 }
 
 interface CampaignMetrics extends FlowMetrics {
   bounce_rate: number;
-  recipients: number;
 }
 
 interface KlaviyoFlow {
@@ -67,17 +68,19 @@ interface GlobalStats {
   avgClickRate: number;
 }
 
+const TIMEFRAME_OPTIONS = [
+  { value: 'last_7_days', label: '7 días' },
+  { value: 'last_30_days', label: '30 días' },
+  { value: 'last_90_days', label: '90 días' },
+  { value: 'last_365_days', label: '12 meses' },
+];
+
 function formatNumber(n: number): string {
   return Math.round(n).toLocaleString('es-CL');
 }
 
 function formatCurrency(n: number): string {
   return `$${Math.round(n).toLocaleString('es-CL')}`;
-}
-
-function calcRate(numerator: number, denominator: number): string {
-  if (denominator === 0) return '0%';
-  return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
 function MetricBadge({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
@@ -100,7 +103,7 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
         <button className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors text-left cursor-pointer">
           <div className="flex items-center gap-3 min-w-0">
             {open ? <ChevronDown className="w-4 h-4 shrink-0 text-primary" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
-            <Zap className="w-4 h-4 shrink-0 text-purple-500" />
+            <Zap className="w-4 h-4 shrink-0 text-primary" />
             <span className="text-sm font-medium truncate">{flow.name}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -129,8 +132,8 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
               <p className="font-semibold text-sm">{(m.click_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Conversión</p>
-              <p className="font-semibold text-sm">{(m.conversion_rate * 100).toFixed(1)}%</p>
+              <p className="text-xs text-muted-foreground">Conversiones</p>
+              <p className="font-semibold text-sm">{formatNumber(m.conversions)}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Revenue</p>
@@ -159,7 +162,7 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
         <button className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors text-left cursor-pointer">
           <div className="flex items-center gap-3 min-w-0">
             {open ? <ChevronDown className="w-4 h-4 shrink-0 text-primary" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
-            <Megaphone className="w-4 h-4 shrink-0 text-blue-500" />
+            <Megaphone className="w-4 h-4 shrink-0 text-primary" />
             <div className="min-w-0">
               <span className="text-sm font-medium truncate block">{campaign.name}</span>
               {sendDate && <span className="text-[10px] text-muted-foreground">{sendDate}</span>}
@@ -218,6 +221,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
+  const [timeframe, setTimeframe] = useState('last_90_days');
 
   useEffect(() => {
     checkConnection();
@@ -239,12 +243,12 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     }
   };
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = async (tf?: string) => {
     if (!connectionId) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
-        body: { connectionId },
+        body: { connectionId, timeframe: tf || timeframe },
       });
 
       if (error) {
@@ -263,6 +267,13 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     }
   };
 
+  const handleTimeframeChange = (value: string) => {
+    setTimeframe(value);
+    if (globalStats) {
+      fetchMetrics(value);
+    }
+  };
+
   if (!hasConnection) {
     return (
       <Card className="glow-box">
@@ -276,43 +287,59 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     );
   }
 
+  const timeframeLabel = TIMEFRAME_OPTIONS.find(o => o.value === timeframe)?.label || '90 días';
+
   return (
     <Card className="glow-box">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Rendimiento de Klaviyo
             </CardTitle>
-            <CardDescription>Métricas de los últimos 90 días</CardDescription>
+            <CardDescription>Métricas de los últimos {timeframeLabel}</CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchMetrics} disabled={loading}>
-            {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            {globalStats ? 'Actualizar' : 'Cargar Métricas'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={timeframe} onValueChange={handleTimeframeChange}>
+              <SelectTrigger className="w-[130px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEFRAME_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => fetchMetrics()} disabled={loading}>
+              {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {globalStats ? 'Actualizar' : 'Cargar'}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         {!globalStats && !loading ? (
           <div className="text-center py-8 text-muted-foreground">
             <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">Haz clic en "Cargar Métricas" para importar tus datos de Klaviyo</p>
+            <p className="text-sm">Haz clic en "Cargar" para importar tus datos de Klaviyo</p>
           </div>
         ) : loading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-14 w-full" />
             ))}
+            <p className="text-xs text-muted-foreground text-center">Cargando métricas (puede tomar unos segundos por rate limits)...</p>
           </div>
         ) : globalStats ? (
           <div className="space-y-6">
             {/* Global Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <MetricBadge label="Perfiles" value={formatNumber(globalStats.totalProfiles)} icon={Users} />
               <MetricBadge label="Flows Activos" value={`${globalStats.activeFlows}/${globalStats.totalFlows}`} icon={Zap} />
+              <MetricBadge label="Campañas" value={formatNumber(globalStats.sentCampaigns)} icon={Megaphone} />
               <MetricBadge label="Open Rate" value={`${(globalStats.avgOpenRate * 100).toFixed(1)}%`} icon={Eye} />
-              <MetricBadge label="Click Rate" value={`${(globalStats.avgClickRate * 100).toFixed(1)}%`} icon={MousePointerClick} />
+              <MetricBadge label="Conversiones" value={formatNumber(globalStats.totalConversions)} icon={ShoppingCart} />
               <MetricBadge label="Revenue Total" value={formatCurrency(globalStats.totalRevenue)} icon={DollarSign} />
             </div>
 
