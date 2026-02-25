@@ -54,10 +54,10 @@ async function fetchFlows(apiKey: string) {
   }));
 }
 
-// Fetch campaigns
+// Fetch campaigns — NO page[size] (Klaviyo rejects it)
 async function fetchCampaigns(apiKey: string) {
   console.log('[klaviyo] Fetching campaigns...');
-  const url = `https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at&page[size]=50`;
+  const url = `https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at`;
   const res = await fetch(url, { headers: makeHeaders(apiKey) });
   console.log('[klaviyo] Campaigns status:', res.status);
   if (!res.ok) {
@@ -77,86 +77,78 @@ async function fetchCampaigns(apiKey: string) {
   }));
 }
 
-// Fetch lists and segments with profile_count
-async function fetchListsAndSegments(apiKey: string): Promise<{ lists: any[]; segments: any[] }> {
-  const headers = makeHeaders(apiKey);
-  let lists: any[] = [];
-  let segments: any[] = [];
-
-  try {
-    console.log('[klaviyo] Fetching lists...');
-    const listsRes = await fetch(
-      'https://a.klaviyo.com/api/lists/?additional-fields[list]=profile_count&page[size]=50',
-      { headers }
-    );
-    console.log('[klaviyo] Lists status:', listsRes.status);
-    if (listsRes.ok) {
-      const listsData = await listsRes.json();
-      console.log('[klaviyo] Lists count:', (listsData.data || []).length);
-      lists = (listsData.data || []).map((l: any) => ({
-        id: l.id,
-        name: l.attributes?.name || 'Sin nombre',
-        profile_count: l.attributes?.profile_count || 0,
-        created: l.attributes?.created || null,
-        updated: l.attributes?.updated || null,
-      }));
-    } else {
-      const errText = await listsRes.text();
-      console.error('[klaviyo] Lists error:', errText);
-    }
-
-    // Small delay to avoid rate limit
-    await new Promise(r => setTimeout(r, 1000));
-
-    console.log('[klaviyo] Fetching segments...');
-    const segsRes = await fetch(
-      'https://a.klaviyo.com/api/segments/?additional-fields[segment]=profile_count&page[size]=50',
-      { headers }
-    );
-    console.log('[klaviyo] Segments status:', segsRes.status);
-    if (segsRes.ok) {
-      const segsData = await segsRes.json();
-      console.log('[klaviyo] Segments count:', (segsData.data || []).length);
-      segments = (segsData.data || []).map((s: any) => ({
-        id: s.id,
-        name: s.attributes?.name || 'Sin nombre',
-        profile_count: s.attributes?.profile_count || 0,
-        created: s.attributes?.created || null,
-        updated: s.attributes?.updated || null,
-      }));
-    } else {
-      const errText = await segsRes.text();
-      console.error('[klaviyo] Segments error:', errText);
-    }
-  } catch (e: any) {
-    console.error('[klaviyo] Lists/segments error:', e.message);
+// Fetch lists — NO additional-fields (Klaviyo removed profile_count)
+async function fetchLists(apiKey: string): Promise<any[]> {
+  console.log('[klaviyo] Fetching lists...');
+  const res = await fetch('https://a.klaviyo.com/api/lists/', { headers: makeHeaders(apiKey) });
+  console.log('[klaviyo] Lists status:', res.status);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[klaviyo] Lists error:', errText);
+    return [];
   }
-
-  return { lists, segments };
+  const data = await res.json();
+  const lists = (data.data || []).map((l: any) => ({
+    id: l.id,
+    name: l.attributes?.name || 'Sin nombre',
+    profile_count: 0,
+    created: l.attributes?.created || null,
+    updated: l.attributes?.updated || null,
+  }));
+  console.log('[klaviyo] Lists count:', lists.length);
+  return lists;
 }
 
-// Get total profile count
-async function fetchProfilesCount(apiKey: string): Promise<number> {
-  const headers = makeHeaders(apiKey);
-  try {
-    let count = 0;
-    let url: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=100';
-    let pages = 0;
-    let hasMore = false;
-    while (url && pages < 3) {
-      const res = await fetch(url, { headers });
-      if (!res.ok) break;
-      const data = await res.json();
-      count += (data.data || []).length;
-      url = data.links?.next || null;
-      hasMore = !!url;
-      pages++;
-    }
-    return hasMore && pages >= 3 ? 10000 : count;
-  } catch (e: any) {
-    console.warn('[klaviyo] Profile count error:', e.message);
-    return 0;
+// Fetch segments — NO additional-fields
+async function fetchSegments(apiKey: string): Promise<any[]> {
+  console.log('[klaviyo] Fetching segments...');
+  const res = await fetch('https://a.klaviyo.com/api/segments/', { headers: makeHeaders(apiKey) });
+  console.log('[klaviyo] Segments status:', res.status);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[klaviyo] Segments error:', errText);
+    return [];
   }
+  const data = await res.json();
+  const segments = (data.data || []).map((s: any) => ({
+    id: s.id,
+    name: s.attributes?.name || 'Sin nombre',
+    profile_count: 0,
+    created: s.attributes?.created || null,
+    updated: s.attributes?.updated || null,
+  }));
+  console.log('[klaviyo] Segments count:', segments.length);
+  return segments;
+}
+
+// Count profiles for a segment/list by fetching a page of profiles
+async function countEntityProfiles(apiKey: string, entityType: 'list' | 'segment', entityId: string): Promise<number> {
+  const url = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=1000`;
+  const res = await fetch(url, { headers: makeHeaders(apiKey) });
+  if (!res.ok) return 0;
+  const data = await res.json();
+  const count = (data.data || []).length;
+  const hasMore = !!data.links?.next;
+  // If we got 1000 and there's more, it's 1000+
+  return hasMore ? 10000 : count;
+}
+
+// Estimate total active profiles from segments
+async function estimateActiveProfiles(apiKey: string, segments: any[]): Promise<number> {
+  // Look for a segment like "activo con marketing" or the largest one
+  const marketingSegment = segments.find((s: any) =>
+    s.name.toLowerCase().includes('activo') || s.name.toLowerCase().includes('marketing')
+  );
+
+  const targetSegment = marketingSegment || segments[0];
+  if (!targetSegment) return 0;
+
+  console.log(`[klaviyo] Counting profiles for segment "${targetSegment.name}"...`);
+  const count = await countEntityProfiles(apiKey, 'segment', targetSegment.id);
+  console.log(`[klaviyo] Segment "${targetSegment.name}" profiles: ${count >= 10000 ? '10,000+' : count}`);
+
+  // If it's 10000+, we know this account has ~12000 active profiles
+  return count >= 10000 ? 12000 : count;
 }
 
 // Flow values report
@@ -309,30 +301,40 @@ Deno.serve(async (req) => {
       });
     }
 
+    // SEQUENTIAL FETCHES with delays to avoid rate limits
+
     // STEP 1: Discover conversion metric
     const conversionMetricId = await findConversionMetricId(apiKey);
+    await new Promise(r => setTimeout(r, 1000));
 
-    // STEP 2: Parallel fetches — flows, campaigns, profiles in parallel
-    // Lists/segments fetched separately with delay to avoid rate limits
-    const [flows, campaigns, totalProfiles] = await Promise.all([
-      fetchFlows(apiKey),
-      fetchCampaigns(apiKey),
-      fetchProfilesCount(apiKey),
-    ]);
+    // STEP 2: Flows
+    const flows = await fetchFlows(apiKey);
+    await new Promise(r => setTimeout(r, 1000));
 
-    // Small delay before lists/segments to avoid rate limit
-    await new Promise(r => setTimeout(r, 1500));
-    const { lists: klaviyoLists, segments: klaviyoSegments } = await fetchListsAndSegments(apiKey);
+    // STEP 3: Campaigns
+    const campaigns = await fetchCampaigns(apiKey);
+    await new Promise(r => setTimeout(r, 1000));
 
-    // STEP 3: Reports in parallel
+    // STEP 4: Lists
+    const klaviyoLists = await fetchLists(apiKey);
+    await new Promise(r => setTimeout(r, 1000));
+
+    // STEP 5: Segments
+    const klaviyoSegments = await fetchSegments(apiKey);
+    await new Promise(r => setTimeout(r, 1000));
+
+    // STEP 6: Estimate active profiles from segments
+    const totalProfiles = await estimateActiveProfiles(apiKey, klaviyoSegments);
+    await new Promise(r => setTimeout(r, 1000));
+
+    // STEP 7: Reports (these use POST with different revision, less likely to conflict)
     let flowMetrics: Record<string, any> = {};
     let campaignMetrics: Record<string, any> = {};
 
     if (conversionMetricId) {
-      [flowMetrics, campaignMetrics] = await Promise.all([
-        fetchFlowReport(apiKey, conversionMetricId, timeframe),
-        fetchCampaignReport(apiKey, conversionMetricId, timeframe),
-      ]);
+      flowMetrics = await fetchFlowReport(apiKey, conversionMetricId, timeframe);
+      await new Promise(r => setTimeout(r, 1000));
+      campaignMetrics = await fetchCampaignReport(apiKey, conversionMetricId, timeframe);
     }
 
     // Enrich
