@@ -432,7 +432,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
 
             {/* Flows & Campaigns Tabs */}
             <Tabs defaultValue="flows">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="flows" className="text-sm">
                   <Zap className="w-4 h-4 mr-1.5" />
                   Flows ({flows.length})
@@ -448,10 +448,6 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
                 <TabsTrigger value="segments" className="text-sm">
                   <Target className="w-4 h-4 mr-1.5" />
                   Segmentos ({segments.length})
-                </TabsTrigger>
-                <TabsTrigger value="templates" className="text-sm">
-                  <Palette className="w-4 h-4 mr-1.5" />
-                  🎨 Templates
                 </TabsTrigger>
               </TabsList>
 
@@ -491,9 +487,6 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               <TabsContent value="segments" className="mt-4">
                 <KlaviyoListsContent items={segments} type="segment" connectionId={connectionId!} />
               </TabsContent>
-              <TabsContent value="templates" className="mt-4">
-                <EmailTemplateBuilder clientId={clientId} />
-              </TabsContent>
             </Tabs>
 
             {/* Steve tip about approximate counts */}
@@ -506,6 +499,11 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
             </div>
           </div>
         ) : null}
+
+        {/* Templates section — always visible */}
+        <div className="mt-6 pt-6 border-t">
+          <EmailTemplateBuilder clientId={clientId} />
+        </div>
       </CardContent>
     </Card>
   );
