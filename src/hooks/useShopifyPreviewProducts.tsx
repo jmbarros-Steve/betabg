@@ -18,13 +18,13 @@ const FALLBACK_PRODUCTS: ShopifyPreviewProduct[] = [
 ];
 
 export function useShopifyPreviewProducts(clientId?: string, count = 6) {
-  const [products, setProducts] = useState<ShopifyPreviewProduct[]>([]);
+  const [products, setProducts] = useState<ShopifyPreviewProduct[]>(FALLBACK_PRODUCTS.slice(0, count));
   const [loading, setLoading] = useState(false);
   const [isRealData, setIsRealData] = useState(false);
 
   useEffect(() => {
     if (!clientId) {
-      setProducts(FALLBACK_PRODUCTS.slice(0, count));
+      setProducts(prev => prev.length ? prev : FALLBACK_PRODUCTS.slice(0, count));
       return;
     }
 
