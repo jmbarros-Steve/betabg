@@ -350,7 +350,11 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
           },
         });
 
-        if (error) throw new Error(error.message || 'Error generando');
+        console.log('Generate response:', { data, error });
+        if (error) {
+          const errorDetail = data?.error || data?.details || error.message || 'Error desconocido';
+          throw new Error(errorDetail);
+        }
         const blocks = data?.blocks || [];
 
         setGeneratedCampaigns(prev => prev.map((c, idx) =>
@@ -488,7 +492,11 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
           },
         });
 
-        if (error) throw new Error(error.message || 'Error subiendo');
+        console.log('Upload response:', { data, error });
+        if (error) {
+          const errorDetail = data?.error || data?.details || error.message || 'Error desconocido';
+          throw new Error(errorDetail);
+        }
 
         // Save to local DB
         await supabase.from('email_campaigns').insert({
@@ -960,7 +968,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" asChild>
-                        <a href="https://www.klaviyo.com/campaigns" target="_blank" rel="noopener">
+                        <a href="https://www.klaviyo.com/email/campaigns" target="_blank" rel="noopener">
                           <ExternalLink className="w-4 h-4 mr-2" /> Abrir Klaviyo
                         </a>
                       </Button>
