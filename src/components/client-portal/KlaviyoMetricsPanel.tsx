@@ -57,7 +57,7 @@ interface KlaviyoCampaign {
 }
 
 interface GlobalStats {
-  totalProfiles: number;
+  totalProfiles: number | string;
   newProfiles: number;
   totalFlows: number;
   activeFlows: number;
@@ -396,7 +396,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <KpiCard
                 label="Perfiles"
-                value={formatProfileCount(globalStats.totalProfiles)}
+                value={typeof globalStats.totalProfiles === 'string' ? globalStats.totalProfiles : formatProfileCount(globalStats.totalProfiles)}
                 subtitle={globalStats.newProfiles > 0 ? `+${formatNumber(globalStats.newProfiles)} nuevos (${timeframeLabel})` : undefined}
                 icon={Users}
               />
@@ -487,6 +487,15 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
                 <KlaviyoListsContent items={segments} type="segment" connectionId={connectionId!} />
               </TabsContent>
             </Tabs>
+
+            {/* Steve tip about approximate counts */}
+            <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl">
+              <span className="text-lg shrink-0 mt-0.5">💡</span>
+              <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
+                <span className="font-semibold">Steve tip:</span> Los conteos que ves aquí son aproximados (máximo 100 por lista/segmento y hasta 1,000 perfiles totales).
+                Para ver los números exactos de cada lista y segmento, revísalos directo en tu cuenta de Klaviyo → Audience → Lists &amp; Segments. ¡Ahí están todos los detalles! 🎯
+              </p>
+            </div>
           </div>
         ) : null}
       </CardContent>

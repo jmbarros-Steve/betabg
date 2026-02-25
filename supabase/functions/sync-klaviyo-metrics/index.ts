@@ -360,18 +360,22 @@ Deno.serve(async (req) => {
       })
     );
 
-    // STEP 5: Total profiles KPI
-    const profilesResp = await fetch(
-      'https://a.klaviyo.com/api/profiles/?page[size]=100&fields[profile]=email',
-      { headers: makeHeaders(apiKey) }
-    );
-    let totalProfiles: number | string = 0;
-    if (profilesResp.ok) {
+    // STEP 5: Total profiles KPI — paginate up to 10 pages of 100
+    let totalProfileCount = 0;
+    let profilesNextUrl: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=100&fields[profile]=email';
+    let profilePages = 0;
+    while (profilesNextUrl && profilePages < 10) {
+      const profilesResp = await fetch(profilesNextUrl, { headers: makeHeaders(apiKey) });
+      if (!profilesResp.ok) break;
       const profilesData = await profilesResp.json();
-      const hasMoreProfiles = !!profilesData.links?.next;
-      totalProfiles = hasMoreProfiles ? 10000 : (profilesData.data?.length || 0);
+      totalProfileCount += (profilesData.data || []).length;
+      profilesNextUrl = profilesData.links?.next || null;
+      profilePages++;
+      if (profilesNextUrl) await new Promise(r => setTimeout(r, 300));
     }
-    await new Promise(r => setTimeout(r, 500));
+    const hasMoreProfiles = !!profilesNextUrl;
+    const totalProfiles: number | string = hasMoreProfiles ? `${totalProfileCount.toLocaleString()}+` : totalProfileCount;
+    console.log(`[klaviyo] Total profiles: ${totalProfiles} (${profilePages} pages scanned)`);
 
     // STEP 6: Reports
     let flowMetrics: Record<string, any> = {};
