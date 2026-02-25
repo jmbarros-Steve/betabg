@@ -20,9 +20,7 @@ interface KlaviyoMetricsPanelProps {
 interface FlowMetrics {
   recipients: number;
   opens: number;
-  unique_opens: number;
   clicks: number;
-  unique_clicks: number;
   conversions: number;
   revenue: number;
 }
@@ -112,18 +110,18 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         {m ? (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-10 pb-3">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 px-10 pb-3">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Enviados</p>
               <p className="font-semibold text-sm">{formatNumber(m.recipients)}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Aperturas</p>
-              <p className="font-semibold text-sm">{calcRate(m.unique_opens, m.recipients)}</p>
+              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.opens, m.recipients) : '0%'}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Clics</p>
-              <p className="font-semibold text-sm">{calcRate(m.unique_clicks, m.recipients)}</p>
+              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.clicks, m.recipients) : '0%'}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Conversiones</p>
@@ -132,10 +130,6 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Revenue</p>
               <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Rev/Enviado</p>
-              <p className="font-semibold text-sm">{m.recipients > 0 ? formatCurrency(m.revenue / m.recipients) : '$0'}</p>
             </div>
           </div>
         ) : (
@@ -178,18 +172,18 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         {m ? (
-          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 px-10 pb-3">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-10 pb-3">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Enviados</p>
               <p className="font-semibold text-sm">{formatNumber(m.recipients)}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Aperturas</p>
-              <p className="font-semibold text-sm">{calcRate(m.unique_opens, m.recipients)}</p>
+              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.opens, m.recipients) : '0%'}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Clics</p>
-              <p className="font-semibold text-sm">{calcRate(m.unique_clicks, m.recipients)}</p>
+              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.clicks, m.recipients) : '0%'}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Conversiones</p>
@@ -202,10 +196,6 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Unsubs</p>
               <p className="font-semibold text-sm">{formatNumber(m.unsubscribes)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Bounces</p>
-              <p className="font-semibold text-sm">{formatNumber(m.bounces)}</p>
             </div>
           </div>
         ) : (
