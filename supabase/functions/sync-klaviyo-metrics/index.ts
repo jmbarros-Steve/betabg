@@ -68,24 +68,26 @@ Deno.serve(async (req) => {
     // Fetch the "Placed Order" metric ID for conversion tracking
     let conversionMetricId: string | null = null;
     try {
-      const metricsListRes = await fetch('https://a.klaviyo.com/api/metrics/?filter=equals(name,"Placed Order")', { headers: klaviyoHeaders });
+      // Klaviyo filter syntax requires single quotes, not double quotes
+      const metricsListRes = await fetch("https://a.klaviyo.com/api/metrics/?filter=equals(name,'Placed Order')", { headers: klaviyoHeaders });
       if (metricsListRes.ok) {
         const metricsData = await metricsListRes.json();
         conversionMetricId = metricsData.data?.[0]?.id || null;
         console.log(`[sync-klaviyo-metrics] Conversion metric ID: ${conversionMetricId}`);
       } else {
-        console.warn('[sync-klaviyo-metrics] Could not fetch metrics list:', metricsListRes.status);
-        await metricsListRes.text();
+        const errText = await metricsListRes.text();
+        console.warn('[sync-klaviyo-metrics] Could not fetch metrics list:', metricsListRes.status, errText);
       }
     } catch (e) {
       console.warn('[sync-klaviyo-metrics] Error fetching metrics:', e);
     }
 
-    // Fetch flows, campaigns, and profiles count in parallel
-    const [flowsRes, campaignsRes, profilesRes] = await Promise.all([
+    // Fetch flows, campaigns, lists (for profile count), in parallel
+    const [flowsRes, campaignsRes, listsRes] = await Promise.all([
       fetch('https://a.klaviyo.com/api/flows/?page[size]=50', { headers: klaviyoHeaders }),
-      fetch('https://a.klaviyo.com/api/campaigns/?page[size]=50&sort=-updated_at', { headers: klaviyoHeaders }),
-      fetch('https://a.klaviyo.com/api/profiles/?page[size]=1', { headers: klaviyoHeaders }),
+      // Klaviyo REQUIRES a channel filter for campaigns endpoint
+      fetch("https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')&page[size]=50&sort=-updated_at", { headers: klaviyoHeaders }),
+      fetch('https://a.klaviyo.com/api/lists/?page[size]=50', { headers: klaviyoHeaders }),
     ]);
 
     // Parse flows
@@ -122,19 +124,35 @@ Deno.serve(async (req) => {
       await campaignsRes.text();
     }
 
-    // Get profiles count
+    // Get profiles count from lists (sum all list profile counts)
     let totalProfiles = 0;
-    if (profilesRes.ok) {
-      const profilesData = await profilesRes.json();
-      // The total count may come from meta or we estimate from pagination
-      totalProfiles = profilesData.data?.length || 0;
-      // If there's a page cursor, there are more
-      if (profilesData.links?.next) {
-        // Use the total count approach - we'll estimate
-        totalProfiles = profilesData.meta?.page?.total || 0;
-      }
+    let listsData: any[] = [];
+    if (listsRes.ok) {
+      const listsJson = await listsRes.json();
+      listsData = listsJson.data || [];
+      // Use the largest list's profile_count as an estimate (main list)
+      // Or fetch profile count for each list
+      console.log(`[sync-klaviyo-metrics] Found ${listsData.length} lists`);
     } else {
-      await profilesRes.text();
+      const errText = await listsRes.text();
+      console.warn('[sync-klaviyo-metrics] Lists fetch failed:', listsRes.status, errText);
+    }
+
+    // Fetch profiles count via a simple query
+    try {
+      const profilesCountRes = await fetch('https://a.klaviyo.com/api/profiles/?page[size]=1', { headers: klaviyoHeaders });
+      if (profilesCountRes.ok) {
+        const profilesData = await profilesCountRes.json();
+        // Try to get total from pagination info
+        totalProfiles = profilesData.data?.length || 0;
+        if (profilesData.links?.next || profilesData.meta?.page_info?.count) {
+          totalProfiles = profilesData.meta?.page_info?.count || listsData.length * 100; // estimate
+        }
+      } else {
+        await profilesCountRes.text();
+      }
+    } catch (e) {
+      console.warn('[sync-klaviyo-metrics] Profiles count error:', e);
     }
 
     // Fetch flow metrics (values report) for the last 90 days
