@@ -9,10 +9,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  RefreshCw, Mail, Users, DollarSign, MousePointerClick,
-  Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3, ShoppingCart, Search
+  RefreshCw, Mail, Users, DollarSign,
+  Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3, ShoppingCart,
+  TrendingUp, MousePointerClick
 } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
 
 interface KlaviyoMetricsPanelProps {
   clientId: string;
@@ -57,6 +57,7 @@ interface KlaviyoCampaign {
 
 interface GlobalStats {
   totalProfiles: number;
+  newProfiles: number;
   totalFlows: number;
   activeFlows: number;
   totalCampaigns: number;
@@ -70,8 +71,10 @@ interface GlobalStats {
 }
 
 const TIMEFRAME_OPTIONS = [
+  { value: 'last_24_hours', label: 'Hoy' },
   { value: 'last_7_days', label: '7 días' },
   { value: 'last_30_days', label: '30 días' },
+  { value: 'last_60_days', label: '60 días' },
   { value: 'last_90_days', label: '90 días' },
   { value: 'last_365_days', label: '12 meses' },
 ];
@@ -84,12 +87,17 @@ function formatCurrency(n: number): string {
   return `$${Math.round(n).toLocaleString('es-CL')}`;
 }
 
-function MetricBadge({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
+function KpiCard({ label, value, subtitle, icon: Icon }: { label: string; value: string; subtitle?: string; icon: any }) {
   return (
-    <div className="flex flex-col items-center gap-1 p-3 bg-muted/50 rounded-lg min-w-[80px]">
-      <Icon className="w-4 h-4 text-muted-foreground" />
-      <span className="text-lg font-bold">{value}</span>
-      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
+    <div className="flex flex-col gap-1 p-4 bg-muted/50 rounded-xl border border-border/50">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="w-4 h-4" />
+        <span className="text-[11px] uppercase tracking-wider font-medium">{label}</span>
+      </div>
+      <span className="text-xl font-bold">{value}</span>
+      {subtitle && (
+        <span className="text-[10px] text-muted-foreground leading-tight">{subtitle}</span>
+      )}
     </div>
   );
 }
@@ -223,8 +231,6 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
   const [timeframe, setTimeframe] = useState('last_90_days');
-  const [debugResult, setDebugResult] = useState<string | null>(null);
-  const [debugLoading, setDebugLoading] = useState(false);
 
   useEffect(() => {
     checkConnection();
@@ -277,41 +283,6 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     }
   };
 
-  const debugKlaviyo = async () => {
-    if (!connectionId) {
-      setDebugResult('No connectionId found');
-      return;
-    }
-    setDebugLoading(true);
-    setDebugResult('Calling sync-klaviyo-metrics...');
-    try {
-      const startTime = Date.now();
-      const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
-        body: { connectionId, timeframe },
-      });
-      const elapsed = Date.now() - startTime;
-      
-      const result = {
-        elapsed_ms: elapsed,
-        connectionId,
-        timeframe,
-        error: error ? { message: error.message, name: error.name, context: error.context } : null,
-        data_keys: data ? Object.keys(data) : null,
-        globalStats: data?.globalStats || null,
-        flows_count: data?.flows?.length || 0,
-        campaigns_count: data?.campaigns?.length || 0,
-        flows_with_metrics: data?.flows?.filter((f: any) => f.metrics)?.length || 0,
-        campaigns_with_metrics: data?.campaigns?.filter((c: any) => c.metrics)?.length || 0,
-        raw_data_preview: JSON.stringify(data)?.substring(0, 2000),
-      };
-      setDebugResult(JSON.stringify(result, null, 2));
-    } catch (err: any) {
-      setDebugResult(JSON.stringify({ catch_error: err.message, stack: err.stack }, null, 2));
-    } finally {
-      setDebugLoading(false);
-    }
-  };
-
   if (!hasConnection) {
     return (
       <Card className="glow-box">
@@ -357,24 +328,6 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {/* DEBUG BUTTON - TEMPORARY */}
-        <div className="mb-4 p-3 border border-dashed border-yellow-500 rounded-lg bg-yellow-500/5">
-          <div className="flex items-center gap-2 mb-2">
-            <Button variant="outline" size="sm" onClick={debugKlaviyo} disabled={debugLoading} className="border-yellow-500 text-yellow-600">
-              <Search className="w-4 h-4 mr-1" />
-              {debugLoading ? 'Cargando...' : '🔍 Debug Klaviyo'}
-            </Button>
-            {debugResult && (
-              <Button variant="ghost" size="sm" onClick={() => setDebugResult(null)} className="text-xs">Limpiar</Button>
-            )}
-          </div>
-          {debugResult && (
-            <pre className="text-xs bg-black/80 text-green-400 p-3 rounded overflow-auto max-h-[400px] whitespace-pre-wrap font-mono">
-              {debugResult}
-            </pre>
-          )}
-        </div>
-
         {!globalStats && !loading ? (
           <div className="text-center py-8 text-muted-foreground">
             <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-50" />
@@ -389,14 +342,41 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
           </div>
         ) : globalStats ? (
           <div className="space-y-6">
-            {/* Global Stats */}
+            {/* Global KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <MetricBadge label="Perfiles" value={formatNumber(globalStats.totalProfiles)} icon={Users} />
-              <MetricBadge label="Flows Activos" value={`${globalStats.activeFlows}/${globalStats.totalFlows}`} icon={Zap} />
-              <MetricBadge label="Campañas" value={formatNumber(globalStats.sentCampaigns)} icon={Megaphone} />
-              <MetricBadge label="Open Rate" value={`${(globalStats.avgOpenRate * 100).toFixed(1)}%`} icon={Eye} />
-              <MetricBadge label="Conversiones" value={formatNumber(globalStats.totalConversions)} icon={ShoppingCart} />
-              <MetricBadge label="Revenue Total" value={formatCurrency(globalStats.totalRevenue)} icon={DollarSign} />
+              <KpiCard
+                label="Perfiles"
+                value={formatNumber(globalStats.totalProfiles)}
+                subtitle={globalStats.newProfiles > 0 ? `+${formatNumber(globalStats.newProfiles)} nuevos (${timeframeLabel})` : undefined}
+                icon={Users}
+              />
+              <KpiCard
+                label="Revenue Total"
+                value={formatCurrency(globalStats.totalRevenue)}
+                subtitle={`Flows: ${formatCurrency(globalStats.totalFlowRevenue)} | Camp: ${formatCurrency(globalStats.totalCampaignRevenue)}`}
+                icon={DollarSign}
+              />
+              <KpiCard
+                label="Open Rate"
+                value={`${(globalStats.avgOpenRate * 100).toFixed(1)}%`}
+                icon={Eye}
+              />
+              <KpiCard
+                label="Click Rate"
+                value={`${(globalStats.avgClickRate * 100).toFixed(1)}%`}
+                icon={MousePointerClick}
+              />
+              <KpiCard
+                label="Conversiones"
+                value={formatNumber(globalStats.totalConversions)}
+                icon={ShoppingCart}
+              />
+              <KpiCard
+                label="Flows Activos"
+                value={`${globalStats.activeFlows}/${globalStats.totalFlows}`}
+                subtitle={`${globalStats.sentCampaigns} campañas enviadas`}
+                icon={Zap}
+              />
             </div>
 
             {/* Flows & Campaigns Tabs */}
