@@ -77,38 +77,50 @@ async function fetchCampaigns(apiKey: string) {
   }));
 }
 
-// Fetch lists — NO additional-fields
+// Fetch ALL lists with pagination
 async function fetchLists(apiKey: string): Promise<any[]> {
-  console.log('[klaviyo] Fetching lists...');
-  const res = await fetch('https://a.klaviyo.com/api/lists/', { headers: makeHeaders(apiKey) });
-  console.log('[klaviyo] Lists status:', res.status);
-  if (!res.ok) { const e = await res.text(); console.error('[klaviyo] Lists error:', e); return []; }
-  const data = await res.json();
-  const lists = (data.data || []).map((l: any) => ({
-    id: l.id,
-    name: l.attributes?.name || 'Sin nombre',
-    created: l.attributes?.created || null,
-    updated: l.attributes?.updated || null,
-  }));
-  console.log('[klaviyo] Lists count:', lists.length);
-  return lists;
+  console.log('[klaviyo] Fetching all lists...');
+  let allLists: any[] = [];
+  let listsUrl: string | null = 'https://a.klaviyo.com/api/lists/';
+  while (listsUrl) {
+    const res = await fetch(listsUrl, { headers: makeHeaders(apiKey) });
+    if (!res.ok) { const e = await res.text(); console.error('[klaviyo] Lists error:', e); break; }
+    const data = await res.json();
+    const page = (data.data || []).map((l: any) => ({
+      id: l.id,
+      name: l.attributes?.name || 'Sin nombre',
+      created: l.attributes?.created || null,
+      updated: l.attributes?.updated || null,
+    }));
+    allLists = [...allLists, ...page];
+    listsUrl = data.links?.next || null;
+    if (listsUrl) await new Promise(r => setTimeout(r, 500));
+  }
+  console.log('[klaviyo] Total lists:', allLists.length);
+  return allLists;
 }
 
-// Fetch segments — NO additional-fields
+// Fetch ALL segments with pagination
 async function fetchSegments(apiKey: string): Promise<any[]> {
-  console.log('[klaviyo] Fetching segments...');
-  const res = await fetch('https://a.klaviyo.com/api/segments/', { headers: makeHeaders(apiKey) });
-  console.log('[klaviyo] Segments status:', res.status);
-  if (!res.ok) { const e = await res.text(); console.error('[klaviyo] Segments error:', e); return []; }
-  const data = await res.json();
-  const segments = (data.data || []).map((s: any) => ({
-    id: s.id,
-    name: s.attributes?.name || 'Sin nombre',
-    created: s.attributes?.created || null,
-    updated: s.attributes?.updated || null,
-  }));
-  console.log('[klaviyo] Segments count:', segments.length);
-  return segments;
+  console.log('[klaviyo] Fetching all segments...');
+  let allSegments: any[] = [];
+  let segsUrl: string | null = 'https://a.klaviyo.com/api/segments/';
+  while (segsUrl) {
+    const res = await fetch(segsUrl, { headers: makeHeaders(apiKey) });
+    if (!res.ok) { const e = await res.text(); console.error('[klaviyo] Segments error:', e); break; }
+    const data = await res.json();
+    const page = (data.data || []).map((s: any) => ({
+      id: s.id,
+      name: s.attributes?.name || 'Sin nombre',
+      created: s.attributes?.created || null,
+      updated: s.attributes?.updated || null,
+    }));
+    allSegments = [...allSegments, ...page];
+    segsUrl = data.links?.next || null;
+    if (segsUrl) await new Promise(r => setTimeout(r, 500));
+  }
+  console.log('[klaviyo] Total segments:', allSegments.length);
+  return allSegments;
 }
 
 // Profile KPI estimate: 1 call, page[size]=1000
@@ -254,10 +266,10 @@ Deno.serve(async (req) => {
       const entities = body.entities as { type: string; id: string }[];
       const results: Record<string, { count: number; display: string; hasMore: boolean }> = {};
 
-      // All in parallel — each requests max 100 profiles
+      // All in parallel — each requests max 1000 profiles
       const promises = entities.map(async (ent) => {
         try {
-          const url = `https://a.klaviyo.com/api/${ent.type}s/${ent.id}/profiles/?page[size]=100&fields[profile]=email`;
+          const url = `https://a.klaviyo.com/api/${ent.type}s/${ent.id}/profiles/?page[size]=1000&fields[profile]=email`;
           const res = await fetch(url, { headers: makeHeaders(apiKey) });
           if (!res.ok) {
             results[ent.id] = { count: 0, display: '0', hasMore: false };
@@ -266,7 +278,7 @@ Deno.serve(async (req) => {
           const data = await res.json();
           const count = (data.data || []).length;
           const hasMore = !!data.links?.next;
-          const display = hasMore ? '100+' : String(count);
+          const display = (count >= 1000 && hasMore) ? '1,000+' : count.toLocaleString();
           results[ent.id] = { count, display, hasMore };
         } catch {
           results[ent.id] = { count: 0, display: '0', hasMore: false };

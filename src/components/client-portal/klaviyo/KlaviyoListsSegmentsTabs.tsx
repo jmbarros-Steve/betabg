@@ -29,7 +29,7 @@ function ProfileCountBadge({ count, display, loading }: { count: number | null; 
   } else if (count >= 10) {
     className += 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
   } else {
-    className += 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30';
+    className += 'bg-destructive/15 text-destructive border-destructive/30';
   }
 
   return <Badge variant="outline" className={className}>{display}</Badge>;
