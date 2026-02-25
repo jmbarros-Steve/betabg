@@ -29,7 +29,8 @@ interface FlowMetrics {
 }
 
 interface CampaignMetrics extends FlowMetrics {
-  bounces: number;
+  bounce_rate: number;
+  recipients: number;
 }
 
 interface KlaviyoFlow {
@@ -194,8 +195,8 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
               <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Bounces</p>
-              <p className="font-semibold text-sm">{formatNumber(m.bounces)}</p>
+              <p className="text-xs text-muted-foreground">Bounce Rate</p>
+              <p className="font-semibold text-sm">{(m.bounce_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Unsubs</p>
@@ -284,7 +285,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               <BarChart3 className="w-4 h-4" />
               Rendimiento de Klaviyo
             </CardTitle>
-            <CardDescription>Métricas de los últimos 30 días</CardDescription>
+            <CardDescription>Métricas de los últimos 90 días</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={fetchMetrics} disabled={loading}>
             {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
