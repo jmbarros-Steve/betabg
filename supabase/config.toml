@@ -110,3 +110,6 @@ verify_jwt = false
 
 [functions.klaviyo-smart-format]
 verify_jwt = false
+
+[functions.import-klaviyo-templates]
+verify_jwt = false
