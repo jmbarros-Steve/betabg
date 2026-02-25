@@ -12,6 +12,7 @@ import {
 import { BLOCK_DEFINITIONS, createBlock, type EmailBlock, type BlockType, type BlockDefinition } from './blockTypes';
 import { renderBlockToHtml } from './blockRenderer';
 import BlockConfigPanel from './BlockConfigPanel';
+import { useShopifyPreviewProducts, type ShopifyPreviewProduct } from '@/hooks/useShopifyPreviewProducts';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   text: <Type className="w-5 h-5" />,
@@ -79,6 +80,9 @@ function normalizeBlockType(block: EmailBlock): EmailBlock {
 }
 
 export default function EmailBlockEditor({ blocks: rawBlocks, onChange, templateColors, assets, clientId }: EmailBlockEditorProps) {
+  // Fetch Shopify products for realistic preview
+  const { products: previewProducts } = useShopifyPreviewProducts(clientId, 6);
+
   // Normalize block types on every render so alias types are always recognized
   const blocks = rawBlocks.map(normalizeBlockType);
   // Propagate normalized blocks back if any were changed
@@ -175,6 +179,27 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
 
   const blockDefs = BLOCK_DEFINITIONS.filter(d => d.category === 'blocks');
   const designDefs = BLOCK_DEFINITIONS.filter(d => d.category === 'design');
+
+  // Generate preview HTML with Klaviyo variables replaced by real Shopify data
+  const generatePreviewHtml = useCallback(() => {
+    let html = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
+    if (previewProducts.length > 0) {
+      previewProducts.forEach((product) => {
+        const formattedPrice = `$${Number(product.price || 0).toLocaleString('es-CL')}`;
+        html = html.replace(/\{\{\s*item\.title\|safe\s*\}\}/i, product.title);
+        html = html.replace(/\{\{\s*Title\s*\}\}/i, product.title);
+        html = html.replace(/\{\{\s*item\.image\s*\}\}/i, product.image_url || '');
+        html = html.replace(/\{\{\s*item\.metadata\.__variant_price\|floatformat:0\s*\}\}/i, formattedPrice);
+        html = html.replace(/\{\{\s*Price\s*\}\}/i, formattedPrice);
+        html = html.replace(/\{\{\s*item\.url\s*\}\}/i, '#');
+      });
+    }
+    html = html.replace(/\{\{\s*first_name\s*\}\}/gi, 'María');
+    html = html.replace(/\{\{\s*person\.first_name\|default:['"](.*?)['"]\s*\}\}/gi, '$1');
+    html = html.replace(/\{\{\s*email\s*\}\}/gi, 'maria@ejemplo.cl');
+    return html;
+  }, [blocks, templateColors, previewProducts]);
+
   const fullHtml = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
   const canvasWidth = viewMode === 'mobile' ? 'max-w-[360px]' : 'max-w-[600px]';
 
@@ -278,6 +303,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
                             isFirst={idx === 0}
                             isLast={idx === blocks.length - 1}
                             templateColors={templateColors}
+                            previewProducts={previewProducts}
                           />
                         </div>
                       ))}
@@ -354,11 +380,16 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
               <Eye className="w-4 h-4" /> Preview del email
             </DialogTitle>
           </DialogHeader>
+          {previewProducts.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+              ⚠️ Preview de ejemplo — Los datos de producto son de tu tienda Shopify. Klaviyo mostrará contenido personalizado al enviar.
+            </div>
+          )}
           <div className="border rounded-lg overflow-auto max-h-[70vh] bg-white">
             <div
               className="mx-auto"
               style={{ maxWidth: viewMode === 'mobile' ? 360 : 600 }}
-              dangerouslySetInnerHTML={{ __html: fullHtml }}
+              dangerouslySetInnerHTML={{ __html: generatePreviewHtml() }}
             />
           </div>
         </DialogContent>
@@ -390,7 +421,7 @@ function BlockPaletteItem({ def, onDragStart, onAdd }: {
   );
 }
 
-function ProductBlockPreview({ block }: { block: EmailBlock }) {
+function ProductBlockPreview({ block, previewProducts = [] }: { block: EmailBlock; previewProducts?: ShopifyPreviewProduct[] }) {
   const p = block.props;
   const mode = p.productMode || p._mode || 'fixed';
 
@@ -406,25 +437,44 @@ function ProductBlockPreview({ block }: { block: EmailBlock }) {
     };
     const count = p.productsCount || 3;
     const isVertical = p.productLayout === 'vertical';
+    const hasRealProducts = previewProducts.length > 0;
     return (
       <div className="bg-purple-50 border-2 border-dashed border-purple-300 rounded-lg p-4">
         <div className="text-center mb-3">
           <span className="text-2xl">🔄</span>
-          <p className="font-bold text-purple-700">{typeLabels[p.dynamicType || p._dynamicType || ''] || 'Selecciona tipo →'}</p>
+          <p className="font-bold text-purple-700">
+            {typeLabels[p.dynamicType || p._dynamicType || ''] || 'Selecciona tipo →'}
+            {hasRealProducts && <span className="text-xs font-normal text-purple-500"> — Preview con datos reales</span>}
+          </p>
         </div>
         <div className={`flex gap-2 ${isVertical ? 'flex-col' : 'flex-row'}`}>
-          {Array.from({ length: count }).map((_, i) => (
-            <div key={i} className="flex-1 bg-white border border-purple-200 rounded-lg p-3 text-center">
-              {p.showImage !== false && <div className="w-full h-16 bg-purple-100 rounded mb-2 flex items-center justify-center text-2xl">📦</div>}
-              <p className="text-xs font-medium text-purple-600">Producto {i + 1}</p>
-              {p.showPrice !== false && <p className="text-xs text-purple-400">{p.price || '{{ Price }}'}</p>}
-              {p.showButton !== false && (
-                <div className="mt-1 bg-purple-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Comprar'}</div>
-              )}
-            </div>
-          ))}
+          {Array.from({ length: count }).map((_, i) => {
+            const realProduct = previewProducts[i];
+            return (
+              <div key={i} className="flex-1 bg-white border border-purple-200 rounded-lg p-3 text-center">
+                {p.showImage !== false && (
+                  realProduct?.image_url ? (
+                    <img src={realProduct.image_url} alt={realProduct.title} className="w-full h-24 object-cover rounded mb-2" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/e9d5ff/7c3aed?text=📦'; }} />
+                  ) : (
+                    <div className="w-full h-16 bg-purple-100 rounded mb-2 flex items-center justify-center text-2xl">📦</div>
+                  )
+                )}
+                <p className="text-xs font-medium text-purple-600">{realProduct?.title || `Producto ${i + 1}`}</p>
+                {p.showPrice !== false && (
+                  <p className="text-xs text-purple-500 font-bold">
+                    {realProduct ? `$${Number(realProduct.price || 0).toLocaleString('es-CL')}` : '{{ Price }}'}
+                  </p>
+                )}
+                {p.showButton !== false && (
+                  <div className="mt-1 bg-purple-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Comprar'}</div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <p className="text-xs text-purple-400 text-center mt-2">Klaviyo insertará productos reales al enviar</p>
+        <p className="text-xs text-purple-400 text-center mt-2">
+          {hasRealProducts ? '⚠️ Preview de ejemplo — Klaviyo mostrará productos personalizados al enviar' : 'Klaviyo insertará productos reales al enviar'}
+        </p>
       </div>
     );
   }
@@ -432,23 +482,42 @@ function ProductBlockPreview({ block }: { block: EmailBlock }) {
   if (mode === 'collection') {
     const count = p.productsCount || p.collectionCount || 3;
     const isVertical = p.productLayout === 'vertical';
+    const hasRealProducts = previewProducts.length > 0;
     return (
       <div className="bg-green-50 border-2 border-dashed border-green-300 rounded-lg p-4">
         <div className="text-center mb-3">
           <span className="text-2xl">📁</span>
-          <p className="font-bold text-green-700">{p.collectionName || 'Selecciona colección →'}</p>
+          <p className="font-bold text-green-700">
+            {p.collectionName || 'Selecciona colección →'}
+            {hasRealProducts && <span className="text-xs font-normal text-green-500"> — Preview con datos reales</span>}
+          </p>
         </div>
         <div className={`flex gap-2 ${isVertical ? 'flex-col' : 'flex-row'}`}>
-          {Array.from({ length: count }).map((_, i) => (
-            <div key={i} className="flex-1 bg-white border border-green-200 rounded-lg p-3 text-center">
-              {p.showImage !== false && <div className="w-full h-16 bg-green-100 rounded mb-2 flex items-center justify-center text-2xl">🛍️</div>}
-              <p className="text-xs font-medium text-green-600">Producto {i + 1}</p>
-              {p.showButton !== false && (
-                <div className="mt-1 bg-green-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Ver'}</div>
-              )}
-            </div>
-          ))}
+          {Array.from({ length: count }).map((_, i) => {
+            const realProduct = previewProducts[i];
+            return (
+              <div key={i} className="flex-1 bg-white border border-green-200 rounded-lg p-3 text-center">
+                {p.showImage !== false && (
+                  realProduct?.image_url ? (
+                    <img src={realProduct.image_url} alt={realProduct.title} className="w-full h-24 object-cover rounded mb-2" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/dcfce7/16a34a?text=🛍️'; }} />
+                  ) : (
+                    <div className="w-full h-16 bg-green-100 rounded mb-2 flex items-center justify-center text-2xl">🛍️</div>
+                  )
+                )}
+                <p className="text-xs font-medium text-green-600">{realProduct?.title || `Producto ${i + 1}`}</p>
+                {p.showPrice !== false && realProduct && (
+                  <p className="text-xs text-green-500 font-bold">${Number(realProduct.price || 0).toLocaleString('es-CL')}</p>
+                )}
+                {p.showButton !== false && (
+                  <div className="mt-1 bg-green-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Ver'}</div>
+                )}
+              </div>
+            );
+          })}
         </div>
+        {hasRealProducts && (
+          <p className="text-xs text-green-400 text-center mt-2">⚠️ Preview de ejemplo — Se mostrarán productos de la colección "{p.collectionName}"</p>
+        )}
       </div>
     );
   }
@@ -456,10 +525,12 @@ function ProductBlockPreview({ block }: { block: EmailBlock }) {
   // Fixed mode
   return (
     <div className="p-3 flex gap-3">
-      {p.imageUrl && !p.imageUrl.includes('{{') ? (
-        <img src={p.imageUrl} alt="" className="w-24 h-24 object-cover rounded" />
-      ) : (
-        <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-2xl">📦</div>
+      {p.showImage !== false && (
+        p.imageUrl && !p.imageUrl.includes('{{') ? (
+          <img src={p.imageUrl} alt="" className="w-24 h-24 object-cover rounded" />
+        ) : (
+          <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-2xl">📦</div>
+        )
       )}
       <div className="flex-1">
         <p className="font-bold">{p.name || 'Nombre del producto'}</p>
@@ -475,7 +546,7 @@ function ProductBlockPreview({ block }: { block: EmailBlock }) {
   );
 }
 
-function ColumnsBlockPreview({ block, templateColors }: { block: EmailBlock; templateColors?: any }) {
+function ColumnsBlockPreview({ block, templateColors, previewProducts = [] }: { block: EmailBlock; templateColors?: any; previewProducts?: ShopifyPreviewProduct[] }) {
   const cols = block.props.columns || [];
   return (
     <div className="p-2">
@@ -484,7 +555,22 @@ function ColumnsBlockPreview({ block, templateColors }: { block: EmailBlock; tem
           <div key={colIdx} style={{ width: col.width || `${Math.floor(100 / cols.length)}%` }} className="border border-dashed border-gray-200 rounded p-2">
             {(col.blocks || []).map((innerBlock: EmailBlock, bIdx: number) => {
               if (innerBlock.type === 'product') {
-                return <div key={bIdx}><ProductBlockPreview block={innerBlock} /></div>;
+                // For products inside columns with Klaviyo variables, use real product from that column index
+                const hasKlaviyoVars = innerBlock.props.name?.includes('{{');
+                const productForColumn = hasKlaviyoVars && previewProducts[colIdx] 
+                  ? previewProducts[colIdx] 
+                  : undefined;
+                const enrichedBlock = productForColumn ? {
+                  ...innerBlock,
+                  props: {
+                    ...innerBlock.props,
+                    _mode: 'fixed',
+                    name: productForColumn.title,
+                    imageUrl: productForColumn.image_url,
+                    price: `$${Number(productForColumn.price || 0).toLocaleString('es-CL')}`,
+                  }
+                } : innerBlock;
+                return <div key={bIdx}><ProductBlockPreview block={enrichedBlock} previewProducts={previewProducts} /></div>;
               }
               const innerHtml = renderBlockToHtml(innerBlock, templateColors);
               return <div key={bIdx} dangerouslySetInnerHTML={{ __html: innerHtml }} />;
@@ -495,11 +581,14 @@ function ColumnsBlockPreview({ block, templateColors }: { block: EmailBlock; tem
           </div>
         ))}
       </div>
+      {previewProducts.length > 0 && cols.some((c: any) => (c.blocks || []).some((b: any) => b.type === 'product' && b.props?.name?.includes('{{'))) && (
+        <p className="text-xs text-amber-500 text-center mt-1">⚠️ Preview con datos reales de Shopify</p>
+      )}
     </div>
   );
 }
 
-function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors }: {
+function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors, previewProducts = [] }: {
   block: EmailBlock;
   isSelected: boolean;
   onSelect: () => void;
@@ -510,6 +599,7 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
   isFirst: boolean;
   isLast: boolean;
   templateColors?: any;
+  previewProducts?: ShopifyPreviewProduct[];
 }) {
   const def = BLOCK_DEFINITIONS.find(d => d.type === block.type);
   const useCustomPreview = block.type === 'product' || (block.type === 'columns' && block.props.columns);
@@ -548,9 +638,9 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
       {/* Block preview */}
       <div className="pointer-events-none overflow-hidden" style={{ fontSize: '13px' }}>
         {block.type === 'product' ? (
-          <ProductBlockPreview block={block} />
+          <ProductBlockPreview block={block} previewProducts={previewProducts} />
         ) : block.type === 'columns' && block.props.columns ? (
-          <ColumnsBlockPreview block={block} templateColors={templateColors} />
+          <ColumnsBlockPreview block={block} templateColors={templateColors} previewProducts={previewProducts} />
         ) : (
           <div dangerouslySetInnerHTML={{ __html: html }} />
         )}
