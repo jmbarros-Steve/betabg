@@ -390,6 +390,115 @@ function BlockPaletteItem({ def, onDragStart, onAdd }: {
   );
 }
 
+function ProductBlockPreview({ block }: { block: EmailBlock }) {
+  const p = block.props;
+  const mode = p.productMode || p._mode || 'fixed';
+
+  if (mode === 'dynamic') {
+    const typeLabels: Record<string, string> = {
+      catalog_feed: 'Feed del catálogo',
+      last_viewed: 'Último producto visto',
+      lastViewed: 'Último producto visto',
+      cart_item: 'Carrito abandonado',
+      abandonedCart: 'Carrito abandonado',
+      recommended: 'Recomendados',
+      collection_dynamic: 'Colección dinámica',
+    };
+    const count = p.productsCount || 3;
+    const isVertical = p.productLayout === 'vertical';
+    return (
+      <div className="bg-purple-50 border-2 border-dashed border-purple-300 rounded-lg p-4">
+        <div className="text-center mb-3">
+          <span className="text-2xl">🔄</span>
+          <p className="font-bold text-purple-700">{typeLabels[p.dynamicType || p._dynamicType || ''] || 'Selecciona tipo →'}</p>
+        </div>
+        <div className={`flex gap-2 ${isVertical ? 'flex-col' : 'flex-row'}`}>
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="flex-1 bg-white border border-purple-200 rounded-lg p-3 text-center">
+              {p.showImage !== false && <div className="w-full h-16 bg-purple-100 rounded mb-2 flex items-center justify-center text-2xl">📦</div>}
+              <p className="text-xs font-medium text-purple-600">Producto {i + 1}</p>
+              {p.showPrice !== false && <p className="text-xs text-purple-400">{p.price || '{{ Price }}'}</p>}
+              {p.showButton !== false && (
+                <div className="mt-1 bg-purple-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Comprar'}</div>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-purple-400 text-center mt-2">Klaviyo insertará productos reales al enviar</p>
+      </div>
+    );
+  }
+
+  if (mode === 'collection') {
+    const count = p.productsCount || p.collectionCount || 3;
+    const isVertical = p.productLayout === 'vertical';
+    return (
+      <div className="bg-green-50 border-2 border-dashed border-green-300 rounded-lg p-4">
+        <div className="text-center mb-3">
+          <span className="text-2xl">📁</span>
+          <p className="font-bold text-green-700">{p.collectionName || 'Selecciona colección →'}</p>
+        </div>
+        <div className={`flex gap-2 ${isVertical ? 'flex-col' : 'flex-row'}`}>
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="flex-1 bg-white border border-green-200 rounded-lg p-3 text-center">
+              {p.showImage !== false && <div className="w-full h-16 bg-green-100 rounded mb-2 flex items-center justify-center text-2xl">🛍️</div>}
+              <p className="text-xs font-medium text-green-600">Producto {i + 1}</p>
+              {p.showButton !== false && (
+                <div className="mt-1 bg-green-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Ver'}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fixed mode
+  return (
+    <div className="p-3 flex gap-3">
+      {p.imageUrl && !p.imageUrl.includes('{{') ? (
+        <img src={p.imageUrl} alt="" className="w-24 h-24 object-cover rounded" />
+      ) : (
+        <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-2xl">📦</div>
+      )}
+      <div className="flex-1">
+        <p className="font-bold">{p.name || 'Nombre del producto'}</p>
+        <p className="text-blue-600 font-bold">{p.price || '$0'}</p>
+        {p.showDescription !== false && p.description && (
+          <p className="text-sm text-gray-500 mt-1">{p.description.substring(0, 80)}</p>
+        )}
+        {p.showButton !== false && (
+          <div className="mt-2 bg-black text-white rounded px-4 py-2 text-sm inline-block">{p.buttonText || 'Comprar'}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ColumnsBlockPreview({ block, templateColors }: { block: EmailBlock; templateColors?: any }) {
+  const cols = block.props.columns || [];
+  return (
+    <div className="p-2">
+      <div className="flex gap-2">
+        {cols.map((col: any, colIdx: number) => (
+          <div key={colIdx} style={{ width: col.width || `${Math.floor(100 / cols.length)}%` }} className="border border-dashed border-gray-200 rounded p-2">
+            {(col.blocks || []).map((innerBlock: EmailBlock, bIdx: number) => {
+              if (innerBlock.type === 'product') {
+                return <div key={bIdx}><ProductBlockPreview block={innerBlock} /></div>;
+              }
+              const innerHtml = renderBlockToHtml(innerBlock, templateColors);
+              return <div key={bIdx} dangerouslySetInnerHTML={{ __html: innerHtml }} />;
+            })}
+            {(!col.blocks || col.blocks.length === 0) && (
+              <p className="text-xs text-gray-400 text-center py-4">Columna vacía</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors }: {
   block: EmailBlock;
   isSelected: boolean;
@@ -403,7 +512,8 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
   templateColors?: any;
 }) {
   const def = BLOCK_DEFINITIONS.find(d => d.type === block.type);
-  const html = renderBlockToHtml(block, templateColors);
+  const useCustomPreview = block.type === 'product' || (block.type === 'columns' && block.props.columns);
+  const html = useCustomPreview ? '' : renderBlockToHtml(block, templateColors);
 
   return (
     <div
@@ -437,7 +547,13 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
 
       {/* Block preview */}
       <div className="pointer-events-none overflow-hidden" style={{ fontSize: '13px' }}>
-        <div dangerouslySetInnerHTML={{ __html: html }} />
+        {block.type === 'product' ? (
+          <ProductBlockPreview block={block} />
+        ) : block.type === 'columns' && block.props.columns ? (
+          <ColumnsBlockPreview block={block} templateColors={templateColors} />
+        ) : (
+          <div dangerouslySetInnerHTML={{ __html: html }} />
+        )}
       </div>
     </div>
   );

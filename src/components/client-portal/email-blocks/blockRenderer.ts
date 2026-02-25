@@ -64,45 +64,69 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
     case 'product': {
       const mode = p.productMode || p._mode || 'fixed';
       if (mode === 'dynamic') {
-        const typeLabels: Record<string, string> = {
-          lastViewed: 'Último producto visto',
-          last_viewed: 'Último producto visto',
-          abandonedCart: 'Producto del carrito abandonado',
-          cart_item: 'Producto del carrito abandonado',
-          recommended: 'Producto recomendado',
-        };
-        const dynType = p.dynamicType || p._dynamicType || 'lastViewed';
-        return `<div style="padding:20px;font-family:${font};text-align:center;border:2px dashed #c084fc;border-radius:8px;background:#faf5ff;">
-          <p style="margin:0 0 4px;font-size:11px;color:#9333ea;">🔄 PRODUCTO DINÁMICO</p>
-          <p style="margin:0;font-size:14px;font-weight:600;color:#581c87;">${typeLabels[dynType] || dynType}</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#7c3aed;">${p.name || '{{ item.title }}'}</p>
-          <p style="margin:4px 0 8px;font-size:12px;color:#7c3aed;">${p.price || '{{ item.price }}'}</p>
-          <span style="display:inline-block;background:#7c3aed;color:#fff;padding:8px 20px;border-radius:4px;font-size:13px;font-weight:600;">${p.buttonText || 'Comprar'}</span>
-          <p style="margin:8px 0 0;font-size:11px;color:#a78bfa;">Klaviyo insertará los datos reales al enviar</p>
+        const count = p.productsCount || 1;
+        const isVertical = p.productLayout === 'vertical';
+        const btnColor = templateColors?.button || '#000';
+        const btnTextColor = templateColors?.buttonText || '#fff';
+        
+        if (count === 1) {
+          // Single dynamic product
+          return `<div style="padding:20px;font-family:${font};text-align:center;border:2px dashed #c084fc;border-radius:8px;background:#faf5ff;">
+            ${p.showImage !== false ? `<div style="margin-bottom:12px;"><img src="${p.imageUrl || '{{ item.image }}'}" alt="" style="max-width:100%;border-radius:8px;" /></div>` : ''}
+            <h3 style="margin:0 0 8px;font-size:18px;color:#111;">${p.name || '{{ item.title }}'}</h3>
+            ${p.showPrice !== false ? `<p style="margin:0 0 8px;font-size:16px;font-weight:700;">${p.price || '{{ item.price }}'}</p>` : ''}
+            ${p.showButton !== false ? `<div style="text-align:center;"><a href="${p.link || '{{ item.url }}'}" style="display:inline-block;background:${btnColor};color:${btnTextColor};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;white-space:nowrap;">${p.buttonText || 'Comprar'}</a></div>` : ''}
+          </div>`;
+        }
+        
+        // Multiple dynamic products - generate Klaviyo loop
+        const widthPct = isVertical ? '100' : Math.floor(100 / count);
+        const productCell = `<td style="width:${widthPct}%;vertical-align:top;padding:8px;text-align:center;">
+            ${p.showImage !== false ? `<img src="${p.imageUrl || '{{ item.image }}'}" alt="" style="max-width:100%;border-radius:8px;margin-bottom:8px;" />` : ''}
+            <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#111;">${p.name || '{{ item.title|safe }}'}</p>
+            ${p.showPrice !== false ? `<p style="margin:0 0 8px;font-size:14px;font-weight:700;">${p.price || '{{ item.metadata.__variant_price|floatformat:0 }}'}</p>` : ''}
+            ${p.showButton !== false ? `<a href="${p.link || '{{ item.url }}'}" style="display:inline-block;background:${btnColor};color:${btnTextColor};padding:10px 20px;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;white-space:nowrap;">${p.buttonText || 'Comprar'}</a>` : ''}
+          </td>`;
+        
+        if (isVertical) {
+          return `<div style="font-family:${font};">
+            <table style="width:100%;border-collapse:collapse;">
+              ${Array.from({ length: count }).map(() => `<tr>${productCell}</tr>`).join('')}
+            </table>
+          </div>`;
+        }
+        return `<div style="font-family:${font};">
+          <table style="width:100%;border-collapse:collapse;"><tr>
+            ${Array.from({ length: count }).map(() => productCell).join('')}
+          </tr></table>
         </div>`;
       }
       if (mode === 'collection') {
-        const count = p.collectionCount || p.productsCount || 2;
+        const count = p.productsCount || p.collectionCount || 2;
+        const isVertical = p.productLayout === 'vertical';
         const cols = Array.from({ length: count }, (_, i) =>
-          `<td style="width:${Math.floor(100/count)}%;vertical-align:top;padding:8px;text-align:center;">
+          `<td style="width:${isVertical ? '100' : Math.floor(100/count)}%;vertical-align:top;padding:8px;text-align:center;">
             <div style="background:#f3f4f6;border-radius:8px;padding:16px;">
-              <div style="width:80px;height:80px;background:#e5e7eb;border-radius:8px;margin:0 auto 8px;"></div>
+              ${p.showImage !== false ? `<div style="width:80px;height:80px;background:#e5e7eb;border-radius:8px;margin:0 auto 8px;"></div>` : ''}
               <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#111;">Producto ${i+1}</p>
-              <p style="margin:0 0 8px;font-size:12px;color:#666;">$XX.XXX</p>
+              ${p.showPrice !== false ? `<p style="margin:0 0 8px;font-size:12px;color:#666;">$XX.XXX</p>` : ''}
             </div>
           </td>`
-        ).join('');
+        );
+        const rowsHtml = isVertical
+          ? cols.map(c => `<tr>${c}</tr>`).join('')
+          : `<tr>${cols.join('')}</tr>`;
         return `<div style="padding:16px 0;font-family:${font};">
           <h3 style="margin:0 0 12px;font-size:18px;color:#111;text-align:center;">${p.collectionName || 'Colección'}</h3>
-          <table style="width:100%;border-collapse:collapse;"><tr>${cols}</tr></table>
-          <div style="text-align:center;margin-top:12px;">
-            <a href="{{shop_url}}/collections/${p.collectionHandle || ''}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;">${p.buttonText || 'Ver colección'}</a>
-          </div>
+          <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
+          ${p.showButton !== false ? `<div style="text-align:center;margin-top:12px;">
+            <a href="{{shop_url}}/collections/${p.collectionHandle || ''}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;white-space:nowrap;">${p.buttonText || 'Ver colección'}</a>
+          </div>` : ''}
         </div>`;
       }
       // Fixed mode (default)
       return `<div style="padding:16px 0;font-family:${font};">
-        ${p.imageUrl ? `<div style="text-align:center;margin-bottom:12px;"><img src="${p.imageUrl}" alt="${p.name || ''}" style="max-width:100%;border-radius:8px;" /></div>` : ''}
+        ${p.showImage !== false && p.imageUrl ? `<div style="text-align:center;margin-bottom:12px;"><img src="${p.imageUrl}" alt="${p.name || ''}" style="max-width:100%;border-radius:8px;" /></div>` : ''}
         <h3 style="margin:0 0 8px;font-size:18px;color:#111;">${p.name || 'Producto'}</h3>
         ${p.showPrice !== false && p.price ? `<p style="margin:0 0 8px;font-size:16px;font-weight:700;color:${templateColors?.primary || '#000'};">${p.price}</p>` : ''}
         ${p.showDescription !== false && p.description ? `<p style="margin:0 0 12px;font-size:14px;color:#666;">${p.description}</p>` : ''}
