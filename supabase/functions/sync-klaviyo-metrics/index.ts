@@ -68,12 +68,16 @@ Deno.serve(async (req) => {
     // Fetch the "Placed Order" metric ID for conversion tracking
     let conversionMetricId: string | null = null;
     try {
-      // Klaviyo filter syntax requires single quotes, not double quotes
-      const metricsListRes = await fetch("https://a.klaviyo.com/api/metrics/?filter=equals(name,'Placed Order')", { headers: klaviyoHeaders });
+      // Klaviyo filterable fields are integration.name and integration.category
+      // Fetch all metrics and find "Placed Order" manually
+      const metricsListRes = await fetch('https://a.klaviyo.com/api/metrics/?page[size]=200', { headers: klaviyoHeaders });
       if (metricsListRes.ok) {
         const metricsData = await metricsListRes.json();
-        conversionMetricId = metricsData.data?.[0]?.id || null;
-        console.log(`[sync-klaviyo-metrics] Conversion metric ID: ${conversionMetricId}`);
+        const placedOrderMetric = (metricsData.data || []).find(
+          (m: any) => m.attributes?.name === 'Placed Order'
+        );
+        conversionMetricId = placedOrderMetric?.id || null;
+        console.log(`[sync-klaviyo-metrics] Conversion metric ID: ${conversionMetricId}, total metrics: ${metricsData.data?.length}`);
       } else {
         const errText = await metricsListRes.text();
         console.warn('[sync-klaviyo-metrics] Could not fetch metrics list:', metricsListRes.status, errText);
@@ -82,12 +86,13 @@ Deno.serve(async (req) => {
       console.warn('[sync-klaviyo-metrics] Error fetching metrics:', e);
     }
 
-    // Fetch flows, campaigns, lists (for profile count), in parallel
-    const [flowsRes, campaignsRes, listsRes] = await Promise.all([
+    // Fetch flows, campaigns, and profiles count in parallel
+    // Campaign filter with proper URL encoding
+    const campaignFilter = encodeURIComponent("equals(messages.channel,'email')");
+    const [flowsRes, campaignsRes, profilesRes] = await Promise.all([
       fetch('https://a.klaviyo.com/api/flows/?page[size]=50', { headers: klaviyoHeaders }),
-      // Klaviyo REQUIRES a channel filter for campaigns endpoint
-      fetch("https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')&page[size]=50&sort=-updated_at", { headers: klaviyoHeaders }),
-      fetch('https://a.klaviyo.com/api/lists/?page[size]=50', { headers: klaviyoHeaders }),
+      fetch(`https://a.klaviyo.com/api/campaigns/?filter=${campaignFilter}&page[size]=50&sort=-updated_at`, { headers: klaviyoHeaders }),
+      fetch('https://a.klaviyo.com/api/profiles/?page[size]=1', { headers: klaviyoHeaders }),
     ]);
 
     // Parse flows
@@ -124,35 +129,22 @@ Deno.serve(async (req) => {
       await campaignsRes.text();
     }
 
-    // Get profiles count from lists (sum all list profile counts)
+    // Get profiles count
     let totalProfiles = 0;
-    let listsData: any[] = [];
-    if (listsRes.ok) {
-      const listsJson = await listsRes.json();
-      listsData = listsJson.data || [];
-      // Use the largest list's profile_count as an estimate (main list)
-      // Or fetch profile count for each list
-      console.log(`[sync-klaviyo-metrics] Found ${listsData.length} lists`);
-    } else {
-      const errText = await listsRes.text();
-      console.warn('[sync-klaviyo-metrics] Lists fetch failed:', listsRes.status, errText);
-    }
-
-    // Fetch profiles count via a simple query
-    try {
-      const profilesCountRes = await fetch('https://a.klaviyo.com/api/profiles/?page[size]=1', { headers: klaviyoHeaders });
-      if (profilesCountRes.ok) {
-        const profilesData = await profilesCountRes.json();
-        // Try to get total from pagination info
-        totalProfiles = profilesData.data?.length || 0;
-        if (profilesData.links?.next || profilesData.meta?.page_info?.count) {
-          totalProfiles = profilesData.meta?.page_info?.count || listsData.length * 100; // estimate
-        }
-      } else {
-        await profilesCountRes.text();
+    if (profilesRes.ok) {
+      const profilesData = await profilesRes.json();
+      totalProfiles = profilesData.data?.length || 0;
+      // Klaviyo returns page_info.count for total
+      if (profilesData.meta?.page_info?.count) {
+        totalProfiles = profilesData.meta.page_info.count;
+      } else if (profilesData.links?.next) {
+        // Has more pages, estimate higher
+        totalProfiles = 100; // conservative estimate
       }
-    } catch (e) {
-      console.warn('[sync-klaviyo-metrics] Profiles count error:', e);
+      console.log(`[sync-klaviyo-metrics] Profiles count: ${totalProfiles}`);
+    } else {
+      const errText = await profilesRes.text();
+      console.warn('[sync-klaviyo-metrics] Profiles fetch failed:', profilesRes.status, errText);
     }
 
     // Fetch flow metrics (values report) for the last 90 days
