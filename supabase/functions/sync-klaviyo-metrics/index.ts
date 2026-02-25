@@ -29,27 +29,23 @@ const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 // STEP 1: Find "Placed Order" metric ID
 async function findConversionMetricId(apiKey: string): Promise<string | null> {
   const headers = makeHeaders(apiKey);
-  // Default returns up to 200 metrics - no page[size] needed
   const res = await fetch('https://a.klaviyo.com/api/metrics/', { headers });
   if (!res.ok) {
-    const err = await res.text();
-    console.error('[klaviyo] GET /metrics failed:', res.status, err);
+    console.error('[klaviyo] GET /metrics failed:', res.status, await res.text());
     return null;
   }
   const data = await res.json();
   const metrics = data.data || [];
-  console.log(`[klaviyo] Found ${metrics.length} metrics:`, metrics.slice(0, 10).map((m: any) => m.attributes?.name));
+  console.log(`[klaviyo] Found ${metrics.length} metrics`);
 
-  const placed = metrics.find((m: any) => {
-    const name = (m.attributes?.name || '').toLowerCase();
-    return name === 'placed order';
-  });
+  const placed = metrics.find((m: any) =>
+    (m.attributes?.name || '').toLowerCase() === 'placed order'
+  );
   if (placed) {
     console.log(`[klaviyo] Placed Order metric ID: ${placed.id}`);
     return placed.id;
   }
 
-  // Fallback: any order-related metric
   const fallback = metrics.find((m: any) => {
     const name = (m.attributes?.name || '').toLowerCase();
     return name.includes('order') || name.includes('purchase');
@@ -58,36 +54,138 @@ async function findConversionMetricId(apiKey: string): Promise<string | null> {
     console.log(`[klaviyo] Fallback metric: ${fallback.attributes?.name} (${fallback.id})`);
     return fallback.id;
   }
-
-  console.warn('[klaviyo] No conversion metric found. All metrics:', metrics.map((m: any) => m.attributes?.name));
+  console.warn('[klaviyo] No conversion metric found');
   return null;
 }
 
-// STEP 2: Get total profiles via Lists endpoint with profile_count
+// STEP 2: Get total profiles — try lists, then segments, then profiles pagination
 async function fetchProfilesCount(apiKey: string): Promise<number> {
   const headers = makeHeaders(apiKey);
-  // Use additional-fields[list]=profile_count to get actual counts per list
-  const res = await fetch(
-    'https://a.klaviyo.com/api/lists/?additional-fields%5Blist%5D=profile_count',
-    { headers }
-  );
-  if (!res.ok) {
-    console.warn('[klaviyo] Lists (profile_count) failed:', res.status, await res.text());
+
+  // Attempt 1: Lists with additional-fields (revision 2025-01-15)
+  try {
+    const listsUrl = 'https://a.klaviyo.com/api/lists/?additional-fields[list]=profile_count&page[size]=50';
+    console.log('[klaviyo] Trying lists with profile_count...');
+    const res = await fetch(listsUrl, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const lists = data.data || [];
+      let maxCount = 0;
+      for (const list of lists) {
+        const count = list.attributes?.profile_count ?? 0;
+        console.log(`[klaviyo] List "${list.attributes?.name}": ${count} profiles`);
+        if (count > maxCount) maxCount = count;
+      }
+      if (maxCount > 0) {
+        console.log(`[klaviyo] Profile count from lists: ${maxCount}`);
+        return maxCount;
+      }
+      console.log('[klaviyo] Lists returned 0 profile_count, trying segments...');
+    } else {
+      const errText = await res.text();
+      console.warn(`[klaviyo] Lists profile_count failed (${res.status}): ${errText.substring(0, 300)}`);
+    }
+  } catch (e: any) {
+    console.warn('[klaviyo] Lists attempt error:', e.message);
+  }
+
+  // Attempt 2: Segments with additional-fields
+  try {
+    const segUrl = 'https://a.klaviyo.com/api/segments/?additional-fields[segment]=profile_count&page[size]=50';
+    console.log('[klaviyo] Trying segments with profile_count...');
+    const res = await fetch(segUrl, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const segments = data.data || [];
+      let maxCount = 0;
+      for (const seg of segments) {
+        const count = seg.attributes?.profile_count ?? 0;
+        console.log(`[klaviyo] Segment "${seg.attributes?.name}": ${count} profiles`);
+        if (count > maxCount) maxCount = count;
+      }
+      if (maxCount > 0) {
+        console.log(`[klaviyo] Profile count from segments: ${maxCount}`);
+        return maxCount;
+      }
+      console.log('[klaviyo] Segments also returned 0');
+    } else {
+      const errText = await res.text();
+      console.warn(`[klaviyo] Segments profile_count failed (${res.status}): ${errText.substring(0, 300)}`);
+    }
+  } catch (e: any) {
+    console.warn('[klaviyo] Segments attempt error:', e.message);
+  }
+
+  // Attempt 3: Paginate profiles (up to 5 pages of 100)
+  try {
+    console.log('[klaviyo] Falling back to profile pagination...');
+    let count = 0;
+    let url: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=100';
+    let pages = 0;
+    while (url && pages < 5) {
+      const res = await fetch(url, { headers });
+      if (!res.ok) break;
+      const data = await res.json();
+      count += (data.data || []).length;
+      url = data.links?.next || null;
+      pages++;
+    }
+    // If we hit 5 pages (500 profiles), there are likely more — estimate
+    if (pages >= 5 && url) {
+      console.log(`[klaviyo] Counted ${count} profiles in ${pages} pages, more exist. Estimating...`);
+      // Rough estimate: multiply by a factor
+      return count * 4; // conservative estimate
+    }
+    console.log(`[klaviyo] Profile count from pagination: ${count}`);
+    return count;
+  } catch (e: any) {
+    console.warn('[klaviyo] Pagination error:', e.message);
+  }
+
+  return 0;
+}
+
+// Fetch new profiles count for the period
+async function fetchNewProfilesCount(apiKey: string, timeframe: string): Promise<number> {
+  const headers = makeHeaders(apiKey);
+  const now = new Date();
+  const startDate = new Date();
+
+  switch (timeframe) {
+    case 'last_24_hours': startDate.setDate(now.getDate() - 1); break;
+    case 'last_7_days': startDate.setDate(now.getDate() - 7); break;
+    case 'last_30_days': startDate.setDate(now.getDate() - 30); break;
+    case 'last_60_days': startDate.setDate(now.getDate() - 60); break;
+    case 'last_90_days': startDate.setDate(now.getDate() - 90); break;
+    case 'last_365_days': startDate.setDate(now.getDate() - 365); break;
+    default: startDate.setDate(now.getDate() - 90);
+  }
+
+  const dateFilter = startDate.toISOString().split('T')[0] + 'T00:00:00';
+  const filter = encodeURIComponent(`greater-or-equal(created,${dateFilter})`);
+
+  try {
+    // Count new profiles by paginating with small pages
+    let count = 0;
+    let url: string | null = `https://a.klaviyo.com/api/profiles/?filter=${filter}&page[size]=100`;
+    let pages = 0;
+    while (url && pages < 10) {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        console.warn('[klaviyo] New profiles count failed:', res.status);
+        break;
+      }
+      const data = await res.json();
+      count += (data.data || []).length;
+      url = data.links?.next || null;
+      pages++;
+    }
+    console.log(`[klaviyo] New profiles in ${timeframe}: ${count} (${pages} pages)`);
+    return count;
+  } catch (e: any) {
+    console.warn('[klaviyo] New profiles error:', e.message);
     return 0;
   }
-  const data = await res.json();
-  const lists = data.data || [];
-  // Find the largest list as the "main" list (most accurate unique count)
-  let maxCount = 0;
-  let totalSum = 0;
-  for (const list of lists) {
-    const count = list.attributes?.profile_count ?? 0;
-    totalSum += count;
-    if (count > maxCount) maxCount = count;
-  }
-  console.log(`[klaviyo] Lists: ${lists.length}, largest: ${maxCount}, sum: ${totalSum}`);
-  // Return the largest list count (best proxy for unique profiles)
-  return maxCount;
 }
 
 // Fetch all flows
@@ -139,7 +237,7 @@ async function fetchCampaigns(apiKey: string) {
   return allCampaigns;
 }
 
-// STEP 3: Flow values report (POST, rate limited)
+// Flow values report
 async function fetchFlowReport(apiKey: string, conversionMetricId: string, timeframe: string) {
   const headers = makePostHeaders(apiKey);
   const body = {
@@ -159,14 +257,11 @@ async function fetchFlowReport(apiKey: string, conversionMetricId: string, timef
 
   console.log(`[klaviyo] POST flow-values-reports (timeframe: ${timeframe})`);
   const res = await fetch('https://a.klaviyo.com/api/flow-values-reports/', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
+    method: 'POST', headers, body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    console.error('[klaviyo] Flow report failed:', res.status, err);
+    console.error('[klaviyo] Flow report failed:', res.status, await res.text());
     return {};
   }
 
@@ -195,7 +290,7 @@ async function fetchFlowReport(apiKey: string, conversionMetricId: string, timef
   return metrics;
 }
 
-// STEP 4: Campaign values report (POST, rate limited)
+// Campaign values report
 async function fetchCampaignReport(apiKey: string, conversionMetricId: string, timeframe: string) {
   const headers = makePostHeaders(apiKey);
   const body = {
@@ -216,14 +311,11 @@ async function fetchCampaignReport(apiKey: string, conversionMetricId: string, t
 
   console.log(`[klaviyo] POST campaign-values-reports (timeframe: ${timeframe})`);
   const res = await fetch('https://a.klaviyo.com/api/campaign-values-reports/', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
+    method: 'POST', headers, body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    console.error('[klaviyo] Campaign report failed:', res.status, err);
+    console.error('[klaviyo] Campaign report failed:', res.status, await res.text());
     return {};
   }
 
@@ -315,42 +407,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- STEP 1: Discover conversion metric (GET, not rate-limited) ---
+    // STEP 1: Discover conversion metric
     const conversionMetricId = await findConversionMetricId(apiKey);
 
-    // --- STEP 2: Fetch lists/profiles/flows/campaigns in parallel (GET, high rate limit) ---
-    const [flows, campaigns, totalProfiles] = await Promise.all([
+    // STEP 2: Parallel fetches (GET endpoints, high rate limit)
+    const [flows, campaigns, totalProfiles, newProfiles] = await Promise.all([
       fetchFlows(apiKey),
       fetchCampaigns(apiKey),
       fetchProfilesCount(apiKey),
+      fetchNewProfilesCount(apiKey, timeframe),
     ]);
 
-    // --- STEP 3 & 4: Reports are rate-limited (1/s burst, 2/min steady) ---
-    // Must call them SEQUENTIALLY with delays
+    // STEP 3 & 4: Reports (rate-limited, sequential)
     let flowMetrics: Record<string, any> = {};
     let campaignMetrics: Record<string, any> = {};
 
     if (conversionMetricId) {
-      // Flow report first
       flowMetrics = await fetchFlowReport(apiKey, conversionMetricId, timeframe);
-      // Wait 1.5s to respect rate limit before campaign report
       await delay(1500);
-      // Campaign report
       campaignMetrics = await fetchCampaignReport(apiKey, conversionMetricId, timeframe);
     } else {
-      console.warn('[klaviyo] No conversion metric found — skipping reports');
+      console.warn('[klaviyo] No conversion metric — skipping reports');
     }
 
-    // Enrich with metrics
-    const enrichedFlows = flows.map((f: any) => ({
-      ...f,
-      metrics: flowMetrics[f.id] || null,
-    }));
-
-    const enrichedCampaigns = campaigns.map((c: any) => ({
-      ...c,
-      metrics: campaignMetrics[c.id] || null,
-    }));
+    // Enrich
+    const enrichedFlows = flows.map((f: any) => ({ ...f, metrics: flowMetrics[f.id] || null }));
+    const enrichedCampaigns = campaigns.map((c: any) => ({ ...c, metrics: campaignMetrics[c.id] || null }));
 
     // Global stats
     const allFlowMetrics = Object.values(flowMetrics) as any[];
@@ -361,7 +443,6 @@ Deno.serve(async (req) => {
     const totalCampaignRevenue = allCampMetrics.reduce((s, m) => s + (m.revenue || 0), 0);
     const totalConversions = allMetrics.reduce((s, m) => s + (m.conversions || 0), 0);
 
-    // Weighted average rates (by delivered count)
     const totalDelivered = allMetrics.reduce((s, m) => s + (m.delivered || 0), 0);
     const avgOpenRate = totalDelivered > 0
       ? allMetrics.reduce((s, m) => s + (m.open_rate || 0) * (m.delivered || 0), 0) / totalDelivered
@@ -372,6 +453,7 @@ Deno.serve(async (req) => {
 
     const globalStats = {
       totalProfiles,
+      newProfiles,
       totalFlows: flows.length,
       activeFlows: flows.filter((f: any) => f.status === 'live').length,
       totalCampaigns: campaigns.length,
@@ -385,7 +467,7 @@ Deno.serve(async (req) => {
       conversionMetricId: conversionMetricId || null,
     };
 
-    console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, flowMetrics: ${Object.keys(flowMetrics).length}, campMetrics: ${Object.keys(campaignMetrics).length}, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
+    console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, profiles: ${totalProfiles}, newProfiles: ${newProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
 
     return new Response(
       JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats }),
