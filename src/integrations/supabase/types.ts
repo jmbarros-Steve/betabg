@@ -809,6 +809,7 @@ export type Database = {
           button_color: string | null
           button_text_color: string | null
           client_id: string
+          content_blocks: Json | null
           created_at: string | null
           description: string | null
           font_family: string | null
@@ -829,6 +830,7 @@ export type Database = {
           button_color?: string | null
           button_text_color?: string | null
           client_id: string
+          content_blocks?: Json | null
           created_at?: string | null
           description?: string | null
           font_family?: string | null
@@ -849,6 +851,7 @@ export type Database = {
           button_color?: string | null
           button_text_color?: string | null
           client_id?: string
+          content_blocks?: Json | null
           created_at?: string | null
           description?: string | null
           font_family?: string | null
