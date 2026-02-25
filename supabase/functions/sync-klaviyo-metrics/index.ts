@@ -249,45 +249,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Handle count-profiles action (lazy count per list/segment)
-    if (action === 'count-profiles' && entityType && entityId) {
-      const url1 = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=1000&fields[profile]=email`;
-      const res1 = await fetch(url1, { headers: makeHeaders(apiKey) });
-      if (!res1.ok) {
-        return new Response(JSON.stringify({ count: 0, display: '0' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const data1 = await res1.json();
-      const page1Count = (data1.data || []).length;
-      const hasPage2 = !!data1.links?.next;
+    // Handle count-profiles action (batch count for multiple entities)
+    if (action === 'count-profiles' && body.entities) {
+      const entities = body.entities as { type: string; id: string }[];
+      const results: Record<string, { count: number; display: string; hasMore: boolean }> = {};
 
-      if (!hasPage2) {
-        return new Response(JSON.stringify({ count: page1Count, display: String(page1Count) }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // All in parallel — each requests max 100 profiles
+      const promises = entities.map(async (ent) => {
+        try {
+          const url = `https://a.klaviyo.com/api/${ent.type}s/${ent.id}/profiles/?page[size]=100&fields[profile]=email`;
+          const res = await fetch(url, { headers: makeHeaders(apiKey) });
+          if (!res.ok) {
+            results[ent.id] = { count: 0, display: '0', hasMore: false };
+            return;
+          }
+          const data = await res.json();
+          const count = (data.data || []).length;
+          const hasMore = !!data.links?.next;
+          const display = hasMore ? '100+' : String(count);
+          results[ent.id] = { count, display, hasMore };
+        } catch {
+          results[ent.id] = { count: 0, display: '0', hasMore: false };
+        }
+      });
 
-      // Has more than 1000 — check second page to see if 10,000+
-      await new Promise(r => setTimeout(r, 500));
-      const url2 = data1.links.next;
-      const res2 = await fetch(url2, { headers: makeHeaders(apiKey) });
-      if (!res2.ok) {
-        return new Response(JSON.stringify({ count: 1000, display: '1,000+' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const data2 = await res2.json();
-      const page2Count = (data2.data || []).length;
-      const hasPage3 = !!data2.links?.next;
-
-      if (hasPage3) {
-        return new Response(JSON.stringify({ count: 10000, display: '10,000+' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const total = page1Count + page2Count;
-      return new Response(JSON.stringify({ count: total, display: total.toLocaleString() }), {
+      await Promise.all(promises);
+      return new Response(JSON.stringify({ results }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
