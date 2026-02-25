@@ -83,6 +83,14 @@ function formatNumber(n: number): string {
   return Math.round(n).toLocaleString('es-CL');
 }
 
+function formatProfileCount(n: number): string {
+  if (n >= 100000) return '100,000+';
+  if (n >= 50000) return '50,000+';
+  if (n >= 25000) return '25,000+';
+  if (n >= 10000) return '10,000+';
+  return Math.round(n).toLocaleString('es-CL');
+}
+
 function formatCurrency(n: number): string {
   return `$${Math.round(n).toLocaleString('es-CL')}`;
 }
@@ -383,7 +391,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <KpiCard
                 label="Perfiles"
-                value={formatNumber(globalStats.totalProfiles)}
+                value={formatProfileCount(globalStats.totalProfiles)}
                 subtitle={globalStats.newProfiles > 0 ? `+${formatNumber(globalStats.newProfiles)} nuevos (${timeframeLabel})` : undefined}
                 icon={Users}
               />
