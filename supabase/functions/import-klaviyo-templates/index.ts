@@ -64,27 +64,41 @@ serve(async (req) => {
       'revision': '2024-10-15',
     };
 
-    // Fetch ONLY the first page — API already returns most recent first
-    const resp = await fetch('https://a.klaviyo.com/api/templates/', { headers });
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return new Response(JSON.stringify({ error: `Klaviyo API error: ${resp.status}`, details: errText }), {
-        status: resp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // PASO 1: Paginar TODAS las plantillas (Klaviyo devuelve viejas primero)
+    let allTemplates: any[] = [];
+    let nextUrl: string | null = 'https://a.klaviyo.com/api/templates/';
+    let pageCount = 0;
+
+    while (nextUrl) {
+      const resp = await fetch(nextUrl, { headers });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.log(`Templates page error: ${resp.status}`, errText);
+        break;
+      }
+
+      const data = await resp.json();
+      const pageTemplates = data.data || [];
+      allTemplates = [...allTemplates, ...pageTemplates];
+      pageCount++;
+
+      console.log(`Page ${pageCount}: ${pageTemplates.length} templates (total: ${allTemplates.length})`);
+
+      nextUrl = data.links?.next || null;
+      if (nextUrl) await new Promise(r => setTimeout(r, 300));
     }
 
-    const templatesData = await resp.json();
-    const allTemplates = templatesData.data || [];
-    console.log('Templates in first page:', allTemplates.length);
+    console.log(`Total templates in Klaviyo: ${allTemplates.length}`);
 
-    // Take the FIRST 10 (already most recent)
-    const top10 = allTemplates.slice(0, 10);
-    console.log('Top 10 (most recent):');
-    top10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - ${t.attributes?.updated || t.attributes?.created}`));
+    // PASO 2: Tomar las ÚLTIMAS 10 (las más recientes están al final)
+    const last10 = allTemplates.slice(-10).reverse();
 
-    // Fetch full HTML for each
+    console.log('Last 10 (most recent):');
+    last10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - created: ${t.attributes?.created} - updated: ${t.attributes?.updated}`));
+
+    // PASO 3: Traer HTML de cada una
     const templates = [];
-    for (const t of top10) {
+    for (const t of last10) {
       try {
         const detailResp = await fetch(`https://a.klaviyo.com/api/templates/${t.id}/`, { headers });
         if (detailResp.ok) {
@@ -104,7 +118,7 @@ serve(async (req) => {
             updated: t.attributes?.updated,
             extractedColors: uniqueColors,
           });
-          console.log(`Template "${t.attributes?.name}": HTML ${html.length} chars`);
+          console.log(`✅ "${t.attributes?.name}": ${html.length} chars`);
         } else {
           const errText = await detailResp.text();
           console.log(`Template ${t.id} detail error: ${detailResp.status}`, errText);
@@ -112,12 +126,12 @@ serve(async (req) => {
       } catch (e: any) {
         console.log(`Error fetching template ${t.id}:`, e.message);
       }
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
     }
 
     return new Response(JSON.stringify({
       templates,
-      total: allTemplates.length,
+      total_in_klaviyo: allTemplates.length,
       showing: templates.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
