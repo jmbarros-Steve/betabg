@@ -729,6 +729,149 @@ export type Database = {
           },
         ]
       }
+      email_campaigns: {
+        Row: {
+          client_id: string
+          content_blocks: Json | null
+          created_at: string | null
+          final_html: string | null
+          id: string
+          klaviyo_campaign_id: string | null
+          klaviyo_list_id: string | null
+          klaviyo_segment_id: string | null
+          name: string
+          preview_text: string | null
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          content_blocks?: Json | null
+          created_at?: string | null
+          final_html?: string | null
+          id?: string
+          klaviyo_campaign_id?: string | null
+          klaviyo_list_id?: string | null
+          klaviyo_segment_id?: string | null
+          name: string
+          preview_text?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject: string
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          content_blocks?: Json | null
+          created_at?: string | null
+          final_html?: string | null
+          id?: string
+          klaviyo_campaign_id?: string | null
+          klaviyo_list_id?: string | null
+          klaviyo_segment_id?: string | null
+          name?: string
+          preview_text?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          accent_color: string | null
+          assets: Json | null
+          base_html: string | null
+          button_color: string | null
+          button_text_color: string | null
+          client_id: string
+          created_at: string | null
+          description: string | null
+          font_family: string | null
+          footer_html: string | null
+          header_html: string | null
+          id: string
+          is_default: boolean | null
+          logo_url: string | null
+          name: string
+          primary_color: string | null
+          secondary_color: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          assets?: Json | null
+          base_html?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
+          client_id: string
+          created_at?: string | null
+          description?: string | null
+          font_family?: string | null
+          footer_html?: string | null
+          header_html?: string | null
+          id?: string
+          is_default?: boolean | null
+          logo_url?: string | null
+          name: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          assets?: Json | null
+          base_html?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
+          client_id?: string
+          created_at?: string | null
+          description?: string | null
+          font_family?: string | null
+          footer_html?: string | null
+          header_html?: string | null
+          id?: string
+          is_default?: boolean | null
+          logo_url?: string | null
+          name?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           client_id: string
