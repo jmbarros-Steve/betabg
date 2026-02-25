@@ -689,6 +689,31 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
             </div>
           )}
 
+          {/* Reconvert banner when too many HTML blocks */}
+          {blocks.length > 0 && form.base_html && (() => {
+            const htmlCount = blocks.filter(b => b.type === 'html').length;
+            return htmlCount / blocks.length > 0.4;
+          })() && (
+            <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                  ⚠️ {blocks.filter(b => b.type === 'html').length} de {blocks.length} bloques son HTML crudo
+                </p>
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">Reconvertir para mejor edición visual</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={convertToBlocks}
+                disabled={converting}
+                className="shrink-0 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+              >
+                {converting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                🔄 Reconvertir
+              </Button>
+            </div>
+          )}
+
           {/* Show raw HTML editor only if no blocks and user wants to edit manually */}
           {form.base_html && blocks.length === 0 && (
             <details className="text-xs">

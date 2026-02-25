@@ -20,7 +20,7 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
       const bg = p.bgColor || templateColors?.button || '#000';
       const tc = p.textColor || templateColors?.buttonText || '#fff';
       return `<div style="text-align:${p.align || 'center'};padding:16px 0;">
-        <a href="${p.url || '#'}" target="_blank" style="display:inline-block;background-color:${bg};color:${tc};padding:${p.paddingV || 14}px ${p.paddingH || 32}px;border-radius:${p.borderRadius || 4}px;text-decoration:none;font-weight:600;font-family:${font};font-size:15px;${p.width === '100%' ? 'width:100%;text-align:center;box-sizing:border-box;' : p.width === '50%' ? 'width:50%;text-align:center;box-sizing:border-box;' : ''}">${p.text || 'Botón'}</a>
+        <a href="${p.url || '#'}" target="_blank" style="display:inline-block;background-color:${bg};color:${tc};padding:${p.paddingV || 14}px ${p.paddingH || 32}px;border-radius:${p.borderRadius || 4}px;text-decoration:none;font-weight:600;font-family:${font};font-size:15px;white-space:nowrap;${p.width === '100%' ? 'width:100%;text-align:center;box-sizing:border-box;' : p.width === '50%' ? 'width:50%;text-align:center;box-sizing:border-box;' : ''}">${p.text || 'Botón'}</a>
       </div>`;
     }
 
@@ -62,21 +62,27 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
       return `<div style="height:${p.height || 30}px;"></div>`;
 
     case 'product': {
-      const mode = p.productMode || 'fixed';
+      const mode = p.productMode || p._mode || 'fixed';
       if (mode === 'dynamic') {
         const typeLabels: Record<string, string> = {
           lastViewed: 'Último producto visto',
+          last_viewed: 'Último producto visto',
           abandonedCart: 'Producto del carrito abandonado',
+          cart_item: 'Producto del carrito abandonado',
           recommended: 'Producto recomendado',
         };
-        return `<div style="padding:20px;font-family:${font};text-align:center;border:2px dashed #d1d5db;border-radius:8px;background:#f9fafb;">
-          <p style="margin:0 0 4px;font-size:11px;color:#9ca3af;">🔄 PRODUCTO DINÁMICO</p>
-          <p style="margin:0;font-size:14px;font-weight:600;color:#374151;">${typeLabels[p.dynamicType || 'lastViewed']}</p>
-          <p style="margin:8px 0 0;font-size:11px;color:#6b7280;">Klaviyo insertará los datos reales al enviar</p>
+        const dynType = p.dynamicType || p._dynamicType || 'lastViewed';
+        return `<div style="padding:20px;font-family:${font};text-align:center;border:2px dashed #c084fc;border-radius:8px;background:#faf5ff;">
+          <p style="margin:0 0 4px;font-size:11px;color:#9333ea;">🔄 PRODUCTO DINÁMICO</p>
+          <p style="margin:0;font-size:14px;font-weight:600;color:#581c87;">${typeLabels[dynType] || dynType}</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#7c3aed;">${p.name || '{{ item.title }}'}</p>
+          <p style="margin:4px 0 8px;font-size:12px;color:#7c3aed;">${p.price || '{{ item.price }}'}</p>
+          <span style="display:inline-block;background:#7c3aed;color:#fff;padding:8px 20px;border-radius:4px;font-size:13px;font-weight:600;">${p.buttonText || 'Comprar'}</span>
+          <p style="margin:8px 0 0;font-size:11px;color:#a78bfa;">Klaviyo insertará los datos reales al enviar</p>
         </div>`;
       }
       if (mode === 'collection') {
-        const count = p.collectionCount || 2;
+        const count = p.collectionCount || p.productsCount || 2;
         const cols = Array.from({ length: count }, (_, i) =>
           `<td style="width:${Math.floor(100/count)}%;vertical-align:top;padding:8px;text-align:center;">
             <div style="background:#f3f4f6;border-radius:8px;padding:16px;">
@@ -100,7 +106,7 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
         <h3 style="margin:0 0 8px;font-size:18px;color:#111;">${p.name || 'Producto'}</h3>
         ${p.showPrice !== false && p.price ? `<p style="margin:0 0 8px;font-size:16px;font-weight:700;color:${templateColors?.primary || '#000'};">${p.price}</p>` : ''}
         ${p.showDescription !== false && p.description ? `<p style="margin:0 0 12px;font-size:14px;color:#666;">${p.description}</p>` : ''}
-        ${p.showButton !== false ? `<div style="text-align:center;"><a href="${p.link || '#'}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;">${p.buttonText || 'Comprar'}</a></div>` : ''}
+        ${p.showButton !== false ? `<div style="text-align:center;"><a href="${p.link || '#'}" style="display:inline-block;background:${templateColors?.button || '#000'};color:${templateColors?.buttonText || '#fff'};padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:600;white-space:nowrap;">${p.buttonText || 'Comprar'}</a></div>` : ''}
       </div>`;
     }
 
