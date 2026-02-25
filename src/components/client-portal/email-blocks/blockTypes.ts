@@ -167,24 +167,24 @@ export interface BlockDefinition {
 
 export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   // Blocks section
-  { type: 'text', label: 'Texto', icon: '📝', category: 'blocks' },
-  { type: 'image', label: 'Imagen', icon: '🖼️', category: 'blocks' },
-  { type: 'split', label: 'División', icon: '📊', category: 'blocks' },
-  { type: 'button', label: 'Botón', icon: '🔘', category: 'blocks' },
-  { type: 'header_bar', label: 'Encabezado', icon: '📌', category: 'blocks' },
-  { type: 'drop_shadow', label: 'Sombra', icon: '🌀', category: 'blocks' },
-  { type: 'divider', label: 'Divisor', icon: '➖', category: 'blocks' },
-  { type: 'social_links', label: 'Redes', icon: '❤️', category: 'blocks' },
-  { type: 'spacer', label: 'Espaciador', icon: '↕️', category: 'blocks' },
-  { type: 'product', label: 'Producto', icon: '📦', category: 'blocks' },
-  { type: 'coupon', label: 'Cupón', icon: '🎟️', category: 'blocks' },
-  { type: 'table', label: 'Tabla', icon: '📋', category: 'blocks' },
-  { type: 'review', label: 'Reseña', icon: '⭐', category: 'blocks' },
-  { type: 'video', label: 'Vídeo', icon: '🎬', category: 'blocks' },
-  { type: 'html', label: 'HTML', icon: '</>', category: 'blocks' },
+  { type: 'text', label: 'Texto', icon: 'text', category: 'blocks' },
+  { type: 'image', label: 'Imagen', icon: 'image', category: 'blocks' },
+  { type: 'split', label: 'División', icon: 'split', category: 'blocks' },
+  { type: 'button', label: 'Botón', icon: 'button', category: 'blocks' },
+  { type: 'header_bar', label: 'Encabezado', icon: 'header_bar', category: 'blocks' },
+  { type: 'drop_shadow', label: 'Sombra', icon: 'drop_shadow', category: 'blocks' },
+  { type: 'divider', label: 'Divisor', icon: 'divider', category: 'blocks' },
+  { type: 'social_links', label: 'Redes', icon: 'social_links', category: 'blocks' },
+  { type: 'spacer', label: 'Espaciador', icon: 'spacer', category: 'blocks' },
+  { type: 'product', label: 'Producto', icon: 'product', category: 'blocks' },
+  { type: 'coupon', label: 'Cupón', icon: 'coupon', category: 'blocks' },
+  { type: 'table', label: 'Tabla', icon: 'table', category: 'blocks' },
+  { type: 'review', label: 'Reseña', icon: 'review', category: 'blocks' },
+  { type: 'video', label: 'Vídeo', icon: 'video', category: 'blocks' },
+  { type: 'html', label: 'HTML', icon: 'html', category: 'blocks' },
   // Design section
-  { type: 'columns', label: 'Columnas', icon: '📐', category: 'design' },
-  { type: 'section', label: 'Sección', icon: '📦', category: 'design' },
+  { type: 'columns', label: 'Columnas', icon: 'columns', category: 'design' },
+  { type: 'section', label: 'Sección', icon: 'section', category: 'design' },
 ];
 
 export function createBlock(type: BlockType): EmailBlock {
