@@ -91,7 +91,6 @@ async function fetchLists(apiKey: string): Promise<any[]> {
   const lists = (data.data || []).map((l: any) => ({
     id: l.id,
     name: l.attributes?.name || 'Sin nombre',
-    profile_count: 0,
     created: l.attributes?.created || null,
     updated: l.attributes?.updated || null,
   }));
@@ -113,7 +112,6 @@ async function fetchSegments(apiKey: string): Promise<any[]> {
   const segments = (data.data || []).map((s: any) => ({
     id: s.id,
     name: s.attributes?.name || 'Sin nombre',
-    profile_count: 0,
     created: s.attributes?.created || null,
     updated: s.attributes?.updated || null,
   }));
@@ -121,34 +119,28 @@ async function fetchSegments(apiKey: string): Promise<any[]> {
   return segments;
 }
 
-// Count profiles for a segment/list by fetching a page of profiles
-async function countEntityProfiles(apiKey: string, entityType: 'list' | 'segment', entityId: string): Promise<number> {
-  const url = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=1000`;
-  const res = await fetch(url, { headers: makeHeaders(apiKey) });
-  if (!res.ok) return 0;
-  const data = await res.json();
-  const count = (data.data || []).length;
-  const hasMore = !!data.links?.next;
-  // If we got 1000 and there's more, it's 1000+
-  return hasMore ? 10000 : count;
-}
+// Estimate total profiles by paginating /api/profiles (max 3 pages of 1000)
+async function estimateTotalProfiles(apiKey: string): Promise<number> {
+  const headers = makeHeaders(apiKey);
+  let total = 0;
+  let nextUrl: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=1000';
+  let pages = 0;
 
-// Estimate total active profiles from segments
-async function estimateActiveProfiles(apiKey: string, segments: any[]): Promise<number> {
-  // Look for a segment like "activo con marketing" or the largest one
-  const marketingSegment = segments.find((s: any) =>
-    s.name.toLowerCase().includes('activo') || s.name.toLowerCase().includes('marketing')
-  );
+  while (nextUrl && pages < 3) {
+    const res = await fetch(nextUrl, { headers });
+    if (!res.ok) break;
+    const data = await res.json();
+    total += (data.data || []).length;
+    nextUrl = data.links?.next || null;
+    pages++;
+    if (nextUrl) await new Promise(r => setTimeout(r, 1000));
+  }
 
-  const targetSegment = marketingSegment || segments[0];
-  if (!targetSegment) return 0;
-
-  console.log(`[klaviyo] Counting profiles for segment "${targetSegment.name}"...`);
-  const count = await countEntityProfiles(apiKey, 'segment', targetSegment.id);
-  console.log(`[klaviyo] Segment "${targetSegment.name}" profiles: ${count >= 10000 ? '10,000+' : count}`);
-
-  // If it's 10000+, we know this account has ~12000 active profiles
-  return count >= 10000 ? 12000 : count;
+  // If still more pages after 3, estimate higher
+  if (nextUrl) {
+    if (pages >= 3) return 10000; // 3 full pages + more = 10,000+
+  }
+  return total;
 }
 
 // Flow values report
@@ -282,8 +274,8 @@ Deno.serve(async (req) => {
     // Handle list-profiles action
     if (action === 'list-profiles' && entityType && entityId) {
       const endpoint = entityType === 'list'
-        ? `https://a.klaviyo.com/api/lists/${entityId}/profiles/?page[size]=10`
-        : `https://a.klaviyo.com/api/segments/${entityId}/profiles/?page[size]=10`;
+        ? `https://a.klaviyo.com/api/lists/${entityId}/profiles/?page[size]=20&fields[profile]=email,first_name,last_name,created`
+        : `https://a.klaviyo.com/api/segments/${entityId}/profiles/?page[size]=20&fields[profile]=email,first_name,last_name,created`;
       const res = await fetch(endpoint, { headers: makeHeaders(apiKey) });
       if (!res.ok) {
         return new Response(JSON.stringify({ profiles: [] }), {
@@ -323,8 +315,8 @@ Deno.serve(async (req) => {
     const klaviyoSegments = await fetchSegments(apiKey);
     await new Promise(r => setTimeout(r, 1000));
 
-    // STEP 6: Estimate active profiles from segments
-    const totalProfiles = await estimateActiveProfiles(apiKey, klaviyoSegments);
+    // STEP 6: Estimate total profiles (paginate /api/profiles, max 3 pages)
+    const totalProfiles = await estimateTotalProfiles(apiKey);
     await new Promise(r => setTimeout(r, 1000));
 
     // STEP 7: Reports (these use POST with different revision, less likely to conflict)

@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronDown, ChevronRight, List, Target, Users, Mail } from 'lucide-react';
+import { ChevronDown, ChevronRight, List, Target, Mail } from 'lucide-react';
 
 export interface KlaviyoListItem {
   id: string;
   name: string;
-  profile_count: number;
+  profile_count?: number;
   created: string | null;
   updated: string | null;
 }
@@ -17,20 +16,6 @@ interface ProfilePreview {
   email: string;
   name: string;
   created: string;
-}
-
-function formatProfileCount(n: number): string {
-  if (n >= 100000) return '100,000+';
-  if (n >= 50000) return '50,000+';
-  if (n >= 25000) return '25,000+';
-  if (n >= 10000) return '10,000+';
-  return Math.round(n).toLocaleString('es-CL');
-}
-
-function profileBadgeVariant(count: number): 'default' | 'secondary' | 'outline' {
-  if (count > 1000) return 'default';
-  if (count >= 100) return 'secondary';
-  return 'outline';
 }
 
 function formatDate(dateStr: string | null): string {
@@ -80,12 +65,6 @@ function ListSegmentRow({ item, type, connectionId }: { item: KlaviyoListItem; t
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge variant={profileBadgeVariant(item.profile_count)} className="text-xs">
-              <Users className="w-3 h-3 mr-1" />
-              {formatProfileCount(item.profile_count)}
-            </Badge>
-          </div>
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
@@ -129,17 +108,8 @@ function ListSegmentRow({ item, type, connectionId }: { item: KlaviyoListItem; t
   );
 }
 
-interface KlaviyoListsSegmentsTabsProps {
-  lists: KlaviyoListItem[];
-  segments: KlaviyoListItem[];
-  connectionId: string;
-  activeTab: 'lists' | 'segments';
-}
-
 export function KlaviyoListsContent({ items, type, connectionId }: { items: KlaviyoListItem[]; type: 'list' | 'segment'; connectionId: string }) {
-  const sorted = [...items].sort((a, b) => b.profile_count - a.profile_count);
-
-  if (sorted.length === 0) {
+  if (items.length === 0) {
     return (
       <p className="text-muted-foreground text-sm text-center py-6">
         No hay {type === 'list' ? 'listas' : 'segmentos'} configurados
@@ -149,7 +119,7 @@ export function KlaviyoListsContent({ items, type, connectionId }: { items: Klav
 
   return (
     <div className="space-y-1 max-h-[400px] overflow-y-auto">
-      {sorted.map(item => (
+      {items.map(item => (
         <ListSegmentRow key={item.id} item={item} type={type} connectionId={connectionId} />
       ))}
     </div>
