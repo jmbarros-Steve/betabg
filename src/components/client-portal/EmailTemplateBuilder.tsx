@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid, Download, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid, Download, Loader2, Wand2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import EmailBlockEditor from './email-blocks/EmailBlockEditor';
 import type { EmailBlock } from './email-blocks/blockTypes';
+import { renderBlockToHtml } from './email-blocks/blockRenderer';
 import { format } from 'date-fns';
 
 interface EmailTemplateBuilderProps {
@@ -74,6 +75,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
   const [importingId, setImportingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetsInputRef = useRef<HTMLInputElement>(null);
+  const [converting, setConverting] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -130,15 +132,57 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       assets: Array.isArray(t.assets) ? t.assets : [],
       is_default: t.is_default,
     });
+    // Load existing content_blocks if available
+    const existingBlocks = (t as any).content_blocks;
+    if (Array.isArray(existingBlocks) && existingBlocks.length > 0) {
+      setBlocks(existingBlocks);
+    } else {
+      setBlocks([]);
+    }
     setEditing(t);
     setIsNew(true);
+  };
+
+  const convertToBlocks = async () => {
+    if (!form.base_html) return;
+    setConverting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-email-html', {
+        body: { html: form.base_html },
+      });
+      if (error) { toast.error('Error al convertir plantilla'); console.error(error); return; }
+      const parsed = data?.blocks || [];
+      if (parsed.length === 0) { toast.error('No se pudieron extraer bloques'); return; }
+      
+      // Ensure proper UUIDs
+      const blocksWithIds = parsed.map((b: any) => ({
+        ...b,
+        id: b.id?.length >= 8 ? b.id : crypto.randomUUID(),
+        props: b.props || {},
+      }));
+      
+      setBlocks(blocksWithIds);
+      
+      // Save blocks to DB
+      if (editing) {
+        await supabase.from('email_templates')
+          .update({ content_blocks: blocksWithIds } as any)
+          .eq('id', editing.id);
+      }
+      
+      toast.success(`✅ Plantilla convertida a ${blocksWithIds.length} bloques editables`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setConverting(false);
+    }
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Nombre requerido'); return; }
     setSaving(true);
 
-    const payload = {
+    const payload: any = {
       client_id: clientId,
       name: form.name.trim(),
       description: form.description.trim() || null,
@@ -154,6 +198,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       base_html: form.base_html || null,
       assets: form.assets as any,
       is_default: form.is_default,
+      content_blocks: blocks.length > 0 ? blocks : [],
     };
 
     // If setting as default, unset others
@@ -578,24 +623,46 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
             )}
           </div>
 
-          {/* Base HTML Editor (for imported templates) */}
-          {form.base_html && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Code className="w-4 h-4 text-muted-foreground" />
-                <Label className="text-base font-semibold">📝 Contenido HTML (plantilla importada)</Label>
+          {/* Convert to blocks button for imported templates */}
+          {form.base_html && blocks.length === 0 && (
+            <div className="border-2 border-dashed border-primary/30 rounded-lg p-6 text-center space-y-3 bg-primary/5">
+              <Wand2 className="w-8 h-8 mx-auto text-primary" />
+              <div>
+                <p className="text-sm font-medium">Plantilla importada de Klaviyo</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Convierte el HTML a bloques editables para usar el editor visual drag & drop
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mb-2">
-                Edita directamente el HTML de la plantilla importada. Los cambios se reflejan en el preview en tiempo real.
-              </p>
+              <Button onClick={convertToBlocks} disabled={converting} className="w-full">
+                {converting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    Steve está analizando la plantilla...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 mr-1.5" />
+                    🤖 Convertir a bloques editables
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Show raw HTML editor only if no blocks and user wants to edit manually */}
+          {form.base_html && blocks.length === 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                📝 Editar HTML crudo (avanzado)
+              </summary>
               <Textarea
                 value={form.base_html}
                 onChange={e => setForm(p => ({ ...p, base_html: e.target.value }))}
                 placeholder="HTML de la plantilla..."
-                rows={16}
-                className="font-mono text-xs"
+                rows={12}
+                className="font-mono text-xs mt-2"
               />
-            </div>
+            </details>
           )}
 
           <div>
@@ -653,7 +720,20 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
               <Label className="text-base font-semibold">Preview en vivo</Label>
             </div>
             <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
-              {form.base_html ? (
+              {blocks.length > 0 ? (
+                <div className="w-full">
+                  {blocks.map(b => (
+                    <div key={b.id} dangerouslySetInnerHTML={{ __html: renderBlockToHtml(b, {
+                      primary: form.primary_color,
+                      secondary: form.secondary_color,
+                      accent: form.accent_color,
+                      button: form.button_color,
+                      buttonText: form.button_text_color,
+                      font: form.font_family,
+                    }) }} />
+                  ))}
+                </div>
+              ) : form.base_html ? (
                 <iframe
                   srcDoc={form.base_html}
                   className="w-full border-0"
