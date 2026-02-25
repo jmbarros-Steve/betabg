@@ -149,6 +149,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       logo_url: form.logo_url,
       header_html: form.header_html || null,
       footer_html: form.footer_html || null,
+      base_html: editing?.base_html || null,
       assets: form.assets as any,
       is_default: form.is_default,
     };
@@ -183,6 +184,29 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     const { error } = await supabase.from('email_templates').delete().eq('id', id);
     if (error) toast.error('Error eliminando');
     else { toast.success('Template eliminado'); loadTemplates(); }
+  };
+
+  const handleDuplicate = async (t: EmailTemplate) => {
+    const payload = {
+      client_id: clientId,
+      name: `Copia de ${t.name}`,
+      description: t.description,
+      primary_color: t.primary_color,
+      secondary_color: t.secondary_color,
+      accent_color: t.accent_color,
+      button_color: t.button_color,
+      button_text_color: t.button_text_color,
+      font_family: t.font_family,
+      logo_url: t.logo_url,
+      header_html: t.header_html,
+      footer_html: t.footer_html,
+      base_html: t.base_html,
+      assets: t.assets as any,
+      is_default: false,
+    };
+    const { error } = await supabase.from('email_templates').insert(payload as any);
+    if (error) toast.error('Error duplicando');
+    else { toast.success('Template duplicado'); loadTemplates(); }
   };
 
   const uploadLogo = async (file: File) => {
@@ -420,9 +444,17 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
                     {format(new Date(t.created_at), 'dd/MM/yyyy')}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); startEdit(t); }}>
+                        ✏️
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDuplicate(t); }}>
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -588,7 +620,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
           {/* Save */}
           <Button onClick={handleSave} disabled={saving} className="w-full">
             <Save className="w-4 h-4 mr-1.5" />
-            {saving ? 'Guardando...' : '💾 Guardar Template'}
+            {saving ? 'Guardando...' : editing ? '💾 Actualizar Template' : '💾 Guardar Template'}
           </Button>
         </div>
 
@@ -600,10 +632,20 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
               <Label className="text-base font-semibold">Preview en vivo</Label>
             </div>
             <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
-              <div
-                className="w-full"
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
-              />
+              {editing?.base_html ? (
+                <iframe
+                  srcDoc={editing.base_html}
+                  className="w-full border-0"
+                  style={{ minHeight: '500px' }}
+                  sandbox="allow-same-origin"
+                  title="Preview plantilla importada"
+                />
+              ) : (
+                <div
+                  className="w-full"
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              )}
             </div>
           </div>
         </div>
