@@ -2,10 +2,30 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ChevronUp, ChevronDown, Copy, Trash2, GripVertical, X } from 'lucide-react';
+import { ChevronUp, ChevronDown, Copy, Trash2, X, Type, Image, MousePointerClick, Heading, CircleDot, Minus, Share2, MoveVertical, ShoppingBag, Ticket, Table2, Star, Play, Code2, Columns3, SquareDashedBottom, SplitSquareHorizontal, Layers } from 'lucide-react';
 import { BLOCK_DEFINITIONS, createBlock, type EmailBlock, type BlockType, type BlockDefinition } from './blockTypes';
 import { renderBlockToHtml } from './blockRenderer';
 import BlockConfigPanel from './BlockConfigPanel';
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  text: <Type className="w-4 h-4" />,
+  image: <Image className="w-4 h-4" />,
+  split: <SplitSquareHorizontal className="w-4 h-4" />,
+  button: <MousePointerClick className="w-4 h-4" />,
+  header_bar: <Heading className="w-4 h-4" />,
+  drop_shadow: <Layers className="w-4 h-4" />,
+  divider: <Minus className="w-4 h-4" />,
+  social_links: <Share2 className="w-4 h-4" />,
+  spacer: <MoveVertical className="w-4 h-4" />,
+  product: <ShoppingBag className="w-4 h-4" />,
+  coupon: <Ticket className="w-4 h-4" />,
+  table: <Table2 className="w-4 h-4" />,
+  review: <Star className="w-4 h-4" />,
+  video: <Play className="w-4 h-4" />,
+  html: <Code2 className="w-4 h-4" />,
+  columns: <Columns3 className="w-4 h-4" />,
+  section: <SquareDashedBottom className="w-4 h-4" />,
+};
 
 interface EmailBlockEditorProps {
   blocks: EmailBlock[];
@@ -97,7 +117,7 @@ export default function EmailBlockEditor({ blocks, onChange, templateColors, ass
   const previewHtml = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
 
   return (
-    <div className="grid grid-cols-12 gap-3 h-[600px]">
+    <div className="grid grid-cols-12 gap-3 h-[calc(100vh-280px)] min-h-[700px]">
       {/* LEFT SIDEBAR — Block palette */}
       <div className="col-span-3 border rounded-lg overflow-hidden flex flex-col">
         <div className="p-2 border-b bg-muted/50">
@@ -218,11 +238,13 @@ function BlockPaletteItem({ def, onDragStart, onAdd }: {
       draggable
       onDragStart={e => onDragStart(e, def.type)}
       onClick={() => onAdd(def.type)}
-      className="flex flex-col items-center gap-0.5 p-2 rounded-md border border-transparent hover:border-border hover:bg-muted/50 cursor-grab active:cursor-grabbing transition-colors text-center"
+      className="flex flex-col items-center gap-1 p-2.5 rounded-lg border border-transparent hover:border-border hover:bg-muted/60 cursor-grab active:cursor-grabbing transition-all text-center group"
       title={def.label}
     >
-      <span className="text-base">{def.icon}</span>
-      <span className="text-[10px] text-muted-foreground leading-tight">{def.label}</span>
+      <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+        {ICON_MAP[def.icon] || <Code2 className="w-4 h-4" />}
+      </span>
+      <span className="text-[10px] text-muted-foreground group-hover:text-foreground leading-tight font-medium">{def.label}</span>
     </button>
   );
 }
@@ -249,7 +271,7 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
     >
       {/* Block toolbar */}
       <div className={`absolute -top-0 right-0 flex items-center gap-0.5 bg-background border rounded-md shadow-sm p-0.5 z-10 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-        <span className="text-[10px] px-1 text-muted-foreground">{def?.icon} {def?.label}</span>
+        <span className="text-[10px] px-1 text-muted-foreground flex items-center gap-1">{ICON_MAP[def?.icon || ''] || null} {def?.label}</span>
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={e => { e.stopPropagation(); onMoveUp(); }} disabled={isFirst}>
           <ChevronUp className="w-3 h-3" />
         </Button>
