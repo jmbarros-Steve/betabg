@@ -70,10 +70,12 @@ async function fetchCampaigns(apiKey: string) {
   }));
 }
 
-// Get profile count: lists/segments profile_count first, then quick pagination fallback
-async function fetchProfilesCount(apiKey: string): Promise<number> {
+// Get profile count + lists/segments info
+async function fetchProfilesCount(apiKey: string): Promise<{ totalProfiles: number; lists: any[]; segments: any[] }> {
   const headers = makeHeaders(apiKey);
   let maxCount = 0;
+  let lists: any[] = [];
+  let segments: any[] = [];
 
   // Strategy 1: Try lists with profile_count (older revision)
   try {
@@ -85,16 +87,24 @@ async function fetchProfilesCount(apiKey: string): Promise<number> {
 
     if (listsRes.ok) {
       const listsData = await listsRes.json();
-      for (const l of (listsData.data || [])) {
-        const pc = l.attributes?.profile_count || 0;
-        if (pc > maxCount) maxCount = pc;
+      lists = (listsData.data || []).map((l: any) => ({
+        id: l.id,
+        name: l.attributes?.name || 'Sin nombre',
+        profile_count: l.attributes?.profile_count || 0,
+      }));
+      for (const l of lists) {
+        if (l.profile_count > maxCount) maxCount = l.profile_count;
       }
     }
     if (segsRes.ok) {
       const segsData = await segsRes.json();
-      for (const s of (segsData.data || [])) {
-        const pc = s.attributes?.profile_count || 0;
-        if (pc > maxCount) maxCount = pc;
+      segments = (segsData.data || []).map((s: any) => ({
+        id: s.id,
+        name: s.attributes?.name || 'Sin nombre',
+        profile_count: s.attributes?.profile_count || 0,
+      }));
+      for (const s of segments) {
+        if (s.profile_count > maxCount) maxCount = s.profile_count;
       }
     }
     console.log(`[klaviyo] Profile count from lists/segments: ${maxCount}`);
@@ -102,7 +112,7 @@ async function fetchProfilesCount(apiKey: string): Promise<number> {
     console.warn('[klaviyo] Lists/segments profile_count error:', e.message);
   }
 
-  if (maxCount > 0) return maxCount;
+  if (maxCount > 0) return { totalProfiles: maxCount, lists, segments };
 
   // Strategy 2: Quick pagination (max 3 pages to avoid timeout)
   try {
@@ -119,9 +129,7 @@ async function fetchProfilesCount(apiKey: string): Promise<number> {
       hasMore = !!url;
       pages++;
     }
-    // Estimate: if we hit 3 pages and there's more, estimate range
     if (hasMore && pages >= 3) {
-      // We got 300 profiles and there's more — mark as 10000+ minimum
       maxCount = 10000;
     } else {
       maxCount = count;
@@ -131,7 +139,7 @@ async function fetchProfilesCount(apiKey: string): Promise<number> {
     console.warn('[klaviyo] Profile pagination error:', e.message);
   }
 
-  return maxCount;
+  return { totalProfiles: maxCount, lists, segments };
 }
 
 // Flow values report (single aggregated call)
@@ -266,11 +274,12 @@ Deno.serve(async (req) => {
     const conversionMetricId = await findConversionMetricId(apiKey);
 
     // STEP 2: Parallel fetches — ALL at once
-    const [flows, campaigns, totalProfiles] = await Promise.all([
+    const [flows, campaigns, profileResult] = await Promise.all([
       fetchFlows(apiKey),
       fetchCampaigns(apiKey),
       fetchProfilesCount(apiKey),
     ]);
+    const { totalProfiles, lists: klaviyoLists, segments: klaviyoSegments } = profileResult;
 
     // STEP 3: Reports in parallel (both are single POST calls)
     let flowMetrics: Record<string, any> = {};
@@ -317,7 +326,7 @@ Deno.serve(async (req) => {
     console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
 
     return new Response(
-      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats }),
+      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, _debug: { lists: klaviyoLists, segments: klaviyoSegments } }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
