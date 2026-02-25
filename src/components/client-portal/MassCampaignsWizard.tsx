@@ -210,6 +210,19 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
         const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
         return line ? line.substring(line.indexOf(':') + 1).trim() : '';
       };
+      // Content can be multi-line: grab everything after "Contenido:" until end
+      const getMultiLineValue = (prefix: string) => {
+        const idx = lines.findIndex(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
+        if (idx === -1) return '';
+        const firstLine = lines[idx].substring(lines[idx].indexOf(':') + 1).trim();
+        const extraLines: string[] = [];
+        for (let i = idx + 1; i < lines.length; i++) {
+          // Stop if we hit another known field
+          if (/^(nombre|asunto|audiencia|contenido)\s*:/i.test(lines[i])) break;
+          extraLines.push(lines[i].trim());
+        }
+        return [firstLine, ...extraLines].filter(Boolean).join(' ');
+      };
       const audienceName = getValue('Audiencia');
       const aud = audiences.find(a => a.name.toLowerCase().includes(audienceName.toLowerCase()));
       return {
@@ -218,7 +231,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
         subject: getValue('Asunto'),
         audienceId: aud?.id || '',
         audienceName: aud?.name || audienceName,
-        content: getValue('Contenido'),
+        content: getMultiLineValue('Contenido'),
       };
     }).filter(c => c.name || c.subject || c.content);
 
@@ -524,7 +537,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
 
   const selectedCount = generatedCampaigns.filter(c => c.selected).length;
   const doneCount = generatedCampaigns.filter(c => c.status === 'done').length;
-  const validCampaignCount = campaigns.filter(c => c.name && c.content).length;
+  const validCampaignCount = campaigns.filter(c => c.name.trim() || c.content.trim()).length;
 
   return (
     <div className="space-y-6">
