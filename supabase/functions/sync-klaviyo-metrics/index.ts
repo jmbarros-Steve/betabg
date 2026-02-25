@@ -58,120 +58,110 @@ async function findConversionMetricId(apiKey: string): Promise<string | null> {
   return null;
 }
 
-// STEP 2: Get total profiles — try lists, then segments, then full pagination
+// STEP 2: Get total profiles — use revision 2024-02-15 which supports additional-fields
 async function fetchProfilesCount(apiKey: string): Promise<{ total: number; debugLists: any[]; debugSegments: any[] }> {
+  // Use older revision that supports additional-fields[list]=profile_count
+  const profileHeaders = {
+    'Authorization': `Klaviyo-API-Key ${apiKey}`,
+    'accept': 'application/json',
+    'revision': '2024-02-15',
+  };
   const headers = makeHeaders(apiKey);
   const debugLists: any[] = [];
   const debugSegments: any[] = [];
+  let maxProfileCount = 0;
 
-  // Attempt 1: Lists with additional-fields (may fail on some revisions)
+  // Fetch ALL lists with profile_count using older revision
   try {
-    const listsUrl = 'https://a.klaviyo.com/api/lists/?additional-fields[list]=profile_count&page[size]=50';
-    console.log('[klaviyo] Trying lists with profile_count...');
-    const res = await fetch(listsUrl, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      const lists = data.data || [];
-      let maxCount = 0;
-      for (const list of lists) {
-        const count = list.attributes?.profile_count ?? 0;
-        const entry = { name: list.attributes?.name, id: list.id, profile_count: count };
-        debugLists.push(entry);
-        console.log(`[klaviyo] List "${entry.name}" (${entry.id}): ${count} profiles`);
-        if (count > maxCount) maxCount = count;
+    let url: string | null = 'https://a.klaviyo.com/api/lists/?additional-fields[list]=profile_count&page[size]=50';
+    let page = 0;
+    while (url && page < 20) {
+      const res = await fetch(url, { headers: profileHeaders });
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.warn(`[klaviyo] Lists page ${page} failed (${res.status}): ${errBody.substring(0, 200)}`);
+        break;
       }
-      if (maxCount > 0) {
-        console.log(`[klaviyo] Profile count from lists: ${maxCount}`);
-        return { total: maxCount, debugLists, debugSegments };
-      }
-    } else {
-      const errText = await res.text();
-      console.warn(`[klaviyo] Lists additional-fields failed (${res.status}): ${errText.substring(0, 300)}`);
-    }
-  } catch (e: any) {
-    console.warn('[klaviyo] Lists attempt error:', e.message);
-  }
-
-  // Attempt 1b: Get lists without additional-fields (for debug info)
-  try {
-    const res = await fetch('https://a.klaviyo.com/api/lists/?page[size]=50', { headers });
-    if (res.ok) {
       const data = await res.json();
       for (const list of (data.data || [])) {
-        debugLists.push({ name: list.attributes?.name, id: list.id, profile_count: 'N/A (no additional-fields)' });
+        const entry = {
+          name: list.attributes?.name,
+          id: list.id,
+          profile_count: list.attributes?.profile_count ?? 'not_in_response',
+        };
+        debugLists.push(entry);
+        const count = typeof entry.profile_count === 'number' ? entry.profile_count : 0;
+        if (count > maxProfileCount) maxProfileCount = count;
       }
-      console.log(`[klaviyo] === LISTS (${debugLists.length}) ===`);
-      debugLists.forEach(l => console.log(`  List: "${l.name}" | ID: ${l.id} | profile_count: ${l.profile_count}`));
+      url = data.links?.next || null;
+      page++;
     }
-  } catch (_) { /* ignore */ }
-
-  // Attempt 2: Segments with additional-fields
-  try {
-    const segUrl = 'https://a.klaviyo.com/api/segments/?additional-fields[segment]=profile_count&page[size]=50';
-    console.log('[klaviyo] Trying segments with profile_count...');
-    const res = await fetch(segUrl, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      let maxCount = 0;
-      for (const seg of (data.data || [])) {
-        const count = seg.attributes?.profile_count ?? 0;
-        const entry = { name: seg.attributes?.name, id: seg.id, profile_count: count };
-        debugSegments.push(entry);
-        console.log(`[klaviyo] Segment "${entry.name}" (${entry.id}): ${count} profiles`);
-        if (count > maxCount) maxCount = count;
-      }
-      if (maxCount > 0) {
-        console.log(`[klaviyo] Profile count from segments: ${maxCount}`);
-        return { total: maxCount, debugLists, debugSegments };
-      }
-    } else {
-      const errText = await res.text();
-      console.warn(`[klaviyo] Segments additional-fields failed (${res.status}): ${errText.substring(0, 300)}`);
-    }
+    console.log(`[klaviyo] === ALL LISTS (${debugLists.length}) ===`);
+    debugLists.forEach(l => console.log(`  List: "${l.name}" | ID: ${l.id} | profile_count: ${l.profile_count}`));
   } catch (e: any) {
-    console.warn('[klaviyo] Segments attempt error:', e.message);
+    console.warn('[klaviyo] Lists error:', e.message);
   }
 
-  // Attempt 2b: Get segments without additional-fields (for debug info)
+  // Fetch ALL segments with profile_count using older revision
   try {
-    const res = await fetch('https://a.klaviyo.com/api/segments/?page[size]=50', { headers });
-    if (res.ok) {
+    let url: string | null = 'https://a.klaviyo.com/api/segments/?additional-fields[segment]=profile_count&page[size]=50';
+    let page = 0;
+    while (url && page < 20) {
+      const res = await fetch(url, { headers: profileHeaders });
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.warn(`[klaviyo] Segments page ${page} failed (${res.status}): ${errBody.substring(0, 200)}`);
+        break;
+      }
       const data = await res.json();
       for (const seg of (data.data || [])) {
-        if (debugSegments.findIndex(s => s.id === seg.id) === -1) {
-          debugSegments.push({ name: seg.attributes?.name, id: seg.id, profile_count: 'N/A' });
+        const entry = {
+          name: seg.attributes?.name,
+          id: seg.id,
+          profile_count: seg.attributes?.profile_count ?? 'not_in_response',
+        };
+        debugSegments.push(entry);
+        const count = typeof entry.profile_count === 'number' ? entry.profile_count : 0;
+        if (count > maxProfileCount) maxProfileCount = count;
+      }
+      url = data.links?.next || null;
+      page++;
+    }
+    console.log(`[klaviyo] === ALL SEGMENTS (${debugSegments.length}) ===`);
+    debugSegments.forEach(s => console.log(`  Segment: "${s.name}" | ID: ${s.id} | profile_count: ${s.profile_count}`));
+  } catch (e: any) {
+    console.warn('[klaviyo] Segments error:', e.message);
+  }
+
+  // If still 0, paginate profiles (no limit)
+  if (maxProfileCount === 0) {
+    try {
+      console.log('[klaviyo] Falling back to FULL profile pagination (no limit)...');
+      let count = 0;
+      let url: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=100';
+      let pages = 0;
+      while (url) {
+        const res = await fetch(url, { headers });
+        if (!res.ok) break;
+        const data = await res.json();
+        count += (data.data || []).length;
+        url = data.links?.next || null;
+        pages++;
+        if (pages % 50 === 0) console.log(`[klaviyo] ... paginated ${count} profiles (${pages} pages)`);
+        if (pages >= 500) { // safety: 50,000 max
+          console.log(`[klaviyo] Stopped at ${pages} pages (${count} profiles)`);
+          break;
         }
       }
-      console.log(`[klaviyo] === SEGMENTS (${debugSegments.length}) ===`);
-      debugSegments.forEach(s => console.log(`  Segment: "${s.name}" | ID: ${s.id} | profile_count: ${s.profile_count}`));
+      console.log(`[klaviyo] Profile count from full pagination: ${count} (${pages} pages, hasMore: ${!!url})`);
+      maxProfileCount = count;
+    } catch (e: any) {
+      console.warn('[klaviyo] Full pagination error:', e.message);
     }
-  } catch (_) { /* ignore */ }
-
-  // Attempt 3: Paginate ALL profiles (up to 50 pages of 100 = 5000 max, then estimate)
-  try {
-    console.log('[klaviyo] Falling back to profile pagination...');
-    let count = 0;
-    let url: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=100';
-    let pages = 0;
-    while (url && pages < 50) {
-      const res = await fetch(url, { headers });
-      if (!res.ok) break;
-      const data = await res.json();
-      count += (data.data || []).length;
-      url = data.links?.next || null;
-      pages++;
-      if (pages % 10 === 0) console.log(`[klaviyo] ... paginated ${count} profiles so far (${pages} pages)`);
-    }
-    if (pages >= 50 && url) {
-      console.log(`[klaviyo] Counted ${count} profiles in ${pages} pages, more exist.`);
-    }
-    console.log(`[klaviyo] Profile count from pagination: ${count} (${pages} pages, hasMore: ${!!url})`);
-    return { total: count, debugLists, debugSegments };
-  } catch (e: any) {
-    console.warn('[klaviyo] Pagination error:', e.message);
   }
 
-  return { total: 0, debugLists, debugSegments };
+  console.log(`[klaviyo] FINAL totalProfiles: ${maxProfileCount}`);
+  return { total: maxProfileCount, debugLists, debugSegments };
 }
 
 // Fetch new profiles count for the period
