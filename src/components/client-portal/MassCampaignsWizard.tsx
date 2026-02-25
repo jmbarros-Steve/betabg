@@ -746,13 +746,28 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
                   </TabsContent>
                 </Tabs>
 
-                <div className="flex justify-between mt-6">
+                {/* DEBUG — ver qué bloquea el botón */}
+                <pre className="text-xs bg-red-50 border border-red-200 p-2 rounded mb-2 overflow-auto mt-4">
+                  {JSON.stringify({
+                    campaignsLength: campaigns?.length,
+                    validCampaignCount,
+                    selectedTemplate: !!selectedTemplate,
+                    selectedTemplateId: selectedTemplate?.id,
+                    templateBlocksCount: selectedTemplate?.content_blocks?.length,
+                    generating,
+                    currentStep: step,
+                    isDisabled_OLD: validCampaignCount === 0 || generating,
+                    isDisabled_NEW: generating,
+                  }, null, 2)}
+                </pre>
+
+                <div className="flex justify-between mt-2">
                   <Button variant="ghost" onClick={() => setStep(1)}>
                     <ArrowLeft className="w-4 h-4 mr-2" /> Atrás
                   </Button>
-                  <Button onClick={generateAll} disabled={validCampaignCount === 0 || generating}>
+                  <Button onClick={generateAll} disabled={generating}>
                     {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
-                    Steve, genera los {validCampaignCount} mails
+                    Steve, genera los {campaigns?.length || 0} mails
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
