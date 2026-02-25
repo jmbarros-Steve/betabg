@@ -60,6 +60,7 @@ interface EmailBlockEditorProps {
     primary: string; secondary: string; accent: string; button: string; buttonText: string; font: string;
   };
   assets?: { url: string; name: string }[];
+  clientId?: string;
 }
 
 // Map alternative block type names to canonical ones
@@ -77,7 +78,7 @@ function normalizeBlockType(block: EmailBlock): EmailBlock {
   return block;
 }
 
-export default function EmailBlockEditor({ blocks: rawBlocks, onChange, templateColors, assets }: EmailBlockEditorProps) {
+export default function EmailBlockEditor({ blocks: rawBlocks, onChange, templateColors, assets, clientId }: EmailBlockEditorProps) {
   // Normalize block types on every render so alias types are always recognized
   const blocks = rawBlocks.map(normalizeBlockType);
   // Propagate normalized blocks back if any were changed
@@ -320,6 +321,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
                   block={selectedBlock}
                   onChange={newProps => updateBlock(selectedBlock.id, newProps)}
                   assets={assets}
+                  clientId={clientId}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
