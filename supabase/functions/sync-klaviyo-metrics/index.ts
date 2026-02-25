@@ -291,13 +291,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // MINIMAL CALLS — max ~7 calls total
-
     // STEP 1: Discover conversion metric
     const conversionMetricId = await findConversionMetricId(apiKey);
     await new Promise(r => setTimeout(r, 500));
 
-    // STEP 2: Flows + Campaigns + Lists + Segments + Profiles (sequential with small delays)
+    // STEP 2: Flows + Campaigns + Lists + Segments (sequential with small delays)
     const flows = await fetchFlows(apiKey);
     await new Promise(r => setTimeout(r, 500));
     const campaigns = await fetchCampaigns(apiKey);
@@ -306,10 +304,60 @@ Deno.serve(async (req) => {
     await new Promise(r => setTimeout(r, 500));
     const klaviyoSegments = await fetchSegments(apiKey);
     await new Promise(r => setTimeout(r, 500));
-    const totalProfiles = await estimateTotalProfiles(apiKey);
+
+    // STEP 3: Count profiles for each list in parallel
+    console.log('[klaviyo] Counting profiles for lists and segments...');
+    const listCounts = await Promise.all(
+      klaviyoLists.map(async (list: any) => {
+        try {
+          const r = await fetch(
+            `https://a.klaviyo.com/api/lists/${list.id}/profiles/?page[size]=1000&fields[profile]=email`,
+            { headers: makeHeaders(apiKey) }
+          );
+          if (!r.ok) return { id: list.id, count: 0, hasMore: false };
+          const d = await r.json();
+          const count = (d.data || []).length;
+          const hasMore = !!d.links?.next;
+          return { id: list.id, count, hasMore };
+        } catch {
+          return { id: list.id, count: 0, hasMore: false };
+        }
+      })
+    );
+
+    // STEP 4: Count profiles for each segment in parallel
+    const segCounts = await Promise.all(
+      klaviyoSegments.map(async (seg: any) => {
+        try {
+          const r = await fetch(
+            `https://a.klaviyo.com/api/segments/${seg.id}/profiles/?page[size]=1000&fields[profile]=email`,
+            { headers: makeHeaders(apiKey) }
+          );
+          if (!r.ok) return { id: seg.id, count: 0, hasMore: false };
+          const d = await r.json();
+          const count = (d.data || []).length;
+          const hasMore = !!d.links?.next;
+          return { id: seg.id, count, hasMore };
+        } catch {
+          return { id: seg.id, count: 0, hasMore: false };
+        }
+      })
+    );
+
+    // STEP 5: Total profiles KPI
+    const profilesResp = await fetch(
+      'https://a.klaviyo.com/api/profiles/?page[size]=100&fields[profile]=email',
+      { headers: makeHeaders(apiKey) }
+    );
+    let totalProfiles: number | string = 0;
+    if (profilesResp.ok) {
+      const profilesData = await profilesResp.json();
+      const hasMoreProfiles = !!profilesData.links?.next;
+      totalProfiles = hasMoreProfiles ? 10000 : (profilesData.data?.length || 0);
+    }
     await new Promise(r => setTimeout(r, 500));
 
-    // STEP 7: Reports (these use POST with different revision, less likely to conflict)
+    // STEP 6: Reports
     let flowMetrics: Record<string, any> = {};
     let campaignMetrics: Record<string, any> = {};
 
@@ -319,9 +367,35 @@ Deno.serve(async (req) => {
       campaignMetrics = await fetchCampaignReport(apiKey, conversionMetricId, timeframe);
     }
 
-    // Enrich
+    // Enrich flows and campaigns
     const enrichedFlows = flows.map((f: any) => ({ ...f, metrics: flowMetrics[f.id] || null }));
     const enrichedCampaigns = campaigns.map((c: any) => ({ ...c, metrics: campaignMetrics[c.id] || null }));
+
+    // Lists with profile counts baked in
+    const listsWithCounts = klaviyoLists.map((l: any) => {
+      const c = listCounts.find(lc => lc.id === l.id);
+      const count = c?.count ?? 0;
+      const hasMore = c?.hasMore ?? false;
+      return {
+        ...l,
+        profile_count: (count >= 1000 && hasMore) ? '1,000+' : count,
+        profile_count_raw: count,
+        has_more: hasMore,
+      };
+    });
+
+    // Segments with profile counts baked in
+    const segmentsWithCounts = klaviyoSegments.map((s: any) => {
+      const c = segCounts.find(sc => sc.id === s.id);
+      const count = c?.count ?? 0;
+      const hasMore = c?.hasMore ?? false;
+      return {
+        ...s,
+        profile_count: (count >= 1000 && hasMore) ? '1,000+' : count,
+        profile_count_raw: count,
+        has_more: hasMore,
+      };
+    });
 
     // Global stats
     const allFlowMetrics = Object.values(flowMetrics) as any[];
@@ -350,10 +424,10 @@ Deno.serve(async (req) => {
       conversionMetricId: conversionMetricId || null,
     };
 
-    console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, ${klaviyoLists.length} lists, ${klaviyoSegments.length} segments, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
+    console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, ${listsWithCounts.length} lists, ${segmentsWithCounts.length} segments, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
 
     return new Response(
-      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, lists: klaviyoLists, segments: klaviyoSegments }),
+      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, lists: listsWithCounts, segments: segmentsWithCounts }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
