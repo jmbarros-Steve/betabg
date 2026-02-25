@@ -111,9 +111,9 @@ async function fetchSegments(apiKey: string): Promise<any[]> {
   return segments;
 }
 
-// Simple profile estimate: 1 call, page[size]=100
+// Profile KPI estimate: 1 call, page[size]=1000
 async function estimateTotalProfiles(apiKey: string): Promise<number> {
-  const res = await fetch('https://a.klaviyo.com/api/profiles/?page[size]=100', { headers: makeHeaders(apiKey) });
+  const res = await fetch('https://a.klaviyo.com/api/profiles/?page[size]=1000&fields[profile]=email', { headers: makeHeaders(apiKey) });
   if (!res.ok) return 0;
   const data = await res.json();
   const firstPage = (data.data || []).length;
@@ -249,22 +249,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Handle list-profiles action (lazy load on click)
-    if (action === 'list-profiles' && entityType && entityId) {
-      const endpoint = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=20&fields[profile]=email,first_name,last_name,created`;
-      const res = await fetch(endpoint, { headers: makeHeaders(apiKey) });
-      if (!res.ok) {
-        return new Response(JSON.stringify({ profiles: [], hasMore: false }), {
+    // Handle count-profiles action (lazy count per list/segment)
+    if (action === 'count-profiles' && entityType && entityId) {
+      const url1 = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=1000&fields[profile]=email`;
+      const res1 = await fetch(url1, { headers: makeHeaders(apiKey) });
+      if (!res1.ok) {
+        return new Response(JSON.stringify({ count: 0, display: '0' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const data = await res.json();
-      const profiles = (data.data || []).map((p: any) => ({
-        email: p.attributes?.email || '—',
-        name: [p.attributes?.first_name, p.attributes?.last_name].filter(Boolean).join(' ') || '',
-        created: p.attributes?.created || null,
-      }));
-      return new Response(JSON.stringify({ profiles, hasMore: !!data.links?.next }), {
+      const data1 = await res1.json();
+      const page1Count = (data1.data || []).length;
+      const hasPage2 = !!data1.links?.next;
+
+      if (!hasPage2) {
+        return new Response(JSON.stringify({ count: page1Count, display: String(page1Count) }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Has more than 1000 — check second page to see if 10,000+
+      await new Promise(r => setTimeout(r, 500));
+      const url2 = data1.links.next;
+      const res2 = await fetch(url2, { headers: makeHeaders(apiKey) });
+      if (!res2.ok) {
+        return new Response(JSON.stringify({ count: 1000, display: '1,000+' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data2 = await res2.json();
+      const page2Count = (data2.data || []).length;
+      const hasPage3 = !!data2.links?.next;
+
+      if (hasPage3) {
+        return new Response(JSON.stringify({ count: 10000, display: '10,000+' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const total = page1Count + page2Count;
+      return new Response(JSON.stringify({ count: total, display: total.toLocaleString() }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
