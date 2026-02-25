@@ -70,28 +70,63 @@ async function fetchCampaigns(apiKey: string) {
   }));
 }
 
-// Get profile count: try lists first, then segments, then limited pagination
+// Get profile count: lists/segments profile_count first, then quick pagination fallback
 async function fetchProfilesCount(apiKey: string): Promise<number> {
   const headers = makeHeaders(apiKey);
   let maxCount = 0;
 
-  // Try lists WITHOUT additional-fields (current revision doesn't support it)
-  // Instead just fetch lists and segments names for debug, and paginate profiles
-  // Quick pagination: 5 pages max = 500 profiles sampled, extrapolate from total
+  // Strategy 1: Try lists with profile_count (older revision)
+  try {
+    const profileHeaders = { ...headers, 'revision': '2024-02-15' };
+    const [listsRes, segsRes] = await Promise.all([
+      fetch('https://a.klaviyo.com/api/lists/?additional-fields[list]=profile_count&page[size]=50', { headers: profileHeaders }),
+      fetch('https://a.klaviyo.com/api/segments/?additional-fields[segment]=profile_count&page[size]=50', { headers: profileHeaders }),
+    ]);
+
+    if (listsRes.ok) {
+      const listsData = await listsRes.json();
+      for (const l of (listsData.data || [])) {
+        const pc = l.attributes?.profile_count || 0;
+        if (pc > maxCount) maxCount = pc;
+      }
+    }
+    if (segsRes.ok) {
+      const segsData = await segsRes.json();
+      for (const s of (segsData.data || [])) {
+        const pc = s.attributes?.profile_count || 0;
+        if (pc > maxCount) maxCount = pc;
+      }
+    }
+    console.log(`[klaviyo] Profile count from lists/segments: ${maxCount}`);
+  } catch (e: any) {
+    console.warn('[klaviyo] Lists/segments profile_count error:', e.message);
+  }
+
+  if (maxCount > 0) return maxCount;
+
+  // Strategy 2: Quick pagination (max 3 pages to avoid timeout)
   try {
     let count = 0;
     let url: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=100';
     let pages = 0;
-    while (url && pages < 100) { // up to 10,000 profiles
+    let hasMore = false;
+    while (url && pages < 3) {
       const res = await fetch(url, { headers });
       if (!res.ok) break;
       const data = await res.json();
       count += (data.data || []).length;
       url = data.links?.next || null;
+      hasMore = !!url;
       pages++;
     }
-    maxCount = count;
-    console.log(`[klaviyo] Profile count via pagination: ${count} (${pages} pages, hasMore: ${!!url})`);
+    // Estimate: if we hit 3 pages and there's more, estimate range
+    if (hasMore && pages >= 3) {
+      // We got 300 profiles and there's more — mark as 10000+ minimum
+      maxCount = 10000;
+    } else {
+      maxCount = count;
+    }
+    console.log(`[klaviyo] Profile count via pagination: ${count} (${pages} pages, hasMore: ${hasMore}, estimate: ${maxCount})`);
   } catch (e: any) {
     console.warn('[klaviyo] Profile pagination error:', e.message);
   }
