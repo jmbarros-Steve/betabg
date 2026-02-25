@@ -792,7 +792,7 @@ function PlanCard({
               <PushToKlaviyoDialog
                 planId={plan.id}
                 planName={plan.name}
-                emailCount={plan.emails.length}
+                emails={plan.emails}
                 clientId={clientId}
                 campaignDate={plan.campaign_date}
                 onClose={() => setShowPushDialog(false)}
@@ -813,75 +813,90 @@ function PlanCard({
 interface PushToKlaviyoDialogProps {
   planId: string;
   planName: string;
-  emailCount: number;
+  emails: EmailStep[];
   clientId: string;
   campaignDate?: string;
   onClose: () => void;
   onComplete: () => void;
 }
 
+function generatePreviewHtml(email: EmailStep): string {
+  const isHtml = email.content?.trim().startsWith('<!DOCTYPE') || email.content?.trim().startsWith('<html') || email.content?.includes('<table') || email.content?.includes('<div');
+  if (isHtml) return email.content;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background:#fff;}
+.preheader{display:none;max-height:0;overflow:hidden;} h1,h2,h3{color:#222;} a{color:#007bff;}</style>
+</head><body>
+<div class="preheader">${email.previewText || ''}</div>
+${email.content?.replace(/\n/g, '<br>') || '<p style="color:#999;">Sin contenido</p>'}
+</body></html>`;
+}
+
 function PushToKlaviyoDialog({
   planId,
   planName,
-  emailCount,
+  emails,
   clientId,
   campaignDate,
   onClose,
   onComplete,
 }: PushToKlaviyoDialogProps) {
+  const [step, setStep] = useState<'preview' | 'config'>('preview');
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [lists, setLists] = useState<Array<{ id: string; name: string; profile_count: number }>>([]);
-  const [loadingLists, setLoadingLists] = useState(true);
+  const [loadingLists, setLoadingLists] = useState(false);
   const [selectedList, setSelectedList] = useState('');
   const [sendStrategy, setSendStrategy] = useState<'draft' | 'scheduled' | 'immediate' | 'smart_send'>('draft');
   const [scheduledAt, setScheduledAt] = useState(campaignDate || '');
   const [pushing, setPushing] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadConnection() {
-      // Find active Klaviyo connection for this client
-      const { data: connections } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'klaviyo')
-        .eq('is_active', true)
-        .limit(1);
+  const emailCount = emails.length;
+  const currentEmail = emails[previewIndex];
 
-      if (!connections || connections.length === 0) {
-        toast.error('No hay conexión de Klaviyo activa para este cliente');
-        setLoadingLists(false);
-        return;
-      }
+  async function loadConnection() {
+    setLoadingLists(true);
+    const { data: connections } = await supabase
+      .from('platform_connections')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('platform', 'klaviyo')
+      .eq('is_active', true)
+      .limit(1);
 
-      const connId = connections[0].id;
-      setConnectionId(connId);
-
-      // Fetch lists from Klaviyo
-      try {
-        const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
-          body: { action: 'fetch_lists', connection_id: connId },
-        });
-
-        if (error) throw error;
-        setLists(data.lists || []);
-        if (data.lists?.length > 0) {
-          setSelectedList(data.lists[0].id);
-        }
-      } catch (err) {
-        console.error('Error fetching lists:', err);
-        toast.error('Error al obtener las listas de Klaviyo');
-      } finally {
-        setLoadingLists(false);
-      }
+    if (!connections || connections.length === 0) {
+      toast.error('No hay conexión de Klaviyo activa para este cliente');
+      setLoadingLists(false);
+      return;
     }
 
+    const connId = connections[0].id;
+    setConnectionId(connId);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
+        body: { action: 'fetch_lists', connection_id: connId },
+      });
+      if (error) throw error;
+      setLists(data.lists || []);
+      if (data.lists?.length > 0) setSelectedList(data.lists[0].id);
+    } catch (err) {
+      console.error('Error fetching lists:', err);
+      toast.error('Error al obtener las listas de Klaviyo');
+    } finally {
+      setLoadingLists(false);
+    }
+  }
+
+  function goToConfig() {
+    setStep('config');
     loadConnection();
-  }, [clientId]);
+  }
 
   async function handlePush() {
     if (!connectionId || !selectedList) return;
-
     setPushing(true);
     try {
       const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
@@ -893,10 +908,8 @@ function PushToKlaviyoDialog({
           scheduled_at: sendStrategy === 'scheduled' ? scheduledAt || undefined : undefined,
         },
       });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-
       const draftLabel = sendStrategy === 'draft' ? ' como borradores' : '';
       toast.success(`${data.campaigns?.length || emailCount} campañas creadas${draftLabel} en Klaviyo 🚀`);
       onComplete();
@@ -910,115 +923,214 @@ function PushToKlaviyoDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Rocket className="w-5 h-5" />
-            Push a Klaviyo
+            {step === 'preview' ? (
+              <><Eye className="w-5 h-5" /> Preview de Emails</>
+            ) : (
+              <><Rocket className="w-5 h-5" /> Push a Klaviyo</>
+            )}
           </DialogTitle>
           <DialogDescription>
-            Crear {emailCount} campaña{emailCount > 1 ? 's' : ''} completa{emailCount > 1 ? 's' : ''} en Klaviyo para "{planName}"
+            {step === 'preview'
+              ? `Revisa cómo quedará cada email antes de subirlo a Klaviyo (${emailCount} email${emailCount > 1 ? 's' : ''})`
+              : `Configurar destino para "${planName}"`}
           </DialogDescription>
         </DialogHeader>
 
-        {loadingLists ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-            <span className="ml-2 text-sm text-muted-foreground">Cargando listas de Klaviyo...</span>
-          </div>
-        ) : lists.length === 0 ? (
-          <div className="py-6 text-center">
-            <p className="text-muted-foreground">No se encontraron listas en Klaviyo.</p>
-            <p className="text-sm text-muted-foreground mt-1">Crea una lista en Klaviyo primero.</p>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {/* List selector */}
-            <div className="space-y-2">
-              <Label>Lista de destinatarios</Label>
-              <Select value={selectedList} onValueChange={setSelectedList}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una lista" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lists.map((list) => (
-                    <SelectItem key={list.id} value={list.id}>
-                      {list.name} ({list.profile_count.toLocaleString()} perfiles)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {step === 'preview' ? (
+          <div className="space-y-4">
+            {/* Email navigation tabs */}
+            <div className="flex gap-1.5 flex-wrap">
+              {emails.map((email, i) => (
+                <Button
+                  key={email.id}
+                  variant={previewIndex === i ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPreviewIndex(i)}
+                  className="text-xs"
+                >
+                  <Mail className="w-3.5 h-3.5 mr-1" />
+                  {i + 1}
+                </Button>
+              ))}
             </div>
 
-            {/* Send strategy */}
-            <div className="space-y-2">
-              <Label>Estrategia de envío</Label>
-              <RadioGroup value={sendStrategy} onValueChange={(v) => setSendStrategy(v as any)} className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="draft" id="draft" />
-                  <Label htmlFor="draft" className="font-normal cursor-pointer">
-                    Solo borrador (crear sin programar, para editar en Klaviyo)
-                  </Label>
+            {/* Email details */}
+            {currentEmail && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Asunto</p>
+                    <p className="text-sm font-medium">{currentEmail.subject || '(sin asunto)'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preview Text</p>
+                    <p className="text-sm text-muted-foreground">{currentEmail.previewText || '(sin preview)'}</p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="scheduled" id="scheduled" />
-                  <Label htmlFor="scheduled" className="font-normal cursor-pointer">
-                    Programar envío
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="smart_send" id="smart_send" />
-                  <Label htmlFor="smart_send" className="font-normal cursor-pointer">
-                    Smart Send Time (Klaviyo elige la mejor hora)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="immediate" id="immediate" />
-                  <Label htmlFor="immediate" className="font-normal cursor-pointer">
-                    Enviar inmediatamente (solo el primer email)
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
 
-            {/* Schedule date */}
-            {sendStrategy === 'scheduled' && (
-              <div className="space-y-2">
-                <Label>Fecha y hora de envío</Label>
-                <Input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Los emails subsiguientes se programarán según los delays configurados en cada paso.
-                </p>
+                {/* HTML Preview */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/50 px-3 py-2 flex items-center justify-between border-b">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Email {previewIndex + 1} de {emailCount} — Vista previa
+                    </span>
+                    {(currentEmail.content?.includes('{{') || currentEmail.content?.includes('{%')) && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Wand2 className="w-3 h-3 mr-1" />
+                        Con variables Klaviyo
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="bg-white p-1">
+                    <iframe
+                      srcDoc={generatePreviewHtml(currentEmail)}
+                      className="w-full border-0"
+                      sandbox="allow-same-origin"
+                      title={`Preview email ${previewIndex + 1}`}
+                      style={{ height: '350px', minHeight: '200px' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Navigation arrows */}
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={previewIndex === 0}
+                    onClick={() => setPreviewIndex(prev => prev - 1)}
+                  >
+                    ← Anterior
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {previewIndex + 1} / {emailCount}
+                  </span>
+                  {previewIndex < emailCount - 1 ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPreviewIndex(prev => prev + 1)}
+                    >
+                      Siguiente →
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={goToConfig}>
+                      <Check className="w-4 h-4 mr-1" />
+                      Todo OK, continuar
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </div>
+        ) : (
+          <>
+            {loadingLists ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <span className="ml-2 text-sm text-muted-foreground">Cargando listas de Klaviyo...</span>
+              </div>
+            ) : lists.length === 0 ? (
+              <div className="py-6 text-center">
+                <p className="text-muted-foreground">No se encontraron listas en Klaviyo.</p>
+                <p className="text-sm text-muted-foreground mt-1">Crea una lista en Klaviyo primero.</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label>Lista de destinatarios</Label>
+                  <Select value={selectedList} onValueChange={setSelectedList}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una lista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lists.map((list) => (
+                        <SelectItem key={list.id} value={list.id}>
+                          {list.name} ({list.profile_count.toLocaleString()} perfiles)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Estrategia de envío</Label>
+                  <RadioGroup value={sendStrategy} onValueChange={(v) => setSendStrategy(v as any)} className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="draft" id="draft" />
+                      <Label htmlFor="draft" className="font-normal cursor-pointer">
+                        Solo borrador (crear sin programar, para editar en Klaviyo)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="scheduled" id="scheduled" />
+                      <Label htmlFor="scheduled" className="font-normal cursor-pointer">
+                        Programar envío
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="smart_send" id="smart_send" />
+                      <Label htmlFor="smart_send" className="font-normal cursor-pointer">
+                        Smart Send Time (Klaviyo elige la mejor hora)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="immediate" id="immediate" />
+                      <Label htmlFor="immediate" className="font-normal cursor-pointer">
+                        Enviar inmediatamente (solo el primer email)
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {sendStrategy === 'scheduled' && (
+                  <div className="space-y-2">
+                    <Label>Fecha y hora de envío</Label>
+                    <Input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Los emails subsiguientes se programarán según los delays configurados.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         <DialogFooter>
+          {step === 'config' && (
+            <Button variant="ghost" onClick={() => setStep('preview')} disabled={pushing}>
+              ← Volver al preview
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose} disabled={pushing}>
             Cancelar
           </Button>
-          <Button
-            onClick={handlePush}
-            disabled={pushing || !selectedList || loadingLists}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {pushing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                Creando campañas...
-              </>
-            ) : (
-              <>
-                <Rocket className="w-4 h-4 mr-1" />
-                Crear {emailCount} campaña{emailCount > 1 ? 's' : ''}
-              </>
-            )}
-          </Button>
+          {step === 'preview' ? (
+            <Button onClick={goToConfig}>
+              <Check className="w-4 h-4 mr-1" />
+              Continuar
+            </Button>
+          ) : (
+            <Button
+              onClick={handlePush}
+              disabled={pushing || !selectedList || loadingLists}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {pushing ? (
+                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Creando campañas...</>
+              ) : (
+                <><Rocket className="w-4 h-4 mr-1" /> Crear {emailCount} campaña{emailCount > 1 ? 's' : ''}</>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
