@@ -63,24 +63,31 @@ async function findConversionMetricId(apiKey: string): Promise<string | null> {
   return null;
 }
 
-// STEP 2: Get total profiles count
+// STEP 2: Get total profiles via Lists endpoint with profile_count
 async function fetchProfilesCount(apiKey: string): Promise<number> {
   const headers = makeHeaders(apiKey);
-  // Fetch with minimal data - just need the count from meta
-  const res = await fetch('https://a.klaviyo.com/api/profiles/', { headers });
+  // Use additional-fields[list]=profile_count to get actual counts per list
+  const res = await fetch(
+    'https://a.klaviyo.com/api/lists/?additional-fields%5Blist%5D=profile_count',
+    { headers }
+  );
   if (!res.ok) {
-    console.warn('[klaviyo] Profiles failed:', res.status, await res.text());
+    console.warn('[klaviyo] Lists (profile_count) failed:', res.status, await res.text());
     return 0;
   }
   const data = await res.json();
-  // Try various locations for total count
-  const count = data.meta?.page_info?.count
-    ?? data.meta?.page_info?.total
-    ?? data.meta?.total
-    ?? data.data?.length
-    ?? 0;
-  console.log(`[klaviyo] Profiles count: ${count} (meta: ${JSON.stringify(data.meta)})`);
-  return count;
+  const lists = data.data || [];
+  // Find the largest list as the "main" list (most accurate unique count)
+  let maxCount = 0;
+  let totalSum = 0;
+  for (const list of lists) {
+    const count = list.attributes?.profile_count ?? 0;
+    totalSum += count;
+    if (count > maxCount) maxCount = count;
+  }
+  console.log(`[klaviyo] Lists: ${lists.length}, largest: ${maxCount}, sum: ${totalSum}`);
+  // Return the largest list count (best proxy for unique profiles)
+  return maxCount;
 }
 
 // Fetch all flows
