@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,14 +9,18 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { type EmailBlock, type BlockType } from './blockTypes';
 import KlaviyoVariablePicker, { PRODUCT_DYNAMIC_VARIABLES } from './KlaviyoVariablePicker';
+import { supabase } from '@/integrations/supabase/client';
+import { useShopifyAuthFetch } from '@/hooks/useShopifyAuthFetch';
+import { Loader2 } from 'lucide-react';
 
 interface BlockConfigProps {
   block: EmailBlock;
   onChange: (props: Record<string, any>) => void;
   assets?: { url: string; name: string }[];
+  clientId?: string;
 }
 
-export default function BlockConfigPanel({ block, onChange, assets }: BlockConfigProps) {
+export default function BlockConfigPanel({ block, onChange, assets, clientId }: BlockConfigProps) {
   const p = block.props;
   const set = (key: string, val: any) => onChange({ ...p, [key]: val });
 
@@ -28,7 +32,7 @@ export default function BlockConfigPanel({ block, onChange, assets }: BlockConfi
     case 'divider': return <DividerConfig p={p} set={set} />;
     case 'spacer': return <SpacerConfig p={p} set={set} />;
     case 'social_links': return <SocialConfig p={p} set={set} />;
-    case 'product': return <ProductConfig p={p} set={set} />;
+    case 'product': return <ProductConfig p={p} set={set} clientId={clientId} />;
     case 'coupon': return <CouponConfig p={p} set={set} />;
     case 'table': return <TableConfig p={p} set={set} />;
     case 'review': return <ReviewConfig p={p} set={set} />;
@@ -515,11 +519,119 @@ function SocialConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) 
 }
 
 // ═══════════════════════════════
-// PRODUCT CONFIG (3 modes)
+// SHOPIFY PRODUCT PICKER (inline search)
 // ═══════════════════════════════
 
-function ProductConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) {
+function ShopifyProductPicker({ clientId, onSelect }: { clientId?: string; onSelect: (product: any) => void }) {
+  const [search, setSearch] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const { callEdgeFunction } = useShopifyAuthFetch();
+
+  const loadProducts = useCallback(async () => {
+    if (loaded || loading || !clientId) return;
+    setLoading(true);
+    try {
+      // Get Shopify connection for this client
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'shopify')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!conn) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await callEdgeFunction('fetch-shopify-products', {
+        body: { connectionId: conn.id },
+      });
+
+      if (!error && data?.products) {
+        setAllProducts(data.products);
+        setLoaded(true);
+      }
+    } catch (err) {
+      console.error('Error loading products:', err);
+    }
+    setLoading(false);
+  }, [clientId, loaded, loading, callEdgeFunction]);
+
+  const handleSearch = (query: string) => {
+    setSearch(query);
+    if (!loaded) loadProducts();
+    if (query.length < 2) { setResults([]); return; }
+    const filtered = allProducts.filter(p =>
+      p.title.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 8);
+    setResults(filtered);
+  };
+
+  if (!clientId) {
+    return (
+      <div className="p-3 bg-muted/50 rounded-lg border border-dashed text-center">
+        <p className="text-xs text-muted-foreground">⚠️ Conecta Shopify para buscar productos</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <Input
+        value={search}
+        onChange={e => handleSearch(e.target.value)}
+        onFocus={() => { if (!loaded) loadProducts(); }}
+        placeholder="Buscar producto por nombre..."
+        className="h-9 text-sm"
+      />
+      {loading && (
+        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+          <Loader2 className="w-3 h-3 animate-spin" /> Cargando productos...
+        </div>
+      )}
+      {results.length > 0 && (
+        <div className="absolute z-20 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {results.map(product => (
+            <button
+              key={product.id}
+              onClick={() => { onSelect(product); setResults([]); setSearch(product.title); }}
+              className="w-full text-left p-2.5 hover:bg-muted/80 flex gap-3 items-center border-b last:border-b-0 transition-colors"
+            >
+              {product.image && (
+                <img src={product.image} alt="" className="w-10 h-10 object-cover rounded" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-medium truncate">{product.title}</p>
+                <p className="text-xs font-bold text-primary">
+                  ${Number(product.variants?.[0]?.price || 0).toLocaleString('es-CL')}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════
+// PRODUCT CONFIG (3 modes + Shopify search)
+// ═══════════════════════════════
+
+function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) => void; clientId?: string }) {
   const mode = p.productMode || 'fixed';
+
+  const dynamicTypes = [
+    { key: 'catalog_feed', label: '📋 Feed del catálogo', desc: 'Productos del feed de Klaviyo', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{{ item.price|floatformat:0 }}', link: '{{ item.url }}' } },
+    { key: 'lastViewed', label: '👁️ Último producto visto', desc: 'El último producto que el cliente visitó', vars: { name: '{{ event.extra.title }}', imageUrl: '{{ event.extra.image_url }}', price: '{{ event.extra.price }}', link: '{{ event.extra.url }}' } },
+    { key: 'abandonedCart', label: '🛒 Producto del carrito', desc: 'Productos del carrito abandonado', vars: { name: '{{ item.product.title }}', imageUrl: '{{ item.product.image }}', price: '{{ item.product.price|floatformat:0 }}', link: '{{ item.product.url }}' } },
+    { key: 'recommended', label: '⭐ Recomendado', desc: 'Productos recomendados por Klaviyo', vars: { name: '{{ recommended_products.0.title }}', imageUrl: '{{ recommended_products.0.image }}', price: '{{ recommended_products.0.price }}', link: '{{ recommended_products.0.url }}' } },
+  ];
 
   return (
     <div className="space-y-4">
@@ -531,8 +643,45 @@ function ProductConfig({ p, set }: { p: any; set: (k: string, v: any) => void })
         </TabsList>
 
         <TabsContent value="fixed" className="mt-4 space-y-3">
+          {/* Shopify Product Search */}
+          <div>
+            <Label className="text-xs font-medium">🔍 Buscar en Shopify</Label>
+            <div className="mt-1.5">
+              <ShopifyProductPicker
+                clientId={clientId}
+                onSelect={(product) => {
+                  set('name', product.title);
+                  set('imageUrl', product.image || '');
+                  set('price', `$${Number(product.variants?.[0]?.price || 0).toLocaleString('es-CL')}`);
+                  set('link', `{{shop_url}}/products/${product.handle}`);
+                  set('buttonText', p.buttonText || 'Comprar ahora');
+                  set('_shopifyProductId', product.id);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Preview of selected product */}
+          {p.name && (
+            <div className="bg-muted/50 rounded-lg p-3 border flex gap-3">
+              {p.imageUrl && !p.imageUrl.includes('{{') && (
+                <img src={p.imageUrl} alt="" className="w-16 h-16 object-cover rounded" />
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{p.name}</p>
+                <p className="text-sm font-bold text-primary">{p.price}</p>
+              </div>
+            </div>
+          )}
+
+          <Separator />
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">O editar manualmente</p>
+
           <div><Label className="text-xs font-medium">Nombre del producto</Label><Input value={p.name || ''} onChange={e => set('name', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="Nombre del producto" /></div>
           <div><Label className="text-xs font-medium">URL de imagen</Label><Input value={p.imageUrl || ''} onChange={e => set('imageUrl', e.target.value)} className="h-9 text-sm mt-1.5" /></div>
+          {p.imageUrl && !p.imageUrl.includes('{{') && (
+            <img src={p.imageUrl} alt="Preview" className="w-full rounded-lg border" />
+          )}
           <div><Label className="text-xs font-medium">Precio</Label><Input value={p.price || ''} onChange={e => set('price', e.target.value)} placeholder="$29.990" className="h-9 text-sm mt-1.5" /></div>
           <div><Label className="text-xs font-medium">Descripción</Label><Textarea value={p.description || ''} onChange={e => set('description', e.target.value)} rows={3} className="text-sm mt-1.5" /></div>
           <div><Label className="text-xs font-medium">Link del producto</Label><Input value={p.link || ''} onChange={e => set('link', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="{{shop_url}}/products/handle" /></div>
@@ -540,35 +689,62 @@ function ProductConfig({ p, set }: { p: any; set: (k: string, v: any) => void })
         </TabsContent>
 
         <TabsContent value="dynamic" className="mt-4 space-y-3">
-          <div>
-            <Label className="text-xs font-medium">Tipo de producto dinámico</Label>
-            <Select value={p.dynamicType || 'lastViewed'} onValueChange={v => set('dynamicType', v)}>
-              <SelectTrigger className="h-9 text-sm mt-1.5"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lastViewed">👁️ Último producto visto</SelectItem>
-                <SelectItem value="abandonedCart">🛒 Carrito abandonado</SelectItem>
-                <SelectItem value="recommended">✨ Producto recomendado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="p-3 bg-muted/50 rounded-lg border border-dashed space-y-1">
-            <p className="text-[11px] font-semibold text-muted-foreground">Variables que se usarán:</p>
-            {(PRODUCT_DYNAMIC_VARIABLES[p.dynamicType as keyof typeof PRODUCT_DYNAMIC_VARIABLES] || PRODUCT_DYNAMIC_VARIABLES.lastViewed).map(v => (
-              <div key={v.key} className="flex items-center justify-between py-0.5">
-                <span className="text-[11px] text-muted-foreground">{v.label}</span>
-                <code className="text-[10px] font-mono bg-background px-1.5 rounded">{v.key}</code>
-              </div>
+          <p className="text-xs text-muted-foreground">Klaviyo insertará el producto automáticamente al enviar el email.</p>
+          <div className="space-y-2">
+            {dynamicTypes.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  set('dynamicType', opt.key);
+                  set('name', opt.vars.name);
+                  set('imageUrl', opt.vars.imageUrl);
+                  set('price', opt.vars.price);
+                  set('link', opt.vars.link);
+                }}
+                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                  (p.dynamicType || 'lastViewed') === opt.key
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                    : 'hover:bg-muted/80'
+                }`}
+              >
+                <p className="text-xs font-medium">{opt.label}</p>
+                <p className="text-[11px] text-muted-foreground">{opt.desc}</p>
+              </button>
             ))}
           </div>
-          <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-[11px] text-blue-700 dark:text-blue-300">
+
+          {p.dynamicType && (
+            <div className="p-3 bg-muted/50 rounded-lg border border-dashed space-y-1.5">
+              <p className="text-[11px] font-semibold text-muted-foreground">Variables que se usarán:</p>
+              <div className="space-y-0.5">
+                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Título:</span><code className="text-[10px] font-mono">{p.name}</code></div>
+                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Imagen:</span><code className="text-[10px] font-mono truncate max-w-[180px]">{p.imageUrl}</code></div>
+                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Precio:</span><code className="text-[10px] font-mono">{p.price}</code></div>
+                <div className="flex justify-between"><span className="text-[11px] text-muted-foreground">Link:</span><code className="text-[10px] font-mono truncate max-w-[180px]">{p.link}</code></div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-start gap-2 p-2.5 bg-accent/50 rounded-lg text-[11px] text-accent-foreground">
             <span>💡</span>
             <span>Klaviyo resolverá estas variables con los datos reales del cliente al enviar.</span>
           </div>
+
+          <div><Label className="text-xs font-medium">Texto del botón</Label><Input value={p.buttonText || 'Comprar ahora'} onChange={e => set('buttonText', e.target.value)} className="h-9 text-sm mt-1.5" /></div>
         </TabsContent>
 
         <TabsContent value="collection" className="mt-4 space-y-3">
-          <div><Label className="text-xs font-medium">Handle de la colección</Label><Input value={p.collectionHandle || ''} onChange={e => set('collectionHandle', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="summer-sale" /></div>
-          <div><Label className="text-xs font-medium">Nombre de la colección</Label><Input value={p.collectionName || ''} onChange={e => set('collectionName', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="Sale de Verano" /></div>
+          <p className="text-xs text-muted-foreground">Muestra varios productos de una colección de Shopify.</p>
+          <div><Label className="text-xs font-medium">Handle de la colección</Label><Input value={p.collectionHandle || ''} onChange={e => set('collectionHandle', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="cuidado-capilar" /></div>
+          <div><Label className="text-xs font-medium">Nombre de la colección</Label><Input value={p.collectionName || ''} onChange={e => set('collectionName', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="Cuidado Capilar" /></div>
+
+          {p.collectionName && (
+            <div className="p-3 bg-accent/30 rounded-lg border border-dashed">
+              <p className="text-xs font-medium">📁 {p.collectionName}</p>
+              <p className="text-[10px] text-muted-foreground font-mono">{'{{shop_url}}'}/collections/{p.collectionHandle}</p>
+            </div>
+          )}
+
           <div>
             <Label className="text-xs font-medium">Productos a mostrar</Label>
             <div className="flex gap-1 mt-1.5">
@@ -577,6 +753,13 @@ function ProductConfig({ p, set }: { p: any; set: (k: string, v: any) => void })
                   {n} productos
                 </Button>
               ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Layout</Label>
+            <div className="flex gap-1 mt-1.5">
+              <Button variant={(p.collectionLayout || 'grid') === 'grid' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('collectionLayout', 'grid')}>Grid</Button>
+              <Button variant={p.collectionLayout === 'list' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('collectionLayout', 'list')}>Lista</Button>
             </div>
           </div>
           <div><Label className="text-xs font-medium">Texto del botón</Label><Input value={p.buttonText || 'Ver colección'} onChange={e => set('buttonText', e.target.value)} className="h-9 text-sm mt-1.5" /></div>

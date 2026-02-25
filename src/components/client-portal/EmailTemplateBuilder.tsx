@@ -836,6 +836,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
             font: form.font_family,
           }}
           assets={form.assets}
+          clientId={clientId}
         />
       </div>
     </div>
