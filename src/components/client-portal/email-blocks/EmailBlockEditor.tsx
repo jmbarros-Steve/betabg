@@ -62,7 +62,31 @@ interface EmailBlockEditorProps {
   assets?: { url: string; name: string }[];
 }
 
-export default function EmailBlockEditor({ blocks, onChange, templateColors, assets }: EmailBlockEditorProps) {
+// Map alternative block type names to canonical ones
+const TYPE_ALIASES: Record<string, BlockType> = {
+  heading: 'text',
+  header: 'header_bar',
+  footer: 'html',
+  social: 'social_links',
+  separator: 'divider',
+};
+
+function normalizeBlockType(block: EmailBlock): EmailBlock {
+  const canonical = TYPE_ALIASES[block.type];
+  if (canonical) return { ...block, type: canonical };
+  return block;
+}
+
+export default function EmailBlockEditor({ blocks: rawBlocks, onChange, templateColors, assets }: EmailBlockEditorProps) {
+  // Normalize block types on every render so alias types are always recognized
+  const blocks = rawBlocks.map(normalizeBlockType);
+  // Propagate normalized blocks back if any were changed
+  const normalizedJson = JSON.stringify(blocks);
+  const rawJson = JSON.stringify(rawBlocks);
+  useEffect(() => {
+    if (normalizedJson !== rawJson) onChange(blocks);
+  }, [normalizedJson, rawJson]);
+
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');

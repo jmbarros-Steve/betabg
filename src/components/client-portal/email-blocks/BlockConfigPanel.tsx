@@ -38,7 +38,7 @@ export default function BlockConfigPanel({ block, onChange, assets }: BlockConfi
     case 'split': return <SplitConfig p={p} set={set} />;
     case 'columns': return <ColumnsConfig p={p} set={set} />;
     case 'section': return <SectionConfig p={p} set={set} />;
-    default: return <p className="text-sm text-muted-foreground">Sin configuración disponible</p>;
+    default: return <GenericConfig block={block} p={p} set={set} />;
   }
 }
 
@@ -886,6 +886,66 @@ function SectionConfig({ p, set }: { p: any; set: (k: string, v: any) => void })
         <div><Label className="text-xs font-medium">Grosor</Label><Input type="number" value={p.borderWidth || 0} onChange={e => set('borderWidth', +e.target.value)} className="h-9 text-sm mt-1.5" /></div>
         <div><Label className="text-xs font-medium">Radius</Label><Input type="number" value={p.borderRadius || 0} onChange={e => set('borderRadius', +e.target.value)} className="h-9 text-sm mt-1.5" /></div>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════
+// GENERIC / FALLBACK CONFIG
+// ═══════════════════════════════
+
+function GenericConfig({ block, p, set }: { block: EmailBlock; p: any; set: (k: string, v: any) => void }) {
+  const [rawJson, setRawJson] = useState(JSON.stringify(p, null, 2));
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle>Bloque: {block.type}</SectionTitle>
+      <div className="flex items-start gap-2 p-2.5 bg-orange-50 dark:bg-orange-950/30 rounded-lg text-[11px] text-orange-700 dark:text-orange-300">
+        <span>⚠️</span>
+        <span>Este tipo de bloque (<strong>{block.type}</strong>) usa un editor genérico. Puedes editar sus propiedades como JSON.</span>
+      </div>
+
+      {/* Render common fields if they exist */}
+      {typeof p.content === 'string' && (
+        <div>
+          <Label className="text-xs font-medium">Contenido</Label>
+          <Textarea value={p.content} onChange={e => set('content', e.target.value)} rows={6} className="text-sm mt-1.5" />
+        </div>
+      )}
+      {typeof p.text === 'string' && (
+        <div>
+          <Label className="text-xs font-medium">Texto</Label>
+          <Input value={p.text} onChange={e => set('text', e.target.value)} className="h-10 text-sm mt-1.5" />
+        </div>
+      )}
+      {typeof p.url === 'string' && (
+        <div>
+          <Label className="text-xs font-medium">URL</Label>
+          <Input value={p.url} onChange={e => set('url', e.target.value)} className="h-9 text-sm mt-1.5" />
+        </div>
+      )}
+      {typeof p.src === 'string' && (
+        <div>
+          <Label className="text-xs font-medium">Imagen (src)</Label>
+          <Input value={p.src} onChange={e => set('src', e.target.value)} className="h-9 text-sm mt-1.5" />
+        </div>
+      )}
+
+      <Separator />
+      <SectionTitle>JSON (avanzado)</SectionTitle>
+      <Textarea
+        value={rawJson}
+        onChange={e => {
+          setRawJson(e.target.value);
+          try {
+            const parsed = JSON.parse(e.target.value);
+            // Apply all parsed props
+            Object.keys(parsed).forEach(k => set(k, parsed[k]));
+          } catch { /* ignore parse errors while typing */ }
+        }}
+        rows={10}
+        className="font-mono text-xs mt-1.5"
+      />
     </div>
   );
 }
