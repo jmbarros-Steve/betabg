@@ -113,6 +113,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
   const [showWizard, setShowWizard] = useState(false);
   const [newPlanType, setNewPlanType] = useState<EmailPlan['flow_type'] | null>(null);
   const [showVariables, setShowVariables] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   
   // Feedback state
   const [showFeedback, setShowFeedback] = useState(false);
@@ -442,19 +443,30 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
 
         {/* Campaigns Tab */}
         <TabsContent value="campaigns" className="space-y-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setNewPlanType('campaign');
-              setShowWizard(true);
-            }}
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <Megaphone className="w-4 h-4" />
-            Nueva Campaña
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setNewPlanType('campaign');
+                setShowWizard(true);
+              }}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <Megaphone className="w-4 h-4" />
+              Nueva Campaña
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBulkImport(true)}
+              className="flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Importar Emails desde Texto
+            </Button>
+          </div>
 
           {campaignPlans.length === 0 ? (
             <Card className="border-dashed">
@@ -540,6 +552,20 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Import Dialog */}
+      {showBulkImport && (
+        <BulkImportDialog
+          clientId={clientId}
+          onComplete={(newPlans) => {
+            setPlans(prev => [...newPlans, ...prev]);
+            setShowBulkImport(false);
+            setActiveTab('campaigns');
+            toast.success(`${newPlans.length} campaña${newPlans.length > 1 ? 's' : ''} importada${newPlans.length > 1 ? 's' : ''}`);
+          }}
+          onClose={() => setShowBulkImport(false)}
+        />
+      )}
 
       {/* Steve Feedback Dialog */}
       {showFeedback && lastCreatedPlanId && (
@@ -990,6 +1016,188 @@ function PushToKlaviyoDialog({
                 <Rocket className="w-4 h-4 mr-1" />
                 Crear {emailCount} campaña{emailCount > 1 ? 's' : ''}
               </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Bulk Import Dialog
+interface BulkImportDialogProps {
+  clientId: string;
+  onComplete: (plans: EmailPlan[]) => void;
+  onClose: () => void;
+}
+
+function BulkImportDialog({ clientId, onComplete, onClose }: BulkImportDialogProps) {
+  const [bulkText, setBulkText] = useState('');
+  const [planName, setPlanName] = useState('Campaña importada');
+  const [importing, setImporting] = useState(false);
+  const [parsed, setParsed] = useState<EmailStep[]>([]);
+
+  function parseEmails(text: string): EmailStep[] {
+    if (!text.trim()) return [];
+    
+    // Split by --- or === or ### or numbered patterns like "Email 1:", "Correo 2:"
+    const blocks = text.split(/\n\s*(?:---+|===+|###\s*Email\s*\d+|###\s*Correo\s*\d+)\s*\n/i)
+      .map(b => b.trim())
+      .filter(b => b.length > 0);
+
+    return blocks.map((block, i) => {
+      const lines = block.split('\n').map(l => l.trim()).filter(l => l);
+      
+      // Try to extract subject from first line or "Asunto:" prefix
+      let subject = `Email ${i + 1}`;
+      let previewText = '';
+      let contentLines: string[] = [];
+      
+      for (const line of lines) {
+        const subjectMatch = line.match(/^(?:asunto|subject|título):\s*(.+)/i);
+        const previewMatch = line.match(/^(?:preview|vista previa|preheader):\s*(.+)/i);
+        
+        if (subjectMatch && subject === `Email ${i + 1}`) {
+          subject = subjectMatch[1].trim();
+        } else if (previewMatch) {
+          previewText = previewMatch[1].trim();
+        } else {
+          contentLines.push(line);
+        }
+      }
+      
+      // If no explicit subject found, use first line as subject
+      if (subject === `Email ${i + 1}` && contentLines.length > 0) {
+        subject = contentLines.shift()!;
+      }
+
+      return {
+        id: `import-${Date.now()}-${i}`,
+        subject,
+        previewText,
+        content: contentLines.join('\n'),
+        delayDays: i > 0 ? 1 : 0,
+        delayHours: 0,
+      };
+    });
+  }
+
+  function handlePreview() {
+    const emails = parseEmails(bulkText);
+    setParsed(emails);
+    if (emails.length === 0) {
+      toast.error('No se detectaron emails. Sepáralos con ---');
+    }
+  }
+
+  async function handleImport() {
+    if (parsed.length === 0) return;
+    setImporting(true);
+
+    try {
+      const insertData = {
+        client_id: clientId,
+        flow_type: 'campaign',
+        name: planName,
+        status: 'draft',
+        emails: parsed as unknown,
+        client_notes: `Importado desde texto (${parsed.length} emails)`,
+      };
+
+      const { data, error } = await supabase
+        .from('klaviyo_email_plans')
+        .insert(insertData as never)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newPlan: EmailPlan = {
+        id: data.id,
+        client_id: data.client_id,
+        flow_type: data.flow_type as EmailPlan['flow_type'],
+        name: data.name,
+        status: data.status as EmailPlan['status'],
+        emails: parsed,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      onComplete([newPlan]);
+    } catch (err: any) {
+      console.error('Bulk import error:', err);
+      toast.error('Error al importar: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5" />
+            Importar Emails desde Texto
+          </DialogTitle>
+          <DialogDescription>
+            Pega el contenido de tus emails separados por <code className="bg-muted px-1 rounded">---</code>. 
+            Puedes usar prefijos como <code className="bg-muted px-1 rounded">Asunto:</code> y <code className="bg-muted px-1 rounded">Preview:</code> en cada bloque.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nombre del plan</Label>
+            <Input
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              placeholder="Ej: Campaña Marzo 2026"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Contenido de emails</Label>
+            <Textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={`Asunto: Bienvenido a nuestra tienda\nPreview: Descubre lo mejor para ti\n\nHola {{ first_name }},\n\nGracias por suscribirte...\n\n---\n\nAsunto: Tu descuento especial\nPreview: 10% solo para ti\n\nHola {{ first_name }},\n\nTenemos algo especial...`}
+              rows={12}
+              className="font-mono text-sm"
+            />
+          </div>
+
+          <Button variant="outline" size="sm" onClick={handlePreview}>
+            <FileText className="w-4 h-4 mr-1" />
+            Preview ({parsed.length > 0 ? `${parsed.length} emails` : 'detectar emails'})
+          </Button>
+
+          {parsed.length > 0 && (
+            <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+              <p className="text-sm font-medium">{parsed.length} email{parsed.length > 1 ? 's' : ''} detectado{parsed.length > 1 ? 's' : ''}:</p>
+              {parsed.map((email, i) => (
+                <div key={email.id} className="flex items-center gap-2 text-sm">
+                  <Badge variant="secondary" className="shrink-0">{i + 1}</Badge>
+                  <span className="font-medium truncate">{email.subject}</span>
+                  {email.previewText && (
+                    <span className="text-muted-foreground text-xs truncate">— {email.previewText}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            onClick={handleImport}
+            disabled={importing || parsed.length === 0}
+          >
+            {importing ? (
+              <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Importando...</>
+            ) : (
+              <><Upload className="w-4 h-4 mr-1" /> Importar {parsed.length} email{parsed.length > 1 ? 's' : ''}</>
             )}
           </Button>
         </DialogFooter>

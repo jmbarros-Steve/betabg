@@ -65,10 +65,26 @@ Deno.serve(async (req) => {
       'revision': KLAVIYO_REVISION,
     };
 
+    // Fetch the "Placed Order" metric ID for conversion tracking
+    let conversionMetricId: string | null = null;
+    try {
+      const metricsListRes = await fetch('https://a.klaviyo.com/api/metrics/?filter=equals(name,"Placed Order")', { headers: klaviyoHeaders });
+      if (metricsListRes.ok) {
+        const metricsData = await metricsListRes.json();
+        conversionMetricId = metricsData.data?.[0]?.id || null;
+        console.log(`[sync-klaviyo-metrics] Conversion metric ID: ${conversionMetricId}`);
+      } else {
+        console.warn('[sync-klaviyo-metrics] Could not fetch metrics list:', metricsListRes.status);
+        await metricsListRes.text();
+      }
+    } catch (e) {
+      console.warn('[sync-klaviyo-metrics] Error fetching metrics:', e);
+    }
+
     // Fetch flows, campaigns, and profiles count in parallel
     const [flowsRes, campaignsRes, profilesRes] = await Promise.all([
       fetch('https://a.klaviyo.com/api/flows/?page[size]=50', { headers: klaviyoHeaders }),
-      fetch('https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&page[size]=50&sort=-send_time', { headers: klaviyoHeaders }),
+      fetch('https://a.klaviyo.com/api/campaigns/?page[size]=50&sort=-updated_at', { headers: klaviyoHeaders }),
       fetch('https://a.klaviyo.com/api/profiles/?page[size]=1', { headers: klaviyoHeaders }),
     ]);
 
@@ -126,7 +142,7 @@ Deno.serve(async (req) => {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     
     let flowMetrics: Record<string, any> = {};
-    if (flows.length > 0) {
+    if (flows.length > 0 && conversionMetricId) {
       try {
         const flowValuesRes = await fetch('https://a.klaviyo.com/api/flow-values-reports/', {
           method: 'POST',
@@ -139,9 +155,10 @@ Deno.serve(async (req) => {
                   start: ninetyDaysAgo.toISOString(),
                   end: now.toISOString(),
                 },
+                conversion_metric_id: conversionMetricId,
                 statistics: [
-                  'recipients', 'opens', 'unique_opens', 'clicks', 'unique_clicks',
-                  'conversions', 'revenue',
+                  'recipients', 'opens', 'clicks',
+                  'conversions', 'conversion_value',
                 ],
               },
             },
@@ -155,12 +172,14 @@ Deno.serve(async (req) => {
             const flowId = result.groupings?.flow_id;
             if (flowId) {
               if (!flowMetrics[flowId]) {
-                flowMetrics[flowId] = { recipients: 0, opens: 0, unique_opens: 0, clicks: 0, unique_clicks: 0, conversions: 0, revenue: 0 };
+                flowMetrics[flowId] = { recipients: 0, opens: 0, clicks: 0, conversions: 0, revenue: 0 };
               }
               const stats = result.statistics || {};
-              for (const key of Object.keys(flowMetrics[flowId])) {
-                flowMetrics[flowId][key] += (stats[key] || 0);
-              }
+              flowMetrics[flowId].recipients += (stats.recipients || 0);
+              flowMetrics[flowId].opens += (stats.opens || 0);
+              flowMetrics[flowId].clicks += (stats.clicks || 0);
+              flowMetrics[flowId].conversions += (stats.conversions || 0);
+              flowMetrics[flowId].revenue += (stats.conversion_value || 0);
             }
           }
         } else {
@@ -170,13 +189,15 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.warn('[sync-klaviyo-metrics] Flow values report error:', e);
       }
+    } else if (flows.length > 0) {
+      console.warn('[sync-klaviyo-metrics] No conversion metric found, skipping flow metrics');
     }
 
     // Fetch campaign metrics
     let campaignMetrics: Record<string, any> = {};
     const sentCampaignIds = campaigns.filter(c => c.status === 'Sent' || c.send_time).map(c => c.id);
     
-    if (sentCampaignIds.length > 0) {
+    if (sentCampaignIds.length > 0 && conversionMetricId) {
       try {
         const campaignValuesRes = await fetch('https://a.klaviyo.com/api/campaign-values-reports/', {
           method: 'POST',
@@ -189,9 +210,10 @@ Deno.serve(async (req) => {
                   start: ninetyDaysAgo.toISOString(),
                   end: now.toISOString(),
                 },
+                conversion_metric_id: conversionMetricId,
                 statistics: [
-                  'recipients', 'opens', 'unique_opens', 'clicks', 'unique_clicks',
-                  'conversions', 'revenue', 'unsubscribes', 'bounces',
+                  'recipients', 'opens', 'clicks',
+                  'conversions', 'conversion_value', 'unsubscribes', 'bounces',
                 ],
                 filter: `in(campaign_id,[${sentCampaignIds.map(id => `"${id}"`).join(',')}])`,
               },
@@ -206,12 +228,16 @@ Deno.serve(async (req) => {
             const campaignId = result.groupings?.campaign_id;
             if (campaignId) {
               if (!campaignMetrics[campaignId]) {
-                campaignMetrics[campaignId] = { recipients: 0, opens: 0, unique_opens: 0, clicks: 0, unique_clicks: 0, conversions: 0, revenue: 0, unsubscribes: 0, bounces: 0 };
+                campaignMetrics[campaignId] = { recipients: 0, opens: 0, clicks: 0, conversions: 0, revenue: 0, unsubscribes: 0, bounces: 0 };
               }
               const stats = result.statistics || {};
-              for (const key of Object.keys(campaignMetrics[campaignId])) {
-                campaignMetrics[campaignId][key] += (stats[key] || 0);
-              }
+              campaignMetrics[campaignId].recipients += (stats.recipients || 0);
+              campaignMetrics[campaignId].opens += (stats.opens || 0);
+              campaignMetrics[campaignId].clicks += (stats.clicks || 0);
+              campaignMetrics[campaignId].conversions += (stats.conversions || 0);
+              campaignMetrics[campaignId].revenue += (stats.conversion_value || 0);
+              campaignMetrics[campaignId].unsubscribes += (stats.unsubscribes || 0);
+              campaignMetrics[campaignId].bounces += (stats.bounces || 0);
             }
           }
         } else {
