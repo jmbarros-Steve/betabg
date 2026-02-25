@@ -805,7 +805,7 @@ function PushToKlaviyoDialog({
   const [lists, setLists] = useState<Array<{ id: string; name: string; profile_count: number }>>([]);
   const [loadingLists, setLoadingLists] = useState(true);
   const [selectedList, setSelectedList] = useState('');
-  const [sendStrategy, setSendStrategy] = useState<'scheduled' | 'immediate' | 'smart_send'>('scheduled');
+  const [sendStrategy, setSendStrategy] = useState<'draft' | 'scheduled' | 'immediate' | 'smart_send'>('draft');
   const [scheduledAt, setScheduledAt] = useState(campaignDate || '');
   const [pushing, setPushing] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -870,7 +870,8 @@ function PushToKlaviyoDialog({
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      toast.success(`${data.campaigns?.length || emailCount} campañas creadas en Klaviyo 🚀`);
+      const draftLabel = sendStrategy === 'draft' ? ' como borradores' : '';
+      toast.success(`${data.campaigns?.length || emailCount} campañas creadas${draftLabel} en Klaviyo 🚀`);
       onComplete();
     } catch (err: any) {
       console.error('Push error:', err);
@@ -927,9 +928,15 @@ function PushToKlaviyoDialog({
               <Label>Estrategia de envío</Label>
               <RadioGroup value={sendStrategy} onValueChange={(v) => setSendStrategy(v as any)} className="space-y-2">
                 <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="draft" id="draft" />
+                  <Label htmlFor="draft" className="font-normal cursor-pointer">
+                    Solo borrador (crear sin programar, para editar en Klaviyo)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="scheduled" id="scheduled" />
                   <Label htmlFor="scheduled" className="font-normal cursor-pointer">
-                    Programar envío (recomendado)
+                    Programar envío
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">

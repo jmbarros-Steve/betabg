@@ -339,8 +339,11 @@ Deno.serve(async (req) => {
       await updateCampaignMessage(apiKey, messageId, email.subject, email.previewText || '');
       console.log(`  Message updated with subject`);
 
-      // 7. Schedule/send if strategy is immediate
-      if (send_strategy === 'immediate' && i === 0) {
+      // 7. Schedule/send based on strategy
+      if (send_strategy === 'draft') {
+        console.log(`  Campaign created as draft`);
+        results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'draft' });
+      } else if (send_strategy === 'immediate' && i === 0) {
         try {
           await sendCampaign(apiKey, campaignId);
           console.log(`  Campaign sent!`);
