@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
       // All in parallel — each requests max 1000 profiles
       const promises = entities.map(async (ent) => {
         try {
-          const url = `https://a.klaviyo.com/api/${ent.type}s/${ent.id}/profiles/?page[size]=1000&fields[profile]=email`;
+          const url = `https://a.klaviyo.com/api/${ent.type}s/${ent.id}/profiles/?page[size]=100&fields[profile]=email`;
           const res = await fetch(url, { headers: makeHeaders(apiKey) });
           if (!res.ok) {
             results[ent.id] = { count: 0, display: '0', hasMore: false };
@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
           const data = await res.json();
           const count = (data.data || []).length;
           const hasMore = !!data.links?.next;
-          const display = (count >= 1000 && hasMore) ? '1,000+' : count.toLocaleString();
+          const display = (count >= 100 && hasMore) ? '100+' : count.toLocaleString();
           results[ent.id] = { count, display, hasMore };
         } catch {
           results[ent.id] = { count: 0, display: '0', hasMore: false };
@@ -312,7 +312,7 @@ Deno.serve(async (req) => {
         try {
           console.log(`[klaviyo] Counting profiles for list ${list.id} "${list.name}"...`);
           const r = await fetch(
-            `https://a.klaviyo.com/api/lists/${list.id}/profiles/?page[size]=1000&fields[profile]=email`,
+            `https://a.klaviyo.com/api/lists/${list.id}/profiles/?page[size]=100&fields[profile]=email`,
             { headers: makeHeaders(apiKey) }
           );
           console.log(`[klaviyo] List ${list.id} response status: ${r.status}`);
@@ -339,7 +339,7 @@ Deno.serve(async (req) => {
         try {
           console.log(`[klaviyo] Counting profiles for segment ${seg.id} "${seg.name}"...`);
           const r = await fetch(
-            `https://a.klaviyo.com/api/segments/${seg.id}/profiles/?page[size]=1000&fields[profile]=email`,
+            `https://a.klaviyo.com/api/segments/${seg.id}/profiles/?page[size]=100&fields[profile]=email`,
             { headers: makeHeaders(apiKey) }
           );
           console.log(`[klaviyo] Segment ${seg.id} response status: ${r.status}`);
@@ -394,7 +394,7 @@ Deno.serve(async (req) => {
       const hasMore = c?.hasMore ?? false;
       return {
         ...l,
-        profile_count: (count >= 1000 && hasMore) ? '1,000+' : count,
+        profile_count: (count >= 100 && hasMore) ? '100+' : count,
         profile_count_raw: count,
         has_more: hasMore,
       };
@@ -407,7 +407,7 @@ Deno.serve(async (req) => {
       const hasMore = c?.hasMore ?? false;
       return {
         ...s,
-        profile_count: (count >= 1000 && hasMore) ? '1,000+' : count,
+        profile_count: (count >= 100 && hasMore) ? '100+' : count,
         profile_count_raw: count,
         has_more: hasMore,
       };
