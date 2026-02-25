@@ -85,8 +85,8 @@ serve(async (req) => {
 
     await new Promise(r => setTimeout(r, 1000))
 
-    // 2. Create campaign in Klaviyo (WITHOUT campaign_messages - not a valid field)
-    const campaignPayload: any = {
+    // 2. Create campaign WITH campaign-messages inline (Klaviyo requires this as a nested attribute)
+    const campaignPayload = {
       data: {
         type: 'campaign',
         attributes: {
@@ -94,6 +94,32 @@ serve(async (req) => {
           audiences: {
             included: campaign.audienceId ? [campaign.audienceId] : [],
             excluded: [],
+          },
+          'campaign-messages': {
+            data: [{
+              type: 'campaign-message',
+              attributes: {
+                channel: 'email',
+                label: campaign.name,
+                content: {
+                  subject: campaign.subject || campaign.name,
+                  preview_text: campaign.previewText || '',
+                  from_email: '{{ organization.default.email }}',
+                  from_label: '{{ organization.default.sender_name }}',
+                },
+                render_options: {
+                  shorten_links: true,
+                  add_org_prefix: true,
+                  add_info_link: true,
+                  add_opt_out_link: true,
+                },
+              },
+              relationships: {
+                template: {
+                  data: { type: 'template', id: templateId }
+                }
+              }
+            }]
           },
           send_strategy: {
             method: 'static',
@@ -104,7 +130,7 @@ serve(async (req) => {
     }
 
     console.log(`Creating campaign: ${campaign.name}`)
-    console.log('Campaign payload:', JSON.stringify(campaignPayload))
+    console.log('Campaign payload:', JSON.stringify(campaignPayload).substring(0, 800))
     const campResp = await fetch('https://a.klaviyo.com/api/campaigns/', {
       method: 'POST',
       headers: klaviyoHeaders,
@@ -119,75 +145,7 @@ serve(async (req) => {
 
     const campData = await campResp.json()
     const campaignId = campData.data?.id
-    console.log(`Campaign created: ${campaignId}`)
-
-    await new Promise(r => setTimeout(r, 1500))
-
-    // 3. Get the campaign's message ID
-    console.log('Fetching campaign messages...')
-    const msgResp = await fetch(
-      `https://a.klaviyo.com/api/campaigns/${campaignId}/campaign-messages/`,
-      { headers: klaviyoHeaders }
-    )
-
-    let messageId: string | null = null
-    if (msgResp.ok) {
-      const msgData = await msgResp.json()
-      messageId = msgData.data?.[0]?.id || null
-      console.log('Message ID found:', messageId)
-    } else {
-      const msgErr = await msgResp.text()
-      console.warn('Could not fetch messages:', msgResp.status, msgErr.substring(0, 200))
-    }
-
-    // 4. If we have a message, assign template and set subject/from
-    if (messageId) {
-      await new Promise(r => setTimeout(r, 1000))
-      console.log('Assigning template to message...')
-      const patchResp = await fetch(`https://a.klaviyo.com/api/campaign-messages/${messageId}/`, {
-        method: 'PATCH',
-        headers: klaviyoHeaders,
-        body: JSON.stringify({
-          data: {
-            type: 'campaign-message',
-            id: messageId,
-            attributes: {
-              label: campaign.name,
-              content: {
-                subject: campaign.subject || campaign.name,
-                preview_text: campaign.previewText || '',
-                from_email: '{{ organization.default.email }}',
-                from_label: '{{ organization.default.sender_name }}',
-              },
-              render_options: {
-                shorten_links: true,
-                add_org_prefix: true,
-                add_info_link: true,
-                add_opt_out_link: true,
-              },
-            },
-            relationships: {
-              template: {
-                data: { type: 'template', id: templateId }
-              }
-            }
-          }
-        })
-      })
-
-      if (!patchResp.ok) {
-        const patchErr = await patchResp.text()
-        console.error('Message patch error:', patchResp.status, patchErr.substring(0, 300))
-        // Don't throw - campaign was created, just template assignment failed
-        console.warn('Campaign created but template assignment failed')
-      } else {
-        console.log('Template assigned to campaign message successfully')
-      }
-    } else {
-      console.warn('No message ID found - campaign created without template assignment')
-    }
-
-    console.log(`✅ Campaign "${campaign.name}" uploaded successfully`)
+    console.log(`✅ Campaign created as draft: ${campaignId}`)
 
     return new Response(JSON.stringify({ 
       success: true,
