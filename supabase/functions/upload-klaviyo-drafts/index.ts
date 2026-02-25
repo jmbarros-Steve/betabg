@@ -13,6 +13,14 @@ serve(async (req) => {
 
   try {
     const { connectionId, campaign } = await req.json()
+    console.log('upload-klaviyo-drafts received:', JSON.stringify({
+      connectionId,
+      campaignName: campaign?.name,
+      campaignSubject: campaign?.subject,
+      hasHtml: !!campaign?.html,
+      htmlLength: campaign?.html?.length,
+      hasAudienceId: !!campaign?.audienceId,
+    }))
     
     if (!connectionId || !campaign) {
       throw new Error('connectionId and campaign are required')
@@ -29,13 +37,17 @@ serve(async (req) => {
       .eq('id', connectionId)
       .single()
 
-    if (connErr || !conn) throw new Error('Connection not found')
+    if (connErr || !conn) {
+      console.error('Connection not found:', connErr?.message)
+      throw new Error('Connection not found')
+    }
 
     const { data: apiKeyData } = await supabase.rpc('decrypt_platform_token', {
       encrypted_token: conn.api_key_encrypted
     })
     const apiKey = apiKeyData as string
     if (!apiKey) throw new Error('No API key found for Klaviyo connection')
+    console.log('Klaviyo API key found, length:', apiKey.length)
 
     const klaviyoHeaders = {
       'Authorization': `Klaviyo-API-Key ${apiKey}`,
@@ -43,8 +55,9 @@ serve(async (req) => {
       'revision': '2024-10-15',
     }
 
-    // 1. Create template in Klaviyo
-    console.log(`Creating template: Steve - ${campaign.name}`)
+    // 1. Create template in Klaviyo with editor_type
+    const templateName = `Steve - ${campaign.name} - ${Date.now()}`
+    console.log(`Creating template: ${templateName}`)
     const tplResp = await fetch('https://a.klaviyo.com/api/templates/', {
       method: 'POST',
       headers: klaviyoHeaders,
@@ -52,9 +65,9 @@ serve(async (req) => {
         data: {
           type: 'template',
           attributes: {
-            name: `Steve - ${campaign.name}`,
+            name: templateName,
             editor_type: 'CODE',
-            html: campaign.html,
+            html: campaign.html || '<html><body><p>Email generado por Steve</p></body></html>',
           }
         }
       })
@@ -63,7 +76,7 @@ serve(async (req) => {
     if (!tplResp.ok) {
       const errBody = await tplResp.text()
       console.error('Klaviyo template creation error:', tplResp.status, errBody)
-      throw new Error(`Error creating template in Klaviyo: ${tplResp.status}`)
+      throw new Error(`Error creating template in Klaviyo: ${tplResp.status} - ${errBody.substring(0, 200)}`)
     }
 
     const tplData = await tplResp.json()
@@ -126,7 +139,7 @@ serve(async (req) => {
     if (!campResp.ok) {
       const errBody = await campResp.text()
       console.error('Klaviyo campaign creation error:', campResp.status, errBody)
-      throw new Error(`Error creating campaign in Klaviyo: ${campResp.status}`)
+      throw new Error(`Error creating campaign in Klaviyo: ${campResp.status} - ${errBody.substring(0, 200)}`)
     }
 
     const campData = await campResp.json()
@@ -142,7 +155,7 @@ serve(async (req) => {
     })
 
   } catch (err: any) {
-    console.error('upload-klaviyo-drafts error:', err)
+    console.error('upload-klaviyo-drafts error:', err.message)
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
