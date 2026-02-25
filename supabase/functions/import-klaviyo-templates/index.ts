@@ -90,15 +90,20 @@ serve(async (req) => {
 
     console.log(`Total templates in Klaviyo: ${allTemplates.length}`);
 
-    // PASO 2: Tomar las ÚLTIMAS 10 (las más recientes están al final)
-    const last10 = allTemplates.slice(-10).reverse();
+    // PASO 2: Ordenar por fecha (updated o created) descendente y tomar top 10
+    const sorted = allTemplates.sort((a: any, b: any) => {
+      const dateA = new Date(a.attributes?.updated || a.attributes?.created || '1970-01-01').getTime();
+      const dateB = new Date(b.attributes?.updated || b.attributes?.created || '1970-01-01').getTime();
+      return dateB - dateA;
+    });
+    const top10 = sorted.slice(0, 10);
 
-    console.log('Last 10 (most recent):');
-    last10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - created: ${t.attributes?.created} - updated: ${t.attributes?.updated}`));
+    console.log('Top 10 (most recent by date):');
+    top10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - created: ${t.attributes?.created} - updated: ${t.attributes?.updated}`));
 
     // PASO 3: Traer HTML de cada una
     const templates = [];
-    for (const t of last10) {
+    for (const t of top10) {
       try {
         const detailResp = await fetch(`https://a.klaviyo.com/api/templates/${t.id}/`, { headers });
         if (detailResp.ok) {
