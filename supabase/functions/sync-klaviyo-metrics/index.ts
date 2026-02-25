@@ -89,7 +89,6 @@ async function fetchLists(apiKey: string): Promise<any[]> {
     name: l.attributes?.name || 'Sin nombre',
     created: l.attributes?.created || null,
     updated: l.attributes?.updated || null,
-    profile_count: null as number | null,
   }));
   console.log('[klaviyo] Lists count:', lists.length);
   return lists;
@@ -107,55 +106,19 @@ async function fetchSegments(apiKey: string): Promise<any[]> {
     name: s.attributes?.name || 'Sin nombre',
     created: s.attributes?.created || null,
     updated: s.attributes?.updated || null,
-    profile_count: null as number | null,
   }));
   console.log('[klaviyo] Segments count:', segments.length);
   return segments;
 }
 
-// Count profiles for a single entity (list or segment). Returns exact count if <1000, or -1 meaning "1000+"
-async function countProfiles(apiKey: string, entityType: 'list' | 'segment', entityId: string): Promise<number> {
-  const url = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=1000`;
-  const res = await fetch(url, { headers: makeHeaders(apiKey) });
-  if (!res.ok) return -2; // error
-  const data = await res.json();
-  const count = (data.data || []).length;
-  const hasMore = !!data.links?.next;
-  return hasMore ? -1 : count; // -1 = 1000+
-}
-
-// Count profiles for first N entities, with 1s delay between calls
-async function enrichWithProfileCounts(apiKey: string, items: any[], entityType: 'list' | 'segment', maxCount = 5): Promise<void> {
-  for (let i = 0; i < Math.min(items.length, maxCount); i++) {
-    const item = items[i];
-    console.log(`[klaviyo] Counting profiles for ${entityType} "${item.name}"...`);
-    item.profile_count = await countProfiles(apiKey, entityType, item.id);
-    console.log(`[klaviyo] ${entityType} "${item.name}": ${item.profile_count === -1 ? '1,000+' : item.profile_count}`);
-    if (i < Math.min(items.length, maxCount) - 1) {
-      await new Promise(r => setTimeout(r, 1000));
-    }
-  }
-}
-
-// Estimate total profiles by paginating /api/profiles (max 3 pages of 1000)
+// Simple profile estimate: 1 call, page[size]=100
 async function estimateTotalProfiles(apiKey: string): Promise<number> {
-  const headers = makeHeaders(apiKey);
-  let total = 0;
-  let nextUrl: string | null = 'https://a.klaviyo.com/api/profiles/?page[size]=1000';
-  let pages = 0;
-
-  while (nextUrl && pages < 3) {
-    const res = await fetch(nextUrl, { headers });
-    if (!res.ok) break;
-    const data = await res.json();
-    total += (data.data || []).length;
-    nextUrl = data.links?.next || null;
-    pages++;
-    if (nextUrl) await new Promise(r => setTimeout(r, 1000));
-  }
-
-  if (nextUrl && pages >= 3) return 10000;
-  return total;
+  const res = await fetch('https://a.klaviyo.com/api/profiles/?page[size]=100', { headers: makeHeaders(apiKey) });
+  if (!res.ok) return 0;
+  const data = await res.json();
+  const firstPage = (data.data || []).length;
+  const hasNext = !!data.links?.next;
+  return hasNext ? 10000 : firstPage;
 }
 
 // Flow values report
@@ -286,39 +249,43 @@ Deno.serve(async (req) => {
       });
     }
 
-    // SEQUENTIAL FETCHES with delays to avoid rate limits
+    // Handle list-profiles action (lazy load on click)
+    if (action === 'list-profiles' && entityType && entityId) {
+      const endpoint = `https://a.klaviyo.com/api/${entityType}s/${entityId}/profiles/?page[size]=20&fields[profile]=email,first_name,last_name,created`;
+      const res = await fetch(endpoint, { headers: makeHeaders(apiKey) });
+      if (!res.ok) {
+        return new Response(JSON.stringify({ profiles: [], hasMore: false }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data = await res.json();
+      const profiles = (data.data || []).map((p: any) => ({
+        email: p.attributes?.email || '—',
+        name: [p.attributes?.first_name, p.attributes?.last_name].filter(Boolean).join(' ') || '',
+        created: p.attributes?.created || null,
+      }));
+      return new Response(JSON.stringify({ profiles, hasMore: !!data.links?.next }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // MINIMAL CALLS — max ~7 calls total
 
     // STEP 1: Discover conversion metric
     const conversionMetricId = await findConversionMetricId(apiKey);
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 500));
 
-    // STEP 2: Flows
+    // STEP 2: Flows + Campaigns + Lists + Segments + Profiles (sequential with small delays)
     const flows = await fetchFlows(apiKey);
-    await new Promise(r => setTimeout(r, 1000));
-
-    // STEP 3: Campaigns
+    await new Promise(r => setTimeout(r, 500));
     const campaigns = await fetchCampaigns(apiKey);
-    await new Promise(r => setTimeout(r, 1000));
-
-    // STEP 4: Lists
+    await new Promise(r => setTimeout(r, 500));
     const klaviyoLists = await fetchLists(apiKey);
-    await new Promise(r => setTimeout(r, 1000));
-
-    // STEP 5: Segments
+    await new Promise(r => setTimeout(r, 500));
     const klaviyoSegments = await fetchSegments(apiKey);
-    await new Promise(r => setTimeout(r, 1000));
-
-    // STEP 6: Count profiles per list (max 5)
-    await enrichWithProfileCounts(apiKey, klaviyoLists, 'list', 5);
-    await new Promise(r => setTimeout(r, 1000));
-
-    // STEP 7: Count profiles per segment (max 5)
-    await enrichWithProfileCounts(apiKey, klaviyoSegments, 'segment', 5);
-    await new Promise(r => setTimeout(r, 1000));
-
-    // STEP 8: Estimate total profiles
+    await new Promise(r => setTimeout(r, 500));
     const totalProfiles = await estimateTotalProfiles(apiKey);
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 500));
 
     // STEP 7: Reports (these use POST with different revision, less likely to conflict)
     let flowMetrics: Record<string, any> = {};
