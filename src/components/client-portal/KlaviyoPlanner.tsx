@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Mail, ShoppingCart, UserMinus, Megaphone, 
   ChevronRight, ChevronDown, Trash2, Edit2, Check, 
-  Clock, Send, Loader2, Save, Archive, Copy, FileText
+  Clock, Send, Loader2, Save, Archive, Copy, FileText, Upload, Rocket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,6 +16,8 @@ import {
   DialogDescription, DialogFooter 
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
@@ -422,6 +424,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
                   key={plan.id}
                   plan={plan}
                   expanded={expandedPlan === plan.id}
+                  clientId={clientId}
                   onToggle={() => setExpandedPlan(expandedPlan === plan.id ? null : plan.id)}
                   onUpdate={updatePlan}
                   onDelete={deletePlan}
@@ -429,6 +432,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
                   onUpdateEmail={updateEmailInPlan}
                   onRemoveEmail={removeEmailFromPlan}
                   onSubmitForReview={submitForReview}
+                  onPushComplete={fetchPlans}
                   saving={saving}
                 />
               ))}
@@ -471,6 +475,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
                   key={plan.id}
                   plan={plan}
                   expanded={expandedPlan === plan.id}
+                  clientId={clientId}
                   onToggle={() => setExpandedPlan(expandedPlan === plan.id ? null : plan.id)}
                   onUpdate={updatePlan}
                   onDelete={deletePlan}
@@ -478,6 +483,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
                   onUpdateEmail={updateEmailInPlan}
                   onRemoveEmail={removeEmailFromPlan}
                   onSubmitForReview={submitForReview}
+                  onPushComplete={fetchPlans}
                   saving={saving}
                 />
               ))}
@@ -552,6 +558,7 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
 interface PlanCardProps {
   plan: EmailPlan;
   expanded: boolean;
+  clientId: string;
   onToggle: () => void;
   onUpdate: (planId: string, updates: Partial<EmailPlan>) => Promise<void>;
   onDelete: (planId: string) => Promise<void>;
@@ -559,12 +566,14 @@ interface PlanCardProps {
   onUpdateEmail: (planId: string, emailIndex: number, updates: Partial<EmailStep>) => void;
   onRemoveEmail: (planId: string, emailIndex: number) => void;
   onSubmitForReview: (planId: string) => Promise<void>;
+  onPushComplete: () => void;
   saving: boolean;
 }
 
 function PlanCard({
   plan,
   expanded,
+  clientId,
   onToggle,
   onUpdate,
   onDelete,
@@ -572,6 +581,7 @@ function PlanCard({
   onUpdateEmail,
   onRemoveEmail,
   onSubmitForReview,
+  onPushComplete,
   saving,
 }: PlanCardProps) {
   const config = flowTypeConfig[plan.flow_type];
@@ -579,6 +589,7 @@ function PlanCard({
   const Icon = config.icon;
   const [clientNotes, setClientNotes] = useState(plan.client_notes || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPushDialog, setShowPushDialog] = useState(false);
 
   return (
     <Card className={expanded ? 'ring-2 ring-primary/20' : ''}>
@@ -708,6 +719,17 @@ function PlanCard({
                       Enviar a Revisión
                     </Button>
                   )}
+                  {(plan.status === 'approved' || plan.status === 'draft' || plan.status === 'pending_review') && plan.emails.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => setShowPushDialog(true)}
+                    >
+                      <Rocket className="w-4 h-4 mr-1" />
+                      Push a Klaviyo
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -737,10 +759,235 @@ function PlanCard({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Push to Klaviyo Dialog */}
+            {showPushDialog && (
+              <PushToKlaviyoDialog
+                planId={plan.id}
+                planName={plan.name}
+                emailCount={plan.emails.length}
+                clientId={clientId}
+                campaignDate={plan.campaign_date}
+                onClose={() => setShowPushDialog(false)}
+                onComplete={() => {
+                  setShowPushDialog(false);
+                  onPushComplete();
+                }}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
     </Card>
+  );
+}
+
+// Push to Klaviyo Dialog
+interface PushToKlaviyoDialogProps {
+  planId: string;
+  planName: string;
+  emailCount: number;
+  clientId: string;
+  campaignDate?: string;
+  onClose: () => void;
+  onComplete: () => void;
+}
+
+function PushToKlaviyoDialog({
+  planId,
+  planName,
+  emailCount,
+  clientId,
+  campaignDate,
+  onClose,
+  onComplete,
+}: PushToKlaviyoDialogProps) {
+  const [lists, setLists] = useState<Array<{ id: string; name: string; profile_count: number }>>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
+  const [selectedList, setSelectedList] = useState('');
+  const [sendStrategy, setSendStrategy] = useState<'scheduled' | 'immediate' | 'smart_send'>('scheduled');
+  const [scheduledAt, setScheduledAt] = useState(campaignDate || '');
+  const [pushing, setPushing] = useState(false);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadConnection() {
+      // Find active Klaviyo connection for this client
+      const { data: connections } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1);
+
+      if (!connections || connections.length === 0) {
+        toast.error('No hay conexión de Klaviyo activa para este cliente');
+        setLoadingLists(false);
+        return;
+      }
+
+      const connId = connections[0].id;
+      setConnectionId(connId);
+
+      // Fetch lists from Klaviyo
+      try {
+        const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
+          body: { action: 'fetch_lists', connection_id: connId },
+        });
+
+        if (error) throw error;
+        setLists(data.lists || []);
+        if (data.lists?.length > 0) {
+          setSelectedList(data.lists[0].id);
+        }
+      } catch (err) {
+        console.error('Error fetching lists:', err);
+        toast.error('Error al obtener las listas de Klaviyo');
+      } finally {
+        setLoadingLists(false);
+      }
+    }
+
+    loadConnection();
+  }, [clientId]);
+
+  async function handlePush() {
+    if (!connectionId || !selectedList) return;
+
+    setPushing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
+        body: {
+          plan_id: planId,
+          connection_id: connectionId,
+          list_id: selectedList,
+          send_strategy: sendStrategy,
+          scheduled_at: sendStrategy === 'scheduled' ? scheduledAt || undefined : undefined,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(`${data.campaigns?.length || emailCount} campañas creadas en Klaviyo 🚀`);
+      onComplete();
+    } catch (err: any) {
+      console.error('Push error:', err);
+      toast.error(`Error: ${err.message || 'No se pudieron crear las campañas'}`);
+    } finally {
+      setPushing(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Rocket className="w-5 h-5" />
+            Push a Klaviyo
+          </DialogTitle>
+          <DialogDescription>
+            Crear {emailCount} campaña{emailCount > 1 ? 's' : ''} completa{emailCount > 1 ? 's' : ''} en Klaviyo para "{planName}"
+          </DialogDescription>
+        </DialogHeader>
+
+        {loadingLists ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="ml-2 text-sm text-muted-foreground">Cargando listas de Klaviyo...</span>
+          </div>
+        ) : lists.length === 0 ? (
+          <div className="py-6 text-center">
+            <p className="text-muted-foreground">No se encontraron listas en Klaviyo.</p>
+            <p className="text-sm text-muted-foreground mt-1">Crea una lista en Klaviyo primero.</p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* List selector */}
+            <div className="space-y-2">
+              <Label>Lista de destinatarios</Label>
+              <Select value={selectedList} onValueChange={setSelectedList}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una lista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.name} ({list.profile_count.toLocaleString()} perfiles)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Send strategy */}
+            <div className="space-y-2">
+              <Label>Estrategia de envío</Label>
+              <RadioGroup value={sendStrategy} onValueChange={(v) => setSendStrategy(v as any)} className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="scheduled" id="scheduled" />
+                  <Label htmlFor="scheduled" className="font-normal cursor-pointer">
+                    Programar envío (recomendado)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="smart_send" id="smart_send" />
+                  <Label htmlFor="smart_send" className="font-normal cursor-pointer">
+                    Smart Send Time (Klaviyo elige la mejor hora)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="immediate" id="immediate" />
+                  <Label htmlFor="immediate" className="font-normal cursor-pointer">
+                    Enviar inmediatamente (solo el primer email)
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Schedule date */}
+            {sendStrategy === 'scheduled' && (
+              <div className="space-y-2">
+                <Label>Fecha y hora de envío</Label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Los emails subsiguientes se programarán según los delays configurados en cada paso.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={pushing}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handlePush}
+            disabled={pushing || !selectedList || loadingLists}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {pushing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                Creando campañas...
+              </>
+            ) : (
+              <>
+                <Rocket className="w-4 h-4 mr-1" />
+                Crear {emailCount} campaña{emailCount > 1 ? 's' : ''}
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
