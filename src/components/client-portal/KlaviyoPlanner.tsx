@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Mail, ShoppingCart, UserMinus, Megaphone, 
   ChevronRight, ChevronDown, Trash2, Edit2, Check, 
-  Clock, Send, Loader2, Save, Archive, Copy, FileText, Upload, Rocket
+  Clock, Send, Loader2, Save, Archive, Copy, FileText, Upload, Rocket, Wand2, Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -683,6 +683,7 @@ function PlanCard({
                         email={email}
                         index={index}
                         isFirst={index === 0}
+                        flowType={plan.flow_type}
                         onUpdate={(updates) => onUpdateEmail(plan.id, index, updates)}
                         onRemove={() => onRemoveEmail(plan.id, index)}
                       />
@@ -1211,19 +1212,63 @@ interface EmailStepCardProps {
   email: EmailStep;
   index: number;
   isFirst: boolean;
+  flowType?: string;
   onUpdate: (updates: Partial<EmailStep>) => void;
   onRemove: () => void;
 }
 
-function EmailStepCard({ email, index, isFirst, onUpdate, onRemove }: EmailStepCardProps) {
+function EmailStepCard({ email, index, isFirst, flowType, onUpdate, onRemove }: EmailStepCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localEmail, setLocalEmail] = useState(email);
+  const [smartFormatting, setSmartFormatting] = useState(false);
+  const [smartHtml, setSmartHtml] = useState<string | null>(null);
+  const [detectedFeatures, setDetectedFeatures] = useState<string[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   const delayText = isFirst
     ? 'Inmediato'
     : email.delayDays > 0
     ? `${email.delayDays} día${email.delayDays > 1 ? 's' : ''} después`
     : `${email.delayHours} hora${email.delayHours > 1 ? 's' : ''} después`;
+
+  async function handleSmartFormat() {
+    if (!localEmail.content?.trim()) {
+      toast.error('Escribe contenido primero para formatear');
+      return;
+    }
+    setSmartFormatting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('klaviyo-smart-format', {
+        body: {
+          subject: localEmail.subject,
+          preview_text: localEmail.previewText,
+          content: localEmail.content,
+          flow_type: flowType || 'campaign',
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setSmartHtml(data.html);
+      setDetectedFeatures(data.features_detected || []);
+      setShowPreview(true);
+      toast.success(`IA detectó ${data.features_detected?.length || 0} features de Klaviyo`);
+    } catch (err: any) {
+      console.error('Smart format error:', err);
+      toast.error('Error al formatear: ' + (err.message || 'Intenta de nuevo'));
+    } finally {
+      setSmartFormatting(false);
+    }
+  }
+
+  function applySmartFormat() {
+    if (smartHtml) {
+      setLocalEmail(prev => ({ ...prev, content: smartHtml }));
+      onUpdate({ content: smartHtml });
+      setShowPreview(false);
+      toast.success('HTML de Klaviyo aplicado al email');
+    }
+  }
 
   return (
     <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg border group">
@@ -1261,14 +1306,70 @@ function EmailStepCard({ email, index, isFirst, onUpdate, onRemove }: EmailStepC
               />
             </div>
             <div className="space-y-2">
-              <Label>Contenido / Briefing</Label>
+              <div className="flex items-center justify-between">
+                <Label>Contenido / Briefing</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSmartFormat}
+                  disabled={smartFormatting || !localEmail.content?.trim()}
+                  className="flex items-center gap-1.5 text-xs"
+                >
+                  {smartFormatting ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analizando con IA...</>
+                  ) : (
+                    <><Wand2 className="w-3.5 h-3.5" /> Smart Format (IA)</>
+                  )}
+                </Button>
+              </div>
               <Textarea
                 value={localEmail.content}
                 onChange={(e) => setLocalEmail({ ...localEmail, content: e.target.value })}
-                placeholder="Describe qué debe incluir este email: productos, ofertas, CTA, etc."
-                rows={4}
+                placeholder="Describe qué debe incluir este email: productos, ofertas, CTA, etc. La IA detectará automáticamente dónde van los bloques de Klaviyo."
+                rows={6}
               />
             </div>
+
+            {/* Smart Format Preview */}
+            {showPreview && smartHtml && (
+              <div className="space-y-2 border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 px-3 py-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Preview HTML con features de Klaviyo</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" variant="ghost" onClick={() => setShowPreview(false)}>
+                      Cerrar
+                    </Button>
+                    <Button size="sm" onClick={applySmartFormat}>
+                      <Check className="w-3.5 h-3.5 mr-1" />
+                      Aplicar
+                    </Button>
+                  </div>
+                </div>
+                {detectedFeatures.length > 0 && (
+                  <div className="px-3 py-1.5 flex flex-wrap gap-1">
+                    {detectedFeatures.map((f, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        <Wand2 className="w-3 h-3 mr-1" />
+                        {f}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="border-t p-3 bg-white max-h-80 overflow-y-auto">
+                  <iframe
+                    srcDoc={smartHtml}
+                    className="w-full min-h-[200px] border-0"
+                    sandbox="allow-same-origin"
+                    title="Email preview"
+                    style={{ height: '300px' }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Compact variables reference */}
             <KlaviyoVariables compact />
             {!isFirst && (
