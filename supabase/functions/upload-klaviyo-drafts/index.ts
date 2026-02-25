@@ -53,6 +53,7 @@ serve(async (req) => {
           type: 'template',
           attributes: {
             name: `Steve - ${campaign.name}`,
+            editor_type: 'CODE',
             html: campaign.html,
           }
         }
