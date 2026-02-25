@@ -344,6 +344,8 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
               button: selectedTemplate.button_color,
               buttonText: selectedTemplate.button_text_color,
             },
+            logoUrl: selectedTemplate.logo_url || '',
+            fontFamily: selectedTemplate.font_family || 'Arial, sans-serif',
             previousEmails,
           },
         });
@@ -958,7 +960,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" asChild>
-                        <a href="https://www.klaviyo.com/email/campaigns" target="_blank" rel="noopener">
+                        <a href="https://www.klaviyo.com/campaigns" target="_blank" rel="noopener">
                           <ExternalLink className="w-4 h-4 mr-2" /> Abrir Klaviyo
                         </a>
                       </Button>

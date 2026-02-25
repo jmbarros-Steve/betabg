@@ -12,7 +12,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { templateBlocks, campaign, shopUrl, colors, previousEmails } = body
+    const { templateBlocks, campaign, shopUrl, colors, previousEmails, logoUrl, fontFamily } = body
 
     console.log('Request received:', JSON.stringify({
       hasTemplateBlocks: !!templateBlocks,
@@ -25,63 +25,92 @@ serve(async (req) => {
     }))
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-    console.log('Anthropic API key exists:', !!ANTHROPIC_API_KEY, 'length:', ANTHROPIC_API_KEY?.length)
-
     if (!ANTHROPIC_API_KEY) {
+      console.error('ANTHROPIC_API_KEY not configured')
       return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // Truncate template if too large
-    const templateJson = JSON.stringify(templateBlocks || [])
-    const truncatedTemplate = templateJson.length > 15000
-      ? templateJson.substring(0, 15000) + '... (truncated)'
-      : templateJson
-    console.log('Template JSON length:', templateJson.length, 'truncated:', templateJson.length > 15000)
+    const primaryColor = colors?.primary || '#000000'
+    const buttonColor = colors?.button || '#000000'
+    const buttonTextColor = colors?.buttonText || '#ffffff'
+    const font = fontFamily || 'Arial, sans-serif'
+    const logo = logoUrl || ''
+    const shop = shopUrl || 'https://tu-tienda.myshopify.com'
 
-    const systemPrompt = `Eres Steve, experto en email marketing para e-commerce Shopify con Klaviyo.
+    // Extract signature from previous emails if available
+    let signatureHint = ''
+    if (previousEmails) {
+      signatureHint = `\nREFERENCIA DE TONO Y FIRMA (extraído de mails anteriores del cliente — úsalo como guía de estilo y firma):
+${previousEmails.substring(0, 3000)}`
+    }
 
-Tu trabajo: tomar una plantilla de email en formato de bloques JSON y ADAPTARLA según las instrucciones del usuario, manteniendo la estructura, el tono y el estilo.
+    const systemPrompt = `Eres Steve, copywriter experto en email marketing para e-commerce chileno.
 
-PLANTILLA BASE (bloques JSON que debes modificar):
-${truncatedTemplate}
+Tu trabajo: CREAR contenido original y persuasivo para emails de marketing. NO copies texto genérico. Cada email debe ser ÚNICO.
 
-${previousEmails ? `MAILS ANTERIORES DEL CLIENTE (para mantener el mismo tono, firma y estilo):
-${previousEmails}` : ''}
+GENERA un array JSON de bloques para el email. Los tipos disponibles son:
 
-REGLAS OBLIGATORIAS:
-1. MANTÉN la estructura del template — misma cantidad de secciones, mismo layout
-2. MODIFICA solo el contenido según las instrucciones
-3. MANTÉN el tono de los mails anteriores del cliente (formal/informal, tuteo/usted, emojis, etc.)
-4. MANTÉN la firma exacta si aparece en los mails anteriores (nombre, cargo, teléfono, logo)
-5. Los bloques de tipo "header" y "footer" NO se modifican (quedan igual del template)
-6. Si las instrucciones dicen "productos cross-sell" o "productos recomendados" → usar bloque product con _mode: "dynamic" y _dynamicType: "recommended"
-7. Si dicen "productos del carrito" → _dynamicType: "cart_item"
-8. Si dicen "productos de colección X" → _mode: "collection" con collectionHandle
-9. Si dicen "producto fijo X" → _mode: "fixed" con datos del producto
-10. Cada bloque DEBE tener un id único (string)
+1. header — Logo del cliente
+   { "type": "header", "props": { "logoUrl": "${logo}", "content": "" } }
 
-URLS DE SHOPIFY:
-- Tienda: ${shopUrl || 'https://tienda.com'}
-- Colección: ${shopUrl || 'https://tienda.com'}/collections/[handle]
-- Producto: ${shopUrl || 'https://tienda.com'}/products/[handle]
-- Carrito: ${shopUrl || 'https://tienda.com'}/cart
-- Cupón: ${shopUrl || 'https://tienda.com'}/discount/[codigo]
+2. text — Texto con HTML inline (títulos, párrafos, listas)
+   { "type": "text", "props": { "content": "<h1>Título aquí</h1>" } }
 
-COLORES DEL CLIENTE:
-- Primario: ${colors?.primary || '#000000'}
-- Botón: ${colors?.button || '#000000'}
-- Texto botón: ${colors?.buttonText || '#ffffff'}
+3. image — Imagen con link
+   { "type": "image", "props": { "url": "URL_IMAGEN", "alt": "desc", "link": "URL_DESTINO" } }
 
-VARIABLES DE KLAVIYO (usar donde corresponda):
-- Saludo: {{ person.first_name|default:"Amigo" }}
+4. button — Botón CTA
+   { "type": "button", "props": { "text": "Texto CTA", "url": "URL", "bgColor": "${buttonColor}", "textColor": "${buttonTextColor}", "borderRadius": 4, "align": "center" } }
 
-Responde SOLO con el array JSON de bloques modificados. Sin explicación, sin markdown, solo JSON puro.`
+5. product — Bloque de producto
+   { "type": "product", "props": { "name": "Nombre", "imageUrl": "URL", "price": "$X.XXX", "link": "${shop}/products/handle", "buttonText": "Comprar", "_mode": "fixed" } }
 
-    console.log('System prompt length:', systemPrompt.length)
-    console.log('Calling Anthropic API with model claude-sonnet-4-20250514...')
+6. coupon — Cupón de descuento
+   { "type": "coupon", "props": { "code": "CODIGO", "description": "Descripción del descuento", "buttonText": "Usar cupón", "link": "${shop}/discount/CODIGO" } }
+
+7. divider — Separador
+   { "type": "divider", "props": { "style": "solid", "color": "#eeeeee", "thickness": 1 } }
+
+8. footer — Footer con unsubscribe
+   { "type": "footer", "props": { "content": "¿No quieres recibir más correos? {% unsubscribe %}\\n{{ organization.name }} {{ organization.full_address }}" } }
+
+REGLAS DE COPYWRITING:
+1. Título principal: llamativo, directo, específico al tema. NO genérico.
+2. Saludo: SIEMPRE usar {{ person.first_name|default:"" }} (sin "Hola" si no queda natural)
+3. Cuerpo: 2-4 párrafos persuasivos, ESPECÍFICOS a las instrucciones. Beneficios concretos.
+4. Al menos 1 botón CTA claro y directo
+5. Si mencionan productos → bloque product
+6. Si mencionan descuento/cupón → bloque coupon con link ${shop}/discount/CODIGO
+7. Tono: profesional pero cercano. Español chileno informal (tú, no usted)
+8. Estructura mínima: header → texto título → texto cuerpo → botón CTA → divider → texto firma → footer
+
+URLS SHOPIFY:
+- Tienda: ${shop}
+- Colección: ${shop}/collections/[handle]
+- Producto: ${shop}/products/[handle]
+- Cupón: ${shop}/discount/[codigo]
+- Carrito: ${shop}/cart
+
+COLORES: primario ${primaryColor}, botón ${buttonColor}, texto botón ${buttonTextColor}
+${signatureHint}
+
+Responde SOLO con el array JSON de bloques. Sin explicación, sin markdown, sin backticks. Solo JSON puro.`
+
+    const userMessage = `Genera un email COMPLETO y ORIGINAL para esta campaña:
+
+Nombre: ${campaign?.name || 'Sin nombre'}
+Asunto: ${campaign?.subject || 'Sin asunto'}
+Instrucciones: ${campaign?.content || 'Crear un email promocional atractivo'}
+
+IMPORTANTE: 
+- NO copies texto genérico ni placeholder. Escribe contenido REAL y persuasivo.
+- El email debe ser único y específico a las instrucciones.
+- Incluye detalles concretos, beneficios y un CTA claro.`
+
+    console.log('Calling Anthropic API... system prompt length:', systemPrompt.length)
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -94,16 +123,7 @@ Responde SOLO con el array JSON de bloques modificados. Sin explicación, sin ma
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8000,
         system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: `Adapta el template para esta campaña:
-
-Nombre: ${campaign?.name || 'Sin nombre'}
-Asunto: ${campaign?.subject || 'Sin asunto'}
-Instrucciones: ${campaign?.content || campaign?.instructions || 'Sin instrucciones'}
-
-Genera los bloques JSON modificados.`
-        }]
+        messages: [{ role: 'user', content: userMessage }]
       })
     })
 
