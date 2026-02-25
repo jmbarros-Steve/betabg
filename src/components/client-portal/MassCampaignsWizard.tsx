@@ -352,7 +352,14 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
 
         console.log('Generate response:', { data, error });
         if (error) {
-          const errorDetail = data?.error || data?.details || error.message || 'Error desconocido';
+          let errorDetail = error.message || 'Error desconocido';
+          try {
+            if (error.context && typeof error.context.json === 'function') {
+              const errBody = await error.context.json();
+              errorDetail = errBody?.error || errBody?.details || JSON.stringify(errBody).substring(0, 300);
+            }
+          } catch (_) {}
+          console.error('Generate error detail:', errorDetail);
           throw new Error(errorDetail);
         }
         const blocks = data?.blocks || [];
@@ -494,7 +501,15 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
 
         console.log('Upload response:', { data, error });
         if (error) {
-          const errorDetail = data?.error || data?.details || error.message || 'Error desconocido';
+          // Try to read body from FunctionsHttpError context
+          let errorDetail = error.message || 'Error desconocido';
+          try {
+            if (error.context && typeof error.context.json === 'function') {
+              const errBody = await error.context.json();
+              errorDetail = errBody?.error || errBody?.details || JSON.stringify(errBody).substring(0, 300);
+            }
+          } catch (_) {}
+          console.error('Upload error detail:', errorDetail);
           throw new Error(errorDetail);
         }
 
