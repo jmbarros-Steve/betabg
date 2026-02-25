@@ -18,15 +18,17 @@ interface KlaviyoMetricsPanelProps {
 }
 
 interface FlowMetrics {
-  recipients: number;
+  delivered: number;
   opens: number;
   clicks: number;
-  conversions: number;
   revenue: number;
+  unsubscribes: number;
+  open_rate: number;
+  click_rate: number;
+  conversion_rate: number;
 }
 
 interface CampaignMetrics extends FlowMetrics {
-  unsubscribes: number;
   bounces: number;
 }
 
@@ -60,6 +62,8 @@ interface GlobalStats {
   totalFlowRevenue: number;
   totalCampaignRevenue: number;
   totalConversions: number;
+  avgOpenRate: number;
+  avgClickRate: number;
 }
 
 function formatNumber(n: number): string {
@@ -113,19 +117,19 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 px-10 pb-3">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Enviados</p>
-              <p className="font-semibold text-sm">{formatNumber(m.recipients)}</p>
+              <p className="font-semibold text-sm">{formatNumber(m.delivered)}</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Aperturas</p>
-              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.opens, m.recipients) : '0%'}</p>
+              <p className="text-xs text-muted-foreground">Open Rate</p>
+              <p className="font-semibold text-sm">{(m.open_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Clics</p>
-              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.clicks, m.recipients) : '0%'}</p>
+              <p className="text-xs text-muted-foreground">Click Rate</p>
+              <p className="font-semibold text-sm">{(m.click_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Conversiones</p>
-              <p className="font-semibold text-sm">{formatNumber(m.conversions)}</p>
+              <p className="text-xs text-muted-foreground">Conversión</p>
+              <p className="font-semibold text-sm">{(m.conversion_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Revenue</p>
@@ -133,7 +137,7 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
             </div>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground px-10 pb-3">Sin métricas disponibles (último 90 días)</p>
+          <p className="text-xs text-muted-foreground px-10 pb-3">Sin métricas disponibles</p>
         )}
       </CollapsibleContent>
     </Collapsible>
@@ -175,23 +179,23 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-10 pb-3">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Enviados</p>
-              <p className="font-semibold text-sm">{formatNumber(m.recipients)}</p>
+              <p className="font-semibold text-sm">{formatNumber(m.delivered)}</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Aperturas</p>
-              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.opens, m.recipients) : '0%'}</p>
+              <p className="text-xs text-muted-foreground">Open Rate</p>
+              <p className="font-semibold text-sm">{(m.open_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Clics</p>
-              <p className="font-semibold text-sm">{m.recipients > 0 ? calcRate(m.clicks, m.recipients) : '0%'}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Conversiones</p>
-              <p className="font-semibold text-sm">{formatNumber(m.conversions)}</p>
+              <p className="text-xs text-muted-foreground">Click Rate</p>
+              <p className="font-semibold text-sm">{(m.click_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Revenue</p>
               <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Bounces</p>
+              <p className="font-semibold text-sm">{formatNumber(m.bounces)}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Unsubs</p>
@@ -280,7 +284,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               <BarChart3 className="w-4 h-4" />
               Rendimiento de Klaviyo
             </CardTitle>
-            <CardDescription>Métricas de los últimos 90 días</CardDescription>
+            <CardDescription>Métricas de los últimos 30 días</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={fetchMetrics} disabled={loading}>
             {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
@@ -306,8 +310,8 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <MetricBadge label="Perfiles" value={formatNumber(globalStats.totalProfiles)} icon={Users} />
               <MetricBadge label="Flows Activos" value={`${globalStats.activeFlows}/${globalStats.totalFlows}`} icon={Zap} />
-              <MetricBadge label="Campañas" value={formatNumber(globalStats.sentCampaigns)} icon={Megaphone} />
-              <MetricBadge label="Conversiones" value={formatNumber(globalStats.totalConversions)} icon={MousePointerClick} />
+              <MetricBadge label="Open Rate" value={`${(globalStats.avgOpenRate * 100).toFixed(1)}%`} icon={Eye} />
+              <MetricBadge label="Click Rate" value={`${(globalStats.avgClickRate * 100).toFixed(1)}%`} icon={MousePointerClick} />
               <MetricBadge label="Revenue Total" value={formatCurrency(globalStats.totalRevenue)} icon={DollarSign} />
             </div>
 
