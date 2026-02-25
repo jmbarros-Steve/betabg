@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const KLAVIYO_REVISION = '2025-01-15';
+const KLAVIYO_REVISION = '2024-10-15';
 
 function makeHeaders(apiKey: string) {
   return {
@@ -20,7 +20,7 @@ function makePostHeaders(apiKey: string) {
     'Authorization': `Klaviyo-API-Key ${apiKey}`,
     'accept': 'application/json',
     'content-type': 'application/json',
-    'revision': KLAVIYO_REVISION,
+    'revision': '2025-01-15',
   };
 }
 
@@ -39,7 +39,7 @@ async function findConversionMetricId(apiKey: string): Promise<string | null> {
   return fallback?.id || null;
 }
 
-// Fetch flows (single page, no pagination needed for most accounts)
+// Fetch flows
 async function fetchFlows(apiKey: string) {
   const res = await fetch('https://a.klaviyo.com/api/flows/', { headers: makeHeaders(apiKey) });
   if (!res.ok) return [];
@@ -54,12 +54,19 @@ async function fetchFlows(apiKey: string) {
   }));
 }
 
-// Fetch campaigns (single page for speed — latest 50)
+// Fetch campaigns
 async function fetchCampaigns(apiKey: string) {
-  const filter = encodeURIComponent("equals(messages.channel,'email')");
-  const res = await fetch(`https://a.klaviyo.com/api/campaigns/?filter=${filter}&sort=-updated_at&page[size]=50`, { headers: makeHeaders(apiKey) });
-  if (!res.ok) return [];
+  console.log('[klaviyo] Fetching campaigns...');
+  const url = `https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at&page[size]=50`;
+  const res = await fetch(url, { headers: makeHeaders(apiKey) });
+  console.log('[klaviyo] Campaigns status:', res.status);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[klaviyo] Campaigns error:', errText);
+    return [];
+  }
   const data = await res.json();
+  console.log('[klaviyo] Campaigns count:', (data.data || []).length);
   return (data.data || []).map((c: any) => ({
     id: c.id,
     name: c.attributes?.name || 'Sin nombre',
@@ -70,82 +77,65 @@ async function fetchCampaigns(apiKey: string) {
   }));
 }
 
-// Fetch lists and segments with current revision, then get profile counts
+// Fetch lists and segments with profile_count
 async function fetchListsAndSegments(apiKey: string): Promise<{ lists: any[]; segments: any[] }> {
   const headers = makeHeaders(apiKey);
   let lists: any[] = [];
   let segments: any[] = [];
 
   try {
-    const [listsRes, segsRes] = await Promise.all([
-      fetch('https://a.klaviyo.com/api/lists/?page[size]=50', { headers }),
-      fetch('https://a.klaviyo.com/api/segments/?page[size]=50', { headers }),
-    ]);
-
+    console.log('[klaviyo] Fetching lists...');
+    const listsRes = await fetch(
+      'https://a.klaviyo.com/api/lists/?additional-fields[list]=profile_count&page[size]=50',
+      { headers }
+    );
+    console.log('[klaviyo] Lists status:', listsRes.status);
     if (listsRes.ok) {
       const listsData = await listsRes.json();
+      console.log('[klaviyo] Lists count:', (listsData.data || []).length);
       lists = (listsData.data || []).map((l: any) => ({
         id: l.id,
         name: l.attributes?.name || 'Sin nombre',
-        profile_count: 0,
+        profile_count: l.attributes?.profile_count || 0,
         created: l.attributes?.created || null,
         updated: l.attributes?.updated || null,
       }));
+    } else {
+      const errText = await listsRes.text();
+      console.error('[klaviyo] Lists error:', errText);
     }
+
+    // Small delay to avoid rate limit
+    await new Promise(r => setTimeout(r, 1000));
+
+    console.log('[klaviyo] Fetching segments...');
+    const segsRes = await fetch(
+      'https://a.klaviyo.com/api/segments/?additional-fields[segment]=profile_count&page[size]=50',
+      { headers }
+    );
+    console.log('[klaviyo] Segments status:', segsRes.status);
     if (segsRes.ok) {
       const segsData = await segsRes.json();
+      console.log('[klaviyo] Segments count:', (segsData.data || []).length);
       segments = (segsData.data || []).map((s: any) => ({
         id: s.id,
         name: s.attributes?.name || 'Sin nombre',
-        profile_count: 0,
+        profile_count: s.attributes?.profile_count || 0,
         created: s.attributes?.created || null,
         updated: s.attributes?.updated || null,
       }));
+    } else {
+      const errText = await segsRes.text();
+      console.error('[klaviyo] Segments error:', errText);
     }
-
-    // Get profile counts: fetch first page of each to estimate size (max 3 in parallel)
-    const countEntities = [...lists.map(l => ({ ...l, type: 'list' })), ...segments.map(s => ({ ...s, type: 'segment' }))];
-    // Only count first 10 entities to avoid timeout
-    const toCount = countEntities.slice(0, 10);
-    const countResults = await Promise.all(
-      toCount.map(async (entity) => {
-        try {
-          const endpoint = entity.type === 'list'
-            ? `https://a.klaviyo.com/api/lists/${entity.id}/profiles/?page[size]=1`
-            : `https://a.klaviyo.com/api/segments/${entity.id}/profiles/?page[size]=1`;
-          const res = await fetch(endpoint, { headers });
-          if (!res.ok) return { id: entity.id, count: 0 };
-          const text = await res.text();
-          // Klaviyo returns page[count] or we can check if there's a next cursor
-          // The total isn't directly available, so we check headers or estimate
-          // Actually let's just use the response to see if profiles exist
-          const data = JSON.parse(text);
-          const hasProfiles = (data.data || []).length > 0;
-          const hasNext = !!data.links?.next;
-          // Rough estimate: if has next, at least 100+
-          return { id: entity.id, count: hasProfiles ? (hasNext ? 1000 : 1) : 0 };
-        } catch {
-          return { id: entity.id, count: 0 };
-        }
-      })
-    );
-
-    for (const cr of countResults) {
-      const list = lists.find(l => l.id === cr.id);
-      if (list) list.profile_count = cr.count;
-      const seg = segments.find(s => s.id === cr.id);
-      if (seg) seg.profile_count = cr.count;
-    }
-
-    console.log(`[klaviyo] Found ${lists.length} lists, ${segments.length} segments`);
   } catch (e: any) {
-    console.warn('[klaviyo] Lists/segments error:', e.message);
+    console.error('[klaviyo] Lists/segments error:', e.message);
   }
 
   return { lists, segments };
 }
 
-// Get total profile count via quick pagination
+// Get total profile count
 async function fetchProfilesCount(apiKey: string): Promise<number> {
   const headers = makeHeaders(apiKey);
   try {
@@ -162,16 +152,14 @@ async function fetchProfilesCount(apiKey: string): Promise<number> {
       hasMore = !!url;
       pages++;
     }
-    const estimate = hasMore && pages >= 3 ? 10000 : count;
-    console.log(`[klaviyo] Profile count: ${count} (${pages} pages, hasMore: ${hasMore}, estimate: ${estimate})`);
-    return estimate;
+    return hasMore && pages >= 3 ? 10000 : count;
   } catch (e: any) {
     console.warn('[klaviyo] Profile count error:', e.message);
     return 0;
   }
 }
 
-// Flow values report (single aggregated call)
+// Flow values report
 async function fetchFlowReport(apiKey: string, conversionMetricId: string, timeframe: string) {
   const body = {
     data: {
@@ -204,7 +192,7 @@ async function fetchFlowReport(apiKey: string, conversionMetricId: string, timef
   return metrics;
 }
 
-// Campaign values report (single aggregated call)
+// Campaign values report
 async function fetchCampaignReport(apiKey: string, conversionMetricId: string, timeframe: string) {
   const body = {
     data: {
@@ -299,7 +287,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Handle list-profiles action (fetch profiles for a list or segment)
+    // Handle list-profiles action
     if (action === 'list-profiles' && entityType && entityId) {
       const endpoint = entityType === 'list'
         ? `https://a.klaviyo.com/api/lists/${entityId}/profiles/?page[size]=10`
@@ -324,16 +312,19 @@ Deno.serve(async (req) => {
     // STEP 1: Discover conversion metric
     const conversionMetricId = await findConversionMetricId(apiKey);
 
-    // STEP 2: Parallel fetches — ALL at once
-    const [flows, campaigns, totalProfiles, listsAndSegments] = await Promise.all([
+    // STEP 2: Parallel fetches — flows, campaigns, profiles in parallel
+    // Lists/segments fetched separately with delay to avoid rate limits
+    const [flows, campaigns, totalProfiles] = await Promise.all([
       fetchFlows(apiKey),
       fetchCampaigns(apiKey),
       fetchProfilesCount(apiKey),
-      fetchListsAndSegments(apiKey),
     ]);
-    const { lists: klaviyoLists, segments: klaviyoSegments } = listsAndSegments;
 
-    // STEP 3: Reports in parallel (both are single POST calls)
+    // Small delay before lists/segments to avoid rate limit
+    await new Promise(r => setTimeout(r, 1500));
+    const { lists: klaviyoLists, segments: klaviyoSegments } = await fetchListsAndSegments(apiKey);
+
+    // STEP 3: Reports in parallel
     let flowMetrics: Record<string, any> = {};
     let campaignMetrics: Record<string, any> = {};
 
@@ -375,7 +366,7 @@ Deno.serve(async (req) => {
       conversionMetricId: conversionMetricId || null,
     };
 
-    console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
+    console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, ${klaviyoLists.length} lists, ${klaviyoSegments.length} segments, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
 
     return new Response(
       JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, lists: klaviyoLists, segments: klaviyoSegments }),
