@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye } from 'lucide-react';
+import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid } from 'lucide-react';
+import EmailBlockEditor from './email-blocks/EmailBlockEditor';
+import type { EmailBlock } from './email-blocks/blockTypes';
 import { format } from 'date-fns';
 
 interface EmailTemplateBuilderProps {
@@ -84,6 +86,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     assets: [] as { url: string; name: string }[],
     is_default: false,
   });
+  const [blocks, setBlocks] = useState<EmailBlock[]>([]);
 
   useEffect(() => { loadTemplates(); }, [clientId]);
 
@@ -447,6 +450,28 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
             </div>
           </div>
         </div>
+      </div>
+
+      {/* BLOCK EDITOR */}
+      <div className="mt-6 pt-6 border-t">
+        <div className="flex items-center gap-2 mb-4">
+          <LayoutGrid className="w-4 h-4 text-muted-foreground" />
+          <Label className="text-base font-semibold">Editor de Bloques</Label>
+          <Badge variant="secondary" className="text-xs">Drag & Drop</Badge>
+        </div>
+        <EmailBlockEditor
+          blocks={blocks}
+          onChange={setBlocks}
+          templateColors={{
+            primary: form.primary_color,
+            secondary: form.secondary_color,
+            accent: form.accent_color,
+            button: form.button_color,
+            buttonText: form.button_text_color,
+            font: form.font_family,
+          }}
+          assets={form.assets}
+        />
       </div>
     </div>
   );
