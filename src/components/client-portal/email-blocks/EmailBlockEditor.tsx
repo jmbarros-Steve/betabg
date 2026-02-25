@@ -180,25 +180,75 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
   const blockDefs = BLOCK_DEFINITIONS.filter(d => d.category === 'blocks');
   const designDefs = BLOCK_DEFINITIONS.filter(d => d.category === 'design');
 
-  // Generate preview HTML with Klaviyo variables replaced by real Shopify data
-  const generatePreviewHtml = useCallback(() => {
-    let html = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
+  // Reusable function to replace ALL Klaviyo variables with real Shopify data
+  const replaceKlaviyoVariables = useCallback((text: string): string => {
+    if (!text || typeof text !== 'string') return text;
+    let result = text;
+
+    // Profile variables
+    result = result.replace(/\{\{[\s]*person\.first_name\|default:['"](.*?)['"][\s]*\}\}/gi, '$1');
+    result = result.replace(/\{\{[\s]*person\.first_name[\s]*\}\}/gi, 'María');
+    result = result.replace(/\{\{[\s]*first_name[\s]*\}\}/gi, 'María');
+    result = result.replace(/\{\{[\s]*email[\s]*\}\}/gi, 'maria@ejemplo.cl');
+    result = result.replace(/\{\{[\s]*last_name[\s]*\}\}/gi, 'González');
+
+    // Product variables — rotate through real products
     if (previewProducts.length > 0) {
-      previewProducts.forEach((product) => {
-        const formattedPrice = `$${Number(product.price || 0).toLocaleString('es-CL')}`;
-        html = html.replace(/\{\{\s*item\.title\|safe\s*\}\}/i, product.title);
-        html = html.replace(/\{\{\s*Title\s*\}\}/i, product.title);
-        html = html.replace(/\{\{\s*item\.image\s*\}\}/i, product.image_url || '');
-        html = html.replace(/\{\{\s*item\.metadata\.__variant_price\|floatformat:0\s*\}\}/i, formattedPrice);
-        html = html.replace(/\{\{\s*Price\s*\}\}/i, formattedPrice);
-        html = html.replace(/\{\{\s*item\.url\s*\}\}/i, '#');
-      });
+      let idx = 0;
+      const getProduct = () => previewProducts[idx++ % previewProducts.length];
+
+      result = result.replace(/\{\{[\s]*item\.title\|safe[\s]*\}\}/gi, () => getProduct().title);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*Title[\s]*\}\}/gi, () => getProduct().title);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.image[\s]*\}\}/gi, () => getProduct().image_url || '');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.price[^}]*\}\}/gi, () => `$${Number(getProduct().price || 0).toLocaleString('es-CL')}`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.metadata\.__variant_price[^}]*\}\}/gi, () => `$${Number(getProduct().price || 0).toLocaleString('es-CL')}`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.metadata\.__variant_compare_at_price[^}]*\}\}/gi, () => '');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*Price[\s]*\}\}/gi, () => `$${Number(getProduct().price || 0).toLocaleString('es-CL')}`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.url[\s]*\}\}/gi, () => `#`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*event\.extra\.title[\s]*\}\}/gi, () => getProduct().title);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*event\.extra\.image_url[\s]*\}\}/gi, () => getProduct().image_url || '');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*event\.extra\.price[\s]*\}\}/gi, () => `$${Number(getProduct().price || 0).toLocaleString('es-CL')}`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*event\.extra\.url[\s]*\}\}/gi, () => '#');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.product\.title[\s]*\}\}/gi, () => getProduct().title);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.product\.image[\s]*\}\}/gi, () => getProduct().image_url || '');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.product\.price[^}]*\}\}/gi, () => `$${Number(getProduct().price || 0).toLocaleString('es-CL')}`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*item\.product\.url[\s]*\}\}/gi, () => '#');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*recommended_products\.\d+\.title[\s]*\}\}/gi, () => getProduct().title);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*recommended_products\.\d+\.image[\s]*\}\}/gi, () => getProduct().image_url || '');
+      idx = 0;
+      result = result.replace(/\{\{[\s]*recommended_products\.\d+\.price[\s]*\}\}/gi, () => `$${Number(getProduct().price || 0).toLocaleString('es-CL')}`);
+      idx = 0;
+      result = result.replace(/\{\{[\s]*recommended_products\.\d+\.url[\s]*\}\}/gi, () => '#');
     }
-    html = html.replace(/\{\{\s*first_name\s*\}\}/gi, 'María');
-    html = html.replace(/\{\{\s*person\.first_name\|default:['"](.*?)['"]\s*\}\}/gi, '$1');
-    html = html.replace(/\{\{\s*email\s*\}\}/gi, 'maria@ejemplo.cl');
-    return html;
-  }, [blocks, templateColors, previewProducts]);
+
+    // Strip remaining Klaviyo block tags
+    result = result.replace(/\{%[^%]*%\}/g, '');
+
+    return result;
+  }, [previewProducts]);
+
+  // Generate preview HTML for the modal
+  const generatePreviewHtml = useCallback(() => {
+    const html = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
+    return replaceKlaviyoVariables(html);
+  }, [blocks, templateColors, replaceKlaviyoVariables]);
 
   const fullHtml = blocks.map(b => renderBlockToHtml(b, templateColors)).join('');
   const canvasWidth = viewMode === 'mobile' ? 'max-w-[360px]' : 'max-w-[600px]';
@@ -304,6 +354,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
                             isLast={idx === blocks.length - 1}
                             templateColors={templateColors}
                             previewProducts={previewProducts}
+                            replaceVars={replaceKlaviyoVariables}
                           />
                         </div>
                       ))}
@@ -546,7 +597,7 @@ function ProductBlockPreview({ block, previewProducts = [] }: { block: EmailBloc
   );
 }
 
-function ColumnsBlockPreview({ block, templateColors, previewProducts = [] }: { block: EmailBlock; templateColors?: any; previewProducts?: ShopifyPreviewProduct[] }) {
+function ColumnsBlockPreview({ block, templateColors, previewProducts = [], replaceVars }: { block: EmailBlock; templateColors?: any; previewProducts?: ShopifyPreviewProduct[]; replaceVars?: (html: string) => string }) {
   const cols = block.props.columns || [];
   return (
     <div className="p-2">
@@ -555,7 +606,6 @@ function ColumnsBlockPreview({ block, templateColors, previewProducts = [] }: { 
           <div key={colIdx} style={{ width: col.width || `${Math.floor(100 / cols.length)}%` }} className="border border-dashed border-gray-200 rounded p-2">
             {(col.blocks || []).map((innerBlock: EmailBlock, bIdx: number) => {
               if (innerBlock.type === 'product') {
-                // For products inside columns with Klaviyo variables, use real product from that column index
                 const hasKlaviyoVars = innerBlock.props.name?.includes('{{');
                 const productForColumn = hasKlaviyoVars && previewProducts[colIdx] 
                   ? previewProducts[colIdx] 
@@ -573,7 +623,7 @@ function ColumnsBlockPreview({ block, templateColors, previewProducts = [] }: { 
                 return <div key={bIdx}><ProductBlockPreview block={enrichedBlock} previewProducts={previewProducts} /></div>;
               }
               const innerHtml = renderBlockToHtml(innerBlock, templateColors);
-              return <div key={bIdx} dangerouslySetInnerHTML={{ __html: innerHtml }} />;
+              return <div key={bIdx} dangerouslySetInnerHTML={{ __html: replaceVars ? replaceVars(innerHtml) : innerHtml }} />;
             })}
             {(!col.blocks || col.blocks.length === 0) && (
               <p className="text-xs text-gray-400 text-center py-4">Columna vacía</p>
@@ -588,7 +638,7 @@ function ColumnsBlockPreview({ block, templateColors, previewProducts = [] }: { 
   );
 }
 
-function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors, previewProducts = [] }: {
+function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors, previewProducts = [], replaceVars }: {
   block: EmailBlock;
   isSelected: boolean;
   onSelect: () => void;
@@ -600,10 +650,12 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
   isLast: boolean;
   templateColors?: any;
   previewProducts?: ShopifyPreviewProduct[];
+  replaceVars?: (html: string) => string;
 }) {
   const def = BLOCK_DEFINITIONS.find(d => d.type === block.type);
   const useCustomPreview = block.type === 'product' || (block.type === 'columns' && block.props.columns);
-  const html = useCustomPreview ? '' : renderBlockToHtml(block, templateColors);
+  const rawHtml = useCustomPreview ? '' : renderBlockToHtml(block, templateColors);
+  const html = replaceVars ? replaceVars(rawHtml) : rawHtml;
 
   return (
     <div
@@ -640,7 +692,7 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
         {block.type === 'product' ? (
           <ProductBlockPreview block={block} previewProducts={previewProducts} />
         ) : block.type === 'columns' && block.props.columns ? (
-          <ColumnsBlockPreview block={block} templateColors={templateColors} previewProducts={previewProducts} />
+          <ColumnsBlockPreview block={block} templateColors={templateColors} previewProducts={previewProducts} replaceVars={replaceVars} />
         ) : (
           <div dangerouslySetInnerHTML={{ __html: html }} />
         )}
