@@ -91,6 +91,8 @@ async function fetchProfilesCount(apiKey: string): Promise<{ totalProfiles: numb
         id: l.id,
         name: l.attributes?.name || 'Sin nombre',
         profile_count: l.attributes?.profile_count || 0,
+        created: l.attributes?.created || null,
+        updated: l.attributes?.updated || null,
       }));
       for (const l of lists) {
         if (l.profile_count > maxCount) maxCount = l.profile_count;
@@ -102,6 +104,8 @@ async function fetchProfilesCount(apiKey: string): Promise<{ totalProfiles: numb
         id: s.id,
         name: s.attributes?.name || 'Sin nombre',
         profile_count: s.attributes?.profile_count || 0,
+        created: s.attributes?.created || null,
+        updated: s.attributes?.updated || null,
       }));
       for (const s of segments) {
         if (s.profile_count > maxCount) maxCount = s.profile_count;
@@ -234,7 +238,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { connectionId, timeframe = 'last_90_days' } = body;
+    const { connectionId, timeframe = 'last_90_days', action, entityType, entityId } = body;
     if (!connectionId) {
       return new Response(JSON.stringify({ error: 'connectionId required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -267,6 +271,28 @@ Deno.serve(async (req) => {
     if (decryptError || !apiKey) {
       return new Response(JSON.stringify({ error: 'Token decryption failed' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Handle list-profiles action (fetch profiles for a list or segment)
+    if (action === 'list-profiles' && entityType && entityId) {
+      const endpoint = entityType === 'list'
+        ? `https://a.klaviyo.com/api/lists/${entityId}/profiles/?page[size]=10`
+        : `https://a.klaviyo.com/api/segments/${entityId}/profiles/?page[size]=10`;
+      const res = await fetch(endpoint, { headers: makeHeaders(apiKey) });
+      if (!res.ok) {
+        return new Response(JSON.stringify({ profiles: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data = await res.json();
+      const profiles = (data.data || []).map((p: any) => ({
+        email: p.attributes?.email || '—',
+        name: [p.attributes?.first_name, p.attributes?.last_name].filter(Boolean).join(' ') || '',
+        created: p.attributes?.created || null,
+      }));
+      return new Response(JSON.stringify({ profiles }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -326,7 +352,7 @@ Deno.serve(async (req) => {
     console.log(`[klaviyo] DONE: ${flows.length} flows, ${campaigns.length} campaigns, profiles: ${totalProfiles}, revenue: $${globalStats.totalRevenue.toFixed(2)}`);
 
     return new Response(
-      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, _debug: { lists: klaviyoLists, segments: klaviyoSegments } }),
+      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, lists: klaviyoLists, segments: klaviyoSegments }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

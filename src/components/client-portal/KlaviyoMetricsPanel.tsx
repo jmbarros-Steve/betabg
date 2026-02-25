@@ -11,8 +11,9 @@ import { toast } from 'sonner';
 import {
   RefreshCw, Mail, Users, DollarSign,
   Eye, ChevronDown, ChevronRight, Zap, Megaphone, BarChart3, ShoppingCart,
-  TrendingUp, MousePointerClick, Search
+  TrendingUp, MousePointerClick, Search, List, Target
 } from 'lucide-react';
+import { KlaviyoListsContent, type KlaviyoListItem } from './klaviyo/KlaviyoListsSegmentsTabs';
 
 interface KlaviyoMetricsPanelProps {
   clientId: string;
@@ -235,6 +236,8 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const [loading, setLoading] = useState(false);
   const [flows, setFlows] = useState<KlaviyoFlow[]>([]);
   const [campaigns, setCampaigns] = useState<KlaviyoCampaign[]>([]);
+  const [lists, setLists] = useState<KlaviyoListItem[]>([]);
+  const [segments, setSegments] = useState<KlaviyoListItem[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
@@ -276,6 +279,8 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
 
       if (data?.flows) setFlows(data.flows);
       if (data?.campaigns) setCampaigns(data.campaigns);
+      if (data?.lists) setLists(data.lists);
+      if (data?.segments) setSegments(data.segments);
       if (data?.globalStats) setGlobalStats(data.globalStats);
       toast.success('Métricas de Klaviyo actualizadas');
     } catch (err: any) {
@@ -426,7 +431,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
 
             {/* Flows & Campaigns Tabs */}
             <Tabs defaultValue="flows">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="flows" className="text-sm">
                   <Zap className="w-4 h-4 mr-1.5" />
                   Flows ({flows.length})
@@ -434,6 +439,14 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
                 <TabsTrigger value="campaigns" className="text-sm">
                   <Megaphone className="w-4 h-4 mr-1.5" />
                   Campañas ({campaigns.filter(c => c.send_time).length})
+                </TabsTrigger>
+                <TabsTrigger value="lists" className="text-sm">
+                  <List className="w-4 h-4 mr-1.5" />
+                  Listas ({lists.length})
+                </TabsTrigger>
+                <TabsTrigger value="segments" className="text-sm">
+                  <Target className="w-4 h-4 mr-1.5" />
+                  Segmentos ({segments.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -464,6 +477,14 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
                       ))}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="lists" className="mt-4">
+                <KlaviyoListsContent items={lists} type="list" connectionId={connectionId!} />
+              </TabsContent>
+
+              <TabsContent value="segments" className="mt-4">
+                <KlaviyoListsContent items={segments} type="segment" connectionId={connectionId!} />
               </TabsContent>
             </Tabs>
           </div>
