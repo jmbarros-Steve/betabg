@@ -154,12 +154,52 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       const parsed = data?.blocks || [];
       if (parsed.length === 0) { toast.error('No se pudieron extraer bloques'); return; }
       
-      // Ensure proper UUIDs
-      const blocksWithIds = parsed.map((b: any) => ({
-        ...b,
-        id: b.id?.length >= 8 ? b.id : crypto.randomUUID(),
-        props: b.props || {},
-      }));
+      // Normalize blocks to match editor's expected types and prop names
+      const VALID_TYPES = ['text','image','split','button','header_bar','drop_shadow','divider','social_links','spacer','product','coupon','table','review','video','html','columns','section'];
+      const TYPE_MAP: Record<string, string> = {
+        'header': 'html', 'footer': 'html', 'social': 'social_links',
+        'heading': 'text', 'paragraph': 'text', 'cta': 'button',
+        'separator': 'divider', 'gap': 'spacer', 'code': 'html',
+      };
+      
+      const blocksWithIds = parsed.map((b: any) => {
+        let type = (b.type || 'html').toLowerCase();
+        if (!VALID_TYPES.includes(type)) {
+          type = TYPE_MAP[type] || 'html';
+        }
+        
+        const props = { ...(b.props || {}) };
+        
+        // Normalize prop names to match what the editor/renderer expects
+        if (type === 'image') {
+          if (props.url && !props.src) { props.src = props.url; delete props.url; }
+        }
+        if (type === 'html') {
+          if (!props.code && props.content) { props.code = props.content; delete props.content; }
+          if (!props.code) { props.code = '<!-- bloque -->'; }
+        }
+        if (type === 'social_links') {
+          if (props.iconStyle === undefined) props.iconStyle = 'color';
+          if (props.iconSize === undefined) props.iconSize = 'medium';
+        }
+        if (type === 'text') {
+          if (!props.content) props.content = '<p></p>';
+          if (!props.fontSize) props.fontSize = 14;
+          if (!props.color) props.color = '#333333';
+          if (!props.align) props.align = 'left';
+        }
+        if (type === 'button') {
+          if (!props.text) props.text = 'Botón';
+          if (!props.bgColor) props.bgColor = '#000000';
+          if (!props.textColor) props.textColor = '#ffffff';
+        }
+        
+        return {
+          id: crypto.randomUUID(),
+          type: type as any,
+          props,
+        };
+      });
       
       setBlocks(blocksWithIds);
       
