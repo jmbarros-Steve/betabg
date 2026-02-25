@@ -25,6 +25,7 @@ import { KlaviyoPlanWizard } from './KlaviyoPlanWizard';
 import { KlaviyoVariables } from './KlaviyoVariables';
 import { SteveFeedbackDialog } from './SteveFeedbackDialog';
 import { KlaviyoMetricsPanel } from './KlaviyoMetricsPanel';
+import { MassCampaignsWizard } from './MassCampaignsWizard';
 
 interface EmailStep {
   id: string;
@@ -108,7 +109,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
   const [plans, setPlans] = useState<EmailPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'flows' | 'campaigns' | 'archive'>('flows');
+  const [activeTab, setActiveTab] = useState<'flows' | 'campaigns' | 'mass' | 'archive'>('flows');
+  const [showMassWizard, setShowMassWizard] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(false);
   const [newPlanType, setNewPlanType] = useState<EmailPlan['flow_type'] | null>(null);
@@ -360,8 +362,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
       <KlaviyoMetricsPanel clientId={clientId} />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'flows' | 'campaigns' | 'archive')}>
-        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="flows" className="flex items-center gap-2">
             <Mail className="w-4 h-4" />
             Automatizaciones
@@ -369,6 +371,10 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
             <Megaphone className="w-4 h-4" />
             Campañas
+          </TabsTrigger>
+          <TabsTrigger value="mass" className="flex items-center gap-2">
+            📦
+            Masivas
           </TabsTrigger>
           <TabsTrigger value="archive" className="flex items-center gap-2">
             <Archive className="w-4 h-4" />
@@ -501,6 +507,11 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Mass Campaigns Tab */}
+        <TabsContent value="mass" className="space-y-4">
+          <MassCampaignsWizard clientId={clientId} onClose={() => setActiveTab('campaigns')} />
         </TabsContent>
 
         {/* Archive Tab */}
