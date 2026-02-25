@@ -7,6 +7,159 @@ const corsHeaders = {
 
 const KLAVIYO_REVISION = '2024-10-15';
 
+function makeKlaviyoHeaders(apiKey: string) {
+  return {
+    'Authorization': `Klaviyo-API-Key ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'revision': KLAVIYO_REVISION,
+  };
+}
+
+async function fetchFlows(headers: Record<string, string>) {
+  const res = await fetch('https://a.klaviyo.com/api/flows/', {
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.warn('[klaviyo] Flows fetch failed:', res.status, err);
+    return [];
+  }
+  const data = await res.json();
+  return (data.data || []).map((f: any) => ({
+    id: f.id,
+    name: f.attributes?.name || 'Sin nombre',
+    status: f.attributes?.status || 'manual',
+    created: f.attributes?.created,
+    updated: f.attributes?.updated,
+    trigger_type: f.attributes?.trigger_type || null,
+  }));
+}
+
+async function fetchCampaigns(headers: Record<string, string>) {
+  // Klaviyo requires channel filter for campaigns
+  const filter = "equals(messages.channel,'email')";
+  const url = `https://a.klaviyo.com/api/campaigns/?filter=${encodeURIComponent(filter)}&sort=-updated_at`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const err = await res.text();
+    console.warn('[klaviyo] Campaigns fetch failed:', res.status, err);
+    return [];
+  }
+  const data = await res.json();
+  return (data.data || []).map((c: any) => ({
+    id: c.id,
+    name: c.attributes?.name || 'Sin nombre',
+    status: c.attributes?.status || 'draft',
+    send_time: c.attributes?.send_time || null,
+    created_at: c.attributes?.created_at,
+    updated_at: c.attributes?.updated_at,
+  }));
+}
+
+async function fetchProfilesCount(headers: Record<string, string>) {
+  const res = await fetch('https://a.klaviyo.com/api/profiles/', { headers });
+  if (!res.ok) {
+    const err = await res.text();
+    console.warn('[klaviyo] Profiles fetch failed:', res.status, err);
+    return 0;
+  }
+  const data = await res.json();
+  // Klaviyo returns total in meta.page_info.count
+  if (data.meta?.page_info?.count) return data.meta.page_info.count;
+  if (data.meta?.total) return data.meta.total;
+  return data.data?.length || 0;
+}
+
+async function fetchFlowValuesReport(headers: Record<string, string>) {
+  const res = await fetch('https://a.klaviyo.com/api/flow-values-reports/', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      data: {
+        type: 'flow-values-report',
+        attributes: {
+          statistics: [
+            'opens', 'clicks', 'revenue',
+            'unsubscribes', 'open_rate', 'click_rate',
+            'conversion_rate', 'delivered',
+          ],
+          timeframe: { key: 'last_30_days' },
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.warn('[klaviyo] Flow values report failed:', res.status, err);
+    return {};
+  }
+  const data = await res.json();
+  const results = data.data?.attributes?.results || [];
+  const metrics: Record<string, any> = {};
+  for (const r of results) {
+    const flowId = r.groupings?.flow_id;
+    if (!flowId) continue;
+    const s = r.statistics || {};
+    metrics[flowId] = {
+      delivered: s.delivered || 0,
+      opens: s.opens || 0,
+      clicks: s.clicks || 0,
+      revenue: s.revenue || 0,
+      unsubscribes: s.unsubscribes || 0,
+      open_rate: s.open_rate || 0,
+      click_rate: s.click_rate || 0,
+      conversion_rate: s.conversion_rate || 0,
+    };
+  }
+  return metrics;
+}
+
+async function fetchCampaignValuesReport(headers: Record<string, string>) {
+  const res = await fetch('https://a.klaviyo.com/api/campaign-values-reports/', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      data: {
+        type: 'campaign-values-report',
+        attributes: {
+          statistics: [
+            'opens', 'clicks', 'revenue',
+            'unsubscribes', 'bounces', 'open_rate',
+            'click_rate', 'conversion_rate', 'delivered',
+          ],
+          timeframe: { key: 'last_30_days' },
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.warn('[klaviyo] Campaign values report failed:', res.status, err);
+    return {};
+  }
+  const data = await res.json();
+  const results = data.data?.attributes?.results || [];
+  const metrics: Record<string, any> = {};
+  for (const r of results) {
+    const campaignId = r.groupings?.campaign_id;
+    if (!campaignId) continue;
+    const s = r.statistics || {};
+    metrics[campaignId] = {
+      delivered: s.delivered || 0,
+      opens: s.opens || 0,
+      clicks: s.clicks || 0,
+      revenue: s.revenue || 0,
+      unsubscribes: s.unsubscribes || 0,
+      bounces: s.bounces || 0,
+      open_rate: s.open_rate || 0,
+      click_rate: s.click_rate || 0,
+      conversion_rate: s.conversion_rate || 0,
+    };
+  }
+  return metrics;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -15,23 +168,28 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate user
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { connectionId } = await req.json();
     if (!connectionId) {
-      return new Response(JSON.stringify({ error: 'connectionId required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'connectionId required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Get connection and verify ownership
@@ -43,12 +201,16 @@ Deno.serve(async (req) => {
       .single();
 
     if (connError || !connection) {
-      return new Response(JSON.stringify({ error: 'Connection not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Connection not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
     if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Decrypt API key
@@ -56,251 +218,72 @@ Deno.serve(async (req) => {
       .rpc('decrypt_platform_token', { encrypted_token: connection.api_key_encrypted });
 
     if (decryptError || !apiKey) {
-      return new Response(JSON.stringify({ error: 'Token decryption failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Token decryption failed' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const klaviyoHeaders = {
-      'Authorization': `Klaviyo-API-Key ${apiKey}`,
-      'Content-Type': 'application/json',
-      'revision': KLAVIYO_REVISION,
-    };
+    const headers = makeKlaviyoHeaders(apiKey);
 
-    // Fetch the "Placed Order" metric ID for conversion tracking
-    let conversionMetricId: string | null = null;
-    try {
-      // Klaviyo filterable fields are integration.name and integration.category
-      // Fetch all metrics and find "Placed Order" manually
-      const metricsListRes = await fetch('https://a.klaviyo.com/api/metrics/?page[size]=200', { headers: klaviyoHeaders });
-      if (metricsListRes.ok) {
-        const metricsData = await metricsListRes.json();
-        const placedOrderMetric = (metricsData.data || []).find(
-          (m: any) => m.attributes?.name === 'Placed Order'
-        );
-        conversionMetricId = placedOrderMetric?.id || null;
-        console.log(`[sync-klaviyo-metrics] Conversion metric ID: ${conversionMetricId}, total metrics: ${metricsData.data?.length}`);
-      } else {
-        const errText = await metricsListRes.text();
-        console.warn('[sync-klaviyo-metrics] Could not fetch metrics list:', metricsListRes.status, errText);
-      }
-    } catch (e) {
-      console.warn('[sync-klaviyo-metrics] Error fetching metrics:', e);
-    }
-
-    // Fetch flows, campaigns, and profiles count in parallel
-    // Campaign filter with proper URL encoding
-    const campaignFilter = encodeURIComponent("equals(messages.channel,'email')");
-    const [flowsRes, campaignsRes, profilesRes] = await Promise.all([
-      fetch('https://a.klaviyo.com/api/flows/?page[size]=50', { headers: klaviyoHeaders }),
-      fetch(`https://a.klaviyo.com/api/campaigns/?filter=${campaignFilter}&page[size]=50&sort=-updated_at`, { headers: klaviyoHeaders }),
-      fetch('https://a.klaviyo.com/api/profiles/?page[size]=1', { headers: klaviyoHeaders }),
+    // Fetch everything in parallel
+    const [flows, campaigns, totalProfiles, flowMetrics, campaignMetrics] = await Promise.all([
+      fetchFlows(headers),
+      fetchCampaigns(headers),
+      fetchProfilesCount(headers),
+      fetchFlowValuesReport(headers),
+      fetchCampaignValuesReport(headers),
     ]);
 
-    // Parse flows
-    let flows: any[] = [];
-    if (flowsRes.ok) {
-      const flowsData = await flowsRes.json();
-      flows = (flowsData.data || []).map((f: any) => ({
-        id: f.id,
-        name: f.attributes?.name || 'Sin nombre',
-        status: f.attributes?.status || 'manual',
-        created: f.attributes?.created,
-        updated: f.attributes?.updated,
-        trigger_type: f.attributes?.trigger_type || null,
-      }));
-    } else {
-      console.warn('[sync-klaviyo-metrics] Flows fetch failed:', flowsRes.status);
-      await flowsRes.text();
-    }
-
-    // Parse campaigns
-    let campaigns: any[] = [];
-    if (campaignsRes.ok) {
-      const campaignsData = await campaignsRes.json();
-      campaigns = (campaignsData.data || []).map((c: any) => ({
-        id: c.id,
-        name: c.attributes?.name || 'Sin nombre',
-        status: c.attributes?.status || 'draft',
-        send_time: c.attributes?.send_time || null,
-        created_at: c.attributes?.created_at,
-        updated_at: c.attributes?.updated_at,
-      }));
-    } else {
-      console.warn('[sync-klaviyo-metrics] Campaigns fetch failed:', campaignsRes.status);
-      await campaignsRes.text();
-    }
-
-    // Get profiles count
-    let totalProfiles = 0;
-    if (profilesRes.ok) {
-      const profilesData = await profilesRes.json();
-      totalProfiles = profilesData.data?.length || 0;
-      // Klaviyo returns page_info.count for total
-      if (profilesData.meta?.page_info?.count) {
-        totalProfiles = profilesData.meta.page_info.count;
-      } else if (profilesData.links?.next) {
-        // Has more pages, estimate higher
-        totalProfiles = 100; // conservative estimate
-      }
-      console.log(`[sync-klaviyo-metrics] Profiles count: ${totalProfiles}`);
-    } else {
-      const errText = await profilesRes.text();
-      console.warn('[sync-klaviyo-metrics] Profiles fetch failed:', profilesRes.status, errText);
-    }
-
-    // Fetch flow metrics (values report) for the last 90 days
-    const now = new Date();
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    
-    let flowMetrics: Record<string, any> = {};
-    if (flows.length > 0 && conversionMetricId) {
-      try {
-        const flowValuesRes = await fetch('https://a.klaviyo.com/api/flow-values-reports/', {
-          method: 'POST',
-          headers: klaviyoHeaders,
-          body: JSON.stringify({
-            data: {
-              type: 'flow-values-report',
-              attributes: {
-                timeframe: {
-                  start: ninetyDaysAgo.toISOString(),
-                  end: now.toISOString(),
-                },
-                conversion_metric_id: conversionMetricId,
-                statistics: [
-                  'recipients', 'opens', 'clicks',
-                  'conversions', 'conversion_value',
-                ],
-              },
-            },
-          }),
-        });
-
-        if (flowValuesRes.ok) {
-          const valuesData = await flowValuesRes.json();
-          const results = valuesData.data?.attributes?.results || [];
-          for (const result of results) {
-            const flowId = result.groupings?.flow_id;
-            if (flowId) {
-              if (!flowMetrics[flowId]) {
-                flowMetrics[flowId] = { recipients: 0, opens: 0, clicks: 0, conversions: 0, revenue: 0 };
-              }
-              const stats = result.statistics || {};
-              flowMetrics[flowId].recipients += (stats.recipients || 0);
-              flowMetrics[flowId].opens += (stats.opens || 0);
-              flowMetrics[flowId].clicks += (stats.clicks || 0);
-              flowMetrics[flowId].conversions += (stats.conversions || 0);
-              flowMetrics[flowId].revenue += (stats.conversion_value || 0);
-            }
-          }
-        } else {
-          const errText = await flowValuesRes.text();
-          console.warn('[sync-klaviyo-metrics] Flow values report failed:', flowValuesRes.status, errText);
-        }
-      } catch (e) {
-        console.warn('[sync-klaviyo-metrics] Flow values report error:', e);
-      }
-    } else if (flows.length > 0) {
-      console.warn('[sync-klaviyo-metrics] No conversion metric found, skipping flow metrics');
-    }
-
-    // Fetch campaign metrics
-    let campaignMetrics: Record<string, any> = {};
-    const sentCampaignIds = campaigns.filter(c => c.status === 'Sent' || c.send_time).map(c => c.id);
-    
-    if (sentCampaignIds.length > 0 && conversionMetricId) {
-      try {
-        const campaignValuesRes = await fetch('https://a.klaviyo.com/api/campaign-values-reports/', {
-          method: 'POST',
-          headers: klaviyoHeaders,
-          body: JSON.stringify({
-            data: {
-              type: 'campaign-values-report',
-              attributes: {
-                timeframe: {
-                  start: ninetyDaysAgo.toISOString(),
-                  end: now.toISOString(),
-                },
-                conversion_metric_id: conversionMetricId,
-                statistics: [
-                  'recipients', 'opens', 'clicks',
-                  'conversions', 'conversion_value', 'unsubscribes', 'bounces',
-                ],
-                filter: `in(campaign_id,[${sentCampaignIds.map(id => `"${id}"`).join(',')}])`,
-              },
-            },
-          }),
-        });
-
-        if (campaignValuesRes.ok) {
-          const valuesData = await campaignValuesRes.json();
-          const results = valuesData.data?.attributes?.results || [];
-          for (const result of results) {
-            const campaignId = result.groupings?.campaign_id;
-            if (campaignId) {
-              if (!campaignMetrics[campaignId]) {
-                campaignMetrics[campaignId] = { recipients: 0, opens: 0, clicks: 0, conversions: 0, revenue: 0, unsubscribes: 0, bounces: 0 };
-              }
-              const stats = result.statistics || {};
-              campaignMetrics[campaignId].recipients += (stats.recipients || 0);
-              campaignMetrics[campaignId].opens += (stats.opens || 0);
-              campaignMetrics[campaignId].clicks += (stats.clicks || 0);
-              campaignMetrics[campaignId].conversions += (stats.conversions || 0);
-              campaignMetrics[campaignId].revenue += (stats.conversion_value || 0);
-              campaignMetrics[campaignId].unsubscribes += (stats.unsubscribes || 0);
-              campaignMetrics[campaignId].bounces += (stats.bounces || 0);
-            }
-          }
-        } else {
-          const errText = await campaignValuesRes.text();
-          console.warn('[sync-klaviyo-metrics] Campaign values report failed:', campaignValuesRes.status, errText);
-        }
-      } catch (e) {
-        console.warn('[sync-klaviyo-metrics] Campaign values report error:', e);
-      }
-    }
-
-    // Merge metrics into flows and campaigns
-    const enrichedFlows = flows.map(f => ({
+    // Enrich with metrics
+    const enrichedFlows = flows.map((f: any) => ({
       ...f,
       metrics: flowMetrics[f.id] || null,
     }));
 
-    const enrichedCampaigns = campaigns.map(c => ({
+    const enrichedCampaigns = campaigns.map((c: any) => ({
       ...c,
       metrics: campaignMetrics[c.id] || null,
     }));
 
-    // Calculate global stats
-    const totalFlowRevenue = Object.values(flowMetrics).reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
-    const totalCampaignRevenue = Object.values(campaignMetrics).reduce((sum: number, m: any) => sum + (m.revenue || 0), 0);
-    const totalFlowConversions = Object.values(flowMetrics).reduce((sum: number, m: any) => sum + (m.conversions || 0), 0);
-    const totalCampaignConversions = Object.values(campaignMetrics).reduce((sum: number, m: any) => sum + (m.conversions || 0), 0);
+    // Global stats
+    const allFlowMetrics = Object.values(flowMetrics) as any[];
+    const allCampMetrics = Object.values(campaignMetrics) as any[];
+
+    const totalFlowRevenue = allFlowMetrics.reduce((s, m) => s + (m.revenue || 0), 0);
+    const totalCampaignRevenue = allCampMetrics.reduce((s, m) => s + (m.revenue || 0), 0);
+
+    const avgOpenRate = [...allFlowMetrics, ...allCampMetrics].length > 0
+      ? [...allFlowMetrics, ...allCampMetrics].reduce((s, m) => s + (m.open_rate || 0), 0) / [...allFlowMetrics, ...allCampMetrics].length
+      : 0;
+    const avgClickRate = [...allFlowMetrics, ...allCampMetrics].length > 0
+      ? [...allFlowMetrics, ...allCampMetrics].reduce((s, m) => s + (m.click_rate || 0), 0) / [...allFlowMetrics, ...allCampMetrics].length
+      : 0;
 
     const globalStats = {
       totalProfiles,
       totalFlows: flows.length,
-      activeFlows: flows.filter(f => f.status === 'live').length,
+      activeFlows: flows.filter((f: any) => f.status === 'live').length,
       totalCampaigns: campaigns.length,
-      sentCampaigns: sentCampaignIds.length,
+      sentCampaigns: campaigns.filter((c: any) => c.status === 'Sent' || c.send_time).length,
       totalRevenue: totalFlowRevenue + totalCampaignRevenue,
       totalFlowRevenue,
       totalCampaignRevenue,
-      totalConversions: totalFlowConversions + totalCampaignConversions,
+      avgOpenRate,
+      avgClickRate,
+      totalConversions: [...allFlowMetrics, ...allCampMetrics].reduce((s, m) => s + (m.conversion_rate || 0), 0),
     };
 
-    console.log(`[sync-klaviyo-metrics] Done: ${flows.length} flows, ${campaigns.length} campaigns`);
+    console.log(`[klaviyo] Done: ${flows.length} flows, ${campaigns.length} campaigns, flowMetrics: ${Object.keys(flowMetrics).length}, campMetrics: ${Object.keys(campaignMetrics).length}`);
 
     return new Response(
-      JSON.stringify({
-        flows: enrichedFlows,
-        campaigns: enrichedCampaigns,
-        globalStats,
-      }),
+      JSON.stringify({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    console.error('[sync-klaviyo-metrics] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    console.error('[klaviyo] Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
