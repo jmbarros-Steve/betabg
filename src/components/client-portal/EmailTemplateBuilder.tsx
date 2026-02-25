@@ -216,8 +216,11 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     toast.success('URL copiada');
   };
 
+  const [previewFullTemplate, setPreviewFullTemplate] = useState<any>(null);
+
   const loadKlaviyoTemplates = async () => {
     setImportLoading(true);
+    setKlaviyoTemplates([]);
     try {
       const { data: conn } = await supabase
         .from('platform_connections')
@@ -229,10 +232,11 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
         .maybeSingle();
       if (!conn) { toast.error('No hay conexión activa de Klaviyo'); setImportLoading(false); return; }
       const { data, error } = await supabase.functions.invoke('import-klaviyo-templates', {
-        body: { connectionId: conn.id, action: 'list' },
+        body: { connectionId: conn.id },
       });
       if (error) { toast.error('Error cargando templates de Klaviyo'); return; }
       setKlaviyoTemplates(data?.templates || []);
+      if ((data?.templates || []).length === 0) toast.info('No se encontraron templates en Klaviyo');
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -240,29 +244,15 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     }
   };
 
-  const importKlaviyoTemplate = async (templateId: string, name: string) => {
-    setImportingId(templateId);
+  const importKlaviyoTemplate = async (template: any) => {
+    setImportingId(template.id);
     try {
-      const { data: conn } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'klaviyo')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-      if (!conn) return;
-      const { data, error } = await supabase.functions.invoke('import-klaviyo-templates', {
-        body: { connectionId: conn.id, action: 'get', templateId },
-      });
-      if (error || !data?.template) { toast.error('Error importando template'); return; }
-
-      const colors = data.template.extractedColors || [];
+      const colors = template.extractedColors || [];
       const payload = {
         client_id: clientId,
-        name: `[Klaviyo] ${name}`,
+        name: `[Klaviyo] ${template.name}`,
         description: 'Importado desde Klaviyo',
-        base_html: data.template.html,
+        base_html: template.html,
         primary_color: colors[0] || '#000000',
         secondary_color: colors[1] || '#ffffff',
         accent_color: colors[2] || '#4F46E5',
@@ -271,7 +261,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       };
       const { error: insertErr } = await supabase.from('email_templates').insert(payload as any);
       if (insertErr) { toast.error('Error guardando template importado'); return; }
-      toast.success('Template importado exitosamente');
+      toast.success(`✅ Template importado: ${template.name}`);
       setImportOpen(false);
       loadTemplates();
     } catch (e: any) {
@@ -296,30 +286,93 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
                   <Download className="w-4 h-4 mr-1.5" /> Importar desde Klaviyo
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>📥 Importar Template de Klaviyo</DialogTitle></DialogHeader>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>📥 Importar Template de Klaviyo (últimos 10)</DialogTitle></DialogHeader>
                 {importLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Cargando templates con HTML completo... (puede tardar 5-10 seg)</p>
                   </div>
                 ) : klaviyoTemplates.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">No se encontraron templates en Klaviyo</p>
                 ) : (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {klaviyoTemplates.map(t => (
-                      <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                        <div>
-                          <p className="text-sm font-medium">{t.name}</p>
-                          {t.created && <p className="text-[10px] text-muted-foreground">{format(new Date(t.created), 'dd/MM/yyyy')}</p>}
+                      <div key={t.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                        {t.hasHtml ? (
+                          <div
+                            className="w-full h-[180px] bg-white cursor-pointer relative group"
+                            onClick={() => setPreviewFullTemplate(t)}
+                          >
+                            <iframe
+                              srcDoc={t.html}
+                              className="w-[600px] h-[600px] origin-top-left pointer-events-none"
+                              style={{ transform: 'scale(0.42)', transformOrigin: 'top left' }}
+                              sandbox="allow-same-origin"
+                              title={t.name}
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                              <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full h-[180px] bg-muted flex items-center justify-center">
+                            <Badge variant="secondary">Solo texto</Badge>
+                          </div>
+                        )}
+                        <div className="p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{t.name}</p>
+                              {t.created && <p className="text-[10px] text-muted-foreground">{format(new Date(t.created), 'dd/MM/yyyy HH:mm')}</p>}
+                            </div>
+                          </div>
+                          {t.extractedColors?.length > 0 && (
+                            <div className="flex gap-1">
+                              {t.extractedColors.slice(0, 6).map((c: string, i: number) => (
+                                <div key={i} className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: c }} title={c} />
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            disabled={!t.hasHtml || importingId === t.id}
+                            onClick={() => importKlaviyoTemplate(t)}
+                          >
+                            {importingId === t.id ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
+                            {t.hasHtml ? '📥 Usar este template' : 'No disponible (solo texto)'}
+                          </Button>
                         </div>
-                        <Button size="sm" variant="outline" disabled={importingId === t.id} onClick={() => importKlaviyoTemplate(t.id, t.name)}>
-                          {importingId === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
-                          Importar
-                        </Button>
                       </div>
                     ))}
                   </div>
                 )}
+              </DialogContent>
+            </Dialog>
+            {/* Full-size preview modal */}
+            <Dialog open={!!previewFullTemplate} onOpenChange={v => { if (!v) setPreviewFullTemplate(null); }}>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
+                <DialogHeader className="p-4 pb-0">
+                  <DialogTitle>👁️ {previewFullTemplate?.name}</DialogTitle>
+                </DialogHeader>
+                {previewFullTemplate?.html && (
+                  <div className="bg-white">
+                    <iframe
+                      srcDoc={previewFullTemplate.html}
+                      className="w-full border-0"
+                      style={{ minHeight: '600px', height: '80vh' }}
+                      sandbox="allow-same-origin"
+                      title="Preview completo"
+                    />
+                  </div>
+                )}
+                <div className="p-4 pt-2 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPreviewFullTemplate(null)}>Cerrar</Button>
+                  <Button size="sm" disabled={importingId === previewFullTemplate?.id} onClick={() => { importKlaviyoTemplate(previewFullTemplate); setPreviewFullTemplate(null); }}>
+                    <Download className="w-3 h-3 mr-1" /> Importar este template
+                  </Button>
+                </div>
               </DialogContent>
             </Dialog>
             <Button onClick={startNew} size="sm">

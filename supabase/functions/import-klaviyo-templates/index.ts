@@ -16,7 +16,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify auth
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
@@ -34,7 +33,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { connectionId, action, templateId } = body;
+    const { connectionId } = body;
 
     if (!connectionId) {
       return new Response(JSON.stringify({ error: 'connectionId required' }), {
@@ -66,65 +65,66 @@ serve(async (req) => {
       'revision': '2024-10-15',
     };
 
-    if (action === 'list') {
-      // List templates
-      const resp = await fetch('https://a.klaviyo.com/api/templates/', { headers });
+    // Fetch templates - try with sort first, fallback without
+    let templatesData: any;
+    try {
+      const resp = await fetch('https://a.klaviyo.com/api/templates/?sort=-created&page[size]=10', { headers });
+      if (!resp.ok) throw new Error(`Status ${resp.status}`);
+      templatesData = await resp.json();
+    } catch {
+      // Fallback: fetch more and sort manually
+      const resp = await fetch('https://a.klaviyo.com/api/templates/?page[size]=50', { headers });
       if (!resp.ok) {
         const errText = await resp.text();
         return new Response(JSON.stringify({ error: `Klaviyo API error: ${resp.status}`, details: errText }), {
           status: resp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-
-      const data = await resp.json();
-      const templates = (data.data || []).map((t: any) => ({
-        id: t.id,
-        name: t.attributes?.name || 'Sin nombre',
-        created: t.attributes?.created || null,
-        updated: t.attributes?.updated || null,
-        html: t.attributes?.html ? '(available)' : null,
-      }));
-
-      return new Response(JSON.stringify({ templates }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      templatesData = await resp.json();
+      // Sort by created desc and take 10
+      if (templatesData.data) {
+        templatesData.data = templatesData.data
+          .sort((a: any, b: any) => new Date(b.attributes?.created || 0).getTime() - new Date(a.attributes?.created || 0).getTime())
+          .slice(0, 10);
+      }
     }
 
-    if (action === 'get' && templateId) {
-      // Get single template with HTML
-      const resp = await fetch(`https://a.klaviyo.com/api/templates/${templateId}/`, { headers });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        return new Response(JSON.stringify({ error: `Klaviyo API error: ${resp.status}`, details: errText }), {
-          status: resp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+    console.log('Templates count:', templatesData.data?.length || 0);
 
-      const data = await resp.json();
-      const attrs = data.data?.attributes || {};
-      
-      // Extract colors from HTML
-      const html = attrs.html || '';
-      const colorMatches = html.match(/#[0-9a-fA-F]{6}/g) || [];
-      const uniqueColors = [...new Set(colorMatches)].slice(0, 10);
+    // Fetch full HTML for each template
+    const templates = [];
+    for (const t of (templatesData.data || [])) {
+      try {
+        const detailResp = await fetch(`https://a.klaviyo.com/api/templates/${t.id}/`, { headers });
+        const detail = await detailResp.json();
+        const html = detail.data?.attributes?.html || '';
+        const text = detail.data?.attributes?.text || '';
 
-      return new Response(JSON.stringify({
-        template: {
-          id: data.data?.id,
-          name: attrs.name || 'Sin nombre',
-          html: attrs.html || '',
-          text: attrs.text || '',
-          created: attrs.created,
-          updated: attrs.updated,
+        // Extract colors from HTML
+        const colorMatches = html.match(/#[0-9a-fA-F]{6}/g) || [];
+        const uniqueColors = [...new Set(colorMatches)].slice(0, 10);
+
+        templates.push({
+          id: t.id,
+          name: detail.data?.attributes?.name || t.attributes?.name || 'Sin nombre',
+          html,
+          text,
+          hasHtml: html.length > 0,
+          htmlLength: html.length,
+          created: detail.data?.attributes?.created || t.attributes?.created,
+          updated: detail.data?.attributes?.updated || t.attributes?.updated,
           extractedColors: uniqueColors,
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        });
+        console.log(`Template "${t.attributes?.name}": HTML length ${html.length}`);
+      } catch (e: any) {
+        console.log(`Error fetching template ${t.id}:`, e.message);
+      }
+      // Rate limit
+      await new Promise(r => setTimeout(r, 500));
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action. Use "list" or "get"' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ templates }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error: any) {
