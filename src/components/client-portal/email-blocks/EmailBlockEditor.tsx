@@ -344,6 +344,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
                           />
                           <BlockCanvasItem
                             block={block}
+                            blockIndex={blocks.slice(0, idx).filter(b => b.type === 'product').length}
                             isSelected={selectedBlockId === block.id}
                             onSelect={() => setSelectedBlockId(block.id)}
                             onRemove={() => removeBlock(block.id)}
@@ -472,11 +473,15 @@ function BlockPaletteItem({ def, onDragStart, onAdd }: {
   );
 }
 
-function ProductBlockPreview({ block, previewProducts = [] }: { block: EmailBlock; previewProducts?: ShopifyPreviewProduct[] }) {
+function ProductBlockPreview({ block, previewProducts = [], blockIndex = 0 }: { block: EmailBlock; previewProducts?: ShopifyPreviewProduct[]; blockIndex?: number }) {
   const p = block.props;
-  const mode = p.productMode || p._mode || 'fixed';
+  let mode = p.productMode || p._mode || 'fixed';
 
-  if (mode === 'dynamic') {
+  // Detect if "fixed" block actually contains Klaviyo variables — treat as dynamic for preview
+  const hasKlaviyoVars = (val?: string) => val && typeof val === 'string' && val.includes('{{');
+  const isFixedWithVars = mode === 'fixed' && (hasKlaviyoVars(p.name) || hasKlaviyoVars(p.price) || hasKlaviyoVars(p.imageUrl));
+
+  if (mode === 'dynamic' || isFixedWithVars) {
     const typeLabels: Record<string, string> = {
       catalog_feed: 'Feed del catálogo',
       last_viewed: 'Último producto visto',
@@ -486,46 +491,67 @@ function ProductBlockPreview({ block, previewProducts = [] }: { block: EmailBloc
       recommended: 'Recomendados',
       collection_dynamic: 'Colección dinámica',
     };
-    const count = p.productsCount || 3;
+    const count = isFixedWithVars ? 1 : (p.productsCount || 3);
     const isVertical = p.productLayout === 'vertical';
     const hasRealProducts = previewProducts.length > 0;
+    const startIdx = isFixedWithVars ? blockIndex : 0;
+
     return (
-      <div className="bg-purple-50 border-2 border-dashed border-purple-300 rounded-lg p-4">
-        <div className="text-center mb-3">
-          <span className="text-2xl">🔄</span>
-          <p className="font-bold text-purple-700">
-            {typeLabels[p.dynamicType || p._dynamicType || ''] || 'Selecciona tipo →'}
-            {hasRealProducts && <span className="text-xs font-normal text-purple-500"> — Preview con datos reales</span>}
-          </p>
-        </div>
+      <div className={`${isFixedWithVars ? '' : 'bg-purple-50 border-2 border-dashed border-purple-300 rounded-lg p-4'}`}>
+        {!isFixedWithVars && (
+          <div className="text-center mb-3">
+            <span className="text-2xl">🔄</span>
+            <p className="font-bold text-purple-700">
+              {typeLabels[p.dynamicType || p._dynamicType || ''] || 'Producto dinámico'}
+              {hasRealProducts && <span className="text-xs font-normal text-purple-500"> — Preview con datos reales</span>}
+            </p>
+          </div>
+        )}
         <div className={`flex gap-2 ${isVertical ? 'flex-col' : 'flex-row'}`}>
           {Array.from({ length: count }).map((_, i) => {
-            const realProduct = previewProducts[i];
+            const realProduct = previewProducts[(startIdx + i) % Math.max(previewProducts.length, 1)];
+            if (!realProduct) {
+              return (
+                <div key={i} className="flex-1 bg-white border border-purple-200 rounded-lg p-3 text-center">
+                  <div className="w-full h-16 bg-purple-100 rounded mb-2 flex items-center justify-center text-2xl">📦</div>
+                  <p className="text-xs font-medium text-purple-600">Producto {i + 1}</p>
+                  <p className="text-xs text-purple-400">Conecta Shopify para ver datos reales</p>
+                </div>
+              );
+            }
             return (
-              <div key={i} className="flex-1 bg-white border border-purple-200 rounded-lg p-3 text-center">
+              <div key={i} className={`flex-1 ${isFixedWithVars ? 'p-3 flex gap-3' : 'bg-white border border-purple-200 rounded-lg p-3 text-center'}`}>
                 {p.showImage !== false && (
-                  realProduct?.image_url ? (
-                    <img src={realProduct.image_url} alt={realProduct.title} className="w-full h-24 object-cover rounded mb-2" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/e9d5ff/7c3aed?text=📦'; }} />
+                  isFixedWithVars ? (
+                    <img src={realProduct.image_url} alt={realProduct.title} className="w-24 h-24 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
-                    <div className="w-full h-16 bg-purple-100 rounded mb-2 flex items-center justify-center text-2xl">📦</div>
+                    realProduct.image_url ? (
+                      <img src={realProduct.image_url} alt={realProduct.title} className="w-full h-24 object-cover rounded mb-2" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/e9d5ff/7c3aed?text=📦'; }} />
+                    ) : (
+                      <div className="w-full h-16 bg-purple-100 rounded mb-2 flex items-center justify-center text-2xl">📦</div>
+                    )
                   )
                 )}
-                <p className="text-xs font-medium text-purple-600">{realProduct?.title || `Producto ${i + 1}`}</p>
-                {p.showPrice !== false && (
-                  <p className="text-xs text-purple-500 font-bold">
-                    {realProduct ? `$${Number(realProduct.price || 0).toLocaleString('es-CL')}` : '{{ Price }}'}
-                  </p>
-                )}
-                {p.showButton !== false && (
-                  <div className="mt-1 bg-purple-600 text-white rounded px-2 py-1 text-xs inline-block">{p.buttonText || 'Comprar'}</div>
-                )}
+                <div className={isFixedWithVars ? 'flex-1' : ''}>
+                  <p className={`font-${isFixedWithVars ? 'bold' : 'medium'} text-${isFixedWithVars ? 'sm' : 'xs'} ${isFixedWithVars ? '' : 'text-purple-600'}`}>{realProduct.title}</p>
+                  {p.showPrice !== false && (
+                    <p className={`font-bold text-${isFixedWithVars ? 'blue-600' : 'xs text-purple-500'}`}>
+                      ${Number(realProduct.price || 0).toLocaleString('es-CL')}
+                    </p>
+                  )}
+                  {p.showButton !== false && (
+                    <div className={`mt-${isFixedWithVars ? '2' : '1'} ${isFixedWithVars ? 'bg-black' : 'bg-purple-600'} text-white rounded px-${isFixedWithVars ? '4' : '2'} py-${isFixedWithVars ? '2' : '1'} text-${isFixedWithVars ? 'sm' : 'xs'} inline-block`}>{p.buttonText || 'Comprar ahora'}</div>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
-        <p className="text-xs text-purple-400 text-center mt-2">
-          {hasRealProducts ? '⚠️ Preview de ejemplo — Klaviyo mostrará productos personalizados al enviar' : 'Klaviyo insertará productos reales al enviar'}
-        </p>
+        {!isFixedWithVars && (
+          <p className="text-xs text-purple-400 text-center mt-2">
+            {hasRealProducts ? '⚠️ Preview de ejemplo — Klaviyo mostrará productos personalizados al enviar' : 'Klaviyo insertará productos reales al enviar'}
+          </p>
+        )}
       </div>
     );
   }
@@ -573,11 +599,11 @@ function ProductBlockPreview({ block, previewProducts = [] }: { block: EmailBloc
     );
   }
 
-  // Fixed mode
+  // Fixed mode (no Klaviyo variables)
   return (
     <div className="p-3 flex gap-3">
       {p.showImage !== false && (
-        p.imageUrl && !p.imageUrl.includes('{{') ? (
+        p.imageUrl ? (
           <img src={p.imageUrl} alt="" className="w-24 h-24 object-cover rounded" />
         ) : (
           <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center text-2xl">📦</div>
@@ -638,8 +664,9 @@ function ColumnsBlockPreview({ block, templateColors, previewProducts = [], repl
   );
 }
 
-function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors, previewProducts = [], replaceVars }: {
+function BlockCanvasItem({ block, blockIndex = 0, isSelected, onSelect, onRemove, onDuplicate, onMoveUp, onMoveDown, isFirst, isLast, templateColors, previewProducts = [], replaceVars }: {
   block: EmailBlock;
+  blockIndex?: number;
   isSelected: boolean;
   onSelect: () => void;
   onRemove: () => void;
@@ -690,7 +717,7 @@ function BlockCanvasItem({ block, isSelected, onSelect, onRemove, onDuplicate, o
       {/* Block preview */}
       <div className="pointer-events-none overflow-hidden" style={{ fontSize: '13px' }}>
         {block.type === 'product' ? (
-          <ProductBlockPreview block={block} previewProducts={previewProducts} />
+          <ProductBlockPreview block={block} previewProducts={previewProducts} blockIndex={blockIndex} />
         ) : block.type === 'columns' && block.props.columns ? (
           <ColumnsBlockPreview block={block} templateColors={templateColors} previewProducts={previewProducts} replaceVars={replaceVars} />
         ) : (
