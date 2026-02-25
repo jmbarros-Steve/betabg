@@ -23,15 +23,13 @@ function ProfileCountBadge({ count, display, loading }: { count: number | null; 
     return <span className="text-muted-foreground">—</span>;
   }
 
-  let variant: 'default' | 'secondary' | 'outline' = 'outline';
   let className = 'text-xs ';
-
-  if (count >= 1000) {
+  if (count >= 100) {
     className += 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30';
-  } else if (count >= 100) {
+  } else if (count >= 10) {
     className += 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
   } else {
-    className += 'bg-muted text-muted-foreground border-border/50';
+    className += 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30';
   }
 
   return <Badge variant="outline" className={className}>{display}</Badge>;
@@ -39,36 +37,28 @@ function ProfileCountBadge({ count, display, loading }: { count: number | null; 
 
 export function KlaviyoListsContent({ items, type, connectionId }: { items: KlaviyoListItem[]; type: 'list' | 'segment'; connectionId: string }) {
   const [counts, setCounts] = useState<Record<string, { count: number; display: string }>>({});
-  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
   const hasFetched = useRef(false);
 
   useEffect(() => {
     if (hasFetched.current || items.length === 0) return;
     hasFetched.current = true;
+    setLoading(true);
 
-    // Count profiles sequentially with 500ms delay
-    const countAll = async () => {
-      for (const item of items) {
-        setLoadingIds(prev => new Set(prev).add(item.id));
-        try {
-          const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
-            body: { connectionId, action: 'count-profiles', entityType: type, entityId: item.id },
-          });
-          if (!error && data) {
-            setCounts(prev => ({ ...prev, [item.id]: { count: data.count, display: data.display } }));
-          }
-        } catch { /* ignore */ }
-        setLoadingIds(prev => {
-          const next = new Set(prev);
-          next.delete(item.id);
-          return next;
+    const fetchCounts = async () => {
+      try {
+        const entities = items.map(item => ({ type, id: item.id }));
+        const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+          body: { connectionId, action: 'count-profiles', entities },
         });
-        // 500ms delay between calls
-        await new Promise(r => setTimeout(r, 500));
-      }
+        if (!error && data?.results) {
+          setCounts(data.results);
+        }
+      } catch { /* ignore */ }
+      setLoading(false);
     };
 
-    countAll();
+    fetchCounts();
   }, [items, type, connectionId]);
 
   if (items.length === 0) {
@@ -95,7 +85,6 @@ export function KlaviyoListsContent({ items, type, connectionId }: { items: Klav
         <tbody>
           {items.map(item => {
             const countData = counts[item.id];
-            const isLoading = loadingIds.has(item.id);
             return (
               <tr key={item.id} className="border-t border-border/30 hover:bg-muted/30 transition-colors">
                 <td className="p-3">
@@ -108,7 +97,7 @@ export function KlaviyoListsContent({ items, type, connectionId }: { items: Klav
                   <ProfileCountBadge
                     count={countData?.count ?? null}
                     display={countData?.display ?? null}
-                    loading={isLoading}
+                    loading={loading && !countData}
                   />
                 </td>
                 <td className="p-3 text-muted-foreground text-xs hidden sm:table-cell">{formatDate(item.created)}</td>
