@@ -11,17 +11,42 @@ serve(async (req) => {
   }
 
   try {
-    const { templateBlocks, campaign, shopUrl, colors, previousEmails } = await req.json()
+    const body = await req.json()
+    const { templateBlocks, campaign, shopUrl, colors, previousEmails } = body
+
+    console.log('Request received:', JSON.stringify({
+      hasTemplateBlocks: !!templateBlocks,
+      templateBlocksCount: templateBlocks?.length,
+      campaignName: campaign?.name,
+      campaignSubject: campaign?.subject,
+      campaignContent: campaign?.content?.substring(0, 100),
+      hasShopUrl: !!shopUrl,
+      hasColors: !!colors,
+    }))
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured')
+    console.log('Anthropic API key exists:', !!ANTHROPIC_API_KEY, 'length:', ANTHROPIC_API_KEY?.length)
+
+    if (!ANTHROPIC_API_KEY) {
+      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Truncate template if too large
+    const templateJson = JSON.stringify(templateBlocks || [])
+    const truncatedTemplate = templateJson.length > 15000
+      ? templateJson.substring(0, 15000) + '... (truncated)'
+      : templateJson
+    console.log('Template JSON length:', templateJson.length, 'truncated:', templateJson.length > 15000)
 
     const systemPrompt = `Eres Steve, experto en email marketing para e-commerce Shopify con Klaviyo.
 
 Tu trabajo: tomar una plantilla de email en formato de bloques JSON y ADAPTARLA según las instrucciones del usuario, manteniendo la estructura, el tono y el estilo.
 
 PLANTILLA BASE (bloques JSON que debes modificar):
-${JSON.stringify(templateBlocks)}
+${truncatedTemplate}
 
 ${previousEmails ? `MAILS ANTERIORES DEL CLIENTE (para mantener el mismo tono, firma y estilo):
 ${previousEmails}` : ''}
@@ -39,11 +64,11 @@ REGLAS OBLIGATORIAS:
 10. Cada bloque DEBE tener un id único (string)
 
 URLS DE SHOPIFY:
-- Tienda: ${shopUrl}
-- Colección: ${shopUrl}/collections/[handle]
-- Producto: ${shopUrl}/products/[handle]
-- Carrito: ${shopUrl}/cart
-- Cupón: ${shopUrl}/discount/[codigo]
+- Tienda: ${shopUrl || 'https://tienda.com'}
+- Colección: ${shopUrl || 'https://tienda.com'}/collections/[handle]
+- Producto: ${shopUrl || 'https://tienda.com'}/products/[handle]
+- Carrito: ${shopUrl || 'https://tienda.com'}/cart
+- Cupón: ${shopUrl || 'https://tienda.com'}/discount/[codigo]
 
 COLORES DEL CLIENTE:
 - Primario: ${colors?.primary || '#000000'}
@@ -52,10 +77,11 @@ COLORES DEL CLIENTE:
 
 VARIABLES DE KLAVIYO (usar donde corresponda):
 - Saludo: {{ person.first_name|default:"Amigo" }}
-- Si es flow de carrito: {{ event.items.0.product.title }}, etc.
-- Si es flow de browse: {{ event.extra.title }}, etc.
 
 Responde SOLO con el array JSON de bloques modificados. Sin explicación, sin markdown, solo JSON puro.`
+
+    console.log('System prompt length:', systemPrompt.length)
+    console.log('Calling Anthropic API with model claude-sonnet-4-20250514...')
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -72,33 +98,48 @@ Responde SOLO con el array JSON de bloques modificados. Sin explicación, sin ma
           role: 'user',
           content: `Adapta el template para esta campaña:
 
-Nombre: ${campaign.name}
-Asunto: ${campaign.subject}
-Instrucciones: ${campaign.content}
+Nombre: ${campaign?.name || 'Sin nombre'}
+Asunto: ${campaign?.subject || 'Sin asunto'}
+Instrucciones: ${campaign?.content || campaign?.instructions || 'Sin instrucciones'}
 
 Genera los bloques JSON modificados.`
         }]
       })
     })
 
+    console.log('Anthropic response status:', response.status)
+
     if (!response.ok) {
       const errText = await response.text()
-      console.error('Anthropic API error:', response.status, errText)
-      throw new Error(`API error: ${response.status}`)
+      console.error('Anthropic API error:', response.status, errText.substring(0, 500))
+      return new Response(JSON.stringify({ 
+        error: `Anthropic API error: ${response.status}`,
+        details: errText.substring(0, 500)
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const data = await response.json()
     const text = data.content?.[0]?.text || '[]'
-    
+    console.log('Claude response length:', text.length, 'preview:', text.substring(0, 200))
+
     // Parse JSON cleaning possible markdown
     const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     
     let blocks
     try {
       blocks = JSON.parse(clean)
-    } catch (parseErr) {
-      console.error('JSON parse error:', parseErr, 'Raw text:', text.substring(0, 500))
-      throw new Error('Error parseando respuesta de la IA')
+    } catch (parseErr: any) {
+      console.error('JSON parse error:', parseErr.message, 'Raw:', clean.substring(0, 300))
+      return new Response(JSON.stringify({ 
+        error: 'Failed to parse Claude response as JSON',
+        raw: clean.substring(0, 500)
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
     
     // Ensure IDs
@@ -107,12 +148,14 @@ Genera los bloques JSON modificados.`
       id: b.id || `block-${Date.now()}-${i}`
     }))
 
+    console.log('Generated', blocksWithIds.length, 'blocks for', campaign?.name)
+
     return new Response(JSON.stringify({ blocks: blocksWithIds }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (err: any) {
-    console.error('generate-mass-campaigns error:', err)
+    console.error('generate-mass-campaigns error:', err.message, err.stack)
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
