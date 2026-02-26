@@ -2,8 +2,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-export-key',
 }
+
+const EXPORT_KEY = 'steve-export-2026'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,33 +13,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const exportKey = req.headers.get('x-export-key')
+    if (exportKey !== EXPORT_KEY) {
+      return new Response(JSON.stringify({ error: 'Forbidden: invalid export key' }), { status: 403, headers: corsHeaders })
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
-
-    // Verify super admin
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
-    }
-    const token = authHeader.replace('Bearer ', '')
-    const { data: claims, error: claimsErr } = await supabaseAdmin.auth.getUser(token)
-    if (claimsErr || !claims?.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
-    }
-
-    const { data: roleData } = await supabaseAdmin
-      .from('user_roles')
-      .select('is_super_admin')
-      .eq('user_id', claims.user.id)
-      .eq('role', 'admin')
-      .eq('is_super_admin', true)
-      .maybeSingle()
-
-    if (!roleData) {
-      return new Response(JSON.stringify({ error: 'Forbidden: super_admin only' }), { status: 403, headers: corsHeaders })
-    }
 
     const tables = [
       'clients', 'user_roles', 'buyer_personas', 'platform_connections',
