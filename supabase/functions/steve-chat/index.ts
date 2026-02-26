@@ -643,13 +643,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-
-    if (!lovableApiKey) {
-      return new Response(JSON.stringify({ error: 'AI service not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -669,7 +662,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { client_id, conversation_id, message } = await req.json();
+    const { client_id, conversation_id, message, mode } = await req.json();
 
     if (!client_id) {
       return new Response(JSON.stringify({ error: 'Missing client_id' }), {
@@ -705,12 +698,190 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ESTRATEGIA MODE — Free-form strategic consulting chat
+    // ═══════════════════════════════════════════════════════════════
+    if (mode === 'estrategia') {
+      let estrategiaConvId = conversation_id;
+
+      // Create or reuse conversation
+      if (!estrategiaConvId) {
+        const { data: existingConv } = await supabase
+          .from('steve_conversations')
+          .select('id')
+          .eq('client_id', client_id)
+          .eq('conversation_type', 'estrategia')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingConv) {
+          estrategiaConvId = existingConv.id;
+        } else {
+          const { data: newConv, error: convErr } = await supabase
+            .from('steve_conversations')
+            .insert({ client_id, conversation_type: 'estrategia' })
+            .select()
+            .single();
+          if (convErr) {
+            return new Response(JSON.stringify({ error: 'Failed to create estrategia conversation' }), {
+              status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          estrategiaConvId = newConv.id;
+        }
+      }
+
+      // If no message, just return the conversation_id (initialization)
+      if (!message) {
+        return new Response(JSON.stringify({ conversation_id: estrategiaConvId }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Insert user message
+      await supabase.from('steve_messages').insert({
+        conversation_id: estrategiaConvId,
+        role: 'user',
+        content: message,
+      });
+
+      // Fetch last 20 messages for context window management
+      const { data: convMessages } = await supabase
+        .from('steve_messages')
+        .select('role, content')
+        .eq('conversation_id', estrategiaConvId)
+        .order('created_at', { ascending: true })
+        .limit(40);
+
+      const recentMessages = (convMessages || []).slice(-20);
+
+      // Load client brief (persona_data)
+      const { data: persona } = await supabase
+        .from('buyer_personas')
+        .select('persona_data, is_complete')
+        .eq('client_id', client_id)
+        .maybeSingle();
+
+      const briefSummary = persona?.persona_data
+        ? JSON.stringify(persona.persona_data)
+        : 'Brief no completado aún.';
+
+      // Load brand research
+      const { data: research } = await supabase
+        .from('brand_research')
+        .select('research_type, research_data')
+        .eq('client_id', client_id);
+
+      const researchContext = research?.map((r: { research_type: string; research_data: any }) =>
+        `### ${r.research_type}\n${JSON.stringify(r.research_data).slice(0, 2000)}`
+      ).join('\n\n') || '';
+
+      // Load knowledge base (same pattern as brief mode)
+      const mensajeLower = (message || '').toLowerCase();
+      const categoriaRelevante =
+        mensajeLower.includes('meta') || mensajeLower.includes('anuncio') || mensajeLower.includes('campaña') ? 'meta_ads' :
+        mensajeLower.includes('buyer') || mensajeLower.includes('cliente') || mensajeLower.includes('dolor') ? 'buyer_persona' :
+        mensajeLower.includes('seo') || mensajeLower.includes('posicionamiento') ? 'seo' :
+        mensajeLower.includes('google') ? 'google_ads' :
+        mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' :
+        mensajeLower.includes('shopify') || mensajeLower.includes('tienda') ? 'shopify' :
+        'brief';
+
+      const { data: knowledge } = await supabase
+        .from('steve_knowledge')
+        .select('categoria, titulo, contenido')
+        .in('categoria', [categoriaRelevante, 'brief'])
+        .eq('activo', true)
+        .order('orden', { ascending: true })
+        .limit(8);
+
+      const knowledgeCtx = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
+        `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
+      ).join('\n\n') || '';
+
+      const estrategiaSystemPrompt = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el consultor estratégico del cliente.
+
+PERSONALIDAD:
+- Perro literal, brutalmente honesto, sin filtros
+- Mezcla jerga de marketing con referencias perrunas
+- Si algo es humo, lo ladras claro
+- Usas emojis: 🐕 🎯 💰 📊 🚀 😤
+- Groserías ocasionales cuando algo es absurdo
+- Referencias a tu doctorado de Stanford
+
+🌎 IDIOMA: Español latinoamericano neutro. NO uses voseo argentino.
+
+ROL: Consultor estratégico libre. El cliente puede preguntarte CUALQUIER COSA sobre marketing, estrategia, competencia, posicionamiento, pricing, campañas, copywriting, SEO, etc. Responde con profundidad y datos concretos basándote en el brief y la investigación del cliente.
+
+NO eres un cuestionario. NO hagas preguntas estructuradas. Simplemente conversa y asesora.
+
+${persona?.is_complete ? '' : '⚠️ NOTA: El brief del cliente aún NO está completo. Puedes responder sus preguntas pero recuérdale que para un análisis más profundo debería completar el brief en la pestaña "Steve".'}
+
+BRIEF DEL CLIENTE:
+${briefSummary}
+
+${researchContext ? `INVESTIGACIÓN DE MARCA:\n${researchContext}\n` : ''}
+${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
+
+Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables.`;
+
+      const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+      if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+
+      const aiMessages = recentMessages.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
+      const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-6',
+          max_tokens: 2000,
+          system: estrategiaSystemPrompt,
+          messages: aiMessages,
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('AI API error (estrategia):', aiResponse.status, errorText);
+        if (aiResponse.status === 429) return new Response(JSON.stringify({ error: 'Rate limit' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'AI service error' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const aiData = await aiResponse.json();
+      const assistantMsg = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu pregunta?';
+
+      await supabase.from('steve_messages').insert({
+        conversation_id: estrategiaConvId,
+        role: 'assistant',
+        content: assistantMsg,
+      });
+
+      console.log(`Steve estrategia: conversation ${estrategiaConvId}, client ${client_id}`);
+
+      return new Response(JSON.stringify({
+        conversation_id: estrategiaConvId,
+        message: assistantMsg,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // BRIEF MODE — Structured 17-question brand brief (existing logic)
+    // ═══════════════════════════════════════════════════════════════
     let activeConversationId = conversation_id;
 
     if (!activeConversationId) {
       const { data: newConv, error: convError } = await supabase
         .from('steve_conversations')
-        .insert({ client_id })
+        .insert({ client_id, conversation_type: 'brief' })
         .select()
         .single();
 

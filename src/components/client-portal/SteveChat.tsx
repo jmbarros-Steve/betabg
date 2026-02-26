@@ -215,6 +215,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
         .from('steve_conversations')
         .select('id')
         .eq('client_id', clientId)
+        .eq('conversation_type', 'brief')
         .order('created_at', { ascending: false })
         .limit(1);
 

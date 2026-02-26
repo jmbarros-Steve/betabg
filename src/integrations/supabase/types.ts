@@ -1268,20 +1268,26 @@ export type Database = {
       steve_conversations: {
         Row: {
           client_id: string
+          conversation_type: string
           created_at: string
           id: string
+          pending_question_index: number | null
           updated_at: string
         }
         Insert: {
           client_id: string
+          conversation_type?: string
           created_at?: string
           id?: string
+          pending_question_index?: number | null
           updated_at?: string
         }
         Update: {
           client_id?: string
+          conversation_type?: string
           created_at?: string
           id?: string
+          pending_question_index?: number | null
           updated_at?: string
         }
         Relationships: [

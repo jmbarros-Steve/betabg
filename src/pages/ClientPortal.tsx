@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, MessageSquare } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -9,6 +9,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { ClientPortalMetrics } from '@/components/client-portal/ClientPortalMetrics';
 import { ClientPortalConnections } from '@/components/client-portal/ClientPortalConnections';
 import { SteveChat } from '@/components/client-portal/SteveChat';
+import { SteveEstrategia } from '@/components/client-portal/SteveEstrategia';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
 import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
@@ -21,12 +22,11 @@ import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPane
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
-import { SteveStrategyChat } from '@/components/client-portal/SteveStrategyChat';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'strategy' | 'copies' | 'google' | 'klaviyo' | 'config';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'google' | 'klaviyo' | 'config';
 interface ClientInfo {
   id: string;
   name: string;
@@ -38,7 +38,7 @@ export default function ClientPortal() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const { user, loading: authLoading, signOut } = useAuth();
   const { isClient, isAdmin, isSuperAdmin, isShopifyUser, loading: roleLoading, clientData } = useUserRole();
-  
+
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
@@ -49,7 +49,7 @@ export default function ClientPortal() {
   // SECURITY: Only super admins can view other clients' portals
   // Shopify users with admin role should NOT have this access
   const isAdminView = isSuperAdmin && urlClientId;
-  
+
   // Determine which client data to use
   const displayClient = isAdminView ? adminViewClient : clientData;
   const effectiveClientId = isAdminView ? urlClientId : clientData?.id;
@@ -94,7 +94,7 @@ export default function ClientPortal() {
     async function fetchClientForAdmin() {
       // SECURITY: Only super admins can view other clients
       if (!isSuperAdmin || !urlClientId) return;
-      
+
       setLoadingClient(true);
       try {
         const { data, error } = await supabase
@@ -174,7 +174,7 @@ export default function ClientPortal() {
     { id: 'competitors', label: 'Competencia', icon: Instagram },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
     { id: 'steve', label: 'Steve', icon: Bot },
-    { id: 'strategy', label: 'Steve Estrategia', icon: MessageSquare },
+    { id: 'estrategia', label: 'Estrategia', icon: Lightbulb },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
@@ -261,9 +261,9 @@ export default function ClientPortal() {
             <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
           )}
           {activeTab === 'brief' && effectiveClientId && (
-            <BrandBriefView 
-              clientId={effectiveClientId} 
-              onEditBrief={() => setActiveTab('steve')} 
+            <BrandBriefView
+              clientId={effectiveClientId}
+              onEditBrief={() => setActiveTab('steve')}
             />
           )}
           {activeTab === 'competitors' && effectiveClientId && (
@@ -277,9 +277,9 @@ export default function ClientPortal() {
               <SteveChat clientId={effectiveClientId} />
             </div>
           )}
-          {activeTab === 'strategy' && effectiveClientId && (
+          {activeTab === 'estrategia' && effectiveClientId && (
             <div className="max-w-2xl mx-auto">
-              <SteveStrategyChat clientId={effectiveClientId} onGoToBrief={() => setActiveTab('steve')} />
+              <SteveEstrategia clientId={effectiveClientId} />
             </div>
           )}
           {activeTab === 'copies' && effectiveClientId && (
@@ -315,7 +315,7 @@ export default function ClientPortal() {
 
       {/* Onboarding Modal */}
       {showOnboarding && (
-        <ClientOnboarding 
+        <ClientOnboarding
           onComplete={handleCompleteOnboarding}
           clientName={displayClient?.name}
         />
