@@ -87,7 +87,7 @@ async function createCampaign(
   const attributes: any = {
     name,
     audiences: {
-      included: [{ type: 'list', id: listId }],
+      included: [listId],
       excluded: [],
     },
     send_strategy: {
@@ -138,12 +138,9 @@ async function assignTemplateToMessage(apiKey: string, messageId: string, templa
     method: 'POST',
     body: JSON.stringify({
       data: {
-        type: 'campaign-message-assign-template',
-        attributes: {},
+        type: 'campaign-message',
+        id: messageId,
         relationships: {
-          'campaign-message': {
-            data: { type: 'campaign-message', id: messageId },
-          },
           template: {
             data: { type: 'template', id: templateId },
           },

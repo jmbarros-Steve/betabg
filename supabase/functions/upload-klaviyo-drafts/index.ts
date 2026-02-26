@@ -85,7 +85,7 @@ serve(async (req) => {
 
     await new Promise(r => setTimeout(r, 1000))
 
-    // 2. Create campaign WITH campaign-messages inline (Klaviyo requires this as a nested attribute)
+    // 2. Create campaign with campaign-messages (without template — assigned separately)
     const campaignPayload = {
       data: {
         type: 'campaign',
@@ -107,18 +107,7 @@ serve(async (req) => {
                   from_email: '{{ organization.default.email }}',
                   from_label: '{{ organization.default.sender_name }}',
                 },
-                render_options: {
-                  shorten_links: true,
-                  add_org_prefix: true,
-                  add_info_link: true,
-                  add_opt_out_link: true,
-                },
               },
-              relationships: {
-                template: {
-                  data: { type: 'template', id: templateId }
-                }
-              }
             }]
           },
           send_strategy: {
@@ -145,6 +134,34 @@ serve(async (req) => {
 
     const campData = await campResp.json()
     const campaignId = campData.data?.id
+    console.log(`Campaign created: ${campaignId}`)
+
+    // 3. Get campaign message ID and assign template
+    const msgRelData = campData.data?.relationships?.['campaign-messages']?.data
+    const messageId = msgRelData?.[0]?.id
+    if (messageId && templateId) {
+      await new Promise(r => setTimeout(r, 500))
+      const assignResp = await fetch('https://a.klaviyo.com/api/campaign-message-assign-template/', {
+        method: 'POST',
+        headers: klaviyoHeaders,
+        body: JSON.stringify({
+          data: {
+            type: 'campaign-message',
+            id: messageId,
+            relationships: {
+              template: {
+                data: { type: 'template', id: templateId }
+              }
+            }
+          }
+        })
+      })
+      if (!assignResp.ok) {
+        console.error('Template assign error:', assignResp.status, await assignResp.text())
+      } else {
+        console.log(`Template ${templateId} assigned to message ${messageId}`)
+      }
+    }
     console.log(`✅ Campaign created as draft: ${campaignId}`)
 
     return new Response(JSON.stringify({ 
