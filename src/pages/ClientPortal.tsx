@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,10 +40,19 @@ export default function ClientPortal() {
 
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('metrics');
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(new Set(['metrics']));
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
+
+  // Track visited tabs so they stay mounted (preserves state like in-flight API calls)
+  useEffect(() => {
+    setVisitedTabs(prev => {
+      if (prev.has(activeTab)) return prev;
+      return new Set([...prev, activeTab]);
+    });
+  }, [activeTab]);
 
   // SECURITY: Only super admins can view other clients' portals
   // Shopify users with admin role should NOT have this access
@@ -241,66 +249,87 @@ export default function ClientPortal() {
           ))}
         </div>
 
-        {/* Content */}
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {activeTab === 'metrics' && effectiveClientId && (
-            <ClientPortalMetrics clientId={effectiveClientId} />
-          )}
-          {activeTab === 'campaigns' && effectiveClientId && (
-            <CampaignAnalyticsPanel clientId={effectiveClientId} />
-          )}
-          {activeTab === 'shopify' && effectiveClientId && (
-            <ShopifyDashboard clientId={effectiveClientId} />
-          )}
-          {activeTab === 'connections' && effectiveClientId && (
-            <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
-          )}
-          {activeTab === 'brief' && effectiveClientId && (
-            <BrandBriefView
-              clientId={effectiveClientId}
-              onEditBrief={() => setActiveTab('steve')}
-            />
-          )}
-          {activeTab === 'competitors' && effectiveClientId && (
-            <CompetitorAdsPanel clientId={effectiveClientId} />
-          )}
-          {activeTab === 'deepdive' && effectiveClientId && (
-            <CompetitorDeepDivePanel clientId={effectiveClientId} />
-          )}
-          {activeTab === 'steve' && effectiveClientId && (
-            <div className="max-w-2xl mx-auto">
-              <SteveChat clientId={effectiveClientId} />
+        {/* Content — tabs stay mounted once visited so in-flight requests complete */}
+        <div>
+          {visitedTabs.has('metrics') && effectiveClientId && (
+            <div className={activeTab !== 'metrics' ? 'hidden' : ''}>
+              <ClientPortalMetrics clientId={effectiveClientId} />
             </div>
           )}
-          {activeTab === 'estrategia' && effectiveClientId && (
-            <div className="max-w-2xl mx-auto">
-              <SteveEstrategia clientId={effectiveClientId} />
+          {visitedTabs.has('campaigns') && effectiveClientId && (
+            <div className={activeTab !== 'campaigns' ? 'hidden' : ''}>
+              <CampaignAnalyticsPanel clientId={effectiveClientId} />
             </div>
           )}
-          {activeTab === 'copies' && effectiveClientId && (
-            <div className="max-w-4xl mx-auto">
-              <CopyGenerator clientId={effectiveClientId} />
+          {visitedTabs.has('shopify') && effectiveClientId && (
+            <div className={activeTab !== 'shopify' ? 'hidden' : ''}>
+              <ShopifyDashboard clientId={effectiveClientId} />
             </div>
           )}
-          {activeTab === 'google' && effectiveClientId && (
-            <div className="max-w-4xl mx-auto">
-              <GoogleAdsGenerator clientId={effectiveClientId} />
+          {visitedTabs.has('connections') && effectiveClientId && (
+            <div className={activeTab !== 'connections' ? 'hidden' : ''}>
+              <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
             </div>
           )}
-          {activeTab === 'klaviyo' && effectiveClientId && (
-            <div className="max-w-4xl mx-auto">
-              <KlaviyoPlanner clientId={effectiveClientId} />
+          {visitedTabs.has('brief') && effectiveClientId && (
+            <div className={activeTab !== 'brief' ? 'hidden' : ''}>
+              <BrandBriefView
+                clientId={effectiveClientId}
+                onEditBrief={() => setActiveTab('steve')}
+              />
             </div>
           )}
-          {activeTab === 'config' && effectiveClientId && (
-            <FinancialConfigPanel clientId={effectiveClientId} />
+          {visitedTabs.has('competitors') && effectiveClientId && (
+            <div className={activeTab !== 'competitors' ? 'hidden' : ''}>
+              <CompetitorAdsPanel clientId={effectiveClientId} />
+            </div>
           )}
-        </motion.div>
+          {visitedTabs.has('deepdive') && effectiveClientId && (
+            <div className={activeTab !== 'deepdive' ? 'hidden' : ''}>
+              <CompetitorDeepDivePanel clientId={effectiveClientId} />
+            </div>
+          )}
+          {visitedTabs.has('steve') && effectiveClientId && (
+            <div className={activeTab !== 'steve' ? 'hidden' : ''}>
+              <div className="max-w-2xl mx-auto">
+                <SteveChat clientId={effectiveClientId} />
+              </div>
+            </div>
+          )}
+          {visitedTabs.has('estrategia') && effectiveClientId && (
+            <div className={activeTab !== 'estrategia' ? 'hidden' : ''}>
+              <div className="max-w-2xl mx-auto">
+                <SteveEstrategia clientId={effectiveClientId} />
+              </div>
+            </div>
+          )}
+          {visitedTabs.has('copies') && effectiveClientId && (
+            <div className={activeTab !== 'copies' ? 'hidden' : ''}>
+              <div className="max-w-4xl mx-auto">
+                <CopyGenerator clientId={effectiveClientId} />
+              </div>
+            </div>
+          )}
+          {visitedTabs.has('google') && effectiveClientId && (
+            <div className={activeTab !== 'google' ? 'hidden' : ''}>
+              <div className="max-w-4xl mx-auto">
+                <GoogleAdsGenerator clientId={effectiveClientId} />
+              </div>
+            </div>
+          )}
+          {visitedTabs.has('klaviyo') && effectiveClientId && (
+            <div className={activeTab !== 'klaviyo' ? 'hidden' : ''}>
+              <div className="max-w-4xl mx-auto">
+                <KlaviyoPlanner clientId={effectiveClientId} />
+              </div>
+            </div>
+          )}
+          {visitedTabs.has('config') && effectiveClientId && (
+            <div className={activeTab !== 'config' ? 'hidden' : ''}>
+              <FinancialConfigPanel clientId={effectiveClientId} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Floating Discount Button */}
