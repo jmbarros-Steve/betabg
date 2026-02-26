@@ -175,6 +175,36 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
       </div>`;
     }
 
+    case 'product_grid': {
+      const gridProducts = (p.products || []) as Array<{ title: string; image_url: string; price: string; url: string }>;
+      if (!gridProducts.length) {
+        return `<div style="padding:20px;text-align:center;border:2px dashed #e5e7eb;border-radius:8px;font-family:${font};color:#999;">Selecciona productos para mostrar</div>`;
+      }
+      const layout = p.layout || 'horizontal';
+      const cols = layout === 'grid_2x2' ? 2 : layout === 'grid_3x1' ? 3 : Math.min(gridProducts.length, 3);
+      const widthPct = Math.floor(100 / cols);
+      const btnColor = templateColors?.button || '#000';
+      const btnTextColor = templateColors?.buttonText || '#fff';
+      const btnRadius = 24;
+      const gridRows: string[] = [];
+      for (let i = 0; i < gridProducts.length; i += cols) {
+        const rowItems = gridProducts.slice(i, i + cols);
+        const cells = rowItems.map(prod => {
+          const imgSrc = prod.image_url || '';
+          return `<td style="width:${widthPct}%;vertical-align:top;padding:8px;text-align:center;">
+            ${imgSrc ? `<a href="${prod.url || '#'}" target="_blank"><img src="${imgSrc}" alt="${prod.title || ''}" style="max-width:100%;border-radius:8px;margin-bottom:8px;" /></a>` : ''}
+            <p style="margin:0 0 4px;font-family:${font};font-size:14px;font-weight:600;color:#111;">${prod.title || ''}</p>
+            ${p.showPrice !== false && prod.price ? `<p style="margin:0 0 8px;font-family:${font};font-size:14px;color:#666;">${prod.price}</p>` : ''}
+            ${p.showButton !== false ? `<a href="${prod.url || '#'}" target="_blank" style="display:inline-block;background:${btnColor};color:${btnTextColor};padding:10px 24px;border-radius:${btnRadius}px;text-decoration:none;font-family:${font};font-size:13px;font-weight:600;">${p.buttonText || 'Comprar'}</a>` : ''}
+          </td>`;
+        }).join('');
+        const emptyCount = cols - rowItems.length;
+        const emptyCells = Array(emptyCount).fill(`<td style="width:${widthPct}%;"></td>`).join('');
+        gridRows.push(`<tr>${cells}${emptyCells}</tr>`);
+      }
+      return `<div style="padding:8px 0;font-family:${font};"><table style="width:100%;border-collapse:collapse;">${gridRows.join('')}</table></div>`;
+    }
+
     case 'html':
       return p.code || '';
 

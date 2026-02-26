@@ -18,7 +18,8 @@ export type BlockType =
   | 'video'
   | 'html'
   | 'columns'
-  | 'section';
+  | 'section'
+  | 'product_grid';
 
 export interface EmailBlock {
   id: string;
@@ -145,6 +146,13 @@ export const BLOCK_DEFAULTS: Record<BlockType, Record<string, any>> = {
     proportions: '50/50',
     columns: [[], []], // Arrays of EmailBlock
   },
+  product_grid: {
+    products: [],
+    layout: 'horizontal',
+    showPrice: true,
+    showButton: true,
+    buttonText: 'Comprar',
+  },
   section: {
     bgColor: '#f9fafb',
     paddingTop: 20,
@@ -182,6 +190,7 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   { type: 'review', label: 'Reseña', icon: 'review', category: 'blocks' },
   { type: 'video', label: 'Vídeo', icon: 'video', category: 'blocks' },
   { type: 'html', label: 'HTML', icon: 'html', category: 'blocks' },
+  { type: 'product_grid', label: 'Productos', icon: 'product_grid', category: 'blocks' },
   // Design section
   { type: 'columns', label: 'Columnas', icon: 'columns', category: 'design' },
   { type: 'section', label: 'Sección', icon: 'section', category: 'design' },

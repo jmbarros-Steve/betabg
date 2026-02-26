@@ -12,7 +12,7 @@ import { SteveEstrategia } from '@/components/client-portal/SteveEstrategia';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
 import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
-import { KlaviyoPlanner } from '@/components/client-portal/KlaviyoPlanner';
+import { CampaignStudio } from '@/components/client-portal/campaign-studio/CampaignStudio';
 import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfigPanel';
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
@@ -320,7 +320,7 @@ export default function ClientPortal() {
           {visitedTabs.has('klaviyo') && effectiveClientId && (
             <div className={activeTab !== 'klaviyo' ? 'hidden' : ''}>
               <div className="max-w-4xl mx-auto">
-                <KlaviyoPlanner clientId={effectiveClientId} />
+                <CampaignStudio clientId={effectiveClientId} />
               </div>
             </div>
           )}
