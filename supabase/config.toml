@@ -122,3 +122,6 @@ verify_jwt = false
 
 [functions.export-database]
 verify_jwt = false
+
+[functions.admin-reset-password]
+verify_jwt = false
