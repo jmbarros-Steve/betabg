@@ -119,3 +119,6 @@ verify_jwt = false
 
 [functions.upload-klaviyo-drafts]
 verify_jwt = false
+
+[functions.export-database]
+verify_jwt = false
