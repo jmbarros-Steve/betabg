@@ -39,6 +39,9 @@ verify_jwt = false
 [functions.generate-meta-copy]
 verify_jwt = false
 
+[functions.sync-klaviyo-metrics]
+verify_jwt = false
+
 [functions.store-klaviyo-connection]
 verify_jwt = false
 
@@ -130,4 +133,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.fetch-shopify-collections]
+verify_jwt = false
+
+[functions.steve-email-content]
+verify_jwt = false
+
+[functions.klaviyo-manage-flows]
 verify_jwt = false

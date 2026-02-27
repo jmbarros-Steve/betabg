@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Package, Plus, X, ImagePlus } from 'lucide-react';
+import { Loader2, Package, Plus, X, ImagePlus, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { CampaignType } from '../templates/TemplatePresets';
 import { CAMPAIGN_TEMPLATES } from '../templates/TemplatePresets';
 import type { BrandIdentity, ProductItem } from '../templates/BrandHtmlGenerator';
@@ -43,29 +43,42 @@ export function ContentConfigurator({
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingCollections, setLoadingCollections] = useState(false);
   const [collections, setCollections] = useState<ShopifyCollection[]>([]);
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [shopifyConnectionId, setShopifyConnectionId] = useState<string | null>(null);
+  const [klaviyoConnectionId, setKlaviyoConnectionId] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [aiSubjects, setAiSubjects] = useState<string[]>([]);
+  const [aiFeedback, setAiFeedback] = useState<{ type: string; message: string }[]>([]);
 
-  // Check for Shopify connection on mount
+  // Check for connections on mount
   useEffect(() => {
-    async function checkConnection() {
-      const { data } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'shopify')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setConnectionId(data.id);
-      }
+    async function checkConnections() {
+      const [shopify, klaviyo] = await Promise.all([
+        supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('platform', 'shopify')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('platform', 'klaviyo')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (shopify.data) setShopifyConnectionId(shopify.data.id);
+      if (klaviyo.data) setKlaviyoConnectionId(klaviyo.data.id);
     }
-    checkConnection();
+    checkConnections();
   }, [clientId]);
 
   // Auto-load products for certain campaign types
   useEffect(() => {
-    if (!connectionId) return;
+    if (!shopifyConnectionId) return;
     if (campaignData.products.length > 0) return;
 
     if (campaignType === 'best_sellers' || campaignType === 'most_viewed' || campaignType === 'new_arrivals') {
@@ -74,14 +87,14 @@ export function ContentConfigurator({
     if (campaignType === 'collection') {
       loadCollections();
     }
-  }, [connectionId, campaignType]);
+  }, [shopifyConnectionId, campaignType]);
 
   const loadProducts = useCallback(async () => {
-    if (!connectionId) return;
+    if (!shopifyConnectionId) return;
     setLoadingProducts(true);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-shopify-products', {
-        body: { connectionId },
+        body: { connectionId: shopifyConnectionId },
       });
       if (error) throw error;
 
@@ -109,14 +122,14 @@ export function ContentConfigurator({
     } finally {
       setLoadingProducts(false);
     }
-  }, [connectionId, brand.shopUrl, template.defaultProductCount, onUpdate]);
+  }, [shopifyConnectionId, brand.shopUrl, template.defaultProductCount, onUpdate]);
 
   const loadCollections = useCallback(async () => {
-    if (!connectionId) return;
+    if (!shopifyConnectionId) return;
     setLoadingCollections(true);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-shopify-collections', {
-        body: { connectionId },
+        body: { connectionId: shopifyConnectionId },
       });
       if (error) throw error;
       setCollections(data?.collections || []);
@@ -126,15 +139,15 @@ export function ContentConfigurator({
     } finally {
       setLoadingCollections(false);
     }
-  }, [connectionId]);
+  }, [shopifyConnectionId]);
 
   const loadCollectionProducts = useCallback(async (collectionId: string, collectionTitle: string) => {
-    if (!connectionId) return;
+    if (!shopifyConnectionId) return;
     setLoadingProducts(true);
     onUpdate({ collectionId, collectionName: collectionTitle });
     try {
       const { data, error } = await supabase.functions.invoke('fetch-shopify-collections', {
-        body: { connectionId, collectionId },
+        body: { connectionId: shopifyConnectionId, collectionId },
       });
       if (error) throw error;
 
@@ -159,41 +172,154 @@ export function ContentConfigurator({
     } finally {
       setLoadingProducts(false);
     }
-  }, [connectionId, brand.shopUrl, template.defaultProductCount, onUpdate]);
+  }, [shopifyConnectionId, brand.shopUrl, template.defaultProductCount, onUpdate]);
 
   const removeProduct = useCallback((index: number) => {
     onUpdate({ products: campaignData.products.filter((_, i) => i !== index) });
   }, [campaignData.products, onUpdate]);
+
+  // AI: Generate subject lines
+  const generateSubjects = useCallback(async () => {
+    if (!klaviyoConnectionId) {
+      toast.error('Conecta Klaviyo para usar la IA de Steve');
+      return;
+    }
+    setAiLoading('subjects');
+    try {
+      const { data, error } = await supabase.functions.invoke('steve-email-content', {
+        body: {
+          connectionId: klaviyoConnectionId,
+          action: 'generate_subject',
+          campaignType,
+          brandName: brand.aesthetic || 'tu marca',
+          productNames: campaignData.products.map(p => p.title).slice(0, 5),
+        },
+      });
+      if (error) throw error;
+      setAiSubjects(data?.subjects || []);
+      if (data?.previewTexts?.[0] && !campaignData.previewText) {
+        onUpdate({ previewText: data.previewTexts[0] });
+      }
+    } catch (err: any) {
+      console.error('Error generating subjects:', err);
+      toast.error('Error al generar subjects con Steve');
+    } finally {
+      setAiLoading(null);
+    }
+  }, [klaviyoConnectionId, campaignType, brand, campaignData.products, campaignData.previewText, onUpdate]);
+
+  // AI: Analyze content
+  const analyzeContent = useCallback(async () => {
+    if (!klaviyoConnectionId) return;
+    setAiLoading('analyze');
+    try {
+      const { data, error } = await supabase.functions.invoke('steve-email-content', {
+        body: {
+          connectionId: klaviyoConnectionId,
+          action: 'analyze_content',
+          subject: campaignData.subject,
+          previewText: campaignData.previewText,
+        },
+      });
+      if (error) throw error;
+      setAiFeedback(data?.feedback || []);
+    } catch (err: any) {
+      console.error('Error analyzing:', err);
+      toast.error('Error al analizar contenido');
+    } finally {
+      setAiLoading(null);
+    }
+  }, [klaviyoConnectionId, campaignData.subject, campaignData.previewText]);
+
+  // Subject length indicator
+  const subjectLength = campaignData.subject.length;
+  const subjectStatus = subjectLength === 0 ? 'empty' : subjectLength <= 50 ? 'good' : subjectLength <= 70 ? 'warning' : 'error';
 
   return (
     <div className="space-y-5">
       <div>
         <h3 className="font-semibold text-base">Contenido de la Campana</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Configura el asunto, textos y productos para tu email de tipo "{template.label}".
+          Configura el asunto, textos y productos. Steve te ayuda a optimizar todo.
         </p>
       </div>
 
       {/* Subject and Preview Text */}
       <div className="grid grid-cols-1 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="subject">Asunto del email</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="subject">Asunto del email</Label>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-medium ${
+                subjectStatus === 'good' ? 'text-green-600' :
+                subjectStatus === 'warning' ? 'text-yellow-600' :
+                subjectStatus === 'error' ? 'text-red-600' : 'text-muted-foreground'
+              }`}>
+                {subjectLength}/50 chars
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={generateSubjects}
+                disabled={aiLoading === 'subjects'}
+              >
+                {aiLoading === 'subjects' ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3" />
+                )}
+                Steve sugiere
+              </Button>
+            </div>
+          </div>
           <Input
             id="subject"
             value={campaignData.subject}
             onChange={(e) => onUpdate({ subject: e.target.value })}
             placeholder={template.defaultSubject}
+            className={subjectStatus === 'error' ? 'border-red-300' : ''}
           />
+          {/* AI Subject suggestions */}
+          {aiSubjects.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {aiSubjects.map((s, i) => (
+                <button
+                  key={i}
+                  className="text-xs px-2.5 py-1 rounded-full border hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                  onClick={() => {
+                    onUpdate({ subject: s });
+                    setAiSubjects([]);
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="previewText">Texto de vista previa</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="previewText">Texto de vista previa</Label>
+            <span className={`text-[10px] font-medium ${
+              (campaignData.previewText?.length || 0) <= 90 ? 'text-green-600' : 'text-yellow-600'
+            }`}>
+              {campaignData.previewText?.length || 0}/90 chars
+            </span>
+          </div>
           <Input
             id="previewText"
             value={campaignData.previewText}
             onChange={(e) => onUpdate({ previewText: e.target.value })}
             placeholder="Texto que aparece junto al asunto en la bandeja de entrada"
           />
+          {!campaignData.previewText && campaignData.subject && (
+            <p className="text-[10px] text-yellow-600 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              No dejes el preview text vacio — mejora tu open rate
+            </p>
+          )}
         </div>
       </div>
 
@@ -221,7 +347,28 @@ export function ContentConfigurator({
         </div>
       </div>
 
-      {/* Collection selector (only for 'collection' type) */}
+      {/* Hero Image URL — available for ALL template types */}
+      <div className="space-y-2">
+        <Label htmlFor="heroImage">
+          <ImagePlus className="w-4 h-4 inline mr-1" />
+          Imagen banner (URL)
+        </Label>
+        <Input
+          id="heroImage"
+          value={campaignData.heroImageUrl}
+          onChange={(e) => onUpdate({ heroImageUrl: e.target.value })}
+          placeholder="https://..."
+        />
+        {campaignData.heroImageUrl && (
+          <img
+            src={campaignData.heroImageUrl}
+            alt="Hero preview"
+            className="w-full max-h-40 object-cover rounded-lg border mt-2"
+          />
+        )}
+      </div>
+
+      {/* Collection selector */}
       {campaignType === 'collection' && (
         <div className="space-y-2">
           <Label>Coleccion de Shopify</Label>
@@ -230,7 +377,7 @@ export function ContentConfigurator({
           ) : collections.length === 0 ? (
             <div className="flex items-center gap-2">
               <p className="text-sm text-muted-foreground">No se encontraron colecciones.</p>
-              <Button variant="outline" size="sm" onClick={loadCollections} disabled={!connectionId}>
+              <Button variant="outline" size="sm" onClick={loadCollections} disabled={!shopifyConnectionId}>
                 Reintentar
               </Button>
             </div>
@@ -239,9 +386,7 @@ export function ContentConfigurator({
               value={campaignData.collectionId}
               onValueChange={(val) => {
                 const col = collections.find(c => String(c.id) === val);
-                if (col) {
-                  loadCollectionProducts(val, col.title);
-                }
+                if (col) loadCollectionProducts(val, col.title);
               }}
             >
               <SelectTrigger>
@@ -259,7 +404,7 @@ export function ContentConfigurator({
         </div>
       )}
 
-      {/* Coupon fields (only for 'promotional' type) */}
+      {/* Coupon fields */}
       {campaignType === 'promotional' && (
         <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
           <h4 className="font-medium text-sm flex items-center gap-2">
@@ -299,7 +444,7 @@ export function ContentConfigurator({
         </div>
       )}
 
-      {/* Custom content (only for 'custom' type) */}
+      {/* Custom content */}
       {campaignType === 'custom' && (
         <div className="space-y-2">
           <Label htmlFor="customContent">Contenido libre</Label>
@@ -310,29 +455,6 @@ export function ContentConfigurator({
             placeholder="Escribe el contenido de tu email. Puedes agregar un bloque de productos abajo."
             rows={6}
           />
-        </div>
-      )}
-
-      {/* Hero Image URL */}
-      {(campaignType === 'collection' || campaignType === 'new_arrivals') && (
-        <div className="space-y-2">
-          <Label htmlFor="heroImage">
-            <ImagePlus className="w-4 h-4 inline mr-1" />
-            Imagen hero (URL)
-          </Label>
-          <Input
-            id="heroImage"
-            value={campaignData.heroImageUrl}
-            onChange={(e) => onUpdate({ heroImageUrl: e.target.value })}
-            placeholder="https://..."
-          />
-          {campaignData.heroImageUrl && (
-            <img
-              src={campaignData.heroImageUrl}
-              alt="Hero preview"
-              className="w-full max-h-40 object-cover rounded-lg border mt-2"
-            />
-          )}
         </div>
       )}
 
@@ -348,7 +470,7 @@ export function ContentConfigurator({
               variant="outline"
               size="sm"
               onClick={loadProducts}
-              disabled={loadingProducts || !connectionId}
+              disabled={loadingProducts || !shopifyConnectionId}
             >
               {loadingProducts ? (
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
@@ -367,7 +489,7 @@ export function ContentConfigurator({
             </div>
           ) : campaignData.products.length === 0 ? (
             <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg border-dashed">
-              {connectionId
+              {shopifyConnectionId
                 ? 'Haz clic en "Cargar productos" para importar desde Shopify'
                 : 'Conecta Shopify para cargar productos automaticamente'}
             </div>
@@ -426,6 +548,50 @@ export function ContentConfigurator({
           />
         </div>
       </div>
+
+      {/* AI Content Analysis */}
+      {campaignData.subject && (
+        <div className="border rounded-lg p-4 bg-muted/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Analisis de Steve
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={analyzeContent}
+              disabled={aiLoading === 'analyze'}
+            >
+              {aiLoading === 'analyze' ? (
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              ) : null}
+              Analizar
+            </Button>
+          </div>
+          {aiFeedback.length > 0 ? (
+            <div className="space-y-1.5">
+              {aiFeedback.map((f, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  {f.type === 'success' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600 mt-0.5 shrink-0" />
+                  ) : f.type === 'error' ? (
+                    <AlertCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 text-yellow-500 mt-0.5 shrink-0" />
+                  )}
+                  <span className="text-muted-foreground">{f.message}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Haz clic en "Analizar" para que Steve revise tu contenido y te de recomendaciones.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

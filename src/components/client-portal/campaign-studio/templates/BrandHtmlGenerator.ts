@@ -28,6 +28,17 @@ export interface BrandIdentity {
   aesthetic: string;
   logoUrl: string;
   shopUrl: string;
+  socialLinks?: {
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+    twitter?: string;
+    youtube?: string;
+    pinterest?: string;
+    whatsapp?: string;
+  };
+  farewellMessage?: string;
+  senderName?: string;
 }
 
 export interface ProductItem {
@@ -37,31 +48,32 @@ export interface ProductItem {
   handle: string;
   url: string;
   count?: number;
+  compareAtPrice?: string;
 }
 
 export interface EmailSection {
-  type: 'header' | 'hero_image' | 'title' | 'intro' | 'product_grid' | 'coupon' | 'cta' | 'footer' | 'custom_blocks';
+  type: 'header' | 'hero_image' | 'title' | 'intro' | 'product_grid' | 'coupon' | 'cta' | 'farewell' | 'social' | 'footer' | 'custom_blocks' | 'divider' | 'spacer';
   props?: Record<string, any>;
 }
 
 const DEFAULT_BRAND: BrandIdentity = {
   colors: {
-    primary: '#193a43',
-    accent: '#ff5b00',
-    secondaryBg: '#ffece1',
+    primary: '#1a1a2e',
+    accent: '#e94560',
+    secondaryBg: '#fef2f4',
     footerBg: '#f4f4f8',
-    border: '#e0e6f4',
-    text: '#193a43',
+    border: '#e5e7eb',
+    text: '#1a1a2e',
     textLight: '#6b7280',
   },
   fonts: {
-    heading: 'Kaisei Tokumin',
-    headingType: 'serif',
-    body: 'Anonymous Pro',
-    bodyType: 'monospace',
+    heading: 'Inter',
+    headingType: 'sans-serif',
+    body: 'Inter',
+    bodyType: 'sans-serif',
   },
-  buttons: { borderRadius: 24, height: 48, style: 'pill' },
-  aesthetic: 'Modern Botanical Artisan',
+  buttons: { borderRadius: 8, height: 44, style: 'rounded' },
+  aesthetic: 'Modern Clean',
   logoUrl: '',
   shopUrl: '',
 };
@@ -77,7 +89,7 @@ function googleFontsImport(brand: BrandIdentity): string {
 }
 
 function headingFont(brand: BrandIdentity): string {
-  return `'${brand.fonts.heading}', ${brand.fonts.headingType || 'serif'}`;
+  return `'${brand.fonts.heading}', ${brand.fonts.headingType || 'sans-serif'}`;
 }
 
 function bodyFont(brand: BrandIdentity): string {
@@ -109,15 +121,19 @@ function renderProductGrid(products: ProductItem[], layout: string, brand: Brand
   return rows.map(row => {
     const cells = row.map(p => {
       const imgUrl = p.image_url?.includes('_400x') ? p.image_url : p.image_url?.replace(/\.(jpg|png|webp)/, '_400x.$1') || '';
+      const priceHtml = showPrice && p.price
+        ? p.compareAtPrice
+          ? `<p style="margin:0 0 8px;font-family:${bodyFont(brand)};font-size:14px;color:${brand.colors.textLight};"><span style="text-decoration:line-through;color:${brand.colors.textLight};opacity:0.6;">${p.compareAtPrice}</span> <span style="color:${brand.colors.accent};font-weight:600;">${p.price}</span></p>`
+          : `<p style="margin:0 0 8px;font-family:${bodyFont(brand)};font-size:14px;color:${brand.colors.textLight};">${p.price}</p>`
+        : '';
       return `<td style="width:${widthPct}%;vertical-align:top;padding:8px;text-align:center;">
         ${imgUrl ? `<a href="${p.url}" target="_blank"><img src="${imgUrl}" alt="${p.title}" style="max-width:100%;border-radius:8px;margin-bottom:8px;" /></a>` : ''}
         <p style="margin:0 0 4px;font-family:${headingFont(brand)};font-size:14px;font-weight:600;color:${brand.colors.text};">${p.title}</p>
-        ${showPrice && p.price ? `<p style="margin:0 0 8px;font-family:${bodyFont(brand)};font-size:14px;color:${brand.colors.textLight};">${p.price}</p>` : ''}
+        ${priceHtml}
         ${showButton ? `<a href="${p.url}" target="_blank" style="display:inline-block;background:${brand.colors.accent};color:#fff;padding:10px 24px;border-radius:${brand.buttons.borderRadius}px;text-decoration:none;font-family:${bodyFont(brand)};font-size:13px;font-weight:600;">${buttonText}</a>` : ''}
       </td>`;
     }).join('');
 
-    // Pad remaining cells if row is shorter than cols
     const emptyCount = cols - row.length;
     const emptyCells = Array(emptyCount).fill(`<td style="width:${widthPct}%;"></td>`).join('');
 
@@ -136,6 +152,45 @@ function renderHeader(brand: BrandIdentity): string {
   </table>`;
 }
 
+function renderSocialLinks(brand: BrandIdentity): string {
+  const links = brand.socialLinks || {};
+  const socialItems: { name: string; url: string; label: string }[] = [];
+
+  if (links.instagram) socialItems.push({ name: 'instagram', url: links.instagram, label: 'Instagram' });
+  if (links.facebook) socialItems.push({ name: 'facebook', url: links.facebook, label: 'Facebook' });
+  if (links.tiktok) socialItems.push({ name: 'tiktok', url: links.tiktok, label: 'TikTok' });
+  if (links.twitter) socialItems.push({ name: 'twitter', url: links.twitter, label: 'Twitter' });
+  if (links.youtube) socialItems.push({ name: 'youtube', url: links.youtube, label: 'YouTube' });
+  if (links.pinterest) socialItems.push({ name: 'pinterest', url: links.pinterest, label: 'Pinterest' });
+
+  if (socialItems.length === 0) return '';
+
+  const linkHtml = socialItems.map(s =>
+    `<a href="${s.url}" target="_blank" style="display:inline-block;margin:0 8px;color:${brand.colors.accent};font-family:${bodyFont(brand)};font-size:13px;text-decoration:none;font-weight:500;">${s.label}</a>`
+  ).join('&nbsp;·&nbsp;');
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="padding:16px 24px;text-align:center;border-top:1px solid ${brand.colors.border};">
+      ${linkHtml}
+    </td></tr>
+  </table>`;
+}
+
+function renderFarewell(brand: BrandIdentity): string {
+  const message = brand.farewellMessage || 'Gracias por ser parte de nuestra comunidad.';
+  const sender = brand.senderName || '{{ organization.name }}';
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="padding:24px 32px 8px;text-align:center;">
+      <p style="margin:0 0 8px;font-family:${bodyFont(brand)};font-size:14px;color:${brand.colors.textLight};line-height:1.6;font-style:italic;">
+        ${message}
+      </p>
+      <p style="margin:0;font-family:${headingFont(brand)};font-size:15px;font-weight:600;color:${brand.colors.text};">
+        — ${sender}
+      </p>
+    </td></tr>
+  </table>`;
+}
+
 function renderFooter(brand: BrandIdentity): string {
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${brand.colors.footerBg};border-top:1px solid ${brand.colors.border};">
     <tr><td style="padding:24px;text-align:center;font-family:${bodyFont(brand)};font-size:12px;color:${brand.colors.textLight};line-height:1.6;">
@@ -147,6 +202,23 @@ function renderFooter(brand: BrandIdentity): string {
         <a href="{{ unsubscribe_url }}" style="color:${brand.colors.accent};text-decoration:underline;">Desuscribirse</a>
       </p>
     </td></tr>
+  </table>`;
+}
+
+function renderDivider(brand: BrandIdentity, props?: Record<string, any>): string {
+  const color = props?.color || brand.colors.border;
+  const style = props?.style || 'solid';
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="padding:8px 24px;">
+      <hr style="border:none;border-top:1px ${style} ${color};margin:0;" />
+    </td></tr>
+  </table>`;
+}
+
+function renderSpacer(props?: Record<string, any>): string {
+  const height = props?.height || 24;
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="height:${height}px;font-size:1px;line-height:1px;">&nbsp;</td></tr>
   </table>`;
 }
 
@@ -163,6 +235,7 @@ export interface GenerateEmailOptions {
   couponCode?: string;
   couponDescription?: string;
   couponExpiry?: string;
+  previewText?: string;
 }
 
 export function generateBrandEmail(options: GenerateEmailOptions): string {
@@ -177,7 +250,9 @@ export function generateBrandEmail(options: GenerateEmailOptions): string {
       case 'hero_image':
         return options.heroImageUrl
           ? `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td>
-              <img src="${options.heroImageUrl}" alt="" style="width:100%;display:block;" />
+              <a href="${options.ctaUrl || brand.shopUrl}" target="_blank">
+                <img src="${options.heroImageUrl}" alt="" style="width:100%;display:block;" />
+              </a>
             </td></tr></table>`
           : '';
 
@@ -216,8 +291,8 @@ export function generateBrandEmail(options: GenerateEmailOptions): string {
             <div style="border:2px dashed ${brand.colors.border};border-radius:12px;padding:24px;text-align:center;background:${brand.colors.secondaryBg};">
               <p style="margin:0 0 8px;font-family:${bodyFont(brand)};font-size:14px;color:${brand.colors.textLight};">${options.couponDescription || ''}</p>
               <p style="margin:0 0 12px;font-family:${headingFont(brand)};font-size:32px;font-weight:700;color:${brand.colors.primary};letter-spacing:3px;">${options.couponCode || ''}</p>
-              ${options.couponExpiry ? `<p style="margin:0 0 12px;font-family:${bodyFont(brand)};font-size:12px;color:${brand.colors.textLight};">Válido hasta: ${options.couponExpiry}</p>` : ''}
-              ${renderButton('Usar cupón', `${brand.shopUrl}/discount/${options.couponCode || ''}`, brand)}
+              ${options.couponExpiry ? `<p style="margin:0 0 12px;font-family:${bodyFont(brand)};font-size:12px;color:${brand.colors.textLight};">Valido hasta: ${options.couponExpiry}</p>` : ''}
+              ${renderButton('Usar cupon', `${brand.shopUrl}/discount/${options.couponCode || ''}`, brand)}
             </div>
           </td>
         </tr></table>`;
@@ -225,9 +300,21 @@ export function generateBrandEmail(options: GenerateEmailOptions): string {
       case 'cta':
         return `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td style="padding:24px;text-align:center;">
-            ${renderButton(options.ctaText || 'Ver más', options.ctaUrl || brand.shopUrl, brand)}
+            ${renderButton(options.ctaText || 'Ver mas', options.ctaUrl || brand.shopUrl, brand)}
           </td>
         </tr></table>`;
+
+      case 'farewell':
+        return renderFarewell(brand);
+
+      case 'social':
+        return renderSocialLinks(brand);
+
+      case 'divider':
+        return renderDivider(brand, section.props);
+
+      case 'spacer':
+        return renderSpacer(section.props);
 
       case 'footer':
         return renderFooter(brand);
@@ -250,6 +337,11 @@ export function generateBrandEmail(options: GenerateEmailOptions): string {
     }
   }).join('\n');
 
+  // Hidden preheader text for email clients
+  const preheader = options.previewText
+    ? `<div style="display:none;font-size:1px;color:#f4f4f8;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${options.previewText}${'&nbsp;&zwnj;'.repeat(30)}</div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -261,14 +353,18 @@ export function generateBrandEmail(options: GenerateEmailOptions): string {
     body { margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table { border-spacing:0; }
     td { padding:0; }
-    img { border:0; display:block; outline:none; text-decoration:none; }
+    img { border:0; display:block; outline:none; text-decoration:none; max-width:100%; }
+    a { color:${brand.colors.accent}; }
     @media only screen and (max-width: 600px) {
       .email-container { width:100% !important; }
       td[class="mobile-full"] { display:block !important; width:100% !important; }
+      h1 { font-size:24px !important; }
+      td { padding-left:16px !important; padding-right:16px !important; }
     }
   </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f8;font-family:${bodyFont(brand)};">
+  ${preheader}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f8;">
     <tr><td align="center" style="padding:16px 0;">
       <table class="email-container" role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
