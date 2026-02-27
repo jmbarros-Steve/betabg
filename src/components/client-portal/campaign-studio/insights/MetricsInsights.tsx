@@ -23,6 +23,7 @@ import {
   BarChart3,
   RefreshCw,
 } from 'lucide-react';
+import { SendTimeHeatmap } from './SendTimeHeatmap';
 
 interface MetricsInsightsProps {
   clientId: string;
@@ -317,7 +318,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [flows, setFlows] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [activeSection, setActiveSection] = useState<'overview' | 'campaigns' | 'flows'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'campaigns' | 'flows' | 'horarios'>('overview');
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState<boolean | null>(null);
   const [timeframe, setTimeframe] = useState('last_30_days');
@@ -588,7 +589,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
       {/* Section Tabs */}
       {!loading && !error && globalStats && (
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
-          {(['overview', 'campaigns', 'flows'] as const).map(section => (
+          {(['overview', 'campaigns', 'flows', 'horarios'] as const).map(section => (
             <button
               key={section}
               onClick={() => setActiveSection(section)}
@@ -599,7 +600,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {section === 'overview' ? 'Resumen' : section === 'campaigns' ? `Campañas (${campaigns.length})` : `Flujos (${flows.length})`}
+              {section === 'overview' ? 'Resumen' : section === 'campaigns' ? `Campañas (${campaigns.length})` : section === 'flows' ? `Flujos (${flows.length})` : 'Horarios'}
             </button>
           ))}
         </div>
@@ -728,6 +729,11 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Send Time Heatmap */}
+      {activeSection === 'horarios' && (
+        <SendTimeHeatmap clientId={clientId} />
       )}
     </div>
   );

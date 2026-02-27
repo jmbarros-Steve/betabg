@@ -274,6 +274,9 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
   const [creationProgress, setCreationProgress] = useState(0);
   const [creationDone, setCreationDone] = useState(false);
 
+  // Optimal send times
+  const [optimalSlots, setOptimalSlots] = useState<Array<{day: number; hour: number; score: number}>>([]);
+
   // ---- Derived ----
   const selectedItems = useMemo(() => contentItems.filter(i => i.selected), [contentItems]);
   const approvedEmails = useMemo(() => generatedEmails.filter(e => e.approved), [generatedEmails]);
@@ -311,6 +314,36 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
       setCreationDone(false);
     }
   }, [open, defaultMonth, defaultYear]);
+
+  // ---- Load optimal send times ----
+  useEffect(() => {
+    if (!open) return;
+    async function loadOptimalTimes() {
+      try {
+        const { data: conn } = await supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('platform', 'klaviyo')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (!conn) return;
+
+        const { data } = await supabase.functions.invoke('steve-send-time-analysis', {
+          body: { connectionId: conn.id },
+        });
+
+        if (data?.bestSlots) {
+          setOptimalSlots(data.bestSlots);
+        }
+      } catch {
+        // Silently fail — optimal times are a nice-to-have
+      }
+    }
+    loadOptimalTimes();
+  }, [open, clientId]);
 
   // ---- Auto-detect content type ----
   useEffect(() => {
@@ -523,7 +556,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
             ctaText: raw.ctaText || 'Ver mas',
             templateId: assignedTemplateId,
             scheduledDate: raw.scheduledDate || dateStr,
-            scheduledTime: raw.scheduledTime || '10:00',
+            scheduledTime: raw.scheduledTime || (optimalSlots.length > 0 ? `${String(optimalSlots[0].hour).padStart(2, '0')}:00` : '10:00'),
             html: '',
             approved: true,
           };
