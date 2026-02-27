@@ -197,12 +197,17 @@ function renderProductGrid(
 /*  renderHeader                                                      */
 /* ------------------------------------------------------------------ */
 function renderHeader(brand: BrandIdentity): string {
-  if (!brand.logoUrl) return '';
+  const logo = brand.logoUrl
+    ? `<img src="${brand.logoUrl}" alt="" style="max-height:60px;max-width:240px;" />`
+    : `<div style="font-family:${headingFont(brand)};font-size:20px;font-weight:700;color:#ffffff;letter-spacing:1px;">&#9679;</div>`;
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${brand.colors.primary};">
-    <tr><td style="padding:32px 40px;text-align:center;border-bottom:1px solid ${hexToRgba(brand.colors.border, 0.2)};">
-      <img src="${brand.logoUrl}" alt="" style="max-height:60px;max-width:240px;" />
+    <tr><td style="padding:32px 40px;text-align:center;">
+      ${logo}
     </td></tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="height:4px;background:${brand.colors.accent};font-size:1px;line-height:1px;">&nbsp;</td></tr>
   </table>`;
 }
 
@@ -237,15 +242,12 @@ function renderSocialLinks(brand: BrandIdentity): string {
 /*  renderFarewell                                                    */
 /* ------------------------------------------------------------------ */
 function renderFarewell(brand: BrandIdentity): string {
-  // Don't render farewell section if neither message nor sender is set
-  if (!brand.farewellMessage && !brand.senderName) return '';
-
-  const message = brand.farewellMessage || '';
-  const sender = brand.senderName || '{{ organization.name }}';
+  const message = brand.farewellMessage || 'Gracias por ser parte de nuestra comunidad.';
+  const sender = brand.senderName || 'Tu marca';
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${brand.colors.secondaryBg};">
-    <tr><td style="padding:36px 48px 16px;text-align:center;">
+    <tr><td style="padding:36px 48px 24px;text-align:center;">
       <hr style="border:none;border-top:1px solid ${brand.colors.border};margin:0 auto 24px;width:60px;" />
-      ${message ? `<p style="margin:0 0 12px;font-family:${bodyFont(brand)};font-size:15px;color:${brand.colors.textLight};line-height:1.7;font-style:italic;">${message}</p>` : ''}
+      <p style="margin:0 0 12px;font-family:${bodyFont(brand)};font-size:15px;color:${brand.colors.textLight};line-height:1.7;font-style:italic;">${message}</p>
       <p style="margin:0;font-family:${headingFont(brand)};font-size:16px;font-weight:600;color:${brand.colors.text};">
         &mdash; ${sender}
       </p>
@@ -329,30 +331,57 @@ export function generateBrandEmail(options: GenerateEmailOptions): string {
                 <img src="${options.heroImageUrl}" alt="" style="width:100%;display:block;" />
               </a>
             </td></tr></table>`
-          : '';
+          : `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="height:200px;background:linear-gradient(135deg, ${brand.colors.secondaryBg} 0%, ${hexToRgba(brand.colors.accent, 0.12)} 100%);text-align:center;vertical-align:middle;">
+                <p style="margin:0;font-family:${headingFont(brand)};font-size:14px;color:${brand.colors.textLight};letter-spacing:2px;text-transform:uppercase;">Tu imagen de banner</p>
+              </td>
+            </tr></table>`;
 
-      case 'title':
+      case 'title': {
+        const titleText = options.title || 'Tu titulo va aqui';
         return `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td style="padding:40px 48px 12px;text-align:center;">
             <h1 style="margin:0;font-family:${headingFont(brand)};font-size:36px;font-weight:700;color:${brand.colors.text};line-height:1.2;letter-spacing:-0.5px;">
-              ${options.title || ''}
+              ${titleText}
             </h1>
           </td>
         </tr></table>`;
+      }
 
-      case 'intro':
+      case 'intro': {
+        const introContent = options.introText || 'Este es un texto de ejemplo para que veas como se ve tu template con tus colores y tipografia.';
         return `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td style="padding:0 48px 36px;text-align:center;">
             <p style="margin:0;font-family:${bodyFont(brand)};font-size:16px;color:${brand.colors.textLight};line-height:1.8;">
-              ${options.introText || ''}
+              ${introContent}
             </p>
           </td>
         </tr></table>`;
+      }
 
       case 'product_grid': {
         const layout = section.props?.layout || 'horizontal';
-        const limit = section.props?.limit || products.length;
+        const limit = section.props?.limit || products.length || 3;
         const slicedProducts = products.slice(0, limit);
+
+        // Show placeholder product cards when no real products
+        if (slicedProducts.length === 0) {
+          const placeholderCount = section.props?.limit || 3;
+          const placeholders = Array.from({ length: placeholderCount }, (_, i) => `
+            <td style="width:${Math.floor(100 / placeholderCount)}%;vertical-align:top;padding:12px;text-align:center;">
+              <div style="width:100%;height:140px;background:${brand.colors.secondaryBg};border-radius:12px;margin-bottom:12px;"></div>
+              <p style="margin:0 0 4px;font-family:${headingFont(brand)};font-size:15px;font-weight:600;color:${brand.colors.text};line-height:1.3;">Producto ${i + 1}</p>
+              <p style="margin:0 0 12px;font-family:${bodyFont(brand)};font-size:14px;color:${brand.colors.textLight};">$00.000</p>
+              <a href="#" style="display:inline-block;background:${brand.colors.accent};color:#fff;padding:10px 20px;border-radius:${brand.buttons.borderRadius}px;text-decoration:none;font-family:${bodyFont(brand)};font-size:13px;font-weight:600;">Comprar</a>
+            </td>
+          `).join('');
+          return `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="padding:8px 32px;">
+              <table style="width:100%;border-collapse:collapse;"><tr>${placeholders}</tr></table>
+            </td>
+          </tr></table>`;
+        }
+
         return `<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td style="padding:8px 32px;">
             ${renderProductGrid(slicedProducts, layout, brand, section.props?.showPrice !== false, section.props?.showButton !== false, section.props?.buttonText || 'Comprar')}
