@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -12,8 +14,13 @@ import {
   Users,
   Mail,
   XCircle,
+  DollarSign,
+  Eye,
+  MousePointerClick,
+  Megaphone,
+  BarChart3,
+  RefreshCw,
 } from 'lucide-react';
-import { KlaviyoMetricsPanel } from '@/components/client-portal/KlaviyoMetricsPanel';
 
 interface MetricsInsightsProps {
   clientId: string;
@@ -48,6 +55,15 @@ interface KlaviyoCampaign {
   send_time: string | null;
 }
 
+const TIMEFRAME_OPTIONS = [
+  { value: 'last_24_hours', label: 'Hoy' },
+  { value: 'last_7_days', label: '7 dias' },
+  { value: 'last_30_days', label: '30 dias' },
+  { value: 'last_60_days', label: '60 dias' },
+  { value: 'last_90_days', label: '90 dias' },
+  { value: 'last_365_days', label: '12 meses' },
+];
+
 const BORDER_COLORS: Record<Insight['type'], string> = {
   success: 'border-l-green-500',
   warning: 'border-l-yellow-500',
@@ -79,6 +95,26 @@ const ICON_MAP: Record<string, React.ElementType> = {
   mail: Mail,
   x_circle: XCircle,
 };
+
+/* ---------- helpers ---------- */
+
+function formatNumber(n: number): string {
+  return Math.round(n).toLocaleString('es-CL');
+}
+
+function formatProfileCount(n: number): string {
+  if (n >= 100000) return '100,000+';
+  if (n >= 50000) return '50,000+';
+  if (n >= 25000) return '25,000+';
+  if (n >= 10000) return '10,000+';
+  return Math.round(n).toLocaleString('es-CL');
+}
+
+function formatCurrency(n: number): string {
+  return `$${Math.round(n).toLocaleString('es-CL')}`;
+}
+
+/* ---------- AI insight generation ---------- */
 
 function generateInsights(
   globalStats: GlobalStats,
@@ -212,6 +248,37 @@ function generateInsights(
   return insights;
 }
 
+/* ---------- sub-components ---------- */
+
+function StatCard({
+  label,
+  value,
+  subtitle,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  subtitle?: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div className="flex flex-col gap-1 p-4 bg-muted/50 rounded-xl border border-border/50">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="w-4 h-4" />
+        <span className="text-[11px] uppercase tracking-wider font-medium">
+          {label}
+        </span>
+      </div>
+      <span className="text-xl font-bold">{value}</span>
+      {subtitle && (
+        <span className="text-[10px] text-muted-foreground leading-tight">
+          {subtitle}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function InsightCard({ insight }: { insight: Insight }) {
   const IconComponent = ICON_MAP[insight.icon] || Info;
 
@@ -240,93 +307,278 @@ function InsightCard({ insight }: { insight: Insight }) {
   );
 }
 
-export function MetricsInsights({ clientId }: MetricsInsightsProps) {
-  const [loading, setLoading] = useState(false);
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [connectionId, setConnectionId] = useState<string | null>(null);
-  const [hasConnection, setHasConnection] = useState(false);
-  const [metricsLoaded, setMetricsLoaded] = useState(false);
+/* ---------- main component ---------- */
 
+export function MetricsInsights({ clientId }: MetricsInsightsProps) {
+  const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [hasConnection, setHasConnection] = useState<boolean | null>(null);
+  const [timeframe, setTimeframe] = useState('last_30_days');
+  const [error, setError] = useState<string | null>(null);
+
+  // Step 1: check if there is an active Klaviyo connection
   useEffect(() => {
+    let cancelled = false;
+
+    async function checkConnection() {
+      const { data } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (data) {
+        setConnectionId(data.id);
+        setHasConnection(true);
+      } else {
+        setHasConnection(false);
+        setLoading(false);
+      }
+    }
+
     checkConnection();
+    return () => { cancelled = true; };
   }, [clientId]);
 
+  // Step 2: once we have a connectionId, auto-fetch metrics
   useEffect(() => {
     if (connectionId) {
-      fetchAndAnalyze();
+      fetchMetrics(timeframe);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId]);
 
-  const checkConnection = async () => {
-    const { data } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('platform', 'klaviyo')
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      setConnectionId(data.id);
-      setHasConnection(true);
-    }
-  };
-
-  const fetchAndAnalyze = async () => {
+  const fetchMetrics = async (tf: string) => {
     if (!connectionId) return;
     setLoading(true);
+    setError(null);
+
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error: fnError } = await supabase.functions.invoke(
         'sync-klaviyo-metrics',
         {
-          body: { connectionId, timeframe: 'last_30_days' },
+          body: { connectionId, timeframe: tf },
         }
       );
 
-      if (error) {
-        console.error('Error fetching metrics for insights:', error);
+      if (fnError) {
+        console.error('Error fetching Klaviyo metrics:', fnError);
+        setError(fnError.message || 'Error al cargar metricas');
+        toast.error('Error al cargar metricas de Klaviyo');
         return;
       }
 
-      if (data?.globalStats) {
+      if (!data) {
+        setError('No se recibieron datos de Klaviyo');
+        return;
+      }
+
+      if (data.globalStats) {
+        const stats = data.globalStats as GlobalStats;
+        setGlobalStats(stats);
+
         const generated = generateInsights(
-          data.globalStats as GlobalStats,
+          stats,
           (data.campaigns || []) as KlaviyoCampaign[]
         );
         setInsights(generated);
-        setMetricsLoaded(true);
+      } else {
+        setError('Respuesta sin metricas globales');
       }
     } catch (err: any) {
       console.error('Error generating insights:', err);
+      setError(err.message || 'Error inesperado');
       toast.error('Error al generar insights');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!hasConnection) {
-    return <KlaviyoMetricsPanel clientId={clientId} />;
+  const handleTimeframeChange = (value: string) => {
+    setTimeframe(value);
+    fetchMetrics(value);
+  };
+
+  const handleRefresh = () => {
+    fetchMetrics(timeframe);
+  };
+
+  // --- No connection state ---
+  if (hasConnection === false) {
+    return (
+      <Card className="glow-box">
+        <CardContent className="py-8 text-center">
+          <Mail className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-muted-foreground text-sm">
+            Conecta Klaviyo en la pestana "Conexiones" para ver tus metricas de email
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
+
+  // --- Still checking connection ---
+  if (hasConnection === null) {
+    return (
+      <Card className="glow-box">
+        <CardContent className="py-8">
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            ))}
+            <p className="text-xs text-muted-foreground text-center">
+              Verificando conexion...
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const timeframeLabel =
+    TIMEFRAME_OPTIONS.find((o) => o.value === timeframe)?.label || '30 dias';
 
   return (
     <div className="space-y-6">
+      {/* Header with controls */}
+      <Card className="glow-box">
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Metricas de Klaviyo
+              </CardTitle>
+              <CardDescription>
+                Rendimiento de los ultimos {timeframeLabel}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={timeframe} onValueChange={handleTimeframeChange}>
+                <SelectTrigger className="w-[130px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEFRAME_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                {loading ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Actualizar
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {/* Loading state */}
+          {loading && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-primary animate-pulse" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Steve esta analizando tus metricas...
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[...Array(6)].map((_, i) => (
+                  <Skeleton key={i} className="h-[88px] w-full rounded-xl" />
+                ))}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Error state */}
+          {!loading && error && (
+            <div className="text-center py-8">
+              <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-yellow-500" />
+              <p className="text-sm text-muted-foreground mb-3">{error}</p>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reintentar
+              </Button>
+            </div>
+          )}
+
+          {/* Metrics loaded */}
+          {!loading && !error && globalStats && (
+            <div className="space-y-6">
+              {/* Stat Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <StatCard
+                  label="Total Perfiles"
+                  value={
+                    typeof globalStats.totalProfiles === 'string'
+                      ? globalStats.totalProfiles
+                      : formatProfileCount(globalStats.totalProfiles)
+                  }
+                  subtitle={
+                    globalStats.newProfiles > 0
+                      ? `+${formatNumber(globalStats.newProfiles)} nuevos`
+                      : undefined
+                  }
+                  icon={Users}
+                />
+                <StatCard
+                  label="Open Rate"
+                  value={`${(globalStats.avgOpenRate * 100).toFixed(1)}%`}
+                  icon={Eye}
+                />
+                <StatCard
+                  label="Click Rate"
+                  value={`${(globalStats.avgClickRate * 100).toFixed(1)}%`}
+                  icon={MousePointerClick}
+                />
+                <StatCard
+                  label="Revenue Total"
+                  value={formatCurrency(globalStats.totalRevenue)}
+                  subtitle={`Flows: ${formatCurrency(globalStats.totalFlowRevenue)} | Camp: ${formatCurrency(globalStats.totalCampaignRevenue)}`}
+                  icon={DollarSign}
+                />
+                <StatCard
+                  label="Flujos Activos"
+                  value={`${globalStats.activeFlows}/${globalStats.totalFlows}`}
+                  icon={Zap}
+                />
+                <StatCard
+                  label="Campanas Enviadas"
+                  value={`${globalStats.sentCampaigns}`}
+                  subtitle={`de ${globalStats.totalCampaigns} totales`}
+                  icon={Megaphone}
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* AI Insights Section */}
-      {loading ? (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Zap className="w-4 h-4 text-primary animate-pulse" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Steve esta analizando tus metricas...
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-lg" />
-            ))}
-          </div>
-        </div>
-      ) : insights.length > 0 ? (
+      {!loading && insights.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-primary" />
@@ -340,10 +592,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
             ))}
           </div>
         </div>
-      ) : null}
-
-      {/* Klaviyo Metrics Panel */}
-      <KlaviyoMetricsPanel clientId={clientId} />
+      )}
     </div>
   );
 }

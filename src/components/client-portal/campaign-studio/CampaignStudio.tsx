@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import {
   TrendingUp, Eye, Layers, Sparkles, Megaphone, Paintbrush,
   PlusCircle, CalendarDays, BarChart3, Palette, Zap, MessageCircle,
-  ArrowRight,
+  ArrowRight, LayoutTemplate,
 } from 'lucide-react';
 import { CAMPAIGN_TEMPLATES, CAMPAIGN_TYPE_LIST, type CampaignType } from './templates/TemplatePresets';
 import type { BrandIdentity } from './templates/BrandHtmlGenerator';
@@ -19,7 +19,7 @@ import { FlowsPanel } from './flows/FlowsPanel';
 import { MetricsInsights } from './insights/MetricsInsights';
 import { SteveKlaviyoChat } from './chat/SteveKlaviyoChat';
 import { AutoActivation } from './activation/AutoActivation';
-import { TemplateBuilder } from './design/TemplateBuilder';
+import TemplatesPanel from './templates/TemplatesPanel';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   TrendingUp,
@@ -48,7 +48,7 @@ interface CampaignStudioProps {
 
 export function CampaignStudio({ clientId }: CampaignStudioProps) {
   const [brand, setBrand] = useState<BrandIdentity>(DEFAULT_BRAND);
-  const [activeTab, setActiveTab] = useState('diseno');
+  const [activeTab, setActiveTab] = useState('plantillas');
   const [selectedType, setSelectedType] = useState<CampaignType | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(false);
@@ -82,7 +82,6 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
       const connected = !!connResult.data;
       setHasKlaviyoConnection(connected);
 
-      // Check if we should show auto-activation
       if (connected) {
         const activationKey = `bg_klaviyo_activated_${clientId}`;
         if (!localStorage.getItem(activationKey)) {
@@ -113,7 +112,7 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
   const handleActivationComplete = useCallback(() => {
     localStorage.setItem(`bg_klaviyo_activated_${clientId}`, 'true');
     setShowActivation(false);
-    toast.success('Email marketing activado. Steve preparó todo para ti.');
+    toast.success('Email marketing activado. Steve preparo todo para ti.');
   }, [clientId]);
 
   return (
@@ -127,7 +126,7 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
           <div>
             <h2 className="text-xl font-semibold">Campaign Studio</h2>
             <p className="text-sm text-muted-foreground">
-              Email marketing inteligente — Steve crea, analiza y optimiza por ti
+              Email marketing inteligente — crea, envia y analiza tus campanas
             </p>
           </div>
         </div>
@@ -150,22 +149,22 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
               Sin conexion
             </Badge>
             <span className="text-sm text-yellow-800">
-              Conecta tu cuenta de Klaviyo en la pestaña "Conexiones" para activar el email marketing.
+              Conecta tu cuenta de Klaviyo en la pestana "Conexiones" para activar el email marketing.
             </span>
           </CardContent>
         </Card>
       )}
 
-      {/* Tabs */}
+      {/* Tabs: Templates | Campanas | Flujos | Calendario | Metricas | Steve */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-6 max-w-3xl">
-          <TabsTrigger value="diseno" className="flex items-center gap-1.5 text-xs">
-            <Palette className="w-3.5 h-3.5" />
-            Diseno
+          <TabsTrigger value="plantillas" className="flex items-center gap-1.5 text-xs">
+            <LayoutTemplate className="w-3.5 h-3.5" />
+            Plantillas
           </TabsTrigger>
-          <TabsTrigger value="crear" className="flex items-center gap-1.5 text-xs">
+          <TabsTrigger value="campanas" className="flex items-center gap-1.5 text-xs">
             <PlusCircle className="w-3.5 h-3.5" />
-            Crear
+            Campanas
           </TabsTrigger>
           <TabsTrigger value="flujos" className="flex items-center gap-1.5 text-xs">
             <Zap className="w-3.5 h-3.5" />
@@ -185,13 +184,13 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB: Diseno */}
-        <TabsContent value="diseno" className="mt-6">
-          <TemplateBuilder clientId={clientId} onBrandUpdate={setBrand} />
+        {/* TAB: Plantillas — Editor drag & drop, CRUD de templates */}
+        <TabsContent value="plantillas" className="mt-6">
+          <TemplatesPanel clientId={clientId} brand={brand} />
         </TabsContent>
 
-        {/* TAB: Crear */}
-        <TabsContent value="crear" className="mt-6">
+        {/* TAB: Campanas — Crear campanas seleccionando tipo */}
+        <TabsContent value="campanas" className="mt-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {CAMPAIGN_TYPE_LIST.map((type) => {
               const template = CAMPAIGN_TEMPLATES[type];
@@ -267,12 +266,12 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
           />
         </TabsContent>
 
-        {/* TAB: Metricas con Insights */}
+        {/* TAB: Metricas — Solo datos y analisis */}
         <TabsContent value="metricas" className="mt-6">
           <MetricsInsights clientId={clientId} />
         </TabsContent>
 
-        {/* TAB: Steve Chat */}
+        {/* TAB: Steve Chat — Persistente */}
         <TabsContent value="steve" className="mt-6">
           <SteveKlaviyoChat clientId={clientId} />
         </TabsContent>
