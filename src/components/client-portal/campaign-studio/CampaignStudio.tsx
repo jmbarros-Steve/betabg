@@ -19,6 +19,7 @@ import { FlowsPanel } from './flows/FlowsPanel';
 import { MetricsInsights } from './insights/MetricsInsights';
 import { SteveKlaviyoChat } from './chat/SteveKlaviyoChat';
 import { AutoActivation } from './activation/AutoActivation';
+import { TemplateBuilder } from './design/TemplateBuilder';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   TrendingUp,
@@ -47,7 +48,7 @@ interface CampaignStudioProps {
 
 export function CampaignStudio({ clientId }: CampaignStudioProps) {
   const [brand, setBrand] = useState<BrandIdentity>(DEFAULT_BRAND);
-  const [activeTab, setActiveTab] = useState('crear');
+  const [activeTab, setActiveTab] = useState('diseno');
   const [selectedType, setSelectedType] = useState<CampaignType | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(false);
@@ -157,7 +158,11 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
+          <TabsTrigger value="diseno" className="flex items-center gap-1.5 text-xs">
+            <Palette className="w-3.5 h-3.5" />
+            Diseno
+          </TabsTrigger>
           <TabsTrigger value="crear" className="flex items-center gap-1.5 text-xs">
             <PlusCircle className="w-3.5 h-3.5" />
             Crear
@@ -179,6 +184,11 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
             Steve
           </TabsTrigger>
         </TabsList>
+
+        {/* TAB: Diseno */}
+        <TabsContent value="diseno" className="mt-6">
+          <TemplateBuilder clientId={clientId} onBrandUpdate={setBrand} />
+        </TabsContent>
 
         {/* TAB: Crear */}
         <TabsContent value="crear" className="mt-6">

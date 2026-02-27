@@ -277,7 +277,7 @@ export function ContentConfigurator({
             id="subject"
             value={campaignData.subject}
             onChange={(e) => onUpdate({ subject: e.target.value })}
-            placeholder={template.defaultSubject}
+            placeholder="ej: Nuevos productos esta semana"
             className={subjectStatus === 'error' ? 'border-red-300' : ''}
           />
           {/* AI Subject suggestions */}
@@ -331,7 +331,7 @@ export function ContentConfigurator({
             id="title"
             value={campaignData.title}
             onChange={(e) => onUpdate({ title: e.target.value })}
-            placeholder={template.defaultTitle}
+            placeholder="Titulo principal del email"
           />
         </div>
 
@@ -341,7 +341,7 @@ export function ContentConfigurator({
             id="introText"
             value={campaignData.introText}
             onChange={(e) => onUpdate({ introText: e.target.value })}
-            placeholder={template.defaultIntro}
+            placeholder="Texto introductorio para tu audiencia..."
             rows={3}
           />
         </div>
@@ -535,7 +535,7 @@ export function ContentConfigurator({
             id="ctaText"
             value={campaignData.ctaText}
             onChange={(e) => onUpdate({ ctaText: e.target.value })}
-            placeholder={template.defaultCtaText}
+            placeholder="ej: Ver productos, Comprar ahora"
           />
         </div>
         <div className="space-y-2">

@@ -51,17 +51,17 @@ function buildInitialData(type: CampaignType, editCampaign?: any): CampaignData 
   if (editCampaign) {
     return {
       type,
-      subject: editCampaign.subject || template.defaultSubject,
+      subject: editCampaign.subject || '',
       previewText: editCampaign.previewText || '',
-      title: editCampaign.title || template.defaultTitle,
-      introText: editCampaign.introText || template.defaultIntro,
+      title: editCampaign.title || '',
+      introText: editCampaign.introText || '',
       products: editCampaign.products || [],
       customBlocks: editCampaign.customBlocks || [],
       heroImageUrl: editCampaign.heroImageUrl || '',
       couponCode: editCampaign.couponCode || '',
       couponDescription: editCampaign.couponDescription || '',
       couponExpiry: editCampaign.couponExpiry || '',
-      ctaText: editCampaign.ctaText || template.defaultCtaText,
+      ctaText: editCampaign.ctaText || '',
       ctaUrl: editCampaign.ctaUrl || '',
       htmlContent: editCampaign.htmlContent || '',
       collectionId: editCampaign.collectionId || '',
@@ -71,17 +71,17 @@ function buildInitialData(type: CampaignType, editCampaign?: any): CampaignData 
 
   return {
     type,
-    subject: template.defaultSubject,
+    subject: '',
     previewText: '',
-    title: template.defaultTitle,
-    introText: template.defaultIntro,
+    title: '',
+    introText: '',
     products: [],
     customBlocks: [],
     heroImageUrl: '',
     couponCode: '',
     couponDescription: '',
     couponExpiry: '',
-    ctaText: template.defaultCtaText,
+    ctaText: '',
     ctaUrl: '',
     htmlContent: '',
     collectionId: '',
@@ -117,14 +117,13 @@ export function CampaignCreationWizard({
   }, []);
 
   const handleTypeChange = useCallback((type: CampaignType) => {
-    const template = CAMPAIGN_TEMPLATES[type];
     setCampaignData(prev => ({
       ...prev,
       type,
-      subject: template.defaultSubject,
-      title: template.defaultTitle,
-      introText: template.defaultIntro,
-      ctaText: template.defaultCtaText,
+      subject: '',
+      title: '',
+      introText: '',
+      ctaText: '',
       products: [],
       customBlocks: [],
       heroImageUrl: '',

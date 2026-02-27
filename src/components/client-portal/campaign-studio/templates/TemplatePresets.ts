@@ -46,10 +46,10 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
     dataSource: 'klaviyo_ordered',
     defaultProductCount: 3,
     defaultLayout: 'horizontal',
-    defaultSubject: 'Los mas vendidos de la semana',
-    defaultTitle: 'Lo que todas aman',
-    defaultIntro: 'Descubre los productos favoritos de nuestra comunidad. No te quedes sin el tuyo.',
-    defaultCtaText: 'Ver todos los productos',
+    defaultSubject: '',
+    defaultTitle: '',
+    defaultIntro: '',
+    defaultCtaText: '',
   },
 
   most_viewed: {
@@ -69,10 +69,10 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
     dataSource: 'klaviyo_viewed',
     defaultProductCount: 4,
     defaultLayout: 'grid_2x2',
-    defaultSubject: 'Lo que mas estan mirando',
-    defaultTitle: 'Tendencia esta semana',
-    defaultIntro: 'Estos son los productos que estan captando todas las miradas.',
-    defaultCtaText: 'Explorar tendencias',
+    defaultSubject: '',
+    defaultTitle: '',
+    defaultIntro: '',
+    defaultCtaText: '',
   },
 
   collection: {
@@ -93,10 +93,10 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
     dataSource: 'shopify_collection',
     defaultProductCount: 6,
     defaultLayout: 'grid_3x1',
-    defaultSubject: 'Descubre nuestra coleccion',
-    defaultTitle: 'Coleccion Destacada',
-    defaultIntro: 'Una seleccion curada especialmente para ti.',
-    defaultCtaText: 'Ver coleccion completa',
+    defaultSubject: '',
+    defaultTitle: '',
+    defaultIntro: '',
+    defaultCtaText: '',
   },
 
   new_arrivals: {
@@ -116,10 +116,10 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
     dataSource: 'shopify_newest',
     defaultProductCount: 4,
     defaultLayout: 'grid_2x2',
-    defaultSubject: 'Recien llegados que te van a encantar',
-    defaultTitle: 'Lo nuevo que llego',
-    defaultIntro: 'Se la primera en descubrir nuestras novedades.',
-    defaultCtaText: 'Ver novedades',
+    defaultSubject: '',
+    defaultTitle: '',
+    defaultIntro: '',
+    defaultCtaText: '',
   },
 
   promotional: {
@@ -140,10 +140,10 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
     dataSource: 'manual',
     defaultProductCount: 3,
     defaultLayout: 'horizontal',
-    defaultSubject: 'Oferta especial solo para ti',
-    defaultTitle: 'Oferta Especial',
-    defaultIntro: 'Aprovecha este descuento exclusivo antes de que termine.',
-    defaultCtaText: 'Ir a la tienda',
+    defaultSubject: '',
+    defaultTitle: '',
+    defaultIntro: '',
+    defaultCtaText: '',
   },
 
   custom: {
@@ -163,7 +163,7 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
     defaultSubject: '',
     defaultTitle: '',
     defaultIntro: '',
-    defaultCtaText: 'Ver mas',
+    defaultCtaText: '',
   },
 };
 
