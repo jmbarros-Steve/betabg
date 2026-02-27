@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,6 +37,93 @@ const QUICK_SUGGESTIONS = [
   'Ideas para mi proxima campana',
 ];
 
+// ---------------------------------------------------------------------------
+// Module-level in-flight tracker: requests survive component unmount
+// ---------------------------------------------------------------------------
+
+interface InflightEntry {
+  conversationId: string;
+  promise: Promise<string>;
+}
+
+const inflightMap = new Map<string, InflightEntry>();
+
+/** Calls Steve edge function and saves the assistant reply to DB.
+ *  Runs independently of component lifecycle. */
+async function sendToSteveAndPersist(
+  conversationId: string,
+  message: string,
+  history: ChatMessage[],
+  connectionId: string | null,
+  clientId: string,
+): Promise<string> {
+  let assistantContent: string;
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      'steve-email-content',
+      {
+        body: {
+          connectionId,
+          action: 'chat',
+          message,
+          history,
+          clientId,
+        },
+      },
+    );
+
+    if (error) {
+      // Fallback: try the steve-chat function
+      const { data: fallbackData, error: fallbackError } =
+        await supabase.functions.invoke('steve-chat', {
+          body: {
+            client_id: clientId,
+            message,
+          },
+        });
+
+      if (fallbackError) throw fallbackError;
+
+      assistantContent =
+        fallbackData?.message ||
+        fallbackData?.response ||
+        'Lo siento, no pude procesar tu mensaje. Intenta de nuevo.';
+    } else {
+      assistantContent =
+        data?.message ||
+        data?.response ||
+        data?.content ||
+        'Lo siento, no pude procesar tu mensaje. Intenta de nuevo.';
+    }
+  } catch (err: any) {
+    console.error('Error sending message to Steve:', err);
+    // On error, clean up inflight and re-throw so caller can handle
+    inflightMap.delete(conversationId);
+    throw err;
+  }
+
+  // Save assistant message to DB (persists even if component unmounted)
+  try {
+    await supabase.from('steve_messages').insert({
+      conversation_id: conversationId,
+      role: 'assistant',
+      content: assistantContent,
+    });
+  } catch (err) {
+    console.error('Error saving assistant message:', err);
+  }
+
+  // Clean up inflight entry
+  inflightMap.delete(conversationId);
+
+  return assistantContent;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -47,9 +134,13 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mountedRef = useRef(true);
 
-  // Messages from the DB (not counting the static greeting)
-  const hasUserMessages = messages.some((m) => m.role === 'user');
+  // Track mount status
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Show quick suggestions only when there are no loaded messages (fresh conversation)
   const showSuggestions = messages.length === 0 && !loading;
@@ -93,6 +184,23 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
           } else {
             setMessages([]);
           }
+
+          // Check if there's an in-flight request for this conversation
+          const inflight = inflightMap.get(existing.id);
+          if (inflight) {
+            setLoading(true);
+            inflight.promise
+              .then((content) => {
+                if (mountedRef.current) {
+                  // Reload messages from DB to get the full history
+                  reloadMessagesFromDB(existing.id);
+                  setLoading(false);
+                }
+              })
+              .catch(() => {
+                if (mountedRef.current) setLoading(false);
+              });
+          }
         } else {
           // Create new conversation
           const { data: newConv } = await supabase
@@ -116,6 +224,28 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
     }
     loadConversation();
   }, [clientId]);
+
+  // Reload messages from DB (used after inflight completes)
+  const reloadMessagesFromDB = useCallback(async (convId: string) => {
+    try {
+      const { data: msgs } = await supabase
+        .from('steve_messages')
+        .select('*')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: true });
+
+      if (mountedRef.current && msgs) {
+        setMessages(
+          msgs.map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Error reloading messages:', err);
+    }
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -177,99 +307,61 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
 
   const sendMessage = async (messageText: string) => {
     const trimmed = messageText.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || loading || !conversationId) return;
 
     const userMessage: ChatMessage = { role: 'user', content: trimmed };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
-    // Save user message to DB
-    if (conversationId) {
-      try {
-        await supabase.from('steve_messages').insert({
-          conversation_id: conversationId,
-          role: 'user',
-          content: trimmed,
-        });
-      } catch (err) {
-        console.error('Error saving user message:', err);
-      }
+    // Save user message to DB immediately
+    try {
+      await supabase.from('steve_messages').insert({
+        conversation_id: conversationId,
+        role: 'user',
+        content: trimmed,
+      });
+    } catch (err) {
+      console.error('Error saving user message:', err);
     }
 
+    // Build history for context (last 10 messages)
+    const allMessages = [...messages, userMessage];
+    const history = allMessages.slice(-10);
+
+    // Launch the request via module-level function (survives unmount)
+    const promise = sendToSteveAndPersist(
+      conversationId,
+      trimmed,
+      history,
+      connectionId,
+      clientId,
+    );
+
+    // Track in-flight
+    inflightMap.set(conversationId, { conversationId, promise });
+
     try {
-      // Build history for context (last 10 messages)
-      const allMessages = [...messages, userMessage];
-      const history = allMessages.slice(-10);
+      const assistantContent = await promise;
 
-      const { data, error } = await supabase.functions.invoke(
-        'steve-email-content',
-        {
-          body: {
-            connectionId,
-            action: 'chat',
-            message: trimmed,
-            history,
-            clientId,
-          },
-        }
-      );
-
-      let assistantContent: string;
-
-      if (error) {
-        // Fallback: try the steve-chat function
-        const { data: fallbackData, error: fallbackError } =
-          await supabase.functions.invoke('steve-chat', {
-            body: {
-              client_id: clientId,
-              message: trimmed,
-            },
-          });
-
-        if (fallbackError) throw fallbackError;
-
-        assistantContent =
-          fallbackData?.message ||
-          fallbackData?.response ||
-          'Lo siento, no pude procesar tu mensaje. Intenta de nuevo.';
-      } else {
-        assistantContent =
-          data?.message ||
-          data?.response ||
-          data?.content ||
-          'Lo siento, no pude procesar tu mensaje. Intenta de nuevo.';
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: assistantContent },
-      ]);
-
-      // Save assistant message to DB
-      if (conversationId) {
-        try {
-          await supabase.from('steve_messages').insert({
-            conversation_id: conversationId,
-            role: 'assistant',
-            content: assistantContent,
-          });
-        } catch (err) {
-          console.error('Error saving assistant message:', err);
-        }
+      // Update UI if still mounted
+      if (mountedRef.current) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: assistantContent },
+        ]);
       }
     } catch (err: any) {
-      console.error('Error sending message to Steve:', err);
-      if (err?.status === 429) {
-        toast.error('Demasiadas solicitudes. Espera un momento.');
-      } else {
-        toast.error('Error al enviar mensaje');
-      }
-      // Remove the user message from state on error
-      setMessages((prev) => prev.slice(0, -1));
+      if (mountedRef.current) {
+        if (err?.status === 429) {
+          toast.error('Demasiadas solicitudes. Espera un momento.');
+        } else {
+          toast.error('Error al enviar mensaje');
+        }
+        // Remove the user message from state on error
+        setMessages((prev) => prev.slice(0, -1));
 
-      // Also remove the user message from DB
-      if (conversationId) {
+        // Also remove the user message from DB
         try {
           const { data: lastMsg } = await supabase
             .from('steve_messages')
@@ -292,8 +384,10 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
         }
       }
     } finally {
-      setLoading(false);
-      textareaRef.current?.focus();
+      if (mountedRef.current) {
+        setLoading(false);
+        textareaRef.current?.focus();
+      }
     }
   };
 

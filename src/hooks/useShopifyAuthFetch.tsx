@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const SUPABASE_URL = 'https://jnqivntlkemzcpomkvwv.supabase.co';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 /**
  * Hook for making authenticated API calls to Edge Functions.

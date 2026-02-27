@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Calendar, ChevronRight, Loader2, Sparkles, Trash2, Plus, Send, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import { BulkPreviewGallery } from './BulkPreviewGallery';
 import { generateBrandEmail, type BrandIdentity, type ProductItem } from '../templates/BrandHtmlGenerator';
 import { CAMPAIGN_TEMPLATES, CAMPAIGN_TYPE_LIST, CAMPAIGN_TYPE_COLORS, type CampaignType } from '../templates/TemplatePresets';
+import { renderBlockToHtml } from '../../email-blocks/blockRenderer';
+import type { EmailBlock } from '../../email-blocks/blockTypes';
 
 interface PlannedCampaign {
   id: string;
@@ -20,6 +22,11 @@ interface PlannedCampaign {
   campaignType: CampaignType;
   week: number;
   dayOfWeek: number; // 0=Mon
+  exactDate: string; // yyyy-mm-dd
+  sendTime: string; // HH:mm
+  templateId: string | null;
+  segmentId: string | null;
+  segmentName: string;
   html: string;
   scheduledDate: string;
   products: ProductItem[];
@@ -54,27 +61,124 @@ function getWeekDate(year: number, month: number, week: number, dayOfWeek: numbe
   return date;
 }
 
+function formatDateToYMD(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated }: MonthlyPlannerWizardProps) {
   const now = new Date();
   const [step, setStep] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1 > 11 ? 0 : now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(selectedMonth === 0 ? now.getFullYear() + 1 : now.getFullYear());
+
+  const buildInitialCampaigns = (year: number, month: number): PlannedCampaign[] =>
+    DEFAULT_PLAN.map((p) => {
+      const date = getWeekDate(year, month, p.week, 1);
+      return {
+        id: crypto.randomUUID(),
+        name: p.label,
+        subject: CAMPAIGN_TEMPLATES[p.type].defaultSubject,
+        campaignType: p.type,
+        week: p.week,
+        dayOfWeek: 1,
+        exactDate: formatDateToYMD(date),
+        sendTime: '10:00',
+        templateId: null,
+        segmentId: null,
+        segmentName: '',
+        html: '',
+        scheduledDate: '',
+        products: [],
+      };
+    });
+
   const [plannedCampaigns, setPlannedCampaigns] = useState<PlannedCampaign[]>(() =>
-    DEFAULT_PLAN.map((p, i) => ({
-      id: crypto.randomUUID(),
-      name: p.label,
-      subject: CAMPAIGN_TEMPLATES[p.type].defaultSubject,
-      campaignType: p.type,
-      week: p.week,
-      dayOfWeek: 1, // Tuesday default
-      html: '',
-      scheduledDate: '',
-      products: [],
-    }))
+    buildInitialCampaigns(selectedYear, selectedMonth)
   );
   const [generating, setGenerating] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [pushResults, setPushResults] = useState<Array<{ name: string; success: boolean }>>([]);
+
+  // Data loading state
+  const [clientTemplates, setClientTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [klaviyoSegments, setKlaviyoSegments] = useState<{ id: string; name: string; type: string; count: string | number }[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
+
+  // Load templates and segments when the dialog opens
+  useEffect(() => {
+    if (!open || !clientId) return;
+
+    let cancelled = false;
+
+    async function loadData() {
+      setLoadingData(true);
+
+      // Load email templates
+      const { data: templates } = await supabase
+        .from('email_templates')
+        .select('id, name')
+        .eq('client_id', clientId)
+        .order('updated_at', { ascending: false });
+
+      if (!cancelled && templates) {
+        setClientTemplates(templates.map(t => ({ id: t.id, name: t.name })));
+      }
+
+      // Load Klaviyo segments/lists
+      try {
+        const { data: conn } = await supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('platform', 'klaviyo')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (conn && !cancelled) {
+          const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+            body: { connectionId: conn.id, timeframe: 'last_30_days' },
+          });
+
+          if (!error && data && !cancelled) {
+            const listItems = (data.lists || []).map((l: any) => ({
+              id: l.id,
+              name: l.name,
+              type: 'list',
+              count: l.profile_count ?? 0,
+            }));
+            const segmentItems = (data.segments || []).map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              type: 'segment',
+              count: s.profile_count ?? 0,
+            }));
+            setKlaviyoSegments([...listItems, ...segmentItems]);
+          }
+        }
+      } catch (e) {
+        console.error('Error loading Klaviyo segments:', e);
+      }
+
+      if (!cancelled) setLoadingData(false);
+    }
+
+    loadData();
+    return () => { cancelled = true; };
+  }, [open, clientId]);
+
+  // Recalculate dates when month/year changes
+  useEffect(() => {
+    setPlannedCampaigns(prev =>
+      prev.map(c => {
+        const date = getWeekDate(selectedYear, selectedMonth, c.week, c.dayOfWeek);
+        return { ...c, exactDate: formatDateToYMD(date) };
+      })
+    );
+  }, [selectedMonth, selectedYear]);
 
   const updateCampaign = (id: string, updates: Partial<PlannedCampaign>) => {
     setPlannedCampaigns(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -86,13 +190,20 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
 
   const addCampaign = () => {
     const nextWeek = Math.max(...plannedCampaigns.map(c => c.week), 0) + 1;
+    const week = Math.min(nextWeek, 5);
+    const date = getWeekDate(selectedYear, selectedMonth, week, 1);
     setPlannedCampaigns(prev => [...prev, {
       id: crypto.randomUUID(),
       name: 'Nueva campaña',
       subject: '',
       campaignType: 'custom' as CampaignType,
-      week: Math.min(nextWeek, 5),
+      week,
       dayOfWeek: 1,
+      exactDate: formatDateToYMD(date),
+      sendTime: '10:00',
+      templateId: null,
+      segmentId: null,
+      segmentName: '',
       html: '',
       scheduledDate: '',
       products: [],
@@ -101,24 +212,92 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
 
   const generateAllHtml = useCallback(async () => {
     setGenerating(true);
-    const updated = plannedCampaigns.map(c => {
-      const template = CAMPAIGN_TEMPLATES[c.campaignType];
-      const date = getWeekDate(selectedYear, selectedMonth, c.week, c.dayOfWeek);
-      const html = generateBrandEmail({
-        brand,
-        sections: template.sections,
-        products: c.products,
-        title: c.name,
-        introText: template.defaultIntro,
-        ctaText: template.defaultCtaText,
-        ctaUrl: brand.shopUrl,
-      });
-      return { ...c, html, scheduledDate: date.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }) };
-    });
-    setPlannedCampaigns(updated);
+
+    const updatedCampaigns: PlannedCampaign[] = [];
+
+    for (const c of plannedCampaigns) {
+      let html = '';
+
+      if (c.templateId) {
+        // Load blocks from email_templates and render
+        try {
+          const { data: tmpl } = await supabase
+            .from('email_templates')
+            .select('content_blocks')
+            .eq('id', c.templateId)
+            .maybeSingle();
+
+          if (tmpl?.content_blocks && Array.isArray(tmpl.content_blocks)) {
+            const blocks = tmpl.content_blocks as unknown as EmailBlock[];
+            const templateColors = {
+              primary: brand.colors.primary,
+              secondary: brand.colors.secondaryBg,
+              accent: brand.colors.accent,
+              button: brand.colors.accent,
+              buttonText: '#ffffff',
+              font: `'${brand.fonts.body}', ${brand.fonts.bodyType || 'sans-serif'}`,
+            };
+            const bodyHtml = blocks.map(b => renderBlockToHtml(b, templateColors)).join('\n');
+            html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin:0; padding:0; background-color:#f6f6f9; font-family:'${brand.fonts.body}', ${brand.fonts.bodyType || 'sans-serif'}; }
+    table { border-spacing:0; }
+    td { padding:0; }
+    img { border:0; display:block; max-width:100%; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f6f6f9;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f6f6f9;">
+    <tr><td align="center" style="padding:24px 0;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td>
+${bodyHtml}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+          }
+        } catch (err) {
+          console.error('Error loading template blocks for', c.name, err);
+        }
+      }
+
+      // Fallback: generate with brand email if no template or template load failed
+      if (!html) {
+        const template = CAMPAIGN_TEMPLATES[c.campaignType];
+        html = generateBrandEmail({
+          brand,
+          sections: template.sections,
+          products: c.products,
+          title: c.name,
+          introText: template.defaultIntro,
+          ctaText: template.defaultCtaText,
+          ctaUrl: brand.shopUrl,
+        });
+      }
+
+      // Format display date from exactDate and sendTime
+      const dateParts = c.exactDate.split('-');
+      const displayDate = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1,
+        parseInt(dateParts[2])
+      );
+      const scheduledDate = displayDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }) + ` ${c.sendTime}`;
+
+      updatedCampaigns.push({ ...c, html, scheduledDate });
+    }
+
+    setPlannedCampaigns(updatedCampaigns);
     setGenerating(false);
-    toast.success(`${updated.length} previews generados`);
-  }, [plannedCampaigns, brand, selectedYear, selectedMonth]);
+    toast.success(`${updatedCampaigns.length} previews generados`);
+  }, [plannedCampaigns, brand]);
 
   const pushAllToKlaviyo = useCallback(async () => {
     setPushing(true);
@@ -126,20 +305,35 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
 
     for (const campaign of plannedCampaigns) {
       try {
-        const date = getWeekDate(selectedYear, selectedMonth, campaign.week, campaign.dayOfWeek);
-        // Save to email_campaigns
+        // Build ISO scheduled_at from exactDate + sendTime
+        const scheduledAt = new Date(`${campaign.exactDate}T${campaign.sendTime}:00`).toISOString();
+
+        const insertPayload: Record<string, any> = {
+          client_id: clientId,
+          name: campaign.name,
+          subject: campaign.subject || CAMPAIGN_TEMPLATES[campaign.campaignType].defaultSubject,
+          final_html: campaign.html,
+          status: 'draft',
+          scheduled_at: scheduledAt,
+        };
+
+        if (campaign.templateId) {
+          insertPayload.template_id = campaign.templateId;
+        }
+
+        if (campaign.segmentId) {
+          // Determine if it's a list or segment by checking the loaded data
+          const seg = klaviyoSegments.find(s => s.id === campaign.segmentId);
+          if (seg?.type === 'list') {
+            insertPayload.klaviyo_list_id = campaign.segmentId;
+          } else {
+            insertPayload.klaviyo_segment_id = campaign.segmentId;
+          }
+        }
+
         const { error } = await supabase
           .from('email_campaigns')
-          .insert({
-            client_id: clientId,
-            name: campaign.name,
-            subject: campaign.subject || CAMPAIGN_TEMPLATES[campaign.campaignType].defaultSubject,
-            final_html: campaign.html,
-            status: 'draft',
-            scheduled_at: date.toISOString(),
-            campaign_type: campaign.campaignType,
-            data_source: CAMPAIGN_TEMPLATES[campaign.campaignType].dataSource,
-          } as any);
+          .insert(insertPayload as any);
 
         results.push({ name: campaign.name, success: !error });
         if (error) console.error('Error saving campaign:', error);
@@ -153,7 +347,7 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
     toast.success(`${successCount}/${results.length} campañas creadas como borradores`);
     setPushing(false);
     onCreated?.();
-  }, [plannedCampaigns, clientId, selectedYear, selectedMonth, onCreated]);
+  }, [plannedCampaigns, clientId, klaviyoSegments, onCreated]);
 
   const steps = ['Mes', 'Campañas', 'Preview', 'Crear'];
 
@@ -233,10 +427,14 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
         {/* Step 1: Configure campaigns */}
         {step === 1 && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Configura las campañas del mes. Puedes agregar, quitar o modificar cada una.</p>
-            {plannedCampaigns.map((c, idx) => (
+            <p className="text-sm text-muted-foreground">
+              Configura las campañas del mes. Puedes agregar, quitar o modificar cada una.
+              {loadingData && <span className="ml-2 text-xs text-orange-500">(Cargando templates y segmentos...)</span>}
+            </p>
+            {plannedCampaigns.map((c) => (
               <Card key={c.id}>
                 <CardContent className="pt-4 space-y-3">
+                  {/* Header with color dot + delete */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CAMPAIGN_TYPE_COLORS[c.campaignType] }} />
@@ -246,8 +444,10 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
                       <Trash2 className="w-3.5 h-3.5 text-destructive" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
+
+                  {/* Row 1: Name + Type */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
                       <Label className="text-xs">Nombre</Label>
                       <Input
                         value={c.name}
@@ -267,14 +467,78 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
                       </Select>
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-xs">Asunto</Label>
-                    <Input
-                      value={c.subject}
-                      onChange={e => updateCampaign(c.id, { subject: e.target.value })}
-                      placeholder={CAMPAIGN_TEMPLATES[c.campaignType].defaultSubject}
-                      className="h-8 text-sm"
-                    />
+
+                  {/* Row 2: Date + Time + Template */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-xs">Fecha</Label>
+                      <Input
+                        type="date"
+                        value={c.exactDate}
+                        onChange={e => updateCampaign(c.id, { exactDate: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Hora</Label>
+                      <Input
+                        type="time"
+                        value={c.sendTime}
+                        onChange={e => updateCampaign(c.id, { sendTime: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Template</Label>
+                      <Select
+                        value={c.templateId || 'none'}
+                        onValueChange={v => updateCampaign(c.id, { templateId: v === 'none' ? null : v })}
+                      >
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Sin template" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin template (auto-generado)</SelectItem>
+                          {clientTemplates.map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Segment + Subject */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Segmento / Lista</Label>
+                      <Select
+                        value={c.segmentId || 'none'}
+                        onValueChange={v => {
+                          const seg = klaviyoSegments.find(s => s.id === v);
+                          updateCampaign(c.id, {
+                            segmentId: v === 'none' ? null : v,
+                            segmentName: seg?.name || '',
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Toda la lista" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Toda la lista</SelectItem>
+                          {klaviyoSegments.map(s => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name} ({s.count})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Asunto</Label>
+                      <Input
+                        value={c.subject}
+                        onChange={e => updateCampaign(c.id, { subject: e.target.value })}
+                        placeholder={CAMPAIGN_TEMPLATES[c.campaignType].defaultSubject}
+                        className="h-8 text-sm"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -330,6 +594,12 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
                     <div key={c.id} className="flex items-center gap-2 text-sm justify-center">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CAMPAIGN_TYPE_COLORS[c.campaignType] }} />
                       {c.name}
+                      <span className="text-xs text-muted-foreground">
+                        ({c.exactDate} {c.sendTime})
+                      </span>
+                      {c.segmentName && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">{c.segmentName}</Badge>
+                      )}
                     </div>
                   ))}
                 </div>

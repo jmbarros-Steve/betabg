@@ -364,7 +364,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     // Two-phase analysis: research (data analysis ~30s) → strategy (Claude Opus ~60s)
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
-    const projectId = 'jnqivntlkemzcpomkvwv';
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

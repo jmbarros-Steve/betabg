@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify JWT
@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
     }
 
   // Use AI for deeper analysis if API key available and we have significant data
-  if (lovableApiKey && campaigns.length > 0) {
+  if (ANTHROPIC_API_KEY && campaigns.length > 0) {
     try {
       // Fetch training data for context
       const { data: trainingExamples } = await supabase
@@ -305,8 +305,8 @@ Deno.serve(async (req) => {
       const knowledgeSectionCR = campaignKnowledge ? `\nMETODOLOGÍA DE CAMPAÑAS — MÉTODO CHARLIE:\n${campaignKnowledge}\n` : '';
 
       const aiRecommendations = await getAIRecommendations(
-        campaigns, 
-        lovableApiKey,
+        campaigns,
+        ANTHROPIC_API_KEY,
         trainingExamples || [],
         positiveFeedback || [],
         negativeFeedback || [],
@@ -423,29 +423,30 @@ Responde SOLO con un JSON array con este formato:
 [{"campaign_name": "...", "recommendation": "...", "priority": "low|medium|high"}]`;
 
   try {
-    const response = await fetch('https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/ai-proxy', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        system: `Eres Steve, consultor experto en gestión de campañas de Meta Ads y Google Ads para e-commerce latinoamericano.\n${knowledgeSection}${bugSection}Responde siempre en español.`,
         messages: [
-          { role: 'system', content: `Eres Steve, consultor experto en gestión de campañas de Meta Ads y Google Ads para e-commerce latinoamericano.\n${knowledgeSection}${bugSection}Responde siempre en español.` },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.7,
       }),
     });
 
     if (!response.ok) {
-      console.error('AI API error:', await response.text());
+      console.error('Anthropic API error:', await response.text());
       return [];
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    const content = data.content?.[0]?.text || '';
     
     // Parse JSON from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);

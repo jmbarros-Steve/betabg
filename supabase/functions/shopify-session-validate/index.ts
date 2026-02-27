@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
           installed: false,
           requiresOAuth: true,
           message: 'Shop not connected to Steve. Please install the app first.',
-          installUrl: `https://jnqivntlkemzcpomkvwv.supabase.co/functions/v1/shopify-install?shop=${shopDomain}`
+          installUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-install?shop=${shopDomain}`
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

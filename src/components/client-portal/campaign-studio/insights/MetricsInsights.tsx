@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   TrendingUp,
   AlertTriangle,
@@ -313,6 +315,9 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [flows, setFlows] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [activeSection, setActiveSection] = useState<'overview' | 'campaigns' | 'flows'>('overview');
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState<boolean | null>(null);
   const [timeframe, setTimeframe] = useState('last_30_days');
@@ -392,6 +397,9 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
       } else {
         setError('Respuesta sin metricas globales');
       }
+
+      if (data.flows) setFlows(data.flows);
+      if (data.campaigns) setCampaigns(data.campaigns);
     } catch (err: any) {
       console.error('Error generating insights:', err);
       setError(err.message || 'Error inesperado');
@@ -577,8 +585,28 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
         </CardContent>
       </Card>
 
+      {/* Section Tabs */}
+      {!loading && !error && globalStats && (
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+          {(['overview', 'campaigns', 'flows'] as const).map(section => (
+            <button
+              key={section}
+              onClick={() => setActiveSection(section)}
+              className={cn(
+                'px-4 py-1.5 rounded-md text-sm font-medium transition-colors',
+                activeSection === section
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {section === 'overview' ? 'Resumen' : section === 'campaigns' ? `Campañas (${campaigns.length})` : `Flujos (${flows.length})`}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* AI Insights Section */}
-      {!loading && insights.length > 0 && (
+      {activeSection === 'overview' && !loading && insights.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-primary" />
@@ -592,6 +620,114 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Campaigns Table */}
+      {activeSection === 'campaigns' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-left p-3 font-medium">Campaña</th>
+                    <th className="text-left p-3 font-medium">Estado</th>
+                    <th className="text-left p-3 font-medium">Fecha</th>
+                    <th className="text-right p-3 font-medium">Enviados</th>
+                    <th className="text-right p-3 font-medium">Open Rate</th>
+                    <th className="text-right p-3 font-medium">Click Rate</th>
+                    <th className="text-right p-3 font-medium">Revenue</th>
+                    <th className="text-right p-3 font-medium">Conversiones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns
+                    .filter(c => c.metrics)
+                    .sort((a, b) => {
+                      const dateA = a.send_time ? new Date(a.send_time).getTime() : 0;
+                      const dateB = b.send_time ? new Date(b.send_time).getTime() : 0;
+                      return dateB - dateA;
+                    })
+                    .map(campaign => (
+                      <tr key={campaign.id} className="border-b hover:bg-muted/20 transition-colors">
+                        <td className="p-3 font-medium max-w-[200px] truncate">{campaign.name}</td>
+                        <td className="p-3">
+                          <Badge variant={campaign.status === 'sent' ? 'default' : campaign.status === 'draft' ? 'secondary' : 'outline'}
+                            className="text-[10px]">
+                            {campaign.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-muted-foreground text-xs">
+                          {campaign.send_time ? new Date(campaign.send_time).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        </td>
+                        <td className="p-3 text-right tabular-nums">{formatNumber(campaign.metrics?.delivered || 0)}</td>
+                        <td className="p-3 text-right tabular-nums">{((campaign.metrics?.open_rate || 0) * 100).toFixed(1)}%</td>
+                        <td className="p-3 text-right tabular-nums">{((campaign.metrics?.click_rate || 0) * 100).toFixed(1)}%</td>
+                        <td className="p-3 text-right tabular-nums">{formatCurrency(campaign.metrics?.revenue || 0)}</td>
+                        <td className="p-3 text-right tabular-nums">{formatNumber(campaign.metrics?.conversions || 0)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {campaigns.filter(c => c.metrics).length === 0 && (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  No hay campañas con métricas en este periodo
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Flows Table */}
+      {activeSection === 'flows' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-left p-3 font-medium">Flujo</th>
+                    <th className="text-left p-3 font-medium">Estado</th>
+                    <th className="text-right p-3 font-medium">Enviados</th>
+                    <th className="text-right p-3 font-medium">Open Rate</th>
+                    <th className="text-right p-3 font-medium">Click Rate</th>
+                    <th className="text-right p-3 font-medium">Revenue</th>
+                    <th className="text-right p-3 font-medium">Conversiones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flows
+                    .filter(f => f.metrics)
+                    .sort((a, b) => (b.metrics?.revenue || 0) - (a.metrics?.revenue || 0))
+                    .map(flow => (
+                      <tr key={flow.id} className="border-b hover:bg-muted/20 transition-colors">
+                        <td className="p-3 font-medium max-w-[200px] truncate">{flow.name}</td>
+                        <td className="p-3">
+                          <Badge
+                            variant={flow.status === 'live' ? 'default' : flow.status === 'draft' ? 'secondary' : 'outline'}
+                            className={cn('text-[10px]', flow.status === 'live' && 'bg-green-600')}
+                          >
+                            {flow.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right tabular-nums">{formatNumber(flow.metrics?.delivered || 0)}</td>
+                        <td className="p-3 text-right tabular-nums">{((flow.metrics?.open_rate || 0) * 100).toFixed(1)}%</td>
+                        <td className="p-3 text-right tabular-nums">{((flow.metrics?.click_rate || 0) * 100).toFixed(1)}%</td>
+                        <td className="p-3 text-right tabular-nums">{formatCurrency(flow.metrics?.revenue || 0)}</td>
+                        <td className="p-3 text-right tabular-nums">{formatNumber(flow.metrics?.conversions || 0)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {flows.filter(f => f.metrics).length === 0 && (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  No hay flujos con métricas en este periodo
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

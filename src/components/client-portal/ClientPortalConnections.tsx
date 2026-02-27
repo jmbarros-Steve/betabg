@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label';
 const SHOPIFY_CLIENT_ID = '933109488c1e95e5fd630abb7e03809e';
 const GOOGLE_CLIENT_ID = '850416724643-52bpu0tvsd9juc2v5b636ajfk4sogt24.apps.googleusercontent.com';
 const META_APP_ID = '1994525824461583';
-const SUPABASE_URL = 'https://jnqivntlkemzcpomkvwv.supabase.co';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 interface ClientPortalConnectionsProps {
   clientId: string;

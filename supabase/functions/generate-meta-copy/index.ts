@@ -695,8 +695,8 @@ Deno.serve(async (req) => {
     if (mode === 'variaciones') {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-      if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
+      const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+      if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       const { data: briefData } = await supabase
@@ -734,18 +734,18 @@ Responde SOLO en JSON válido sin markdown ni backticks:
   ]
 }`;
 
-      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.85,
         }),
       });
-      if (!aiResp.ok) throw new Error(`AI error ${aiResp.status}`);
+      if (!aiResp.ok) throw new Error(`Anthropic API error ${aiResp.status}`);
       const aiData = await aiResp.json();
-      const raw = aiData.choices?.[0]?.message?.content || '';
+      const raw = aiData.content?.[0]?.text || '';
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
       return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -755,8 +755,8 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     if (mode === 'brief_visual') {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-      if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
+      const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+      if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       const { data: briefData } = await supabase
@@ -788,18 +788,18 @@ ${adType === 'static'
 {"tipo":"video","duracion":"15s","escena_1":{"tiempo":"0-3s","descripcion":"...","texto_overlay":"..."},"escena_2":{"tiempo":"3-12s","descripcion":"...","texto_overlay":"..."},"escena_3":{"tiempo":"12-15s","descripcion":"...","texto_overlay":"..."},"musica_sugerida":"...","tono":"...","foto_recomendada":"URL de la foto más adecuada o null si no hay","instruccion_foto":"animar / usar como base / cambiar fondo","prompt_generacion":"prompt detallado en inglés para Kling AI"}`
 }`;
 
-      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
         }),
       });
-      if (!aiResp.ok) throw new Error(`AI error ${aiResp.status}`);
+      if (!aiResp.ok) throw new Error(`Anthropic API error ${aiResp.status}`);
       const aiData = await aiResp.json();
-      const raw = aiData.choices?.[0]?.message?.content || '';
+      const raw = aiData.content?.[0]?.text || '';
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
       return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -809,10 +809,10 @@ ${adType === 'static'
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY is not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -1012,19 +1012,21 @@ las preferencias específicas de cada cliente cuando las conozco.
 
     console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 
-    // Call Lovable AI
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Call Anthropic API directly
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { 
-            role: 'user', 
+          {
+            role: 'user',
             content: `Genera copies profesionales para un anuncio ${adType === 'static' ? 'estático' : 'de video'} de Meta Ads para la etapa ${funnelStage.toUpperCase()} del funnel.
 
 CONTEXTO DEL BUYER PERSONA: "${briefContext.buyerPersona.nombre || 'Cliente ideal'}"
@@ -1048,7 +1050,6 @@ ${learningContext}
 Genera copies que VENDAN siguiendo las metodologías combinadas y las preferencias aprendidas del cliente.`
           },
         ],
-        temperature: 0.85,
       }),
     });
 
@@ -1059,19 +1060,13 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
       const errorText = await aiResponse.text();
-      console.error('AI Gateway error:', aiResponse.status, errorText);
-      throw new Error('AI Gateway error');
+      console.error('Anthropic API error:', aiResponse.status, errorText);
+      throw new Error(`Anthropic API error (${aiResponse.status})`);
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content;
+    const content = aiData.content?.[0]?.text;
 
     if (!content) {
       throw new Error('No content in AI response');

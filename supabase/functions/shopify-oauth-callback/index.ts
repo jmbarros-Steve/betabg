@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
   const shopifyClientId = Deno.env.get('SHOPIFY_CLIENT_ID')!;
   const shopifyClientSecret = Deno.env.get('SHOPIFY_CLIENT_SECRET')!;
   
-  const frontendUrl = 'https://betabg.lovable.app';
+  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://betabg.lovable.app';
 
   try {
     const isDirectRedirect = req.method === 'GET';

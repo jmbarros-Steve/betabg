@@ -1166,7 +1166,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const competitorUrls = extractCompetitorUrlsFromBrief();
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'jnqivntlkemzcpomkvwv';
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

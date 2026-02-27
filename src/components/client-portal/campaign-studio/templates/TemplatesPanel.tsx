@@ -5,6 +5,7 @@ import type { BrandIdentity } from '../templates/BrandHtmlGenerator';
 import EmailBlockEditor from '../../email-blocks/EmailBlockEditor';
 import { type EmailBlock, createBlock } from '../../email-blocks/blockTypes';
 import { renderBlockToHtml } from '../../email-blocks/blockRenderer';
+import ImportKlaviyoDialog from './ImportKlaviyoDialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Plus, Pencil, Copy, Trash2, LayoutTemplate, Loader2, Search,
-  MoreVertical, Star, X, Save,
+  MoreVertical, Star, X, Save, Download,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,8 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [klaviyoConnectionId, setKlaviyoConnectionId] = useState<string | null>(null);
 
   // Derive template colors from brand
   const templateColors = useMemo(
@@ -192,6 +195,21 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  // Check for active Klaviyo connection
+  useEffect(() => {
+    supabase
+      .from('platform_connections')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('platform', 'klaviyo')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setKlaviyoConnectionId(data.id);
+      });
+  }, [clientId]);
 
   // -----------------------------------------------------------------------
   // CRUD: Create / Update
@@ -412,10 +430,22 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
               </p>
             </div>
           </div>
-          <Button onClick={openNewTemplate} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nueva plantilla
-          </Button>
+          <div className="flex items-center gap-2">
+            {klaviyoConnectionId && (
+              <Button
+                variant="outline"
+                onClick={() => setShowImportDialog(true)}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Importar desde Klaviyo
+              </Button>
+            )}
+            <Button onClick={openNewTemplate} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nueva plantilla
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
@@ -622,6 +652,21 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ================================================================= */}
+      {/* Import from Klaviyo Dialog                                         */}
+      {/* ================================================================= */}
+
+      {klaviyoConnectionId && (
+        <ImportKlaviyoDialog
+          open={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          connectionId={klaviyoConnectionId}
+          clientId={clientId}
+          brand={brand}
+          onImported={fetchTemplates}
+        />
+      )}
     </>
   );
 }
