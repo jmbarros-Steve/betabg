@@ -8,13 +8,14 @@ import { toast } from 'sonner';
 import {
   TrendingUp, Eye, Layers, Sparkles, Megaphone, Paintbrush,
   PlusCircle, CalendarDays, BarChart3, Palette, Zap, MessageCircle,
-  ArrowRight, LayoutTemplate,
+  ArrowRight, LayoutTemplate, Upload,
 } from 'lucide-react';
 import { CAMPAIGN_TEMPLATES, CAMPAIGN_TYPE_LIST, type CampaignType } from './templates/TemplatePresets';
 import type { BrandIdentity } from './templates/BrandHtmlGenerator';
 import { CampaignCreationWizard } from './create/CampaignCreationWizard';
 import { MonthlyCalendar } from './calendar/MonthlyCalendar';
 import { MonthlyPlannerWizard } from './bulk/MonthlyPlannerWizard';
+import { BulkUploadWizard } from './bulk/BulkUploadWizard';
 import { FlowsPanel } from './flows/FlowsPanel';
 import { MetricsInsights } from './insights/MetricsInsights';
 import { SteveKlaviyoChat } from './chat/SteveKlaviyoChat';
@@ -52,6 +53,7 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
   const [selectedType, setSelectedType] = useState<CampaignType | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showActivation, setShowActivation] = useState(false);
   const [hasKlaviyoConnection, setHasKlaviyoConnection] = useState<boolean | null>(null);
@@ -130,15 +132,26 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPlannerOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <CalendarDays className="w-4 h-4" />
-          Planificar Mes
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setBulkUploadOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Carga Masiva
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPlannerOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <CalendarDays className="w-4 h-4" />
+            Planificar Mes
+          </Button>
+        </div>
       </div>
 
       {/* Connection status */}
@@ -298,6 +311,20 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
           onClose={() => setPlannerOpen(false)}
           onCreated={() => {
             setPlannerOpen(false);
+            setRefreshKey(k => k + 1);
+          }}
+        />
+      )}
+
+      {/* Bulk Upload Wizard */}
+      {bulkUploadOpen && (
+        <BulkUploadWizard
+          clientId={clientId}
+          brand={brand}
+          open={bulkUploadOpen}
+          onClose={() => setBulkUploadOpen(false)}
+          onCreated={() => {
+            setBulkUploadOpen(false);
             setRefreshKey(k => k + 1);
           }}
         />
