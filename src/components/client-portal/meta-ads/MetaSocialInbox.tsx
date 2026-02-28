@@ -30,6 +30,7 @@ import {
   UserPlus,
   AlertCircle,
 } from 'lucide-react';
+import MetaScopeAlert from './MetaScopeAlert';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1304,6 +1305,9 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
 
   return (
     <div className="space-y-4">
+      {/* Scope alert */}
+      <MetaScopeAlert clientId={clientId} requiredFeature="pages" compact />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>

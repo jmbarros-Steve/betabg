@@ -13,6 +13,7 @@ import {
   Plus, X, RefreshCw, TrendingUp, AlertCircle, Link2,
   Sparkles, Lightbulb, BarChart3, Target, Zap,
 } from 'lucide-react';
+import MetaScopeAlert from './meta-ads/MetaScopeAlert';
 
 interface CompetitorAdsPanelProps {
   clientId: string;
@@ -288,6 +289,9 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
   return (
     <div className="space-y-6">
+      {/* Scope alert for pages permission */}
+      <MetaScopeAlert clientId={clientId} requiredFeature="pages" compact />
+
       {/* Meta Connection Warning */}
       {hasMetaConnection === false && (
         <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
@@ -295,7 +299,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
           <AlertTitle>Conecta Meta Ads primero</AlertTitle>
           <AlertDescription className="mt-2 space-y-2">
             <p>
-              Para rastrear los anuncios de tus competidores necesitas conectar tu cuenta de Meta Ads. 
+              Para rastrear los anuncios de tus competidores necesitas conectar tu cuenta de Meta Ads.
               Esto le permite a Steve acceder a la <strong>Meta Ad Library</strong> y buscar los anuncios activos.
             </p>
             <p className="text-xs text-muted-foreground">

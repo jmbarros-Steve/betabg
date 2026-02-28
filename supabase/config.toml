@@ -152,3 +152,6 @@ verify_jwt = false
 
 [functions.manage-meta-pixel]
 verify_jwt = false
+
+[functions.check-meta-scopes]
+verify_jwt = false

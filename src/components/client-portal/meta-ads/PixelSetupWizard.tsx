@@ -20,6 +20,7 @@ import {
   Search,
   AlertTriangle,
 } from 'lucide-react';
+import MetaScopeAlert from './MetaScopeAlert';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -195,6 +196,9 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
 
   return (
     <div className="space-y-6">
+      {/* Scope alert */}
+      <MetaScopeAlert clientId={clientId} requiredFeature="pixel" compact />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>

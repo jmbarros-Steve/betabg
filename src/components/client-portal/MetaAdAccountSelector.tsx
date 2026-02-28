@@ -140,6 +140,12 @@ export function MetaAdAccountSelector({
       'ads_management',
       'business_management',
       'read_insights',
+      'pages_read_engagement',
+      'pages_manage_ads',
+      'pages_manage_metadata',
+      'catalog_management',
+      'public_profile',
+      'email',
     ].join(',');
 
     sessionStorage.setItem('meta_oauth_client_id', connectionId);

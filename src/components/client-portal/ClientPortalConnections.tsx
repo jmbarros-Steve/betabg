@@ -108,6 +108,12 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       'ads_management',
       'business_management',
       'read_insights',
+      'pages_read_engagement',
+      'pages_manage_ads',
+      'pages_manage_metadata',
+      'catalog_management',
+      'public_profile',
+      'email',
     ].join(',');
 
     // Store client_id in sessionStorage for callback

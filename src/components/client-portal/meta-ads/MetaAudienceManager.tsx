@@ -44,6 +44,7 @@ import {
   Info,
   RefreshCw,
 } from 'lucide-react';
+import MetaScopeAlert from './MetaScopeAlert';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1486,6 +1487,9 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
   return (
     <div className="space-y-6">
+      {/* Scope alert */}
+      <MetaScopeAlert clientId={clientId} requiredFeature="audiences" compact />
+
       {/* ----------------------------------------------------------------- */}
       {/* Header */}
       {/* ----------------------------------------------------------------- */}

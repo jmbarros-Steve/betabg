@@ -54,6 +54,7 @@ import TestingWizard322 from './TestingWizard322';
 import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
+import { MetaScopeStatusPanel } from './MetaScopeAlert';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -377,6 +378,9 @@ function DashboardSection({ clientId }: { clientId: string }) {
           {syncing ? 'Sincronizando...' : 'Sincronizar'}
         </Button>
       </div>
+
+      {/* Scope status */}
+      <MetaScopeStatusPanel clientId={clientId} />
 
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
