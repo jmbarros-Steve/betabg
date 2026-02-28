@@ -42,6 +42,7 @@ import {
   Mail,
   AlertCircle,
   Info,
+  RefreshCw,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -978,6 +979,88 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<AudienceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [syncingFromMeta, setSyncingFromMeta] = useState(false);
+
+  // ---- Sync audiences from Meta Graph API ----
+
+  const syncAudiencesFromMeta = useCallback(async (connectionId: string): Promise<AudienceRow[]> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-meta-audiences', {
+        body: { action: 'list', connection_id: connectionId },
+      });
+
+      if (error) {
+        console.error('[MetaAudienceManager] Sync from Meta error:', error);
+        return [];
+      }
+
+      if (!data?.success || !Array.isArray(data.audiences)) {
+        console.warn('[MetaAudienceManager] No audiences returned from Meta');
+        return [];
+      }
+
+      // Map Meta API fields to component's expected format
+      return data.audiences.map((aud: Record<string, unknown>) => {
+        const subtype = String(aud.subtype || '').toUpperCase();
+        let type: AudienceTab = 'custom';
+        if (subtype === 'LOOKALIKE') type = 'lookalike';
+        else if (subtype === 'SAVED' || subtype === 'REACH_ESTIMATE') type = 'saved';
+
+        // Map delivery_status to component status
+        const deliveryStatus = aud.delivery_status as Record<string, unknown> | undefined;
+        let status: AudienceStatus = 'READY';
+        if (deliveryStatus) {
+          const code = Number(deliveryStatus.code || 0);
+          if (code === 200) status = 'READY';
+          else if (code === 100) status = 'POPULATING';
+          else if (code >= 400) status = 'ERROR';
+          else if (code === 300) status = 'TOO_SMALL';
+        }
+
+        return {
+          id: String(aud.id),
+          name: String(aud.name || 'Sin nombre'),
+          type,
+          size: Number(aud.approximate_count) || 0,
+          status,
+          created_at: aud.time_created ? String(aud.time_created) : new Date().toISOString(),
+          source: 'Meta Ads',
+          description: aud.description ? String(aud.description) : undefined,
+        } as AudienceRow;
+      });
+    } catch (err) {
+      console.error('[MetaAudienceManager] Sync from Meta exception:', err);
+      return [];
+    }
+  }, []);
+
+  // Manual sync handler
+  const handleSyncFromMeta = useCallback(async () => {
+    if (!metaConnectionId) {
+      toast.error('No hay conexion de Meta activa');
+      return;
+    }
+    setSyncingFromMeta(true);
+    try {
+      const metaAudiences = await syncAudiencesFromMeta(metaConnectionId);
+      if (metaAudiences.length > 0) {
+        setAudiences((prev) => {
+          // Merge: Meta audiences replace local ones with same ID, add new ones
+          const map = new Map<string, AudienceRow>();
+          for (const a of prev) map.set(a.id, a);
+          for (const a of metaAudiences) map.set(a.id, a);
+          return Array.from(map.values());
+        });
+        toast.success(`${metaAudiences.length} audiencias sincronizadas desde Meta`);
+      } else {
+        toast.info('No se encontraron audiencias en Meta Ads');
+      }
+    } catch {
+      toast.error('Error al sincronizar audiencias');
+    } finally {
+      setSyncingFromMeta(false);
+    }
+  }, [metaConnectionId, syncAudiencesFromMeta]);
 
   // ---- Data Fetching ----
 
@@ -1008,7 +1091,10 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         return;
       }
 
-      // 2. Extract audience data from connection metadata (if stored there)
+      // 2. Fetch audiences directly from Meta Graph API
+      const metaAudiences = await syncAudiencesFromMeta(metaConns[0].id);
+
+      // 3. Also extract any locally-stored audience data from connection metadata
       const metadataAudiences: AudienceRow[] = [];
       for (const conn of metaConns) {
         const meta = conn.metadata as Record<string, unknown> | null;
@@ -1032,7 +1118,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         }
       }
 
-      // 3. Fetch ad_creatives that may reference audience data
+      // 4. Fetch ad_creatives that may reference audience data
       const { data: creatives } = await supabase
         .from('ad_creatives')
         .select('id, titulo, metadata, created_at')
@@ -1044,33 +1130,28 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         for (const creative of creatives) {
           const meta = creative.metadata as Record<string, unknown> | null;
           if (meta && meta.audience_id) {
-            const exists = metadataAudiences.some(
-              (a) => a.id === String(meta.audience_id),
-            );
-            if (!exists) {
-              creativeAudiences.push({
-                id: String(meta.audience_id),
-                name: String(meta.audience_name || `Audiencia de ${creative.titulo}`),
-                type: 'saved',
-                size: Number(meta.audience_size) || 0,
-                status: 'READY',
-                created_at: creative.created_at,
-                source: 'Ad Creative',
-                description: String(meta.audience_description || ''),
-              });
-            }
+            creativeAudiences.push({
+              id: String(meta.audience_id),
+              name: String(meta.audience_name || `Audiencia de ${creative.titulo}`),
+              type: 'saved',
+              size: Number(meta.audience_size) || 0,
+              status: 'READY',
+              created_at: creative.created_at,
+              source: 'Ad Creative',
+              description: String(meta.audience_description || ''),
+            });
           }
         }
       }
 
-      // Combine and deduplicate
-      const allAudiences = [...metadataAudiences, ...creativeAudiences];
+      // Combine and deduplicate - Meta API data takes priority
       const uniqueMap = new Map<string, AudienceRow>();
-      for (const a of allAudiences) {
-        if (!uniqueMap.has(a.id)) {
-          uniqueMap.set(a.id, a);
-        }
+      for (const a of metadataAudiences) uniqueMap.set(a.id, a);
+      for (const a of creativeAudiences) {
+        if (!uniqueMap.has(a.id)) uniqueMap.set(a.id, a);
       }
+      // Meta API data overwrites local data
+      for (const a of metaAudiences) uniqueMap.set(a.id, a);
 
       setAudiences(Array.from(uniqueMap.values()));
     } catch (err) {
@@ -1079,7 +1160,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, syncAudiencesFromMeta]);
 
   useEffect(() => {
     fetchData();
@@ -1398,6 +1479,16 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSyncFromMeta}
+            disabled={syncingFromMeta}
+            title="Sincronizar audiencias desde Meta"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncingFromMeta ? 'animate-spin' : ''}`} />
+            {syncingFromMeta ? 'Sincronizando...' : 'Sync Meta'}
+          </Button>
           <Button
             variant="outline"
             onClick={() => {

@@ -133,6 +133,8 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
 - Paquetes: Multiple products arranged together, lifestyle bundle composition
 `;
 
+    const systemPrompt = `${bugSection}${knowledgeSection}${referencesSection}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Cuando generes prompt_generacion, SIEMPRE sigue las reglas de estilo fotográfico del ángulo creativo indicado.${adReferences && adReferences.length > 0 ? ' PRIORIZA replicar los patrones de las referencias visuales reales proporcionadas.' : ''}`;
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -143,25 +145,37 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1500,
-        system: `${bugSection}${knowledgeSection}${referencesSection}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Cuando generes prompt_generacion, SIEMPRE sigue las reglas de estilo fotográfico del ángulo creativo indicado.${adReferences && adReferences.length > 0 ? ' PRIORIZA replicar los patrones de las referencias visuales reales proporcionadas.' : ''}`,
+        system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Anthropic API error: ${response.status} - ${errText}`);
+      console.error('Anthropic API error response:', errText);
+      // Parse error for user-friendly message
+      let userMessage = `Error del modelo AI (${response.status})`;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.error?.message) userMessage = errJson.error.message;
+      } catch { /* use generic message */ }
+      throw new Error(userMessage);
     }
 
     const aiResult = await response.json();
     const rawContent = aiResult.content?.[0]?.text || '';
+
+    if (!rawContent) {
+      throw new Error('La IA no generó respuesta. Intenta de nuevo.');
+    }
 
     let parsed;
     try {
       const clean = rawContent.replace(/```json|```/g, '').trim();
       parsed = JSON.parse(clean);
     } catch {
-      throw new Error('Failed to parse AI response as JSON');
+      console.error('Failed to parse AI JSON response:', rawContent.slice(0, 500));
+      throw new Error('Error parseando respuesta de IA. Intenta de nuevo.');
     }
 
     return new Response(JSON.stringify(parsed), {

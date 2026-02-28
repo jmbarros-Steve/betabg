@@ -290,10 +290,19 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
         copyPattern.map(async (patternIdx) => {
           const copyIndex = selectedCopies[patternIdx];
           const variacion = generatedVariaciones.variaciones[copyIndex];
+          if (!variacion) throw new Error(`Variacion no encontrada para indice ${copyIndex}`);
           const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
             body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: variacion },
           });
-          if (error) throw error;
+          if (error) {
+            // Extract error message from edge function response
+            const errMsg = (error as any)?.message || (error as any)?.context?.body || 'Error desconocido';
+            throw new Error(`Brief visual: ${errMsg}`);
+          }
+          // Check if response contains an error field (edge function returned 200 but with error)
+          if (data?.error) {
+            throw new Error(data.error);
+          }
           let parsed = data;
           if (typeof data === 'string') parsed = JSON.parse(data.replace(/```json|```/g, '').trim());
           return parsed as Record<string, unknown>;
@@ -304,14 +313,27 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
         .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === 'fulfilled')
         .map(r => r.value);
 
+      // Log failures for debugging
+      const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (failures.length > 0) {
+        console.error('[MetaAdCreator] Brief generation failures:', failures.map(f => f.reason?.message || f.reason));
+      }
+
       if (successful.length === 0) {
-        toast.error('Error generando los briefs visuales');
+        // Show specific error from first failure
+        const firstError = failures[0]?.reason?.message || 'Error generando los briefs visuales';
+        toast.error(firstError);
         return;
       }
 
+      if (failures.length > 0) {
+        toast.warning(`${successful.length} de ${copyPattern.length} briefs generados. ${failures.length} fallaron.`);
+      }
+
       setBriefsVisuales(successful);
-    } catch (err) {
-      toast.error('Error generando los briefs visuales');
+    } catch (err: any) {
+      console.error('[MetaAdCreator] handleApproveVariaciones error:', err);
+      toast.error(err?.message || 'Error generando los briefs visuales');
     } finally {
       setGeneratingBrief(false);
     }
@@ -353,22 +375,32 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
           const { data, error } = await supabase.functions.invoke('generate-image', {
             body: { clientId, creativeId: savedCreativeId, promptGeneracion: brief.prompt_generacion as string, engine: imageEngine },
           });
-          if (error) throw error;
+          if (error) {
+            const errMsg = (error as any)?.message || 'Error desconocido';
+            throw new Error(`Imagen: ${errMsg}`);
+          }
+          if (data?.error === 'NO_CREDITS') throw new Error('Sin creditos. Se necesitan 2 creditos por imagen.');
+          if (data?.error) throw new Error(data.error);
           return data?.asset_url as string;
         })
       );
-      console.log('Promise.allSettled results:', results);
       const urls = results
         .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
         .map(r => r.value);
-      console.log('URLs generadas:', urls);
-      console.log('Total:', urls.length);
-      if (urls.length === 0) throw new Error('No se generaron imágenes');
+      const imgFailures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (imgFailures.length > 0) {
+        console.error('[MetaAdCreator] Image generation failures:', imgFailures.map(f => f.reason?.message));
+      }
+      if (urls.length === 0) {
+        const firstImgErr = imgFailures[0]?.reason?.message || 'Error generando imagenes';
+        throw new Error(firstImgErr);
+      }
       setGeneratedAssetUrls(urls);
       // Update dct_imagenes in DB
       await (supabase as any).from('ad_creatives').update({ dct_imagenes: urls }).eq('id', savedCreativeId);
-      toast.success(`🖼 ${urls.length} imagen${urls.length !== 1 ? 'es' : ''} generada${urls.length !== 1 ? 's' : ''}`);
-    } catch { toast.error('Error generando imágenes'); }
+      toast.success(`${urls.length} imagen${urls.length !== 1 ? 'es' : ''} generada${urls.length !== 1 ? 's' : ''}`);
+      if (imgFailures.length > 0) toast.warning(`${imgFailures.length} imagen${imgFailures.length !== 1 ? 'es' : ''} fallaron`);
+    } catch (imgErr: any) { toast.error(imgErr?.message || 'Error generando imagenes'); }
     finally { setGeneratingImage(false); }
   };
 
