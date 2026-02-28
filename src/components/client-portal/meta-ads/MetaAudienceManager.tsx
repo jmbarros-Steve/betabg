@@ -964,6 +964,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
   // Connection info
   const [hasMetaConnection, setHasMetaConnection] = useState(false);
+  const [metaConnectionId, setMetaConnectionId] = useState<string | null>(null);
   const [hasShopify, setHasShopify] = useState(false);
   const [hasKlaviyo, setHasKlaviyo] = useState(false);
 
@@ -997,6 +998,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       const klaviyoConns = (connections || []).filter((c) => c.platform === 'klaviyo');
 
       setHasMetaConnection(metaConns.length > 0);
+      setMetaConnectionId(metaConns.length > 0 ? metaConns[0].id : null);
       setHasShopify(shopifyConns.length > 0);
       setHasKlaviyo(klaviyoConns.length > 0);
 
@@ -1137,32 +1139,59 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       return;
     }
 
+    if (!metaConnectionId) {
+      toast.error('No se encontro conexion de Meta Ads activa');
+      return;
+    }
+
     setFormSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {
-        action: 'create_custom',
-        client_id: clientId,
+      // Build the nested data payload matching the edge function's expected format
+      const data: Record<string, unknown> = {
         name: customForm.name.trim(),
         description: customForm.description.trim(),
-        source: customForm.source,
+        source_type: customForm.source.toLowerCase(),
       };
 
       if (customForm.source === 'WEBSITE') {
-        payload.url_rule = customForm.url_rule;
-        payload.url_match_type = customForm.url_match_type;
-        payload.retention_days = customForm.retention_days;
+        data.rule = {
+          inclusions: {
+            operator: 'or',
+            rules: [{
+              event_sources: [{ type: 'pixel' }],
+              retention_seconds: customForm.retention_days * 86400,
+              filter: {
+                operator: 'and',
+                filters: [{
+                  field: 'url',
+                  operator: customForm.url_match_type === 'CONTAINS' ? 'i_contains'
+                    : customForm.url_match_type === 'STARTS_WITH' ? 'i_starts_with'
+                    : 'eq',
+                  value: customForm.url_rule,
+                }],
+              },
+            }],
+          },
+        };
+        data.retention_days = customForm.retention_days;
       } else if (customForm.source === 'CUSTOMER_LIST') {
-        payload.customer_list_source = customForm.customer_list_source;
+        data.customer_file_source = customForm.customer_list_source === 'CSV'
+          ? 'USER_PROVIDED_ONLY'
+          : customForm.customer_list_source;
       } else if (customForm.source === 'ENGAGEMENT') {
-        payload.engagement_type = customForm.engagement_type;
-        payload.engagement_days = customForm.engagement_days;
+        data.engagement_type = customForm.engagement_type;
+        data.retention_days = customForm.engagement_days;
       } else if (customForm.source === 'APP_ACTIVITY') {
-        payload.app_activity_type = customForm.app_activity_type;
-        payload.app_activity_days = customForm.app_activity_days;
+        data.app_activity_type = customForm.app_activity_type;
+        data.retention_days = customForm.app_activity_days;
       }
 
       const { error } = await supabase.functions.invoke('manage-meta-audiences', {
-        body: payload,
+        body: {
+          action: 'create_custom',
+          connection_id: metaConnectionId,
+          data,
+        },
       });
 
       if (error) throw error;
@@ -1200,29 +1229,37 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       return;
     }
 
+    if (!metaConnectionId) {
+      toast.error('No se encontro conexion de Meta Ads activa');
+      return;
+    }
+
     setFormSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke('manage-meta-audiences', {
-        body: {
-          action: 'create_lookalike',
-          client_id: clientId,
-          source_audience_id: lookalikeForm.source_audience_id,
-          country: lookalikeForm.country,
-          lookalike_percent: lookalikeForm.lookalike_percent,
-        },
-      });
-
-      if (error) throw error;
-
       const sourceAudience = audiences.find(
         (a) => a.id === lookalikeForm.source_audience_id,
       );
       const countryLabel =
         COUNTRY_OPTIONS.find((c) => c.value === lookalikeForm.country)?.label ||
         lookalikeForm.country;
-      const name = `Lookalike ${lookalikeForm.lookalike_percent}% - ${sourceAudience?.name || 'Origen'} (${countryLabel})`;
+      const lookName = `Lookalike ${lookalikeForm.lookalike_percent}% - ${sourceAudience?.name || 'Origen'} (${countryLabel})`;
 
-      toast.success(`Audiencia similar "${name}" creada exitosamente`);
+      const { error } = await supabase.functions.invoke('manage-meta-audiences', {
+        body: {
+          action: 'create_lookalike',
+          connection_id: metaConnectionId,
+          data: {
+            name: lookName,
+            source_audience_id: lookalikeForm.source_audience_id,
+            country: lookalikeForm.country,
+            ratio: lookalikeForm.lookalike_percent / 100,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success(`Audiencia similar "${lookName}" creada exitosamente`);
 
       // Optimistic add
       const reach = estimateReach(
@@ -1231,7 +1268,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       );
       const newAudience: AudienceRow = {
         id: crypto.randomUUID(),
-        name,
+        name: lookName,
         type: 'lookalike',
         size: Math.round((reach.min + reach.max) / 2),
         status: 'POPULATING',
@@ -1266,13 +1303,18 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   const handleDelete = async () => {
     if (!deleteTarget) return;
 
+    if (!metaConnectionId) {
+      toast.error('No se encontro conexion de Meta Ads activa');
+      return;
+    }
+
     setDeleting(true);
     try {
       const { error } = await supabase.functions.invoke('manage-meta-audiences', {
         body: {
           action: 'delete',
-          client_id: clientId,
-          audience_id: deleteTarget.id,
+          connection_id: metaConnectionId,
+          data: { audience_id: deleteTarget.id },
         },
       });
 

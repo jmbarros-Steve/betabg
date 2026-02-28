@@ -29,18 +29,27 @@ import {
   Lightbulb,
   Eye,
   ShoppingCart,
+  ListTree,
+  FlaskConical,
+  Wand2,
 } from 'lucide-react';
 
 // Existing components
 import { MetaAdCreator } from '@/components/client-portal/MetaAdCreator';
 import { AdCreativesLibrary } from '@/components/client-portal/AdCreativesLibrary';
+import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
 
-// Sub-module components (to be built separately)
+// Sub-module components
 import MetaCampaignManager from './MetaCampaignManager';
 import MetaAudienceManager from './MetaAudienceManager';
 import MetaAnalyticsDashboard from './MetaAnalyticsDashboard';
 import MetaSocialInbox from './MetaSocialInbox';
 import MetaAutomatedRules from './MetaAutomatedRules';
+
+// New professional components
+import CampaignTreeView from './CampaignTreeView';
+import TestingWizard322 from './TestingWizard322';
+import CampaignCreateWizard from './CampaignCreateWizard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +61,9 @@ interface MetaAdsManagerProps {
 
 type SectionKey =
   | 'dashboard'
+  | 'tree-view'
+  | 'create-wizard'
+  | 'testing-322'
   | 'campaigns'
   | 'create-ad'
   | 'audiences'
@@ -110,8 +122,9 @@ interface CampaignAggregate {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'campaigns', label: 'Campanas', icon: Megaphone },
-  { key: 'create-ad', label: 'Crear Anuncio', icon: PlusCircle },
+  { key: 'tree-view', label: 'Campanas', icon: ListTree },
+  { key: 'create-wizard', label: 'Crear', icon: Wand2 },
+  { key: 'testing-322', label: 'Test 3:2:2', icon: FlaskConical },
   { key: 'audiences', label: 'Audiencias', icon: Users },
   { key: 'library', label: 'Biblioteca', icon: FolderOpen },
   { key: 'analytics', label: 'Analisis', icon: BarChart3 },
@@ -577,26 +590,8 @@ function DashboardSection({ clientId }: { clientId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Competitors placeholder
+// Competitors — delegates to the real CompetitorAdsPanel (Meta Ad Library)
 // ---------------------------------------------------------------------------
-
-function CompetitorIntelligence({ clientId }: { clientId: string }) {
-  return (
-    <Card className="border-dashed">
-      <CardContent className="py-16 text-center">
-        <Swords className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Inteligencia Competitiva</h3>
-        <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          Pronto podras analizar los anuncios de tus competidores, detectar tendencias
-          de mercado y encontrar oportunidades de posicionamiento.
-        </p>
-        <Badge variant="secondary" className="mt-4">
-          Proximamente
-        </Badge>
-      </CardContent>
-    </Card>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Main MetaAdsManager component
@@ -655,6 +650,27 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         aria-hidden={!isActive}
       >
         {key === 'dashboard' && <DashboardSection clientId={clientId} />}
+        {key === 'tree-view' && (
+          <CampaignTreeView
+            clientId={clientId}
+            onCreateCampaign={() => handleNavClick('create-wizard')}
+            onCreate322={() => handleNavClick('testing-322')}
+          />
+        )}
+        {key === 'create-wizard' && (
+          <CampaignCreateWizard
+            clientId={clientId}
+            onBack={() => handleNavClick('tree-view')}
+            onComplete={() => handleNavClick('tree-view')}
+          />
+        )}
+        {key === 'testing-322' && (
+          <TestingWizard322
+            clientId={clientId}
+            onBack={() => handleNavClick('tree-view')}
+            onComplete={() => handleNavClick('tree-view')}
+          />
+        )}
         {key === 'campaigns' && <MetaCampaignManager clientId={clientId} />}
         {key === 'create-ad' && (
           <MetaAdCreator
@@ -668,7 +684,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         {key === 'analytics' && <MetaAnalyticsDashboard clientId={clientId} />}
         {key === 'social-inbox' && <MetaSocialInbox clientId={clientId} />}
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
-        {key === 'competitors' && <CompetitorIntelligence clientId={clientId} />}
+        {key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
       </div>
     );
   };

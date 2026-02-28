@@ -512,12 +512,18 @@ const SENTIMENT_CONFIG: Record<SentimentType, { label: string; color: string; do
 // ---------------------------------------------------------------------------
 
 /** Stats bar shown at the top */
-function StatsBar() {
+function StatsBar({ conversations }: { conversations: ConversationItem[] }) {
+  const total = conversations.length;
+  const resolved = conversations.filter((c) => c.resolved).length;
+  const responseRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+  const positive = conversations.filter((c) => c.sentiment === 'positive').length;
+  const sentimentScore = total > 0 ? Math.round((positive / total) * 100) : 0;
+
   const stats = {
-    totalToday: 24,
-    responseRate: 87,
+    totalToday: total,
+    responseRate,
     avgResponseTime: '12m',
-    sentimentScore: 72,
+    sentimentScore,
   };
 
   return (
@@ -1313,7 +1319,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       </div>
 
       {/* Stats Bar */}
-      <StatsBar />
+      <StatsBar conversations={conversations} />
 
       {/* Main Three-Column Layout */}
       <Card className="overflow-hidden border">

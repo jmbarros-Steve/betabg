@@ -574,7 +574,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           body: {
             action: newStatus === 'ACTIVE' ? 'resume' : 'pause',
             campaign_id: campaign.campaign_id,
-            client_id: clientId,
+            connection_id: connectionIds[0],
           },
         },
       );
@@ -611,8 +611,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           body: {
             action: 'duplicate',
             campaign_id: campaign.campaign_id,
-            client_id: clientId,
-            campaign_name: `${campaign.campaign_name} (Copia)`,
+            connection_id: connectionIds[0],
+            data: { new_name: `${campaign.campaign_name} (Copia)` },
           },
         },
       );
@@ -638,7 +638,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           body: {
             action: 'archive',
             campaign_id: campaign.campaign_id,
-            client_id: clientId,
+            connection_id: connectionIds[0],
           },
         },
       );
@@ -686,14 +686,20 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         {
           body: {
             action: 'create',
-            client_id: clientId,
-            campaign_name: formData.campaign_name.trim(),
-            objective: formData.objective,
-            daily_budget: Number(formData.daily_budget),
-            start_date: formData.start_date,
-            end_date: formData.end_date || null,
-            placements: formData.placements,
-            optimization_goal: formData.optimization_goal,
+            connection_id: connectionIds[0],
+            data: {
+              name: formData.campaign_name.trim(),
+              objective: `OUTCOME_${formData.objective}`,
+              status: 'PAUSED',
+              daily_budget: Number(formData.daily_budget) * 100,
+              billing_event: 'IMPRESSIONS',
+              optimization_goal: formData.optimization_goal === 'PURCHASES' ? 'OFFSITE_CONVERSIONS'
+                : formData.optimization_goal === 'ADD_TO_CART' ? 'OFFSITE_CONVERSIONS'
+                : 'LINK_CLICKS',
+              start_time: formData.start_date,
+              end_time: formData.end_date || undefined,
+              adset_name: `${formData.campaign_name.trim()} - Ad Set`,
+            },
           },
         },
       );
@@ -731,14 +737,11 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           body: {
             action: 'update',
             campaign_id: selectedCampaign.campaign_id,
-            client_id: clientId,
-            campaign_name: formData.campaign_name.trim(),
-            objective: formData.objective,
-            daily_budget: Number(formData.daily_budget),
-            start_date: formData.start_date || null,
-            end_date: formData.end_date || null,
-            placements: formData.placements,
-            optimization_goal: formData.optimization_goal,
+            connection_id: connectionIds[0],
+            data: {
+              name: formData.campaign_name.trim(),
+              daily_budget: Number(formData.daily_budget) * 100,
+            },
           },
         },
       );
@@ -780,8 +783,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           body: {
             action: 'update_budget',
             campaign_id: campaign.campaign_id,
-            client_id: clientId,
-            daily_budget: newBudget,
+            connection_id: connectionIds[0],
+            data: { daily_budget: newBudget },
           },
         },
       );
