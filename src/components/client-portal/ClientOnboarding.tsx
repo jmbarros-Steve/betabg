@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChevronRight, ChevronLeft, Sparkles, 
-  Link2, MessageCircle, FileText, Mail, Megaphone, 
+import {
+  ChevronRight, ChevronLeft, Sparkles, Store,
+  Link2, MessageCircle, FileText, Mail, Megaphone,
   CheckCircle2, Rocket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 import avatarSteve from '@/assets/avatar-steve.png';
 import avatarChonga from '@/assets/avatar-chonga.png';
 
@@ -24,6 +29,14 @@ const ONBOARDING_STEPS = [
     description: 'Tu portal de marketing digital está listo. Te explicamos rápidamente cómo sacarle el máximo provecho.',
     icon: Sparkles,
     color: 'from-primary/20 to-purple-500/20',
+  },
+  {
+    id: 'store_setup',
+    title: 'Tu Tienda',
+    description: 'Cuéntanos sobre tu tienda para que podamos conectarla automáticamente cuando instales la app de Shopify.',
+    icon: Store,
+    color: 'from-emerald-500/20 to-green-500/20',
+    isInteractive: true,
   },
   {
     id: 'connections',
@@ -83,15 +96,57 @@ const ONBOARDING_STEPS = [
 ];
 
 export function ClientOnboarding({ onComplete, clientName }: ClientOnboardingProps) {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
+  const [shopDomain, setShopDomain] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [savingStore, setSavingStore] = useState(false);
   const step = ONBOARDING_STEPS[currentStep];
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
   const Icon = step.icon;
 
-  const handleNext = () => {
+  const saveStoreInfo = async () => {
+    if (!user || !shopDomain.trim()) return;
+
+    setSavingStore(true);
+    try {
+      // Normalize domain
+      let domain = shopDomain.trim().toLowerCase();
+      if (!domain.includes('.myshopify.com')) {
+        domain = domain.replace(/\.myshopify\.com$/, '') + '.myshopify.com';
+      }
+
+      const updates: Record<string, string> = { shop_domain: domain };
+      if (companyName.trim()) {
+        updates.company = companyName.trim();
+      }
+
+      const { error } = await supabase
+        .from('clients')
+        .update(updates)
+        .eq('client_user_id', user.id);
+
+      if (error) {
+        console.error('Error saving store info:', error);
+        toast.error('Error guardando los datos');
+      } else {
+        toast.success('Tienda registrada');
+      }
+    } catch (e) {
+      console.error('Error:', e);
+    } finally {
+      setSavingStore(false);
+    }
+  };
+
+  const handleNext = async () => {
     if (isLastStep) {
       onComplete();
     } else {
+      // Save store info when leaving the store_setup step
+      if (step.id === 'store_setup' && shopDomain.trim()) {
+        await saveStoreInfo();
+      }
       setCurrentStep(prev => prev + 1);
     }
   };
@@ -161,6 +216,36 @@ export function ClientOnboarding({ onComplete, clientName }: ClientOnboardingPro
                       <span>{tip}</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Store setup form */}
+              {step.id === 'store_setup' && (
+                <div className="space-y-4 text-left">
+                  <div className="space-y-2">
+                    <Label htmlFor="company">Nombre de tu empresa</Label>
+                    <Input
+                      id="company"
+                      placeholder="Ej: Jardín de Eva"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="shop">Dominio de Shopify</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="shop"
+                        placeholder="mi-tienda"
+                        value={shopDomain}
+                        onChange={(e) => setShopDomain(e.target.value)}
+                      />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">.myshopify.com</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Lo encuentras en Shopify Admin → Configuración → Dominios
+                    </p>
+                  </div>
                 </div>
               )}
 

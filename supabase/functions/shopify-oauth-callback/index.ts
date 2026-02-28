@@ -250,14 +250,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === shopEmail);
+    // PRIORITY 1: Check if a client was pre-registered with this shop_domain
+    // This handles custom distribution apps where the admin creates the client first
+    const { data: preRegisteredClient } = await supabaseAdmin
+      .from('clients').select('id, client_user_id')
+      .eq('shop_domain', normalizedShopDomain)
+      .single();
 
     let userId: string;
     let clientId: string;
     let isNewUser = false;
     let tempPassword: string | null = null;
+
+    if (preRegisteredClient) {
+      // Client was pre-registered by admin — link Shopify to this existing account
+      clientId = preRegisteredClient.id;
+      userId = preRegisteredClient.client_user_id;
+      console.log('Pre-registered client found for shop:', normalizedShopDomain, '→ client_id:', clientId);
+
+      // Update client with Shopify store info
+      await supabaseAdmin.from('clients').update({
+        shop_domain: normalizedShopDomain,
+        company: storeName || undefined,
+      }).eq('id', clientId);
+
+    } else {
+      // PRIORITY 2: Check if user already exists by email
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(u => u.email === shopEmail);
 
     if (existingUser) {
       userId = existingUser.id;
@@ -342,6 +362,7 @@ Deno.serve(async (req) => {
         });
       }
     }
+    } // end: pre-registered else block
 
     // Encrypt the access token
     const { data: encryptedToken, error: encryptError } = await supabaseAdmin
