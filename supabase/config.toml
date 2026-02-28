@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.check-meta-scopes]
 verify_jwt = false
+
+[functions.meta-data-deletion]
+verify_jwt = false
