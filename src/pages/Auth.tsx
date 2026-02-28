@@ -112,7 +112,7 @@ export default function Auth() {
     
     try {
       if (mode === 'login') {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email.trim(), password);
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             toast.error('Credenciales incorrectas');
