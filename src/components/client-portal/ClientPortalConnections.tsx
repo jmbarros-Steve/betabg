@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail } from 'lucide-react';
+import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail, Unlink } from 'lucide-react';
 import { ClientOnboardingSteps } from './ClientOnboardingSteps';
 import { MetaAdAccountSelector } from './MetaAdAccountSelector';
 import logoShopify from '@/assets/logo-shopify-clean.png';
@@ -74,7 +74,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [showKlaviyoDialog, setShowKlaviyoDialog] = useState(false);
   const [klaviyoApiKey, setKlaviyoApiKey] = useState('');
   const [connectingKlaviyo, setConnectingKlaviyo] = useState(false);
-  
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+
   // Use Shopify auth fetch for embedded mode with Session Tokens
   const { callEdgeFunction, isEmbedded } = useShopifyAuthFetch();
 
@@ -214,6 +215,25 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     }
   };
 
+  const handleDisconnect = async (connection: Connection) => {
+    if (!confirm(`¿Desconectar ${platformConfig[connection.platform].name}? Podras reconectar en cualquier momento.`)) return;
+    setDisconnecting(connection.id);
+    try {
+      const { error } = await supabase
+        .from('platform_connections')
+        .delete()
+        .eq('id', connection.id);
+      if (error) throw error;
+      setConnections((prev) => prev.filter((c) => c.id !== connection.id));
+      toast.success(`${platformConfig[connection.platform].name} desconectado`);
+    } catch (err) {
+      console.error('Error disconnecting:', err);
+      toast.error('Error al desconectar');
+    } finally {
+      setDisconnecting(null);
+    }
+  };
+
   const handleConnectKlaviyo = async () => {
     if (!klaviyoApiKey.trim()) {
       toast.error('Ingresa tu API Key de Klaviyo');
@@ -329,6 +349,19 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                           Sincronizar
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDisconnect(connection)}
+                        disabled={disconnecting === connection.id}
+                      >
+                        {disconnecting === connection.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Unlink className="w-4 h-4" />
+                        )}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
