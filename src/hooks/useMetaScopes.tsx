@@ -54,12 +54,15 @@ export function useMetaScopes(clientId: string) {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [noConnection, setNoConnection] = useState(false);
   const [tokenExpired, setTokenExpired] = useState(false);
+  // Only true when the edge function returned success: true with real scope data
+  const [scopeDataLoaded, setScopeDataLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const checkScopes = useCallback(async () => {
     setLoading(true);
     setError(null);
     setTokenExpired(false);
+    setScopeDataLoaded(false);
     try {
       // Get Meta connection
       const { data: conns } = await supabase
@@ -80,28 +83,50 @@ export function useMetaScopes(clientId: string) {
       setConnectionId(conns[0].id);
 
       // Call edge function
-      const { data, error: fnError } = await supabase.functions.invoke('check-meta-scopes', {
-        body: { connection_id: conns[0].id },
-      });
+      let data: any = null;
+      try {
+        const result = await supabase.functions.invoke('check-meta-scopes', {
+          body: { connection_id: conns[0].id },
+        });
+        if (result.error) {
+          console.warn('[useMetaScopes] Edge function error:', result.error);
+          return; // scopeDataLoaded stays false → panel hidden
+        }
+        data = result.data;
+      } catch (invokeErr) {
+        console.warn('[useMetaScopes] Edge function unreachable:', invokeErr);
+        return; // scopeDataLoaded stays false → panel hidden
+      }
 
-      if (fnError) throw fnError;
-
+      // Explicit token_expired from edge function
       if (data?.token_expired) {
         setTokenExpired(true);
+        setScopeDataLoaded(true); // We DO have confirmed info: token is expired
         setGranted([]);
         return;
       }
 
+      // Explicit missing_all (no access token stored)
       if (data?.missing_all) {
+        setScopeDataLoaded(true); // We DO have confirmed info: no token
         setGranted([]);
         return;
       }
 
-      setGranted(data?.granted || []);
-      setDeclined(data?.declined || []);
+      // Only trust the response if the edge function explicitly reported success
+      if (data?.success !== true || !Array.isArray(data?.granted)) {
+        console.warn('[useMetaScopes] Unexpected response shape:', data);
+        return; // scopeDataLoaded stays false → panel hidden
+      }
+
+      // Happy path — we have real scope data
+      setScopeDataLoaded(true);
+      setGranted(data.granted);
+      setDeclined(data.declined || []);
     } catch (err: any) {
-      console.error('[useMetaScopes] Error:', err);
+      console.warn('[useMetaScopes] Scope check failed:', err?.message);
       setError(err?.message || 'Error checking scopes');
+      // scopeDataLoaded stays false → panel hidden
     } finally {
       setLoading(false);
     }
@@ -111,7 +136,7 @@ export function useMetaScopes(clientId: string) {
     checkScopes();
   }, [checkScopes]);
 
-  // Compute feature availability
+  // Compute feature availability — only meaningful when scopeDataLoaded is true
   const features: FeatureStatus[] = FEATURE_SCOPE_MAP.map((f) => {
     const missingScopes = f.requiredScopes.filter((s) => !granted.includes(s));
     return {
@@ -124,7 +149,7 @@ export function useMetaScopes(clientId: string) {
   });
 
   const allScopesMissing = ALL_REQUIRED_SCOPES.filter((s) => !granted.includes(s));
-  const needsReconnect = allScopesMissing.length > 0 || tokenExpired;
+  const needsReconnect = scopeDataLoaded ? (allScopesMissing.length > 0 || tokenExpired) : false;
 
   // Build reconnect URL
   const getReconnectUrl = useCallback(() => {
@@ -155,6 +180,7 @@ export function useMetaScopes(clientId: string) {
     connectionId,
     noConnection,
     tokenExpired,
+    scopeDataLoaded,
     needsReconnect,
     error,
     reconnect,

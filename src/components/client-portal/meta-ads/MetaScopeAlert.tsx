@@ -29,7 +29,7 @@ interface MetaScopeAlertProps {
 // ---------------------------------------------------------------------------
 
 export function MetaScopeStatusPanel({ clientId }: { clientId: string }) {
-  const { loading, features, needsReconnect, tokenExpired, noConnection, reconnect, refresh } =
+  const { loading, features, needsReconnect, tokenExpired, noConnection, scopeDataLoaded, reconnect, refresh } =
     useMetaScopes(clientId);
 
   if (loading) {
@@ -44,6 +44,10 @@ export function MetaScopeStatusPanel({ clientId }: { clientId: string }) {
   }
 
   if (noConnection) return null;
+
+  // Only show the scope panel when we have confirmed data from the edge function.
+  // If the function is not deployed, errored, or returned unexpected data, hide silently.
+  if (!scopeDataLoaded) return null;
 
   if (!needsReconnect) {
     return (
@@ -138,10 +142,13 @@ function FeatureRow({ feature }: { feature: FeatureStatus }) {
 // ---------------------------------------------------------------------------
 
 export default function MetaScopeAlert({ clientId, requiredFeature, compact }: MetaScopeAlertProps) {
-  const { loading, features, noConnection, tokenExpired, reconnect, hasFeature } =
+  const { loading, features, noConnection, tokenExpired, scopeDataLoaded, reconnect, hasFeature } =
     useMetaScopes(clientId);
 
   if (loading || noConnection) return null;
+
+  // Only show alerts when we have confirmed scope data from the edge function
+  if (!scopeDataLoaded) return null;
 
   // If a specific feature is required, only show alert if it's unavailable
   if (requiredFeature && hasFeature(requiredFeature)) return null;
