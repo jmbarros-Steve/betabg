@@ -19,6 +19,7 @@ import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
 import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
+import MetaAdsManager from '@/components/client-portal/meta-ads/MetaAdsManager';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
 import { supabase } from '@/integrations/supabase/client';
@@ -305,9 +306,7 @@ export default function ClientPortal() {
           )}
           {visitedTabs.has('copies') && effectiveClientId && (
             <div className={activeTab !== 'copies' ? 'hidden' : ''}>
-              <div className="max-w-4xl mx-auto">
-                <CopyGenerator clientId={effectiveClientId} />
-              </div>
+              <MetaAdsManager clientId={effectiveClientId} />
             </div>
           )}
           {visitedTabs.has('google') && effectiveClientId && (
