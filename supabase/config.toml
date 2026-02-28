@@ -140,3 +140,12 @@ verify_jwt = false
 
 [functions.klaviyo-manage-flows]
 verify_jwt = false
+
+[functions.manage-meta-campaign]
+verify_jwt = false
+
+[functions.manage-meta-audiences]
+verify_jwt = false
+
+[functions.admin-create-client]
+verify_jwt = false
