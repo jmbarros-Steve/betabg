@@ -32,6 +32,8 @@ import {
   ListTree,
   FlaskConical,
   Wand2,
+  FileCheck,
+  Crosshair,
 } from 'lucide-react';
 
 // Existing components
@@ -50,6 +52,8 @@ import MetaAutomatedRules from './MetaAutomatedRules';
 import CampaignTreeView from './CampaignTreeView';
 import TestingWizard322 from './TestingWizard322';
 import CampaignCreateWizard from './CampaignCreateWizard';
+import DraftsManager from './DraftsManager';
+import PixelSetupWizard from './PixelSetupWizard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,7 +75,9 @@ type SectionKey =
   | 'analytics'
   | 'social-inbox'
   | 'rules'
-  | 'competitors';
+  | 'competitors'
+  | 'drafts'
+  | 'pixel';
 
 interface NavItem {
   key: SectionKey;
@@ -124,8 +130,10 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'tree-view', label: 'Campanas', icon: ListTree },
   { key: 'create-wizard', label: 'Crear', icon: Wand2 },
+  { key: 'drafts', label: 'Borradores', icon: FileCheck },
   { key: 'testing-322', label: 'Test 3:2:2', icon: FlaskConical },
   { key: 'audiences', label: 'Audiencias', icon: Users },
+  { key: 'pixel', label: 'Pixel', icon: Crosshair },
   { key: 'library', label: 'Biblioteca', icon: FolderOpen },
   { key: 'analytics', label: 'Analisis', icon: BarChart3 },
   { key: 'social-inbox', label: 'Social Inbox', icon: MessageSquare },
@@ -684,6 +692,8 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         {key === 'analytics' && <MetaAnalyticsDashboard clientId={clientId} />}
         {key === 'social-inbox' && <MetaSocialInbox clientId={clientId} />}
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
+        {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={(id) => { console.log('Edit draft:', id); handleNavClick('create-wizard'); }} />}
+        {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
         {key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
       </div>
     );

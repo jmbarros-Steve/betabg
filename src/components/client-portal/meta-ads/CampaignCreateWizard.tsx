@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -28,6 +29,13 @@ import {
   Sparkles,
   CalendarDays,
   Zap,
+  Upload,
+  Video,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  X,
+  Save,
+  Send,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -232,7 +240,11 @@ function AdSetForm({
 // Ad Form
 // ---------------------------------------------------------------------------
 
+type MediaTab = 'upload' | 'ai-image' | 'ai-video' | 'gallery' | 'url';
+type AdFormat = '1:1' | '9:16' | '16:9';
+
 function AdForm({
+  clientId,
   headline, setHeadline,
   primaryText, setPrimaryText,
   description, setDescription,
@@ -242,6 +254,7 @@ function AdForm({
   generating,
   onGenerateCopy,
 }: {
+  clientId: string;
   headline: string; setHeadline: (v: string) => void;
   primaryText: string; setPrimaryText: (v: string) => void;
   description: string; setDescription: (v: string) => void;
@@ -251,6 +264,139 @@ function AdForm({
   generating: boolean;
   onGenerateCopy: () => void;
 }) {
+  const [mediaTab, setMediaTab] = useState<MediaTab>('upload');
+  const [adFormat, setAdFormat] = useState<AdFormat>('1:1');
+  const [uploading, setUploading] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoPolling, setVideoPolling] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
+  const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
+  const [loadingGallery, setLoadingGallery] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load gallery assets
+  const loadGallery = useCallback(async () => {
+    setLoadingGallery(true);
+    try {
+      const [{ data: generated }, { data: uploaded }] = await Promise.all([
+        supabase.from('ad_assets').select('id, asset_url, tipo').eq('client_id', clientId).order('created_at', { ascending: false }).limit(20),
+        supabase.from('client_assets').select('id, url, tipo').eq('client_id', clientId).order('created_at', { ascending: false }).limit(20),
+      ]);
+      const all: Array<{ id: string; url: string; tipo: string }> = [];
+      if (generated) for (const a of generated) all.push({ id: a.id, url: a.asset_url, tipo: a.tipo });
+      if (uploaded) for (const a of uploaded) all.push({ id: a.id, url: a.url, tipo: a.tipo });
+      setGalleryAssets(all);
+    } catch { /* ignore */ }
+    setLoadingGallery(false);
+  }, [clientId]);
+
+  useEffect(() => { if (mediaTab === 'gallery') loadGallery(); }, [mediaTab, loadGallery]);
+
+  // File upload handler
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      toast.error('Solo se permiten imagenes y videos');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('Archivo muy grande. Maximo 20MB.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `assets/${clientId}/uploads/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('client-assets').upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('client-assets').getPublicUrl(path);
+      setImageUrl(publicUrl);
+      toast.success('Archivo subido');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al subir archivo');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // AI Image generation
+  const handleGenerateImage = async () => {
+    if (!aiPrompt.trim()) { toast.error('Describe lo que quieres en la imagen'); return; }
+    setGeneratingImage(true);
+    try {
+      const formatMap: Record<AdFormat, string> = { '1:1': 'square', '9:16': 'story', '16:9': 'feed' };
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { clientId, promptGeneracion: aiPrompt, engine: imageEngine, formato: formatMap[adFormat] },
+      });
+      if (error) throw error;
+      if (data?.error === 'NO_CREDITS') { toast.error('Sin creditos. Se necesitan 2 creditos por imagen.'); return; }
+      if (data?.error) throw new Error(data.error);
+      if (data?.asset_url) { setImageUrl(data.asset_url); toast.success('Imagen generada por IA'); }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error generando imagen');
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
+  // AI Video generation
+  const handleGenerateVideo = async () => {
+    if (!aiPrompt.trim()) { toast.error('Describe lo que quieres en el video'); return; }
+    setGeneratingVideo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-video', {
+        body: { clientId, promptGeneracion: aiPrompt, fotoBaseUrl: imageUrl || undefined },
+      });
+      if (error) throw error;
+      if (data?.error === 'NO_CREDITS') { toast.error('Sin creditos. Se necesitan 10 creditos por video.'); return; }
+      if (data?.prediction_id) {
+        toast.info('Video en proceso... puede tomar 1-3 minutos.');
+        setVideoPolling(true);
+        // Poll for video status
+        const pollInterval = setInterval(async () => {
+          try {
+            const { data: status } = await supabase.functions.invoke('check-video-status', {
+              body: { predictionId: data.prediction_id, clientId },
+            });
+            if (status?.status === 'succeeded' && status?.asset_url) {
+              clearInterval(pollInterval);
+              setImageUrl(status.asset_url);
+              setVideoPolling(false);
+              setGeneratingVideo(false);
+              toast.success('Video generado');
+            } else if (status?.status === 'failed') {
+              clearInterval(pollInterval);
+              setVideoPolling(false);
+              setGeneratingVideo(false);
+              toast.error('Error generando video');
+            }
+          } catch { /* keep polling */ }
+        }, 5000);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error generando video');
+      setGeneratingVideo(false);
+    }
+  };
+
+  const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: React.ElementType }> = [
+    { key: 'upload', label: 'Subir', icon: Upload },
+    { key: 'ai-image', label: 'IA Imagen', icon: Sparkles },
+    { key: 'ai-video', label: 'IA Video', icon: Video },
+    { key: 'gallery', label: 'Galeria', icon: ImageIcon },
+    { key: 'url', label: 'URL', icon: LinkIcon },
+  ];
+
+  const FORMAT_OPTIONS: Array<{ key: AdFormat; label: string; desc: string }> = [
+    { key: '1:1', label: 'Cuadrado', desc: 'Feed' },
+    { key: '9:16', label: 'Vertical', desc: 'Stories/Reels' },
+    { key: '16:9', label: 'Horizontal', desc: 'Landscape' },
+  ];
+
   return (
     <div className="space-y-5">
       <SteveTip>
@@ -264,12 +410,160 @@ function AdForm({
         </Button>
       </div>
 
-      <div>
-        <Label>Imagen / Creativo (URL)</Label>
-        <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+      {/* Creative / Media Section */}
+      <div className="space-y-3">
+        <Label className="text-sm font-semibold">Creativo (Imagen / Video)</Label>
+
+        {/* Format selector */}
+        <div className="flex gap-2">
+          {FORMAT_OPTIONS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setAdFormat(f.key)}
+              className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
+                adFormat === f.key ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'
+              }`}
+            >
+              <span className="block font-bold">{f.label}</span>
+              <span className="text-[10px] text-muted-foreground">{f.desc}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Media source tabs */}
+        <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+          {MEDIA_TABS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setMediaTab(t.key)}
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  mediaTab === t.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Icon className="w-3 h-3" />
+                <span className="hidden sm:inline">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Upload tab */}
+        {mediaTab === 'upload' && (
+          <div className="space-y-2">
+            <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors"
+            >
+              {uploading ? (
+                <><Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Subiendo...</p></>
+              ) : (
+                <><Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Click para subir imagen o video</p><p className="text-xs text-muted-foreground/70">JPG, PNG, WebP, MP4 — max 20MB</p></>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* AI Image tab */}
+        {mediaTab === 'ai-image' && (
+          <div className="space-y-3">
+            <Textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="Describe la imagen que quieres: 'Mujer joven con producto X en mano, fondo minimalista, iluminacion natural, estilo editorial...'"
+              rows={3}
+            />
+            <div className="flex items-center gap-2">
+              <Select value={imageEngine} onValueChange={(v: 'gpt4o' | 'flux') => setImageEngine(v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt4o">GPT-4o (2 cred)</SelectItem>
+                  <SelectItem value="flux">Flux Pro (2 cred)</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleGenerateImage} disabled={generatingImage || !aiPrompt.trim()} className="flex-1">
+                {generatingImage ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</> : <><Sparkles className="w-4 h-4 mr-2" />Generar Imagen</>}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* AI Video tab */}
+        {mediaTab === 'ai-video' && (
+          <div className="space-y-3">
+            <Textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="Describe el video: 'Producto girando 360 grados sobre fondo blanco con iluminacion suave...'"
+              rows={3}
+            />
+            <Button onClick={handleGenerateVideo} disabled={generatingVideo || !aiPrompt.trim()} className="w-full">
+              {generatingVideo ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{videoPolling ? 'Procesando video...' : 'Iniciando...'}</>
+              ) : (
+                <><Video className="w-4 h-4 mr-2" />Generar Video (10 cred)</>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Gallery tab */}
+        {mediaTab === 'gallery' && (
+          <div className="space-y-2">
+            {loadingGallery ? (
+              <div className="grid grid-cols-4 gap-2">{[1,2,3,4].map(i => <Skeleton key={i} className="aspect-square rounded" />)}</div>
+            ) : galleryAssets.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-4">Sin creativos guardados. Genera uno primero.</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                {galleryAssets.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => { setImageUrl(a.url); toast.success('Creativo seleccionado'); }}
+                    className={`aspect-square rounded-lg border-2 overflow-hidden transition-all ${
+                      imageUrl === a.url ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    {a.tipo === 'video' ? (
+                      <div className="w-full h-full bg-muted flex items-center justify-center"><Video className="w-6 h-6 text-muted-foreground" /></div>
+                    ) : (
+                      <img src={a.url} alt="" className="w-full h-full object-cover" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* URL tab */}
+        {mediaTab === 'url' && (
+          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+        )}
+
+        {/* Preview of selected media */}
         {imageUrl && (
-          <div className="mt-2 w-32 h-32 rounded-lg bg-muted overflow-hidden">
-            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+          <div className="relative">
+            <div className={`rounded-lg bg-muted overflow-hidden ${
+              adFormat === '1:1' ? 'aspect-square max-w-[200px]' :
+              adFormat === '9:16' ? 'aspect-[9/16] max-w-[140px]' :
+              'aspect-video max-w-[280px]'
+            }`}>
+              {imageUrl.endsWith('.mp4') || imageUrl.includes('video') ? (
+                <video src={imageUrl} controls className="w-full h-full object-cover" />
+              ) : (
+                <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+              )}
+            </div>
+            <button
+              onClick={() => setImageUrl('')}
+              className="absolute top-1 right-1 bg-background/80 rounded-full p-1 hover:bg-destructive hover:text-white transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
         )}
       </div>
@@ -307,17 +601,29 @@ function AdForm({
         </div>
       </div>
 
-      {/* Mini preview */}
+      {/* Full preview */}
       {(primaryText || headline || imageUrl) && (
         <Card className="border-primary/20 bg-muted/30">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-1.5">
               <Eye className="w-3.5 h-3.5 text-primary" />
-              <CardTitle className="text-xs">Preview</CardTitle>
+              <CardTitle className="text-xs">Preview del Anuncio</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {imageUrl && <div className="aspect-video rounded bg-muted overflow-hidden max-w-xs"><img src={imageUrl} alt="" className="w-full h-full object-cover" /></div>}
+            {imageUrl && (
+              <div className={`rounded bg-muted overflow-hidden ${
+                adFormat === '1:1' ? 'aspect-square max-w-[200px]' :
+                adFormat === '9:16' ? 'aspect-[9/16] max-w-[140px]' :
+                'aspect-video max-w-xs'
+              }`}>
+                {imageUrl.endsWith('.mp4') ? (
+                  <video src={imageUrl} controls className="w-full h-full object-cover" />
+                ) : (
+                  <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                )}
+              </div>
+            )}
             {headline && <p className="text-sm font-semibold">{headline}</p>}
             {primaryText && <p className="text-xs text-muted-foreground line-clamp-3">{primaryText}</p>}
             {description && <p className="text-xs text-muted-foreground/70">{description}</p>}
@@ -385,6 +691,44 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     }
   };
 
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  // Save as draft to ad_creatives table
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      const { error } = await supabase.from('ad_creatives').insert({
+        client_id: clientId,
+        funnel: objective === 'CONVERSIONS' ? 'bofu' : objective === 'TRAFFIC' ? 'tofu' : 'mofu',
+        formato: imageUrl?.endsWith('.mp4') ? 'video' : 'static',
+        titulo: headline || campName || 'Borrador sin titulo',
+        texto_principal: primaryText,
+        descripcion: description,
+        cta: cta,
+        asset_url: imageUrl || null,
+        estado: 'borrador',
+        metadata: {
+          campaign_name: campName,
+          budget_type: budgetType,
+          objective,
+          campaign_budget: campBudget,
+          adset_name: adsetName,
+          audience_description: audienceDesc,
+          adset_budget: adsetBudget,
+          destination_url: destinationUrl,
+          start_date: startDate,
+        },
+      });
+      if (error) throw error;
+      toast.success('Borrador guardado. Puedes publicarlo despues desde la Biblioteca.');
+    } catch (err) {
+      console.error('[CampaignCreateWizard] Save draft error:', err);
+      toast.error('Error al guardar borrador');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
@@ -434,7 +778,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
       if (error) throw error;
 
-      toast.success(`Campana "${name}" creada como ${budgetType}. Estado: PAUSED.`);
+      toast.success(`Campana "${name}" creada como PAUSED en Meta. Activa cuando estes listo.`);
       onComplete?.();
     } catch (err) {
       console.error('[CampaignCreateWizard] Submit error:', err);
@@ -515,6 +859,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             </CardHeader>
             <CardContent>
               <AdForm
+                clientId={clientId}
                 headline={headline} setHeadline={setHeadline}
                 primaryText={primaryText} setPrimaryText={setPrimaryText}
                 description={description} setDescription={setDescription}
@@ -530,15 +875,24 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       </div>
 
       {/* Submit */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack}>Cancelar</Button>
-        <Button onClick={handleSubmit} disabled={submitting} size="lg">
-          {submitting ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
-          ) : (
-            <><Megaphone className="w-4 h-4 mr-2" />Crear Campana</>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
+            {savingDraft ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+            ) : (
+              <><Save className="w-4 h-4 mr-2" />Guardar Borrador</>
+            )}
+          </Button>
+          <Button onClick={handleSubmit} disabled={submitting} size="lg">
+            {submitting ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
+            ) : (
+              <><Send className="w-4 h-4 mr-2" />Publicar en Meta (Paused)</>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

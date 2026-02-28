@@ -149,3 +149,6 @@ verify_jwt = false
 
 [functions.admin-create-client]
 verify_jwt = false
+
+[functions.manage-meta-pixel]
+verify_jwt = false

@@ -983,7 +983,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
   // ---- Sync audiences from Meta Graph API ----
 
-  const syncAudiencesFromMeta = useCallback(async (connectionId: string): Promise<AudienceRow[]> => {
+  const syncAudiencesFromMeta = useCallback(async (connectionId: string, showErrors = false): Promise<AudienceRow[]> => {
     try {
       const { data, error } = await supabase.functions.invoke('manage-meta-audiences', {
         body: { action: 'list', connection_id: connectionId },
@@ -991,11 +991,31 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
       if (error) {
         console.error('[MetaAudienceManager] Sync from Meta error:', error);
+        if (showErrors) {
+          // Try to extract specific error message
+          const errMsg = (data as any)?.error || (error as any)?.message || '';
+          if (errMsg.includes('Unauthorized') || errMsg.includes('403')) {
+            toast.error('Sin permisos. Tu token de Meta necesita permisos ads_management y ads_read.');
+          } else if (errMsg.includes('Missing Meta credentials') || errMsg.includes('account ID')) {
+            toast.error('Falta el Ad Account ID en tu conexion de Meta. Reconecta desde Conexiones.');
+          } else if (errMsg.includes('decrypt')) {
+            toast.error('Error con el token de Meta. Reconecta Meta Ads desde Conexiones.');
+          } else if (errMsg.includes('Connection not found') || errMsg.includes('404')) {
+            toast.error('Conexion de Meta no encontrada. Verifica en Conexiones.');
+          } else if (errMsg.includes('Failed to list')) {
+            toast.error('Meta API rechazo la solicitud. Verifica permisos del token (ads_read, ads_management).');
+          } else {
+            toast.error(`Error al cargar audiencias: ${errMsg || 'Error desconocido'}`);
+          }
+        }
         return [];
       }
 
       if (!data?.success || !Array.isArray(data.audiences)) {
-        console.warn('[MetaAudienceManager] No audiences returned from Meta');
+        console.warn('[MetaAudienceManager] No audiences returned from Meta', data);
+        if (showErrors && data?.error) {
+          toast.error(`Meta API: ${data.error}${data.details ? ` - ${data.details}` : ''}`);
+        }
         return [];
       }
 
@@ -1042,7 +1062,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     }
     setSyncingFromMeta(true);
     try {
-      const metaAudiences = await syncAudiencesFromMeta(metaConnectionId);
+      const metaAudiences = await syncAudiencesFromMeta(metaConnectionId, true);
       if (metaAudiences.length > 0) {
         setAudiences((prev) => {
           // Merge: Meta audiences replace local ones with same ID, add new ones
@@ -1092,7 +1112,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       }
 
       // 2. Fetch audiences directly from Meta Graph API
-      const metaAudiences = await syncAudiencesFromMeta(metaConns[0].id);
+      const metaAudiences = await syncAudiencesFromMeta(metaConns[0].id, true);
 
       // 3. Also extract any locally-stored audience data from connection metadata
       const metadataAudiences: AudienceRow[] = [];

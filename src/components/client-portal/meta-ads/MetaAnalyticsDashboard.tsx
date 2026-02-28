@@ -669,20 +669,13 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   }}
                 />
                 <YAxis
-                  yAxisId="left"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v: number) => formatCLP(v)}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
                   tick={{ fontSize: 11 }}
                   tickFormatter={(v: number) => formatCLP(v)}
                 />
                 <Tooltip
                   formatter={(value: number, name: string) => [
                     formatCLP(value),
-                    name === 'spend' ? 'Gasto' : 'Revenue',
+                    name === 'revenue' ? 'Revenue' : 'Gasto',
                   ]}
                   labelFormatter={(label: string) => {
                     const d = new Date(label + 'T12:00:00');
@@ -696,25 +689,25 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   }}
                 />
                 <Legend
-                  formatter={(value: string) => (value === 'spend' ? 'Gasto' : 'Revenue')}
+                  formatter={(value: string) => (value === 'revenue' ? 'Revenue' : 'Gasto')}
                 />
                 <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="spend"
-                  stroke="#3B82F6"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  yAxisId="right"
                   type="monotone"
                   dataKey="revenue"
                   stroke="#22C55E"
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4 }}
+                  name="revenue"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="spend"
+                  stroke="#EF4444"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                  name="spend"
                 />
               </LineChart>
             </ResponsiveContainer>
