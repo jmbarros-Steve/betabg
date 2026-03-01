@@ -121,7 +121,7 @@ function getInitials(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, pageId: ctxPageId } = useMetaBusiness();
 
   // Connection state
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -172,7 +172,9 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
         if (data?.pages) {
           setPages(data.pages);
           if (data.pages.length > 0) {
-            setSelectedPageId(data.pages[0].id);
+            // Prefer page from context (selected portfolio), fallback to first page
+            const contextMatch = ctxPageId ? data.pages.find((p: PageInfo) => p.id === ctxPageId) : null;
+            setSelectedPageId(contextMatch ? contextMatch.id : data.pages[0].id);
           }
         }
       } catch (err) {
@@ -183,7 +185,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       }
     }
     init();
-  }, [clientId, ctxConnectionId])
+  }, [clientId, ctxConnectionId, ctxPageId])
 
   // ─── Fetch conversations when page changes ────────────────────────────────
 

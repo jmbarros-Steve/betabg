@@ -103,7 +103,8 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       if (trackingData && trackingData.length > 0) {
         setTracking(trackingData as CompetitorTracking[]);
         const existing = trackingData.map(t => t.ig_handle);
-        const filled = [...existing, ...Array(5 - existing.length).fill('')].slice(0, 5);
+        const padCount = Math.max(0, 5 - existing.length);
+        const filled = [...existing, ...Array(padCount).fill('')].slice(0, 5);
         setHandles(filled);
 
         const trackingIds = trackingData.map(t => t.id).filter(Boolean);

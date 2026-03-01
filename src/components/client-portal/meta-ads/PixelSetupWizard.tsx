@@ -73,7 +73,7 @@ const PRIORITY_BADGE: Record<string, { label: string; color: string }> = {
 // ---------------------------------------------------------------------------
 
 export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, pixelId: ctxPixelId } = useMetaBusiness();
 
   const [loading, setLoading] = useState(true);
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -98,9 +98,9 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       setConnectionId(ctxConnectionId);
       setNoConnection(false);
 
-      // Call edge function to list pixels
+      // Call edge function to list pixels using context connectionId
       const { data, error } = await supabase.functions.invoke('manage-meta-pixel', {
-        body: { action: 'list', connection_id: conns[0].id },
+        body: { action: 'list', connection_id: ctxConnectionId },
       });
 
       if (error) throw error;
@@ -108,9 +108,10 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       const pixelList = data?.pixels || [];
       setPixels(pixelList);
 
-      // Auto-select first pixel
+      // Auto-select pixel from context (selected portfolio), fallback to first pixel
       if (pixelList.length > 0) {
-        setSelectedPixel(pixelList[0]);
+        const contextMatch = ctxPixelId ? pixelList.find((p: PixelInfo) => p.id === ctxPixelId) : null;
+        setSelectedPixel(contextMatch || pixelList[0]);
       }
     } catch (err: any) {
       console.error('[PixelSetupWizard] Detection error:', err);
@@ -119,7 +120,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       setLoading(false);
       setDetecting(false);
     }
-  }, [clientId]);
+  }, [ctxConnectionId, ctxPixelId]);
 
   // Fetch pixel events/stats
   const fetchEvents = useCallback(async (pixelId: string) => {

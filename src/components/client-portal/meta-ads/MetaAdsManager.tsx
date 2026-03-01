@@ -3,15 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// Select UI components no longer needed for portfolio picker (handled by MetaConnectionWizard)
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -63,6 +55,7 @@ import TestingWizard322 from './TestingWizard322';
 import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
+import MetaConnectionWizard from './MetaConnectionWizard';
 import { MetaScopeStatusPanel } from './MetaScopeAlert';
 
 // Business context
@@ -521,6 +514,11 @@ interface MetaConnectionInfo {
   id: string;
   account_id: string | null;
   store_name: string | null;
+  business_id: string | null;
+  portfolio_name: string | null;
+  page_id: string | null;
+  ig_account_id: string | null;
+  pixel_id: string | null;
 }
 
 export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
@@ -558,10 +556,10 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   const fetchHierarchy = useCallback(async () => {
     setHierarchyLoading(true);
     try {
-      // 1. Get the Meta connection
+      // 1. Get the Meta connection (including new portfolio fields)
       const { data: conn } = await supabase
         .from('platform_connections')
-        .select('id, account_id, store_name')
+        .select('id, account_id, store_name, business_id, portfolio_name, page_id, ig_account_id, pixel_id')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
         .eq('is_active', true)
@@ -629,11 +627,25 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 businessName: match.businessName,
                 adAccountId: match.adAccountId,
                 adAccountName: match.adAccountName,
-                pageId: match.pageId,
+                pageId: conn.page_id || match.pageId,
                 pageName: match.pageName,
-                igAccountId: match.igAccountId,
+                igAccountId: conn.ig_account_id || match.igAccountId,
                 igAccountName: match.igAccountName,
-                pixelId: match.pixelId,
+                pixelId: conn.pixel_id || match.pixelId,
+              });
+            } else {
+              // No match in hierarchy, use DB fields directly
+              setSelectedAssets({
+                connectionId: conn.id,
+                businessId: conn.business_id || 'personal',
+                businessName: conn.portfolio_name || conn.store_name || 'Cuenta Meta',
+                adAccountId: conn.account_id,
+                adAccountName: conn.store_name || conn.account_id,
+                pageId: conn.page_id || null,
+                pageName: null,
+                igAccountId: conn.ig_account_id || null,
+                igAccountName: null,
+                pixelId: conn.pixel_id || null,
               });
             }
           }
@@ -676,11 +688,25 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
               businessName: match.businessName,
               adAccountId: match.adAccountId,
               adAccountName: match.adAccountName,
-              pageId: match.pageId,
+              pageId: conn.page_id || match.pageId,
               pageName: match.pageName,
-              igAccountId: match.igAccountId,
+              igAccountId: conn.ig_account_id || match.igAccountId,
               igAccountName: match.igAccountName,
-              pixelId: match.pixelId,
+              pixelId: conn.pixel_id || match.pixelId,
+            });
+          } else {
+            // No match in hierarchy, use DB fields directly
+            setSelectedAssets({
+              connectionId: conn.id,
+              businessId: conn.business_id || 'personal',
+              businessName: conn.portfolio_name || conn.store_name || 'Cuenta Meta',
+              adAccountId: conn.account_id,
+              adAccountName: conn.store_name || conn.account_id,
+              pageId: conn.page_id || null,
+              pageName: null,
+              igAccountId: conn.ig_account_id || null,
+              igAccountName: null,
+              pixelId: conn.pixel_id || null,
             });
           }
         }
@@ -703,19 +729,33 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
 
     setPortfolioSwitching(true);
     try {
-      // 1. Update connection in DB with the new ad account
+      // 1. Update connection in DB with all portfolio assets
       const { error: updateError } = await supabase
         .from('platform_connections')
         .update({
           account_id: portfolio.adAccountId,
           store_name: portfolio.name,
+          business_id: portfolio.businessId,
+          portfolio_name: portfolio.name,
+          page_id: portfolio.pageId,
+          ig_account_id: portfolio.igAccountId,
+          pixel_id: portfolio.pixelId,
         })
         .eq('id', metaConnection.id);
       if (updateError) throw updateError;
 
       // 2. Update local state
       setMetaConnection(prev =>
-        prev ? { ...prev, account_id: portfolio.adAccountId, store_name: portfolio.name } : null,
+        prev ? {
+          ...prev,
+          account_id: portfolio.adAccountId,
+          store_name: portfolio.name,
+          business_id: portfolio.businessId,
+          portfolio_name: portfolio.name,
+          page_id: portfolio.pageId,
+          ig_account_id: portfolio.igAccountId,
+          pixel_id: portfolio.pixelId,
+        } : null,
       );
 
       setSelectedAssets({
@@ -769,12 +809,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       setPortfolioSwitching(false);
     }
   }, [metaConnection, selectedAssets.adAccountId]);
-
-  // --- Handle select dropdown change ---
-  const handlePortfolioSelect = useCallback((adAccountId: string) => {
-    const portfolio = allPortfolios.find(p => p.adAccountId === adAccountId);
-    if (portfolio) selectPortfolio(portfolio);
-  }, [allPortfolios, selectPortfolio]);
 
   // --- Navigation ---
   const markVisited = useCallback(
@@ -946,64 +980,17 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
               </CardContent>
             </Card>
           ) : !selectedAssets.adAccountId ? (
-            /* Portfolio selection required */
-            <Card className="mb-4 border-amber-500/30 bg-amber-500/5">
-              <CardContent className="py-6">
-                <div className="flex items-start gap-3">
-                  <Building2 className="w-6 h-6 text-amber-500 mt-0.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-amber-700">
-                      Selecciona un negocio / portfolio
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1 mb-3">
-                      Tu Business Manager tiene {allPortfolios.length} negocio{allPortfolios.length !== 1 ? 's' : ''} disponible{allPortfolios.length !== 1 ? 's' : ''}. Selecciona uno para ver sus metricas, campanas y anuncios.
-                    </p>
-                    {allPortfolios.length > 0 && (
-                      <Select onValueChange={handlePortfolioSelect} disabled={portfolioSwitching}>
-                        <SelectTrigger className="w-full max-w-lg bg-background">
-                          <SelectValue placeholder="Selecciona un negocio..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-popover z-50 max-h-96">
-                          {businessGroups.map((group) => (
-                            <SelectGroup key={group.businessId}>
-                              <SelectLabel className="flex items-center gap-2 text-xs">
-                                <Building2 className="w-3 h-3" />
-                                {group.businessName}
-                              </SelectLabel>
-                              {group.portfolios.map((p) => (
-                                <SelectItem key={p.adAccountId} value={p.adAccountId}>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{p.name}</span>
-                                    <span className="text-muted-foreground text-xs flex items-center gap-2">
-                                      <span>Ad: {p.adAccountId}</span>
-                                      {p.pageName && (
-                                        <span className="flex items-center gap-0.5">
-                                          <Facebook className="w-3 h-3" /> {p.pageName}
-                                        </span>
-                                      )}
-                                      {p.igAccountName && (
-                                        <span className="flex items-center gap-0.5">
-                                          <Instagram className="w-3 h-3" /> @{p.igAccountName}
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {allPortfolios.length === 0 && (
-                      <p className="text-xs text-red-500">
-                        No se encontraron negocios activos. Verifica los permisos de tu Business Manager.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            /* Portfolio selection required — show wizard */
+            <div className="mb-4">
+              {metaConnection && (
+                <MetaConnectionWizard
+                  connectionId={metaConnection.id}
+                  onComplete={(portfolio) => {
+                    selectPortfolio(portfolio);
+                  }}
+                />
+              )}
+            </div>
           ) : (
             /* Active portfolio bar */
             <div className="mb-4 p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1011,9 +998,9 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 <img src={logoMeta} alt="Meta" className="h-8 w-8 object-contain" />
                 <div>
                   <p className="text-sm font-semibold">
-                    {selectedAssets.adAccountName || 'Cuenta Meta'}
+                    Trabajando con: {selectedAssets.adAccountName || 'Cuenta Meta'}
                   </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                     {selectedAssets.businessName && (
                       <span className="flex items-center gap-1">
                         <Building2 className="w-3 h-3" />
@@ -1031,6 +1018,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                         <Instagram className="w-3 h-3" /> @{selectedAssets.igAccountName}
                       </span>
                     )}
+                    {selectedAssets.pixelId && (
+                      <span className="flex items-center gap-0.5">
+                        <Crosshair className="w-3 h-3" /> Pixel
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1038,37 +1030,46 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 {portfolioSwitching && (
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 )}
-                <Select
-                  value={selectedAssets.adAccountId || undefined}
-                  onValueChange={handlePortfolioSelect}
+                <Button
+                  variant="outline"
+                  size="sm"
                   disabled={portfolioSwitching}
+                  onClick={async () => {
+                    // Reset account_id in DB to force wizard
+                    if (metaConnection) {
+                      await supabase
+                        .from('platform_connections')
+                        .update({
+                          account_id: null,
+                          store_name: null,
+                          business_id: null,
+                          portfolio_name: null,
+                          page_id: null,
+                          ig_account_id: null,
+                          pixel_id: null,
+                        })
+                        .eq('id', metaConnection.id);
+                      setMetaConnection(prev =>
+                        prev ? { ...prev, account_id: null, store_name: null, business_id: null, portfolio_name: null, page_id: null, ig_account_id: null, pixel_id: null } : null,
+                      );
+                      setSelectedAssets({
+                        connectionId: metaConnection.id,
+                        businessId: null,
+                        businessName: null,
+                        adAccountId: null,
+                        adAccountName: null,
+                        pageId: null,
+                        pageName: null,
+                        igAccountId: null,
+                        igAccountName: null,
+                        pixelId: null,
+                      });
+                    }
+                  }}
                 >
-                  <SelectTrigger className="w-[300px] bg-background text-xs h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover z-50 max-h-96">
-                    {businessGroups.map((group) => (
-                      <SelectGroup key={group.businessId}>
-                        <SelectLabel className="flex items-center gap-2 text-xs">
-                          <Building2 className="w-3 h-3" />
-                          {group.businessName}
-                        </SelectLabel>
-                        {group.portfolios.map((p) => (
-                          <SelectItem key={p.adAccountId} value={p.adAccountId}>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{p.name}</span>
-                              {p.pageName && (
-                                <span className="text-muted-foreground text-xs flex items-center gap-0.5">
-                                  <Facebook className="w-3 h-3" /> {p.pageName}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Cambiar negocio
+                </Button>
               </div>
             </div>
           )}
