@@ -173,13 +173,15 @@ function DashboardSection({ clientId }: { clientId: string }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Get active Meta connections
+      // 1. Get the active Meta connection with a selected ad account
       const { data: connections, error: connError } = await supabase
         .from('platform_connections')
         .select('id')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .not('account_id', 'is', null)
+        .limit(1);
 
       if (connError) throw connError;
       if (!connections || connections.length === 0) {

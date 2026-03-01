@@ -299,7 +299,9 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
         .select('id')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .not('account_id', 'is', null)
+        .limit(1);
 
       if (!conns || conns.length === 0) {
         setCampaigns([]);
@@ -378,6 +380,13 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
   }, [clientId]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
+
+  // Refresh when account changes (bg:sync-complete)
+  useEffect(() => {
+    const handler = () => fetchCampaigns();
+    window.addEventListener('bg:sync-complete', handler);
+    return () => window.removeEventListener('bg:sync-complete', handler);
+  }, [fetchCampaigns]);
 
   // ---------- Fetch ad sets for a campaign ----------
   const fetchAdSets = useCallback(async (campaignId: string) => {

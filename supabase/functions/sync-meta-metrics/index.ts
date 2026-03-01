@@ -400,16 +400,16 @@ Deno.serve(async (req) => {
 
     console.log(`Upserting ${metricsToUpsert.length} metrics (all converted to CLP)`);
 
-    // Purge stale metrics from previous ad account if requested
-    if (purge_stale) {
-      console.log(`Purging stale platform_metrics for connection ${connection_id}`);
-      const { error: purgeError } = await supabase
-        .from('platform_metrics')
-        .delete()
-        .eq('connection_id', connection_id);
-      if (purgeError) {
-        console.error('Purge error:', purgeError);
-      }
+    // Always purge old metrics for this connection before upserting.
+    // This ensures data integrity when the ad account was changed —
+    // old campaigns have different IDs and won't be overwritten by upsert.
+    console.log(`Purging old platform_metrics for connection ${connection_id}`);
+    const { error: purgeError } = await supabase
+      .from('platform_metrics')
+      .delete()
+      .eq('connection_id', connection_id);
+    if (purgeError) {
+      console.error('Purge error:', purgeError);
     }
 
     // Upsert metrics in batches

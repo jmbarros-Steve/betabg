@@ -225,16 +225,25 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     fetchData();
   }, [clientId, from, to, prevFrom, prevTo]);
 
+  // Refresh when account changes (bg:sync-complete)
+  useEffect(() => {
+    const handler = () => fetchData();
+    window.addEventListener('bg:sync-complete', handler);
+    return () => window.removeEventListener('bg:sync-complete', handler);
+  }, [clientId, from, to, prevFrom, prevTo]);
+
   async function fetchData() {
     setLoading(true);
     try {
-      // 1. Get Meta connection IDs for this client
+      // 1. Get the active Meta connection with a selected ad account
       const { data: connections, error: connError } = await supabase
         .from('platform_connections')
         .select('id')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .not('account_id', 'is', null)
+        .limit(1);
 
       if (connError) throw connError;
       const connectionIds = (connections || []).map((c) => c.id);
@@ -283,13 +292,15 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      // Trigger sync for Meta connections
+      // Trigger sync for the active Meta connection
       const { data: connections } = await supabase
         .from('platform_connections')
         .select('id')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .not('account_id', 'is', null)
+        .limit(1);
 
       for (const conn of connections || []) {
         await supabase.functions.invoke('sync-campaign-metrics', {

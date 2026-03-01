@@ -88,7 +88,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         // Fetch connections
         const { data: connections, error: connError } = await supabase
           .from('platform_connections')
-          .select('id, platform')
+          .select('id, platform, account_id')
           .eq('client_id', clientId);
 
         if (connError) throw connError;
@@ -104,7 +104,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         const connIds = connections.map((c) => c.id);
         // Separate Shopify connection IDs for revenue/orders (avoid double attribution)
         const shopifyConnIds = connections.filter(c => c.platform === 'shopify').map(c => c.id);
-        const adConnIds = connections.filter(c => c.platform === 'meta' || c.platform === 'google').map(c => c.id);
+        // Only use Meta connections that have a selected ad account (avoid stale/mixed data)
+        const adConnIds = connections.filter(c =>
+          (c.platform === 'meta' && c.account_id) || c.platform === 'google'
+        ).map(c => c.id);
         setConnectionIds(connIds);
 
         const startDate = getDateRangeStart(dateRange);

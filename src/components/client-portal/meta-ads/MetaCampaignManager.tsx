@@ -327,13 +327,15 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch active Meta connections for this client
+      // 1. Fetch the active Meta connection with a selected ad account
       const { data: connections, error: connErr } = await supabase
         .from('platform_connections')
         .select('id')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .not('account_id', 'is', null)
+        .limit(1);
 
       if (connErr) throw connErr;
 
