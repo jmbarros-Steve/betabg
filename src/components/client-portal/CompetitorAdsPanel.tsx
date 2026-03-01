@@ -106,14 +106,26 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         const filled = [...existing, ...Array(5 - existing.length).fill('')].slice(0, 5);
         setHandles(filled);
 
-        const trackingIds = trackingData.map(t => t.id);
-        const { data: adsData } = await supabase
-          .from('competitor_ads')
-          .select('*')
-          .in('tracking_id', trackingIds)
-          .order('days_running', { ascending: false, nullsFirst: false });
+        const trackingIds = trackingData.map(t => t.id).filter(Boolean);
+        if (trackingIds.length > 0) {
+          const { data: adsData, error: adsError } = await supabase
+            .from('competitor_ads')
+            .select('*')
+            .in('tracking_id', trackingIds)
+            .order('days_running', { ascending: false, nullsFirst: false });
 
-        if (adsData) setAds(adsData as CompetitorAd[]);
+          if (adsError) {
+            console.error('[CompetitorAdsPanel] Error fetching ads:', adsError);
+          }
+          if (Array.isArray(adsData)) {
+            setAds(adsData as CompetitorAd[]);
+          } else {
+            setAds([]);
+          }
+        }
+      } else {
+        setTracking([]);
+        setAds([]);
       }
     } finally {
       setLoading(false);
@@ -149,12 +161,13 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         throw new Error(response.error.message);
       }
 
-      const results = response.data?.results || [];
-      const totalAds = results.reduce((sum: number, r: any) => sum + r.ads_found, 0);
-      const permissionErrors = results.filter((r: any) => r.status?.startsWith('permission_denied'));
-      const tokenErrors = results.filter((r: any) => r.status?.startsWith('token_expired'));
+      const rawResults = response.data?.results;
+      const results = Array.isArray(rawResults) ? rawResults : [];
+      const totalAds = results.reduce((sum: number, r: any) => sum + (Number(r.ads_found) || 0), 0);
+      const permissionErrors = results.filter((r: any) => r.status?.startsWith?.('permission_denied'));
+      const tokenErrors = results.filter((r: any) => r.status?.startsWith?.('token_expired'));
       const otherErrors = results.filter((r: any) =>
-        r.status?.startsWith('error') || r.status?.startsWith('api_error') || r.status?.startsWith('upsert_error')
+        r.status?.startsWith?.('error') || r.status?.startsWith?.('api_error') || r.status?.startsWith?.('upsert_error')
       );
       const allErrors = [...permissionErrors, ...tokenErrors, ...otherErrors];
 
