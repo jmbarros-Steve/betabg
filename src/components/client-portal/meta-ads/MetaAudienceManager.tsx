@@ -990,10 +990,13 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         body: { action: 'list', connection_id: connectionId },
       });
 
-      if (error) {
+      // supabase.functions.invoke puts the body in `data` even on non-2xx responses.
+      // If the edge function returned success with empty audiences, that's valid — not an error.
+      if (data?.success && Array.isArray(data.audiences)) {
+        // Edge function returned 200 with valid data (possibly empty list) — proceed normally
+      } else if (error) {
         console.error('[MetaAudienceManager] Sync from Meta error:', error);
         if (showErrors) {
-          // Try to extract specific error message
           const errMsg = (data as any)?.error || (error as any)?.message || '';
           if (errMsg.includes('Unauthorized') || errMsg.includes('403')) {
             toast.error('Sin permisos. Tu token de Meta necesita permisos ads_management y ads_read.');
@@ -1010,9 +1013,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           }
         }
         return [];
-      }
-
-      if (!data?.success || !Array.isArray(data.audiences)) {
+      } else if (!data?.success || !Array.isArray(data.audiences)) {
         console.warn('[MetaAudienceManager] No audiences returned from Meta', data);
         if (showErrors && data?.error) {
           toast.error(`Meta API: ${data.error}${data.details ? ` - ${data.details}` : ''}`);
