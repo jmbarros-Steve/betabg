@@ -112,8 +112,8 @@ Deno.serve(async (req) => {
     const finalToken = longLivedData.access_token || accessToken;
     console.log('Long-lived token obtained');
 
-    // Get ad accounts for this user
-    const accountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id`;
+    // Get ad accounts for this user (include account_status to filter)
+    const accountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`;
     const accountsResponse = await fetch(accountsUrl);
     const accountsData = await accountsResponse.json();
 
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
     }
 
     const adAccounts = accountsData.data || [];
-    console.log(`Found ${adAccounts.length} ad accounts`);
+    console.log(`Found ${adAccounts.length} ad accounts:`, adAccounts.map((a: any) => ({ id: a.id, name: a.name, status: a.account_status })));
 
     if (adAccounts.length === 0) {
       return new Response(
@@ -135,8 +135,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use first ad account (or could let user choose)
-    const primaryAccount = adAccounts[0];
+    // Prioritize active accounts (account_status: 1 = ACTIVE)
+    // Status 2 = DISABLED, 3 = UNSETTLED, 7 = PENDING_RISK_REVIEW, etc.
+    const activeAccounts = adAccounts.filter((a: any) => a.account_status === 1);
+    const primaryAccount = activeAccounts.length > 0 ? activeAccounts[0] : adAccounts[0];
+
+    if (activeAccounts.length === 0) {
+      console.warn('No active ad accounts found, using first available (status:', primaryAccount.account_status, ')');
+    } else {
+      console.log(`Selected active account: ${primaryAccount.name} (${primaryAccount.id}), ${activeAccounts.length} active of ${adAccounts.length} total`);
+    }
+
     const accountId = primaryAccount.id.replace('act_', '');
     const accountName = primaryAccount.name;
 
@@ -201,11 +210,19 @@ Deno.serve(async (req) => {
 
     console.log('Connection saved successfully');
 
+    // Return all available accounts so the frontend can offer switching
+    const allAccounts = adAccounts.map((a: any) => ({
+      id: a.id.replace('act_', ''),
+      name: a.name,
+      account_status: a.account_status,
+    }));
+
     return new Response(
       JSON.stringify({
         success: true,
         account_name: accountName,
         account_id: accountId,
+        all_accounts: allAccounts,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

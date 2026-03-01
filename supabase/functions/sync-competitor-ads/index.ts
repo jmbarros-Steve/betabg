@@ -177,65 +177,145 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Step 2: Search Ad Library
-        const adLibraryUrl = new URL('https://graph.facebook.com/v21.0/ads_archive');
-        adLibraryUrl.searchParams.set('access_token', accessToken);
-        adLibraryUrl.searchParams.set('search_terms', handle);
-        adLibraryUrl.searchParams.set('ad_type', 'ALL');
-        adLibraryUrl.searchParams.set('ad_reached_countries', 'CL,MX,CO,AR,PE,US');
-        adLibraryUrl.searchParams.set('ad_active_status', 'ALL');
-        adLibraryUrl.searchParams.set('fields', 
-          'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages'
-        );
-        adLibraryUrl.searchParams.set('limit', '25');
+        // Step 2: Search Ad Library with multi-strategy approach
+        const AD_LIBRARY_FIELDS = 'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages';
+        const AD_LIBRARY_COUNTRIES = 'CL,MX,CO,AR,PE,US';
 
-        console.log(`[sync-competitor-ads] Fetching Ad Library for: ${handle}`, adLibraryUrl.toString().replace(accessToken, '***'));
-        const adResponse = await fetch(adLibraryUrl.toString());
-        
-        // Handle non-JSON responses
-        const responseText = await adResponse.text();
-        let adResponseJson: any;
-        try {
-          adResponseJson = JSON.parse(responseText);
-        } catch {
-          console.error(`Non-JSON response for ${handle}:`, responseText.slice(0, 500));
-          results.push({ handle, ads_found: 0, status: 'api_error: Non-JSON response from Meta' });
-          continue;
+        // Helper: fetch Ad Library with given params
+        async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
+          const url = new URL('https://graph.facebook.com/v21.0/ads_archive');
+          url.searchParams.set('access_token', accessToken);
+          url.searchParams.set('ad_type', 'ALL');
+          url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);
+          url.searchParams.set('ad_active_status', 'ALL');
+          url.searchParams.set('fields', AD_LIBRARY_FIELDS);
+          url.searchParams.set('limit', '25');
+          for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+
+          console.log(`[sync-competitor-ads] Ad Library query:`, url.toString().replace(accessToken, '***'));
+          const res = await fetch(url.toString());
+          const text = await res.text();
+          let json: any;
+          try { json = JSON.parse(text); } catch {
+            return { ads: [], error: 'Non-JSON response from Meta' };
+          }
+          if (!res.ok || json.error) {
+            const code = json.error?.code || 0;
+            const msg = json.error?.message || 'Unknown error';
+            if (code === 190) return { ads: [], error: 'token_expired: El token de Meta expiró. Reconecta Meta Ads en Conexiones.' };
+            if (code === 10 || code === 200) return { ads: [], error: 'permission_denied: La app necesita permisos de Ad Library.' };
+            return { ads: [], error: `api_error: ${msg}` };
+          }
+          return { ads: json.data || [] };
         }
 
-        if (!adResponse.ok || adResponseJson.error) {
-          const errMsg = adResponseJson.error?.message || 'Unknown error';
-          const errCode = adResponseJson.error?.code || 0;
-          console.error(`Ad Library API error for ${handle}: code=${errCode}, msg=${errMsg}`);
-          
-          // Provide actionable error messages
-          let statusMsg = `api_error: ${errMsg}`;
-          if (errCode === 190) statusMsg = 'token_expired: El token de Meta expiró. Reconecta Meta Ads en Conexiones.';
-          if (errCode === 10 || errCode === 200) statusMsg = 'permission_denied: La app necesita permisos de Ad Library. Contacta soporte.';
-          
-          results.push({ handle, ads_found: 0, status: statusMsg });
-          continue;
+        // Helper: try to resolve IG handle → Facebook page ID via Pages Search API
+        async function resolvePageId(searchQuery: string): Promise<{ pageId: string; pageName: string } | null> {
+          try {
+            const url = new URL('https://graph.facebook.com/v21.0/pages/search');
+            url.searchParams.set('q', searchQuery);
+            url.searchParams.set('fields', 'id,name,verification_status');
+            url.searchParams.set('access_token', accessToken);
+            const res = await fetch(url.toString());
+            const json = await res.json();
+            if (json.data && json.data.length > 0) {
+              console.log(`[sync-competitor-ads] Page search for "${searchQuery}" found: ${json.data[0].name} (${json.data[0].id})`);
+              return { pageId: json.data[0].id, pageName: json.data[0].name };
+            }
+          } catch (e) {
+            console.error(`[sync-competitor-ads] Page search failed for "${searchQuery}":`, e);
+          }
+          return null;
         }
 
-        const ads: AdLibraryAd[] = adResponseJson.data || [];
-        console.log(`[sync-competitor-ads] Found ${ads.length} ads for ${handle}`);
+        let ads: AdLibraryAd[] = [];
+        let searchMethod = '';
+        let resolvedPageId = tracking.meta_page_id || null;
+        let resolvedPageName = '';
 
-        // Update page info if found
+        // Strategy 1: Use cached page_id if available
+        if (resolvedPageId) {
+          console.log(`[sync-competitor-ads] ${handle}: Using cached page_id ${resolvedPageId}`);
+          const result = await fetchAdLibrary({ search_page_ids: resolvedPageId });
+          if (result.error) {
+            results.push({ handle, ads_found: 0, status: result.error });
+            continue;
+          }
+          ads = result.ads;
+          searchMethod = 'cached_page_id';
+        }
+
+        // Strategy 2: Try to resolve handle → page_id via Pages Search API
+        if (ads.length === 0 && !resolvedPageId) {
+          // Generate search variations from handle
+          const variations = [
+            handle,
+            handle.replace(/_/g, ' '),
+            handle.replace(/([a-z])([A-Z])/g, '$1 $2'),
+            handle.replace(/(\d+)/g, ' $1 ').trim(),
+          ];
+          // Deduplicate
+          const uniqueVariations = [...new Set(variations)];
+
+          for (const variation of uniqueVariations) {
+            const page = await resolvePageId(variation);
+            if (page) {
+              resolvedPageId = page.pageId;
+              resolvedPageName = page.pageName;
+              console.log(`[sync-competitor-ads] ${handle}: Resolved to page "${page.pageName}" (${page.pageId}) via "${variation}"`);
+              const result = await fetchAdLibrary({ search_page_ids: page.pageId });
+              if (result.error) {
+                results.push({ handle, ads_found: 0, status: result.error });
+                break;
+              }
+              ads = result.ads;
+              searchMethod = `resolved_page_id:${variation}`;
+              break;
+            }
+          }
+        }
+
+        // Strategy 3: Fallback to search_terms with variations
+        if (ads.length === 0 && !results.find(r => r.handle === handle)) {
+          const searchVariations = [
+            handle,
+            handle.replace(/_/g, ' '),
+          ];
+          const uniqueSearches = [...new Set(searchVariations)];
+
+          for (const term of uniqueSearches) {
+            console.log(`[sync-competitor-ads] ${handle}: Fallback search_terms="${term}"`);
+            const result = await fetchAdLibrary({ search_terms: term });
+            if (result.error) {
+              results.push({ handle, ads_found: 0, status: result.error });
+              break;
+            }
+            if (result.ads.length > 0) {
+              ads = result.ads;
+              searchMethod = `search_terms:${term}`;
+              break;
+            }
+          }
+        }
+
+        // Skip if already pushed an error result
+        if (results.find(r => r.handle === handle)) continue;
+
+        console.log(`[sync-competitor-ads] ${handle}: Found ${ads.length} ads via ${searchMethod || 'none'}`);
+
+        // Update tracking record with page info and sync timestamp
+        const updateData: Record<string, any> = { last_sync_at: new Date().toISOString() };
         if (ads.length > 0 && ads[0].page_id) {
-          await supabase
-            .from('competitor_tracking')
-            .update({
-              meta_page_id: ads[0].page_id,
-              display_name: ads[0].page_name || handle,
-              last_sync_at: new Date().toISOString(),
-            })
-            .eq('id', tracking.id);
-        } else {
-          await supabase
-            .from('competitor_tracking')
-            .update({ last_sync_at: new Date().toISOString() })
-            .eq('id', tracking.id);
+          updateData.meta_page_id = ads[0].page_id;
+          updateData.display_name = ads[0].page_name || handle;
+        } else if (resolvedPageId && !tracking.meta_page_id) {
+          updateData.meta_page_id = resolvedPageId;
+          if (resolvedPageName) updateData.display_name = resolvedPageName;
         }
+        await supabase
+          .from('competitor_tracking')
+          .update(updateData)
+          .eq('id', tracking.id);
 
         // Step 3: Upsert ads
         const adsToUpsert = ads.map((ad) => {

@@ -1091,7 +1091,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       // 1. Check platform connections for Meta, Shopify, Klaviyo
       const { data: connections, error: connErr } = await supabase
         .from('platform_connections')
-        .select('id, platform, is_active, metadata')
+        .select('id, platform, is_active')
         .eq('client_id', clientId)
         .eq('is_active', true);
 
@@ -1115,66 +1115,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       // 2. Fetch audiences directly from Meta Graph API
       const metaAudiences = await syncAudiencesFromMeta(metaConns[0].id, true);
 
-      // 3. Also extract any locally-stored audience data from connection metadata
-      const metadataAudiences: AudienceRow[] = [];
-      for (const conn of metaConns) {
-        const meta = conn.metadata as Record<string, unknown> | null;
-        if (meta && Array.isArray(meta.audiences)) {
-          for (const aud of meta.audiences as Record<string, unknown>[]) {
-            metadataAudiences.push({
-              id: String(aud.id || crypto.randomUUID()),
-              name: String(aud.name || 'Sin nombre'),
-              type: (aud.type as AudienceTab) || 'custom',
-              size: Number(aud.size) || 0,
-              status: (aud.status as AudienceStatus) || 'READY',
-              created_at: String(aud.created_at || new Date().toISOString()),
-              source: String(aud.source || 'Meta Ads'),
-              source_audience_id: aud.source_audience_id as string | undefined,
-              lookalike_percent: aud.lookalike_percent as number | undefined,
-              country: aud.country as string | undefined,
-              description: aud.description as string | undefined,
-              retention_days: aud.retention_days as number | undefined,
-            });
-          }
-        }
-      }
-
-      // 4. Fetch ad_creatives that may reference audience data
-      const { data: creatives } = await supabase
-        .from('ad_creatives')
-        .select('id, titulo, metadata, created_at')
-        .eq('client_id', clientId)
-        .not('metadata', 'is', null);
-
-      const creativeAudiences: AudienceRow[] = [];
-      if (creatives) {
-        for (const creative of creatives) {
-          const meta = creative.metadata as Record<string, unknown> | null;
-          if (meta && meta.audience_id) {
-            creativeAudiences.push({
-              id: String(meta.audience_id),
-              name: String(meta.audience_name || `Audiencia de ${creative.titulo}`),
-              type: 'saved',
-              size: Number(meta.audience_size) || 0,
-              status: 'READY',
-              created_at: creative.created_at,
-              source: 'Ad Creative',
-              description: String(meta.audience_description || ''),
-            });
-          }
-        }
-      }
-
-      // Combine and deduplicate - Meta API data takes priority
-      const uniqueMap = new Map<string, AudienceRow>();
-      for (const a of metadataAudiences) uniqueMap.set(a.id, a);
-      for (const a of creativeAudiences) {
-        if (!uniqueMap.has(a.id)) uniqueMap.set(a.id, a);
-      }
-      // Meta API data overwrites local data
-      for (const a of metaAudiences) uniqueMap.set(a.id, a);
-
-      setAudiences(Array.from(uniqueMap.values()));
+      setAudiences(metaAudiences);
     } catch (err) {
       console.error('[MetaAudienceManager] Error fetching audiences:', err);
       toast.error('Error al cargar audiencias');

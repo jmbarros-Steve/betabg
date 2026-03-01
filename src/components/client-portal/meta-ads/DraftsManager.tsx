@@ -50,7 +50,6 @@ interface DraftItem {
   funnel: string | null;
   angulo: string | null;
   estado: DraftStatus;
-  metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,7 +82,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
     try {
       const { data, error } = await supabase
         .from('ad_creatives')
-        .select('id, titulo, texto_principal, descripcion, cta, asset_url, formato, funnel, angulo, estado, metadata, created_at, updated_at')
+        .select('id, titulo, texto_principal, descripcion, cta, asset_url, formato, funnel, angulo, estado, created_at, updated_at')
         .eq('client_id', clientId)
         .in('estado', ['borrador', 'aprobado', 'generando'])
         .order('created_at', { ascending: false });
@@ -137,8 +136,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         return;
       }
 
-      const meta = draft.metadata as Record<string, unknown> | null;
-      const name = (meta?.campaign_name as string) || draft.titulo || `Campana - ${new Date().toISOString().split('T')[0]}`;
+      const name = draft.titulo || `Campana - ${new Date().toISOString().split('T')[0]}`;
 
       const { error } = await supabase.functions.invoke('manage-meta-campaign', {
         body: {
@@ -146,12 +144,12 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
           connection_id: conns[0].id,
           data: {
             name,
-            objective: (meta?.objective as string) || 'OUTCOME_SALES',
+            objective: 'OUTCOME_SALES',
             status: 'PAUSED',
-            daily_budget: Number(meta?.campaign_budget || meta?.adset_budget || 100) * 100,
+            daily_budget: 100 * 100,
             billing_event: 'IMPRESSIONS',
             optimization_goal: 'OFFSITE_CONVERSIONS',
-            adset_name: (meta?.adset_name as string) || `${name} - Ad Set 1`,
+            adset_name: `${name} - Ad Set 1`,
           },
         },
       });
@@ -248,7 +246,6 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
           {filtered.map((draft) => {
             const statusConf = STATUS_CONFIG[draft.estado];
             const StatusIcon = statusConf.icon;
-            const meta = draft.metadata as Record<string, unknown> | null;
 
             return (
               <Card key={draft.id} className="hover:shadow-sm transition-shadow">
@@ -285,7 +282,6 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                       <p className="text-xs text-muted-foreground line-clamp-1">{draft.texto_principal || 'Sin copy'}</p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>{formatDate(draft.created_at)}</span>
-                        {meta?.campaign_name && <span>Campana: {meta.campaign_name as string}</span>}
                         {draft.cta && <span>CTA: {(draft.cta as string).replace(/_/g, ' ')}</span>}
                       </div>
                     </div>

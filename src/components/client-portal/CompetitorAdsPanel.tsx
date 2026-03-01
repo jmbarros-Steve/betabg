@@ -71,6 +71,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   const [hasMetaConnection, setHasMetaConnection] = useState<boolean | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<SteveAnalysis | null>(null);
+  const [adLibraryPermissionError, setAdLibraryPermissionError] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -150,13 +151,24 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       const results = response.data?.results || [];
       const totalAds = results.reduce((sum: number, r: any) => sum + r.ads_found, 0);
-      const errors = results.filter((r: any) => r.status.startsWith('error') || r.status.startsWith('api_error'));
+      const permissionErrors = results.filter((r: any) => r.status?.startsWith('permission_denied'));
+      const tokenErrors = results.filter((r: any) => r.status?.startsWith('token_expired'));
+      const otherErrors = results.filter((r: any) =>
+        r.status?.startsWith('error') || r.status?.startsWith('api_error') || r.status?.startsWith('upsert_error')
+      );
+      const allErrors = [...permissionErrors, ...tokenErrors, ...otherErrors];
 
-      if (errors.length > 0 && errors.length === results.length) {
+      if (permissionErrors.length > 0) {
+        setAdLibraryPermissionError(true);
+        toast.error('La aplicación no tiene acceso a Meta Ad Library. Contacta al administrador.');
+      } else if (tokenErrors.length > 0) {
+        toast.error('El token de Meta expiró. Reconecta Meta Ads en la pestaña Conexiones.');
+      } else if (allErrors.length > 0 && allErrors.length === results.length) {
         toast.error('No se pudieron sincronizar los competidores. Verifica los handles.');
-      } else if (errors.length > 0) {
-        toast.warning(`${totalAds} anuncios encontrados. ${errors.length} handles con errores.`);
+      } else if (allErrors.length > 0) {
+        toast.warning(`${totalAds} anuncios encontrados. ${allErrors.length} handles con errores.`);
       } else {
+        setAdLibraryPermissionError(false);
         toast.success(`${totalAds} anuncios sincronizados de ${results.length} competidores`);
       }
 
@@ -304,6 +316,32 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             </p>
             <p className="text-xs text-muted-foreground">
               Ve a la pestaña <strong>"Conexiones"</strong> → conecta <strong>Meta Ads</strong> con tu cuenta de Facebook/Instagram.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Ad Library Permission Error */}
+      {adLibraryPermissionError && (
+        <Alert variant="destructive" className="border-orange-500/50 bg-orange-500/5">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Acceso a Meta Ad Library requerido</AlertTitle>
+          <AlertDescription className="mt-2 space-y-2">
+            <p>
+              La aplicación de Meta no tiene permisos para acceder a la <strong>Ad Library API</strong>.
+              Este es un requisito de Meta que debe configurarse a nivel de aplicación.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              El administrador debe registrar la app en{' '}
+              <a
+                href="https://www.facebook.com/ads/library/api/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+              >
+                facebook.com/ads/library/api
+              </a>{' '}
+              y solicitar acceso a la Ad Library API.
             </p>
           </AlertDescription>
         </Alert>
