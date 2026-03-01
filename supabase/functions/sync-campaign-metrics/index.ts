@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { connection_id, platform } = await req.json();
+    const { connection_id, platform, purge_stale } = await req.json();
     
     if (!connection_id || !platform) {
       return new Response(
@@ -259,6 +259,18 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Upserting ${campaignMetrics.length} campaign metric records (all in CLP)`);
+
+    // Purge stale campaign metrics from previous ad account if requested
+    if (purge_stale) {
+      console.log(`Purging stale campaign_metrics for connection ${connection_id}`);
+      const { error: purgeError } = await supabase
+        .from('campaign_metrics')
+        .delete()
+        .eq('connection_id', connection_id);
+      if (purgeError) {
+        console.error('Purge error:', purgeError);
+      }
+    }
 
     if (campaignMetrics.length > 0) {
       // Upsert in batches of 100

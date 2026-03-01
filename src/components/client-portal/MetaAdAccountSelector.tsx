@@ -98,10 +98,14 @@ export function MetaAdAccountSelector({
     setSaving(true);
 
     try {
-      // Update the platform_connections table with the selected account_id
+      // Find the selected account name for store_name
+      const selectedAcc = accounts.find(a => a.account_id === accountId);
+      const storeName = selectedAcc?.name || accountId;
+
+      // Update account_id AND store_name in platform_connections
       const { error: updateError } = await supabase
         .from('platform_connections')
-        .update({ account_id: accountId })
+        .update({ account_id: accountId, store_name: storeName })
         .eq('id', connectionId);
 
       if (updateError) throw updateError;
@@ -109,20 +113,29 @@ export function MetaAdAccountSelector({
       toast.success('Cuenta publicitaria seleccionada');
       onAccountSelected(accountId);
 
-      // Auto-trigger sync after selecting account
-      toast.loading('Sincronizando métricas...', { id: 'meta-sync' });
-      
-      const { error: syncError } = await supabase.functions.invoke('sync-meta-metrics', {
-        body: { connection_id: connectionId }
-      });
+      // Sync metrics + campaigns in parallel, purging stale data from previous account
+      toast.loading('Sincronizando métricas y campañas...', { id: 'meta-sync' });
 
-      if (syncError) {
-        toast.error('Error al sincronizar métricas', { id: 'meta-sync' });
+      const [metricsResult, campaignsResult] = await Promise.allSettled([
+        supabase.functions.invoke('sync-meta-metrics', {
+          body: { connection_id: connectionId, purge_stale: true }
+        }),
+        supabase.functions.invoke('sync-campaign-metrics', {
+          body: { connection_id: connectionId, platform: 'meta', purge_stale: true }
+        }),
+      ]);
+
+      const metricsOk = metricsResult.status === 'fulfilled' && !metricsResult.value.error;
+      const campaignsOk = campaignsResult.status === 'fulfilled' && !campaignsResult.value.error;
+
+      if (metricsOk && campaignsOk) {
+        toast.success('Métricas y campañas sincronizadas', { id: 'meta-sync' });
       } else {
-        toast.success('Métricas sincronizadas correctamente', { id: 'meta-sync' });
-        // Notify other views (e.g., Metrics dashboard) to refresh instantly
-        window.dispatchEvent(new CustomEvent('bg:sync-complete'));
+        toast.warning('Sincronización parcial — revisa la consola', { id: 'meta-sync' });
       }
+
+      // Notify all views to refresh
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (err) {
       console.error('Error saving account:', err);
       toast.error('Error al guardar la cuenta');
