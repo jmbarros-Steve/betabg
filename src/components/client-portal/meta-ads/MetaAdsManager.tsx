@@ -703,12 +703,12 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         .eq('id', metaConnection.id);
       if (updateError) throw updateError;
 
-      // 2. Update local state immediately
+      // 2. Update select value immediately so UI reflects the choice
       setMetaConnection((prev) =>
         prev ? { ...prev, account_id: accountId, store_name: storeName } : null,
       );
 
-      console.log(`[MetaAdsManager] Switched to account: ${storeName} (${accountId})`);
+      console.log(`[MetaAdsManager] Switching to account: ${storeName} (${accountId})`);
       toast.loading('Sincronizando datos de la nueva cuenta...', { id: 'account-switch' });
 
       // 3. Purge old data + sync new data in parallel
@@ -733,7 +733,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         toast.warning('Cuenta cambiada, sincronizacion parcial', { id: 'account-switch' });
       }
 
-      // 4. Tell all child components to refresh
+      // 4. Reset navigation — force all sections to unmount & remount fresh
+      setActiveSection('dashboard');
+      setVisitedSections(new Set(['dashboard']));
+
+      // 5. Tell any external listeners to refresh
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (err) {
       console.error('[MetaAdsManager] Account switch error:', err);
@@ -1000,7 +1004,16 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         )}
 
         {/* Only show sections if we have a connection with an account selected */}
-        {metaConnection?.account_id && NAV_ITEMS.map((item) => renderSection(item.key))}
+        {accountSwitching ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Cambiando cuenta publicitaria...</p>
+          </div>
+        ) : metaConnection?.account_id ? (
+          <div key={`account-${metaConnection.account_id}`}>
+            {NAV_ITEMS.map((item) => renderSection(item.key))}
+          </div>
+        ) : null}
       </main>
     </div>
   );
