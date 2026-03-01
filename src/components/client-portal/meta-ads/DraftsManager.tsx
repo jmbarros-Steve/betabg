@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Video,
 } from 'lucide-react';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,6 +71,8 @@ const STATUS_CONFIG: Record<DraftStatus, { label: string; color: string; icon: R
 // ---------------------------------------------------------------------------
 
 export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<DraftStatus | 'all'>('all');
@@ -122,16 +125,8 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
   const handlePublish = async (draft: DraftItem) => {
     setPublishing(draft.id);
     try {
-      // Get Meta connection
-      const { data: conns } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .limit(1);
-
-      if (!conns || conns.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         toast.error('No hay conexion Meta Ads activa. Conecta Meta desde Conexiones.');
         return;
       }
@@ -141,7 +136,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       const { error } = await supabase.functions.invoke('manage-meta-campaign', {
         body: {
           action: 'create',
-          connection_id: conns[0].id,
+          connection_id: ctxConnectionId,
           data: {
             name,
             objective: 'OUTCOME_SALES',

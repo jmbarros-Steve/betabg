@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Zap,
 } from 'lucide-react';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -283,6 +284,8 @@ function CampaignRow({
 // ---------------------------------------------------------------------------
 
 export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate322 }: CampaignTreeViewProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   const [campaigns, setCampaigns] = useState<CampaignNode[]>([]);
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -294,22 +297,14 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: conns } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .not('account_id', 'is', null)
-        .limit(1);
-
-      if (!conns || conns.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         setCampaigns([]);
         setConnectionIds([]);
         setLoading(false);
         return;
       }
-      const connIds = conns.map((c) => c.id);
+      const connIds = [ctxConnectionId];
       setConnectionIds(connIds);
 
       const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];

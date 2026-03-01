@@ -29,6 +29,7 @@ import {
   Eye,
   Zap,
 } from 'lucide-react';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -383,6 +384,8 @@ function StepBudget({
 // ---------------------------------------------------------------------------
 
 export default function TestingWizard322({ clientId, onBack, onComplete }: TestingWizard322Props) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   const [step, setStep] = useState<WizardStep>('config');
   const [publishing, setPublishing] = useState(false);
 
@@ -508,20 +511,13 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      const { data: conns } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .limit(1);
-
-      if (!conns || conns.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         toast.error('No hay conexion Meta Ads activa');
         return;
       }
 
-      const connectionId = conns[0].id;
+      const connectionId = ctxConnectionId;
       const name = campaignName || `Testing 3:2:2 - ${new Date().toISOString().split('T')[0]}`;
       const cpa = Number(cpaTarget) || 15000;
       const budgetPerAdset = Math.round((cpa * 50) / 7);

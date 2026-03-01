@@ -112,42 +112,31 @@ Deno.serve(async (req) => {
     const finalToken = longLivedData.access_token || accessToken;
     console.log('Long-lived token obtained');
 
-    // Get ad accounts for this user (include account_status to filter)
-    const accountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`;
-    const accountsResponse = await fetch(accountsUrl);
-    const accountsData = await accountsResponse.json();
+    // Fetch businesses and ad accounts to verify access
+    // We do NOT auto-select an account — the user will choose from the portfolio selector
+    const [accountsResponse, businessesResponse] = await Promise.all([
+      fetch(`https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`),
+      fetch(`https://graph.facebook.com/v18.0/me/businesses?access_token=${finalToken}&fields=id,name`),
+    ]);
 
-    if (accountsData.error) {
-      console.error('Error fetching ad accounts:', accountsData.error);
-      return new Response(
-        JSON.stringify({ error: 'Could not fetch ad accounts' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const accountsData = await accountsResponse.json();
+    const businessesData = await businessesResponse.json();
 
     const adAccounts = accountsData.data || [];
-    console.log(`Found ${adAccounts.length} ad accounts:`, adAccounts.map((a: any) => ({ id: a.id, name: a.name, status: a.account_status })));
+    const businesses = businessesData.data || [];
+    console.log(`Found ${adAccounts.length} ad accounts, ${businesses.length} businesses`);
 
-    if (adAccounts.length === 0) {
+    if (adAccounts.length === 0 && businesses.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No ad accounts found for this user' }),
+        JSON.stringify({ error: 'No ad accounts or businesses found for this user' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Prioritize active accounts (account_status: 1 = ACTIVE)
-    // Status 2 = DISABLED, 3 = UNSETTLED, 7 = PENDING_RISK_REVIEW, etc.
-    const activeAccounts = adAccounts.filter((a: any) => a.account_status === 1);
-    const primaryAccount = activeAccounts.length > 0 ? activeAccounts[0] : adAccounts[0];
-
-    if (activeAccounts.length === 0) {
-      console.warn('No active ad accounts found, using first available (status:', primaryAccount.account_status, ')');
-    } else {
-      console.log(`Selected active account: ${primaryAccount.name} (${primaryAccount.id}), ${activeAccounts.length} active of ${adAccounts.length} total`);
-    }
-
-    const accountId = primaryAccount.id.replace('act_', '');
-    const accountName = primaryAccount.name;
+    // NO auto-selection: account_id starts as null
+    // User must select a portfolio/negocio from the Business Manager hierarchy
+    const accountId: string | null = null;
+    const accountName: string | null = businesses.length > 0 ? businesses[0].name : null;
 
     // Encrypt the token
     const { data: encryptedToken, error: encryptError } = await supabase
@@ -164,20 +153,20 @@ Deno.serve(async (req) => {
     // Check if connection already exists
     const { data: existingConnection } = await supabase
       .from('platform_connections')
-      .select('id')
+      .select('id, account_id, store_name')
       .eq('client_id', client_id)
       .eq('platform', 'meta')
       .maybeSingle();
 
     let connectionResult;
     if (existingConnection) {
-      // Update existing connection
+      // Update existing connection — preserve existing account_id if user already selected one
       connectionResult = await supabase
         .from('platform_connections')
         .update({
           access_token_encrypted: encryptedToken,
-          account_id: accountId,
-          store_name: accountName,
+          account_id: existingConnection.account_id || accountId,
+          store_name: existingConnection.store_name || accountName,
           is_active: true,
           updated_at: new Date().toISOString(),
         })
@@ -185,7 +174,7 @@ Deno.serve(async (req) => {
         .select()
         .single();
     } else {
-      // Create new connection
+      // Create new connection — account_id is null until user picks a portfolio
       connectionResult = await supabase
         .from('platform_connections')
         .insert({
@@ -210,7 +199,7 @@ Deno.serve(async (req) => {
 
     console.log('Connection saved successfully');
 
-    // Return all available accounts so the frontend can offer switching
+    // Return all available accounts and businesses so frontend can build hierarchy
     const allAccounts = adAccounts.map((a: any) => ({
       id: a.id.replace('act_', ''),
       name: a.name,
@@ -220,9 +209,12 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        account_name: accountName,
-        account_id: accountId,
+        account_name: connectionResult.data?.store_name || accountName,
+        account_id: connectionResult.data?.account_id || accountId,
+        connection_id: connectionResult.data?.id,
         all_accounts: allAccounts,
+        businesses: businesses.map((b: any) => ({ id: b.id, name: b.name })),
+        needs_portfolio_selection: !connectionResult.data?.account_id,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

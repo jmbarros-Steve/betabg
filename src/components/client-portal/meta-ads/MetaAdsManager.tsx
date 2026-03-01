@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ import logoMeta from '@/assets/logo-meta-clean.png';
 import {
   LayoutDashboard,
   Megaphone,
-  PlusCircle,
   Users,
   FolderOpen,
   BarChart3,
@@ -34,17 +33,16 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  ArrowUpRight,
-  ArrowDownRight,
   Lightbulb,
-  Eye,
-  ShoppingCart,
   ListTree,
   FlaskConical,
   Wand2,
   FileCheck,
   Crosshair,
   Loader2,
+  Building2,
+  Instagram,
+  Facebook,
 } from 'lucide-react';
 
 // Existing components
@@ -66,6 +64,14 @@ import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
 import { MetaScopeStatusPanel } from './MetaScopeAlert';
+
+// Business context
+import MetaBusinessContext, {
+  useMetaBusiness,
+  type PortfolioItem,
+  type BusinessGroup,
+  type MetaBusinessAssets,
+} from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -171,42 +177,25 @@ const formatNumber = (value: number) =>
 const formatPercent = (value: number) => `${value.toFixed(2)}%`;
 
 // ---------------------------------------------------------------------------
-// Dashboard Section (fully functional)
+// Dashboard Section — uses MetaBusinessContext
 // ---------------------------------------------------------------------------
 
 function DashboardSection({ clientId }: { clientId: string }) {
+  const { connectionId } = useMetaBusiness();
   const [metrics, setMetrics] = useState<CampaignMetricRow[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [connectionIds, setConnectionIds] = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
+    if (!connectionId) {
+      setMetrics([]);
+      setRecommendations([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      // 1. Get the active Meta connection with a selected ad account
-      const { data: connections, error: connError } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .not('account_id', 'is', null)
-        .limit(1);
-
-      if (connError) throw connError;
-      if (!connections || connections.length === 0) {
-        setMetrics([]);
-        setRecommendations([]);
-        setConnectionIds([]);
-        setLoading(false);
-        return;
-      }
-
-      const connIds = connections.map((c) => c.id);
-      setConnectionIds(connIds);
-
-      // 2. Fetch last 30 days of campaign_metrics + recommendations in parallel
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split('T')[0];
@@ -215,13 +204,13 @@ function DashboardSection({ clientId }: { clientId: string }) {
         supabase
           .from('campaign_metrics')
           .select('*')
-          .in('connection_id', connIds)
+          .eq('connection_id', connectionId)
           .gte('metric_date', thirtyDaysAgo)
           .order('metric_date', { ascending: false }),
         supabase
           .from('campaign_recommendations')
           .select('*')
-          .in('connection_id', connIds)
+          .eq('connection_id', connectionId)
           .eq('is_dismissed', false)
           .order('created_at', { ascending: false })
           .limit(10),
@@ -238,7 +227,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [connectionId]);
 
   useEffect(() => {
     fetchData();
@@ -279,7 +268,6 @@ function DashboardSection({ clientId }: { clientId: string }) {
     return Array.from(map.values()).sort((a, b) => b.total_spend - a.total_spend);
   }, [metrics]);
 
-  // Totals
   const totals = useMemo(() => {
     return aggregated.reduce(
       (acc, c) => ({
@@ -299,22 +287,18 @@ function DashboardSection({ clientId }: { clientId: string }) {
   const overallCtr =
     totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
 
-  // Top 5 campaigns by spend
   const topCampaigns = aggregated.slice(0, 5);
 
-  // Sync handler
   async function handleSync() {
-    if (connectionIds.length === 0) return;
+    if (!connectionId) return;
     setSyncing(true);
     try {
-      for (const connId of connectionIds) {
-        const { error } = await supabase.functions.invoke('sync-campaign-metrics', {
-          body: { connection_id: connId, platform: 'meta' },
-        });
-        if (error) {
-          console.error('Sync error:', error);
-          toast.error('Error sincronizando Meta Ads');
-        }
+      const { error } = await supabase.functions.invoke('sync-campaign-metrics', {
+        body: { connection_id: connectionId, platform: 'meta' },
+      });
+      if (error) {
+        console.error('Sync error:', error);
+        toast.error('Error sincronizando Meta Ads');
       }
       toast.success('Datos sincronizados');
       await fetchData();
@@ -326,7 +310,6 @@ function DashboardSection({ clientId }: { clientId: string }) {
     }
   }
 
-  // Priority config for recommendation badges
   const priorityBadge = (priority: string | null) => {
     switch (priority) {
       case 'critical':
@@ -340,7 +323,6 @@ function DashboardSection({ clientId }: { clientId: string }) {
     }
   };
 
-  // Loading skeleton
   if (loading) {
     return (
       <div className="space-y-6">
@@ -357,8 +339,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
     );
   }
 
-  // Empty state
-  if (connectionIds.length === 0) {
+  if (!connectionId) {
     return (
       <Card className="border-dashed">
         <CardContent className="py-16 text-center">
@@ -375,7 +356,6 @@ function DashboardSection({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Meta Ads Dashboard</h2>
@@ -392,21 +372,14 @@ function DashboardSection({ clientId }: { clientId: string }) {
         </Button>
       </div>
 
-      {/* Scope status */}
       <MetaScopeStatusPanel clientId={clientId} />
 
-      {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Spend */}
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Gasto Total
-              </span>
-              <div className="p-1.5 rounded-md bg-red-500/10">
-                <DollarSign className="w-4 h-4 text-red-500" />
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gasto Total</span>
+              <div className="p-1.5 rounded-md bg-red-500/10"><DollarSign className="w-4 h-4 text-red-500" /></div>
             </div>
             <p className="text-2xl font-bold">{formatCurrency(totals.spend)}</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -416,49 +389,27 @@ function DashboardSection({ clientId }: { clientId: string }) {
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/40 to-red-500/10" />
         </Card>
 
-        {/* ROAS */}
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                ROAS
-              </span>
-              <div className="p-1.5 rounded-md bg-green-500/10">
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">ROAS</span>
+              <div className="p-1.5 rounded-md bg-green-500/10"><TrendingUp className="w-4 h-4 text-green-500" /></div>
             </div>
-            <p
-              className={`text-2xl font-bold ${
-                overallRoas >= 3
-                  ? 'text-green-600'
-                  : overallRoas >= 2
-                    ? 'text-yellow-600'
-                    : 'text-red-500'
-              }`}
-            >
+            <p className={`text-2xl font-bold ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
               {overallRoas.toFixed(2)}x
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Revenue: {formatCurrency(totals.revenue)}
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Revenue: {formatCurrency(totals.revenue)}</p>
           </CardContent>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500/40 to-green-500/10" />
         </Card>
 
-        {/* CPA */}
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                CPA
-              </span>
-              <div className="p-1.5 rounded-md bg-blue-500/10">
-                <Target className="w-4 h-4 text-blue-500" />
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPA</span>
+              <div className="p-1.5 rounded-md bg-blue-500/10"><Target className="w-4 h-4 text-blue-500" /></div>
             </div>
-            <p className="text-2xl font-bold">
-              {totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}
-            </p>
+            <p className="text-2xl font-bold">{totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {formatNumber(totals.conversions)} conversion{totals.conversions !== 1 ? 'es' : ''}
             </p>
@@ -466,16 +417,11 @@ function DashboardSection({ clientId }: { clientId: string }) {
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
         </Card>
 
-        {/* CTR */}
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                CTR
-              </span>
-              <div className="p-1.5 rounded-md bg-purple-500/10">
-                <MousePointerClick className="w-4 h-4 text-purple-500" />
-              </div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CTR</span>
+              <div className="p-1.5 rounded-md bg-purple-500/10"><MousePointerClick className="w-4 h-4 text-purple-500" /></div>
             </div>
             <p className="text-2xl font-bold">{formatPercent(overallCtr)}</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -486,15 +432,11 @@ function DashboardSection({ clientId }: { clientId: string }) {
         </Card>
       </div>
 
-      {/* Bottom row: Top campaigns + AI Recommendations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Top campaigns table */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Top Campanas por Gasto</CardTitle>
-            <CardDescription className="text-xs">
-              Las 5 campanas con mayor inversion en los ultimos 30 dias
-            </CardDescription>
+            <CardDescription className="text-xs">Las 5 campanas con mayor inversion en los ultimos 30 dias</CardDescription>
           </CardHeader>
           <CardContent>
             {topCampaigns.length === 0 ? (
@@ -506,56 +448,27 @@ function DashboardSection({ clientId }: { clientId: string }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/50">
-                      <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Campana
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Gasto
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        ROAS
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Conv.
-                      </th>
-                      <th className="text-right py-2 pl-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        CTR
-                      </th>
+                      <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Campana</th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Gasto</th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">ROAS</th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Conv.</th>
+                      <th className="text-right py-2 pl-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">CTR</th>
                     </tr>
                   </thead>
                   <tbody>
                     {topCampaigns.map((c) => (
-                      <tr
-                        key={c.campaign_id}
-                        className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors"
-                      >
+                      <tr key={c.campaign_id} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
                         <td className="py-2.5 pr-4">
-                          <span className="font-medium text-sm truncate block max-w-[260px]">
-                            {c.campaign_name}
-                          </span>
+                          <span className="font-medium text-sm truncate block max-w-[260px]">{c.campaign_name}</span>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-medium">
-                          {formatCurrency(c.total_spend)}
-                        </td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(c.total_spend)}</td>
                         <td className="py-2.5 px-3 text-right">
-                          <span
-                            className={`font-medium ${
-                              c.avg_roas >= 3
-                                ? 'text-green-600'
-                                : c.avg_roas >= 2
-                                  ? 'text-yellow-600'
-                                  : 'text-red-500'
-                            }`}
-                          >
+                          <span className={`font-medium ${c.avg_roas >= 3 ? 'text-green-600' : c.avg_roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
                             {c.avg_roas.toFixed(2)}x
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          {formatNumber(c.total_conversions)}
-                        </td>
-                        <td className="py-2.5 pl-3 text-right">
-                          {formatPercent(c.avg_ctr)}
-                        </td>
+                        <td className="py-2.5 px-3 text-right">{formatNumber(c.total_conversions)}</td>
+                        <td className="py-2.5 pl-3 text-right">{formatPercent(c.avg_ctr)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -565,43 +478,29 @@ function DashboardSection({ clientId }: { clientId: string }) {
           </CardContent>
         </Card>
 
-        {/* AI Recommendations */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
               <CardTitle className="text-base">Recomendaciones IA</CardTitle>
             </div>
-            <CardDescription className="text-xs">
-              Sugerencias basadas en el rendimiento de tus campanas
-            </CardDescription>
+            <CardDescription className="text-xs">Sugerencias basadas en el rendimiento de tus campanas</CardDescription>
           </CardHeader>
           <CardContent>
             {recommendations.length === 0 ? (
               <div className="text-center py-6">
                 <Lightbulb className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                <p className="text-muted-foreground text-xs">
-                  Sin recomendaciones pendientes.
-                </p>
-                <p className="text-muted-foreground text-xs mt-1">
-                  Genera analisis desde la seccion de Analytics.
-                </p>
+                <p className="text-muted-foreground text-xs">Sin recomendaciones pendientes.</p>
+                <p className="text-muted-foreground text-xs mt-1">Genera analisis desde la seccion de Analytics.</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {recommendations.slice(0, 5).map((rec) => (
-                  <div
-                    key={rec.id}
-                    className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/40 border border-border/50"
-                  >
+                  <div key={rec.id} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/40 border border-border/50">
                     <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        {priorityBadge(rec.priority)}
-                      </div>
-                      <p className="text-xs text-foreground leading-relaxed line-clamp-3">
-                        {rec.recommendation_text}
-                      </p>
+                      <div className="flex items-center gap-1.5 mb-1">{priorityBadge(rec.priority)}</div>
+                      <p className="text-xs text-foreground leading-relaxed line-clamp-3">{rec.recommendation_text}</p>
                     </div>
                   </div>
                 ))}
@@ -615,10 +514,6 @@ function DashboardSection({ clientId }: { clientId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Competitors — delegates to the real CompetitorAdsPanel (Meta Ad Library)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Main MetaAdsManager component
 // ---------------------------------------------------------------------------
 
@@ -628,13 +523,6 @@ interface MetaConnectionInfo {
   store_name: string | null;
 }
 
-interface AdAccountOption {
-  account_id: string;
-  name: string;
-  currency: string;
-  business_name: string;
-}
-
 export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   const [activeSection, setActiveSection] = useState<SectionKey>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -642,16 +530,35 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
     () => new Set(['dashboard']),
   );
 
-  // --- Account context ---
+  // --- Connection & hierarchy state ---
   const [metaConnection, setMetaConnection] = useState<MetaConnectionInfo | null>(null);
-  const [availableAccounts, setAvailableAccounts] = useState<AdAccountOption[]>([]);
-  const [accountLoading, setAccountLoading] = useState(true);
-  const [accountSwitching, setAccountSwitching] = useState(false);
+  const [hierarchyLoading, setHierarchyLoading] = useState(true);
+  const [portfolioSwitching, setPortfolioSwitching] = useState(false);
   const [noConnection, setNoConnection] = useState(false);
 
-  const fetchAccountContext = useCallback(async () => {
-    setAccountLoading(true);
+  // Business hierarchy
+  const [businessGroups, setBusinessGroups] = useState<BusinessGroup[]>([]);
+  const [allPortfolios, setAllPortfolios] = useState<PortfolioItem[]>([]);
+
+  // Currently selected portfolio
+  const [selectedAssets, setSelectedAssets] = useState<MetaBusinessAssets>({
+    connectionId: '',
+    businessId: null,
+    businessName: null,
+    adAccountId: null,
+    adAccountName: null,
+    pageId: null,
+    pageName: null,
+    igAccountId: null,
+    igAccountName: null,
+    pixelId: null,
+  });
+
+  // --- Fetch connection + hierarchy ---
+  const fetchHierarchy = useCallback(async () => {
+    setHierarchyLoading(true);
     try {
+      // 1. Get the Meta connection
       const { data: conn } = await supabase
         .from('platform_connections')
         .select('id, account_id, store_name')
@@ -664,54 +571,170 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       if (!conn) {
         setNoConnection(true);
         setMetaConnection(null);
-        setAccountLoading(false);
+        setHierarchyLoading(false);
         return;
       }
 
       setNoConnection(false);
       setMetaConnection(conn);
 
-      // Fetch available ad accounts from Meta API
-      const { data } = await supabase.functions.invoke('fetch-meta-ad-accounts', {
+      // 2. Fetch business hierarchy from edge function
+      const { data, error } = await supabase.functions.invoke('fetch-meta-business-hierarchy', {
         body: { connection_id: conn.id },
       });
-      if (data?.accounts) {
-        setAvailableAccounts(data.accounts);
+
+      if (error) {
+        console.error('[MetaAdsManager] Hierarchy fetch error:', error);
+        // Fallback: try old fetch-meta-ad-accounts
+        const { data: fallbackData } = await supabase.functions.invoke('fetch-meta-ad-accounts', {
+          body: { connection_id: conn.id },
+        });
+        if (fallbackData?.accounts) {
+          const fallbackPortfolios: PortfolioItem[] = fallbackData.accounts.map((acc: any) => ({
+            name: acc.name,
+            businessId: acc.business_id || 'personal',
+            businessName: acc.business_name || 'Cuenta Personal',
+            adAccountId: acc.account_id,
+            adAccountName: acc.name,
+            currency: acc.currency,
+            timezone: acc.timezone,
+            pageId: null,
+            pageName: null,
+            igAccountId: null,
+            igAccountName: null,
+            pixelId: null,
+          }));
+
+          // Group by business
+          const groupMap = new Map<string, BusinessGroup>();
+          for (const p of fallbackPortfolios) {
+            const existing = groupMap.get(p.businessId) || {
+              businessId: p.businessId,
+              businessName: p.businessName,
+              portfolios: [],
+            };
+            existing.portfolios.push(p);
+            groupMap.set(p.businessId, existing);
+          }
+          setBusinessGroups(Array.from(groupMap.values()));
+          setAllPortfolios(fallbackPortfolios);
+
+          // If user already has an account selected, find and set the matching portfolio
+          if (conn.account_id) {
+            const match = fallbackPortfolios.find(p => p.adAccountId === conn.account_id);
+            if (match) {
+              setSelectedAssets({
+                connectionId: conn.id,
+                businessId: match.businessId,
+                businessName: match.businessName,
+                adAccountId: match.adAccountId,
+                adAccountName: match.adAccountName,
+                pageId: match.pageId,
+                pageName: match.pageName,
+                igAccountId: match.igAccountId,
+                igAccountName: match.igAccountName,
+                pixelId: match.pixelId,
+              });
+            }
+          }
+        }
+        setHierarchyLoading(false);
+        return;
+      }
+
+      if (data?.groups) {
+        const groups: BusinessGroup[] = (data.groups || []).map((g: any) => ({
+          businessId: g.business_id,
+          businessName: g.business_name,
+          portfolios: (g.portfolios || []).map((p: any) => ({
+            name: p.name,
+            businessId: p.business_id,
+            businessName: p.business_name,
+            adAccountId: p.ad_account_id,
+            adAccountName: p.ad_account_name,
+            currency: p.currency,
+            timezone: p.timezone,
+            pageId: p.page_id,
+            pageName: p.page_name,
+            igAccountId: p.ig_account_id,
+            igAccountName: p.ig_account_name,
+            pixelId: p.pixel_id,
+          })),
+        }));
+
+        const portfolios = groups.flatMap(g => g.portfolios);
+        setBusinessGroups(groups);
+        setAllPortfolios(portfolios);
+
+        // If user already has an account selected, restore that portfolio
+        if (conn.account_id) {
+          const match = portfolios.find(p => p.adAccountId === conn.account_id);
+          if (match) {
+            setSelectedAssets({
+              connectionId: conn.id,
+              businessId: match.businessId,
+              businessName: match.businessName,
+              adAccountId: match.adAccountId,
+              adAccountName: match.adAccountName,
+              pageId: match.pageId,
+              pageName: match.pageName,
+              igAccountId: match.igAccountId,
+              igAccountName: match.igAccountName,
+              pixelId: match.pixelId,
+            });
+          }
+        }
       }
     } catch (err) {
-      console.error('[MetaAdsManager] Account context error:', err);
+      console.error('[MetaAdsManager] Hierarchy error:', err);
     } finally {
-      setAccountLoading(false);
+      setHierarchyLoading(false);
     }
   }, [clientId]);
 
   useEffect(() => {
-    fetchAccountContext();
-  }, [fetchAccountContext]);
+    fetchHierarchy();
+  }, [fetchHierarchy]);
 
-  const handleAccountChange = useCallback(async (accountId: string) => {
-    if (!metaConnection || accountId === metaConnection.account_id) return;
-    setAccountSwitching(true);
+  // --- Select a portfolio ---
+  const selectPortfolio = useCallback(async (portfolio: PortfolioItem) => {
+    if (!metaConnection) return;
+    if (portfolio.adAccountId === selectedAssets.adAccountId) return;
+
+    setPortfolioSwitching(true);
     try {
-      const account = availableAccounts.find((a) => a.account_id === accountId);
-      const storeName = account?.name || accountId;
-
-      // 1. Update connection in DB
+      // 1. Update connection in DB with the new ad account
       const { error: updateError } = await supabase
         .from('platform_connections')
-        .update({ account_id: accountId, store_name: storeName })
+        .update({
+          account_id: portfolio.adAccountId,
+          store_name: portfolio.name,
+        })
         .eq('id', metaConnection.id);
       if (updateError) throw updateError;
 
-      // 2. Update select value immediately so UI reflects the choice
-      setMetaConnection((prev) =>
-        prev ? { ...prev, account_id: accountId, store_name: storeName } : null,
+      // 2. Update local state
+      setMetaConnection(prev =>
+        prev ? { ...prev, account_id: portfolio.adAccountId, store_name: portfolio.name } : null,
       );
 
-      console.log(`[MetaAdsManager] Switching to account: ${storeName} (${accountId})`);
-      toast.loading('Sincronizando datos de la nueva cuenta...', { id: 'account-switch' });
+      setSelectedAssets({
+        connectionId: metaConnection.id,
+        businessId: portfolio.businessId,
+        businessName: portfolio.businessName,
+        adAccountId: portfolio.adAccountId,
+        adAccountName: portfolio.adAccountName,
+        pageId: portfolio.pageId,
+        pageName: portfolio.pageName,
+        igAccountId: portfolio.igAccountId,
+        igAccountName: portfolio.igAccountName,
+        pixelId: portfolio.pixelId,
+      });
 
-      // 3. Purge old data + sync new data in parallel
+      console.log(`[MetaAdsManager] Portfolio selected: ${portfolio.name}`);
+      toast.loading('Sincronizando datos del negocio...', { id: 'portfolio-switch' });
+
+      // 3. Sync data for the new account
       const [metricsRes, campaignsRes] = await Promise.allSettled([
         supabase.functions.invoke('sync-meta-metrics', {
           body: { connection_id: metaConnection.id, purge_stale: true },
@@ -728,26 +751,32 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         !campaignsRes.value.error;
 
       if (ok) {
-        toast.success(`Cuenta cambiada: ${storeName}`, { id: 'account-switch' });
+        toast.success(`Negocio seleccionado: ${portfolio.name}`, { id: 'portfolio-switch' });
       } else {
-        toast.warning('Cuenta cambiada, sincronizacion parcial', { id: 'account-switch' });
+        toast.warning('Negocio seleccionado, sincronizacion parcial', { id: 'portfolio-switch' });
       }
 
-      // 4. Reset navigation — force all sections to unmount & remount fresh
+      // 4. Reset navigation
       setActiveSection('dashboard');
       setVisitedSections(new Set(['dashboard']));
 
-      // 5. Tell any external listeners to refresh
+      // 5. Notify listeners
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (err) {
-      console.error('[MetaAdsManager] Account switch error:', err);
-      toast.error('Error al cambiar cuenta', { id: 'account-switch' });
+      console.error('[MetaAdsManager] Portfolio switch error:', err);
+      toast.error('Error al seleccionar negocio', { id: 'portfolio-switch' });
     } finally {
-      setAccountSwitching(false);
+      setPortfolioSwitching(false);
     }
-  }, [metaConnection, availableAccounts]);
+  }, [metaConnection, selectedAssets.adAccountId]);
 
-  // Track which sections have been visited for lazy mounting
+  // --- Handle select dropdown change ---
+  const handlePortfolioSelect = useCallback((adAccountId: string) => {
+    const portfolio = allPortfolios.find(p => p.adAccountId === adAccountId);
+    if (portfolio) selectPortfolio(portfolio);
+  }, [allPortfolios, selectPortfolio]);
+
+  // --- Navigation ---
   const markVisited = useCallback(
     (key: SectionKey) => {
       setVisitedSections((prev) => {
@@ -768,7 +797,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
     [markVisited],
   );
 
-  // Responsive: collapse sidebar on small screens by default
+  // Responsive sidebar
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
     const handler = (e: MediaQueryListEvent | MediaQueryList) => {
@@ -779,10 +808,19 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // Render a section only once it has been visited; keep it alive afterwards.
+  // --- Context value ---
+  const contextValue = useMemo(() => ({
+    ...selectedAssets,
+    loading: hierarchyLoading,
+    switching: portfolioSwitching,
+    businessGroups,
+    allPortfolios,
+    selectPortfolio,
+  }), [selectedAssets, hierarchyLoading, portfolioSwitching, businessGroups, allPortfolios, selectPortfolio]);
+
+  // Render section (lazy mount pattern)
   const renderSection = (key: SectionKey) => {
     if (!visitedSections.has(key)) return null;
-
     const isActive = activeSection === key;
 
     return (
@@ -835,186 +873,219 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   };
 
   return (
-    <div className="flex h-full min-h-[600px]">
-      {/* ----------------------------------------------------------------- */}
-      {/* Sidebar */}
-      {/* ----------------------------------------------------------------- */}
-      <aside
-        className={`
-          flex flex-col shrink-0 border-r border-border
-          bg-muted/30 transition-all duration-200 ease-in-out
-          ${sidebarCollapsed ? 'w-[56px]' : 'w-[200px]'}
-        `}
-      >
-        {/* Collapse toggle */}
-        <div className="flex items-center justify-end p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setSidebarCollapsed((prev) => !prev)}
-            aria-label={sidebarCollapsed ? 'Expandir menu' : 'Colapsar menu'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <ChevronLeft className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
+    <MetaBusinessContext.Provider value={contextValue}>
+      <div className="flex h-full min-h-[600px]">
+        {/* Sidebar */}
+        <aside
+          className={`
+            flex flex-col shrink-0 border-r border-border
+            bg-muted/30 transition-all duration-200 ease-in-out
+            ${sidebarCollapsed ? 'w-[56px]' : 'w-[200px]'}
+          `}
+        >
+          <div className="flex items-center justify-end p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setSidebarCollapsed((prev) => !prev)}
+              aria-label={sidebarCollapsed ? 'Expandir menu' : 'Colapsar menu'}
+            >
+              {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </Button>
+          </div>
 
-        {/* Navigation items */}
-        <nav className="flex-1 flex flex-col gap-0.5 px-2 pb-4" role="tablist">
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeSection === item.key;
-            const Icon = item.icon;
+          <nav className="flex-1 flex flex-col gap-0.5 px-2 pb-4" role="tablist">
+            {NAV_ITEMS.map((item) => {
+              const isActive = activeSection === item.key;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => handleNavClick(item.key)}
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={`
+                    group flex items-center gap-2.5 rounded-md px-2.5 py-2
+                    text-sm font-medium transition-colors duration-150
+                    outline-none focus-visible:ring-2 focus-visible:ring-ring
+                    ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                    ${sidebarCollapsed ? 'justify-center' : ''}
+                  `}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
 
-            return (
-              <button
-                key={item.key}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => handleNavClick(item.key)}
-                title={sidebarCollapsed ? item.label : undefined}
-                className={`
-                  group flex items-center gap-2.5 rounded-md px-2.5 py-2
-                  text-sm font-medium transition-colors duration-150
-                  outline-none focus-visible:ring-2 focus-visible:ring-ring
-                  ${
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }
-                  ${sidebarCollapsed ? 'justify-center' : ''}
-                `}
-              >
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
-                  }`}
-                />
-                {!sidebarCollapsed && (
-                  <span className="truncate">{item.label}</span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Bottom branding */}
-        {!sidebarCollapsed && (
-          <div className="px-3 pb-3">
-            <div className="text-[10px] text-muted-foreground/50 text-center">
-              Meta Ads Manager
+          {!sidebarCollapsed && (
+            <div className="px-3 pb-3">
+              <div className="text-[10px] text-muted-foreground/50 text-center">Meta Ads Manager</div>
             </div>
-          </div>
-        )}
-      </aside>
+          )}
+        </aside>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* Main content area */}
-      {/* ----------------------------------------------------------------- */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-        {/* Account Context Bar */}
-        {accountLoading ? (
-          <div className="mb-4">
-            <Skeleton className="h-16 rounded-lg" />
-          </div>
-        ) : noConnection ? (
-          <Card className="mb-4 border-dashed">
-            <CardContent className="py-10 text-center">
-              <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
-              <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                Conecta tu cuenta de Meta Ads desde la pestana de <strong>Conexiones</strong>.
-              </p>
-            </CardContent>
-          </Card>
-        ) : !metaConnection?.account_id ? (
-          <Card className="mb-4 border-amber-500/30 bg-amber-500/5">
-            <CardContent className="py-6">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-6 h-6 text-amber-500 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-amber-700">
-                    Selecciona una cuenta publicitaria
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Portfolio Context Bar */}
+          {hierarchyLoading ? (
+            <div className="mb-4">
+              <Skeleton className="h-20 rounded-lg" />
+            </div>
+          ) : noConnection ? (
+            <Card className="mb-4 border-dashed">
+              <CardContent className="py-10 text-center">
+                <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
+                <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                  Conecta tu cuenta de Meta Ads desde la pestana de <strong>Conexiones</strong>.
+                </p>
+              </CardContent>
+            </Card>
+          ) : !selectedAssets.adAccountId ? (
+            /* Portfolio selection required */
+            <Card className="mb-4 border-amber-500/30 bg-amber-500/5">
+              <CardContent className="py-6">
+                <div className="flex items-start gap-3">
+                  <Building2 className="w-6 h-6 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-700">
+                      Selecciona un negocio / portfolio
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 mb-3">
+                      Tu Business Manager tiene {allPortfolios.length} negocio{allPortfolios.length !== 1 ? 's' : ''} disponible{allPortfolios.length !== 1 ? 's' : ''}. Selecciona uno para ver sus metricas, campanas y anuncios.
+                    </p>
+                    {allPortfolios.length > 0 && (
+                      <Select onValueChange={handlePortfolioSelect} disabled={portfolioSwitching}>
+                        <SelectTrigger className="w-full max-w-lg bg-background">
+                          <SelectValue placeholder="Selecciona un negocio..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50 max-h-96">
+                          {businessGroups.map((group) => (
+                            <SelectGroup key={group.businessId}>
+                              <SelectLabel className="flex items-center gap-2 text-xs">
+                                <Building2 className="w-3 h-3" />
+                                {group.businessName}
+                              </SelectLabel>
+                              {group.portfolios.map((p) => (
+                                <SelectItem key={p.adAccountId} value={p.adAccountId}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{p.name}</span>
+                                    <span className="text-muted-foreground text-xs flex items-center gap-2">
+                                      <span>Ad: {p.adAccountId}</span>
+                                      {p.pageName && (
+                                        <span className="flex items-center gap-0.5">
+                                          <Facebook className="w-3 h-3" /> {p.pageName}
+                                        </span>
+                                      )}
+                                      {p.igAccountName && (
+                                        <span className="flex items-center gap-0.5">
+                                          <Instagram className="w-3 h-3" /> @{p.igAccountName}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {allPortfolios.length === 0 && (
+                      <p className="text-xs text-red-500">
+                        No se encontraron negocios activos. Verifica los permisos de tu Business Manager.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Active portfolio bar */
+            <div className="mb-4 p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <img src={logoMeta} alt="Meta" className="h-8 w-8 object-contain" />
+                <div>
+                  <p className="text-sm font-semibold">
+                    {selectedAssets.adAccountName || 'Cuenta Meta'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 mb-3">
-                    Debes elegir una cuenta publicitaria de Meta para ver metricas, campanas y anuncios.
-                  </p>
-                  {availableAccounts.length > 0 && (
-                    <Select onValueChange={handleAccountChange} disabled={accountSwitching}>
-                      <SelectTrigger className="w-full max-w-md bg-background">
-                        <SelectValue placeholder="Selecciona una cuenta publicitaria..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover z-50 max-h-80">
-                        {availableAccounts.map((acc) => (
-                          <SelectItem key={acc.account_id} value={acc.account_id}>
-                            <span className="font-medium">{acc.name}</span>
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              ({acc.account_id}) - {acc.currency}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {selectedAssets.businessName && (
+                      <span className="flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />
+                        {selectedAssets.businessName}
+                      </span>
+                    )}
+                    <span className="font-mono">ID: {selectedAssets.adAccountId}</span>
+                    {selectedAssets.pageName && (
+                      <span className="flex items-center gap-0.5">
+                        <Facebook className="w-3 h-3" /> {selectedAssets.pageName}
+                      </span>
+                    )}
+                    {selectedAssets.igAccountName && (
+                      <span className="flex items-center gap-0.5">
+                        <Instagram className="w-3 h-3" /> @{selectedAssets.igAccountName}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="mb-4 p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <img src={logoMeta} alt="Meta" className="h-8 w-8 object-contain" />
-              <div>
-                <p className="text-sm font-semibold">
-                  {metaConnection.store_name || 'Cuenta Meta'}
-                </p>
-                <p className="text-xs text-muted-foreground font-mono">
-                  ID: {metaConnection.account_id}
-                </p>
+              <div className="flex items-center gap-2">
+                {portfolioSwitching && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                )}
+                <Select
+                  value={selectedAssets.adAccountId || undefined}
+                  onValueChange={handlePortfolioSelect}
+                  disabled={portfolioSwitching}
+                >
+                  <SelectTrigger className="w-[300px] bg-background text-xs h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50 max-h-96">
+                    {businessGroups.map((group) => (
+                      <SelectGroup key={group.businessId}>
+                        <SelectLabel className="flex items-center gap-2 text-xs">
+                          <Building2 className="w-3 h-3" />
+                          {group.businessName}
+                        </SelectLabel>
+                        {group.portfolios.map((p) => (
+                          <SelectItem key={p.adAccountId} value={p.adAccountId}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{p.name}</span>
+                              {p.pageName && (
+                                <span className="text-muted-foreground text-xs flex items-center gap-0.5">
+                                  <Facebook className="w-3 h-3" /> {p.pageName}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {accountSwitching && (
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              )}
-              <Select
-                value={metaConnection.account_id}
-                onValueChange={handleAccountChange}
-                disabled={accountSwitching}
-              >
-                <SelectTrigger className="w-[280px] bg-background text-xs h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover z-50 max-h-80">
-                  {availableAccounts.map((acc) => (
-                    <SelectItem key={acc.account_id} value={acc.account_id}>
-                      <span className="font-medium">{acc.name}</span>
-                      <span className="text-muted-foreground ml-1 text-xs">
-                        ({acc.account_id})
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Only show sections if we have a connection with an account selected */}
-        {accountSwitching ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Cambiando cuenta publicitaria...</p>
-          </div>
-        ) : metaConnection?.account_id ? (
-          <div key={`account-${metaConnection.account_id}`}>
-            {NAV_ITEMS.map((item) => renderSection(item.key))}
-          </div>
-        ) : null}
-      </main>
-    </div>
+          {/* Sections */}
+          {portfolioSwitching ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Cambiando negocio...</p>
+            </div>
+          ) : selectedAssets.adAccountId ? (
+            <div key={`portfolio-${selectedAssets.adAccountId}`}>
+              {NAV_ITEMS.map((item) => renderSection(item.key))}
+            </div>
+          ) : null}
+        </main>
+      </div>
+    </MetaBusinessContext.Provider>
   );
 }

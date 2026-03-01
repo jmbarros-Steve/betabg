@@ -38,6 +38,7 @@ import {
   Megaphone,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,6 +121,8 @@ function getInitials(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   // Connection state
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [noConnection, setNoConnection] = useState(false);
@@ -151,48 +154,36 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
     async function init() {
       setLoadingPages(true);
       try {
-        const { data: conn } = await supabase
-          .from('platform_connections')
-          .select('id')
-          .eq('client_id', clientId)
-          .eq('platform', 'meta')
-          .eq('is_active', true)
-          .limit(1)
-          .maybeSingle();
-
-        if (!conn) {
+        // Use connectionId from MetaBusinessContext
+        if (!ctxConnectionId) {
           setNoConnection(true);
-          setLoadingPages(false);
           return;
         }
 
-        setConnectionId(conn.id);
+        setConnectionId(ctxConnectionId);
         setNoConnection(false);
 
         // Fetch pages
         const { data, error } = await supabase.functions.invoke('meta-social-inbox', {
-          body: { action: 'list_pages', connection_id: conn.id },
+          body: { connection_id: ctxConnectionId, action: 'list_pages' },
         });
 
-        if (error || !data?.success) {
-          console.error('[SocialInbox] list_pages error:', error, data);
-          setPages([]);
-        } else {
-          const pageList = data.pages || [];
-          setPages(pageList);
-          if (pageList.length > 0) {
-            setSelectedPageId(pageList[0].id);
+        if (error) throw error;
+        if (data?.pages) {
+          setPages(data.pages);
+          if (data.pages.length > 0) {
+            setSelectedPageId(data.pages[0].id);
           }
         }
       } catch (err) {
-        console.error('[SocialInbox] Init error:', err);
+        console.error('[MetaSocialInbox] Init error:', err);
+        toast.error('Error cargando Social Inbox');
       } finally {
         setLoadingPages(false);
       }
     }
-
     init();
-  }, [clientId]);
+  }, [clientId, ctxConnectionId])
 
   // ─── Fetch conversations when page changes ────────────────────────────────
 

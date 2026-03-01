@@ -45,6 +45,7 @@ import {
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -289,6 +290,8 @@ function BudgetAllocationChart({
 // ---------------------------------------------------------------------------
 
 export default function MetaCampaignManager({ clientId }: MetaCampaignManagerProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   // ----- State -----
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
@@ -327,26 +330,14 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch the active Meta connection with a selected ad account
-      const { data: connections, error: connErr } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .not('account_id', 'is', null)
-        .limit(1);
-
-      if (connErr) throw connErr;
-
-      if (!connections || connections.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         setCampaigns([]);
         setConnectionIds([]);
         setLoading(false);
         return;
       }
-
-      const connIds = connections.map((c) => c.id);
+      const connIds = [ctxConnectionId];
       setConnectionIds(connIds);
 
       // 2. Fetch last 30 days of campaign_metrics

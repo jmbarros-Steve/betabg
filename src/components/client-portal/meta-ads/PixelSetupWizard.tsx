@@ -21,6 +21,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +73,8 @@ const PRIORITY_BADGE: Record<string, { label: string; color: string }> = {
 // ---------------------------------------------------------------------------
 
 export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   const [loading, setLoading] = useState(true);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [pixels, setPixels] = useState<PixelInfo[]>([]);
@@ -86,21 +89,13 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
     setLoading(true);
     setDetecting(true);
     try {
-      // Get Meta connection
-      const { data: conns } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .limit(1);
-
-      if (!conns || conns.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         setNoConnection(true);
         return;
       }
 
-      setConnectionId(conns[0].id);
+      setConnectionId(ctxConnectionId);
       setNoConnection(false);
 
       // Call edge function to list pixels

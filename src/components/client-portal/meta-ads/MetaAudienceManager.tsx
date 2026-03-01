@@ -45,6 +45,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -958,6 +959,8 @@ function CreateLookalikeDialog({
 // ---------------------------------------------------------------------------
 
 export default function MetaAudienceManager({ clientId }: MetaAudienceManagerProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   // State
   const [audiences, setAudiences] = useState<AudienceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1089,32 +1092,31 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Check platform connections for Meta, Shopify, Klaviyo
-      const { data: connections, error: connErr } = await supabase
+      // Use connectionId from MetaBusinessContext for Meta
+      // Still check Shopify/Klaviyo connections from DB
+      const { data: otherConns } = await supabase
         .from('platform_connections')
         .select('id, platform, is_active')
         .eq('client_id', clientId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .in('platform', ['shopify', 'klaviyo']);
 
-      if (connErr) throw connErr;
+      const shopifyConns = (otherConns || []).filter((c) => c.platform === 'shopify');
+      const klaviyoConns = (otherConns || []).filter((c) => c.platform === 'klaviyo');
 
-      const metaConns = (connections || []).filter((c) => c.platform === 'meta');
-      const shopifyConns = (connections || []).filter((c) => c.platform === 'shopify');
-      const klaviyoConns = (connections || []).filter((c) => c.platform === 'klaviyo');
-
-      setHasMetaConnection(metaConns.length > 0);
-      setMetaConnectionId(metaConns.length > 0 ? metaConns[0].id : null);
+      setHasMetaConnection(!!ctxConnectionId);
+      setMetaConnectionId(ctxConnectionId);
       setHasShopify(shopifyConns.length > 0);
       setHasKlaviyo(klaviyoConns.length > 0);
 
-      if (metaConns.length === 0) {
+      if (!ctxConnectionId) {
         setAudiences([]);
         setLoading(false);
         return;
       }
 
       // 2. Fetch audiences directly from Meta Graph API
-      const metaAudiences = await syncAudiencesFromMeta(metaConns[0].id, true);
+      const metaAudiences = await syncAudiencesFromMeta(ctxConnectionId, true);
 
       setAudiences(metaAudiences);
     } catch (err) {

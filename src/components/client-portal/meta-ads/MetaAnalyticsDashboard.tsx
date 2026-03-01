@@ -14,6 +14,7 @@ import {
   ShoppingCart, Target, ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronRight, Sparkles, RefreshCw,
 } from 'lucide-react';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -178,6 +179,8 @@ function KpiCard({
 // ---------------------------------------------------------------------------
 
 export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashboardProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   // State
   const [dateRange, setDateRange] = useState<DateRangeKey>('30d');
   const [customFrom, setCustomFrom] = useState('');
@@ -235,25 +238,14 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   async function fetchData() {
     setLoading(true);
     try {
-      // 1. Get the active Meta connection with a selected ad account
-      const { data: connections, error: connError } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .not('account_id', 'is', null)
-        .limit(1);
-
-      if (connError) throw connError;
-      const connectionIds = (connections || []).map((c) => c.id);
-
-      if (connectionIds.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         setMetrics([]);
         setPrevMetrics([]);
         setLoading(false);
         return;
       }
+      const connectionIds = [ctxConnectionId];
 
       // 2. Current period
       const { data: currentData, error: currentError } = await supabase
@@ -292,21 +284,11 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      // Trigger sync for the active Meta connection
-      const { data: connections } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .not('account_id', 'is', null)
-        .limit(1);
-
-      for (const conn of connections || []) {
-        await supabase.functions.invoke('sync-campaign-metrics', {
-          body: { connection_id: conn.id, platform: 'meta' },
-        });
-      }
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) return;
+      await supabase.functions.invoke('sync-campaign-metrics', {
+        body: { connection_id: ctxConnectionId, platform: 'meta' },
+      });
 
       toast.success('Datos sincronizados correctamente');
       await fetchData();

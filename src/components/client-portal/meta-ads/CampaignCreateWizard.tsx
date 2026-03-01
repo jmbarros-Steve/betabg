@@ -37,6 +37,7 @@ import {
   Save,
   Send,
 } from 'lucide-react';
+import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -640,6 +641,8 @@ function AdForm({
 // ---------------------------------------------------------------------------
 
 export default function CampaignCreateWizard({ clientId, onBack, onComplete, startFrom = 'campaign' }: CampaignCreateWizardProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   const [level, setLevel] = useState<StartLevel>(startFrom);
   const [submitting, setSubmitting] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
@@ -732,20 +735,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const { data: conns } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .limit(1);
-
-      if (!conns || conns.length === 0) {
+      // Use connectionId from MetaBusinessContext
+      if (!ctxConnectionId) {
         toast.error('No hay conexion Meta Ads activa');
         return;
       }
 
-      const connectionId = conns[0].id;
+      const connectionId = ctxConnectionId;
       const name = campName || `Campana - ${new Date().toISOString().split('T')[0]}`;
       const objMap: Record<Objective, string> = {
         CONVERSIONS: 'OUTCOME_SALES',
