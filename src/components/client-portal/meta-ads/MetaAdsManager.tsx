@@ -3,8 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import logoMeta from '@/assets/logo-meta-clean.png';
 import {
   LayoutDashboard,
   Megaphone,
@@ -34,6 +44,7 @@ import {
   Wand2,
   FileCheck,
   Crosshair,
+  Loader2,
 } from 'lucide-react';
 
 // Existing components
@@ -611,12 +622,126 @@ function DashboardSection({ clientId }: { clientId: string }) {
 // Main MetaAdsManager component
 // ---------------------------------------------------------------------------
 
+interface MetaConnectionInfo {
+  id: string;
+  account_id: string | null;
+  store_name: string | null;
+}
+
+interface AdAccountOption {
+  account_id: string;
+  name: string;
+  currency: string;
+  business_name: string;
+}
+
 export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   const [activeSection, setActiveSection] = useState<SectionKey>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [visitedSections, setVisitedSections] = useState<Set<SectionKey>>(
     () => new Set(['dashboard']),
   );
+
+  // --- Account context ---
+  const [metaConnection, setMetaConnection] = useState<MetaConnectionInfo | null>(null);
+  const [availableAccounts, setAvailableAccounts] = useState<AdAccountOption[]>([]);
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountSwitching, setAccountSwitching] = useState(false);
+  const [noConnection, setNoConnection] = useState(false);
+
+  const fetchAccountContext = useCallback(async () => {
+    setAccountLoading(true);
+    try {
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id, account_id, store_name')
+        .eq('client_id', clientId)
+        .eq('platform', 'meta')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!conn) {
+        setNoConnection(true);
+        setMetaConnection(null);
+        setAccountLoading(false);
+        return;
+      }
+
+      setNoConnection(false);
+      setMetaConnection(conn);
+
+      // Fetch available ad accounts from Meta API
+      const { data } = await supabase.functions.invoke('fetch-meta-ad-accounts', {
+        body: { connection_id: conn.id },
+      });
+      if (data?.accounts) {
+        setAvailableAccounts(data.accounts);
+      }
+    } catch (err) {
+      console.error('[MetaAdsManager] Account context error:', err);
+    } finally {
+      setAccountLoading(false);
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    fetchAccountContext();
+  }, [fetchAccountContext]);
+
+  const handleAccountChange = useCallback(async (accountId: string) => {
+    if (!metaConnection || accountId === metaConnection.account_id) return;
+    setAccountSwitching(true);
+    try {
+      const account = availableAccounts.find((a) => a.account_id === accountId);
+      const storeName = account?.name || accountId;
+
+      // 1. Update connection in DB
+      const { error: updateError } = await supabase
+        .from('platform_connections')
+        .update({ account_id: accountId, store_name: storeName })
+        .eq('id', metaConnection.id);
+      if (updateError) throw updateError;
+
+      // 2. Update local state immediately
+      setMetaConnection((prev) =>
+        prev ? { ...prev, account_id: accountId, store_name: storeName } : null,
+      );
+
+      console.log(`[MetaAdsManager] Switched to account: ${storeName} (${accountId})`);
+      toast.loading('Sincronizando datos de la nueva cuenta...', { id: 'account-switch' });
+
+      // 3. Purge old data + sync new data in parallel
+      const [metricsRes, campaignsRes] = await Promise.allSettled([
+        supabase.functions.invoke('sync-meta-metrics', {
+          body: { connection_id: metaConnection.id, purge_stale: true },
+        }),
+        supabase.functions.invoke('sync-campaign-metrics', {
+          body: { connection_id: metaConnection.id, platform: 'meta', purge_stale: true },
+        }),
+      ]);
+
+      const ok =
+        metricsRes.status === 'fulfilled' &&
+        !metricsRes.value.error &&
+        campaignsRes.status === 'fulfilled' &&
+        !campaignsRes.value.error;
+
+      if (ok) {
+        toast.success(`Cuenta cambiada: ${storeName}`, { id: 'account-switch' });
+      } else {
+        toast.warning('Cuenta cambiada, sincronizacion parcial', { id: 'account-switch' });
+      }
+
+      // 4. Tell all child components to refresh
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
+    } catch (err) {
+      console.error('[MetaAdsManager] Account switch error:', err);
+      toast.error('Error al cambiar cuenta', { id: 'account-switch' });
+    } finally {
+      setAccountSwitching(false);
+    }
+  }, [metaConnection, availableAccounts]);
 
   // Track which sections have been visited for lazy mounting
   const markVisited = useCallback(
@@ -786,7 +911,96 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       {/* Main content area */}
       {/* ----------------------------------------------------------------- */}
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-        {NAV_ITEMS.map((item) => renderSection(item.key))}
+        {/* Account Context Bar */}
+        {accountLoading ? (
+          <div className="mb-4">
+            <Skeleton className="h-16 rounded-lg" />
+          </div>
+        ) : noConnection ? (
+          <Card className="mb-4 border-dashed">
+            <CardContent className="py-10 text-center">
+              <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
+              <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                Conecta tu cuenta de Meta Ads desde la pestana de <strong>Conexiones</strong>.
+              </p>
+            </CardContent>
+          </Card>
+        ) : !metaConnection?.account_id ? (
+          <Card className="mb-4 border-amber-500/30 bg-amber-500/5">
+            <CardContent className="py-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-6 h-6 text-amber-500 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-700">
+                    Selecciona una cuenta publicitaria
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">
+                    Debes elegir una cuenta publicitaria de Meta para ver metricas, campanas y anuncios.
+                  </p>
+                  {availableAccounts.length > 0 && (
+                    <Select onValueChange={handleAccountChange} disabled={accountSwitching}>
+                      <SelectTrigger className="w-full max-w-md bg-background">
+                        <SelectValue placeholder="Selecciona una cuenta publicitaria..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50 max-h-80">
+                        {availableAccounts.map((acc) => (
+                          <SelectItem key={acc.account_id} value={acc.account_id}>
+                            <span className="font-medium">{acc.name}</span>
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              ({acc.account_id}) - {acc.currency}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="mb-4 p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src={logoMeta} alt="Meta" className="h-8 w-8 object-contain" />
+              <div>
+                <p className="text-sm font-semibold">
+                  {metaConnection.store_name || 'Cuenta Meta'}
+                </p>
+                <p className="text-xs text-muted-foreground font-mono">
+                  ID: {metaConnection.account_id}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {accountSwitching && (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              )}
+              <Select
+                value={metaConnection.account_id}
+                onValueChange={handleAccountChange}
+                disabled={accountSwitching}
+              >
+                <SelectTrigger className="w-[280px] bg-background text-xs h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50 max-h-80">
+                  {availableAccounts.map((acc) => (
+                    <SelectItem key={acc.account_id} value={acc.account_id}>
+                      <span className="font-medium">{acc.name}</span>
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        ({acc.account_id})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {/* Only show sections if we have a connection with an account selected */}
+        {metaConnection?.account_id && NAV_ITEMS.map((item) => renderSection(item.key))}
       </main>
     </div>
   );
