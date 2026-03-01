@@ -158,3 +158,9 @@ verify_jwt = false
 
 [functions.meta-data-deletion]
 verify_jwt = false
+
+[functions.fetch-meta-business-hierarchy]
+verify_jwt = false
+
+[functions.meta-social-inbox]
+verify_jwt = false
