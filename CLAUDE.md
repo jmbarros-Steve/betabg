@@ -91,7 +91,7 @@ Backend secrets are managed in the Supabase dashboard (not in the repo): `ANTHRO
 
 ### Deployment
 
-- Frontend auto-deploys via Lovable Cloud on git push to `main`.
+- Frontend auto-deploys via Vercel on git push to `main`.
 - Supabase migrations apply via `npx supabase db push`.
-- Edge functions deploy individually with `supabase functions deploy <name>`.
-- Production URL: `betabg.lovable.app`.
+- Edge functions deploy individually with `npx supabase functions deploy <name> --no-verify-jwt --project-ref zpswjccsxjtnhetkkqde`.
+- Production URL: Vercel (previously `betabg.lovable.app`).
