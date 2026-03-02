@@ -724,50 +724,15 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
 
   // --- Select a portfolio ---
   const selectPortfolio = useCallback(async (portfolio: PortfolioItem) => {
-    console.log('[selectPortfolio] === INICIO === portfolio:', portfolio.name, 'adAccountId:', portfolio.adAccountId);
-    console.log('[selectPortfolio] metaConnection:', metaConnection ? { id: metaConnection.id, account_id: metaConnection.account_id } : 'NULL');
-    console.log('[selectPortfolio] selectedAssets.adAccountId:', selectedAssets.adAccountId);
+    if (!metaConnection) return;
+    if (portfolio.adAccountId === selectedAssets.adAccountId) return;
 
-    if (!metaConnection) {
-      console.log('[selectPortfolio] EARLY RETURN: metaConnection es null');
-      return;
-    }
-    if (portfolio.adAccountId === selectedAssets.adAccountId) {
-      console.log('[selectPortfolio] EARLY RETURN: mismo adAccountId, no hay cambio');
-      return;
-    }
-
-    console.log('[selectPortfolio] Pasó early returns, iniciando switch...');
     setPortfolioSwitching(true);
     try {
-      // DEBUG: Log before DB update
-      console.log('[selectPortfolio] PASO 1: Actualizando DB...');
-      console.log('[selectPortfolio] ANTES - account_id actual:', selectedAssets.adAccountId);
-      console.log('[selectPortfolio] ANTES - metaConnection.account_id:', metaConnection.account_id);
-      console.log('[selectPortfolio] NUEVO - account_id seleccionado:', portfolio.adAccountId);
-      console.log('[selectPortfolio] NUEVO - portfolio completo:', JSON.stringify(portfolio));
+      // Note: DB update is already done by MetaConnectionWizard.handleConfirmConnect.
+      // We only update local state and sync metrics here.
 
-      // 1. Update connection in DB with all portfolio assets
-      const { error: updateError, data: updateResult } = await supabase
-        .from('platform_connections')
-        .update({
-          account_id: portfolio.adAccountId,
-          store_name: portfolio.name,
-          business_id: portfolio.businessId,
-          portfolio_name: portfolio.name,
-          page_id: portfolio.pageId,
-          ig_account_id: portfolio.igAccountId,
-          pixel_id: portfolio.pixelId,
-        })
-        .eq('id', metaConnection.id)
-        .select('id, account_id');
-      if (updateError) throw updateError;
-
-      // DEBUG: Log after DB update
-      console.log('[selectPortfolio] PASO 1 COMPLETADO - UPDATE DB resultado:', JSON.stringify(updateResult));
-
-      // 2. Update local state
-      console.log('[selectPortfolio] PASO 2: Actualizando estado local...');
+      // 1. Update local state so UI shows new portfolio immediately
       setMetaConnection(prev =>
         prev ? {
           ...prev,
@@ -794,13 +759,9 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         pixelId: portfolio.pixelId,
       });
 
-      console.log('[selectPortfolio] PASO 2 COMPLETADO - Estado local actualizado');
-      console.log('[selectPortfolio] PASO 3: Iniciando sync de métricas...');
-      console.log('[selectPortfolio] SYNC connection_id:', metaConnection.id, 'nuevo account_id:', portfolio.adAccountId);
       toast.loading('Sincronizando datos del negocio...', { id: 'portfolio-switch' });
 
-      // 3. Sync data for the new account
-      console.log('[selectPortfolio] Llamando Promise.allSettled con sync-meta-metrics y sync-campaign-metrics...');
+      // 2. Sync data for the new account
       const [metricsRes, campaignsRes] = await Promise.allSettled([
         supabase.functions.invoke('sync-meta-metrics', {
           body: { connection_id: metaConnection.id, purge_stale: true },
@@ -809,11 +770,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           body: { connection_id: metaConnection.id, platform: 'meta', purge_stale: true },
         }),
       ]);
-
-      // DEBUG: Log sync results
-      console.log('[selectPortfolio] PASO 3 COMPLETADO - Promise.allSettled terminó');
-      console.log('[selectPortfolio] sync-meta-metrics:', metricsRes.status, JSON.stringify(metricsRes.status === 'fulfilled' ? { data: metricsRes.value.data, error: metricsRes.value.error } : { reason: String(metricsRes.reason) }));
-      console.log('[selectPortfolio] sync-campaign-metrics:', campaignsRes.status, JSON.stringify(campaignsRes.status === 'fulfilled' ? { data: campaignsRes.value.data, error: campaignsRes.value.error } : { reason: String(campaignsRes.reason) }));
 
       const ok =
         metricsRes.status === 'fulfilled' &&
@@ -824,24 +780,20 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       if (ok) {
         toast.success(`Negocio seleccionado: ${portfolio.name}`, { id: 'portfolio-switch' });
       } else {
-        toast.warning('Negocio seleccionado, sincronizacion parcial', { id: 'portfolio-switch' });
+        toast.warning('Negocio seleccionado, sincronización parcial', { id: 'portfolio-switch' });
       }
 
-      // 4. Reset navigation
-      console.log('[selectPortfolio] PASO 4: Reseteando navegación a dashboard');
+      // 3. Reset navigation
       setActiveSection('dashboard');
       setVisitedSections(new Set(['dashboard']));
 
-      // 5. Notify listeners
-      console.log('[selectPortfolio] PASO 5: Disparando evento bg:sync-complete');
-      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
-      console.log('[selectPortfolio] === FIN EXITOSO ===');
-    } catch (err: any) {
-      console.error('[selectPortfolio] === ERROR CAPTURADO ===');
-      console.error('[selectPortfolio] Error type:', typeof err);
-      console.error('[selectPortfolio] Error message:', err?.message || String(err));
-      console.error('[selectPortfolio] Error stack:', err?.stack);
-      console.error('[selectPortfolio] Error completo:', err);
+      // 4. Notify listeners — use setTimeout to ensure React has flushed state updates
+      // and DashboardSection is mounted with its event listener before the event fires.
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('bg:sync-complete'));
+      }, 0);
+    } catch (err) {
+      console.error('[MetaAdsManager] Portfolio switch error:', err);
       toast.error('Error al seleccionar negocio', { id: 'portfolio-switch' });
     } finally {
       setPortfolioSwitching(false);
@@ -902,7 +854,12 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         role="tabpanel"
         aria-hidden={!isActive}
       >
-        {key === 'dashboard' && <DashboardSection clientId={clientId} />}
+        {key === 'dashboard' && (
+          <DashboardSection
+            clientId={clientId}
+            key={`dash-${selectedAssets.adAccountId || 'none'}`}
+          />
+        )}
         {key === 'tree-view' && (
           <CampaignTreeView
             clientId={clientId}
@@ -924,7 +881,12 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             onComplete={() => handleNavClick('tree-view')}
           />
         )}
-        {key === 'campaigns' && <MetaCampaignManager clientId={clientId} />}
+        {key === 'campaigns' && (
+          <MetaCampaignManager
+            clientId={clientId}
+            key={`camp-${selectedAssets.adAccountId || 'none'}`}
+          />
+        )}
         {key === 'create-ad' && (
           <MetaAdCreator
             clientId={clientId}
@@ -934,7 +896,12 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         )}
         {key === 'audiences' && <MetaAudienceManager clientId={clientId} />}
         {key === 'library' && <AdCreativesLibrary clientId={clientId} />}
-        {key === 'analytics' && <MetaAnalyticsDashboard clientId={clientId} />}
+        {key === 'analytics' && (
+          <MetaAnalyticsDashboard
+            clientId={clientId}
+            key={`analytics-${selectedAssets.adAccountId || 'none'}`}
+          />
+        )}
         {key === 'social-inbox' && <MetaSocialInbox clientId={clientId} />}
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
         {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={(id) => { console.log('Edit draft:', id); handleNavClick('create-wizard'); }} />}
