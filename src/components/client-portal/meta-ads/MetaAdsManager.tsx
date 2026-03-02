@@ -174,7 +174,7 @@ const formatPercent = (value: number) => `${value.toFixed(2)}%`;
 // ---------------------------------------------------------------------------
 
 function DashboardSection({ clientId }: { clientId: string }) {
-  const { connectionId } = useMetaBusiness();
+  const { connectionId, lastSyncAt } = useMetaBusiness();
   const [metrics, setMetrics] = useState<CampaignMetricRow[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,7 +220,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [connectionId]);
+  }, [connectionId, lastSyncAt]);
 
   useEffect(() => {
     fetchData();
@@ -533,6 +533,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   const [hierarchyLoading, setHierarchyLoading] = useState(true);
   const [portfolioSwitching, setPortfolioSwitching] = useState(false);
   const [noConnection, setNoConnection] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState(0);
 
   // Business hierarchy
   const [businessGroups, setBusinessGroups] = useState<BusinessGroup[]>([]);
@@ -783,15 +784,15 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         toast.warning('Negocio seleccionado, sincronización parcial', { id: 'portfolio-switch' });
       }
 
-      // 3. Reset navigation
+      // 3. Signal all components to refetch with fresh data
+      setLastSyncAt(Date.now());
+
+      // 4. Reset navigation
       setActiveSection('dashboard');
       setVisitedSections(new Set(['dashboard']));
 
-      // 4. Notify listeners — use setTimeout to ensure React has flushed state updates
-      // and DashboardSection is mounted with its event listener before the event fires.
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('bg:sync-complete'));
-      }, 0);
+      // 5. Also fire event for any other listeners
+      window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (err) {
       console.error('[MetaAdsManager] Portfolio switch error:', err);
       toast.error('Error al seleccionar negocio', { id: 'portfolio-switch' });
@@ -837,10 +838,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
     ...selectedAssets,
     loading: hierarchyLoading,
     switching: portfolioSwitching,
+    lastSyncAt,
     businessGroups,
     allPortfolios,
     selectPortfolio,
-  }), [selectedAssets, hierarchyLoading, portfolioSwitching, businessGroups, allPortfolios, selectPortfolio]);
+  }), [selectedAssets, hierarchyLoading, portfolioSwitching, lastSyncAt, businessGroups, allPortfolios, selectPortfolio]);
 
   // Render section (lazy mount pattern)
   const renderSection = (key: SectionKey) => {

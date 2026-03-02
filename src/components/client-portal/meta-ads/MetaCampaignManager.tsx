@@ -290,7 +290,7 @@ function BudgetAllocationChart({
 // ---------------------------------------------------------------------------
 
 export default function MetaCampaignManager({ clientId }: MetaCampaignManagerProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, lastSyncAt } = useMetaBusiness();
 
   // ----- State -----
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
@@ -438,7 +438,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, lastSyncAt]);
 
   useEffect(() => {
     fetchCampaigns();

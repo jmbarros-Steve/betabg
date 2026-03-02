@@ -179,7 +179,7 @@ function KpiCard({
 // ---------------------------------------------------------------------------
 
 export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashboardProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, lastSyncAt } = useMetaBusiness();
 
   // State
   const [dateRange, setDateRange] = useState<DateRangeKey>('30d');
@@ -226,14 +226,14 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
 
   useEffect(() => {
     fetchData();
-  }, [clientId, from, to, prevFrom, prevTo]);
+  }, [clientId, from, to, prevFrom, prevTo, lastSyncAt]);
 
   // Refresh when account changes (bg:sync-complete)
   useEffect(() => {
     const handler = () => fetchData();
     window.addEventListener('bg:sync-complete', handler);
     return () => window.removeEventListener('bg:sync-complete', handler);
-  }, [clientId, from, to, prevFrom, prevTo]);
+  }, [clientId, from, to, prevFrom, prevTo, lastSyncAt]);
 
   async function fetchData() {
     setLoading(true);

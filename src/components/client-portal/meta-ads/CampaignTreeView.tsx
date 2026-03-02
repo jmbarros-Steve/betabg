@@ -284,7 +284,7 @@ function CampaignRow({
 // ---------------------------------------------------------------------------
 
 export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate322 }: CampaignTreeViewProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, lastSyncAt } = useMetaBusiness();
 
   const [campaigns, setCampaigns] = useState<CampaignNode[]>([]);
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
@@ -372,7 +372,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, lastSyncAt]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 

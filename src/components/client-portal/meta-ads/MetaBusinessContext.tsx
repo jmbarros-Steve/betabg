@@ -53,6 +53,8 @@ interface MetaBusinessContextType extends MetaBusinessAssets {
   loading: boolean;
   /** Whether an account switch is in progress */
   switching: boolean;
+  /** Timestamp of the last successful sync — components should refetch when this changes */
+  lastSyncAt: number;
   /** Grouped hierarchy for the selector */
   businessGroups: BusinessGroup[];
   /** All flat portfolios for quick lookup */
