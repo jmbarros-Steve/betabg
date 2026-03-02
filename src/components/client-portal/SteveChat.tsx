@@ -102,6 +102,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [showInteraction, setShowInteraction] = useState(true);
   const [currentQuestionLabel, setCurrentQuestionLabel] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [acceptedResponses, setAcceptedResponses] = useState<Array<{label: string; content: string}>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -242,6 +243,11 @@ export function SteveChat({ clientId }: SteveChatProps) {
             .eq('client_id', clientId)
             .maybeSingle();
           const acceptedCount = (persona?.persona_data as { answered_count?: number } | null)?.answered_count;
+          const rawResponses: string[] = (persona?.persona_data as any)?.raw_responses ?? [];
+          setAcceptedResponses(rawResponses.map((content: string, i: number) => ({
+            label: BRIEF_QUESTION_LABELS[i] ?? `Pregunta ${i + 1}`,
+            content,
+          })));
           const progressAnswered = typeof acceptedCount === 'number' ? acceptedCount : userMsgCount;
           setProgress({ answered: progressAnswered, total: 17 });
           setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(progressAnswered, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
@@ -327,8 +333,25 @@ export function SteveChat({ clientId }: SteveChatProps) {
           created_at: new Date().toISOString(),
         };
         setMessages(prev => [...prev, assistantMsg]);
-        // BUG 1 FIX: Never update progress/label on rejection — the user stays on the same question
-        if (!data.rejected) {
+        if (data.rejected) {
+          // Remove the rejected user message from chat so index mapping stays clean
+          setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
+          setShowInteraction(true);
+          toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
+        } else {
+          // Track accepted response only when the counter actually advances
+          const prevAnswered = progress.answered;
+          const newAnswered = data.answered_count ?? prevAnswered;
+          if (newAnswered > prevAnswered) {
+            setAcceptedResponses(prev => {
+              const copy = [...prev];
+              copy[prevAnswered] = {
+                label: BRIEF_QUESTION_LABELS[prevAnswered] ?? `Pregunta ${prevAnswered + 1}`,
+                content: userMessage,
+              };
+              return copy;
+            });
+          }
           if (data.answered_count !== undefined) {
             setProgress({ answered: data.answered_count, total: data.total_questions ?? 17 });
           }
@@ -339,10 +362,6 @@ export function SteveChat({ clientId }: SteveChatProps) {
         setExamples(data.examples ?? []);
         setCurrentFields(data.fields ?? []);
         setFieldValidation(data.field_validation);
-        if (data.rejected) {
-          setShowInteraction(true);
-          toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
-        }
       if (data.is_complete) {
           setIsComplete(true);
           // Keep asset upload visible so user can still upload after completion
@@ -381,6 +400,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   async function handleRestart() {
     if (!confirm('¿Estás seguro de que quieres reiniciar la conversación?')) return;
+
+    const oldConversationId = conversationId;
+
+    // Reset ALL local state
     setMessages([]);
     setConversationId(null);
     setIsComplete(false);
@@ -389,9 +412,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setCurrentFields([]);
     setFieldValidation(undefined);
     setShowAssetUpload(false);
-    
-    if (conversationId) {
-      await supabase.from('steve_conversations').delete().eq('id', conversationId);
+    setAcceptedResponses([]);
+    setCurrentQuestionLabel(null);
+    setShowSummary(false);
+
+    // Delete old data from DB (messages first, then conversation)
+    if (oldConversationId) {
+      await supabase.from('steve_messages').delete().eq('conversation_id', oldConversationId);
+      await supabase.from('steve_conversations').delete().eq('id', oldConversationId);
     }
     await supabase.from('buyer_personas').delete().eq('client_id', clientId);
     await startNewConversation();
@@ -400,11 +428,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const progressPercent = Math.round((progress.answered / progress.total) * 100);
   const hasStructuredFields = currentFields.length > 0 && !isLoading && !isComplete;
 
-  const userMessagesOrdered = messages.filter(m => m.role === 'user');
-  const summaryItems = userMessagesOrdered.map((msg, i) => ({
-    label: BRIEF_QUESTION_LABELS[i] ?? `Pregunta ${i + 1}`,
-    content: msg.content,
-    excerpt: msg.content.length > 60 ? msg.content.slice(0, 60).trim() + '…' : msg.content,
+  const summaryItems = acceptedResponses.map((resp, i) => ({
+    label: resp.label,
+    content: resp.content,
+    excerpt: resp.content.length > 60 ? resp.content.slice(0, 60).trim() + '…' : resp.content,
   }));
 
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
