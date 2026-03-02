@@ -228,7 +228,7 @@ async function handleList(
     accessToken,
     'GET',
     {
-      fields: 'id,name,subtype,approximate_count,delivery_status,description,time_created',
+      fields: 'id,name,subtype,approximate_count_lower_bound,approximate_count_upper_bound,delivery_status,description,time_created',
       limit: '100',
     }
   );

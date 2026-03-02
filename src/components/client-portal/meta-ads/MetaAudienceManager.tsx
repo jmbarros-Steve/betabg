@@ -1046,7 +1046,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           id: String(aud.id),
           name: String(aud.name || 'Sin nombre'),
           type,
-          size: Number(aud.approximate_count) || 0,
+          size: Number(aud.approximate_count_lower_bound || aud.approximate_count) || 0,
           status,
           created_at: aud.time_created ? String(aud.time_created) : new Date().toISOString(),
           source: 'Meta Ads',
