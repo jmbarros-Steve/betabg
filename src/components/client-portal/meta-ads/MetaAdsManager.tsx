@@ -376,7 +376,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
             </div>
             <p className="text-2xl font-bold">{formatCurrency(totals.spend)}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {aggregated.length} campana{aggregated.length !== 1 ? 's' : ''} activa{aggregated.length !== 1 ? 's' : ''}
+              {aggregated.length} campana{aggregated.length !== 1 ? 's' : ''} (30d)
             </p>
           </CardContent>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/40 to-red-500/10" />

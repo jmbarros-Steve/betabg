@@ -959,7 +959,7 @@ function CreateLookalikeDialog({
 // ---------------------------------------------------------------------------
 
 export default function MetaAudienceManager({ clientId }: MetaAudienceManagerProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, lastSyncAt } = useMetaBusiness();
 
   // State
   const [audiences, setAudiences] = useState<AudienceRow[]>([]);
@@ -1125,7 +1125,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     } finally {
       setLoading(false);
     }
-  }, [clientId, syncAudiencesFromMeta]);
+  }, [clientId, ctxConnectionId, lastSyncAt, syncAudiencesFromMeta]);
 
   useEffect(() => {
     fetchData();
