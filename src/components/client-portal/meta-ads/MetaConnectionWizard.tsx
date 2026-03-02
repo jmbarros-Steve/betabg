@@ -133,7 +133,7 @@ export default function MetaConnectionWizard({
     setConnecting(true);
     try {
       // Save all assets to platform_connections
-      const { error: updateError } = await supabase
+      const { error: updateError, data: updateData } = await supabase
         .from('platform_connections')
         .update({
           account_id: selectedPortfolio.adAccountId,
@@ -144,9 +144,13 @@ export default function MetaConnectionWizard({
           ig_account_id: selectedPortfolio.igAccountId,
           pixel_id: selectedPortfolio.pixelId,
         })
-        .eq('id', connectionId);
+        .eq('id', connectionId)
+        .select('id, account_id');
 
       if (updateError) throw updateError;
+      if (!updateData || updateData.length === 0) {
+        throw new Error('No se pudo actualizar la conexión (permisos insuficientes)');
+      }
 
       toast.success(`Conectado: ${selectedPortfolio.name}`);
       onComplete(selectedPortfolio);
