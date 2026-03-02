@@ -1172,6 +1172,9 @@ REGLAS ABSOLUTAS:
     console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}/${BRAND_BRIEF_QUESTIONS.length}`);
 
     const maxTokens = isLastQuestion ? 8000 : 1200;
+    // Use Sonnet for the last question (brief generation follows a template — Sonnet is
+    // much faster and avoids edge-function timeouts that Opus + 8000 tokens would cause).
+    const model = isLastQuestion ? 'claude-sonnet-4-6' : 'claude-opus-4-6';
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -1188,7 +1191,7 @@ REGLAS ABSOLUTAS:
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model,
         max_tokens: maxTokens,
         system: systemMessage,
         messages: userMessages_anthropic,
@@ -1267,13 +1270,9 @@ REGLAS ABSOLUTAS:
       content: assistantMessage,
     });
 
-    // ── BUG 4+5 FIX: Save competitors — DELETE all existing first, then INSERT fresh ones ──
-    // Using delete+insert instead of upsert prevents stale old competitors from persisting
-    // when the user changes their competitors (e.g. swaps one out or corrects a URL).
+    // ── Save competitors — DELETE all existing first, then INSERT fresh ones ──
     if (hasAdvanced && currentQuestionIndex === 9) {
       try {
-        // message IS the Q9 answer (competitor form formatted by StructuredFieldsForm)
-        // BUG 4 FIX: Log full raw message so we can debug parse failures
         console.log('[steve-chat] Q9 raw message (for parser debug):\n', JSON.stringify(message));
         const compNames = [...message.matchAll(/Nombre Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
         const compUrls = [...message.matchAll(/Web \/ Instagram Competidor \d+:\s*(.+)/g)].map((m: RegExpMatchArray) => m[1].trim());
@@ -1283,7 +1282,22 @@ REGLAS ABSOLUTAS:
         const { error: delErr } = await supabase.from('competitor_tracking').delete().eq('client_id', client_id);
         if (delErr) console.error('[steve-chat] Error deleting old competitors:', delErr);
 
+        // Extract a unique handle from the URL.
+        // For Instagram URLs (instagram.com/brand), use the username as handle.
+        // For regular URLs (mitienda.cl), use the domain.
+        // Append index suffix to guarantee uniqueness across all 3 competitors.
+        function extractHandle(rawUrl: string, index: number): string {
+          const cleaned = rawUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+          const igMatch = cleaned.match(/instagram\.com\/([^/?#]+)/i);
+          if (igMatch) return igMatch[1].toLowerCase();
+          const fbMatch = cleaned.match(/facebook\.com\/([^/?#]+)/i);
+          if (fbMatch) return fbMatch[1].toLowerCase();
+          const domain = cleaned.split('/')[0].split('?')[0].toLowerCase();
+          return domain;
+        }
+
         const total = Math.min(compNames.length, compUrls.length, 3);
+        const usedHandles = new Set<string>();
         for (let i = 0; i < total; i++) {
           const rawUrl = compUrls[i];
           const name = compNames[i];
@@ -1292,7 +1306,13 @@ REGLAS ABSOLUTAS:
             continue;
           }
           const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-          const handle = rawUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].toLowerCase();
+          let handle = extractHandle(rawUrl, i);
+          // Guarantee uniqueness: if handle already used, append index
+          if (usedHandles.has(handle)) {
+            handle = `${handle}_${i + 1}`;
+          }
+          usedHandles.add(handle);
+
           const { error: insErr } = await supabase.from('competitor_tracking').insert({
             client_id,
             ig_handle: handle,
@@ -1336,7 +1356,11 @@ REGLAS ABSOLUTAS:
     const isBriefComplete = finalAnswered >= BRAND_BRIEF_QUESTIONS.length && !isRejection;
 
     // Persist updated buyer_personas with accurate answered_count
-    await supabase.from('buyer_personas').upsert({
+    // For the completion case, save the summary WITHOUT the aviso prefix (keep only the brief)
+    const briefSummary = isBriefComplete
+      ? assistantMessage.replace(/^⏳[\s\S]*?---\n\n/, '')
+      : undefined;
+    const { error: personaError } = await supabase.from('buyer_personas').upsert({
       client_id,
       persona_data: {
         raw_responses: newRawResponses,
@@ -1345,10 +1369,13 @@ REGLAS ABSOLUTAS:
         total_questions: BRAND_BRIEF_QUESTIONS.length,
         fase_negocio: briefData.fase_negocio || undefined,
         presupuesto_ads: briefData.presupuesto_ads || undefined,
-        ...(isBriefComplete ? { summary: assistantMessage, completed_at: new Date().toISOString() } : {}),
+        ...(isBriefComplete ? { summary: briefSummary, completed_at: new Date().toISOString() } : {}),
       },
       is_complete: isBriefComplete,
     }, { onConflict: 'client_id' });
+    if (personaError) {
+      console.error('[steve-chat] Error saving buyer_personas:', personaError);
+    }
 
     // ── BUG 5 + 7: Trigger two-phase analysis (research → strategy) instead of deprecated analyze-brand ──
     if (isBriefComplete) {
