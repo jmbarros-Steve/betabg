@@ -1164,14 +1164,37 @@ REGLAS ABSOLUTAS:
 
     const dynamicSystemPrompt = bugSection + knowledgeSection + SYSTEM_PROMPT + phaseContext;
 
-    const chatMessages: ChatMessage[] = [
-      { role: 'system', content: dynamicSystemPrompt + questionContext },
-      ...messages!.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-    ];
+    // For the last question (Q16 brief generation), use a compact context and a minimal
+    // system prompt. The full Steve personality + knowledge + 34 messages + 8000 tokens
+    // exceeds Supabase's 150s Edge Function timeout. Instead, send ONLY the brief
+    // template + raw responses + a lean generation instruction.
+    let chatMessages: ChatMessage[];
+    if (isLastQuestion) {
+      const compactResponses = storedRawResponses.map((resp: string, i: number) => {
+        const q = BRAND_BRIEF_QUESTIONS[i];
+        return `### ${q?.id || `Q${i}`} (${q?.shortLabel || `Pregunta ${i}`})\n${resp}`;
+      }).join('\n\n');
 
-    console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}/${BRAND_BRIEF_QUESTIONS.length}`);
+      // Minimal system prompt for brief generation — skip personality, knowledge, bugs
+      const briefSystemPrompt = `Eres un consultor de marketing estratégico generando un Brief Estratégico profesional para un cliente.
+Idioma: Español latinoamericano. Tono: McKinsey/BCG.
+${phaseContext}
+${questionContext}`;
 
-    const maxTokens = isLastQuestion ? 8000 : 1200;
+      chatMessages = [
+        { role: 'system', content: briefSystemPrompt },
+        { role: 'user', content: `RESPUESTAS COMPLETAS DEL CLIENTE AL BRIEF:\n\n${compactResponses}\n\nÚltima respuesta (archivos visuales): ${message}` },
+      ];
+    } else {
+      chatMessages = [
+        { role: 'system', content: dynamicSystemPrompt + questionContext },
+        ...messages!.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ];
+    }
+
+    console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}, messages: ${chatMessages.length}/${BRAND_BRIEF_QUESTIONS.length}`);
+
+    const maxTokens = isLastQuestion ? 6000 : 1200;
     // Use Sonnet for the last question (brief generation follows a template — Sonnet is
     // much faster and avoids edge-function timeouts that Opus + 8000 tokens would cause).
     const model = isLastQuestion ? 'claude-sonnet-4-6' : 'claude-opus-4-6';
@@ -1377,80 +1400,9 @@ REGLAS ABSOLUTAS:
       console.error('[steve-chat] Error saving buyer_personas:', personaError);
     }
 
-    // ── BUG 5 + 7: Trigger two-phase analysis (research → strategy) instead of deprecated analyze-brand ──
-    if (isBriefComplete) {
-      try {
-        const { data: clientData } = await supabase.from('clients').select('website_url').eq('id', client_id).single();
-        const q0Response = newRawResponses[0] || '';
-        const urlMatch = q0Response.match(/https?:\/\/[^\s,]+|www\.[^\s,]+|\b\w+\.(cl|com|net|store|shop|myshopify\.com)\b/i);
-        const websiteUrl = clientData?.website_url || (urlMatch ? (urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`) : null);
-
-        // Competitor URLs from the saved competitor_tracking (populated in BUG 6 fix above)
-        // Also extract from Q9 raw response as fallback
-        const q9Resp = newRawResponses[9] || '';
-        const competitorUrls: string[] = [];
-        const urlMatches = q9Resp.match(/Web \/ Instagram Competidor \d+:\s*([^\n]+)/g) || [];
-        for (const line of urlMatches.slice(0, 3)) {
-          const u = line.replace(/Web \/ Instagram Competidor \d+:\s*/i, '').trim();
-          if (u) competitorUrls.push(u.startsWith('http') ? u : `https://${u}`);
-        }
-
-        await supabase.from('brand_research').upsert({
-          client_id,
-          research_type: 'analysis_status',
-          research_data: { status: 'pending', started_at: new Date().toISOString() },
-        }, { onConflict: 'client_id,research_type' });
-
-        const projectId = supabaseUrl.replace('https://', '').split('.')[0];
-        const serviceKey = supabaseServiceKey;
-
-        // Fire-and-forget two-phase chain: research (~30s) → strategy (~20-30s with sonnet)
-        (async () => {
-          try {
-            const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ client_id, website_url: websiteUrl, competitor_urls: competitorUrls }),
-            });
-            if (!researchRes.ok) throw new Error(`Research failed: ${researchRes.status}`);
-            const researchJson = await researchRes.json();
-            const research = researchJson.research;
-            if (!research) throw new Error('No research data returned');
-
-            const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ client_id, research }),
-            });
-            if (!strategyRes.ok) throw new Error(`Strategy failed: ${strategyRes.status}`);
-            // BUG 5 FIX 3: Explicitly write 'complete' after BOTH phases finish successfully.
-            // analyze-brand-strategy also writes it internally, but we write it here too as a
-            // safety net in case the function's internal write was interrupted by Deno's lifecycle.
-            await supabase.from('brand_research').upsert({
-              client_id,
-              research_type: 'analysis_status',
-              research_data: {
-                status: 'complete',
-                research_completed_at: new Date().toISOString(),
-                strategy_completed_at: new Date().toISOString(),
-              },
-            }, { onConflict: 'client_id,research_type' });
-            console.log(`[steve-chat] Auto-analysis complete for client ${client_id}`);
-          } catch (err) {
-            console.error('[steve-chat] Auto-analysis error:', err);
-            await supabase.from('brand_research').upsert({
-              client_id,
-              research_type: 'analysis_status',
-              research_data: { status: 'error', error: String(err) },
-            }, { onConflict: 'client_id,research_type' });
-          }
-        })();
-
-        console.log(`[steve-chat] Auto-analysis triggered for client ${client_id}`);
-      } catch (autoAnalyzeErr) {
-        console.error('[steve-chat] Error triggering auto-analysis:', autoAnalyzeErr);
-      }
-    }
+    // Analysis chain is now triggered by the FRONTEND (SteveChat.tsx → triggerAnalysisChain)
+    // after receiving is_complete=true. The previous fire-and-forget IIFE here was unreliable
+    // because Supabase Edge Functions (Deno Deploy) terminate the process after responding.
 
     const returnAnswered = finalAnswered;
     const isComplete = isBriefComplete;

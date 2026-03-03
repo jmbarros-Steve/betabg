@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
 };
 
 Deno.serve(async (req) => {
@@ -23,8 +23,11 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const token = authHeader.replace('Bearer ', '');
-    const isInternalCall = token === supabaseServiceKey;
+    const token = authHeader.replace('Bearer ', '').trim();
+    // Check internal call via both Authorization header AND X-Internal-Key custom header
+    // (the Supabase gateway may strip the JWT from the Authorization header on internal calls)
+    const internalKey = req.headers.get('X-Internal-Key')?.trim();
+    const isInternalCall = token === supabaseServiceKey || internalKey === supabaseServiceKey;
 
     let userId: string | null = null;
     if (!isInternalCall) {
@@ -146,22 +149,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build final competitor list: max 3 (explicit + brief fallback)
+    // Build final competitor list: max 6 (3 user-provided + up to 3 AI-detected)
     const explicitUrls = (competitor_urls || []).filter((u: string) => u.trim());
-    const remainingSlots = 3 - Math.min(explicitUrls.length, 3);
+    const remainingSlots = 6 - Math.min(explicitUrls.length, 6);
     const fillFromBrief = briefCompetitorUrls
       .filter(u => !explicitUrls.some((e: string) => e.includes(u.replace(/https?:\/\//, '').split('/')[0])))
       .slice(0, remainingSlots);
-    let allCompetitorUrls = [...new Set([...explicitUrls, ...fillFromBrief])].slice(0, 3);
+    let allCompetitorUrls = [...new Set([...explicitUrls, ...fillFromBrief])].slice(0, 6);
+
+    // Track how many are user-provided (before AI detection fills the rest)
+    const numUserProvided = allCompetitorUrls.length;
 
     console.log('Competitor URLs before AI detection:', allCompetitorUrls);
 
-    // 2b. AI auto-detection of competitors when we have fewer than 3
+    // 2b. AI auto-detection of competitors when we have fewer than 6
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (allCompetitorUrls.length < 3 && anthropicApiKey && (websiteContent || briefContext)) {
+    if (allCompetitorUrls.length < 6 && anthropicApiKey && (websiteContent || briefContext)) {
       await updateProgress('auto_competidores', 'Detectando competidores automáticamente con IA...', 18);
       try {
-        const slotsNeeded = 3 - allCompetitorUrls.length;
+        const slotsNeeded = 6 - allCompetitorUrls.length;
         const existingDomains = allCompetitorUrls.map(u => {
           try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace('www.', ''); } catch { return u; }
         });
@@ -203,7 +209,7 @@ Solo dominios reales de tiendas que existan. NO inventes dominios.`;
           if (jsonMatch) {
             const detected: { url: string; reason: string }[] = JSON.parse(jsonMatch[0]);
             for (const comp of detected) {
-              if (allCompetitorUrls.length >= 3) break;
+              if (allCompetitorUrls.length >= 6) break;
               const compUrl = comp.url.startsWith('http') ? comp.url : `https://${comp.url}`;
               const compDomain = new URL(compUrl).hostname.replace('www.', '');
               if (compDomain !== clientDomain && !existingDomains.includes(compDomain)) {
@@ -222,7 +228,29 @@ Solo dominios reales de tiendas que existan. NO inventes dominios.`;
 
     console.log('Final competitor URLs to analyze:', allCompetitorUrls);
 
-    // 3. Scrape each competitor (max 3, sequentially)
+    // Save AI-detected competitors to competitor_tracking so they appear in panels
+    if (allCompetitorUrls.length > numUserProvided) {
+      for (let i = numUserProvided; i < allCompetitorUrls.length; i++) {
+        try {
+          const compUrl = allCompetitorUrls[i];
+          const fullUrl = compUrl.startsWith('http') ? compUrl : `https://${compUrl}`;
+          const domain = new URL(fullUrl).hostname.replace('www.', '');
+          const { error: upsErr } = await supabase.from('competitor_tracking').upsert({
+            client_id,
+            ig_handle: domain,
+            display_name: domain,
+            store_url: fullUrl,
+            is_active: true,
+          }, { onConflict: 'client_id,ig_handle' });
+          if (upsErr) console.error(`[analyze-brand-research] Error saving AI competitor ${domain}:`, upsErr);
+          else console.log(`[analyze-brand-research] Saved AI-detected competitor: ${domain}`);
+        } catch (saveErr) {
+          console.error('[analyze-brand-research] Error saving AI competitor:', saveErr);
+        }
+      }
+    }
+
+    // 3. Scrape each competitor (max 6, sequentially)
     const competitorContents: string[] = [];
     for (let i = 0; i < allCompetitorUrls.length; i++) {
       const url = allCompetitorUrls[i];
@@ -248,6 +276,7 @@ Solo dominios reales de tiendas que existan. NO inventes dominios.`;
       websiteContent: websiteContent.slice(0, 6000),
       competitorContents,
       clientProvidedUrls: allCompetitorUrls,
+      numUserProvided,
       brandContext: JSON.stringify(briefContext).slice(0, 3000),
       clientName: client.name,
       clientCompany: client.company || '',

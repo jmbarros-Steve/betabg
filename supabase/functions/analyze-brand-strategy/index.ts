@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
@@ -332,8 +332,11 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const token = authHeader.replace('Bearer ', '');
-    const isInternalCall = token === supabaseServiceKey;
+    const token = authHeader.replace('Bearer ', '').trim();
+    // Check internal call via both Authorization header AND X-Internal-Key custom header
+    // (the Supabase gateway may strip the JWT from the Authorization header on internal calls)
+    const internalKey = req.headers.get('X-Internal-Key')?.trim();
+    const isInternalCall = token === supabaseServiceKey || internalKey === supabaseServiceKey;
     if (!isInternalCall) {
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !user) {
@@ -351,7 +354,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { websiteContent, competitorContents, clientProvidedUrls, brandContext, clientName, clientCompany, websiteUrl } = research;
+    const { websiteContent, competitorContents, clientProvidedUrls, numUserProvided: researchNumUserProvided, brandContext, clientName, clientCompany, websiteUrl } = research;
 
     // Fetch knowledge base
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
@@ -375,7 +378,8 @@ Deno.serve(async (req) => {
     const phaseSection = fase_negocio ? `\nFASE: ${fase_negocio} | PRESUPUESTO: ${presupuesto_ads || 'N/A'} CLP` : '';
 
     // Build structured research data with client + 6 competitors
-    const numUserProvided = clientProvidedUrls?.length || 0;
+    // Use numUserProvided from research payload to correctly split user vs AI-detected
+    const numUserProvided = researchNumUserProvided ?? clientProvidedUrls?.length ?? 0;
     const userCompetitors: { url: string; scraping: unknown }[] = [];
     const autoCompetitors: { url: string; scraping: unknown }[] = [];
 
@@ -407,8 +411,8 @@ Deno.serve(async (req) => {
       auto_competitors: autoCompetitors,
     };
 
-    // Truncate to 20,000 chars — prioritize: client complete > user competitors > auto competitors
-    const truncatedResearch = JSON.stringify(researchData).slice(0, 20_000);
+    // Truncate to 35,000 chars — increased for 6 competitors (3 user + 3 AI-detected)
+    const truncatedResearch = JSON.stringify(researchData).slice(0, 35_000);
 
     // Update progress
     await supabase.from('brand_research').upsert(

@@ -364,8 +364,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
         setFieldValidation(data.field_validation);
       if (data.is_complete) {
           setIsComplete(true);
-          // Keep asset upload visible so user can still upload after completion
           toast.success('¡Brief de Marca completado! 🎉');
+          // Trigger analysis chain from frontend since edge function fire-and-forget
+          // gets killed by Deno after returning the response.
+          triggerAnalysisChain(clientId);
         }
       }
     } catch (error: any) {
@@ -396,6 +398,56 @@ export function SteveChat({ clientId }: SteveChatProps) {
   function handleExampleClick(example: string) {
     setInput(example);
     inputRef.current?.focus();
+  }
+
+  // Trigger the two-phase analysis chain (research → strategy) from the frontend.
+  // This replaces the fire-and-forget pattern in steve-chat which gets killed by Deno.
+  async function triggerAnalysisChain(cId: string) {
+    try {
+      // Get client website URL
+      const { data: clientData } = await supabase.from('clients').select('website_url').eq('id', cId).single();
+      // Get competitor URLs
+      const { data: competitors } = await supabase.from('competitor_tracking').select('store_url').eq('client_id', cId).eq('is_active', true);
+      const competitorUrls = (competitors || []).map(c => c.store_url).filter(Boolean);
+
+      toast.info('Analizando tu sitio y competencia... puede tomar unos minutos.');
+
+      // Phase 1: Research (scraping + AI competitor detection)
+      const { data: researchData, error: researchErr } = await supabase.functions.invoke('analyze-brand-research', {
+        body: { client_id: cId, website_url: clientData?.website_url, competitor_urls: competitorUrls },
+      });
+      if (researchErr || !researchData?.research) {
+        console.error('[triggerAnalysis] Research failed:', researchErr || researchData);
+        await supabase.from('brand_research').upsert({
+          client_id: cId, research_type: 'analysis_status',
+          research_data: { status: 'error', error: researchErr?.message || 'Research failed' },
+        }, { onConflict: 'client_id,research_type' });
+        return;
+      }
+
+      // Phase 2: Strategy (12 parallel Claude Sonnet calls)
+      const { data: strategyData, error: strategyErr } = await supabase.functions.invoke('analyze-brand-strategy', {
+        body: { client_id: cId, research: researchData.research },
+      });
+      if (strategyErr) {
+        console.error('[triggerAnalysis] Strategy failed:', strategyErr);
+        await supabase.from('brand_research').upsert({
+          client_id: cId, research_type: 'analysis_status',
+          research_data: { status: 'error', error: strategyErr?.message || 'Strategy failed' },
+        }, { onConflict: 'client_id,research_type' });
+        return;
+      }
+
+      // Mark complete
+      await supabase.from('brand_research').upsert({
+        client_id: cId, research_type: 'analysis_status',
+        research_data: { status: 'complete', research_completed_at: new Date().toISOString(), strategy_completed_at: new Date().toISOString() },
+      }, { onConflict: 'client_id,research_type' });
+
+      toast.success('¡Análisis completo! Revisa las pestañas Brief, Competencia y SEO.');
+    } catch (err) {
+      console.error('[triggerAnalysis] Error:', err);
+    }
   }
 
   async function handleRestart() {
