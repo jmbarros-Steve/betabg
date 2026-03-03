@@ -56,18 +56,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string): Promise<SignUpResult> => {
-    // Use edge function to create user with auto-confirmed email,
-    // so they can sign in immediately without email verification
+    // Use edge function to create user with auto-confirmed email
     const { data: fnData, error: fnError } = await supabase.functions.invoke('self-signup', {
       body: { email, password },
     });
 
-    if (fnError || fnData?.error) {
-      const message = fnData?.error || fnError?.message || 'Error al crear cuenta';
-      return { error: new Error(message) };
+    if (fnData?.error) {
+      return { error: new Error(fnData.error) };
+    }
+    if (fnError) {
+      // Try to read actual error from response body
+      try {
+        const body = await (fnError as any).context?.json?.();
+        if (body?.error) return { error: new Error(body.error) };
+      } catch { /* ignore */ }
+      return { error: new Error(fnError.message) };
     }
 
-    // User created and confirmed — now sign in to establish session
+    // User created (or already exists) — sign in to establish session
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,

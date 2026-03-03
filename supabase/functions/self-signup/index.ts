@@ -54,11 +54,14 @@ Deno.serve(async (req) => {
 
     if (createError) {
       console.error('Create user error:', createError.message);
-      const message = createError.message.includes('already been registered')
-        ? 'Este email ya está registrado'
-        : createError.message;
-      return new Response(JSON.stringify({ error: message }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      if (createError.message.includes('already been registered')) {
+        // Not an error — user exists, frontend will just sign in
+        return new Response(JSON.stringify({ exists: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ error: createError.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
