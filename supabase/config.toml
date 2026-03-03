@@ -164,3 +164,6 @@ verify_jwt = false
 
 [functions.meta-social-inbox]
 verify_jwt = false
+
+[functions.self-signup]
+verify_jwt = false

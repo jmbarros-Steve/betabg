@@ -14,6 +14,13 @@ import { passwordSchema } from '@/lib/password-validation';
 import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter';
 import logo from '@/assets/logo.jpg';
 
+// Always use production URL for auth redirects so emails never contain localhost
+const PROD_URL = 'https://betabg.vercel.app';
+const getAuthRedirectUrl = (path: string) => {
+  const base = window.location.hostname === 'localhost' ? PROD_URL : window.location.origin;
+  return `${base}${path}`;
+};
+
 const loginSchema = z.object({
   email: z.string().trim().email('Email inválido').max(255),
   password: z.string().min(1, 'La contraseña es requerida'),
@@ -154,7 +161,7 @@ export default function Auth() {
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?mode=reset`,
+        redirectTo: getAuthRedirectUrl('/auth?mode=reset'),
       });
       
       if (error) {
@@ -355,7 +362,7 @@ export default function Auth() {
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'google',
                       options: {
-                        redirectTo: `${window.location.origin}/auth`,
+                        redirectTo: getAuthRedirectUrl('/auth'),
                         queryParams: { prompt: 'select_account' },
                       },
                     });
