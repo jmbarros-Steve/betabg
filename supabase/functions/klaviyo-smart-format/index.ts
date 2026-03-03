@@ -115,7 +115,7 @@ Convierte esto en HTML optimizado para Klaviyo con todas las variables, bloques 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userMessage }],
@@ -125,7 +125,7 @@ Convierte esto en HTML optimizado para Klaviyo con todas las variables, bloques 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
       console.error('Anthropic error:', anthropicRes.status, errText);
-      return new Response(JSON.stringify({ error: 'AI processing failed' }), {
+      return new Response(JSON.stringify({ error: 'AI processing failed', detail: `Anthropic API ${anthropicRes.status}`, anthropic_error: errText.substring(0, 500) }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

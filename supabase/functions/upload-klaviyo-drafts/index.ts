@@ -112,7 +112,9 @@ serve(async (req) => {
           },
           send_strategy: {
             method: 'static',
-            options_static: null,
+            options_static: {
+              datetime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            },
           },
         }
       }

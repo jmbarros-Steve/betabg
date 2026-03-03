@@ -49,7 +49,7 @@ async function klaviyoFetch(url: string, apiKey: string, options: RequestInit = 
 
 // Step 1: Fetch available lists
 async function fetchLists(apiKey: string) {
-  const data = await klaviyoFetch(`${KLAVIYO_BASE}/lists/?page[size]=50`, apiKey);
+  const data = await klaviyoFetch(`${KLAVIYO_BASE}/lists/`, apiKey);
   return (data.data || []).map((l: any) => ({
     id: l.id,
     name: l.attributes?.name || 'Sin nombre',
@@ -92,11 +92,11 @@ async function createCampaign(
     },
     send_strategy: {
       method: sendStrategy === 'smart_send' ? 'smart_send_time' : 'static',
-      ...(sendStrategy === 'scheduled' && scheduledAt
-        ? { options_static: { datetime: scheduledAt } }
-        : {}),
+      options_static: {
+        datetime: scheduledAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      },
     },
-    campaign_messages: {
+    'campaign-messages': {
       data: [
         {
           type: 'campaign-message',
@@ -207,7 +207,7 @@ function generateEmailHtml(email: EmailStep): string {
 </head>
 <body>
   <div class="preheader">${email.previewText || ''}</div>
-  ${email.content.replace(/\n/g, '<br>')}
+  ${(email.content || '').replace(/\n/g, '<br>')}
 </body>
 </html>`.trim();
 }
@@ -267,8 +267,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch the plan
-    const { data: plan, error: planError } = await supabase
+    // Fetch the plan using service role to bypass RLS
+    const serviceSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const { data: plan, error: planError } = await serviceSupabase
       .from('klaviyo_email_plans')
       .select('*')
       .eq('id', plan_id)
@@ -281,7 +285,8 @@ Deno.serve(async (req) => {
     }
 
     const apiKey = await decryptApiKey(connection_id);
-    const emails = plan.emails as EmailStep[];
+    const rawEmails = plan.emails;
+    const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
     const results: Array<{ email_subject: string; template_id: string; campaign_id: string; status: string }> = [];
 
     for (let i = 0; i < emails.length; i++) {
@@ -355,7 +360,7 @@ Deno.serve(async (req) => {
     }
 
     // Update plan status
-    await supabase
+    await serviceSupabase
       .from('klaviyo_email_plans')
       .update({
         status: 'implemented',

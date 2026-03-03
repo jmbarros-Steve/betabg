@@ -172,7 +172,7 @@ async function handleGetFlowDetail(apiKey: string, body: any): Promise<Response>
   }
 
   const data = await klaviyoGet(
-    `${KLAVIYO_BASE}/flows/${flowId}/?include=flow-actions,flow-messages`,
+    `${KLAVIYO_BASE}/flows/${flowId}/?include=flow-actions`,
     apiKey,
   );
 
