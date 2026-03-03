@@ -80,6 +80,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     });
+
+    // If email not confirmed, auto-confirm via edge function and retry
+    if (error?.message?.includes('Email not confirmed')) {
+      const { error: confirmError } = await supabase.functions.invoke('self-signup', {
+        body: { email, password, action: 'confirm' },
+      });
+      if (!confirmError) {
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        return { error: retryError };
+      }
+    }
+
     return { error };
   };
 

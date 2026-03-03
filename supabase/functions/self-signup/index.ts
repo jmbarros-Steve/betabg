@@ -11,10 +11,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, password } = await req.json();
+    const { email, password, action } = await req.json();
 
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: 'Email y contraseña son requeridos' }), {
+    if (!email) {
+      return new Response(JSON.stringify({ error: 'Email requerido' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -24,6 +24,26 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // Action: confirm existing user's email
+    if (action === 'confirm') {
+      const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const user = users?.find(u => u.email === email);
+      if (user) {
+        await supabase.auth.admin.updateUserById(user.id, { email_confirm: true });
+        console.log('Email confirmed for:', email);
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Default action: create new user
+    if (!password) {
+      return new Response(JSON.stringify({ error: 'Contraseña requerida' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Create user with auto-confirmed email
     const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
