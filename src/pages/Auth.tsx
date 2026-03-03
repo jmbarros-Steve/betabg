@@ -114,8 +114,10 @@ export default function Auth() {
       if (mode === 'login') {
         const { error } = await signIn(email.trim(), password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Credenciales incorrectas');
+          if (error.message.includes('Email not confirmed')) {
+            toast.error('Debes confirmar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.');
+          } else if (error.message.includes('Invalid login credentials')) {
+            toast.error('Credenciales incorrectas. Verifica tu email y contraseña.');
           } else {
             toast.error(error.message);
           }
@@ -125,14 +127,14 @@ export default function Auth() {
       } else {
         const { error } = await signUp(email, password);
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('Este email ya está registrado');
+          if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+            toast.error('Este email ya está registrado. Intenta iniciar sesión.');
           } else {
             toast.error(error.message);
           }
         } else {
           toast.success('¡Cuenta creada exitosamente!');
-          navigate('/dashboard');
+          // signUp auto-signs in, useEffect will redirect
         }
       }
     } finally {

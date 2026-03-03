@@ -2,11 +2,15 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+interface SignUpResult {
+  error: Error | null;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -51,14 +55,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string): Promise<SignUpResult> => {
+    // Use edge function to create user with auto-confirmed email,
+    // so they can sign in immediately without email verification
+    const { data: fnData, error: fnError } = await supabase.functions.invoke('self-signup', {
+      body: { email, password },
+    });
+
+    if (fnError || fnData?.error) {
+      const message = fnData?.error || fnError?.message || 'Error al crear cuenta';
+      return { error: new Error(message) };
+    }
+
+    // User created and confirmed — now sign in to establish session
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
-      options: { emailRedirectTo: redirectUrl }
     });
-    return { error };
+    return { error: signInError };
   };
 
   const signIn = async (email: string, password: string) => {
