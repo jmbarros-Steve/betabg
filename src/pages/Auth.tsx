@@ -15,7 +15,7 @@ import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter';
 import logo from '@/assets/logo.jpg';
 
 // Always use production URL for auth redirects so emails never contain localhost
-const PROD_URL = 'https://betabg.vercel.app';
+const PROD_URL = 'https://betabgnuevosupa-git-main-jmbarros-steves-projects.vercel.app';
 const getAuthRedirectUrl = (path: string) => {
   const base = window.location.hostname === 'localhost' ? PROD_URL : window.location.origin;
   return `${base}${path}`;
