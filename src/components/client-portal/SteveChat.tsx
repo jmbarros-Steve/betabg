@@ -91,6 +91,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisPhase, setAnalysisPhase] = useState<'research' | 'strategy' | 'done' | null>(null);
   const [progress, setProgress] = useState({ answered: 0, total: 15 });
   const [examples, setExamples] = useState<string[]>([]);
   const [currentFields, setCurrentFields] = useState<QuestionField[]>([]);
@@ -252,6 +254,21 @@ export function SteveChat({ clientId }: SteveChatProps) {
           setProgress({ answered: progressAnswered, total: 17 });
           setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(progressAnswered, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
           setIsComplete(persona?.is_complete || false);
+
+          // Check if analysis is in progress (user might have refreshed while it was running)
+          if (persona?.is_complete) {
+            const { data: analysisRow } = await supabase
+              .from('brand_research')
+              .select('research_data')
+              .eq('client_id', clientId)
+              .eq('research_type', 'analysis_status')
+              .maybeSingle();
+            const status = (analysisRow?.research_data as any)?.status;
+            if (status === 'pending' || status === 'in_progress') {
+              setIsAnalyzing(true);
+              setAnalysisPhase('research');
+            }
+          }
         } else {
           await startNewConversation();
         }
@@ -403,14 +420,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
   // Trigger the two-phase analysis chain (research → strategy) from the frontend.
   // This replaces the fire-and-forget pattern in steve-chat which gets killed by Deno.
   async function triggerAnalysisChain(cId: string) {
+    setIsAnalyzing(true);
+    setAnalysisPhase('research');
     try {
       // Get client website URL
       const { data: clientData } = await supabase.from('clients').select('website_url').eq('id', cId).single();
       // Get competitor URLs
       const { data: competitors } = await supabase.from('competitor_tracking').select('store_url').eq('client_id', cId).eq('is_active', true);
       const competitorUrls = (competitors || []).map(c => c.store_url).filter(Boolean);
-
-      toast.info('Analizando tu sitio y competencia... puede tomar unos minutos.');
 
       // Phase 1: Research (scraping + AI competitor detection)
       const { data: researchData, error: researchErr } = await supabase.functions.invoke('analyze-brand-research', {
@@ -422,10 +439,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
           client_id: cId, research_type: 'analysis_status',
           research_data: { status: 'error', error: researchErr?.message || 'Research failed' },
         }, { onConflict: 'client_id,research_type' });
+        setIsAnalyzing(false);
+        setAnalysisPhase(null);
+        toast.error('Error en el análisis. Intenta de nuevo desde la pestaña Brief.');
         return;
       }
 
       // Phase 2: Strategy (12 parallel Claude Sonnet calls)
+      setAnalysisPhase('strategy');
       const { data: strategyData, error: strategyErr } = await supabase.functions.invoke('analyze-brand-strategy', {
         body: { client_id: cId, research: researchData.research },
       });
@@ -435,6 +456,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
           client_id: cId, research_type: 'analysis_status',
           research_data: { status: 'error', error: strategyErr?.message || 'Strategy failed' },
         }, { onConflict: 'client_id,research_type' });
+        setIsAnalyzing(false);
+        setAnalysisPhase(null);
+        toast.error('Error en la estrategia. Intenta de nuevo desde la pestaña Brief.');
         return;
       }
 
@@ -444,9 +468,18 @@ export function SteveChat({ clientId }: SteveChatProps) {
         research_data: { status: 'complete', research_completed_at: new Date().toISOString(), strategy_completed_at: new Date().toISOString() },
       }, { onConflict: 'client_id,research_type' });
 
+      setAnalysisPhase('done');
       toast.success('¡Análisis completo! Revisa las pestañas Brief, Competencia y SEO.');
+      // Keep the "done" phase visible for a few seconds, then hide
+      setTimeout(() => {
+        setIsAnalyzing(false);
+        setAnalysisPhase(null);
+      }, 5000);
     } catch (err) {
       console.error('[triggerAnalysis] Error:', err);
+      setIsAnalyzing(false);
+      setAnalysisPhase(null);
+      toast.error('Error inesperado en el análisis.');
     }
   }
 
@@ -645,10 +678,17 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
               <div className="bg-muted rounded-2xl rounded-bl-md px-5 py-4">
-                <div className="flex gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  {progress.answered >= progress.total - 1 && (
+                    <span className="text-xs text-muted-foreground ml-1 animate-pulse">
+                      Generando tu Brief estratégico... esto toma ~2 min
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -773,8 +813,32 @@ export function SteveChat({ clientId }: SteveChatProps) {
           <p className="text-xs text-muted-foreground mb-2">Responde sobre: <span className="font-medium text-foreground">{currentQuestionLabel}</span></p>
         )}
         {isComplete ? (
-          <div className="text-center py-2">
-            <p className="text-sm text-muted-foreground mb-2">
+          <div className="text-center py-2 space-y-3">
+            {isAnalyzing && analysisPhase && analysisPhase !== 'done' && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mx-2 animate-in fade-in duration-500">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    {analysisPhase === 'research'
+                      ? 'Investigando tu sitio web y competidores...'
+                      : 'Generando estrategia de marketing con IA...'}
+                  </span>
+                </div>
+                <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                  {analysisPhase === 'research'
+                    ? 'Escaneando sitios web, detectando competidores y recopilando datos (1-3 min)'
+                    : 'Analizando posicionamiento, audiencia, SEO y más (1-2 min)'}
+                </p>
+              </div>
+            )}
+            {analysisPhase === 'done' && (
+              <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-3 mx-2 animate-in fade-in duration-500">
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                  ¡Análisis completo! Revisa las pestañas Brief, Competencia y SEO.
+                </p>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
               🐕 ¡WOOF! Tu Brief de Marca está listo. Ve a la pestaña <strong>Brief</strong> para verlo y descargarlo.
             </p>
             <Button variant="outline" size="sm" onClick={handleRestart}>
