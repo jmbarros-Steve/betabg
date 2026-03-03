@@ -12,6 +12,26 @@ serve(async (req) => {
   }
 
   try {
+    // Auth: verify JWT
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     const { connectionId, campaign } = await req.json()
     console.log('upload-klaviyo-drafts received:', JSON.stringify({
       connectionId,
@@ -21,25 +41,29 @@ serve(async (req) => {
       htmlLength: campaign?.html?.length,
       hasAudienceId: !!campaign?.audienceId,
     }))
-    
+
     if (!connectionId || !campaign) {
       throw new Error('connectionId and campaign are required')
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Get API key from connection
+    // Verify connection ownership
     const { data: conn, error: connErr } = await supabase
       .from('platform_connections')
-      .select('api_key_encrypted')
+      .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
       .eq('id', connectionId)
+      .eq('platform', 'klaviyo')
       .single()
 
     if (connErr || !conn) {
       console.error('Connection not found:', connErr?.message)
       throw new Error('Connection not found')
+    }
+
+    const clientData = (conn as any).clients as { user_id: string; client_user_id: string | null }
+    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const { data: apiKeyData } = await supabase.rpc('decrypt_platform_token', {

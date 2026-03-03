@@ -41,15 +41,24 @@ serve(async (req) => {
       });
     }
 
+    // Verify connection ownership
     const { data: conn } = await supabase
       .from('platform_connections')
-      .select('api_key_encrypted')
+      .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
       .eq('id', connectionId)
+      .eq('platform', 'klaviyo')
       .single();
 
     if (!conn?.api_key_encrypted) {
       return new Response(JSON.stringify({ error: 'No Klaviyo connection found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const clientData = (conn as any).clients as { user_id: string; client_user_id: string | null };
+    if (clientData.user_id !== user!.id && clientData.client_user_id !== user!.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 

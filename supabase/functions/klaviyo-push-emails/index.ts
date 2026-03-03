@@ -239,7 +239,24 @@ Deno.serve(async (req) => {
       });
     }
 
+    const userId = claimsData.claims.sub as string;
     const body = await req.json();
+
+    // Helper: verify connection ownership
+    async function verifyConnectionOwnership(connId: string) {
+      const svc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: conn, error } = await svc
+        .from('platform_connections')
+        .select('id, clients!inner(user_id, client_user_id)')
+        .eq('id', connId)
+        .eq('platform', 'klaviyo')
+        .single();
+      if (error || !conn) throw new Error('Connection not found');
+      const client = (conn as any).clients as { user_id: string; client_user_id: string | null };
+      if (client.user_id !== userId && client.client_user_id !== userId) {
+        throw new Error('Forbidden');
+      }
+    }
 
     // Handle "fetch_lists" action
     if (body.action === 'fetch_lists') {
@@ -250,6 +267,7 @@ Deno.serve(async (req) => {
         });
       }
 
+      await verifyConnectionOwnership(connection_id);
       const apiKey = await decryptApiKey(connection_id);
       const lists = await fetchLists(apiKey);
 
@@ -266,6 +284,8 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    await verifyConnectionOwnership(connection_id);
 
     // Fetch the plan using service role to bypass RLS
     const serviceSupabase = createClient(
@@ -379,8 +399,9 @@ Deno.serve(async (req) => {
   } catch (error: unknown) {
     console.error('Error in klaviyo-push-emails:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
+    const status = message === 'Forbidden' ? 403 : message === 'Connection not found' ? 404 : 500;
     return new Response(JSON.stringify({ error: message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
