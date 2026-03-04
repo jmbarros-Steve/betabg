@@ -112,6 +112,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       'pages_read_engagement',
       'pages_manage_ads',
       'pages_manage_metadata',
+      'pages_messaging',
       'catalog_management',
       'public_profile',
       'email',

@@ -22,7 +22,7 @@ const FEATURE_SCOPE_MAP: Array<{
   { key: 'campaigns', label: 'Gestionar Campanas', requiredScopes: ['ads_management'] },
   { key: 'audiences', label: 'Audiencias y Segmentos', requiredScopes: ['ads_management'] },
   { key: 'pixel', label: 'Meta Pixel', requiredScopes: ['ads_management', 'ads_read'] },
-  { key: 'pages', label: 'Paginas y Social Inbox', requiredScopes: ['pages_read_engagement', 'pages_manage_ads'] },
+  { key: 'pages', label: 'Paginas y Social Inbox', requiredScopes: ['pages_read_engagement', 'pages_manage_ads', 'pages_messaging'] },
   { key: 'catalog', label: 'Catalogo de Productos', requiredScopes: ['catalog_management'] },
   { key: 'insights', label: 'Insights Avanzados', requiredScopes: ['read_insights'] },
 ];
@@ -36,6 +36,7 @@ export const ALL_REQUIRED_SCOPES = [
   'pages_read_engagement',
   'pages_manage_ads',
   'pages_manage_metadata',
+  'pages_messaging',
   'catalog_management',
   'public_profile',
   'email',

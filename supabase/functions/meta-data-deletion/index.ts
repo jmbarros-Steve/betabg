@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://betabgnuevosupa-git-main-jmbarros-steves-projects.vercel.app';
+const FRONTEND_URL = 'https://betabgnuevosupa-git-main-jmbarros-steves-projects.vercel.app';
 
 // Parse Meta's signed_request
 async function parseSignedRequest(signedRequest: string, appSecret: string): Promise<Record<string, unknown> | null> {

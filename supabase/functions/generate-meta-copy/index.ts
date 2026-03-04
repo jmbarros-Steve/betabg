@@ -743,7 +743,13 @@ Responde SOLO en JSON válido sin markdown ni backticks:
           messages: [{ role: 'user', content: prompt }],
         }),
       });
-      if (!aiResp.ok) throw new Error(`Anthropic API error ${aiResp.status}`);
+      if (!aiResp.ok) {
+        const errText = await aiResp.text();
+        console.error('Anthropic API error (variaciones):', aiResp.status, errText);
+        return new Response(JSON.stringify({ error: `Anthropic API error (${aiResp.status}): ${errText.slice(0, 300)}` }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       const aiData = await aiResp.json();
       const raw = aiData.content?.[0]?.text || '';
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -797,7 +803,13 @@ ${adType === 'static'
           messages: [{ role: 'user', content: prompt }],
         }),
       });
-      if (!aiResp.ok) throw new Error(`Anthropic API error ${aiResp.status}`);
+      if (!aiResp.ok) {
+        const errText = await aiResp.text();
+        console.error('Anthropic API error (brief_visual):', aiResp.status, errText);
+        return new Response(JSON.stringify({ error: `Anthropic API error (${aiResp.status}): ${errText.slice(0, 300)}` }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       const aiData = await aiResp.json();
       const raw = aiData.content?.[0]?.text || '';
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -1062,7 +1074,10 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
       }
       const errorText = await aiResponse.text();
       console.error('Anthropic API error:', aiResponse.status, errorText);
-      throw new Error(`Anthropic API error (${aiResponse.status})`);
+      return new Response(JSON.stringify({ error: `Anthropic API error (${aiResponse.status}): ${errorText.slice(0, 300)}` }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const aiData = await aiResponse.json();
