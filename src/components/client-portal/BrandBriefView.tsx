@@ -591,12 +591,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         .from('brand_research')
         .select('research_type, research_data')
         .eq('client_id', clientId)
-        .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
+        .in('research_type', ['executive_summary', 'seo_audit', 'competitive_analysis', 'competitor_analysis', 'keywords']);
       const dataInDb: Record<string, boolean> = {};
       for (const r of rows ?? []) {
         const d = (r as any).research_data;
         const has = !!d && (Array.isArray(d) ? d.length > 0 : typeof d === 'object' ? Object.keys(d).length > 0 : !!d);
         dataInDb[(r as any).research_type] = has;
+        if ((r as any).research_type === 'competitive_analysis') dataInDb['competitor_analysis'] = has;
       }
       setDiagnostic(prev => ({ ...prev, dataInDb }));
     })();
@@ -613,13 +614,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         .from('brand_research')
         .select('research_type, research_data')
         .eq('client_id', clientId)
-        .in('research_type', ['executive_summary', 'seo_audit', 'competitor_analysis', 'keywords']);
+        .in('research_type', ['executive_summary', 'seo_audit', 'competitive_analysis', 'competitor_analysis', 'keywords']);
       return (rows ?? []).some((r: any) => {
         const d = r.research_data;
         if (!d || typeof d !== 'object') return false;
         if (r.research_type === 'executive_summary' && (d.summary || d.executive_summary)) return true;
         if (r.research_type === 'seo_audit' && (d.issues?.length || d.recommendations?.length || d.score != null || d.score_seo != null || d.problemas_detectados?.length || d.acciones_prioritarias?.length)) return true;
-        if (r.research_type === 'competitor_analysis' && (d.competitors?.length || d.individual_analysis?.length || d.overview)) return true;
+        if ((r.research_type === 'competitor_analysis' || r.research_type === 'competitive_analysis') && (d.competitors?.length || d.individual_analysis?.length || d.overview)) return true;
         if (r.research_type === 'keywords' && (d.recommended?.length || d.primary?.length || d.primary_keywords?.length || d.competitor_keywords?.length)) return true;
         return false;
       });
