@@ -18,7 +18,7 @@ export type PdfHelpers = {
   addWatermark: () => void;
   addBody: (text: string, indent?: number, lineH?: number) => void;
   addSubTitle: (title: string) => void;
-  addSectionHeader: (num: string, title: string) => void;
+  addSectionHeader: (numOrTitle: string, title?: string) => void;
   addInsightBox: (text: string) => void;
   addKeyValue: (label: string, value: string) => void;
   addArrowBullet: (text: string, indent?: number) => void;
@@ -109,7 +109,7 @@ export function renderGlossaryBox(
   // Gold left border
   doc.setFillColor(accentR, accentG, accentB);
   doc.rect(margin, y, 3, 9, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('NotoSans', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(accentR, accentG, accentB);
   doc.text('GLOSARIO', margin + 8, y + 6.2);
@@ -118,7 +118,7 @@ export function renderGlossaryBox(
 
   for (let i = 0; i < items.length; i++) {
     // Measure definition for block height
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('NotoSans', 'normal');
     doc.setFontSize(7.5);
     const defLines = doc.splitTextToSize(items[i].def, maxWidth - 14);
     const blockH = 6 + defLines.length * 4 + 3;
@@ -132,7 +132,7 @@ export function renderGlossaryBox(
     doc.rect(margin, y - 1.5, 2, blockH, 'F');
 
     // Term in bold gold — on its own line
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('NotoSans', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(accentR, accentG, accentB);
     doc.text(items[i].term, margin + 6, y);
@@ -141,7 +141,7 @@ export function renderGlossaryBox(
     helpers.setY(y);
 
     // Definition in dark gray, wrapped — clearly below term
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('NotoSans', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(60, 60, 70);
     for (let li = 0; li < defLines.length; li++) {
@@ -194,12 +194,12 @@ export function renderBrandIdentity(
       const y0 = helpers.getY();
       doc.setFillColor(245, 246, 252);
       doc.roundedRect(margin, y0 - 2, maxWidth, 8, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(ctx.accentR, ctx.accentG, ctx.accentB);
       doc.text(`${label}:`, margin + 4, y0 + 3);
       const labelW = doc.getTextWidth(`${label}: `);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 50);
       const cleanVal = helpers.stripEmojis(String(val));
@@ -447,7 +447,7 @@ export function renderCompetitorCards(
     doc.setFillColor(accentR, accentG, accentB);
     doc.rect(margin, y + 9, maxWidth, 1, 'F');
 
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('NotoSans', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
     doc.text(`${i + 1}. ${String(comp.name || comp.url || 'Competidor').slice(0, 35)}`, margin + 5, y + 7);
@@ -462,7 +462,7 @@ export function renderCompetitorCards(
         : threat.includes('medio') || threat.includes('medium') ? 'MEDIO' : 'BAJO';
       doc.setFillColor(...threatColor);
       doc.roundedRect(ctx.pageWidth - margin - 28, y + 2, 24, 6, 2, 2, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7);
       doc.setTextColor(255, 255, 255);
       doc.text(threatLabel, ctx.pageWidth - margin - 16, y + 6, { align: 'center' });
@@ -482,7 +482,7 @@ export function renderCompetitorCards(
       y = helpers.getY();
       doc.setFillColor(230, 250, 235);
       doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(22, 120, 50);
       doc.text('FORTALEZAS', margin + 5, y + 2.5);
@@ -499,7 +499,7 @@ export function renderCompetitorCards(
       y = helpers.getY();
       doc.setFillColor(255, 235, 235);
       doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(180, 40, 40);
       doc.text('DEBILIDADES', margin + 5, y + 2.5);
@@ -515,7 +515,7 @@ export function renderCompetitorCards(
       y = helpers.getY();
       doc.setFillColor(255, 248, 230);
       doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(180, 120, 0);
       doc.text('QUE HACEN MEJOR', margin + 5, y + 2.5);
@@ -529,7 +529,7 @@ export function renderCompetitorCards(
       y = helpers.getY();
       doc.setFillColor(230, 240, 255);
       doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 5, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(22, 80, 160);
       doc.text('NUESTRA VENTAJA', margin + 5, y + 2.5);
@@ -593,7 +593,7 @@ export function renderKeywordPhases(
     doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
     doc.setFillColor(accentR, accentG, accentB);
     doc.rect(margin, y + 9, maxWidth, 1, 'F');
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('NotoSans', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
     const phaseTitle = `${style.label}${focus ? ': ' + focus : ''}${timeline ? ' — ' + timeline : ''}`;
@@ -613,11 +613,11 @@ export function renderKeywordPhases(
       const kwLines = doc.splitTextToSize(kwText, maxWidth - 12);
       const kwBoxH = kwLines.length * 4.5 + 5;
       doc.roundedRect(margin, y, maxWidth, kwBoxH, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(...style.color);
       doc.text('Keywords:', margin + 4, y + 4);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(40, 40, 50);
       for (let kli = 0; kli < kwLines.length; kli++) {
@@ -634,7 +634,7 @@ export function renderKeywordPhases(
       const kpiLines = doc.splitTextToSize(kpiText, maxWidth - 12);
       const kpiBoxH = kpiLines.length * 4.5 + 4;
       doc.roundedRect(margin, y, maxWidth, kpiBoxH, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 100, 120);
       for (let kli = 0; kli < kpiLines.length; kli++) {
@@ -703,7 +703,7 @@ export function renderMetaAdsStrategy(
       // Stage label
       helpers.checkPage(10);
       let y = helpers.getY();
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(ctx.brandR, ctx.brandG, ctx.brandB);
       doc.text(stageLabels[stage] || stage.toUpperCase(), margin + 2, y);
@@ -725,13 +725,13 @@ export function renderMetaAdsStrategy(
         doc.setFillColor(245, 246, 252);
         doc.roundedRect(cx, chipY, chipW - 3, 9, 1, 1, 'F');
         // Metric name
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setFontSize(7);
         doc.setTextColor(100, 100, 120);
         const metricName = String(entries[ei][0]).replace(/_/g, ' ').toUpperCase();
         doc.text(metricName, cx + 2, chipY + 3.5);
         // Metric value
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setFontSize(8.5);
         doc.setTextColor(ctx.brandR, ctx.brandG, ctx.brandB);
         doc.text(String(entries[ei][1]), cx + 2, chipY + 7.5);
@@ -786,19 +786,19 @@ export function renderGoogleAdsStrategy(
       doc.setFillColor(...cColor);
       doc.rect(margin, y, 3, 24, 'F');
       // Variant label
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7);
       doc.setTextColor(...cColor);
       doc.text(`Variante ${copy.variant || ci + 1}`, margin + 7, y + 5);
       // Headlines
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(40, 40, 50);
       const headlines = [copy.headline1, copy.headline2, copy.headline3].filter(Boolean).join(' | ');
       const hLines = doc.splitTextToSize(helpers.stripEmojis(headlines), maxWidth - 12);
       doc.text(hLines[0] || '', margin + 7, y + 11);
       // Descriptions
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(60, 60, 70);
       if (copy.description1) {
@@ -894,7 +894,7 @@ export function renderAdsLibraryAnalysis(
       doc.rect(margin, y + 5, maxWidth, 4, 'F');
 
       // Concept name
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(255, 255, 255);
       doc.text(`Concepto ${i + 1}: ${String(cc.nombre || cc.name || '').slice(0, 40)}`, margin + 4, y + 6);
@@ -904,7 +904,7 @@ export function renderAdsLibraryAnalysis(
       if (fmt) {
         doc.setFillColor(accentR, accentG, accentB);
         doc.roundedRect(ctx.pageWidth - margin - 26, y + 2, 24, 5, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setFontSize(6.5);
         doc.setTextColor(255, 255, 255);
         doc.text(fmt.slice(0, 12), ctx.pageWidth - margin - 14, y + 5.5, { align: 'center' });
@@ -913,7 +913,7 @@ export function renderAdsLibraryAnalysis(
       y += 12;
       // Hook in bold
       if (cc.hook) {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(40, 40, 50);
         const hookLines = doc.splitTextToSize(`"${cc.hook}"`, maxWidth - 12);
@@ -922,7 +922,7 @@ export function renderAdsLibraryAnalysis(
       }
       // Copy
       if (cc.copy) {
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('NotoSans', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(60, 60, 70);
         const copyLines = doc.splitTextToSize(cc.copy, maxWidth - 12);
@@ -936,7 +936,7 @@ export function renderAdsLibraryAnalysis(
         y += 1;
         doc.setFillColor(...cColor);
         doc.roundedRect(margin + 5, y, 40, 6, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('NotoSans', 'bold');
         doc.setFontSize(7);
         doc.setTextColor(255, 255, 255);
         doc.text(String(cc.cta).slice(0, 20), margin + 25, y + 4, { align: 'center' });
@@ -997,7 +997,7 @@ export function renderBudgetAndFunnel(
     let y = helpers.getY();
     doc.setFillColor(accentR, accentG, accentB);
     doc.roundedRect(margin, y, maxWidth, 16, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('NotoSans', 'bold');
     doc.setFontSize(7);
     doc.setTextColor(255, 255, 255);
     doc.text('PRESUPUESTO MENSUAL TOTAL', margin + 6, y + 5.5);
@@ -1044,7 +1044,7 @@ export function renderBudgetAndFunnel(
       doc.setFillColor(...camp.color);
       doc.roundedRect(margin, y, maxWidth, 10, 2, 2, 'F');
       doc.rect(margin, y + 6, maxWidth, 4, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(255, 255, 255);
       const budgetPct = data.budget_percentage ? ` — ${data.budget_percentage}%` : '';
@@ -1068,11 +1068,11 @@ export function renderBudgetAndFunnel(
           doc.roundedRect(margin + 2, y - 1, maxWidth - 4, 12, 1, 1, 'F');
           doc.setFillColor(...camp.color);
           doc.rect(margin + 2, y - 1, 2, 12, 'F');
-          doc.setFont('helvetica', 'bold');
+          doc.setFont('NotoSans', 'bold');
           doc.setFontSize(8);
           doc.setTextColor(...camp.color);
           doc.text(helpers.stripEmojis(adSet.name || '').slice(0, 40), margin + 7, y + 2.5);
-          doc.setFont('helvetica', 'normal');
+          doc.setFont('NotoSans', 'normal');
           doc.setFontSize(7.5);
           doc.setTextColor(60, 60, 70);
           if (adSet.variable_tested) doc.text(`Variable: ${helpers.stripEmojis(adSet.variable_tested).slice(0, 50)}`, margin + 7, y + 6.5);
@@ -1092,11 +1092,11 @@ export function renderBudgetAndFunnel(
             const cx = margin + 2 + mi * chipW;
             doc.setFillColor(245, 246, 252);
             doc.roundedRect(cx, y, chipW - 2, 8, 1, 1, 'F');
-            doc.setFont('helvetica', 'bold');
+            doc.setFont('NotoSans', 'bold');
             doc.setFontSize(6.5);
             doc.setTextColor(100, 100, 120);
             doc.text(String(metrics[mi][0]).replace(/_/g, ' ').toUpperCase(), cx + 2, y + 3);
-            doc.setFont('helvetica', 'bold');
+            doc.setFont('NotoSans', 'bold');
             doc.setFontSize(8);
             doc.setTextColor(...camp.color);
             doc.text(String(metrics[mi][1]), cx + 2, y + 7);
@@ -1161,11 +1161,11 @@ export function renderBudgetAndFunnel(
       doc.roundedRect(margin, y, maxWidth, 10, 1, 1, 'F');
       doc.setFillColor(...phase.color);
       doc.rect(margin, y, 3, 10, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(...phase.color);
       doc.text(`${pd.phase || phase.key} — ROAS: ${pd.roas || 'N/D'}`, margin + 6, y + 4);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('NotoSans', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(60, 60, 70);
       if (pd.reasoning) {
@@ -1199,7 +1199,7 @@ export function renderBudgetAndFunnel(
       // Phase header
       doc.setFillColor(...style.color);
       doc.roundedRect(margin, y, maxWidth, 8, 2, 2, 'F');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSans', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(255, 255, 255);
       const days = phaseData.days || '';

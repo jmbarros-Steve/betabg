@@ -234,10 +234,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       const patrones: string[] = [];
       if (hasQuestions > winnerTexts.length * 0.3) patrones.push('Usan preguntas en el copy para generar curiosidad');
-      if (hasEmojis > winnerTexts.length * 0.4) patrones.push('Uso frecuente de emojis para llamar la atencion');
-      if (hasNumbers > winnerTexts.length * 0.2) patrones.push('Incluyen numeros y estadisticas en sus ads ganadores');
-      if (winners.length > 3) patrones.push(`${winners.length} ads llevan mas de 30 dias - estan escalando agresivamente`);
-      if (patrones.length === 0) patrones.push('Patron mixto - necesitan mas data para identificar tendencias claras');
+      if (hasEmojis > winnerTexts.length * 0.4) patrones.push('Uso frecuente de emojis para llamar la atención');
+      if (hasNumbers > winnerTexts.length * 0.2) patrones.push('Incluyen números y estadísticas en sus ads ganadores');
+      if (winners.length > 3) patrones.push(`${winners.length} ads llevan mas de 30 días - están escalando agresivamente`);
+      if (patrones.length === 0) patrones.push('Patrón mixto - necesitan más data para identificar tendencias claras');
 
       // Analyze copy angles from winner ads
       const angulos: string[] = [];
@@ -256,7 +256,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       const avgDays = ads.reduce((s, a) => s + (a.days_running || 0), 0) / Math.max(ads.length, 1);
       const estMinDaily = activeAds.length * 15; // conservative: $15/day per ad
       const estMaxDaily = activeAds.length * 50; // aggressive: $50/day per ad
-      const estimacion = `Estimacion: $${estMinDaily}-$${estMaxDaily} USD/dia (${activeAds.length} ads activos, promedio ${Math.round(avgDays)} dias)`;
+      const estimacion = `Estimación: $${estMinDaily}-$${estMaxDaily} USD/día (${activeAds.length} ads activos, promedio ${Math.round(avgDays)} días)`;
 
       // Winner insights
       const ganadorInsights: string[] = [];
@@ -273,10 +273,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         recomendaciones.push(`Hay ${winners.length} ads ganadores (30d+). Analiza sus copies y crea versiones mejoradas.`);
       }
       if (topCtas[0]) {
-        recomendaciones.push(`CTA mas popular: ${topCtas[0]}. Considera usar el mismo para competir.`);
+        recomendaciones.push(`CTA más popular: ${topCtas[0]}. Considera usar el mismo para competir.`);
       }
       if (uniqueAngulos[0]) {
-        recomendaciones.push(`Angulo dominante: ${uniqueAngulos[0]}. Prueba un angulo diferente para diferenciarte.`);
+        recomendaciones.push(`Ángulo dominante: ${uniqueAngulos[0]}. Prueba un angulo diferente para diferenciarte.`);
       }
       if (activeAds.length > 10) {
         recomendaciones.push(`Competidores tienen ${activeAds.length} ads activos. Necesitas al menos ${Math.ceil(activeAds.length * 0.5)} para competir.`);
@@ -464,7 +464,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  Analisis de Steve — Inteligencia Competitiva
+                  Análisis de Steve — Inteligencia Competitiva
                 </CardTitle>
                 <CardDescription className="text-xs">
                   Patrones detectados en {ads.length} anuncios de {tracking.length} competidores
@@ -490,7 +490,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                   {/* Angles & Formats */}
                   <div className="space-y-2">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <BarChart3 className="h-3.5 w-3.5" /> Angulos y Formatos
+                      <BarChart3 className="h-3.5 w-3.5" /> Ángulos y Formatos
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
                       {analysis.angulos_frecuentes.map((a, i) => (
@@ -516,7 +516,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                 {/* Spend Estimation */}
                 <div className="p-3 rounded-lg bg-background border border-border/50">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <BarChart3 className="h-3.5 w-3.5" /> Estimacion de Gasto
+                    <BarChart3 className="h-3.5 w-3.5" /> Estimación de Gasto
                   </h4>
                   <p className="text-sm font-medium">{analysis.estimacion_gasto}</p>
                 </div>

@@ -67,6 +67,7 @@ const CAMPAIGN_TYPES: Record<string, { name: string; focus: string; tips: string
 };
 
 export async function generateGoogleCopy(c: Context) {
+  try {
   const { clientId, campaignType, customPrompt } = await c.req.json();
 
   if (!clientId) {
@@ -217,7 +218,8 @@ REGLAS:
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+    console.error('[generate-google-copy] ANTHROPIC_API_KEY not configured');
+    return c.json({ error: 'Error interno del servidor' }, 500);
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -242,7 +244,8 @@ REGLAS:
       return c.json({ error: 'Rate limit exceeded' }, 429);
     }
     const errorBody = await response.text();
-    throw new Error(`Anthropic API error (${response.status}): ${errorBody}`);
+    console.error('[generate-google-copy] Anthropic API error:', response.status, errorBody);
+    return c.json({ error: 'Error generando el copy. Intenta de nuevo.' }, 500);
   }
 
   const data: any = await response.json();
@@ -250,10 +253,15 @@ REGLAS:
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('Invalid JSON response from AI');
+    console.error('[generate-google-copy] Invalid JSON response from AI');
+    return c.json({ error: 'Error procesando la respuesta. Intenta de nuevo.' }, 500);
   }
 
   const generatedCopy = JSON.parse(jsonMatch[0]);
 
   return c.json(generatedCopy);
+  } catch (err: any) {
+    console.error('[generate-google-copy]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

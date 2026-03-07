@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, Lightbulb } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, Lightbulb, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -40,12 +46,13 @@ export default function ClientPortal() {
   const { isClient, isAdmin, isSuperAdmin, isShopifyUser, loading: roleLoading, clientData } = useUserRole();
 
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('metrics');
-  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(new Set(['metrics']));
+  const [activeTab, setActiveTab] = useState<TabType>('connections');
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(new Set(['connections']));
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
+  const [defaultTabResolved, setDefaultTabResolved] = useState(false);
 
   // Track visited tabs so they stay mounted (preserves state like in-flight API calls)
   useEffect(() => {
@@ -150,6 +157,59 @@ export default function ClientPortal() {
     }
   }, [roleLoading, isClient, isAdmin, isSuperAdmin, isShopifyUser, isAdminView, user, urlClientId, navigate]);
 
+  // Determine smart default tab based on user state
+  useEffect(() => {
+    if (defaultTabResolved || roleLoading || authLoading) return;
+    const id = isAdminView ? urlClientId : clientData?.id;
+    if (!id) return;
+
+    async function resolveDefaultTab() {
+      try {
+        // Check if user has platform connections
+        const { data: connections } = await supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', id)
+          .limit(1);
+
+        const hasConnections = connections && connections.length > 0;
+
+        if (!hasConnections) {
+          // No connections: go to Conexiones
+          setActiveTab('connections');
+          setVisitedTabs(new Set(['connections']));
+        } else {
+          // Has connections: check if brief exists
+          const { data: brief } = await supabase
+            .from('brand_briefs')
+            .select('id')
+            .eq('client_id', id)
+            .limit(1);
+
+          const hasBrief = brief && brief.length > 0;
+
+          if (!hasBrief) {
+            // Has connections but no brief: go to Steve
+            setActiveTab('steve');
+            setVisitedTabs(new Set(['steve']));
+          } else {
+            // Has connections and brief: go to Metricas
+            setActiveTab('metrics');
+            setVisitedTabs(new Set(['metrics']));
+          }
+        }
+      } catch (e) {
+        // On error, default to metrics
+        setActiveTab('metrics');
+        setVisitedTabs(new Set(['metrics']));
+      } finally {
+        setDefaultTabResolved(true);
+      }
+    }
+
+    resolveDefaultTab();
+  }, [defaultTabResolved, roleLoading, authLoading, isAdminView, urlClientId, clientData?.id]);
+
   // Fetch client logo
   useEffect(() => {
     const id = isAdminView ? urlClientId : clientData?.id;
@@ -174,21 +234,26 @@ export default function ClientPortal() {
     return null;
   }
 
-  const tabs = [
+  const primaryTabs = [
+    { id: 'steve', label: 'Steve', icon: Bot },
+    { id: 'brief', label: 'Brief', icon: FileText },
     { id: 'metrics', label: 'Métricas', icon: BarChart3 },
+    { id: 'connections', label: 'Conexiones', icon: Link2 },
+    { id: 'config', label: 'Configuración', icon: Settings },
+  ] as const;
+
+  const secondaryTabs = [
     { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
-    { id: 'connections', label: 'Conexiones', icon: Link2 },
-    { id: 'brief', label: 'Brief', icon: FileText },
     { id: 'competitors', label: 'Competencia', icon: Instagram },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
-    { id: 'steve', label: 'Steve', icon: Bot },
     { id: 'estrategia', label: 'Estrategia', icon: Lightbulb },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
-    { id: 'config', label: 'Configuración', icon: Settings },
   ] as const;
+
+  const tabs = [...primaryTabs, ...secondaryTabs] as const;
 
   return (
     <div className="min-h-screen bg-background">
@@ -237,7 +302,7 @@ export default function ClientPortal() {
       <div className="container px-6 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-          {tabs.map((tab) => (
+          {primaryTabs.map((tab) => (
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'ghost'}
@@ -248,6 +313,29 @@ export default function ClientPortal() {
               {tab.label}
             </Button>
           ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={secondaryTabs.some(t => t.id === activeTab) ? 'default' : 'ghost'}
+                className="flex items-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap"
+              >
+                {secondaryTabs.find(t => t.id === activeTab)?.label || 'Más'}
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {secondaryTabs.map((tab) => (
+                <DropdownMenuItem
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 text-xs ${activeTab === tab.id ? 'bg-primary/10 text-primary' : ''}`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Content — tabs stay mounted once visited so in-flight requests complete */}

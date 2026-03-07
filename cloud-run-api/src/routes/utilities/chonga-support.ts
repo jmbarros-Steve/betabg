@@ -27,11 +27,13 @@ interface Message {
 }
 
 export async function chongaSupport(c: Context) {
+  try {
   const { messages } = await c.req.json() as { messages: Message[] };
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY is not configured');
+    console.error('[chonga-support] ANTHROPIC_API_KEY is not configured');
+    return c.json({ error: 'Error interno del servidor' }, 500);
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -54,12 +56,16 @@ export async function chongaSupport(c: Context) {
       return c.json({ error: 'Rate limit exceeded' }, 429);
     }
     const text = await response.text();
-    console.error('Anthropic API error:', response.status, text);
-    throw new Error('Anthropic API error');
+    console.error('[chonga-support] Anthropic API error:', response.status, text);
+    return c.json({ error: 'Error interno del servidor' }, 500);
   }
 
   const data: any = await response.json();
   const message = data.content?.[0]?.text || '';
 
   return c.json({ message });
+  } catch (err: any) {
+    console.error('[chonga-support]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

@@ -26,7 +26,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: ['www.mitienda.cl', 'mitienda.myshopify.com', 'www.mimarca.com.ar'],
       fields: [{ key: 'url', label: '🌐 URL de tu sitio web o tienda online', type: 'text', placeholder: 'Ej: www.mitienda.cl' }],
       steveIntro: '*olisquea el aire y se prepara* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford. Vamos a ir charlando y con lo que me cuentes voy armando tu **Brief Estratégico**. El brief todavía no está listo — cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso.\n\nPara empezar necesito UNA cosa:\n\n',
-      commentGuide: 'Responde en tono conversacional. Si da URL válida, confirma brevemente y pasa a Pregunta 1. Si escribe "sin web" o "no tengo", explícale que sin URL no hay análisis SEO ni comparación; pueden usar Instagram o perfil Shopify. No avances sin URL. No inventes otros ejemplos; invita a usar los de abajo.',
+      commentGuide: 'Responde en tono conversacional. Si da URL válida, confirma brevemente y pasa a Pregunta 1. Si escribe "sin web" o "no tengo", ACEPTA: explica que el análisis SEO y competitivo será limitado sin URL pero que pueden continuar y agregarla después, y avanza a Pregunta 1. También acepta URLs de Instagram o perfil Shopify. No inventes otros ejemplos; invita a usar los de abajo.',
     },
     {
       id: 'business_pitch',
@@ -76,7 +76,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'facebook', label: '👥 Facebook', type: 'number', suffix: '%', placeholder: '0' },
       ],
       validation: 'sum_100',
-      steveIntro: '*ladea la cabeza curioso*\n\nPara saber dónde enfocar la estrategia necesito que me digas cómo se reparten hoy tus ventas. ',
+      steveIntro: '*ladea la cabeza curioso* 🐕\n\nPara saber dónde enfocar la estrategia necesito que me digas cómo se reparten hoy tus ventas. ',
       commentGuide: 'Comenta en 1-3 oraciones. Analiza si la distribución tiene sentido. Da contexto breve antes de pedir el formulario ("Llena los campos…").',
     },
     {
@@ -87,7 +87,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       fields: [
         { key: 'name', label: '👤 Nombre ficticio', type: 'text', placeholder: 'Ej: María' },
         { key: 'age', label: '🎂 Edad', type: 'number', placeholder: 'Ej: 32' },
-        { key: 'gender', label: '⚧ Género', type: 'text', placeholder: 'Ej: Mujer' },
+        { key: 'gender', label: '🧑 Género', type: 'text', placeholder: 'Ej: Mujer' },
         { key: 'city', label: '📍 Ciudad / Zona', type: 'text', placeholder: 'Ej: Santiago' },
         { key: 'occupation', label: '💼 Ocupación', type: 'text', placeholder: 'Ej: Diseñadora freelance' },
         { key: 'income', label: '💰 Ingreso mensual aprox.', type: 'text', prefix: '$', placeholder: 'Ej: 1.500.000' },
@@ -130,7 +130,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       question: '**Pregunta 8 de 16 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers o cuentas sigue?',
       examples: [],
       fields: [],
-      steveIntro: '*mueve la cola curioso*\n\n',
+      steveIntro: '*mueve la cola curioso* 🐕\n\n',
       commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona. HAZ INFERENCIAS: en base a edad, ingreso, ocupación, deduce qué consume. NO escribas otros ejemplos en tu mensaje; solo invita a usar los de abajo.',
     },
     {
@@ -162,7 +162,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'comp3_fail', label: '3️⃣ Competidor 3: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: '' },
         { key: 'comp3_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: '' },
       ],
-      steveIntro: '*gruñe con desconfianza*\n\nAhora cuéntame para cada uno qué prometen y no cumplen, y por qué tú lo haces mejor. ',
+      steveIntro: '*gruñe con desconfianza* 🐕\n\nAhora cuéntame para cada uno qué prometen y no cumplen, y por qué tú lo haces mejor. ',
       commentGuide: 'Analiza si las diferenciaciones son REALES. Da contexto breve antes de pedir el formulario.',
     },
     {
@@ -250,16 +250,20 @@ PERSONALIDAD:
 
 ---
 
+IMPORTANTE: La PRIMERA VEZ que La Chonga aparece en una conversación, Steve debe introducirla brevemente ANTES del bloque de La Chonga. Ejemplo:
+*De pronto, una figura translúcida aparece con un café...* 👻
+"Ah, esta es La Chonga, mi amiga abogada que ya no está con nosotros pero aparece de vez en cuando para dar su opinión experta."
+Luego incluye el bloque normal de La Chonga. En apariciones siguientes, NO repitas la introducción.
+
 🚨 REGLA ABSOLUTA #1: ORDEN DE PREGUNTAS
 ESTÁS SIGUIENDO UN CUESTIONARIO DE UNA PREGUNTA INICIAL (Q0: URL del sitio web) + 16 PREGUNTAS.
 Las preguntas se hacen EN ORDEN: Q0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16.
 NUNCA te saltes una. NUNCA cambies el orden.
 NUNCA pidas fotos, logos ni archivos visuales antes de la Pregunta 16.
 
-Q0 (website_url) es OBLIGATORIA y BLOQUEANTE:
-- Si el cliente escribe "sin web" → RECHAZA. Explica que sin URL no se puede hacer el análisis.
-- Acepta alternativas: URL de Instagram, perfil de Shopify. Pero DEBE dar algo.
-- SOLO después de obtener URL válida, avanza a la Pregunta 1.
+Q0 (website_url): Si el cliente escribe "sin web" o "no tengo", ACEPTA la respuesta [AVANZAR] y explica que el análisis SEO y competitivo será limitado sin URL, pero que pueden continuar y agregarla después. Guárdalos con URL vacía.
+- También acepta alternativas: URL de Instagram, perfil de Shopify.
+- Después de obtener URL o aceptar "sin web", avanza a la Pregunta 1.
 
 Tu trabajo en CADA turno:
 1. Reaccionar a lo que dijo (1-3 oraciones, conversacional)
@@ -396,7 +400,7 @@ FORMATO (headers markdown ##):
 - **Tono y personalidad de marca:** [guía de comunicación concreta]
 - **Identidad visual:** [descripción profesional de paleta, estilo y coherencia]
 
-## 7. EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS (Framework SCR)
+## 7. EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS (Framework SCR (Situación-Complicación-Resolución))
 
 ### Accionable 1: [Título una oración]
 **Situación (S):** [Contexto actual basado en datos del brief]
@@ -449,7 +453,7 @@ FORMATO (headers markdown ##):
 |---|---|---|---|
 | TOFU | Video / Reels | Awareness | 30% |
 | MOFU | Carrusel | Tráfico | 30% |
-| BOFU | Dynamic Product Ads | Conversiones | 40% |
+| BOFU | Dynamic Product Ads (Anuncios Dinámicos de Producto) | Conversiones | 40% |
 
 **Recomendaciones creativas (MECE):**
 **Hallazgo:** [Diagnóstico del tipo de creativo que mejor convierte en este sector]
@@ -552,23 +556,23 @@ FORMATO (headers markdown ##):
 - **Hallazgo:** / **Recomendación:** / **Justificación:** / **KPI:**
 
 **SEO 1.3 — Schema Markup:**
-- **Hallazgo:** Sin schema markup, Google no muestra Rich Snippets.
+- **Hallazgo:** Sin schema markup, Google no muestra Rich Snippets (Fragmentos Enriquecidos).
 - **Recomendación:** Implementar schema.org/Product con: name, description, image, offers, AggregateRating.
-- **Justificación:** Rich Snippets incrementan CTR orgánico 20–30%.
-- **KPI:** Rich Snippets activos en ≤ 14 días; CTR +25%
+- **Justificación:** Rich Snippets (Fragmentos Enriquecidos) incrementan CTR orgánico 20–30%.
+- **KPI:** Rich Snippets (Fragmentos Enriquecidos) activos en ≤ 14 días; CTR +25%
 
-**SEO 1.4 — Core Web Vitals:**
+**SEO 1.4 — Core Web Vitals (Métricas de Rendimiento Web):**
 - **Hallazgo:** [Estimación según plataforma del sitio]
 - **Recomendación:** Comprimir imágenes a WebP (<200KB), lazy loading, eliminar CSS/JS bloqueantes.
-- **Justificación:** Google usa Core Web Vitals como factor de ranking desde 2021.
+- **Justificación:** Google usa Core Web Vitals (Métricas de Rendimiento Web) como factor de ranking desde 2021.
 - **KPI:** LCP < 2.5s, FID < 100ms, CLS < 0.1 en ≤ 21 días
 
 ### Horizonte 2 — Crecimiento (Semanas 5–8)
 
-**SEO 2.1 — Topic Cluster:**
+**SEO 2.1 — Topic Cluster (Grupo de Contenido):**
 - **Hallazgo:** [Estado actual del contenido]
 - **Recomendación:** Página pilar 2,000+ palabras + 4-5 artículos de soporte con internal linking.
-- **Justificación:** Topic clusters mejoran ranking de todas las páginas del cluster 8-12 posiciones.
+- **Justificación:** Topic Clusters (Grupos de Contenido) mejoran ranking de todas las páginas del cluster 8-12 posiciones.
 - **KPI:** Página pilar en top 20 en 45d; top 10 en 90d
 
 **SEO 2.2 — Páginas de Categoría:**
@@ -622,13 +626,13 @@ FORMATO (headers markdown ##):
 - **vs. [Competidor 3]:** "[Mensaje diferenciador específico]"
 **KPI:** CTR de anuncios diferenciadores > CTR genéricos en +20%
 
-**11.4 — Oportunidades Blue Ocean (MECE):**
+**11.4 — Oportunidades Blue Ocean (Océano Azul) (MECE):**
 - **Hallazgo:** Segmentos donde ningún competidor está posicionado:
   1. [Oportunidad 1 con potencial estimado]
   2. [Oportunidad 2]
   3. [Oportunidad 3 — mayor potencial]
 - **Recomendación:** [Estrategia de entrada para la oportunidad de mayor potencial — 3 oraciones]
-- **KPI a 6 meses:** Share of Voice: X%; posición promedio top X; tráfico orgánico atribuido X%
+- **KPI a 6 meses:** Share of Voice (Participación de Voz): X%; posición promedio top X; tráfico orgánico atribuido X%
 
 ---
 **Documento preparado por Dr. Steve Dogs**
@@ -1004,11 +1008,15 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
   if (currentQuestionIndex === 1) {
     try {
       const urlResponse = acceptedResponses[0]?.content || '';
-      const urlMatch = urlResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+(?:\.[\w-]+)+(?:\/\S*)?/i);
-      if (urlMatch) {
-        await supabase.from('clients').update({
-          website_url: urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`,
-        }).eq('id', client_id);
+      // Handle "sin web" / "no tengo" case — skip URL extraction
+      const isSinWeb = /sin\s*web|no\s*tengo/i.test(urlResponse);
+      if (!isSinWeb) {
+        const urlMatch = urlResponse.match(/(?:https?:\/\/)?(?:www\.)?[\w-]+(?:\.[\w-]+)+(?:\/\S*)?/i);
+        if (urlMatch) {
+          await supabase.from('clients').update({
+            website_url: urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`,
+          }).eq('id', client_id);
+        }
       }
     } catch (e) {
       console.error('Error saving website URL:', e);

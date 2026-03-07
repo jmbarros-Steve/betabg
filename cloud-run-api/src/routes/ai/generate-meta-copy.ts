@@ -543,10 +543,14 @@ IMPORTANTE:
 }
 
 export async function generateMetaCopy(c: Context) {
+  try {
   const body = await c.req.json();
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
+  if (!ANTHROPIC_API_KEY) {
+    console.error('[generate-meta-copy] ANTHROPIC_API_KEY is not configured');
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 
   const supabase = getSupabaseAdmin();
 
@@ -554,7 +558,9 @@ export async function generateMetaCopy(c: Context) {
   // Used by TestingWizard322 and CampaignCreateWizard for quick copy generation
   if (body.instruction) {
     const cId = body.client_id || body.clientId;
-    if (!cId) throw new Error('Missing client_id');
+    if (!cId) {
+      return c.json({ error: 'Missing client_id' }, 400);
+    }
 
     // Fetch client brief, knowledge base, and brand research
     const [{ data: briefData }, { data: brandResearch }, { data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
@@ -584,7 +590,7 @@ export async function generateMetaCopy(c: Context) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         messages: [{ role: 'user', content: `${brandSection}${briefSection}${bugSection}${knowledgeSection}\n${body.instruction}` }],
       }),
@@ -598,7 +604,7 @@ export async function generateMetaCopy(c: Context) {
   const { clientId, adType, funnelStage, customPrompt, angulo, assetUrls, variacionElegida, mode } = body as GenerateRequest;
 
   if (!clientId || !adType || !funnelStage) {
-    throw new Error('Missing required parameters');
+    return c.json({ error: 'Missing required parameters' }, 400);
   }
 
   // ── VARIACIONES MODE ──────────────────────────────────────────────────────
@@ -721,8 +727,8 @@ ${adType === 'static'
     .single();
 
   if (briefError || !briefData) {
-    console.error('Brief error:', briefError);
-    throw new Error('No completed brand brief found. Please complete the brief with Steve first.');
+    console.error('[generate-meta-copy] Brief error:', briefError);
+    return c.json({ error: 'No completed brand brief found. Please complete the brief with Steve first.' }, 404);
   }
 
   // Dual-layer learning
@@ -932,7 +938,8 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
   const content = aiData.content?.[0]?.text;
 
   if (!content) {
-    throw new Error('No content in AI response');
+    console.error('[generate-meta-copy] No content in AI response');
+    return c.json({ error: 'Error generando el copy. Intenta de nuevo.' }, 500);
   }
 
   let parsedContent;
@@ -944,12 +951,16 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
       throw new Error('No JSON found in response');
     }
   } catch (parseError) {
-    console.error('Parse error:', parseError);
-    console.log('Raw content:', content);
-    throw new Error('Failed to parse AI response');
+    console.error('[generate-meta-copy] Parse error:', parseError);
+    console.log('[generate-meta-copy] Raw content:', content);
+    return c.json({ error: 'Error procesando la respuesta. Intenta de nuevo.' }, 500);
   }
 
   console.log('Successfully generated copy with Sabri + Russell methodology');
 
   return c.json(parsedContent);
+  } catch (err: any) {
+    console.error('[generate-meta-copy]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

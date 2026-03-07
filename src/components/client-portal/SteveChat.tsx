@@ -22,6 +22,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   created_at: string;
+  rejected?: boolean;
 }
 
 // Strip system instruction annotations visible to user
@@ -58,6 +59,95 @@ function parseMessageWithChonga(content: string) {
 
   return parts;
 }
+
+// Question config matching the backend's BRAND_BRIEF_QUESTIONS for restoring form state on refresh.
+// Only includes fields, examples, and validation — the backend is the source of truth for question text.
+const BRIEF_QUESTION_CONFIG: Array<{
+  fields: QuestionField[];
+  examples: string[];
+  validation?: string;
+}> = [
+  // Q0 — website_url
+  { fields: [{ key: 'url', label: '🌐 URL de tu sitio web o tienda online', type: 'text', placeholder: 'Ej: www.mitienda.cl' }], examples: ['www.mitienda.cl', 'mitienda.myshopify.com', 'www.mimarca.com.ar'] },
+  // Q1 — business_pitch
+  { fields: [], examples: ['Vendemos ropa deportiva premium para mujeres', 'Somos una agencia de diseño web para pymes', 'Tenemos una tienda de cosmética natural en Shopify'] },
+  // Q2 — numbers
+  { fields: [
+    { key: 'price', label: '💰 Precio promedio de venta', type: 'number', prefix: '$', placeholder: 'Ej: 35.000' },
+    { key: 'cost', label: '📦 Costo del producto/servicio', type: 'number', prefix: '$', placeholder: 'Ej: 12.000' },
+    { key: 'shipping', label: '🚚 Costo de envío promedio', type: 'number', prefix: '$', placeholder: 'Ej: 4.000 (0 si es gratis)' },
+    { key: 'fase_negocio', label: '📈 ¿Cuánto facturas mensualmente?', type: 'select', placeholder: 'Selecciona tu fase', options: [
+      { value: 'Fase Inicial', label: 'Menos de $500.000 CLP — Fase Inicial' },
+      { value: 'Fase Crecimiento', label: '$500.000 - $5.000.000 CLP — Fase Crecimiento' },
+      { value: 'Fase Escalado', label: '$5.000.000 - $25.000.000 CLP — Fase Escalado' },
+      { value: 'Fase Avanzada', label: 'Más de $25.000.000 CLP — Fase Avanzada' },
+    ]},
+    { key: 'presupuesto_ads', label: '📢 ¿Cuánto tienes disponible mensualmente para publicidad?', type: 'select', placeholder: 'Selecciona tu presupuesto', options: [
+      { value: 'Menos de $100.000 CLP', label: 'Menos de $100.000 CLP' },
+      { value: '$100.000 - $500.000 CLP', label: '$100.000 - $500.000 CLP' },
+      { value: '$500.000 - $2.000.000 CLP', label: '$500.000 - $2.000.000 CLP' },
+      { value: 'Más de $2.000.000 CLP', label: 'Más de $2.000.000 CLP' },
+    ]},
+  ], examples: [] },
+  // Q3 — sales_channels
+  { fields: [
+    { key: 'shopify', label: '🛒 Shopify / E-commerce propio', type: 'number', suffix: '%', placeholder: '0' },
+    { key: 'marketplaces', label: '🏪 Marketplaces (MercadoLibre, Falabella, etc.)', type: 'number', suffix: '%', placeholder: '0' },
+    { key: 'direct', label: '🏬 Venta directa / Tienda física', type: 'number', suffix: '%', placeholder: '0' },
+    { key: 'whatsapp', label: '📱 WhatsApp', type: 'number', suffix: '%', placeholder: '0' },
+    { key: 'instagram', label: '📸 Instagram', type: 'number', suffix: '%', placeholder: '0' },
+    { key: 'facebook', label: '👥 Facebook', type: 'number', suffix: '%', placeholder: '0' },
+  ], examples: [], validation: 'sum_100' },
+  // Q4 — persona_profile
+  { fields: [
+    { key: 'name', label: '👤 Nombre ficticio', type: 'text', placeholder: 'Ej: María' },
+    { key: 'age', label: '🎂 Edad', type: 'number', placeholder: 'Ej: 32' },
+    { key: 'gender', label: '🧑 Género', type: 'text', placeholder: 'Ej: Mujer' },
+    { key: 'city', label: '📍 Ciudad / Zona', type: 'text', placeholder: 'Ej: Santiago' },
+    { key: 'occupation', label: '💼 Ocupación', type: 'text', placeholder: 'Ej: Diseñadora freelance' },
+    { key: 'income', label: '💰 Ingreso mensual aprox.', type: 'text', prefix: '$', placeholder: 'Ej: 1.500.000' },
+    { key: 'family', label: '💍 Estado civil / Familia', type: 'text', placeholder: 'Ej: Soltera con gato' },
+    { key: 'interest', label: '🎯 ¿Por qué te compra?', type: 'text', placeholder: 'Ej: Verse bien sin esfuerzo' },
+  ], examples: [] },
+  // Q5 — persona_pain
+  { fields: [], examples: [] },
+  // Q6 — persona_words
+  { fields: [], examples: [] },
+  // Q7 — persona_transformation
+  { fields: [], examples: [] },
+  // Q8 — persona_lifestyle
+  { fields: [], examples: [] },
+  // Q9 — competitors
+  { fields: [
+    { key: 'comp1_name', label: '1️⃣ Nombre Competidor 1', type: 'text', placeholder: 'Ej: Cannon Home' },
+    { key: 'comp1_url', label: '🌐 Web / Instagram Competidor 1', type: 'text', placeholder: 'Ej: cannonhome.cl' },
+    { key: 'comp2_name', label: '2️⃣ Nombre Competidor 2', type: 'text', placeholder: 'Ej: Intime' },
+    { key: 'comp2_url', label: '🌐 Web / Instagram Competidor 2', type: 'text', placeholder: 'Ej: intime.cl' },
+    { key: 'comp3_name', label: '3️⃣ Nombre Competidor 3', type: 'text', placeholder: 'Ej: Marca X' },
+    { key: 'comp3_url', label: '🌐 Web / Instagram Competidor 3', type: 'text', placeholder: 'Ej: marcax.com' },
+  ], examples: [] },
+  // Q10 — competitors_weakness
+  { fields: [
+    { key: 'comp1_fail', label: '1️⃣ Competidor 1: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: 'Ej: Promete algodón premium pero es mezcla barata' },
+    { key: 'comp1_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: 'Ej: Usamos algodón pima certificado' },
+    { key: 'comp2_fail', label: '2️⃣ Competidor 2: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: 'Ej: Dice entrega en 24h pero demora 5 días' },
+    { key: 'comp2_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: 'Ej: Entregamos el mismo día en Santiago' },
+    { key: 'comp3_fail', label: '3️⃣ Competidor 3: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: '' },
+    { key: 'comp3_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: '' },
+  ], examples: [] },
+  // Q11 — your_advantage
+  { fields: [], examples: [] },
+  // Q12 — purple_cow_promise
+  { fields: [], examples: [] },
+  // Q13 — villain_guarantee
+  { fields: [], examples: [] },
+  // Q14 — proof_tone
+  { fields: [], examples: [] },
+  // Q15 — brand_identity
+  { fields: [], examples: [] },
+  // Q16 — brand_assets_upload
+  { fields: [], examples: ['Ya subí mi logo y 3 fotos de productos', 'No tengo fotos ahora pero las subo después'] },
+];
 
 // Orden igual que en steve-chat (17 preguntas). Para "Ahora: X" y resumen "Lo que ya respondiste".
 const BRIEF_QUESTION_LABELS = [
@@ -256,6 +346,16 @@ export function SteveChat({ clientId }: SteveChatProps) {
           setCurrentQuestionLabel(BRIEF_QUESTION_LABELS[Math.min(progressAnswered, BRIEF_QUESTION_LABELS.length - 1)] ?? null);
           setIsComplete(persona?.is_complete || false);
 
+          // Restore structured form fields for the current question on refresh
+          if (!persona?.is_complete && progressAnswered < BRIEF_QUESTION_CONFIG.length) {
+            const currentQ = BRIEF_QUESTION_CONFIG[progressAnswered];
+            if (currentQ) {
+              setCurrentFields(currentQ.fields ?? []);
+              setExamples(currentQ.examples ?? []);
+              setFieldValidation(currentQ.validation);
+            }
+          }
+
           // Check if analysis is in progress (user might have refreshed while it was running)
           if (persona?.is_complete) {
             const { data: analysisRow } = await supabase
@@ -285,7 +385,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   async function startNewConversation() {
-    const WELCOME_MESSAGE = '¡WOOF! 🐕 Soy Steve, tu consultor de performance marketing. Voy a hacerte 16 preguntas para construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Toma unos 20 minutos. ¿Empezamos? 🌐 Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
+    const WELCOME_MESSAGE = '*olisquea el aire y se prepara* 🐕\n\n¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford. Vamos a ir charlando y con lo que me cuentes voy armando tu **Brief Estratégico**. Son 16 preguntas y toma unos 20 minutos. Puedes entrar y salir cuando quieras, guardamos el progreso.\n\nPara empezar necesito UNA cosa:\n\n**¿Cuál es tu sitio web o tienda online?**\n\n(Si todavía no tienes, escribe "sin web" y te explico qué hacemos en ese caso)';
 
     try {
       // Use edge function to create conversation — it uses service_role and bypasses RLS.
@@ -352,8 +452,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
         };
         setMessages(prev => [...prev, assistantMsg]);
         if (data.rejected) {
-          // Remove the rejected user message from chat so index mapping stays clean
-          setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
+          // Instead of removing, mark as rejected
+          setMessages(prev => prev.map(m =>
+            m.id === tempUserMsg.id ? { ...m, rejected: true } : m
+          ));
           setShowInteraction(true);
           toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
         } else {
@@ -575,7 +677,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
           <div className="mt-3 space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Progreso del Brief</span>
-              <span className="font-medium text-foreground">{progressPercent}% ({progress.answered}/{progress.total})</span>
+              <span className="font-medium text-foreground">{progressPercent}%</span>
             </div>
             <Progress value={progressPercent} className="h-2" />
             {currentQuestionLabel && (
@@ -615,9 +717,12 @@ export function SteveChat({ clientId }: SteveChatProps) {
           {messages.map((message, msgIndex) => (
             <div key={message.id}>
               {message.role === 'user' ? (
-                <div className="flex gap-3 justify-end">
+                <div className={cn("flex gap-3 justify-end", message.rejected && "opacity-50")}>
                   <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-primary text-primary-foreground rounded-br-md shadow-sm">
                     <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                    {message.rejected && (
+                      <span className="text-xs text-destructive block mt-1">&#10005; Respuesta no aceptada</span>
+                    )}
                   </div>
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarFallback className="bg-secondary">

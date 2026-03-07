@@ -8,7 +8,10 @@ export async function generateVideo(c: Context) {
     const supabase = getSupabaseAdmin();
 
     const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
-    if (!REPLICATE_API_KEY) throw new Error('REPLICATE_API_KEY not configured');
+    if (!REPLICATE_API_KEY) {
+      console.error('[generate-video] REPLICATE_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
 
     // Check & deduct 10 credits
     const { data: credits } = await supabase
@@ -51,12 +54,16 @@ export async function generateVideo(c: Context) {
 
     if (!replicateResp.ok) {
       const errText = await replicateResp.text();
-      throw new Error(`Replicate API error: ${replicateResp.status} - ${errText}`);
+      console.error('[generate-video] Replicate API error:', replicateResp.status, errText);
+      return c.json({ error: 'Error generando el video. Intenta de nuevo.' }, 500);
     }
 
     const prediction: any = await replicateResp.json();
 
-    if (!prediction.id) throw new Error('No prediction ID returned from Replicate');
+    if (!prediction.id) {
+      console.error('[generate-video] No prediction ID returned from Replicate');
+      return c.json({ error: 'Error generando el video. Intenta de nuevo.' }, 500);
+    }
 
     // Update creative with prediction ID and estado = generando
     if (creativeId) {
@@ -81,11 +88,8 @@ export async function generateVideo(c: Context) {
 
     return c.json({ prediction_id: prediction.id, status: 'generando' });
 
-  } catch (err) {
-    console.error('generate-video error:', err);
-    return c.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
-      500
-    );
+  } catch (err: any) {
+    console.error('[generate-video]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
   }
 }

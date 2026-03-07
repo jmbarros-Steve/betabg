@@ -156,7 +156,7 @@ function FlowRow({ flow }: { flow: KlaviyoFlow }) {
               <p className="font-semibold text-sm">{formatNumber(m.conversions)}</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Revenue</p>
+              <p className="text-xs text-muted-foreground">Ingresos</p>
               <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
             </div>
           </div>
@@ -214,7 +214,7 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
               <p className="font-semibold text-sm">{(m.click_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-muted-foreground">Revenue</p>
+              <p className="text-xs text-muted-foreground">Ingresos</p>
               <p className="font-semibold text-sm text-primary">{formatCurrency(m.revenue)}</p>
             </div>
             <div className="text-center">
@@ -403,9 +403,9 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
                 icon={Users}
               />
               <KpiCard
-                label="Revenue Total"
+                label="Ingresos Totales"
                 value={formatCurrency(globalStats.totalRevenue)}
-                subtitle={`Flows: ${formatCurrency(globalStats.totalFlowRevenue)} | Camp: ${formatCurrency(globalStats.totalCampaignRevenue)}`}
+                subtitle={`Flujos: ${formatCurrency(globalStats.totalFlowRevenue)} | Camp: ${formatCurrency(globalStats.totalCampaignRevenue)}`}
                 icon={DollarSign}
               />
               <KpiCard

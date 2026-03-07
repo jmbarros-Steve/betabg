@@ -643,7 +643,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       {/* ------------------------------------------------------------------ */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Gasto vs Revenue Diario</CardTitle>
+          <CardTitle className="text-base">Gasto vs Ingresos Diario</CardTitle>
         </CardHeader>
         <CardContent>
           {dailyChartData.length === 0 ? (
@@ -669,7 +669,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <Tooltip
                   formatter={(value: number, name: string) => [
                     formatCLP(value),
-                    name === 'revenue' ? 'Revenue' : 'Gasto',
+                    name === 'revenue' ? 'Ingresos' : 'Gasto',
                   ]}
                   labelFormatter={(label: string) => {
                     const d = new Date(label + 'T12:00:00');
@@ -683,7 +683,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   }}
                 />
                 <Legend
-                  formatter={(value: string) => (value === 'revenue' ? 'Revenue' : 'Gasto')}
+                  formatter={(value: string) => (value === 'revenue' ? 'Ingresos' : 'Gasto')}
                 />
                 <Line
                   type="monotone"
@@ -742,7 +742,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <SortHeader field="cpc" label="CPC" />
                     <SortHeader field="cpm" label="CPM" />
                     <SortHeader field="conversions" label="Conv." />
-                    <SortHeader field="revenue" label="Revenue" />
+                    <SortHeader field="revenue" label="Ingresos" />
                     <SortHeader field="roas" label="ROAS" />
                     <SortHeader field="cpa" label="CPA" />
                   </tr>
@@ -863,7 +863,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <p className="text-sm font-medium">{insights.bestCampaign.campaign_name}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   ROAS: <span className="text-green-500 font-semibold">{formatRoas(insights.bestCampaign.roas)}</span>
-                  {' | '}Revenue: {formatCLP(insights.bestCampaign.revenue)}
+                  {' | '}Ingresos: {formatCLP(insights.bestCampaign.revenue)}
                   {' | '}Gasto: {formatCLP(insights.bestCampaign.spend)}
                 </p>
               </div>
@@ -1010,7 +1010,7 @@ function CampaignRow({
                     <th className="px-3 py-1.5 text-left">CTR</th>
                     <th className="px-3 py-1.5 text-left">CPC</th>
                     <th className="px-3 py-1.5 text-left">Conv.</th>
-                    <th className="px-3 py-1.5 text-left">Revenue</th>
+                    <th className="px-3 py-1.5 text-left">Ingresos</th>
                     <th className="px-3 py-1.5 text-left">ROAS</th>
                   </tr>
                 </thead>

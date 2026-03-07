@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 
 export async function generateMassCampaigns(c: Context) {
+  try {
   const body = await c.req.json();
   const { templateBlocks, campaign, shopUrl, colors, previousEmails, logoUrl, fontFamily } = body;
 
@@ -107,7 +108,7 @@ IMPORTANTE:
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]
@@ -152,4 +153,8 @@ IMPORTANTE:
   console.log('Generated', blocksWithIds.length, 'blocks for', campaign?.name);
 
   return c.json({ blocks: blocksWithIds });
+  } catch (err: any) {
+    console.error('[generate-mass-campaigns]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

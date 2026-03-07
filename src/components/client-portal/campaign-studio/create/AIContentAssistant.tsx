@@ -190,7 +190,7 @@ export function AIContentAssistant({
       });
 
       setAnalysisOpen(true);
-      toast.success('Analisis completado');
+      toast.success('Análisis completado');
     } catch (err: any) {
       console.error('Error analyzing content:', err);
       toast.error('Error al analizar contenido');
@@ -390,7 +390,7 @@ export function AIContentAssistant({
                       <ChevronRight className="w-3.5 h-3.5" />
                     )}
                     <FlaskConical className="w-3.5 h-3.5" />
-                    Analisis de Contenido
+                    Análisis de Contenido
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2 space-y-2">

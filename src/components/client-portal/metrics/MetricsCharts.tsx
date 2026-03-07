@@ -66,7 +66,7 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
                       borderRadius: '8px',
                     }}
                     formatter={(value: number, name: string) => [
-                      `$${value.toLocaleString('es-CL')} USD`,
+                      `$${value.toLocaleString('es-CL')} ${name === 'revenue' ? 'CLP' : 'USD'}`,
                       name === 'revenue' ? 'Ingresos' : 'Inversión'
                     ]}
                     labelFormatter={(label) => `Fecha: ${label}`}

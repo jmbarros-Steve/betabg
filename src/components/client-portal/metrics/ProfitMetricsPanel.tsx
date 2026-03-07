@@ -87,7 +87,7 @@ export function ProfitMetricsPanel({
       value: `${mer.toFixed(2)}x`,
       previousValue: previousMer ? `${previousMer.toFixed(2)}x` : undefined,
       changePercent: merChange,
-      description: 'Marketing Efficiency Ratio (Revenue / Total Ad Spend)',
+      description: 'Ratio de Eficiencia de Marketing (Ingresos / Inversión Total)',
       icon: BarChart3,
     },
     {

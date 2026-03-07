@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function generateCopy(c: Context) {
+  try {
   const {
     clientId, funnel, formato, angulo, instrucciones, assetUrls,
     fase_negocio, presupuesto_ads, producto_seleccionado,
@@ -25,7 +26,10 @@ export async function generateCopy(c: Context) {
     .eq('client_id', clientId)
     .maybeSingle();
 
-  if (creditsErr) throw creditsErr;
+  if (creditsErr) {
+    console.error('[generate-copy] Credits error:', creditsErr);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 
   if (!credits) {
     await supabase.from('client_credits').insert({ client_id: clientId, creditos_disponibles: 99999, creditos_usados: 0, plan: 'free_beta' });
@@ -37,7 +41,10 @@ export async function generateCopy(c: Context) {
   }
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!ANTHROPIC_API_KEY) {
+    console.error('[generate-copy] ANTHROPIC_API_KEY not configured');
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 
   const contextoLower = `${funnel || ''} ${angulo || ''} ${instrucciones || ''}`.toLowerCase();
   const categoriaRelevante = contextoLower.includes('google') ? 'google_ads' : 'meta_ads';
@@ -140,7 +147,8 @@ Responde SOLO en JSON válido sin markdown ni backticks:
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Anthropic API error: ${response.status} - ${errText}`);
+    console.error('[generate-copy] Anthropic API error:', response.status, errText);
+    return c.json({ error: 'Error generando el copy. Intenta de nuevo.' }, 500);
   }
 
   const aiResult: any = await response.json();
@@ -151,7 +159,8 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const clean = rawContent.replace(/```json|```/g, '').trim();
     parsed = JSON.parse(clean);
   } catch {
-    throw new Error('Failed to parse AI response as JSON');
+    console.error('[generate-copy] Failed to parse AI response as JSON');
+    return c.json({ error: 'Error procesando la respuesta. Intenta de nuevo.' }, 500);
   }
 
   // Deduct 1 credit
@@ -171,4 +180,8 @@ Responde SOLO en JSON válido sin markdown ni backticks:
   });
 
   return c.json(parsed);
+  } catch (err: any) {
+    console.error('[generate-copy]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

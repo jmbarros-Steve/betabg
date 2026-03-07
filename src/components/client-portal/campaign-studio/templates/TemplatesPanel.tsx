@@ -77,7 +77,7 @@ function relativeTime(dateStr: string): string {
     const months = Math.floor(diffDay / 30);
     return `hace ${months} ${months === 1 ? 'mes' : 'meses'}`;
   }
-  if (diffDay > 0) return `hace ${diffDay} ${diffDay === 1 ? 'dia' : 'dias'}`;
+  if (diffDay > 0) return `hace ${diffDay} ${diffDay === 1 ? 'día' : 'días'}`;
   if (diffHr > 0) return `hace ${diffHr} ${diffHr === 1 ? 'hora' : 'horas'}`;
   if (diffMin > 0) return `hace ${diffMin} ${diffMin === 1 ? 'minuto' : 'minutos'}`;
   return 'justo ahora';

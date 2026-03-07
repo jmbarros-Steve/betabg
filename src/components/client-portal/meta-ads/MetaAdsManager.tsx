@@ -307,7 +307,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
   const priorityBadge = (priority: string | null) => {
     switch (priority) {
       case 'critical':
-        return <Badge variant="destructive" className="text-xs">Critico</Badge>;
+        return <Badge variant="destructive" className="text-xs">Crítico</Badge>;
       case 'high':
         return <Badge className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-xs">Alta</Badge>;
       case 'medium':
@@ -931,7 +931,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
               size="icon"
               className="h-7 w-7"
               onClick={() => setSidebarCollapsed((prev) => !prev)}
-              aria-label={sidebarCollapsed ? 'Expandir menu' : 'Colapsar menu'}
+              aria-label={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
             >
               {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </Button>

@@ -2,10 +2,14 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function checkVideoStatus(c: Context) {
+  try {
   const { predictionId, creativeId, clientId } = await c.req.json();
 
   const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
-  if (!REPLICATE_API_KEY) throw new Error('REPLICATE_API_KEY not configured');
+  if (!REPLICATE_API_KEY) {
+    console.error('[check-video-status] REPLICATE_API_KEY not configured');
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 
   const supabase = getSupabaseAdmin();
 
@@ -14,7 +18,8 @@ export async function checkVideoStatus(c: Context) {
   });
 
   if (!replicateResp.ok) {
-    throw new Error(`Replicate check error: ${replicateResp.status}`);
+    console.error('[check-video-status] Replicate check error:', replicateResp.status);
+    return c.json({ error: 'Error verificando el estado del video.' }, 500);
   }
 
   const prediction: any = await replicateResp.json();
@@ -22,7 +27,10 @@ export async function checkVideoStatus(c: Context) {
 
   if (status === 'succeeded') {
     const videoUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-    if (!videoUrl) throw new Error('No video URL in completed prediction');
+    if (!videoUrl) {
+      console.error('[check-video-status] No video URL in completed prediction');
+      return c.json({ error: 'Error procesando el video.' }, 500);
+    }
 
     const videoResp = await fetch(videoUrl);
     const videoBuffer = await videoResp.arrayBuffer();
@@ -64,4 +72,8 @@ export async function checkVideoStatus(c: Context) {
   }
 
   return c.json({ status, progress: prediction.metrics?.predict_time || null });
+  } catch (err: any) {
+    console.error('[check-video-status]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

@@ -215,7 +215,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                     <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Medio</th>
                     <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Campaña</th>
                     <th className="text-right py-2 pr-4 text-muted-foreground font-medium">Pedidos</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium">Revenue</th>
+                    <th className="text-right py-2 text-muted-foreground font-medium">Ingresos</th>
                   </tr>
                 </thead>
                 <tbody>

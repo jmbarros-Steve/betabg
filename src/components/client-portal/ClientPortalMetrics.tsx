@@ -386,12 +386,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       ? (prevGrossProfit - previous.totalSpend) / previous.totalSpend 
       : undefined;
 
-    // CAC = Total Ad Spend / Number of unique customers (approx orders * 0.85)
-    const uniqueCustomers = Math.round(current.totalOrders * 0.85);
-    const cac = uniqueCustomers > 0 ? current.totalSpend / uniqueCustomers : 0;
+    // CAC = Total Ad Spend / Number of orders (unique customer count not available)
+    const cac = current.totalOrders > 0 ? current.totalSpend / current.totalOrders : 0;
 
-    const prevUniqueCustomers = Math.round(previous.totalOrders * 0.85);
-    const previousCac = prevUniqueCustomers > 0 ? previous.totalSpend / prevUniqueCustomers : undefined;
+    const previousCac = previous.totalOrders > 0 ? previous.totalSpend / previous.totalOrders : undefined;
 
     // MER = Total Revenue / Total Ad Spend
     const mer = current.totalSpend > 0 ? current.totalRevenue / current.totalSpend : 0;
@@ -445,26 +443,11 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     };
   }, [current, profitMetrics, financialConfig]);
 
-  // Demo cohort data
-  const cohortData = useMemo(() => [
-    { cohort: 'Ene 2025', month0: 420, month1: 126, month2: 84, month3: 63, month4: 50, month5: 42 },
-    { cohort: 'Dic 2024', month0: 380, month1: 114, month2: 76, month3: 57, month4: 46 },
-    { cohort: 'Nov 2024', month0: 350, month1: 105, month2: 70, month3: 53 },
-    { cohort: 'Oct 2024', month0: 310, month1: 93, month2: 62 },
-    { cohort: 'Sep 2024', month0: 290, month1: 87 },
-    { cohort: 'Ago 2024', month0: 275 },
-  ], []);
+  // Cohort data: placeholder until real data is available
+  const cohortData = useMemo(() => [] as { cohort: string; month0: number; month1?: number; month2?: number; month3?: number; month4?: number; month5?: number }[], []);
 
-  // Demo conversion/LTV metrics
-  const conversionMetrics = useMemo(() => {
-    const totalCustomers = Math.round(current.totalOrders * 0.85);
-    return {
-      conversionRate: 3.42,
-      averageLtv: totalCustomers > 0 ? Math.round(current.totalRevenue / totalCustomers) : 0,
-      totalCustomers,
-      repeatCustomerRate: 28.5,
-    };
-  }, [current]);
+  // Conversion/LTV metrics: no real data available yet
+  const conversionMetrics = useMemo(() => null, []);
 
   if (loading) {
     return (
@@ -490,10 +473,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   }
 
   const statCards = [
-    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
-    { title: 'Inversión Publicitaria', value: `$${current.totalSpend.toLocaleString('es-CL')} CLP`, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
-    { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
-    { title: 'ROAS Promedio', value: `${current.avgRoas.toFixed(2)}x`, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
+    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
+    { title: 'Inversión Publicitaria', value: `$${current.totalSpend.toLocaleString('es-CL')} CLP`, currentNum: current.totalSpend, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
+    { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
+    { title: 'ROAS Promedio', value: `${current.avgRoas.toFixed(2)}x`, currentNum: current.avgRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
   ];
 
   const hasData = current.totalRevenue > 0 || current.totalSpend > 0 || current.totalOrders > 0;
@@ -518,9 +501,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat) => {
           const change = getChangePercent(
-            typeof stat.value === 'string' && stat.value.includes('x')
-              ? parseFloat(stat.value)
-              : current.totalRevenue, // simplified for demo
+            stat.currentNum,
             stat.prevValue || 0
           );
           return (
@@ -567,18 +548,38 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           />
 
           {/* Conversion & LTV */}
-          <ConversionLtvPanel
-            conversionRate={conversionMetrics.conversionRate}
-            averageLtv={conversionMetrics.averageLtv}
-            totalCustomers={conversionMetrics.totalCustomers}
-            repeatCustomerRate={conversionMetrics.repeatCustomerRate}
-            currency="CLP"
-          />
+          {conversionMetrics ? (
+            <ConversionLtvPanel
+              conversionRate={conversionMetrics.conversionRate}
+              averageLtv={conversionMetrics.averageLtv}
+              totalCustomers={conversionMetrics.totalCustomers}
+              repeatCustomerRate={conversionMetrics.repeatCustomerRate}
+              currency="CLP"
+            />
+          ) : (
+            <Card className="bg-muted/50">
+              <CardContent className="py-8 text-center">
+                <p className="text-muted-foreground text-sm">
+                  Proximamente — Conecta Shopify y acumula ventas para ver estas metricas.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* P&L and Cohort side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ProfitLossPanel data={profitLossData} currency="CLP" productBreakdown={productBreakdown} />
-            <CohortAnalysisPanel cohorts={cohortData} />
+            {cohortData.length > 0 ? (
+              <CohortAnalysisPanel cohorts={cohortData} />
+            ) : (
+              <Card className="bg-muted/50">
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground text-sm">
+                    Proximamente — Conecta Shopify y acumula ventas para ver estas metricas.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Removed: SKUs & Abandoned Carts moved to Shopify tab */}

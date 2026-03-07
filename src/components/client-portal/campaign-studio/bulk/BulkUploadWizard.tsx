@@ -74,7 +74,7 @@ interface BulkUploadWizardProps {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const STEP_LABELS = ['Contenido', 'Analisis', 'Templates', 'Emails', 'Calendario', 'Aprobar'];
+const STEP_LABELS = ['Contenido', 'Análisis', 'Templates', 'Emails', 'Calendario', 'Aprobar'];
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -1342,7 +1342,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
               {hasWeekWarnings && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  Hay semanas con mas de 3 emails. Considera redistribuir.
+                  Hay semanas con más de 3 emails. Considera redistribuir.
                 </div>
               )}
 

@@ -268,7 +268,7 @@ export default function ImportKlaviyoDialog({
                 <DialogTitle className="text-lg">Importar plantillas de Klaviyo</DialogTitle>
                 {!loading && templates.length > 0 && (
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Mostrando {templates.length} de {totalInKlaviyo} plantillas (mas recientes)
+                    Mostrando {templates.length} de {totalInKlaviyo} plantillas (más recientes)
                   </p>
                 )}
               </div>

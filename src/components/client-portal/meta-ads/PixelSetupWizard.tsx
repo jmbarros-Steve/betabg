@@ -62,7 +62,7 @@ const STANDARD_EVENTS = [
 ];
 
 const PRIORITY_BADGE: Record<string, { label: string; color: string }> = {
-  critico: { label: 'Critico', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
+  critico: { label: 'Crítico', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
   basico: { label: 'Basico', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
   importante: { label: 'Importante', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
   opcional: { label: 'Opcional', color: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },

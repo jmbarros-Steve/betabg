@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function generateImage(c: Context) {
+  try {
   const {
     clientId,
     creativeId,
@@ -42,7 +43,10 @@ export async function generateImage(c: Context) {
   if (engine === 'flux') {
     // -- Flux (Fal.ai) path --
     const FAL_API_KEY = process.env.FAL_API_KEY;
-    if (!FAL_API_KEY) throw new Error('FAL_API_KEY not configured');
+    if (!FAL_API_KEY) {
+      console.error('[generate-image] FAL_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
 
     const imageSize = formato === 'story' ? 'portrait_16_9' :
                       formato === 'feed' ? 'square_hd' :
@@ -71,12 +75,16 @@ export async function generateImage(c: Context) {
 
     if (!falResponse.ok) {
       const errText = await falResponse.text();
-      throw new Error(`Fal.ai API error: ${falResponse.status} - ${errText}`);
+      console.error('[generate-image] Fal.ai API error:', falResponse.status, errText);
+      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
     const falResult: any = await falResponse.json();
     imageUrl = falResult.images?.[0]?.url;
-    if (!imageUrl) throw new Error('No image returned from Fal.ai');
+    if (!imageUrl) {
+      console.error('[generate-image] No image returned from Fal.ai');
+      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
+    }
 
     // Download image
     const imageResp = await fetch(imageUrl);
@@ -87,7 +95,10 @@ export async function generateImage(c: Context) {
   } else {
     // -- GPT-4o (OpenAI) path --
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+    if (!OPENAI_API_KEY) {
+      console.error('[generate-image] OPENAI_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
 
     const gptSize = formato === 'story' ? '1024x1792' :
                     formato === 'feed' ? '1024x1024' :
@@ -110,7 +121,8 @@ export async function generateImage(c: Context) {
 
     if (!openaiResponse.ok) {
       const errText = await openaiResponse.text();
-      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errText}`);
+      console.error('[generate-image] OpenAI API error:', openaiResponse.status, errText);
+      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
     const openaiResult: any = await openaiResponse.json();
@@ -127,11 +139,15 @@ export async function generateImage(c: Context) {
       const arrayBuffer = await imageBlob.arrayBuffer();
       imageBytes = new Uint8Array(arrayBuffer);
     } else {
-      throw new Error('No image returned from OpenAI');
+      console.error('[generate-image] No image returned from OpenAI');
+      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
   }
 
-  if (!imageBytes) throw new Error('No image data obtained');
+  if (!imageBytes) {
+    console.error('[generate-image] No image data obtained');
+    return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
+  }
 
   // Save to Storage
   const timestamp = Date.now();
@@ -144,7 +160,10 @@ export async function generateImage(c: Context) {
       upsert: false,
     });
 
-  if (storageErr) throw storageErr;
+  if (storageErr) {
+    console.error('[generate-image] Storage upload error:', storageErr);
+    return c.json({ error: 'Error guardando la imagen.' }, 500);
+  }
 
   const { data: { publicUrl } } = supabase.storage
     .from('client-assets')
@@ -173,4 +192,8 @@ export async function generateImage(c: Context) {
   });
 
   return c.json({ asset_url: publicUrl });
+  } catch (err: any) {
+    console.error('[generate-image]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

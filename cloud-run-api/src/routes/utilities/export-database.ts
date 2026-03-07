@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-const EXPORT_KEY = 'steve-export-2026';
+const EXPORT_KEY = process.env.EXPORT_SECRET_KEY || '';
 
 const TABLES = [
   'clients', 'user_roles', 'buyer_personas', 'platform_connections',
@@ -20,7 +20,7 @@ const TABLES = [
 
 export async function exportDatabase(c: Context) {
   const exportKey = c.req.header('x-export-key');
-  if (exportKey !== EXPORT_KEY) {
+  if (!EXPORT_KEY || exportKey !== EXPORT_KEY) {
     return c.json({ error: 'Forbidden: invalid export key' }, 403);
   }
 

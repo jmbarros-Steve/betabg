@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function analyzeBrandResearch(c: Context) {
+  try {
   const supabase = getSupabaseAdmin();
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
@@ -229,21 +230,31 @@ Solo dominios reales de tiendas que existan. NO inventes dominios.`;
     }
   }
 
-  // 3. Scrape each competitor (max 6, sequentially)
-  const competitorContents: string[] = [];
-  for (let i = 0; i < allCompetitorUrls.length; i++) {
-    const url = allCompetitorUrls[i];
-    try {
-      let formattedUrl = url.trim();
-      if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
-      const domain = new URL(formattedUrl).hostname.replace('www.', '');
-      const pct = 20 + Math.round((i / allCompetitorUrls.length) * 50);
-      await updateProgress(`competidor_${i}`, `Analizando competidor: ${domain}...`, pct);
+  // 3. Scrape all competitors in parallel (max 6)
+  await updateProgress('competidores', `Analizando ${allCompetitorUrls.length} competidores en paralelo...`, 20);
 
-      const content = await scrapeUrl(formattedUrl);
+  const scrapePromises = allCompetitorUrls.map((url) => {
+    let formattedUrl = url.trim();
+    if (!formattedUrl.startsWith('http')) formattedUrl = `https://${formattedUrl}`;
+    return scrapeUrl(formattedUrl)
+      .then(content => ({ formattedUrl, content, error: null as any }))
+      .catch(e => ({ formattedUrl, content: '', error: e }));
+  });
+
+  const scrapeResults = await Promise.allSettled(scrapePromises);
+
+  const competitorContents: string[] = [];
+  for (let i = 0; i < scrapeResults.length; i++) {
+    const result = scrapeResults[i];
+    const url = allCompetitorUrls[i];
+    if (result.status === 'fulfilled' && !result.value.error) {
+      const { formattedUrl, content } = result.value;
+      const domain = new URL(formattedUrl).hostname.replace('www.', '');
+      console.log(`Scraped competitor ${domain}, length: ${content.length}`);
       competitorContents.push(`## ${formattedUrl}\n${content.slice(0, 3000) || '(Sin contenido disponible)'}`);
-    } catch (e) {
-      console.error('Competitor scrape error:', url, e);
+    } else {
+      const errorMsg = result.status === 'rejected' ? result.reason : result.value.error;
+      console.error('Competitor scrape error:', url, errorMsg);
       competitorContents.push(`## ${url}\n(Sin contenido disponible)`);
     }
   }
@@ -263,4 +274,8 @@ Solo dominios reales de tiendas que existan. NO inventes dominios.`;
   };
 
   return c.json({ success: true, research: researchPayload });
+  } catch (err: any) {
+    console.error('[analyze-brand-research]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

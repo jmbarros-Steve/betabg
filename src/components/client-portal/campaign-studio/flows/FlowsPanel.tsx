@@ -154,7 +154,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
           <div>
             <h2 className="text-xl font-semibold">Flujos Automaticos</h2>
             <p className="text-sm text-muted-foreground">
-              Steve propone los flujos mas efectivos para tu marca
+              Steve propone los flujos más efectivos para tu marca
             </p>
           </div>
         </div>
@@ -174,7 +174,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
         <div>
           <h2 className="text-xl font-semibold">Flujos Automaticos</h2>
           <p className="text-sm text-muted-foreground">
-            Steve propone los flujos mas efectivos para tu marca
+            Steve propone los flujos más efectivos para tu marca
           </p>
         </div>
       </div>

@@ -1708,7 +1708,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Revenue</span>
+                    <span className="text-muted-foreground">Ingresos</span>
                     <span className="font-medium">
                       {formatCLP(selectedCampaign.revenue)}
                     </span>

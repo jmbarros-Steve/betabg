@@ -2,6 +2,25 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function trainSteve(c: Context) {
+  try {
+  const supabase = getSupabaseAdmin();
+
+  // Admin role check
+  const user = c.get('user');
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 403);
+  }
+
+  const { data: userRole } = await supabase
+    .from('user_roles')
+    .select('is_super_admin, role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!userRole?.is_super_admin && userRole?.role !== 'admin') {
+    return c.json({ error: 'Unauthorized' }, 403);
+  }
+
   const { contenido, categoriaHint } = await c.req.json();
 
   if (!contenido?.trim()) {
@@ -9,9 +28,10 @@ export async function trainSteve(c: Context) {
   }
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY no configurada');
-
-  const supabase = getSupabaseAdmin();
+  if (!ANTHROPIC_API_KEY) {
+    console.error('[train-steve] ANTHROPIC_API_KEY no configurada');
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -21,7 +41,7 @@ export async function trainSteve(c: Context) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4000,
       messages: [{
         role: 'user',
@@ -75,7 +95,8 @@ ${contenido}`,
 
   if (!anthropicRes.ok) {
     const errText = await anthropicRes.text();
-    throw new Error(`Anthropic error: ${errText}`);
+    console.error('[train-steve] Anthropic error:', errText);
+    return c.json({ error: 'Error procesando el contenido. Intenta de nuevo.' }, 500);
   }
 
   const anthropicData: any = await anthropicRes.json();
@@ -85,7 +106,7 @@ ${contenido}`,
   const resultado = JSON.parse(jsonText);
 
   if (!resultado.entradas || !Array.isArray(resultado.entradas)) {
-    throw new Error('Respuesta de Claude no tiene el formato esperado');
+    return c.json({ error: 'Error en el formato de respuesta. Intenta de nuevo.' }, 500);
   }
 
   let savedKnowledge = 0;
@@ -130,4 +151,8 @@ ${contenido}`,
     savedKnowledge,
     savedBugs,
   });
+  } catch (err: any) {
+    console.error('[train-steve]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

@@ -2,13 +2,30 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function learnFromSource(c: Context) {
+  try {
+  const supabase = getSupabaseAdmin();
+
+  // Admin role check
+  const user = c.get('user');
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 403);
+  }
+
+  const { data: userRole } = await supabase
+    .from('user_roles')
+    .select('is_super_admin, role')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!userRole?.is_super_admin && userRole?.role !== 'admin') {
+    return c.json({ error: 'Unauthorized' }, 403);
+  }
+
   const { sourceType, content, title, queueId } = await c.req.json();
 
   if (!sourceType || !content?.trim()) {
     return c.json({ error: 'sourceType and content are required' }, 400);
   }
-
-  const supabase = getSupabaseAdmin();
 
   // Duplicate check
   if (!queueId) {
@@ -40,7 +57,10 @@ export async function learnFromSource(c: Context) {
       })
       .eq('id', resolvedQueueId);
 
-    if (updateErr) throw new Error(`Failed to update queue item: ${updateErr.message}`);
+    if (updateErr) {
+      console.error('[learn-from-source] Failed to update queue item:', updateErr.message);
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
   } else {
     const { data: queueRow, error: insertErr } = await supabase
       .from('learning_queue')
@@ -54,7 +74,8 @@ export async function learnFromSource(c: Context) {
       .single();
 
     if (insertErr || !queueRow?.id) {
-      throw new Error(`Failed to create queue item: ${insertErr?.message || 'unknown error'}`);
+      console.error('[learn-from-source] Failed to create queue item:', insertErr?.message || 'unknown error');
+      return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
     resolvedQueueId = queueRow.id;
@@ -64,8 +85,15 @@ export async function learnFromSource(c: Context) {
       .update({ status: 'processing' })
       .eq('id', resolvedQueueId);
 
-    if (statusErr) throw new Error(`Failed to set queue item processing: ${statusErr.message}`);
+    if (statusErr) {
+      console.error('[learn-from-source] Failed to set queue item processing:', statusErr.message);
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
   }
 
   return c.json({ status: 'processing', queueId: resolvedQueueId });
+  } catch (err: any) {
+    console.error('[learn-from-source]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

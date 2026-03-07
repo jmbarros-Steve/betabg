@@ -268,7 +268,7 @@ async function callClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [
@@ -373,8 +373,8 @@ export async function analyzeBrandStrategy(c: Context) {
       auto_competitors: autoCompetitors,
     };
 
-    // Truncate to 35,000 chars — increased for 6 competitors (3 user + 3 AI-detected)
-    const truncatedResearch = JSON.stringify(researchData).slice(0, 35_000);
+    // Truncate to 80,000 chars — Claude Sonnet 4.6 supports 200K+ context, so 80K ensures all competitor data is included
+    const truncatedResearch = JSON.stringify(researchData).slice(0, 80_000);
 
     // Update progress
     await supabase.from('brand_research').upsert(

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 
 export async function analyzeAdImage(c: Context) {
+  try {
   const { imageBase64, mediaType, performance, context } = await c.req.json();
 
   if (!imageBase64) {
@@ -90,11 +91,15 @@ Responde en español, de forma concreta y accionable.`,
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Anthropic error:', errorText);
-    return c.json({ error: 'Anthropic API error', details: errorText }, 500);
+    return c.json({ error: 'Error analizando la imagen. Intenta de nuevo.' }, 500);
   }
 
   const data: any = await response.json();
   const analysis = data.content?.[0]?.text ?? '';
 
   return c.json({ analysis });
+  } catch (err: any) {
+    console.error('[analyze-ad-image]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

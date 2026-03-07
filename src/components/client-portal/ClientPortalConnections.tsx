@@ -217,7 +217,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   };
 
   const handleDisconnect = async (connection: Connection) => {
-    if (!confirm(`¿Desconectar ${platformConfig[connection.platform].name}? Podras reconectar en cualquier momento.`)) return;
+    if (!confirm(`¿Desconectar ${platformConfig[connection.platform].name}? Podrás reconectar en cualquier momento.`)) return;
     setDisconnecting(connection.id);
     try {
       const { error } = await supabase

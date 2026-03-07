@@ -18,6 +18,22 @@ const TABLES = [
 export async function exportAllData(c: Context) {
   const supabase = getSupabaseAdmin();
 
+  // Admin check: require super_admin role
+  const user = c.get('user');
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 403);
+  }
+
+  const { data: userRole } = await supabase
+    .from('user_roles')
+    .select('is_super_admin')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!userRole?.is_super_admin) {
+    return c.json({ error: 'Unauthorized' }, 403);
+  }
+
   const dump: Record<string, any> = {
     exported_at: new Date().toISOString(),
     project_ref: process.env.SUPABASE_URL,

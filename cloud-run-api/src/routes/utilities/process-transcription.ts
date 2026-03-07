@@ -38,7 +38,7 @@ async function extractRulesFromChunk(
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userText }],
@@ -67,13 +67,17 @@ async function extractRulesFromChunk(
 }
 
 export async function processTranscription(c: Context) {
+  try {
   const { queueId } = await c.req.json();
   if (!queueId) {
     return c.json({ error: 'queueId is required' }, 400);
   }
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!ANTHROPIC_API_KEY) {
+    console.error('[process-transcription] ANTHROPIC_API_KEY not configured');
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 
   const supabase = getSupabaseAdmin();
 
@@ -84,11 +88,13 @@ export async function processTranscription(c: Context) {
     .single();
 
   if (fetchErr || !item) {
-    throw new Error(`Queue item not found: ${queueId}`);
+    console.error('[process-transcription] Queue item not found:', queueId, fetchErr?.message);
+    return c.json({ error: 'Queue item not found' }, 404);
   }
 
   if (!item.transcription) {
-    throw new Error('No transcription found for this queue item');
+    console.error('[process-transcription] No transcription found for queue item:', queueId);
+    return c.json({ error: 'No transcription found for this queue item' }, 400);
   }
 
   await supabase.from('learning_queue').update({ status: 'processing' }).eq('id', queueId);
@@ -117,7 +123,8 @@ export async function processTranscription(c: Context) {
   console.log(`[process-transcription] Total rules extracted: ${allRules.length}`);
 
   if (allRules.length === 0) {
-    throw new Error('No rules extracted from any chunk');
+    console.error('[process-transcription] No rules extracted from any chunk');
+    return c.json({ error: 'No se pudieron extraer reglas del contenido.' }, 500);
   }
 
   // Deduplicate by titulo
@@ -143,7 +150,7 @@ export async function processTranscription(c: Context) {
   const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);
   if (insertErr) {
     console.error('[process-transcription] Failed to save rules:', insertErr);
-    throw new Error(`Failed to save rules: ${insertErr.message}`);
+    return c.json({ error: 'Error guardando las reglas.' }, 500);
   }
 
   await supabase.from('learning_queue').update({
@@ -161,4 +168,8 @@ export async function processTranscription(c: Context) {
     queueId,
     chunksProcessed: chunks.length,
   });
+  } catch (err: any) {
+    console.error('[process-transcription]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
+  }
 }

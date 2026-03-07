@@ -74,7 +74,7 @@ function extractJSON(text: string): unknown {
     }
   }
 
-  throw new Error('No se pudo extraer JSON válido de la respuesta de Claude');
+  throw new Error('No se pudo procesar la respuesta. Intenta de nuevo.');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -124,7 +124,7 @@ Responde SOLO con el JSON array de items.`;
     const items = extractJSON(rawResponse);
 
     if (!Array.isArray(items)) {
-      throw new Error('La respuesta de Claude no es un array de items');
+      throw new Error('Error en el formato de respuesta.');
     }
 
     // Build summary
@@ -236,14 +236,14 @@ Genera un email optimizado para cada item y un calendario inteligente distribuye
     const result = extractJSON(rawResponse) as { emails?: unknown[]; schedule?: unknown[] };
 
     if (!result || typeof result !== 'object') {
-      throw new Error('La respuesta de Claude no es un objeto válido');
+      throw new Error('Error procesando los datos.');
     }
 
     const emails = Array.isArray(result.emails) ? result.emails : [];
     const schedule = Array.isArray(result.schedule) ? result.schedule : [];
 
     if (emails.length === 0) {
-      throw new Error('Claude no generó ningún email');
+      throw new Error('No se pudo generar el contenido.');
     }
 
     return c.json({ emails, schedule });

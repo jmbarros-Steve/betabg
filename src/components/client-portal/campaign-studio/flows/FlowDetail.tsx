@@ -26,7 +26,7 @@ function formatDelay(hours: number): string {
   if (hours === 0) return 'Inmediato';
   if (hours < 24) return `${hours} hora${hours > 1 ? 's' : ''}`;
   const days = Math.round(hours / 24);
-  return `${days} dia${days > 1 ? 's' : ''}`;
+  return `${days} día${days > 1 ? 's' : ''}`;
 }
 
 export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }: FlowDetailProps) {
@@ -152,7 +152,7 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
               style={{ backgroundColor: `${borderColor}15`, color: borderColor, borderColor }}
               variant="outline"
             >
-              {template.priority === 'critical' ? 'Critico' : template.priority === 'high' ? 'Alta prioridad' : 'Media prioridad'}
+              {template.priority === 'critical' ? 'Crítico' : template.priority === 'high' ? 'Alta prioridad' : 'Media prioridad'}
             </Badge>
           </div>
 

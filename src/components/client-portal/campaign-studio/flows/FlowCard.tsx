@@ -52,14 +52,14 @@ function formatDelay(hours: number): string {
   if (hours === 0) return 'Inmediato';
   if (hours < 24) return `${hours}h`;
   const days = Math.round(hours / 24);
-  return `${days} dia${days > 1 ? 's' : ''}`;
+  return `${days} día${days > 1 ? 's' : ''}`;
 }
 
 function getTimingSummary(template: FlowTemplate): string {
   const emailCount = template.emails.length;
   const maxDelay = Math.max(...template.emails.map((e) => e.delayHours));
   const totalDays = Math.round(maxDelay / 24);
-  const dayLabel = totalDays === 0 ? 'inmediato' : `${totalDays} dia${totalDays > 1 ? 's' : ''}`;
+  const dayLabel = totalDays === 0 ? 'inmediato' : `${totalDays} día${totalDays > 1 ? 's' : ''}`;
   return `${emailCount} email${emailCount > 1 ? 's' : ''} · ${dayLabel}`;
 }
 
@@ -121,7 +121,7 @@ export function FlowCard({ template, status, metrics, recommended, onAction }: F
           <div className="grid grid-cols-3 gap-2 pt-2 border-t">
             <div className="text-center">
               <p className="text-xs font-semibold">${metrics.revenue.toLocaleString()}</p>
-              <p className="text-[10px] text-muted-foreground">Revenue</p>
+              <p className="text-[10px] text-muted-foreground">Ingresos</p>
             </div>
             <div className="text-center">
               <p className="text-xs font-semibold">{metrics.openRate}%</p>

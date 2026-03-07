@@ -61,10 +61,10 @@ interface KlaviyoCampaign {
 
 const TIMEFRAME_OPTIONS = [
   { value: 'last_24_hours', label: 'Hoy' },
-  { value: 'last_7_days', label: '7 dias' },
-  { value: 'last_30_days', label: '30 dias' },
-  { value: 'last_60_days', label: '60 dias' },
-  { value: 'last_90_days', label: '90 dias' },
+  { value: 'last_7_days', label: '7 días' },
+  { value: 'last_30_days', label: '30 días' },
+  { value: 'last_60_days', label: '60 días' },
+  { value: 'last_90_days', label: '90 días' },
   { value: 'last_365_days', label: '12 meses' },
 ];
 
@@ -132,7 +132,7 @@ function generateInsights(
     insights.push({
       type: 'warning',
       title: 'Open Rate Bajo',
-      message: `Tu open rate (${openRatePct}%) esta por debajo del promedio. Prueba subjects mas cortos y personalizados.`,
+      message: `Tu open rate (${openRatePct}%) está por debajo del promedio. Prueba subjects más cortos y personalizados.`,
       icon: 'mail',
     });
   } else if (globalStats.avgOpenRate > 0.25) {
@@ -173,15 +173,15 @@ function generateInsights(
   if (globalStats.totalRevenue > 0) {
     insights.push({
       type: 'success',
-      title: 'Revenue por Email',
-      message: `Has generado $${Math.round(globalStats.totalRevenue).toLocaleString('es-CL')} en los ultimos 30 dias via email.`,
+      title: 'Ingresos por Email',
+      message: `Has generado $${Math.round(globalStats.totalRevenue).toLocaleString('es-CL')} en los últimos 30 días via email.`,
       icon: 'trending_up',
     });
   } else {
     insights.push({
       type: 'warning',
-      title: 'Sin Revenue por Email',
-      message: 'Sin revenue por email aun. Activa flujos de abandoned cart y post-purchase.',
+      title: 'Sin Ingresos por Email',
+      message: 'Sin ingresos por email aun. Activa flujos de abandoned cart y post-purchase.',
       icon: 'alert_triangle',
     });
   }
@@ -467,7 +467,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                 Metricas de Klaviyo
               </CardTitle>
               <CardDescription>
-                Rendimiento de los ultimos {timeframeLabel}
+                Rendimiento de los últimos {timeframeLabel}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -565,9 +565,9 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                   icon={MousePointerClick}
                 />
                 <StatCard
-                  label="Revenue Total"
+                  label="Ingresos Totales"
                   value={formatCurrency(globalStats.totalRevenue)}
-                  subtitle={`Flows: ${formatCurrency(globalStats.totalFlowRevenue)} | Camp: ${formatCurrency(globalStats.totalCampaignRevenue)}`}
+                  subtitle={`Flujos: ${formatCurrency(globalStats.totalFlowRevenue)} | Camp: ${formatCurrency(globalStats.totalCampaignRevenue)}`}
                   icon={DollarSign}
                 />
                 <StatCard
@@ -638,7 +638,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                     <th className="text-right p-3 font-medium">Enviados</th>
                     <th className="text-right p-3 font-medium">Open Rate</th>
                     <th className="text-right p-3 font-medium">Click Rate</th>
-                    <th className="text-right p-3 font-medium">Revenue</th>
+                    <th className="text-right p-3 font-medium">Ingresos</th>
                     <th className="text-right p-3 font-medium">Conversiones</th>
                   </tr>
                 </thead>
@@ -694,7 +694,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                     <th className="text-right p-3 font-medium">Enviados</th>
                     <th className="text-right p-3 font-medium">Open Rate</th>
                     <th className="text-right p-3 font-medium">Click Rate</th>
-                    <th className="text-right p-3 font-medium">Revenue</th>
+                    <th className="text-right p-3 font-medium">Ingresos</th>
                     <th className="text-right p-3 font-medium">Conversiones</th>
                   </tr>
                 </thead>

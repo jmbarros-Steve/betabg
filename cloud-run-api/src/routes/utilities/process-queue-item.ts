@@ -121,7 +121,7 @@ async function extractRulesFromChunk(text: string, apiKey: string): Promise<Arra
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: `Analiza el siguiente contenido y extrae todas las reglas accionables:\n\n${text}` }],
@@ -152,7 +152,10 @@ export async function processQueueItem(c: Context) {
     queueId = inputQueueId;
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+    if (!ANTHROPIC_API_KEY) {
+      console.error('[process-queue-item] ANTHROPIC_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
 
     const supabase = getSupabaseAdmin();
 
@@ -162,7 +165,10 @@ export async function processQueueItem(c: Context) {
       .eq('id', queueId)
       .single();
 
-    if (fetchErr || !item) throw new Error('Queue item not found');
+    if (fetchErr || !item) {
+      console.error('[process-queue-item] Queue item not found:', fetchErr?.message);
+      return c.json({ error: 'Queue item not found' }, 404);
+    }
 
     await supabase.from('learning_queue').update({ status: 'processing', error_message: null }).eq('id', queueId);
 
@@ -269,6 +275,7 @@ export async function processQueueItem(c: Context) {
       } catch {}
     }
 
-    throw err;
+    console.error('[process-queue-item]', err);
+    return c.json({ error: 'Error interno del servidor' }, 500);
   }
 }
