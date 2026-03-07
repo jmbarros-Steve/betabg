@@ -44,8 +44,8 @@ export async function generateImage(c: Context) {
     const FAL_API_KEY = process.env.FAL_API_KEY;
     if (!FAL_API_KEY) throw new Error('FAL_API_KEY not configured');
 
-    const imageSize = formato === 'story' ? 'portrait_4_3' :
-                      formato === 'feed' ? 'landscape_16_9' :
+    const imageSize = formato === 'story' ? 'portrait_16_9' :
+                      formato === 'feed' ? 'square_hd' :
                       'square_hd';
 
     const falBody: Record<string, unknown> = {
@@ -89,8 +89,8 @@ export async function generateImage(c: Context) {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
 
-    const gptSize = formato === 'story' ? '1024x1536' :
-                    formato === 'feed' ? '1536x1024' :
+    const gptSize = formato === 'story' ? '1024x1792' :
+                    formato === 'feed' ? '1024x1024' :
                     '1024x1024';
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {

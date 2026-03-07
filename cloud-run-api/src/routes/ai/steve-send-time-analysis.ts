@@ -114,7 +114,7 @@ async function fetchCampaignReport(
 }
 
 // Day names for logging / reference
-const DAY_NAMES = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
+const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 interface HeatmapCell {
   count: number;
@@ -293,19 +293,19 @@ async function getClaudeInsights(
     }
   }
 
-  const systemPrompt = `Eres Steve, un experto en email marketing. Analiza los datos de rendimiento de envio por hora y dia de la semana y proporciona insights accionables en espanol.
+  const systemPrompt = `Eres Steve, un experto en email marketing. Analiza los datos de rendimiento de envío por hora y día de la semana y proporciona insights accionables en español.
 
 IMPORTANTE:
-- Los dias van de 0 (Lunes) a 6 (Domingo)
+- Los días van de 0 (Lunes) a 6 (Domingo)
 - Las horas son en formato 24h (UTC)
-- El score es una puntuacion compuesta (0-100) basada en open_rate, click_rate, revenue y conversions
+- El score es una puntuación compuesta (0-100) basada en open_rate, click_rate, revenue y conversions
 - Solo analiza las celdas que tienen datos (count > 0)
-- Se especifico con dias y horas
-- Responde SOLO con JSON valido, sin markdown ni texto adicional`;
+- Sé específico con días y horas
+- Responde SOLO con JSON válido, sin markdown ni texto adicional`;
 
-  const userMessage = `Analiza estos datos de rendimiento de envio de campanas de email:
+  const userMessage = `Analiza estos datos de rendimiento de envío de campañas de email:
 
-DATOS DEL HEATMAP (solo celdas con envios):
+DATOS DEL HEATMAP (solo celdas con envíos):
 ${JSON.stringify(heatmapSummary, null, 2)}
 
 TOP 5 MEJORES HORARIOS:
@@ -314,14 +314,14 @@ ${JSON.stringify(bestSlots.map(s => ({ ...s, dayName: DAY_NAMES[s.day], hourLabe
 TOP 5 PEORES HORARIOS:
 ${JSON.stringify(worstSlots.map(s => ({ ...s, dayName: DAY_NAMES[s.day], hourLabel: `${s.hour.toString().padStart(2, '0')}:00` })), null, 2)}
 
-Total de campanas analizadas: ${totalAnalyzed}
+Total de campañas analizadas: ${totalAnalyzed}
 Rango de fechas: ${dateRange.from} a ${dateRange.to}
 
-Basandote en estos datos:
-1. Identifica las mejores combinaciones de dia+hora para enviar
+Basándote en estos datos:
+1. Identifica las mejores combinaciones de día+hora para enviar
 2. Identifica los peores momentos que se deben evitar
-3. Nota cualquier patron interesante (ej: mananas vs tardes, entre semana vs fin de semana)
-4. Da 4-6 recomendaciones especificas y accionables
+3. Nota cualquier patrón interesante (ej: mañanas vs tardes, entre semana vs fin de semana)
+4. Da 4-6 recomendaciones específicas y accionables
 
 Responde UNICAMENTE con este JSON (sin markdown, sin backticks):
 {
@@ -352,7 +352,7 @@ Reglas para insights:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2048,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
@@ -444,7 +444,7 @@ export async function steveSendTimeAnalysis(c: Context) {
   if (sentCampaigns.length < 5) {
     return c.json({
       error: 'not_enough_data',
-      message: 'Se necesitan al menos 5 campanas enviadas para generar un analisis de horarios de envio. Actualmente hay ' + sentCampaigns.length + ' campana(s) enviada(s).',
+      message: 'Se necesitan al menos 5 campañas enviadas para generar un análisis de horarios de envío. Actualmente hay ' + sentCampaigns.length + ' campaña(s) enviada(s).',
     });
   }
 
@@ -462,7 +462,7 @@ export async function steveSendTimeAnalysis(c: Context) {
   if (totalAnalyzed < 5) {
     return c.json({
       error: 'not_enough_data',
-      message: 'Se necesitan al menos 5 campanas con metricas disponibles para generar el analisis. Solo se encontraron ' + totalAnalyzed + ' campana(s) con datos de rendimiento.',
+      message: 'Se necesitan al menos 5 campañas con métricas disponibles para generar el análisis. Solo se encontraron ' + totalAnalyzed + ' campaña(s) con datos de rendimiento.',
     });
   }
 

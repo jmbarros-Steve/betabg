@@ -57,7 +57,15 @@ function detectRelevantCategories(message: string): string[] {
 }
 
 export async function steveStrategy(c: Context) {
+  try {
   const { messages, client_id } = await c.req.json() as { messages: Message[]; client_id: string };
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return c.json({ error: 'Messages required' }, 400);
+  }
+  if (!client_id) {
+    return c.json({ error: 'client_id required' }, 400);
+  }
 
   const supabase = getSupabaseAdmin();
 
@@ -147,7 +155,7 @@ ${clientContext}${knowledgeBlock}`;
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
@@ -167,4 +175,9 @@ ${clientContext}${knowledgeBlock}`;
   const message = data.content?.[0]?.text || '';
 
   return c.json({ message });
+
+  } catch (error: any) {
+    console.error('steve-strategy error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
 }

@@ -413,12 +413,12 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
     setGeneratingImage(true);
     try {
       const { data, error } = await callApi('generate-image', {
-        body: { client_id: clientId, prompt: `Producto para anuncio de Meta Ads. Variacion ${index + 1}. ${audienceDesc}` },
+        body: { clientId, promptGeneracion: `Producto para anuncio de Meta Ads. Variacion ${index + 1}. ${audienceDesc}` },
       });
       if (error) throw error;
-      if (data?.image_url) {
+      if (data?.asset_url) {
         const next = [...images];
-        next[index] = data.image_url;
+        next[index] = data.asset_url;
         setImages(next);
         toast.success(`Imagen ${index + 1} generada`);
       }

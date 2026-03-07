@@ -31,7 +31,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'business_pitch',
       shortLabel: 'Tu negocio (pitch)',
-      question: '**Pregunta 1 de 15 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.',
+      question: '**Pregunta 1 de 16 — TU NEGOCIO:** ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.',
       examples: ['Vendemos ropa deportiva premium para mujeres', 'Somos una agencia de diseño web para pymes', 'Tenemos una tienda de cosmética natural en Shopify'],
       fields: [],
       steveIntro: '*sacude las orejas y se sienta* 🐕\n\nVamos bien. Siguiente tema:\n\n',
@@ -40,7 +40,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'numbers',
       shortLabel: 'Números (precio, costo, fase)',
-      question: '**Pregunta 2 de 15 — LOS NÚMEROS:**\n\nNecesito la carne de tu negocio. **Llena los campos del formulario que aparece abajo** y yo calculo tu **Margen Bruto** y tu **CPA Máximo Viable**. 💰',
+      question: '**Pregunta 2 de 16 — LOS NÚMEROS:**\n\nNecesito la carne de tu negocio. **Llena los campos del formulario que aparece abajo** y yo calculo tu **Margen Bruto** y tu **CPA Máximo Viable**. 💰',
       examples: [],
       fields: [
         { key: 'price', label: '💰 Precio promedio de venta', type: 'number', prefix: '$', placeholder: 'Ej: 35.000' },
@@ -65,7 +65,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'sales_channels',
       shortLabel: 'Canales de venta',
-      question: '**Pregunta 3 de 15 — CANALES DE VENTA:**\n\nPonle porcentaje a cada canal en los campos del formulario abajo. **Deben sumar 100%.** Si no usas un canal, déjalo en 0. 🐕📝',
+      question: '**Pregunta 3 de 16 — CANALES DE VENTA:**\n\nPonle porcentaje a cada canal en los campos del formulario abajo. **Deben sumar 100%.** Si no usas un canal, déjalo en 0. 🐕📝',
       examples: [],
       fields: [
         { key: 'shopify', label: '🛒 Shopify / E-commerce propio', type: 'number', suffix: '%', placeholder: '0' },
@@ -82,7 +82,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_profile',
       shortLabel: 'Cliente ideal (buyer persona)',
-      question: '**Pregunta 4 de 15 — TU CLIENTE IDEAL (Buyer Persona):**\n\nLlena los 8 campos del formulario abajo para construir el perfil de tu cliente ideal.',
+      question: '**Pregunta 4 de 16 — TU CLIENTE IDEAL (Buyer Persona):**\n\nLlena los 8 campos del formulario abajo para construir el perfil de tu cliente ideal.',
       examples: [],
       fields: [
         { key: 'name', label: '👤 Nombre ficticio', type: 'text', placeholder: 'Ej: María' },
@@ -100,7 +100,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_pain',
       shortLabel: 'Dolor del cliente',
-      question: '**Pregunta 5 de 15 — SU DOLOR PROFUNDO:** Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:\n\n1. ¿Qué problema específico tiene?\n2. ¿Cómo lo ha intentado resolver antes?\n3. ¿Por qué esa solución anterior no le dio satisfacción completa?\n\nSé específico — piensa en situaciones concretas que vive tu cliente.',
+      question: '**Pregunta 5 de 16 — SU DOLOR PROFUNDO:** Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:\n\n1. ¿Qué problema específico tiene?\n2. ¿Cómo lo ha intentado resolver antes?\n3. ¿Por qué esa solución anterior no le dio satisfacción completa?\n\nSé específico — piensa en situaciones concretas que vive tu cliente.',
       examples: [],
       fields: [],
       steveIntro: '*pone cara seria* 😰\n\n',
@@ -109,7 +109,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_words',
       shortLabel: 'Palabras y objeciones del cliente',
-      question: '**Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame **2 o 3 frases literales distintas** — una queja habitual, una objeción de compra, y una frustración pasada.',
+      question: '**Pregunta 6 de 16 — SUS PALABRAS Y OBJECIONES:** ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame **2 o 3 frases literales distintas** — una queja habitual, una objeción de compra, y una frustración pasada.',
       examples: [],
       fields: [],
       steveIntro: '*saca su libreta* 📝\n\n',
@@ -118,7 +118,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_transformation',
       shortLabel: 'La transformación (después de usarte)',
-      question: '**Pregunta 7 de 15 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
+      question: '**Pregunta 7 de 16 — LA TRANSFORMACIÓN:** ¿Cómo se ve la vida de tu cliente DESPUÉS de usarte? ¿A quién quiere impresionar? ¿Qué cambia para él/ella?',
       examples: [],
       fields: [],
       steveIntro: '*levanta las orejas, ojos brillantes* ✨\n\n',
@@ -127,7 +127,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'persona_lifestyle',
       shortLabel: 'Estilo de vida del cliente',
-      question: '**Pregunta 8 de 15 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers o cuentas sigue?',
+      question: '**Pregunta 8 de 16 — SU MUNDO:** ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers o cuentas sigue?',
       examples: [],
       fields: [],
       steveIntro: '*mueve la cola curioso*\n\n',
@@ -136,7 +136,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'competitors',
       shortLabel: '3 competidores (con URLs)',
-      question: '**Pregunta 9 de 15 — COMPETENCIA:**\n\nNecesito **EXACTAMENTE 3 competidores** con su página web o Instagram. Llena los campos del formulario abajo.\n\n⚠️ **Sin 3 competidores con URLs NO avanzamos.**',
+      question: '**Pregunta 9 de 16 — COMPETENCIA:**\n\nNecesito **EXACTAMENTE 3 competidores** con su página web o Instagram. Llena los campos del formulario abajo.\n\n⚠️ **Sin 3 competidores con URLs NO avanzamos.**',
       examples: [],
       fields: [
         { key: 'comp1_name', label: '1️⃣ Nombre Competidor 1', type: 'text', placeholder: 'Ej: Cannon Home' },
@@ -152,7 +152,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'competitors_weakness',
       shortLabel: 'Análisis de competidores',
-      question: '**Pregunta 10 de 15 — ANÁLISIS COMPETITIVO:**\n\nPara cada uno de tus 3 competidores, llena los campos del formulario abajo: qué promete y no cumple, y por qué TÚ lo haces mejor.',
+      question: '**Pregunta 10 de 16 — ANÁLISIS COMPETITIVO:**\n\nPara cada uno de tus 3 competidores, llena los campos del formulario abajo: qué promete y no cumple, y por qué TÚ lo haces mejor.',
       examples: [],
       fields: [
         { key: 'comp1_fail', label: '1️⃣ Competidor 1: ¿Qué promete y NO cumple?', type: 'textarea', placeholder: 'Ej: Promete algodón premium pero es mezcla barata' },
@@ -168,7 +168,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'your_advantage',
       shortLabel: 'Tu ventaja incopiable',
-      question: '**Pregunta 11 de 15 — TU VENTAJA INCOPIABLE:** ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?',
+      question: '**Pregunta 11 de 16 — TU VENTAJA INCOPIABLE:** ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?',
       examples: [],
       fields: [],
       steveIntro: '*se para firme* 🏆\n\n',
@@ -177,7 +177,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'purple_cow_promise',
       shortLabel: 'Vaca púrpura y gran promesa',
-      question: '**Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
+      question: '**Pregunta 12 de 16 — VACA PÚRPURA Y GRAN PROMESA:**\n\n¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?',
       examples: [],
       fields: [],
       steveIntro: '*se para en dos patas, emocionado* 🐄💜\n\n',
@@ -186,7 +186,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'villain_guarantee',
       shortLabel: 'Villano y garantía',
-      question: '**Pregunta 13 de 15 — EL VILLANO:** ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea quieres erradicar del mercado?\n\n¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?',
+      question: '**Pregunta 13 de 16 — EL VILLANO:** ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea quieres erradicar del mercado?\n\n¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?',
       examples: [],
       fields: [],
       steveIntro: '*gruñe pensando en los enemigos de tu marca* 🐕\n\n',
@@ -195,7 +195,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'proof_tone',
       shortLabel: 'Prueba social y tono',
-      question: '**Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes)\n\n¿Y qué TONO de comunicación conecta con tu cliente?',
+      question: '**Pregunta 14 de 16 — PRUEBA SOCIAL Y TONO:** ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes)\n\n¿Y qué TONO de comunicación conecta con tu cliente?',
       examples: [],
       fields: [],
       steveIntro: '*olfatea buscando evidencia* 📸\n\n',
@@ -804,7 +804,7 @@ ${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables.`;
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+    if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
     const aiMessages = recentMessages.map(m => ({
       role: m.role as 'user' | 'assistant',
@@ -932,7 +932,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
   // -- GUARD: If the brief is already complete, respond as free-chat Steve (no brief logic) --
   if (dbAnsweredCount !== null && dbAnsweredCount >= BRAND_BRIEF_QUESTIONS.length) {
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+    if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
     const postBriefSystem = SYSTEM_PROMPT + `\n\nEl brief de marca de este cliente YA ESTÁ COMPLETO. No hagas más preguntas del brief. Responde como un consultor amigable que puede ayudar con preguntas generales de marketing, estrategia, o cualquier duda. Si el cliente pregunta por su brief, dile que ya está listo y que puede verlo en la pestaña "Brief de Marca".`;
     const chatMsgs = messages!.filter(m => m.role !== 'system').map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
@@ -940,7 +940,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1200, system: postBriefSystem, messages: chatMsgs }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200, system: postBriefSystem, messages: chatMsgs }),
     });
 
     if (!aiResp.ok) {
@@ -1158,7 +1158,7 @@ ${questionContext}`;
   const model = 'claude-sonnet-4-6';
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
   // Convert messages: Anthropic uses system separately, not in messages array
   const systemMessage = chatMessages.find(m => m.role === 'system')?.content || '';

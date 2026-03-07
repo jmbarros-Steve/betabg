@@ -94,7 +94,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [isComplete, setIsComplete] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisPhase, setAnalysisPhase] = useState<'research' | 'strategy' | 'done' | null>(null);
-  const [progress, setProgress] = useState({ answered: 0, total: 15 });
+  const [progress, setProgress] = useState({ answered: 0, total: 17 });
   const [examples, setExamples] = useState<string[]>([]);
   const [currentFields, setCurrentFields] = useState<QuestionField[]>([]);
   const [fieldValidation, setFieldValidation] = useState<string | undefined>();
@@ -127,7 +127,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   // Show asset upload when we're on Q15
   useEffect(() => {
-    if (progress.answered >= 14 && !isComplete) {
+    if (progress.answered >= 16 && !isComplete) {
       setShowAssetUpload(true);
       loadExistingAssets();
     }
@@ -285,7 +285,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   async function startNewConversation() {
-    const WELCOME_MESSAGE = '¡Hola! Soy Steve, tu consultor de performance marketing. Voy a ayudarte a construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Son 15 preguntas y toma unos 20 minutos. ¿Empezamos? Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
+    const WELCOME_MESSAGE = '¡Hola! Soy Steve, tu consultor de performance marketing. Voy a ayudarte a construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Son 16 preguntas y toma unos 20 minutos. ¿Empezamos? Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
 
     try {
       // Use edge function to create conversation — it uses service_role and bypasses RLS.

@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function generateBriefVisual(c: Context) {
+  try {
   const { clientId, formato, angulo, variacionElegida, assetUrls, productData } = await c.req.json();
 
   const supabase = getSupabaseAdmin();
@@ -27,6 +28,7 @@ export async function generateBriefVisual(c: Context) {
       .order('created_at', { ascending: false })
       .limit(15),
     supabase.from('ad_references').select('visual_patterns, quality_score, image_url')
+      .eq('client_id', clientId)
       .eq('angulo', angulo)
       .order('quality_score', { ascending: false })
       .limit(3),
@@ -165,4 +167,9 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
   }
 
   return c.json(parsed);
+
+  } catch (error: any) {
+    console.error('generate-brief-visual error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
 }

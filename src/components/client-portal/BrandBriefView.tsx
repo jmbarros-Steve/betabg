@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -1165,15 +1166,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // Two-phase analysis: research (data analysis) → strategy (AI strategy)
     // Each phase fits within the 150s edge function timeout
     const competitorUrls = extractCompetitorUrlsFromBrief();
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
-    };
-
     const debugKey = `analysis_debug_${clientId}`;
     const setDebug = (updates: Record<string, unknown>) => {
       try {
@@ -1186,19 +1178,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
-      const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls }),
+      const { data: researchData, error: researchErr } = await callApi('analyze-brand-research', {
+        body: { client_id: clientId, website_url: websiteUrl, competitor_urls: competitorUrls },
       });
-      if (researchRes.ok) {
-        const researchData = await researchRes.json();
-        research = researchData.research;
-        setDebug({ phase1: 'ok', phase1Status: 200 });
+      if (researchErr) {
+        setDebug({ phase1: 'error', phase1Message: researchErr });
+        console.error('analyze-brand-research error:', researchErr);
       } else {
-        const errBody = await researchRes.text();
-        setDebug({ phase1: 'error', phase1Status: researchRes.status, phase1Message: errBody.slice(0, 300) });
-        console.error('analyze-brand-research error:', researchRes.status, errBody.slice(0, 500));
+        research = researchData?.research;
+        setDebug({ phase1: 'ok', phase1Status: 200 });
       }
     } catch (err: any) {
       setDebug({ phase1: 'error', phase1Message: err?.message || String(err) });
@@ -1209,17 +1197,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (research) {
       setDebug({ phase2: 'running' });
       try {
-        const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ client_id: clientId, research }),
+        const { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
+          body: { client_id: clientId, research },
         });
-        if (strategyRes.ok) {
-          setDebug({ phase2: 'ok', phase2Status: 200 });
+        if (strategyErr) {
+          setDebug({ phase2: 'error', phase2Message: strategyErr });
+          console.error('analyze-brand-strategy error:', strategyErr);
         } else {
-          const errBody = await strategyRes.text();
-          setDebug({ phase2: 'error', phase2Status: strategyRes.status, phase2Message: errBody.slice(0, 300) });
-          if (strategyRes.status !== 429) console.error('analyze-brand-strategy error:', strategyRes.status, errBody.slice(0, 500));
+          setDebug({ phase2: 'ok', phase2Status: 200 });
         }
       } catch (err: any) {
         setDebug({ phase2: 'error', phase2Message: err?.message || String(err) });
