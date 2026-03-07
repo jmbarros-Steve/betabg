@@ -9,20 +9,20 @@ const CLOUD_RUN_URL = import.meta.env.VITE_API_URL as string | undefined;
  */
 const CLOUD_RUN_FUNCTIONS = new Set<string>([
   // Phase 1: Utilities
-  // 'chonga-support',
-  // 'parse-email-html',
-  // 'export-all-data',
-  // 'export-database',
-  // 'check-video-status',
-  // 'process-queue-item',
-  // 'process-transcription',
-  // 'learn-from-source',
-  // 'train-steve',
-  // 'analyze-ad-image',
-  // 'generate-brief-visual',
-  // 'generate-copy',
-  // 'generate-google-copy',
-  // 'generate-campaign-recommendations',
+  'chonga-support',
+  'parse-email-html',
+  'export-all-data',
+  'export-database',
+  'check-video-status',
+  'process-queue-item',
+  'process-transcription',
+  'learn-from-source',
+  'train-steve',
+  'analyze-ad-image',
+  'generate-brief-visual',
+  'generate-copy',
+  'generate-google-copy',
+  'generate-campaign-recommendations',
 ]);
 
 interface ApiResponse<T = any> {
