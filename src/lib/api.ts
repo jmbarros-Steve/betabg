@@ -23,6 +23,8 @@ const CLOUD_RUN_FUNCTIONS = new Set<string>([
   'generate-copy',
   'generate-google-copy',
   'generate-campaign-recommendations',
+  // Phase 2 (migrated early)
+  'generate-meta-copy',
 ]);
 
 interface ApiResponse<T = any> {

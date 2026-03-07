@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 
 // Phase 1: Utilities
+import { generateMetaCopy } from './ai/generate-meta-copy.js';
 import { chongaSupport } from './utilities/chonga-support.js';
 import { parseEmailHtml } from './utilities/parse-email-html.js';
 import { checkVideoStatus } from './utilities/check-video-status.js';
@@ -41,8 +42,9 @@ export function registerRoutes(app: Hono) {
   app.post('/api/process-transcription', authMiddleware, processTranscription);
 
   // ============================================================
-  // Phase 2: AI & Analytics
+  // Phase 2: AI & Analytics (migrated early)
   // ============================================================
+  app.post('/api/generate-meta-copy', authMiddleware, generateMetaCopy);
   // app.post('/api/steve-chat', authMiddleware, steveChat);
   // app.post('/api/analyze-brand-research', authMiddleware, analyzeBrandResearch);
   // app.post('/api/analyze-brand-strategy', authMiddleware, analyzeBrandStrategy);
