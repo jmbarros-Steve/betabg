@@ -556,11 +556,23 @@ export async function generateMetaCopy(c: Context) {
     const cId = body.client_id || body.clientId;
     if (!cId) throw new Error('Missing client_id');
 
-    // Fetch knowledge base for context
-    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
+    // Fetch client brief, knowledge base, and brand research
+    const [{ data: briefData }, { data: brandResearch }, { data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
+      supabase.from('buyer_personas').select('*').eq('client_id', cId).eq('is_complete', true).order('created_at', { ascending: false }).limit(1).single(),
+      supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', cId).order('created_at', { ascending: false }).limit(1).single(),
       supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
       supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).limit(10),
     ]);
+
+    const personaData = briefData?.persona_data || briefData?.raw_data || {};
+    const brandSection = brandResearch ? `\nDATOS DE LA MARCA:
+- Marca: ${brandResearch.brand_name || 'N/A'}
+- Industria: ${brandResearch.industry || 'N/A'}
+- Audiencia objetivo: ${JSON.stringify(brandResearch.target_audience || 'N/A')}
+- Propuesta de valor: ${JSON.stringify(brandResearch.value_proposition || 'N/A')}
+- Voz de marca: ${JSON.stringify(brandResearch.brand_voice || 'N/A')}
+- Detalles del producto: ${JSON.stringify(brandResearch.product_details || 'N/A')}\n` : '';
+    const briefSection = Object.keys(personaData).length > 0 ? `\nBRIEF DEL CLIENTE:\n${JSON.stringify(personaData, null, 2)}\n` : '';
     const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES A EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}`).join('\n')}\n` : '';
     const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nREGLAS:\n${kbKnowledge.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
@@ -574,7 +586,7 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
-        messages: [{ role: 'user', content: `${bugSection}${knowledgeSection}\n${body.instruction}` }],
+        messages: [{ role: 'user', content: `${brandSection}${briefSection}${bugSection}${knowledgeSection}\n${body.instruction}` }],
       }),
     });
     const aiData: any = await resp.json();
