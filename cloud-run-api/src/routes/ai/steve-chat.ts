@@ -204,7 +204,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
     {
       id: 'brand_identity',
       shortLabel: 'Identidad visual (colores, estilo)',
-      question: '**Pregunta 15 de 16 — IDENTIDAD VISUAL Y TONO:**\n\nCuéntame sobre la identidad visual de tu marca:\n\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n- ✍️ **¿Tienes un manual de marca o guía de estilo?**',
+      question: '**Pregunta 15 de 16 — IDENTIDAD VISUAL DE MARCA:**\n\nCuéntame sobre la identidad visual de tu marca:\n\n- 🎨 **¿Cuáles son tus colores de marca?** (hex, RGB o nombre)\n- 🖼 **¿Cuál es el estilo visual** que quieres proyectar?\n- ✍️ **¿Tienes un manual de marca o guía de estilo?**',
       examples: [],
       fields: [],
       steveIntro: '*saca su paleta de colores* 🎨🐕\n\n',
@@ -1239,9 +1239,9 @@ ${questionContext}`;
   }
 
   // BUG 5 FIX 2: Prepend analysis-pending notice before the brief so the client knows
-  // the analysis is running and can take up to 8 minutes.
+  // the analysis is running and can take 3-5 minutes.
   if (newAnsweredCount >= BRAND_BRIEF_QUESTIONS.length && !isRejection) {
-    const avisoText = `⏳ *saca termo y se prepara para el análisis* 🐕\n\n¡WOOF! Tu brief ya está listo. Además estoy lanzando el análisis automático de tu sitio web y el de tu competencia ahora mismo. Puede demorar hasta 8 minutos — anda por un café y cuando vuelvas tendrás el análisis completo de SEO, Keywords y Competencia en las pestañas correspondientes. ¡No cierres la sesión!\n\n---\n\n`;
+    const avisoText = `⏳ *saca termo y se prepara para el análisis* 🐕\n\n¡WOOF! Tu brief ya está listo. Además estoy lanzando el análisis automático de tu sitio web y el de tu competencia ahora mismo. Puede demorar de 3 a 5 minutos — anda por un café y cuando vuelvas tendrás el análisis completo de SEO, Keywords y Competencia en las pestañas correspondientes. ¡No cierres la sesión!\n\n---\n\n`;
     assistantMessage = avisoText + assistantMessage;
   }
 

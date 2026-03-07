@@ -142,7 +142,7 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
   if (!response.ok) {
     const errText = await response.text();
     console.error('Anthropic API error response:', errText);
-    let userMessage = `Error del modelo AI (${response.status})`;
+    let userMessage = 'Steve no pudo generar el brief visual. Intenta de nuevo.';
     try {
       const errJson = JSON.parse(errText);
       if (errJson.error?.message) userMessage = errJson.error.message;
@@ -154,7 +154,7 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
   const rawContent = aiResult.content?.[0]?.text || '';
 
   if (!rawContent) {
-    throw new Error('La IA no generó respuesta. Intenta de nuevo.');
+    throw new Error('No se pudo generar el contenido. Intenta de nuevo.');
   }
 
   let parsed;
@@ -163,7 +163,7 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
     parsed = JSON.parse(clean);
   } catch {
     console.error('Failed to parse AI JSON response:', rawContent.slice(0, 500));
-    throw new Error('Error parseando respuesta de IA. Intenta de nuevo.');
+    throw new Error('Error procesando la respuesta. Intenta de nuevo.');
   }
 
   return c.json(parsed);

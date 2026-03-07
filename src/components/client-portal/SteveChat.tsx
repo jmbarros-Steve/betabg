@@ -278,14 +278,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
       }
     } catch (error) {
       console.error('Error initializing conversation:', error);
-      toast.error('Error al cargar la conversación');
+      toast.error('No pudimos cargar tu conversación. Recarga la página para intentar de nuevo.');
     } finally {
       setIsInitializing(false);
     }
   }
 
   async function startNewConversation() {
-    const WELCOME_MESSAGE = '¡Hola! Soy Steve, tu consultor de performance marketing. Voy a ayudarte a construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Son 16 preguntas y toma unos 20 minutos. ¿Empezamos? Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
+    const WELCOME_MESSAGE = '¡WOOF! 🐕 Soy Steve, tu consultor de performance marketing. Voy a hacerte 16 preguntas para construir el brief estratégico de tu marca — un documento que va a definir exactamente cómo hacer crecer tu negocio online. Toma unos 20 minutos. ¿Empezamos? 🌐 Primero necesito saber: ¿Cuál es tu sitio web o tienda online?';
 
     try {
       // Use edge function to create conversation — it uses service_role and bypasses RLS.
@@ -393,9 +393,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
       if (error?.status === 429) {
         toast.error('Demasiadas solicitudes. Espera un momento.');
       } else if (error?.status === 402) {
-        toast.error('Servicio de IA no disponible temporalmente.');
+        toast.error('Steve no está disponible en este momento. Intenta de nuevo en unos minutos.');
       } else {
-        toast.error('Error al enviar mensaje');
+        toast.error('No se pudo enviar tu mensaje. Verifica tu conexión e intenta de nuevo.');
       }
       setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
     } finally {
@@ -480,7 +480,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       console.error('[triggerAnalysis] Error:', err);
       setIsAnalyzing(false);
       setAnalysisPhase(null);
-      toast.error('Error inesperado en el análisis.');
+      toast.error('Ocurrió un error durante el análisis. Puedes reintentarlo desde la pestaña Brief.');
     }
   }
 
@@ -713,7 +713,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
           {/* Asset Upload for Q15 — inline in chat */}
           {showAssetUpload && !isLoading && (
             <div className="px-4 pb-2 flex-shrink-0 border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <p className="text-xs font-medium text-muted-foreground mb-2">📸 Sube tus archivos aquí (obligatorio para el brief):</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2">📸 Sube tus archivos aquí (recomendado para mejores resultados):</p>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 {/* Logo upload */}
                 <div className="bg-muted/50 rounded-lg p-3 border border-border">
@@ -732,7 +732,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                   ) : null}
                   <input type="file" ref={logoInputRef} accept="image/*" onChange={e => handleAssetUpload('logo', e.target.files)} className="hidden" />
                   <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'logo'} onClick={() => logoInputRef.current?.click()}>
-                    {uploadingAssets === 'logo' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> {uploadedAssets.logo.length > 0 ? 'Cambiar' : 'Subir Logo'}</>}
+                    {uploadingAssets === 'logo' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo logo...</> : <><Upload className="h-3 w-3 mr-1" /> {uploadedAssets.logo.length > 0 ? 'Cambiar' : 'Subir Logo'}</>}
                   </Button>
                 </div>
 
@@ -753,7 +753,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                   ) : null}
                   <input type="file" ref={photosInputRef} accept="image/*" multiple onChange={e => handleAssetUpload('products', e.target.files)} className="hidden" />
                   <Button variant="outline" size="sm" className="w-full text-xs" disabled={uploadingAssets === 'products'} onClick={() => photosInputRef.current?.click()}>
-                    {uploadingAssets === 'products' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo...</> : <><Upload className="h-3 w-3 mr-1" /> Subir Fotos ({uploadedAssets.products.length})</>}
+                    {uploadingAssets === 'products' ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo fotos...</> : <><Upload className="h-3 w-3 mr-1" /> Subir Fotos ({uploadedAssets.products.length})</>}
                   </Button>
                 </div>
               </div>
@@ -822,13 +822,13 @@ export function SteveChat({ clientId }: SteveChatProps) {
                   <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                     {analysisPhase === 'research'
                       ? 'Investigando tu sitio web y competidores...'
-                      : 'Generando estrategia de marketing con IA...'}
+                      : 'Generando estrategia de marketing...'}
                   </span>
                 </div>
                 <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
                   {analysisPhase === 'research'
-                    ? 'Escaneando sitios web, detectando competidores y recopilando datos (1-3 min)'
-                    : 'Analizando posicionamiento, audiencia, SEO y más (1-2 min)'}
+                    ? 'Escaneando sitios web, detectando competidores y recopilando datos (2-3 min)'
+                    : 'Analizando posicionamiento, audiencia, SEO y más (2-4 min)'}
                 </p>
               </div>
             )}

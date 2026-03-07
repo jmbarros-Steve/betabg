@@ -144,7 +144,7 @@ export async function analyzeBrandResearch(c: Context) {
   // 2b. AI auto-detection of competitors when we have fewer than 6
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   if (allCompetitorUrls.length < 6 && anthropicApiKey && (websiteContent || briefContext)) {
-    await updateProgress('auto_competidores', 'Detectando competidores automáticamente con IA...', 18);
+    await updateProgress('auto_competidores', 'Detectando competidores automáticamente...', 18);
     try {
       const slotsNeeded = 6 - allCompetitorUrls.length;
       const existingDomains = allCompetitorUrls.map(u => {
@@ -248,7 +248,7 @@ Solo dominios reales de tiendas que existan. NO inventes dominios.`;
     }
   }
 
-  await updateProgress('ia', `Análisis de datos completado — iniciando análisis estratégico con IA (${competitorContents.length} competidores)...`, 75);
+  await updateProgress('ia', 'Análisis de datos completado — generando estrategia de marketing...', 75);
 
   // Save research data so strategy function can read it
   const researchPayload = {

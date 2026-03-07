@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-// ── 11 secciones individuales para llamadas paralelas ──
+// ── 12 secciones individuales para llamadas paralelas ──
 const SECTIONS = [
   {
     id: 'executive_summary',
@@ -378,18 +378,18 @@ export async function analyzeBrandStrategy(c: Context) {
 
     // Update progress
     await supabase.from('brand_research').upsert(
-      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Ejecutando 11 análisis en paralelo...', pct: 60, ts: new Date().toISOString() } },
+      { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: 'Generando tu estrategia de marketing...', pct: 60, ts: new Date().toISOString() } },
       { onConflict: 'client_id,research_type' }
     );
 
     // ══════════════════════════════════════════════
-    //  11 LLAMADAS EN 3 OLEADAS (rate limit friendly)
+    //  12 LLAMADAS EN 3 OLEADAS (rate limit friendly)
     // ══════════════════════════════════════════════
     const fullSystemBase = `Eres un estratega de marketing digital experto en e-commerce LATAM.\n\nREGLA DE PRIORIDAD: Si hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n${knowledgeContext ? `\nREGLAS APRENDIDAS (aplicar obligatoriamente):\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
 
     const wave1 = SECTIONS.slice(0, 4);   // secciones 1-4
     const wave2 = SECTIONS.slice(4, 8);   // secciones 5-8
-    const wave3 = SECTIONS.slice(8, 11);  // secciones 9-11
+    const wave3 = SECTIONS.slice(8, 12);  // secciones 9-12
 
     console.log(`[analyze-brand-strategy] Wave 1: starting ${wave1.map(s => s.id).join(', ')}`);
     const results1 = await Promise.allSettled(
@@ -442,7 +442,7 @@ export async function analyzeBrandStrategy(c: Context) {
     // Log resumen
     const fulfilled = results.filter(r => r.status === 'fulfilled').length;
     const rejected = results.filter(r => r.status === 'rejected').length;
-    console.log(`[analyze-brand-strategy] SUMMARY: ${fulfilled}/11 OK, ${rejected}/11 FAILED`);
+    console.log(`[analyze-brand-strategy] SUMMARY: ${fulfilled}/12 OK, ${rejected}/12 FAILED`);
 
     // ── Consolidar resultados ──
     const finalBrief: Record<string, unknown> = {};
@@ -528,7 +528,7 @@ export async function analyzeBrandStrategy(c: Context) {
       { onConflict: 'client_id,research_type' }
     );
 
-    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (status=${status}, saved=${completedSections.length}/11)`);
+    console.log(`[analyze-brand-strategy] Complete for client ${client_id} (status=${status}, saved=${completedSections.length}/12)`);
 
     return c.json({ success: true, status, data: finalBrief, completed_sections: completedSections, failed_sections: failedSections, errors });
 

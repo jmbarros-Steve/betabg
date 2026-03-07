@@ -431,6 +431,14 @@ const PERFORMANCE_QUOTES = [
 function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string; detail: string; pct: number } | null }) {
   const [quoteIdx, setQuoteIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const maxPctRef = useRef(0);
+
+  // Ensure displayed percentage never decreases
+  const rawPct = progressStep?.pct ?? 0;
+  if (rawPct > maxPctRef.current) {
+    maxPctRef.current = rawPct;
+  }
+  const displayPct = Math.max(rawPct, maxPctRef.current);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -460,12 +468,10 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
           <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary truncate">
-              {progressStep?.detail?.includes('Claude') || progressStep?.detail?.includes('Opus')
-                ? 'Analizando con equipo de Marketing Steve AI'
-                : (progressStep?.detail || 'Analizando con equipo de Marketing Steve AI')}
+              Analizando con equipo de Marketing Steve
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Analizando con equipo de Marketing Steve AI.
+              Analizando con equipo de Marketing Steve.
             </p>
           </div>
         </div>
@@ -474,17 +480,16 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
         <div className="mb-4">
           <div className="flex justify-between items-center mb-1">
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
-            <span className="text-[10px] font-bold text-primary">{progressStep?.pct ?? 0}%</span>
+            <span className="text-[10px] font-bold text-primary">{displayPct}%</span>
           </div>
-          <Progress value={progressStep?.pct ?? 5} className="h-2" />
+          <Progress value={displayPct || 5} className="h-2" />
         </div>
 
         {/* Step indicators */}
         <div className="grid grid-cols-4 gap-2 text-center mb-5">
           {phases.map((phase, i) => {
             const isActive = progressStep && phase.key.includes(progressStep.step);
-            const pct = progressStep?.pct ?? 0;
-            const isDone = pct > thresholds[i] && !isActive;
+            const isDone = displayPct > thresholds[i] && !isActive;
             return (
               <div key={i} className={`rounded-lg p-2 border transition-all duration-300 ${isActive ? 'bg-primary/10 border-primary/40' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background border-border'}`}>
                 <div className={isActive ? 'text-primary' : isDone ? 'text-green-500' : 'text-muted-foreground'}>
@@ -642,7 +647,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       await fetchResearch();
       setAnalysisStatus('complete');
       setProgressStep(null);
-      toast.success('Análisis aplicado automáticamente — revisa los tabs SEO, Keywords y Competencia.');
+      toast.success('Análisis aplicado automáticamente — revisa las pestañas SEO, Keywords y Competencia.');
     }
 
     (async () => {
@@ -675,7 +680,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     await fetchResearch();
     setAnalysisStatus('complete');
     setProgressStep(null);
-    toast.success('Análisis forzado — mostrando últimos datos disponibles.');
+    toast.success('Análisis cargado — mostrando datos disponibles.');
   }
 
   // Re-fetch research data whenever analysisStatus transitions to 'complete'
@@ -1507,7 +1512,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(180, 180, 210);
-    doc.text('PERFORMANCE MARKETING CON IA', pageWidth / 2, 43, { align: 'center' });
+    doc.text('PERFORMANCE MARKETING ESTRATÉGICO', pageWidth / 2, 43, { align: 'center' });
 
     // Business name as main title, user name as subtitle
     const businessName_cover = clientInfo?.company || clientInfo?.name || 'Cliente';
@@ -1646,7 +1651,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       },
       {
         title: 'SOLUCION',
-        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en ${cpaMaxCLP || 'N/D'}, keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia con IA en tiempo real.`,
+        text: `Brief estrategico completo: buyer persona definido, CPA maximo calculado en ${cpaMaxCLP || 'N/D'}, keywords identificadas y competencia mapeada. Steve Ads ejecuta la estrategia en tiempo real.`,
         col: 1, row: 0,
       },
       {
@@ -2554,7 +2559,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(150, 150, 180);
-    doc.text('Este informe fue generado por STEVE.IO — Plataforma de Performance Marketing con IA para e-commerce latinoamericano', pageWidth / 2, steveY + 4, { align: 'center', maxWidth: maxWidth });
+    doc.text('Este informe fue generado por STEVE.IO — Plataforma de Performance Marketing para e-commerce latinoamericano', pageWidth / 2, steveY + 4, { align: 'center', maxWidth: maxWidth });
 
     // ─── FIRMA — tercio superior compacto ────────────────────────────────────────
     doc.addPage();
@@ -2603,7 +2608,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
 
     doc.save(`Brief_Estrategico_${clientInfo?.name || 'Marca'}_${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('PDF McKinsey descargado con exito');
+    toast.success('Brief estratégico descargado con éxito');
   }
 
   if (loading) {
@@ -2661,7 +2666,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       {analysisStatus === 'pending' && (
         <div className="space-y-3">
           <AnalysisProgressBanner progressStep={progressStep} />
-          {diagnostic && elapsedSeconds >= 15 && (
+          {diagnostic && elapsedSeconds >= 15 && user?.email === 'jmbarros@bgconsult.cl' && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs font-mono space-y-1">
               <p className="font-semibold text-foreground">Diagnóstico (para localizar la falla):</p>
               <p className="text-muted-foreground">
@@ -2743,7 +2748,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Sin Brief de Marca</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Habla con Steve para crear tu Brief Estratégico en solo 15 preguntas.
+              Habla con Steve para crear tu Brief Estratégico en solo 16 preguntas.
             </p>
             <Button onClick={onEditBrief}>
               <MessageSquare className="h-4 w-4 mr-2" />
@@ -3553,7 +3558,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       <CardTitle className="text-sm flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-primary" /> Oportunidades de Keywords
                       </CardTitle>
-                      <CardDescription className="text-xs">Featured snippets y oportunidades detectadas por la IA</CardDescription>
+                      <CardDescription className="text-xs">Featured snippets y oportunidades detectadas</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-1.5">
@@ -3576,7 +3581,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <Trophy className="h-4 w-4 text-primary" />
                         Keywords por Competidor
                       </CardTitle>
-                      <CardDescription className="text-xs">Keywords y posicionamiento competitivo detectado por la IA</CardDescription>
+                      <CardDescription className="text-xs">Keywords y posicionamiento competitivo detectado</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {/* Keywords generales de competidores */}
@@ -3694,7 +3699,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                                 </Badge>
                               )}
                               {comp.source === 'auto' && (
-                                <Badge variant="secondary" className="text-[10px]">🤖 Detectado por IA</Badge>
+                                <Badge variant="secondary" className="text-[10px]">🤖 Detectado automáticamente</Badge>
                               )}
                               {comp.url && <a href={comp.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-auto">{comp.url}</a>}
                             </div>

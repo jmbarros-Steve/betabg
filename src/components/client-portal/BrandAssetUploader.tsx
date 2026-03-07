@@ -67,11 +67,9 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
         <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-primary truncate">
-            {progressStep.detail?.includes('Claude') || progressStep.detail?.includes('Opus')
-              ? 'Analizando con equipo de Marketing Steve AI'
-              : progressStep.detail}
+            Analizando con equipo de Marketing Steve
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Analizando con equipo de Marketing Steve AI.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Analizando con equipo de Marketing Steve.</p>
         </div>
       </div>
 
@@ -410,7 +408,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
     // Phase 2: await to capture error for diagnóstico
     if (research) {
-      console.log('[launchAnalysis] Phase 2 — strategy (Steve AI)');
+      console.log('[launchAnalysis] Phase 2 — strategy (Steve)');
       setDebug({ phase2: 'running' });
       try {
         const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
