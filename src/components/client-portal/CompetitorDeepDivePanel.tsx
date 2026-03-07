@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Loader2, Globe, Code, ShoppingCart, BarChart3,
@@ -109,7 +110,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
 
     setScrapingId(competitor.id);
     try {
-      const response = await supabase.functions.invoke('deep-dive-competitor', {
+      const response = await callApi('deep-dive-competitor', {
         body: {
           client_id: clientId,
           tracking_id: competitor.id,

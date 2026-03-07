@@ -8,9 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { 
-  RefreshCw, TrendingUp, TrendingDown, DollarSign, MousePointerClick, 
+import {
+  RefreshCw, TrendingUp, TrendingDown, DollarSign, MousePointerClick,
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
   BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
   Clock, CheckCircle, PauseCircle, Calendar
@@ -221,7 +222,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         : connections.filter(c => c.id === selectedConnection);
 
       for (const conn of connectionsToSync) {
-        const { error } = await supabase.functions.invoke('sync-campaign-metrics', {
+        const { error } = await callApi('sync-campaign-metrics', {
           body: { connection_id: conn.id, platform: conn.platform }
         });
 
@@ -305,7 +306,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     setLoadingAdSets(prev => new Set(prev).add(campaignId));
     
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-campaign-adsets', {
+      const { data, error } = await callApi('fetch-campaign-adsets', {
         body: { connection_id: connection.id, campaign_id: campaignId, platform }
       });
 

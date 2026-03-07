@@ -23,8 +23,23 @@ const CLOUD_RUN_FUNCTIONS = new Set<string>([
   'generate-copy',
   'generate-google-copy',
   'generate-campaign-recommendations',
-  // Phase 2 (migrated early)
+  // Phase 2: AI & Analytics
+  'steve-chat',
+  'steve-strategy',
+  'steve-email-content',
+  'steve-send-time-analysis',
+  'steve-bulk-analyze',
   'generate-meta-copy',
+  'generate-image',
+  'generate-video',
+  'generate-mass-campaigns',
+  'analyze-brand',
+  'analyze-brand-research',
+  'analyze-brand-strategy',
+  'sync-competitor-ads',
+  'deep-dive-competitor',
+  'fetch-campaign-adsets',
+  'sync-campaign-metrics',
 ]);
 
 interface ApiResponse<T = any> {

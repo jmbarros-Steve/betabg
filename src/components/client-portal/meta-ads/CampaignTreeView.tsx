@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -389,7 +390,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
     setCampaigns((prev) => prev.map((c) => c.campaign_id === campaignId ? { ...c, adsets_loading: true } : c));
 
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-campaign-adsets', {
+      const { data, error } = await callApi('fetch-campaign-adsets', {
         body: { connection_id: connectionIds[0], campaign_id: campaignId, platform: 'meta' },
       });
       if (error) throw error;
@@ -425,7 +426,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
     setSyncing(true);
     try {
       for (const connId of connectionIds) {
-        await supabase.functions.invoke('sync-campaign-metrics', { body: { connection_id: connId, platform: 'meta' } });
+        await callApi('sync-campaign-metrics', { body: { connection_id: connId, platform: 'meta' } });
       }
       toast.success('Datos sincronizados');
       await fetchCampaigns();

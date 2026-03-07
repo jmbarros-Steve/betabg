@@ -331,7 +331,7 @@ function AdForm({
     setGeneratingImage(true);
     try {
       const formatMap: Record<AdFormat, string> = { '1:1': 'square', '9:16': 'story', '16:9': 'feed' };
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error } = await callApi('generate-image', {
         body: { clientId, promptGeneracion: aiPrompt, engine: imageEngine, formato: formatMap[adFormat] },
       });
       if (error) throw error;
@@ -350,7 +350,7 @@ function AdForm({
     if (!aiPrompt.trim()) { toast.error('Describe lo que quieres en el video'); return; }
     setGeneratingVideo(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
+      const { data, error } = await callApi('generate-video', {
         body: { clientId, promptGeneracion: aiPrompt, fotoBaseUrl: imageUrl || undefined },
       });
       if (error) throw error;

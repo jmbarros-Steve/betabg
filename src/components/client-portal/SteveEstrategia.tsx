@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Send, User, Lightbulb, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -108,7 +109,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('steve-chat', {
+      const { data, error } = await callApi('steve-chat', {
         body: {
           client_id: clientId,
           conversation_id: conversationId,

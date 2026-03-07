@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Loader2, Check, Sparkles, Zap, Clock, Mail, Info } from 'lucide-react';
 import { type FlowTemplate, FLOW_CATEGORY_LABELS, FLOW_PRIORITY_COLORS } from './FlowTemplates';
@@ -37,7 +38,7 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
   const handleGenerateContent = async () => {
     setGeneratingContent(true);
     try {
-      const { data, error } = await supabase.functions.invoke('steve-email-content', {
+      const { data, error } = await callApi('steve-email-content', {
         body: {
           action: 'generate_flow_emails',
           flowType: template.id,

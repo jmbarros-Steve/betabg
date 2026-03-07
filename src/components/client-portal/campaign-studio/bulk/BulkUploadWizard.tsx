@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import type { BrandIdentity } from '../templates/BrandHtmlGenerator';
 import { generateBrandEmail } from '../templates/BrandHtmlGenerator';
@@ -331,7 +332,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
 
         if (!conn) return;
 
-        const { data } = await supabase.functions.invoke('steve-send-time-analysis', {
+        const { data } = await callApi('steve-send-time-analysis', {
           body: { connectionId: conn.id },
         });
 
@@ -412,7 +413,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
       }, 800);
 
       try {
-        const { data, error } = await supabase.functions.invoke('steve-bulk-analyze', {
+        const { data, error } = await callApi('steve-bulk-analyze', {
           body: { action: 'analyze', content: rawContent, contentType },
         });
 
@@ -503,7 +504,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
       }, 600);
 
       try {
-        const { data, error } = await supabase.functions.invoke('steve-bulk-analyze', {
+        const { data, error } = await callApi('steve-bulk-analyze', {
           body: {
             action: 'generate',
             items: selectedItems,

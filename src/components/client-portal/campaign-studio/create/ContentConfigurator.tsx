@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Loader2, Package, Plus, X, ImagePlus, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { CampaignType } from '../templates/TemplatePresets';
@@ -186,7 +187,7 @@ export function ContentConfigurator({
     }
     setAiLoading('subjects');
     try {
-      const { data, error } = await supabase.functions.invoke('steve-email-content', {
+      const { data, error } = await callApi('steve-email-content', {
         body: {
           connectionId: klaviyoConnectionId,
           action: 'generate_subject',
@@ -213,7 +214,7 @@ export function ContentConfigurator({
     if (!klaviyoConnectionId) return;
     setAiLoading('analyze');
     try {
-      const { data, error } = await supabase.functions.invoke('steve-email-content', {
+      const { data, error } = await callApi('steve-email-content', {
         body: {
           connectionId: klaviyoConnectionId,
           action: 'analyze_content',

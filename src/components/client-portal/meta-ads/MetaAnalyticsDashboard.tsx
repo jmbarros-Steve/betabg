@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -286,7 +287,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     try {
       // Use connectionId from MetaBusinessContext
       if (!ctxConnectionId) return;
-      await supabase.functions.invoke('sync-campaign-metrics', {
+      await callApi('sync-campaign-metrics', {
         body: { connection_id: ctxConnectionId, platform: 'meta' },
       });
 

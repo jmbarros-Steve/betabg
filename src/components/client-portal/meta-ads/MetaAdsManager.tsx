@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 // Select UI components no longer needed for portfolio picker (handled by MetaConnectionWizard)
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import {
@@ -286,7 +287,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
     if (!connectionId) return;
     setSyncing(true);
     try {
-      const { error } = await supabase.functions.invoke('sync-campaign-metrics', {
+      const { error } = await callApi('sync-campaign-metrics', {
         body: { connection_id: connectionId, platform: 'meta' },
       });
       if (error) {
@@ -767,7 +768,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         supabase.functions.invoke('sync-meta-metrics', {
           body: { connection_id: metaConnection.id, purge_stale: true },
         }),
-        supabase.functions.invoke('sync-campaign-metrics', {
+        callApi('sync-campaign-metrics', {
           body: { connection_id: metaConnection.id, platform: 'meta', purge_stale: true },
         }),
       ]);

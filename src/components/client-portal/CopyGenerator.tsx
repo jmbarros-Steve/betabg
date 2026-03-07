@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { ClientAssetsGallery } from './ClientAssetsGallery';
 import { AdCreativesLibrary } from './AdCreativesLibrary';
 import { MetaAdCreator } from './MetaAdCreator';
@@ -240,7 +241,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     setGeneratingImage(true);
     setGeneratedAssetUrl(null);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error } = await callApi('generate-image', {
         body: {
           clientId, creativeId: savedCreativeId,
           promptGeneracion: briefVisual.prompt_generacion as string,
@@ -269,7 +270,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     setVideoProgress('Iniciando generación...');
     setGeneratedAssetUrl(null);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
+      const { data, error } = await callApi('generate-video', {
         body: {
           clientId, creativeId: savedCreativeId,
           promptGeneracion: briefVisual.prompt_generacion as string,

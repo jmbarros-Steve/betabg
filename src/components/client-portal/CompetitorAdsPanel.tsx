@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Instagram, Search, Loader2, Trophy, Clock, Eye,
@@ -148,7 +149,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         return;
       }
 
-      const response = await supabase.functions.invoke('sync-competitor-ads', {
+      const response = await callApi('sync-competitor-ads', {
         body: { client_id: clientId, ig_handles: validHandles },
       });
 

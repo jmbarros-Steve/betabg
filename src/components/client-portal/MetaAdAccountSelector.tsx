@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { RefreshCw, CheckCircle, AlertCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -120,7 +121,7 @@ export function MetaAdAccountSelector({
         supabase.functions.invoke('sync-meta-metrics', {
           body: { connection_id: connectionId, purge_stale: true }
         }),
-        supabase.functions.invoke('sync-campaign-metrics', {
+        callApi('sync-campaign-metrics', {
           body: { connection_id: connectionId, platform: 'meta', purge_stale: true }
         }),
       ]);

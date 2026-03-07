@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Bot, Send, Loader2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -60,7 +61,7 @@ async function sendToSteveAndPersist(
   let assistantContent: string;
 
   try {
-    const { data, error } = await supabase.functions.invoke(
+    const { data, error } = await callApi(
       'steve-email-content',
       {
         body: {
@@ -76,7 +77,7 @@ async function sendToSteveAndPersist(
     if (error) {
       // Fallback: try the steve-chat function
       const { data: fallbackData, error: fallbackError } =
-        await supabase.functions.invoke('steve-chat', {
+        await callApi('steve-chat', {
           body: {
             client_id: clientId,
             message,

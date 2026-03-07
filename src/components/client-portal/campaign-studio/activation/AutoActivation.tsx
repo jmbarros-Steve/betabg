@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Loader2,
@@ -217,7 +218,7 @@ export function AutoActivation({
         );
 
         try {
-          await supabase.functions.invoke('steve-email-content', {
+          await callApi('steve-email-content', {
             body: {
               connectionId,
               action: 'generate_flow',

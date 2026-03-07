@@ -413,7 +413,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const handleGenerateImage = async (index: number) => {
     setGeneratingImage(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error } = await callApi('generate-image', {
         body: { client_id: clientId, prompt: `Producto para anuncio de Meta Ads. Variacion ${index + 1}. ${audienceDesc}` },
       });
       if (error) throw error;

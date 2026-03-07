@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { useBriefContext } from '@/hooks/useBriefContext';
 
 interface MetaAdCreatorProps {
@@ -372,7 +373,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
       const results = await Promise.allSettled(
         selectedBriefs.map(async (briefIdx) => {
           const brief = briefsVisuales[briefIdx];
-          const { data, error } = await supabase.functions.invoke('generate-image', {
+          const { data, error } = await callApi('generate-image', {
             body: { clientId, creativeId: savedCreativeId, promptGeneracion: brief.prompt_generacion as string, engine: imageEngine },
           });
           if (error) {
@@ -431,7 +432,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
     if (!savedCreativeId || !primaryBrief) return;
     setGeneratingVideo(true); setVideoProgress('Iniciando...'); setGeneratedAssetUrls([]);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
+      const { data, error } = await callApi('generate-video', {
         body: { clientId, creativeId: savedCreativeId, promptGeneracion: primaryBrief.prompt_generacion as string },
       });
       if (error) throw error;

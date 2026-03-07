@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Send, User, Sparkles, RefreshCw, Upload, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -289,7 +290,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
     try {
       // Use edge function to create conversation — it uses service_role and bypasses RLS.
       // This is required for both regular clients AND super admins viewing a client's portal.
-      const { data, error } = await supabase.functions.invoke('steve-chat', {
+      const { data, error } = await callApi('steve-chat', {
         body: { client_id: clientId },
       });
 
@@ -334,7 +335,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('steve-chat', {
+      const { data, error } = await callApi('steve-chat', {
         body: {
           client_id: clientId,
           conversation_id: conversationId,
@@ -430,7 +431,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       const competitorUrls = (competitors || []).map(c => c.store_url).filter(Boolean);
 
       // Phase 1: Research (scraping + AI competitor detection)
-      const { data: researchData, error: researchErr } = await supabase.functions.invoke('analyze-brand-research', {
+      const { data: researchData, error: researchErr } = await callApi('analyze-brand-research', {
         body: { client_id: cId, website_url: clientData?.website_url, competitor_urls: competitorUrls },
       });
       if (researchErr || !researchData?.research) {
@@ -447,7 +448,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
       // Phase 2: Strategy (12 parallel Claude Sonnet calls)
       setAnalysisPhase('strategy');
-      const { data: strategyData, error: strategyErr } = await supabase.functions.invoke('analyze-brand-strategy', {
+      const { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
         body: { client_id: cId, research: researchData.research },
       });
       if (strategyErr) {
