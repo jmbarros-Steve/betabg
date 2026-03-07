@@ -819,7 +819,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
         system: estrategiaSystemPrompt,
         messages: aiMessages,
@@ -1155,7 +1155,7 @@ ${questionContext}`;
   const maxTokens = isLastQuestion ? 6000 : 1200;
   // Use Sonnet for the last question (brief generation follows a template -- Sonnet is
   // much faster and avoids timeouts that Opus + 8000 tokens would cause).
-  const model = isLastQuestion ? 'claude-sonnet-4-6' : 'claude-opus-4-6';
+  const model = 'claude-sonnet-4-6';
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
