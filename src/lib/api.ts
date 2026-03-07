@@ -70,6 +70,16 @@ const CLOUD_RUN_FUNCTIONS = new Set<string>([
   'sync-klaviyo-metrics',
   // Phase 3: Other
   'store-platform-connection',
+  // Phase 4: Auth & OAuth
+  'self-signup',
+  'admin-create-client',
+  'create-client-user',
+  'meta-oauth-callback',
+  'google-ads-oauth-callback',
+  'shopify-install',
+  'shopify-oauth-callback',
+  'shopify-fulfillment-webhooks',
+  'shopify-gdpr-webhooks',
 ]);
 
 interface ApiResponse<T = any> {

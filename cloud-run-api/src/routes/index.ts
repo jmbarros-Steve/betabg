@@ -72,6 +72,21 @@ import { metaSocialInbox } from './meta/meta-social-inbox.js';
 import { metaDataDeletion } from './meta/meta-data-deletion.js';
 import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
 
+// Phase 4: Auth
+import { selfSignup } from './auth/self-signup.js';
+import { adminCreateClient } from './auth/admin-create-client.js';
+import { createClientUser } from './auth/create-client-user.js';
+
+// Phase 4: OAuth
+import { metaOauthCallback } from './oauth/meta-oauth-callback.js';
+import { googleAdsOauthCallback } from './oauth/google-ads-oauth-callback.js';
+
+// Phase 4: Shopify OAuth & Webhooks
+import { shopifyInstall } from './shopify/shopify-install.js';
+import { shopifyOauthCallback } from './shopify/shopify-oauth-callback.js';
+import { shopifyFulfillmentWebhooks } from './shopify/shopify-fulfillment-webhooks.js';
+import { shopifyGdprWebhooks } from './shopify/shopify-gdpr-webhooks.js';
+
 /**
  * Registers all API routes on the Hono app.
  * Convention: each route maps to /api/{original-function-name}
@@ -159,6 +174,13 @@ export function registerRoutes(app: Hono) {
   // ============================================================
   // Phase 4: Auth & OAuth
   // ============================================================
-  // app.post('/api/self-signup', selfSignup);
-  // app.get('/api/shopify-install', shopifyInstall);
+  app.post('/api/self-signup', selfSignup); // No JWT - creates users
+  app.post('/api/admin-create-client', adminCreateClient); // No JWT - uses own secret
+  app.post('/api/create-client-user', authMiddleware, createClientUser);
+  app.post('/api/meta-oauth-callback', authMiddleware, metaOauthCallback);
+  app.post('/api/google-ads-oauth-callback', authMiddleware, googleAdsOauthCallback);
+  app.get('/api/shopify-install', shopifyInstall); // GET - browser redirect, no JWT
+  app.all('/api/shopify-oauth-callback', shopifyOauthCallback); // GET + POST, no JWT
+  app.post('/api/shopify-fulfillment-webhooks', shopifyFulfillmentWebhooks); // No JWT - HMAC verified
+  app.post('/api/shopify-gdpr-webhooks', shopifyGdprWebhooks); // No JWT - HMAC verified
 }
