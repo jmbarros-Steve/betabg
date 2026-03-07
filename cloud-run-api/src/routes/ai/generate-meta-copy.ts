@@ -543,16 +543,51 @@ IMPORTANTE:
 }
 
 export async function generateMetaCopy(c: Context) {
-  const { clientId, adType, funnelStage, customPrompt, angulo, assetUrls, variacionElegida, mode } = await c.req.json() as GenerateRequest;
-
-  if (!clientId || !adType || !funnelStage) {
-    throw new Error('Missing required parameters');
-  }
+  const body = await c.req.json();
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
 
   const supabase = getSupabaseAdmin();
+
+  // ── INSTRUCTION MODE (simple prompt pass-through) ───────────────────────
+  // Used by TestingWizard322 and CampaignCreateWizard for quick copy generation
+  if (body.instruction) {
+    const cId = body.client_id || body.clientId;
+    if (!cId) throw new Error('Missing client_id');
+
+    // Fetch knowledge base for context
+    const [{ data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
+      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
+      supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).limit(10),
+    ]);
+    const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES A EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}`).join('\n')}\n` : '';
+    const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nREGLAS:\n${kbKnowledge.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: `${bugSection}${knowledgeSection}\n${body.instruction}` }],
+      }),
+    });
+    const aiData: any = await resp.json();
+    const text = aiData?.content?.[0]?.text || '';
+    return c.json({ copy: text, text });
+  }
+
+  // ── STANDARD MODES (variaciones, brief_visual, legacy) ─────────────────
+  const { clientId, adType, funnelStage, customPrompt, angulo, assetUrls, variacionElegida, mode } = body as GenerateRequest;
+
+  if (!clientId || !adType || !funnelStage) {
+    throw new Error('Missing required parameters');
+  }
 
   // ── VARIACIONES MODE ──────────────────────────────────────────────────────
   if (mode === 'variaciones') {

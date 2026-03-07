@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -670,7 +671,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const handleGenerateCopy = async () => {
     setGeneratingCopy(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-meta-copy', {
+      const { data, error } = await callApi('generate-meta-copy', {
         body: {
           client_id: clientId,
           instruction: `Genera copy para un anuncio de Meta Ads. Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Responde SOLO con JSON: {"primary_text":"...","headline":"...","description":"..."}`,

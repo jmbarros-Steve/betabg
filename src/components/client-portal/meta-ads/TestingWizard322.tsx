@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -432,7 +433,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const handleGenerateCopies = async () => {
     setGeneratingCopy(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-meta-copy', {
+      const { data, error } = await callApi('generate-meta-copy', {
         body: {
           client_id: clientId,
           instruction: `Genera 2 copies DIFERENTES para un anuncio de Meta Ads. Audiencia: ${audienceDesc}. Copy 1: enfoque emocional. Copy 2: enfoque racional con datos. Maximo 125 caracteres cada uno. Responde SOLO con JSON: {"copies":["copy1","copy2"]}`,
@@ -459,7 +460,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const handleGenerateHeadlines = async () => {
     setGeneratingHeadline(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-meta-copy', {
+      const { data, error } = await callApi('generate-meta-copy', {
         body: {
           client_id: clientId,
           instruction: `Genera 2 headlines DIFERENTES para un anuncio de Meta Ads. Audiencia: ${audienceDesc}. Headline 1: beneficio principal. Headline 2: urgencia/oferta. Maximo 40 caracteres cada uno. Responde SOLO con JSON: {"headlines":["h1","h2"]}`,
