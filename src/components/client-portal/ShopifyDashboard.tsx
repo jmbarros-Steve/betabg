@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, Package } from 'lucide-react';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
@@ -82,10 +83,10 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
     if (!connectionId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-shopify-analytics', {
+      const { data, error } = await callApi('fetch-shopify-analytics', {
         body: { connectionId, daysBack },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
       setSkuData(data?.topSkus || []);
       setAbandonedCarts(data?.abandonedCarts || []);
       setSalesByChannel(data?.salesByChannel || []);

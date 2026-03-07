@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -989,11 +990,11 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
   const syncAudiencesFromMeta = useCallback(async (connectionId: string, showErrors = false): Promise<AudienceRow[]> => {
     try {
-      const { data, error } = await supabase.functions.invoke('manage-meta-audiences', {
+      const { data, error } = await callApi('manage-meta-audiences', {
         body: { action: 'list', connection_id: connectionId },
       });
 
-      // supabase.functions.invoke puts the body in `data` even on non-2xx responses.
+      // callApi puts the body in `data` even on non-2xx responses.
       // If the edge function returned success with empty audiences, that's valid — not an error.
       if (data?.success && Array.isArray(data.audiences)) {
         // Edge function returned 200 with valid data (possibly empty list) — proceed normally
@@ -1232,7 +1233,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         data.retention_days = customForm.app_activity_days;
       }
 
-      const { error } = await supabase.functions.invoke('manage-meta-audiences', {
+      const { error } = await callApi('manage-meta-audiences', {
         body: {
           action: 'create_custom',
           connection_id: metaConnectionId,
@@ -1290,7 +1291,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         lookalikeForm.country;
       const lookName = `Lookalike ${lookalikeForm.lookalike_percent}% - ${sourceAudience?.name || 'Origen'} (${countryLabel})`;
 
-      const { error } = await supabase.functions.invoke('manage-meta-audiences', {
+      const { error } = await callApi('manage-meta-audiences', {
         body: {
           action: 'create_lookalike',
           connection_id: metaConnectionId,
@@ -1356,7 +1357,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
     setDeleting(true);
     try {
-      const { error } = await supabase.functions.invoke('manage-meta-audiences', {
+      const { error } = await callApi('manage-meta-audiences', {
         body: {
           action: 'delete',
           connection_id: metaConnectionId,

@@ -85,7 +85,7 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('klaviyo-manage-flows', {
+      const { data, error } = await callApi('klaviyo-manage-flows', {
         body: {
           action: 'create_flow',
           connectionId: conn.id,

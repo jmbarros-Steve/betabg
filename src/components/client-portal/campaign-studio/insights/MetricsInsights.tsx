@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -367,7 +368,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke(
+      const { data, error: fnError } = await callApi(
         'sync-klaviyo-metrics',
         {
           body: { connectionId, timeframe: tf },
@@ -376,7 +377,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
 
       if (fnError) {
         console.error('Error fetching Klaviyo metrics:', fnError);
-        setError(fnError.message || 'Error al cargar metricas');
+        setError(fnError || 'Error al cargar metricas');
         toast.error('Error al cargar metricas de Klaviyo');
         return;
       }

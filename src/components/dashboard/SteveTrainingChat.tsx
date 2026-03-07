@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Bot, Loader2, Send, CheckCircle, Edit2, Save, X, Bug, BookOpen, RefreshCw } from 'lucide-react';
 
@@ -156,7 +157,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
     setPendingResult(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('train-steve', {
+      const { data, error } = await callApi('train-steve', {
         body: {
           contenido: text,
           categoriaHint: categoria === 'auto' ? null : categoria,

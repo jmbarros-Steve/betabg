@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import logoKlaviyo from '@/assets/logo-klaviyo-clean.png';
 import { KlaviyoPlanWizard } from './KlaviyoPlanWizard';
@@ -887,7 +888,7 @@ function PushToKlaviyoDialog({
     setConnectionId(connId);
 
     try {
-      const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
+      const { data, error } = await callApi('klaviyo-push-emails', {
         body: { action: 'fetch_lists', connection_id: connId },
       });
       if (error) throw error;
@@ -910,7 +911,7 @@ function PushToKlaviyoDialog({
     if (!connectionId || !selectedList) return;
     setPushing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
+      const { data, error } = await callApi('klaviyo-push-emails', {
         body: {
           plan_id: planId,
           connection_id: connectionId,
@@ -1361,7 +1362,7 @@ function EmailStepCard({ email, index, isFirst, flowType, onUpdate, onRemove }: 
     }
     setSmartFormatting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('klaviyo-smart-format', {
+      const { data, error } = await callApi('klaviyo-smart-format', {
         body: {
           subject: localEmail.subject,
           preview_text: localEmail.previewText,

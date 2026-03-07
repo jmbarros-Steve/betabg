@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Loader2, Zap } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -55,7 +56,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
       setConnectionId(conn.id);
 
       // Fetch existing flows from Klaviyo
-      const { data, error: fetchError } = await supabase.functions.invoke('klaviyo-manage-flows', {
+      const { data, error: fetchError } = await callApi('klaviyo-manage-flows', {
         body: { action: 'list_flows', connectionId: conn.id },
       });
 

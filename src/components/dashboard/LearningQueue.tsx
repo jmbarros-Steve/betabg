@@ -8,6 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Youtube, FileText, Globe, Type, Loader2, Play, Pause, Trash2,
@@ -154,7 +155,7 @@ export function LearningQueue() {
       await fetchQueue();
 
       try {
-        const { data, error } = await supabase.functions.invoke('learn-from-source', {
+        const { data, error } = await callApi('learn-from-source', {
           body: {
             sourceType: item.source_type,
             content: item.source_content,
@@ -185,7 +186,7 @@ export function LearningQueue() {
         setCurrentItemTitle(`${item.source_title || 'Fuente'} — procesamiento en background...`);
 
         // Fire-and-forget
-        void supabase.functions.invoke('process-queue-item', {
+        void callApi('process-queue-item', {
           body: { queueId: data.queueId },
         }).catch((invokeErr) => {
           console.error('process-queue-item invoke error:', invokeErr);

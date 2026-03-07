@@ -198,7 +198,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
     try {
       const chipsText = getActiveChipsText();
       const fullInstrucciones = [instrucciones.trim(), chipsText].filter(Boolean).join('. ') || undefined;
-      const { data, error } = await supabase.functions.invoke('generate-copy', {
+      const { data, error } = await callApi('generate-copy', {
         body: {
           clientId,
           funnel,
@@ -292,7 +292,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
           const copyIndex = selectedCopies[patternIdx];
           const variacion = generatedVariaciones.variaciones[copyIndex];
           if (!variacion) throw new Error(`Variacion no encontrada para indice ${copyIndex}`);
-          const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
+          const { data, error } = await callApi('generate-brief-visual', {
             body: { clientId, formato: 'static', angulo: effectiveAngle, variacionElegida: variacion },
           });
           if (error) {
@@ -411,7 +411,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
     const interval = setInterval(async () => {
       setVideoProgress(msgs[idx % msgs.length]); idx++;
       try {
-        const { data } = await supabase.functions.invoke('check-video-status', {
+        const { data } = await callApi('check-video-status', {
           body: { predictionId, creativeId: savedCreativeId, clientId },
         });
         if (data?.status === 'succeeded' && data?.asset_url) {

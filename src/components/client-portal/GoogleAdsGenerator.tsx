@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SteveFeedbackDialog } from './SteveFeedbackDialog';
@@ -205,7 +206,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
     setGeneratedContent(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-google-copy', {
+      const { data, error } = await callApi('generate-google-copy', {
         body: {
           clientId,
           campaignType,

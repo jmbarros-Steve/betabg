@@ -37,6 +37,41 @@ import { deepDiveCompetitor } from './analytics/deep-dive-competitor.js';
 import { fetchCampaignAdsets } from './analytics/fetch-campaign-adsets.js';
 import { syncCampaignMetrics } from './analytics/sync-campaign-metrics.js';
 
+// Phase 3: Shopify
+import { fetchShopifyAnalytics } from './shopify/fetch-shopify-analytics.js';
+import { fetchShopifyProducts } from './shopify/fetch-shopify-products.js';
+import { fetchShopifyCollections } from './shopify/fetch-shopify-collections.js';
+import { createShopifyDiscount } from './shopify/create-shopify-discount.js';
+import { shopifySessionValidate } from './shopify/shopify-session-validate.js';
+import { syncShopifyMetrics } from './shopify/sync-shopify-metrics.js';
+
+// Phase 3: Google
+import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
+
+// Phase 3: Other
+import { storePlatformConnection } from './utilities/store-platform-connection.js';
+
+// Phase 3: Klaviyo
+import { fetchKlaviyoTopProducts } from './klaviyo/fetch-klaviyo-top-products.js';
+import { storeKlaviyoConnection } from './klaviyo/store-klaviyo-connection.js';
+import { importKlaviyoTemplates } from './klaviyo/import-klaviyo-templates.js';
+import { uploadKlaviyoDrafts } from './klaviyo/upload-klaviyo-drafts.js';
+import { klaviyoManageFlows } from './klaviyo/klaviyo-manage-flows.js';
+import { klaviyoPushEmails } from './klaviyo/klaviyo-push-emails.js';
+import { klaviyoSmartFormat } from './klaviyo/klaviyo-smart-format.js';
+import { syncKlaviyoMetrics } from './klaviyo/sync-klaviyo-metrics.js';
+
+// Phase 3: Meta
+import { checkMetaScopes } from './meta/check-meta-scopes.js';
+import { fetchMetaAdAccounts } from './meta/fetch-meta-ad-accounts.js';
+import { fetchMetaBusinessHierarchy } from './meta/fetch-meta-business-hierarchy.js';
+import { manageMetaAudiences } from './meta/manage-meta-audiences.js';
+import { manageMetaCampaign } from './meta/manage-meta-campaign.js';
+import { manageMetaPixel } from './meta/manage-meta-pixel.js';
+import { metaSocialInbox } from './meta/meta-social-inbox.js';
+import { metaDataDeletion } from './meta/meta-data-deletion.js';
+import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
+
 /**
  * Registers all API routes on the Hono app.
  * Convention: each route maps to /api/{original-function-name}
@@ -81,9 +116,45 @@ export function registerRoutes(app: Hono) {
   app.post('/api/sync-campaign-metrics', authMiddleware, syncCampaignMetrics);
 
   // ============================================================
-  // Phase 3: Platform Integrations
+  // Phase 3: Platform Integrations (Klaviyo)
   // ============================================================
-  // Shopify, Meta, Google, Klaviyo routes
+  app.post('/api/fetch-klaviyo-top-products', authMiddleware, fetchKlaviyoTopProducts);
+  app.post('/api/store-klaviyo-connection', authMiddleware, storeKlaviyoConnection);
+  app.post('/api/import-klaviyo-templates', authMiddleware, importKlaviyoTemplates);
+  app.post('/api/upload-klaviyo-drafts', authMiddleware, uploadKlaviyoDrafts);
+  app.post('/api/klaviyo-manage-flows', authMiddleware, klaviyoManageFlows);
+  app.post('/api/klaviyo-push-emails', authMiddleware, klaviyoPushEmails);
+  app.post('/api/klaviyo-smart-format', authMiddleware, klaviyoSmartFormat);
+  app.post('/api/sync-klaviyo-metrics', authMiddleware, syncKlaviyoMetrics);
+
+  // ============================================================
+  // Phase 3: Platform Integrations (Meta)
+  // ============================================================
+  app.post('/api/check-meta-scopes', authMiddleware, checkMetaScopes);
+  app.post('/api/fetch-meta-ad-accounts', authMiddleware, fetchMetaAdAccounts);
+  app.post('/api/fetch-meta-business-hierarchy', authMiddleware, fetchMetaBusinessHierarchy);
+  app.post('/api/manage-meta-audiences', authMiddleware, manageMetaAudiences);
+  app.post('/api/manage-meta-campaign', authMiddleware, manageMetaCampaign);
+  app.post('/api/manage-meta-pixel', authMiddleware, manageMetaPixel);
+  app.post('/api/meta-social-inbox', authMiddleware, metaSocialInbox);
+  app.post('/api/meta-data-deletion', metaDataDeletion); // No JWT - called by Meta directly
+  app.post('/api/sync-meta-metrics', authMiddleware, syncMetaMetrics);
+
+  // ============================================================
+  // Phase 3: Platform Integrations (Shopify)
+  // ============================================================
+  app.post('/api/fetch-shopify-analytics', authMiddleware, fetchShopifyAnalytics);
+  app.post('/api/fetch-shopify-products', authMiddleware, fetchShopifyProducts);
+  app.post('/api/fetch-shopify-collections', authMiddleware, fetchShopifyCollections);
+  app.post('/api/create-shopify-discount', authMiddleware, createShopifyDiscount);
+  app.post('/api/shopify-session-validate', shopifySessionValidate); // Uses Shopify session token, no JWT
+  app.post('/api/sync-shopify-metrics', authMiddleware, syncShopifyMetrics);
+
+  // ============================================================
+  // Phase 3: Platform Integrations (Google + Other)
+  // ============================================================
+  app.post('/api/sync-google-ads-metrics', authMiddleware, syncGoogleAdsMetrics);
+  app.post('/api/store-platform-connection', authMiddleware, storePlatformConnection);
 
   // ============================================================
   // Phase 4: Auth & OAuth

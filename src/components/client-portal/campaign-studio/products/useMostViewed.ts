@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 
 export interface Product {
   title: string;
@@ -45,12 +46,12 @@ export function useMostViewed(clientId: string, options?: UseMostViewedOptions) 
         return;
       }
 
-      const { data, error: fnError } = await supabase.functions.invoke('fetch-klaviyo-top-products', {
+      const { data, error: fnError } = await callApi('fetch-klaviyo-top-products', {
         body: { connectionId: conn.id, metric: 'viewed', timeframe, limit },
       });
 
       if (fnError || !data?.products) {
-        setError(fnError?.message || 'Error al obtener productos más vistos');
+        setError(fnError || 'Error al obtener productos más vistos');
         setProducts([]);
         return;
       }

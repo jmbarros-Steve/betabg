@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -251,14 +252,14 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
     setError(null);
 
     try {
-      const { data: result, error: fnError } = await supabase.functions.invoke(
+      const { data: result, error: fnError } = await callApi(
         'steve-send-time-analysis',
         { body: { connectionId } }
       );
 
       if (fnError) {
         console.error('Error fetching send time heatmap:', fnError);
-        setError(fnError.message || 'Error al cargar analisis de horarios');
+        setError(fnError || 'Error al cargar analisis de horarios');
         toast.error('Error al cargar analisis de horarios');
         return;
       }

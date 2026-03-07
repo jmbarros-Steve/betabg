@@ -6,6 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Loader2, Check, ExternalLink, Rocket, Mail } from 'lucide-react';
 import type { BrandIdentity } from '../templates/BrandHtmlGenerator';
@@ -66,7 +67,7 @@ export function SchedulePublish({
 
       setConnectionId(conn.id);
 
-      const { data, error } = await supabase.functions.invoke('klaviyo-push-emails', {
+      const { data, error } = await callApi('klaviyo-push-emails', {
         body: { action: 'fetch_lists', connection_id: conn.id },
       });
 
@@ -148,7 +149,7 @@ export function SchedulePublish({
       if (planError) throw planError;
 
       // Step 3: Push to Klaviyo
-      const { data: pushData, error: pushError } = await supabase.functions.invoke('klaviyo-push-emails', {
+      const { data: pushData, error: pushError } = await callApi('klaviyo-push-emails', {
         body: {
           plan_id: tempPlan.id,
           connection_id: connectionId,

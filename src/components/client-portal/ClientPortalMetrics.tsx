@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { TrendingUp, DollarSign, ShoppingCart, Target } from 'lucide-react';
 import { MetricsCharts } from './metrics/MetricsCharts';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
@@ -221,7 +222,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         // Fetch Shopify products for per-product margin breakdown
         if (shopifyConnIds.length > 0) {
           try {
-            const { data: prodData } = await supabase.functions.invoke('fetch-shopify-products', {
+            const { data: prodData } = await callApi('fetch-shopify-products', {
               body: { connectionId: shopifyConnIds[0] },
             });
             if (prodData?.products) {
@@ -256,7 +257,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           // Fetch real SKU sales and abandoned checkouts
           try {
             const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': 30, 'ytd': 365 };
-            const { data: analyticsData } = await supabase.functions.invoke('fetch-shopify-analytics', {
+            const { data: analyticsData } = await callApi('fetch-shopify-analytics', {
               body: { connectionId: shopifyConnIds[0], daysBack: daysMap[dateRange] || 30 },
             });
             if (analyticsData?.topSkus) {

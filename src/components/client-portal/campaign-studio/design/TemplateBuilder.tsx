@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Palette, Type, Image, ImagePlus, MousePointerClick, Share2, Heart,
@@ -235,10 +236,10 @@ export function TemplateBuilder({ clientId, onBrandUpdate }: TemplateBuilderProp
     if (!shopifyConnectionId) return;
     setLoadingProducts(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-shopify-products', {
+      const { data, error } = await callApi('fetch-shopify-products', {
         body: { connectionId: shopifyConnectionId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
       const rawProducts = data?.products || [];
       const shopDomain = shopUrl ? shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
       const mapped = rawProducts.slice(0, 6).map((p: any) => ({

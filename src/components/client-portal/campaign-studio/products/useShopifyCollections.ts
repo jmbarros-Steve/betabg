@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 
 export interface Collection {
   id: number;
@@ -49,12 +50,12 @@ export function useShopifyCollections(clientId: string) {
 
       setConnectionId(conn.id);
 
-      const { data, error: fnError } = await supabase.functions.invoke('fetch-shopify-collections', {
+      const { data, error: fnError } = await callApi('fetch-shopify-collections', {
         body: { connectionId: conn.id },
       });
 
       if (fnError || !data?.collections) {
-        setError(fnError?.message || 'Error al obtener colecciones');
+        setError(fnError || 'Error al obtener colecciones');
         setCollections([]);
         return;
       }
@@ -77,12 +78,12 @@ export function useShopifyCollections(clientId: string) {
       throw new Error('No Shopify connection available');
     }
 
-    const { data, error: fnError } = await supabase.functions.invoke('fetch-shopify-collections', {
+    const { data, error: fnError } = await callApi('fetch-shopify-collections', {
       body: { connectionId, collectionId },
     });
 
     if (fnError || !data?.products) {
-      throw new Error(fnError?.message || 'Error al obtener productos de la colección');
+      throw new Error(fnError || 'Error al obtener productos de la colección');
     }
 
     return data.products;

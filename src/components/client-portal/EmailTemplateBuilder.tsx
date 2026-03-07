@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid, Download, Loader2, Wand2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -147,7 +148,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     if (!form.base_html) return;
     setConverting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('parse-email-html', {
+      const { data, error } = await callApi('parse-email-html', {
         body: { html: form.base_html },
       });
       if (error) { toast.error('Error al convertir plantilla'); console.error(error); return; }
@@ -342,7 +343,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
         .limit(1)
         .maybeSingle();
       if (!conn) { toast.error('No hay conexión activa de Klaviyo'); setImportLoading(false); return; }
-      const { data, error } = await supabase.functions.invoke('import-klaviyo-templates', {
+      const { data, error } = await callApi('import-klaviyo-templates', {
         body: { connectionId: conn.id },
       });
       if (error) { toast.error('Error cargando templates de Klaviyo'); return; }

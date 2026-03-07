@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Brain, Youtube, FileText, Globe, Type, Upload, Loader2,
@@ -141,7 +142,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
       await new Promise(r => setTimeout(r, 500));
       setPhaseMessage('Encolando procesamiento...');
 
-      const { data, error } = await supabase.functions.invoke('learn-from-source', {
+      const { data, error } = await callApi('learn-from-source', {
         body: { sourceType, content, title },
       });
 
@@ -161,7 +162,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
       setCurrentQueueId(data.queueId || null);
 
-      void supabase.functions.invoke('process-queue-item', {
+      void callApi('process-queue-item', {
         body: { queueId: data.queueId },
       }).catch((invokeErr) => {
         console.error('process-queue-item invoke error:', invokeErr);

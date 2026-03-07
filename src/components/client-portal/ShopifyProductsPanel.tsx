@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Package, RefreshCw, AlertTriangle, TrendingUp, ImageOff } from 'lucide-react';
 
@@ -61,13 +62,13 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
     if (!connectionId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-shopify-products', {
+      const { data, error } = await callApi('fetch-shopify-products', {
         body: { connectionId },
       });
 
       if (error) {
         console.error('[ShopifyProducts] Error:', error);
-        toast.error('Error al cargar productos: ' + (error?.message || error));
+        toast.error('Error al cargar productos: ' + error);
         return;
       }
 

@@ -40,6 +40,36 @@ const CLOUD_RUN_FUNCTIONS = new Set<string>([
   'deep-dive-competitor',
   'fetch-campaign-adsets',
   'sync-campaign-metrics',
+  // Phase 3: Shopify
+  'fetch-shopify-analytics',
+  'fetch-shopify-products',
+  'fetch-shopify-collections',
+  'create-shopify-discount',
+  'shopify-session-validate',
+  'sync-shopify-metrics',
+  // Phase 3: Meta
+  'check-meta-scopes',
+  'fetch-meta-ad-accounts',
+  'fetch-meta-business-hierarchy',
+  'manage-meta-audiences',
+  'manage-meta-campaign',
+  'manage-meta-pixel',
+  'meta-social-inbox',
+  'meta-data-deletion',
+  'sync-meta-metrics',
+  // Phase 3: Google
+  'sync-google-ads-metrics',
+  // Phase 3: Klaviyo
+  'fetch-klaviyo-top-products',
+  'store-klaviyo-connection',
+  'import-klaviyo-templates',
+  'upload-klaviyo-drafts',
+  'klaviyo-manage-flows',
+  'klaviyo-push-emails',
+  'klaviyo-smart-format',
+  'sync-klaviyo-metrics',
+  // Phase 3: Other
+  'store-platform-connection',
 ]);
 
 interface ApiResponse<T = any> {

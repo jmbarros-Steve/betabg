@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail, Unlink } from 'lucide-react';
 import { ClientOnboardingSteps } from './ClientOnboardingSteps';
@@ -195,15 +196,14 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
         const { data, error } = await callEdgeFunction(functionName, {
           body: { [bodyKey]: connection.id },
         });
-        
+
         if (error) throw new Error(error);
       } else {
-        // Standard Supabase invoke (uses Authorization header)
-        const { error } = await supabase.functions.invoke(functionName, {
+        const { error } = await callApi(functionName, {
           body: { [bodyKey]: connection.id },
         });
-        
-        if (error) throw error;
+
+        if (error) throw new Error(error);
       }
 
       toast.success('Sincronización completada', { id: 'sync' });
@@ -244,14 +244,14 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     setConnectingKlaviyo(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('store-klaviyo-connection', {
+      const { data, error } = await callApi('store-klaviyo-connection', {
         body: {
           client_id: clientId,
           api_key: klaviyoApiKey,
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       if (data?.error) {
         toast.error(data.error);

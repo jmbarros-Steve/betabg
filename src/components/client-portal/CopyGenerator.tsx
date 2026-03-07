@@ -162,7 +162,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     try {
       const chipsText = getActiveChipsText();
       const fullInstrucciones = [instrucciones.trim(), chipsText].filter(Boolean).join('. ') || undefined;
-      const { data, error } = await supabase.functions.invoke('generate-copy', {
+      const { data, error } = await callApi('generate-copy', {
         body: { clientId, funnel, formato, angulo: efectiveAngulo, instrucciones: fullInstrucciones, assetUrls: assets.slice(0, 5).map(a => a.url) },
       });
 
@@ -197,7 +197,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     setGeneratingBrief(true);
     setBriefVisual(null);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-brief-visual', {
+      const { data, error } = await callApi('generate-brief-visual', {
         body: { clientId, formato, angulo: efectiveAngulo, variacionElegida: v, assetUrls: assets.slice(0, 5).map(a => a.url) },
       });
       if (error) throw error;
@@ -298,7 +298,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       setVideoProgress(messages[msgIdx % messages.length]);
       msgIdx++;
       try {
-        const { data, error } = await supabase.functions.invoke('check-video-status', {
+        const { data, error } = await callApi('check-video-status', {
           body: { predictionId, creativeId: savedCreativeId, clientId },
         });
         if (error || !data) return;

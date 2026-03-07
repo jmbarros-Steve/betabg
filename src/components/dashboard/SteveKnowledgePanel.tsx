@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, Save, X, BookOpen, Bug, ChevronDown, ChevronUp, Upload, Sparkles, ImageIcon, Loader2, CalendarDays, RefreshCw } from 'lucide-react';
 import { LearningCenter } from './LearningCenter';
@@ -236,7 +237,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
       setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'analyzing' } : q));
 
       try {
-        const { data, error } = await supabase.functions.invoke('analyze-ad-image', {
+        const { data, error } = await callApi('analyze-ad-image', {
           body: { imageBase64: item.base64, mediaType: item.mediaType, performance, context },
         });
         if (error) throw error;

@@ -69,7 +69,7 @@ export function MetaAdAccountSelector({
     setMissingPermissions([]);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('fetch-meta-ad-accounts', {
+      const { data, error: fnError } = await callApi('fetch-meta-ad-accounts', {
         body: { connection_id: connectionId }
       });
 
@@ -118,7 +118,7 @@ export function MetaAdAccountSelector({
       toast.loading('Sincronizando métricas y campañas...', { id: 'meta-sync' });
 
       const [metricsResult, campaignsResult] = await Promise.allSettled([
-        supabase.functions.invoke('sync-meta-metrics', {
+        callApi('sync-meta-metrics', {
           body: { connection_id: connectionId, purge_stale: true }
         }),
         callApi('sync-campaign-metrics', {

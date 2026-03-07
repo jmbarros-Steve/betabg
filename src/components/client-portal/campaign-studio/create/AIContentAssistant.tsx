@@ -10,6 +10,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Sparkles,
@@ -112,7 +113,7 @@ export function AIContentAssistant({
   const generateSubjects = async () => {
     setLoadingSubjects(true);
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await callApi(
         'steve-email-content',
         {
           body: {
@@ -127,7 +128,7 @@ export function AIContentAssistant({
         }
       );
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       const subjects = data?.subjects || data?.subject_lines || [];
       const previewTexts = data?.preview_texts || data?.previewTexts || [];
@@ -156,7 +157,7 @@ export function AIContentAssistant({
 
     setLoadingAnalysis(true);
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await callApi(
         'steve-email-content',
         {
           body: {
@@ -172,7 +173,7 @@ export function AIContentAssistant({
         }
       );
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       const score = data?.score ?? 0;
       const feedback = data?.feedback || [];
@@ -206,7 +207,7 @@ export function AIContentAssistant({
 
     setLoadingVariants(true);
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await callApi(
         'steve-email-content',
         {
           body: {
@@ -219,7 +220,7 @@ export function AIContentAssistant({
         }
       );
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       const variants = data?.variants || [];
       setAbVariants(

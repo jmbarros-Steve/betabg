@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -524,7 +523,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
       const budgetPerAdset = Math.round((cpa * 50) / 7);
 
       // Create campaign (ABO)
-      const { data: campaignResult, error: campaignErr } = await supabase.functions.invoke('manage-meta-campaign', {
+      const { data: campaignResult, error: campaignErr } = await callApi('manage-meta-campaign', {
         body: {
           action: 'create',
           connection_id: connectionId,

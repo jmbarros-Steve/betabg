@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,12 +68,12 @@ export default function MetaConnectionWizard({
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke(
+      const { data, error: fnError } = await callApi(
         'fetch-meta-business-hierarchy',
         { body: { connection_id: connectionId } },
       );
 
-      if (fnError) throw fnError;
+      if (fnError) throw new Error(fnError);
       if (data?.error) throw new Error(data.error);
 
       // Extract businesses

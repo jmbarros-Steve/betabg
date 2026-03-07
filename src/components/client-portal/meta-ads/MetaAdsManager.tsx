@@ -586,7 +586,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       if (error) {
         console.error('[MetaAdsManager] Hierarchy fetch error:', error);
         // Fallback: try old fetch-meta-ad-accounts
-        const { data: fallbackData } = await supabase.functions.invoke('fetch-meta-ad-accounts', {
+        const { data: fallbackData } = await callApi('fetch-meta-ad-accounts', {
           body: { connection_id: conn.id },
         });
         if (fallbackData?.accounts) {
@@ -765,7 +765,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
 
       // 2. Sync data for the new account
       const [metricsRes, campaignsRes] = await Promise.allSettled([
-        supabase.functions.invoke('sync-meta-metrics', {
+        callApi('sync-meta-metrics', {
           body: { connection_id: metaConnection.id, purge_stale: true },
         }),
         callApi('sync-campaign-metrics', {

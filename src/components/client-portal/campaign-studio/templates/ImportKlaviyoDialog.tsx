@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import type { BrandIdentity } from './BrandHtmlGenerator';
 import {
@@ -99,7 +100,7 @@ export default function ImportKlaviyoDialog({
     setPreviewId(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('import-klaviyo-templates', {
+      const { data, error } = await callApi('import-klaviyo-templates', {
         body: { connectionId },
       });
 

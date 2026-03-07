@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import logoShopify from '@/assets/logo-shopify-clean.png';
@@ -121,7 +122,7 @@ export function PlatformConnectionsPanel() {
 
     try {
       // Send tokens securely through edge function (never stored in client memory longer than needed)
-      const { data, error } = await supabase.functions.invoke('store-platform-connection', {
+      const { data, error } = await callApi('store-platform-connection', {
         body: {
           clientId: selectedClient,
           platform: selectedPlatform,
@@ -133,7 +134,7 @@ export function PlatformConnectionsPanel() {
       });
 
       if (error) {
-        throw error;
+        throw new Error(error);
       }
 
       if (data?.error) {

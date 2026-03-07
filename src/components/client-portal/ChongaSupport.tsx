@@ -7,6 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import avatarChonga from '@/assets/avatar-chonga.png';
 
@@ -87,7 +88,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('chonga-support', {
+      const { data, error } = await callApi('chonga-support', {
         body: {
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
           client_id: clientId,

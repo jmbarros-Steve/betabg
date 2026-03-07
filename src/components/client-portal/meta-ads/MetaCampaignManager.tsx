@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -561,18 +561,15 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
     setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: true }));
     try {
-      const { error: fnErr } = await supabase.functions.invoke(
-        'manage-meta-campaign',
-        {
-          body: {
-            action: newStatus === 'ACTIVE' ? 'resume' : 'pause',
-            campaign_id: campaign.campaign_id,
-            connection_id: connectionIds[0],
-          },
+      const { error: fnErr } = await callApi('manage-meta-campaign', {
+        body: {
+          action: newStatus === 'ACTIVE' ? 'resume' : 'pause',
+          campaign_id: campaign.campaign_id,
+          connection_id: connectionIds[0],
         },
-      );
+      });
 
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(fnErr);
 
       // Optimistic update
       setCampaigns((prev) =>
@@ -598,19 +595,16 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
   const handleDuplicate = async (campaign: CampaignRow) => {
     setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: true }));
     try {
-      const { error: fnErr } = await supabase.functions.invoke(
-        'manage-meta-campaign',
-        {
-          body: {
-            action: 'duplicate',
-            campaign_id: campaign.campaign_id,
-            connection_id: connectionIds[0],
-            data: { new_name: `${campaign.campaign_name} (Copia)` },
-          },
+      const { error: fnErr } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'duplicate',
+          campaign_id: campaign.campaign_id,
+          connection_id: connectionIds[0],
+          data: { new_name: `${campaign.campaign_name} (Copia)` },
         },
-      );
+      });
 
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(fnErr);
 
       toast.success(`Campana duplicada: "${campaign.campaign_name} (Copia)"`);
       await fetchCampaigns();
@@ -625,18 +619,15 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
   const handleArchive = async (campaign: CampaignRow) => {
     setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: true }));
     try {
-      const { error: fnErr } = await supabase.functions.invoke(
-        'manage-meta-campaign',
-        {
-          body: {
-            action: 'archive',
-            campaign_id: campaign.campaign_id,
-            connection_id: connectionIds[0],
-          },
+      const { error: fnErr } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'archive',
+          campaign_id: campaign.campaign_id,
+          connection_id: connectionIds[0],
         },
-      );
+      });
 
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(fnErr);
 
       setCampaigns((prev) =>
         prev.map((c) =>
@@ -674,30 +665,27 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
     setFormSubmitting(true);
     try {
-      const { error: fnErr } = await supabase.functions.invoke(
-        'manage-meta-campaign',
-        {
-          body: {
-            action: 'create',
-            connection_id: connectionIds[0],
-            data: {
-              name: formData.campaign_name.trim(),
-              objective: `OUTCOME_${formData.objective}`,
-              status: 'PAUSED',
-              daily_budget: Number(formData.daily_budget) * 100,
-              billing_event: 'IMPRESSIONS',
-              optimization_goal: formData.optimization_goal === 'PURCHASES' ? 'OFFSITE_CONVERSIONS'
-                : formData.optimization_goal === 'ADD_TO_CART' ? 'OFFSITE_CONVERSIONS'
-                : 'LINK_CLICKS',
-              start_time: formData.start_date,
-              end_time: formData.end_date || undefined,
-              adset_name: `${formData.campaign_name.trim()} - Ad Set`,
-            },
+      const { error: fnErr } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'create',
+          connection_id: connectionIds[0],
+          data: {
+            name: formData.campaign_name.trim(),
+            objective: `OUTCOME_${formData.objective}`,
+            status: 'PAUSED',
+            daily_budget: Number(formData.daily_budget) * 100,
+            billing_event: 'IMPRESSIONS',
+            optimization_goal: formData.optimization_goal === 'PURCHASES' ? 'OFFSITE_CONVERSIONS'
+              : formData.optimization_goal === 'ADD_TO_CART' ? 'OFFSITE_CONVERSIONS'
+              : 'LINK_CLICKS',
+            start_time: formData.start_date,
+            end_time: formData.end_date || undefined,
+            adset_name: `${formData.campaign_name.trim()} - Ad Set`,
           },
         },
-      );
+      });
 
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(fnErr);
 
       toast.success(`Campana "${formData.campaign_name}" creada exitosamente`);
       setCreateDialogOpen(false);
@@ -724,22 +712,19 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
     setFormSubmitting(true);
     try {
-      const { error: fnErr } = await supabase.functions.invoke(
-        'manage-meta-campaign',
-        {
-          body: {
-            action: 'update',
-            campaign_id: selectedCampaign.campaign_id,
-            connection_id: connectionIds[0],
-            data: {
-              name: formData.campaign_name.trim(),
-              daily_budget: Number(formData.daily_budget) * 100,
-            },
+      const { error: fnErr } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'update',
+          campaign_id: selectedCampaign.campaign_id,
+          connection_id: connectionIds[0],
+          data: {
+            name: formData.campaign_name.trim(),
+            daily_budget: Number(formData.daily_budget) * 100,
           },
         },
-      );
+      });
 
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(fnErr);
 
       toast.success(`Campana "${formData.campaign_name}" actualizada`);
       setEditDialogOpen(false);
@@ -770,19 +755,16 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
     setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: true }));
     try {
-      const { error: fnErr } = await supabase.functions.invoke(
-        'manage-meta-campaign',
-        {
-          body: {
-            action: 'update_budget',
-            campaign_id: campaign.campaign_id,
-            connection_id: connectionIds[0],
-            data: { daily_budget: newBudget },
-          },
+      const { error: fnErr } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'update_budget',
+          campaign_id: campaign.campaign_id,
+          connection_id: connectionIds[0],
+          data: { daily_budget: newBudget },
         },
-      );
+      });
 
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(fnErr);
 
       setCampaigns((prev) =>
         prev.map((c) =>

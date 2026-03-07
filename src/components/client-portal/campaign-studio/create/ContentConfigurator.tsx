@@ -94,10 +94,10 @@ export function ContentConfigurator({
     if (!shopifyConnectionId) return;
     setLoadingProducts(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-shopify-products', {
+      const { data, error } = await callApi('fetch-shopify-products', {
         body: { connectionId: shopifyConnectionId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       const rawProducts = data?.products || [];
       const shopDomain = brand.shopUrl
@@ -129,10 +129,10 @@ export function ContentConfigurator({
     if (!shopifyConnectionId) return;
     setLoadingCollections(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-shopify-collections', {
+      const { data, error } = await callApi('fetch-shopify-collections', {
         body: { connectionId: shopifyConnectionId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
       setCollections(data?.collections || []);
     } catch (err: any) {
       console.error('Error loading collections:', err);
@@ -147,10 +147,10 @@ export function ContentConfigurator({
     setLoadingProducts(true);
     onUpdate({ collectionId, collectionName: collectionTitle });
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-shopify-collections', {
+      const { data, error } = await callApi('fetch-shopify-collections', {
         body: { connectionId: shopifyConnectionId, collectionId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       const shopDomain = brand.shopUrl
         ? brand.shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')

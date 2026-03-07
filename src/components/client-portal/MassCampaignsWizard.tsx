@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { renderBlockToHtml } from './email-blocks/blockRenderer';
 import EmailBlockEditor from './email-blocks/EmailBlockEditor';
@@ -330,7 +331,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
       ));
 
       try {
-        const { data, error } = await supabase.functions.invoke('generate-mass-campaigns', {
+        const { data, error } = await callApi('generate-mass-campaigns', {
           body: {
             templateBlocks: selectedTemplate.content_blocks,
             campaign: {
@@ -405,7 +406,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
         ? `https://${clientInfo.shop_domain}`
         : clientInfo?.website_url || 'https://tu-tienda.myshopify.com';
 
-      const { data, error } = await supabase.functions.invoke('generate-mass-campaigns', {
+      const { data, error } = await callApi('generate-mass-campaigns', {
         body: {
           templateBlocks: selectedTemplate.content_blocks,
           campaign: { name: campaign.name, subject: campaign.subject, content: campaign.content },

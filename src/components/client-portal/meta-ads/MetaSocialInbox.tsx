@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -164,7 +164,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
         setNoConnection(false);
 
         // Fetch pages
-        const { data, error } = await supabase.functions.invoke('meta-social-inbox', {
+        const { data, error } = await callApi('meta-social-inbox', {
           body: { connection_id: ctxConnectionId, action: 'list_pages' },
         });
 
@@ -199,13 +199,13 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
     try {
       // Fetch in parallel: conversations + post comments + ad comments
       const [convRes, commentsRes, adCommentsRes] = await Promise.allSettled([
-        supabase.functions.invoke('meta-social-inbox', {
+        callApi('meta-social-inbox', {
           body: { action: 'list_conversations', connection_id: connectionId, page_id: selectedPageId },
         }),
-        supabase.functions.invoke('meta-social-inbox', {
+        callApi('meta-social-inbox', {
           body: { action: 'list_post_comments', connection_id: connectionId, page_id: selectedPageId },
         }),
-        supabase.functions.invoke('meta-social-inbox', {
+        callApi('meta-social-inbox', {
           body: { action: 'list_ad_comments', connection_id: connectionId, page_id: selectedPageId },
         }),
       ]);
@@ -259,7 +259,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       if (conv.type === 'messages' && connectionId && selectedPageId) {
         setLoadingMessages(true);
         try {
-          const { data, error } = await supabase.functions.invoke('meta-social-inbox', {
+          const { data, error } = await callApi('meta-social-inbox', {
             body: {
               action: 'get_messages',
               connection_id: connectionId,
@@ -312,7 +312,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       const isMessage = selectedConversation.type === 'messages';
       const action = isMessage ? 'reply_message' : 'reply_comment';
 
-      const { data, error } = await supabase.functions.invoke('meta-social-inbox', {
+      const { data, error } = await callApi('meta-social-inbox', {
         body: {
           action,
           connection_id: connectionId,

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { BulkPreviewGallery } from './BulkPreviewGallery';
 import { generateBrandEmail, type BrandIdentity, type ProductItem } from '../templates/BrandHtmlGenerator';
@@ -139,7 +140,7 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
           .maybeSingle();
 
         if (conn && !cancelled) {
-          const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+          const { data, error } = await callApi('sync-klaviyo-metrics', {
             body: { connectionId: conn.id, timeframe: 'last_30_days' },
           });
 

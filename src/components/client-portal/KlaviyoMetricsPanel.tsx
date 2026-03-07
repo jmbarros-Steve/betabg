@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   RefreshCw, Mail, Users, DollarSign,
@@ -269,12 +270,12 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     if (!connectionId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+      const { data, error } = await callApi('sync-klaviyo-metrics', {
         body: { connectionId, timeframe: tf || timeframe },
       });
 
       if (error) {
-        toast.error('Error al cargar métricas de Klaviyo: ' + (error?.message || error));
+        toast.error('Error al cargar métricas de Klaviyo: ' + error);
         return;
       }
 
@@ -344,7 +345,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               setDebugResult('Cargando...');
               try {
                 const startTime = Date.now();
-                const { data, error } = await supabase.functions.invoke('sync-klaviyo-metrics', {
+                const { data, error } = await callApi('sync-klaviyo-metrics', {
                   body: { connectionId, timeframe },
                 });
                 const elapsed = Date.now() - startTime;

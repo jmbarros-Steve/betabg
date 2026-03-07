@@ -361,7 +361,7 @@ function AdForm({
         // Poll for video status
         const pollInterval = setInterval(async () => {
           try {
-            const { data: status } = await supabase.functions.invoke('check-video-status', {
+            const { data: status } = await callApi('check-video-status', {
               body: { predictionId: data.prediction_id, clientId },
             });
             if (status?.status === 'succeeded' && status?.asset_url) {
@@ -756,7 +756,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         ? Number(campBudget) * 100
         : Number(adsetBudget) * 100;
 
-      const { error } = await supabase.functions.invoke('manage-meta-campaign', {
+      const { error } = await callApi('manage-meta-campaign', {
         body: {
           action: 'create',
           connection_id: connectionId,
