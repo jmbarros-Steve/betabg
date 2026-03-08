@@ -823,7 +823,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-opus-4-6',
         max_tokens: 2000,
         system: estrategiaSystemPrompt,
         messages: aiMessages,
@@ -944,7 +944,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200, system: postBriefSystem, messages: chatMsgs }),
+      body: JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 1200, system: postBriefSystem, messages: chatMsgs }),
     });
 
     if (!aiResp.ok) {
@@ -1162,11 +1162,11 @@ ${questionContext}`;
 
   console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}, messages: ${chatMessages.length}/${BRAND_BRIEF_QUESTIONS.length}`);
 
-  const maxTokens = isLastQuestion ? 6000 : 1200;
-  // Use Sonnet only for the last question (brief generation follows a template -- Sonnet is
-  // much faster and avoids timeouts that Opus + 8000 tokens would cause).
-  // All other questions use Opus for better instruction-following (especially [AVANZAR] tags).
-  const model = isLastQuestion ? 'claude-sonnet-4-6' : 'claude-opus-4-6';
+  const maxTokens = isLastQuestion ? 16000 : 1200;
+  // Use Opus for ALL questions including brief generation.
+  // Sonnet was cutting the brief short (only 3/7 accionables, missing SEO and competitive sections).
+  // Opus follows the full 11-section template faithfully. Cloud Run has 300s timeout which is enough.
+  const model = 'claude-opus-4-6';
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
@@ -1263,7 +1263,7 @@ ${questionContext}`;
   // BUG 5 FIX 2: Prepend analysis-pending notice before the brief so the client knows
   // the analysis is running and can take 3-5 minutes.
   if (newAnsweredCount >= BRAND_BRIEF_QUESTIONS.length && !isRejection) {
-    const avisoText = `⏳ *saca termo y se prepara para el análisis* 🐕\n\n¡WOOF! Tu brief ya está listo. Además estoy lanzando el análisis automático de tu sitio web y el de tu competencia ahora mismo. Puede demorar de 3 a 5 minutos — anda por un café y cuando vuelvas tendrás el análisis completo de SEO, Keywords y Competencia en las pestañas correspondientes. ¡No cierres la sesión!\n\n---\n\n`;
+    const avisoText = `⏳ *saca termo y se prepara para el análisis profundo* 🐕\n\n¡WOOF! Tu brief ya está listo. Ahora viene lo mejor: estoy lanzando un **análisis profundo con IA de última generación** de tu sitio web, tus competidores, SEO, keywords y estrategia publicitaria.\n\n🕐 **Esto toma entre 5 y 10 minutos** porque uso el modelo de IA más potente disponible para darte un análisis de calidad consultoría. Anda por un café ☕ y cuando vuelvas tendrás:\n\n- 📊 Análisis competitivo de 6 competidores\n- 🔍 Auditoría SEO completa\n- 🎯 Estrategia de Keywords\n- 📢 Plan de Meta Ads y Google Ads\n- 💰 Presupuesto y proyección de ROAS\n\nTodo en las pestañas correspondientes. **No cierres la sesión.**\n\n---\n\n`;
     assistantMessage = avisoText + assistantMessage;
   }
 

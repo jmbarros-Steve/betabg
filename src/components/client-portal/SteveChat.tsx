@@ -927,13 +927,13 @@ export function SteveChat({ clientId }: SteveChatProps) {
                   <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                     {analysisPhase === 'research'
                       ? 'Investigando tu sitio web y competidores...'
-                      : 'Generando estrategia de marketing...'}
+                      : 'Generando estrategia con IA premium...'}
                   </span>
                 </div>
                 <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
                   {analysisPhase === 'research'
                     ? 'Escaneando sitios web, detectando competidores y recopilando datos (2-3 min)'
-                    : 'Analizando posicionamiento, audiencia, SEO y más (2-4 min)'}
+                    : 'Análisis profundo de SEO, keywords, competencia y estrategia publicitaria (5-8 min)'}
                 </p>
               </div>
             )}

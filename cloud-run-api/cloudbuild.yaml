@@ -25,7 +25,7 @@ steps:
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--timeout=300s'
+      - '--timeout=600s'
       - '--memory=1Gi'
       - '--cpu=2'
       - '--min-instances=0'

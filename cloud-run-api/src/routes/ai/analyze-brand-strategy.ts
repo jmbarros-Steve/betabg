@@ -255,7 +255,7 @@ async function callClaude(
 ): Promise<Record<string, unknown>> {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
+  const timeout = setTimeout(() => controller.abort(), 240_000);
 
   console.log(`[callClaude] Starting request — maxTokens: ${maxTokens}, researchLength: ${researchData.length}`);
 
@@ -268,7 +268,7 @@ async function callClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: "claude-opus-4-6",
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [
