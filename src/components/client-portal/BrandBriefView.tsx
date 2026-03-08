@@ -66,6 +66,14 @@ class BriefErrorBoundary extends React.Component<{ children: React.ReactNode }, 
   }
 }
 
+// Safe text render — prevents React error #31 (objects rendered as children)
+function safeText(val: any): string {
+  if (val == null) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  return JSON.stringify(val);
+}
+
 // Parse SCR fields from accionable block text
 function parseSCRBlock(text: string): { title: string; S: string; C: string; R: string; impacto: string } {
   const clean = (s: string) => s.replace(/\*\*/g, '').replace(/^#+\s*/, '').trim();
@@ -4338,7 +4346,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {(research.positioning_strategy as any).statement_posicionamiento && (
                         <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
                           <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Positioning Statement</p>
-                          <p className="text-sm leading-relaxed font-medium italic">"{(research.positioning_strategy as any).statement_posicionamiento}"</p>
+                          <p className="text-sm leading-relaxed font-medium italic">"{typeof (research.positioning_strategy as any).statement_posicionamiento === 'string' ? (research.positioning_strategy as any).statement_posicionamiento : JSON.stringify((research.positioning_strategy as any).statement_posicionamiento)}"</p>
                         </div>
                       )}
 
@@ -4346,7 +4354,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {(research.positioning_strategy as any).posicionamiento_recomendado && (
                         <div className="bg-muted/50 rounded-lg p-3 border border-border">
                           <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">🎯 Posicionamiento Recomendado</p>
-                          <p className="text-xs leading-relaxed">{(research.positioning_strategy as any).posicionamiento_recomendado}</p>
+                          <p className="text-xs leading-relaxed">{typeof (research.positioning_strategy as any).posicionamiento_recomendado === 'string' ? (research.positioning_strategy as any).posicionamiento_recomendado : JSON.stringify((research.positioning_strategy as any).posicionamiento_recomendado)}</p>
                         </div>
                       )}
 
@@ -4354,7 +4362,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {(research.positioning_strategy as any).posicionamiento_actual && (
                         <div className="bg-muted/50 rounded-lg p-3 border border-border">
                           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">📍 Posicionamiento Actual</p>
-                          <p className="text-xs leading-relaxed">{(research.positioning_strategy as any).posicionamiento_actual}</p>
+                          <p className="text-xs leading-relaxed">{typeof (research.positioning_strategy as any).posicionamiento_actual === 'string' ? (research.positioning_strategy as any).posicionamiento_actual : JSON.stringify((research.positioning_strategy as any).posicionamiento_actual)}</p>
                         </div>
                       )}
 
@@ -4363,8 +4371,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <div>
                           <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">🏷️ Territorios de Comunicación</p>
                           <div className="flex flex-wrap gap-2">
-                            {(research.positioning_strategy as any).territorios_comunicacion.map((t: string, i: number) => (
-                              <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>
+                            {(research.positioning_strategy as any).territorios_comunicacion.map((t: any, i: number) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{typeof t === 'string' ? t : (t?.nombre || t?.territorio || JSON.stringify(t))}</Badge>
                             ))}
                           </div>
                         </div>
@@ -4375,12 +4383,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <div>
                           <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">💬 Mensajes Clave</p>
                           <ul className="space-y-2">
-                            {(research.positioning_strategy as any).mensajes_clave_diferenciadores.map((m: string, i: number) => (
+                            {(research.positioning_strategy as any).mensajes_clave_diferenciadores.map((m: any, i: number) => {
+                              const text = typeof m === 'string' ? m : (m?.mensaje || m?.text || JSON.stringify(m));
+                              const context = typeof m === 'object' ? (m?.contexto_uso || m?.diferenciacion_vs_competencia || '') : '';
+                              return (
                               <li key={i} className="flex items-start gap-2 text-xs bg-muted/40 rounded-lg p-2.5 border border-border">
                                 <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
-                                <span className="leading-relaxed">{m}</span>
+                                <div className="leading-relaxed">
+                                  <span className="font-medium">{text}</span>
+                                  {context && <p className="text-muted-foreground mt-1">{context}</p>}
+                                </div>
                               </li>
-                            ))}
+                              );
+                            })}
                           </ul>
                         </div>
                       )}
