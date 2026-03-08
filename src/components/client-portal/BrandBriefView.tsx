@@ -158,6 +158,68 @@ function ExpandableAccionables({ blocks }: { blocks: string[] }) {
   );
 }
 
+// Structured Accionables from AI action_plan array
+function StructuredAccionables({ items }: { items: any[] }) {
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  return (
+    <div className="space-y-3">
+      {items.slice(0, 7).map((item: any, i: number) => {
+        const isExpanded = !!expanded[i];
+        const hasSCR = item.situation || item.complication || item.resolution;
+        return (
+          <div key={i} className="bg-muted/40 rounded-xl border border-border hover:border-primary/30 transition-colors overflow-hidden">
+            <div className="flex gap-3 p-4 items-start">
+              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">{i + 1}</div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground leading-snug">{item.title || `Accionable ${i + 1}`}</p>
+                {(item.priority || item.timeline) && (
+                  <div className="flex gap-2 mt-1">
+                    {item.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${item.priority === 'alta' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>{item.priority}</span>}
+                    {item.timeline && <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">{item.timeline}</span>}
+                  </div>
+                )}
+              </div>
+              {hasSCR && (
+                <button onClick={() => setExpanded(prev => ({ ...prev, [i]: !prev[i] }))} className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors flex-shrink-0 mt-0.5">
+                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+              )}
+            </div>
+            {isExpanded && hasSCR && (
+              <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+                {item.situation && (
+                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Situacion (S)</p>
+                    <p className="text-xs text-foreground leading-relaxed">{item.situation}</p>
+                  </div>
+                )}
+                {item.complication && (
+                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border-l-4 border-orange-400">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1">Complicacion (C)</p>
+                    <p className="text-xs text-foreground leading-relaxed">{item.complication}</p>
+                  </div>
+                )}
+                {item.resolution && (
+                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border-l-4 border-green-500">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-500 mb-1">Resolucion (R)</p>
+                    <p className="text-xs text-foreground leading-relaxed">{item.resolution}</p>
+                  </div>
+                )}
+                {item.expected_impact && (
+                  <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Impacto de Negocio</p>
+                    <p className="text-xs text-foreground leading-relaxed font-medium">{item.expected_impact}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Keyword Strategy Roadmap component — renders structured phase data as visual cards
 function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
   // Accept either the raw roadmap object or a stringified version
@@ -938,18 +1000,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     if (r.competitor_analysis && typeof r.competitor_analysis === 'object') {
       const ca = r.competitor_analysis;
-      if (!Array.isArray(ca.competitors) && Array.isArray(ca.individual_analysis)) {
-        ca.competitors = ca.individual_analysis.map((comp: any) => ({
+      const indiv = ca.individual_analysis || ca.individual_analyses;
+      if (!Array.isArray(ca.competitors) && Array.isArray(indiv)) {
+        ca.competitors = indiv.map((comp: any) => ({
           ...comp,
           strengths: comp.strengths || comp.fortalezas || [],
           weaknesses: comp.weaknesses || comp.debilidades || [],
-          value_proposition: comp.value_proposition || comp.propuesta_valor || '',
-          ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido || '',
-          positioning: comp.positioning || comp.propuesta_valor || '',
+          value_proposition: comp.value_proposition || comp.propuesta_de_valor || comp.propuesta_valor || '',
+          ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido_observada || comp.estrategia_contenido || '',
+          positioning: comp.positioning || comp.propuesta_de_valor || comp.propuesta_valor || '',
           attack_vector: comp.attack_vector || comp.que_hace_cliente_mejor || '',
-          que_hacen_mejor: comp.que_hacen_mejor || '',
+          que_hacen_mejor: comp.que_hacen_mejor || comp.que_hacen_mejor_que_cliente || '',
           que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
-          estrategia_contenido: comp.estrategia_contenido || '',
+          estrategia_contenido: comp.estrategia_contenido || comp.estrategia_contenido_observada || '',
           justificacion_amenaza: comp.justificacion_amenaza || '',
           nivel_amenaza: comp.nivel_amenaza || '',
           source: comp.source || (comp.name?.includes('autodetectado') ? 'auto' : 'user'),
@@ -981,14 +1044,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           ca.benchmark_summary = rows.map((row: string[]) => row.map((cell: string, ci: number) => `${headers[ci]}: ${cell}`).join(' | ')).join('\n');
         }
       }
-      // market_gaps from general analysis
-      if (!Array.isArray(ca.market_gaps) && ca.competitors?.length > 0) {
-        // Extract weaknesses as market gaps
-        const gaps: string[] = [];
-        for (const comp of ca.competitors) {
-          if (comp.attack_vector) gaps.push(`${comp.name}: ${comp.attack_vector}`);
+      // market_gaps from insights_estrategicos or general analysis
+      if (!Array.isArray(ca.market_gaps)) {
+        if (Array.isArray(ca.insights_estrategicos?.gaps_de_mercado_sin_cubrir)) {
+          ca.market_gaps = ca.insights_estrategicos.gaps_de_mercado_sin_cubrir;
+        } else if (ca.competitors?.length > 0) {
+          const gaps: string[] = [];
+          for (const comp of ca.competitors) {
+            if (comp.attack_vector) gaps.push(`${comp.name}: ${comp.attack_vector}`);
+          }
+          if (gaps.length > 0) ca.market_gaps = gaps;
         }
-        if (gaps.length > 0) ca.market_gaps = gaps;
       }
     }
 
@@ -3102,45 +3168,77 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
 
             {/* BUYER PERSONA CARD */}
-            {personaResponse && (
+            {(() => {
+              const aiPersona = (research as any).consumer_profile?.buyer_persona_principal;
+              const hasAI = aiPersona && typeof aiPersona === 'object' && (aiPersona.nombre_ficticio || aiPersona.pain_points);
+
+              if (!hasAI && !personaResponse) return null;
+
+              // AI persona data helpers
+              const aiName = aiPersona?.nombre_ficticio || '';
+              const aiAge = aiPersona?.edad;
+              const aiGender = (aiPersona?.genero || '').toLowerCase();
+              const aiImage = aiGender.includes('fem') || aiGender.includes('mujer') ? personaFemale : aiGender.includes('masc') || aiGender.includes('hombre') ? personaMale : personaImage;
+              const aiLocation = aiPersona?.ubicacion || '';
+              const aiOccupation = aiPersona?.ocupacion || '';
+              const aiIncome = aiPersona?.nivel_socioeconomico || '';
+              const aiFamily = aiPersona?.estado_civil || '';
+
+              const painText = hasAI
+                ? (Array.isArray(aiPersona.pain_points) ? aiPersona.pain_points.slice(0, 3).join('. ') + '.' : String(aiPersona.pain_points || ''))
+                : getResponse('persona_pain') || 'Pendiente';
+              const quoteText = hasAI
+                ? (aiPersona.frase_que_lo_define || '')
+                : '';
+              const lifestyleText = hasAI
+                ? (typeof aiPersona.psicografia === 'object' ? (aiPersona.psicografia.estilo_de_vida || '') : String(aiPersona.psicografia || ''))
+                : getResponse('persona_lifestyle') || 'Pendiente';
+              const transformText = hasAI
+                ? (Array.isArray(aiPersona.motivadores_de_compra) ? aiPersona.motivadores_de_compra.slice(0, 3).join('. ') + '.' : String(aiPersona.motivadores_de_compra || ''))
+                : getResponse('persona_transformation') || 'Pendiente';
+              const barrerasText = hasAI && Array.isArray(aiPersona.barreras_y_objeciones)
+                ? aiPersona.barreras_y_objeciones.slice(0, 3).join('. ') + '.'
+                : '';
+
+              return (
               <Card className="overflow-hidden border-2 border-primary/10">
                 <CardHeader className="bg-primary/5 pb-3">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
-                    Buyer Persona
+                    Buyer Persona {hasAI && <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium ml-auto">AI</span>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
                   <div className="grid md:grid-cols-[200px_1fr] gap-6">
                     <div className="text-center">
                       <img
-                        src={personaImage}
+                        src={hasAI ? aiImage : personaImage}
                         alt="Buyer Persona"
                         className="w-36 h-36 object-cover rounded-xl mx-auto mb-3 shadow-md border-2 border-primary/10"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
-                      <h3 className="font-bold text-lg">{personaProfile['nombre ficticio'] || personaProfile['nombre'] || 'Cliente Ideal'}</h3>
-                      <p className="text-sm text-muted-foreground">{personaProfile['edad'] ? `${personaProfile['edad']} años` : ''}</p>
-                      {(personaProfile['ciudad / zona'] || personaProfile['ciudad']) && (
+                      <h3 className="font-bold text-lg">{hasAI ? aiName : (personaProfile['nombre ficticio'] || personaProfile['nombre'] || 'Cliente Ideal')}</h3>
+                      <p className="text-sm text-muted-foreground">{hasAI ? (aiAge ? `${aiAge} anos` : '') : (personaProfile['edad'] ? `${personaProfile['edad']} anos` : '')}</p>
+                      {(hasAI ? aiLocation : (personaProfile['ciudad / zona'] || personaProfile['ciudad'])) && (
                         <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
                           <MapPin className="h-3 w-3" />
-                          {personaProfile['ciudad / zona'] || personaProfile['ciudad']}
+                          {hasAI ? aiLocation : (personaProfile['ciudad / zona'] || personaProfile['ciudad'])}
                         </p>
                       )}
-                      {(personaProfile['ocupación'] || personaProfile['ocupacion']) && (
+                      {(hasAI ? aiOccupation : (personaProfile['ocupación'] || personaProfile['ocupacion'])) && (
                         <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-1">
                           <Briefcase className="h-3 w-3" />
-                          {personaProfile['ocupación'] || personaProfile['ocupacion']}
+                          {hasAI ? aiOccupation : (personaProfile['ocupación'] || personaProfile['ocupacion'])}
                         </p>
                       )}
-                      {(personaProfile['estado civil / familia'] || personaProfile['familia']) && (
+                      {(hasAI ? aiFamily : (personaProfile['estado civil / familia'] || personaProfile['familia'])) && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {personaProfile['estado civil / familia'] || personaProfile['familia']}
+                          {hasAI ? aiFamily : (personaProfile['estado civil / familia'] || personaProfile['familia'])}
                         </p>
                       )}
-                      {(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso']) && (
+                      {(hasAI ? aiIncome : (personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'])) && (
                         <p className="text-xs font-medium text-primary mt-1">
-                          {formatCurrency(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '')}
+                          {hasAI ? aiIncome : formatCurrency(personaProfile['ingreso mensual aprox.'] || personaProfile['ingreso'] || '')}
                         </p>
                       )}
                     </div>
@@ -3150,33 +3248,27 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <Heart className="h-3 w-3" /> Dolor Principal
                         </p>
-                        <p className="text-sm leading-relaxed">{getResponse('persona_pain') || 'Pendiente'}</p>
+                        <p className="text-sm leading-relaxed">{painText}</p>
                       </div>
 
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                           <MessageSquare className="h-3 w-3" /> Lo que Dice
                         </p>
-                      {getResponse('persona_words') ? (
+                        {hasAI && quoteText ? (
+                          <p className="text-sm italic text-muted-foreground border-l-2 border-primary/20 pl-2">"{quoteText}"</p>
+                        ) : getResponse('persona_words') ? (
                           <ul className="space-y-1">
                             {(() => {
                               const raw = getResponse('persona_words');
-                              // Split by: slash separator, newlines, numbered list items, or sentence-ending quotes
                               const parts = raw
                                 .split(/\s*\/\s*|\n+/)
-                                .map(l =>
-                                  l
-                                    .replace(/^[-•*\d.)]+\s*/, '')   // remove list markers like "1." "•" "-"
-                                    .replace(/^["'«""]\s*/, '')       // remove opening quotes
-                                    .replace(/\s*["'»""]$/, '')       // remove closing quotes
-                                    .replace(/^[^a-zA-ZáéíóúÁÉÍÓÚñÑ]+/, '') // strip leading non-alpha
-                                    .trim()
+                                .map((l: string) =>
+                                  l.replace(/^[-\u2022*\d.)]+\s*/, '').replace(/^["'\u00AB\u201C\u201D]\s*/, '').replace(/\s*["'\u00BB\u201C\u201D]$/, '').replace(/^[^a-zA-Z\u00E1\u00E9\u00ED\u00F3\u00FA\u00C1\u00C9\u00CD\u00D3\u00DA\u00F1\u00D1]+/, '').trim()
                                 )
-                                .filter(s => s.length > 8 && /[a-zA-ZáéíóúÁÉÍÓÚ]/.test(s));
-                              return parts.map((frase, i) => (
-                                <li key={i} className="text-sm italic text-muted-foreground border-l-2 border-primary/20 pl-2">
-                                  "{frase}"
-                                </li>
+                                .filter((s: string) => s.length > 8);
+                              return parts.map((frase: string, i: number) => (
+                                <li key={i} className="text-sm italic text-muted-foreground border-l-2 border-primary/20 pl-2">"{frase}"</li>
                               ));
                             })()}
                           </ul>
@@ -3186,23 +3278,32 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
                           <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3" /> Transformación
+                            <TrendingUp className="h-3 w-3" /> Motivadores de Compra
                           </p>
-                          <p className="text-sm leading-relaxed">{getResponse('persona_transformation') || 'Pendiente'}</p>
+                          <p className="text-sm leading-relaxed">{transformText}</p>
                         </div>
 
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1">
                             <Gem className="h-3 w-3" /> Estilo de Vida
                           </p>
-                          <p className="text-sm leading-relaxed">{getResponse('persona_lifestyle') || 'Pendiente'}</p>
+                          <p className="text-sm leading-relaxed">{lifestyleText}</p>
                         </div>
                       </div>
 
-                      {(personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra']) && (
+                      {barrerasText && (
+                        <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
+                          <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-1.5 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Barreras y Objeciones
+                          </p>
+                          <p className="text-sm leading-relaxed">{barrerasText}</p>
+                        </div>
+                      )}
+
+                      {!hasAI && (personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra']) && (
                         <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
                           <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
-                            <Target className="h-3 w-3" /> ¿Por qué Compra?
+                            <Target className="h-3 w-3" /> ¿Por que Compra?
                           </p>
                           <p className="text-sm font-medium">{personaProfile['¿por qué te compra?'] || personaProfile['por qué te compra']}</p>
                         </div>
@@ -3211,7 +3312,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardContent>
               </Card>
-            )}
+              );
+            })()}
 
             {/* Section Cards — El Negocio with enhanced financial display */}
             <div className="grid gap-4 lg:grid-cols-2">
@@ -3367,7 +3469,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
 
             {/* Evaluación Estratégica — 7 Accionables as numbered cards */}
-            {briefData?.summary && isComplete && (
+            {(Array.isArray((research as any).action_plan) || (briefData?.summary && isComplete)) && (
               <Card className="border-2 border-primary/30">
                 <CardHeader className="pb-3 bg-primary/5">
                   <div className="flex items-center gap-3">
@@ -3382,26 +3484,22 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  {(() => {
-                    const raw = briefData.summary || '';
-                    // Find section 7 — support both "## 7." and "## 7 " variants
+                  {Array.isArray((research as any).action_plan) && (research as any).action_plan.length > 0 ? (
+                    <StructuredAccionables items={(research as any).action_plan} />
+                  ) : (() => {
+                    const raw = briefData?.summary || '';
                     const section7Match = raw.match(/##\s*7[\.\s]/);
                     if (!section7Match || section7Match.index === undefined) {
                       return (
-                        <p className="text-sm text-muted-foreground italic">La evaluación estratégica se generará al completar el brief.</p>
+                        <p className="text-sm text-muted-foreground italic">La evaluacion estrategica se generara al completar el brief.</p>
                       );
                     }
                     const section7Text = raw.slice(section7Match.index);
-
-                    // Find first accionable marker — flexible regex: "### Accionable 1" or "### 1." etc
                     const firstAcc = section7Text.search(/###\s*(Accionable\s*)?\d/i);
                     const introText = firstAcc > 0
                       ? section7Text.slice(0, firstAcc).replace(/^##[^#\n]*\n/, '').replace(/\*\*/g, '').replace(/^#+\s*/gm, '').trim()
                       : '';
-
-                    // Split from first accionable onward into individual blocks
                     const accionableSection = firstAcc >= 0 ? section7Text.slice(firstAcc) : section7Text;
-                    // Split preserving the delimiter — use lookahead on ### followed by Accionable or number
                     const accionableBlocks = accionableSection
                       .split(/(?=###\s*(Accionable\s*)?\d)/gi)
                       .map(b => b == null ? '' : String(b).trim())
@@ -3415,13 +3513,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               <p className="text-xs text-muted-foreground leading-relaxed italic">{introText}</p>
                             </div>
                           )}
-                          {/* Show exactly up to 7 accionables */}
                           <ExpandableAccionables blocks={accionableBlocks.slice(0, 7)} />
                         </div>
                       );
                     }
-
-                    // Fallback: render full section 7 as markdown
                     return (
                       <div className="prose prose-sm dark:prose-invert max-w-none [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-4 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-3 [&>h3]:mb-1 [&>h3]:border-l-2 [&>h3]:border-primary/30 [&>h3]:pl-3 [&>p]:mb-2 [&>ul>li]:mb-1 [&>table]:text-xs [&_th]:bg-primary/10 [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{section7Text}</ReactMarkdown>
