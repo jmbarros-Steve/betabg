@@ -25,11 +25,11 @@ steps:
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--timeout=600s'
+      - '--timeout=1200s'
       - '--memory=1Gi'
       - '--cpu=2'
-      - '--min-instances=0'
-      - '--max-instances=10'
+      - '--min-instances=1'
+      - '--max-instances=4'
       - '--set-secrets'
       - >-
         SUPABASE_URL=SUPABASE_URL:latest,

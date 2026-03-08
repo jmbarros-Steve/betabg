@@ -7,6 +7,7 @@ const SECTIONS = [
     id: 'executive_summary',
     keys: ['executive_summary'],
     maxTokens: 4000,
+    model: 'claude-sonnet-4-6' as const,
     prompt: `Genera ÚNICAMENTE la sección "executive_summary". Debe incluir:
 - Situación actual de la marca basada en los datos reales del sitio (qué venden, cómo se presentan, qué propuesta de valor comunican)
 - Posición relativa frente a los 6 competidores analizados (en qué están mejor, en qué están peor)
@@ -20,6 +21,7 @@ Responde con JSON válido: { "executive_summary": { ... } }`,
     id: 'brand_identity',
     keys: ['brand_identity'],
     maxTokens: 4000,
+    model: 'claude-sonnet-4-6' as const,
     prompt: `Genera ÚNICAMENTE la sección "brand_identity". Debe incluir:
 - Propuesta de valor actual: qué promete la marca según su sitio web (extrae las frases exactas que usan)
 - Tono y voz: analiza el lenguaje del sitio (formal/informal, técnico/accesible, emocional/racional)
@@ -34,6 +36,7 @@ Responde con JSON válido: { "brand_identity": { ... } }`,
     id: 'financial_analysis',
     keys: ['financial_analysis'],
     maxTokens: 4000,
+    model: 'claude-sonnet-4-6' as const,
     prompt: `Genera ÚNICAMENTE la sección "financial_analysis". Debe incluir:
 - Modelo de negocio identificado (e-commerce, SaaS, servicios, infoproducto, marketplace, etc.)
 - Productos/servicios detectados en el sitio con sus precios si están visibles
@@ -47,6 +50,7 @@ Responde con JSON válido: { "financial_analysis": { ... } }`,
     id: 'consumer_profile',
     keys: ['consumer_profile'],
     maxTokens: 4000,
+    model: 'claude-sonnet-4-6' as const,
     prompt: `Genera ÚNICAMENTE la sección "consumer_profile". Debe incluir:
 - Buyer persona principal: nombre ficticio, demografía, psicografía, comportamiento digital, pain points, motivadores de compra, barreras/objeciones, frase que lo define
 - Buyer persona secundario (mismo formato pero más breve)
@@ -324,17 +328,19 @@ Responde SOLO con JSON válido:
   },
 ];
 
-// ── Llamada individual a Claude ──
+// ── Llamada individual a Claude con prompt caching ──
 async function callClaude(
-  systemPrompt: string,
+  baseSystemPrompt: string,
+  sectionPrompt: string,
   researchData: string,
-  maxTokens: number = 2500
+  maxTokens: number = 2500,
+  model: string = 'claude-opus-4-6'
 ): Promise<Record<string, unknown>> {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 240_000);
+  const timeout = setTimeout(() => controller.abort(), 300_000); // 5 min timeout
 
-  console.log(`[callClaude] Starting request — maxTokens: ${maxTokens}, researchLength: ${researchData.length}`);
+  console.log(`[callClaude] Starting ${model} request — maxTokens: ${maxTokens}, researchLength: ${researchData.length}`);
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -345,13 +351,37 @@ async function callClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-6",
+        model,
         max_tokens: maxTokens,
-        system: systemPrompt,
+        system: [
+          {
+            type: "text",
+            text: baseSystemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+          {
+            type: "text",
+            text: `${sectionPrompt}\nResponde SOLO JSON válido sin markdown.`,
+          },
+        ],
         messages: [
           {
             role: "user",
-            content: `Aquí están los datos de research del sitio web del cliente y sus competidores. Analízalos a fondo:\n\n${researchData}\n\nResponde ÚNICAMENTE con JSON válido. Sin markdown, sin backticks, sin texto antes o después del JSON.`,
+            content: [
+              {
+                type: "text",
+                text: `Aquí están los datos de research del sitio web del cliente y sus competidores. Analízalos a fondo:\n\n`,
+              },
+              {
+                type: "text",
+                text: researchData,
+                cache_control: { type: "ephemeral" },
+              },
+              {
+                type: "text",
+                text: `\n\nResponde ÚNICAMENTE con JSON válido. Sin markdown, sin backticks, sin texto antes o después del JSON.`,
+              },
+            ],
           },
         ],
       }),
@@ -364,13 +394,15 @@ async function callClaude(
     }
 
     const data: any = await res.json();
+    const usage = data.usage || {};
+    const cached = usage.cache_read_input_tokens || 0;
     const text = data.content?.[0]?.text ?? "{}";
     const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
-    console.log(`[callClaude] Response OK — textLength: ${text.length}, cleanedLength: ${cleaned.length}`);
+    console.log(`[callClaude] ${model} OK — output: ${text.length} chars, cached_input: ${cached} tokens`);
     return JSON.parse(cleaned);
   } catch (error: any) {
     if (error.name === "AbortError") {
-      throw new Error("Claude API timeout after 120s");
+      throw new Error(`Claude API timeout after 300s (model: ${model})`);
     }
     throw error;
   } finally {
@@ -459,9 +491,9 @@ export async function analyzeBrandStrategy(c: Context) {
       { onConflict: 'client_id,research_type' }
     );
 
-    // ══════════════════════════════════════════════
-    //  12 LLAMADAS EN 3 OLEADAS (rate limit friendly)
-    // ══════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════
+    //  12 LLAMADAS EN PARALELO + PROMPT CACHING + GUARDADO PROGRESIVO
+    // ══════════════════════════════════════════════════════
     // Include client financial data in context for all sections
     const clientFinancials = researchData.client?.brief ? (() => {
       const brief = typeof researchData.client.brief === 'string' ? researchData.client.brief : JSON.stringify(researchData.client.brief);
@@ -478,45 +510,52 @@ export async function analyzeBrandStrategy(c: Context) {
 
     const fullSystemBase = `Eres un estratega senior de marketing digital con 15+ años de experiencia en e-commerce LATAM. Tu análisis debe ser de nivel McKinsey/BCG — datos concretos, cálculos reales, recomendaciones específicas.\n\nREGLA DE PRIORIDAD: Si hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n\nREGLA CRÍTICA DE REDACCIÓN: NUNCA copies texto del cliente verbatim. Reescribe TODO en tercera persona profesional. Transforma respuestas coloquiales en análisis estratégico. NO uses placeholders como [X] o N/D — calcula o estima con los datos disponibles.${clientFinancials}${budgetContext}\n${knowledgeContext ? `\nREGLAS APRENDIDAS (aplicar obligatoriamente):\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
 
-    const wave1 = SECTIONS.slice(0, 4);   // secciones 1-4
-    const wave2 = SECTIONS.slice(4, 8);   // secciones 5-8
-    const wave3 = SECTIONS.slice(8, 12);  // secciones 9-12
+    // ── 12 llamadas en paralelo (sin oleadas) ──
+    // Prompt caching: fullSystemBase + truncatedResearch se cachean entre las 12 llamadas
+    // Guardado progresivo: cada sección se guarda a BD apenas termina
+    let completedCount = 0;
+    const totalSections = SECTIONS.length;
 
-    console.log(`[analyze-brand-strategy] Wave 1: starting ${wave1.map(s => s.id).join(', ')}`);
-    const results1 = await Promise.allSettled(
-      wave1.map(section => callClaude(
-        `${fullSystemBase}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`,
-        truncatedResearch,
-        section.maxTokens
-      ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
+    console.log(`[analyze-brand-strategy] Launching ALL ${totalSections} sections in parallel (prompt caching enabled)`);
+    const results = await Promise.allSettled(
+      SECTIONS.map(section => {
+        const sectionModel = (section as any).model || 'claude-opus-4-6';
+        return callClaude(
+          fullSystemBase,
+          section.prompt,
+          truncatedResearch,
+          section.maxTokens,
+          sectionModel
+        ).then(async (data) => {
+          // ── Guardado progresivo: guardar a BD apenas la sección termine ──
+          completedCount++;
+          const keys = section.keys;
+          for (const key of keys) {
+            const value = data[key] || (keys.length === 1 ? data : null);
+            if (value) {
+              const sectionResearchData = key === 'executive_summary'
+                ? { summary: typeof value === 'string' ? (value as string).slice(0, 12000) : JSON.stringify(value).slice(0, 4000), ...((typeof value === 'object' && value !== null) ? value as Record<string, unknown> : {}) }
+                : value;
+              await supabase.from('brand_research').upsert(
+                { client_id, research_type: key, research_data: sectionResearchData },
+                { onConflict: 'client_id,research_type' }
+              ).then(({ error }) => {
+                if (error) console.error(`[progressive-save] Failed ${key}:`, error.message);
+                else console.log(`[progressive-save] Saved ${key} (${completedCount}/${totalSections})`);
+              });
+            }
+          }
+          // Update progress percentage
+          const pct = Math.min(60 + Math.round((completedCount / totalSections) * 38), 98);
+          await supabase.from('brand_research').upsert(
+            { client_id, research_type: 'analysis_progress', research_data: { step: 'ia', detail: `${completedCount}/${totalSections} secciones listas (${section.id})`, pct, ts: new Date().toISOString() } },
+            { onConflict: 'client_id,research_type' }
+          );
+          return { sectionId: section.id, keys: section.keys, data };
+        });
+      })
     );
-
-    console.log(`[analyze-brand-strategy] Wave 1 done. Waiting 5s for rate limit reset...`);
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    console.log(`[analyze-brand-strategy] Wave 2: starting ${wave2.map(s => s.id).join(', ')}`);
-    const results2 = await Promise.allSettled(
-      wave2.map(section => callClaude(
-        `${fullSystemBase}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`,
-        truncatedResearch,
-        section.maxTokens
-      ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
-    );
-
-    console.log(`[analyze-brand-strategy] Wave 2 done. Waiting 5s for rate limit reset...`);
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    console.log(`[analyze-brand-strategy] Wave 3: starting ${wave3.map(s => s.id).join(', ')}`);
-    const results3 = await Promise.allSettled(
-      wave3.map(section => callClaude(
-        `${fullSystemBase}\n${section.prompt}\nResponde SOLO JSON válido sin markdown.`,
-        truncatedResearch,
-        section.maxTokens
-      ).then(data => ({ sectionId: section.id, keys: section.keys, data })))
-    );
-
-    const results = [...results1, ...results2, ...results3];
-    console.log(`[analyze-brand-strategy] All 3 waves complete.`);
+    console.log(`[analyze-brand-strategy] All ${totalSections} sections complete.`);
 
     // Log detallado de cada resultado
     for (let i = 0; i < results.length; i++) {
@@ -574,19 +613,21 @@ export async function analyzeBrandStrategy(c: Context) {
 
     console.log(`[analyze-brand-strategy] Status: ${status}, completed: ${completedSections.join(', ')}, failed: ${failedSections.join(', ')}`);
 
-    // Guardar cada sección individualmente en brand_research
+    // Secciones ya guardadas progresivamente en el .then() de cada llamada
+    // Solo guardamos las que fallaron en el guardado progresivo (fallback)
     for (const key of completedSections) {
-      const value = finalBrief[key];
-      const sectionResearchData = key === 'executive_summary'
-        ? { summary: typeof value === 'string' ? (value as string).slice(0, 12000) : JSON.stringify(value).slice(0, 4000), ...((typeof value === 'object' && value !== null) ? value as Record<string, unknown> : {}) }
-        : value;
-
-      const { error: upsertErr } = await supabase.from('brand_research').upsert(
-        { client_id, research_type: key, research_data: sectionResearchData },
-        { onConflict: 'client_id,research_type' }
-      );
-      if (upsertErr) {
-        console.error(`[analyze-brand-strategy] Failed to save ${key}:`, upsertErr.message);
+      const { data: existing } = await supabase.from('brand_research')
+        .select('id').eq('client_id', client_id).eq('research_type', key).maybeSingle();
+      if (!existing) {
+        const value = finalBrief[key];
+        const sectionResearchData = key === 'executive_summary'
+          ? { summary: typeof value === 'string' ? (value as string).slice(0, 12000) : JSON.stringify(value).slice(0, 4000), ...((typeof value === 'object' && value !== null) ? value as Record<string, unknown> : {}) }
+          : value;
+        await supabase.from('brand_research').upsert(
+          { client_id, research_type: key, research_data: sectionResearchData },
+          { onConflict: 'client_id,research_type' }
+        );
+        console.log(`[fallback-save] Saved ${key} (was missing from progressive save)`);
       }
     }
 
