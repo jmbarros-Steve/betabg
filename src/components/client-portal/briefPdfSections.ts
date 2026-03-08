@@ -301,8 +301,11 @@ export function renderPositioningStrategy(
     if (mp.eje_y) helpers.addKeyValue('Eje Y', String(mp.eje_y));
     if (mp.posiciones && typeof mp.posiciones === 'object') {
       for (const [brand, pos] of Object.entries(mp.posiciones as Record<string, any>)) {
+        const px = pos.x || pos.posicion_x || pos.score_x || '';
+        const py = pos.y || pos.posicion_y || pos.score_y || '';
+        const coords = px && py ? `(${px}, ${py}) — ` : '';
         helpers.addKeyValue(brand.charAt(0).toUpperCase() + brand.slice(1),
-          `(${pos.x || '?'}, ${pos.y || '?'}) — ${pos.descripcion || ''}`);
+          `${coords}${pos.descripcion || ''}`);
       }
     }
   }
@@ -627,7 +630,8 @@ export function renderKeywordPhases(
     doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
     const phaseTitle = `${style.label}${focus ? ': ' + focus : ''}${timeline ? ' — ' + timeline : ''}`;
-    doc.text(phaseTitle, margin + 5, y + 7);
+    const phaseTitleLines = doc.splitTextToSize(phaseTitle, maxWidth - 10);
+    doc.text(phaseTitleLines[0] || phaseTitle, margin + 5, y + 7);
     y += 13;
     helpers.setY(y);
 
@@ -776,7 +780,11 @@ export function renderMetaAdsStrategy(
     const ps = metaStrategy.presupuesto_sugerido;
     if (typeof ps === 'object') {
       for (const [k, v] of Object.entries(ps)) {
-        helpers.addKeyValue(k.replace(/_/g, ' '), String(v));
+        const label = k.replace(/_/g, ' ').toUpperCase();
+        const value = typeof v === 'number'
+          ? '$' + Math.round(v).toLocaleString('es-CL') + ' CLP'
+          : String(v);
+        helpers.addKeyValue(label, value);
       }
     } else {
       helpers.addBody(String(ps));
@@ -962,12 +970,14 @@ export function renderAdsLibraryAnalysis(
       // Format badge
       const fmt = String(cc.formato || cc.format || '').toUpperCase();
       if (fmt) {
+        const fmtText = fmt.slice(0, 18);
+        const fmtWidth = Math.max(24, doc.getTextWidth(fmtText) + 6);
         doc.setFillColor(accentR, accentG, accentB);
-        doc.roundedRect(ctx.pageWidth - margin - 26, y + 2, 24, 5, 2, 2, 'F');
+        doc.roundedRect(ctx.pageWidth - margin - fmtWidth - 2, y + 2, fmtWidth, 5, 2, 2, 'F');
         doc.setFont('NotoSans', 'bold');
         doc.setFontSize(6.5);
         doc.setTextColor(255, 255, 255);
-        doc.text(fmt.slice(0, 12), ctx.pageWidth - margin - 14, y + 5.5, { align: 'center' });
+        doc.text(fmtText, ctx.pageWidth - margin - fmtWidth / 2 - 2, y + 5.5, { align: 'center' });
       }
 
       y += 12;
@@ -1007,12 +1017,14 @@ export function renderAdsLibraryAnalysis(
       // CTA as button-like element
       if (cc.cta) {
         y += 1;
+        const ctaText = String(cc.cta).slice(0, 40);
+        const ctaWidth = Math.max(40, doc.getTextWidth(ctaText) + 12);
         doc.setFillColor(...cColor);
-        doc.roundedRect(margin + 5, y, 40, 6, 2, 2, 'F');
+        doc.roundedRect(margin + 5, y, ctaWidth, 6, 2, 2, 'F');
         doc.setFont('NotoSans', 'bold');
         doc.setFontSize(7);
         doc.setTextColor(255, 255, 255);
-        doc.text(String(cc.cta).slice(0, 25), margin + 25, y + 4, { align: 'center' });
+        doc.text(ctaText, margin + 5 + ctaWidth / 2, y + 4, { align: 'center' });
         y += 8;
       }
 
@@ -1284,7 +1296,7 @@ export function renderBudgetAndFunnel(
       for (const chKey of calChannelKeys) {
         const action = phaseData[chKey];
         if (action) {
-          helpers.addKeyValue(calChannelLabels[chKey] || chKey, helpers.stripEmojis(String(action)).slice(0, 60));
+          helpers.addKeyValue(calChannelLabels[chKey] || chKey, helpers.stripEmojis(String(action)));
         }
       }
       y = helpers.getY();

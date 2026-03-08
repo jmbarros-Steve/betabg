@@ -69,9 +69,15 @@ class BriefErrorBoundary extends React.Component<{ children: React.ReactNode }, 
 // Safe text render — prevents React error #31 (objects rendered as children)
 function safeText(val: any): string {
   if (val == null) return '';
-  if (typeof val === 'string') return val;
-  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-  return JSON.stringify(val);
+  let text: string;
+  if (typeof val === 'string') text = val;
+  else if (typeof val === 'number' || typeof val === 'boolean') text = String(val);
+  else text = JSON.stringify(val);
+  // Detect truncated text — add ellipsis if it doesn't end in punctuation
+  if (text.length > 10 && !/[.!?")\]:]$/.test(text.trim())) {
+    text = text.trim() + '...';
+  }
+  return text;
 }
 
 // Parse SCR fields from accionable block text
@@ -304,7 +310,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${cfg.badge}`}>
                         FASE {phaseNum}
                       </span>
-                      {focus && <span className={`text-xs font-semibold ${cfg.text}`}>{focus}</span>}
+                      {focus && <span className={`text-xs font-semibold ${cfg.text} truncate max-w-[200px]`} title={focus}>{focus}</span>}
                       {timeline && <span className="text-[10px] text-muted-foreground ml-auto">📅 {timeline}</span>}
                     </div>
 
@@ -384,7 +390,9 @@ function CreativeCalendarTimeline({ calendar }: { calendar: any }) {
           {weekKeys.map((key, i) => {
             const week = calendar[key];
             const cfg = weekColors[i % weekColors.length];
-            const label = key.replace(/_/g, ' ').replace(/week/i, 'Semana');
+            const label = key.replace(/_/g, ' ')
+              .replace(/week\s*(\d+)\s+(\d+)/i, 'Semana $1-$2')
+              .replace(/week/i, 'Semana');
             const launch = typeof week === 'string' ? week : week?.launch;
             const testVars: string[] = typeof week === 'object' && Array.isArray(week?.test_variables) ? week.test_variables : [];
 
@@ -1412,6 +1420,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   async function handleDownloadPDF() {
     if (!briefData) return;
 
+    try {
     const doc = new jsPDF();
     registerPdfFont(doc);
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -2426,14 +2435,23 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     // Action Plan — handle _repair_failed gracefully
     const actionPlanData = (research as any).action_plan;
-    if (actionPlanData && (actionPlanData as any)._repair_failed) {
+    let pdfActionPlanItems = Array.isArray(actionPlanData) ? actionPlanData : null;
+    if (!pdfActionPlanItems && actionPlanData?._repair_failed && actionPlanData?.raw_text) {
+      try {
+        const parsed = JSON.parse(actionPlanData.raw_text);
+        pdfActionPlanItems = Array.isArray(parsed) ? parsed
+          : Array.isArray(parsed?.action_plan) ? parsed.action_plan : null;
+      } catch {
+        const match = actionPlanData.raw_text.match(/\[[\s\S]+/);
+        if (match) try { pdfActionPlanItems = JSON.parse(match[0].replace(/,\s*$/, '') + ']'); } catch {}
+      }
+    }
+    if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
+      safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, pdfActionPlanItems!));
+    } else if (actionPlanData && (actionPlanData as any)._repair_failed) {
       safePdfRender('Plan de Accion', () => {
         addSectionHeader('E', 'PLAN DE ACCION ESTRATEGICO');
         addBody('Los datos del plan de accion se generaron parcialmente. Contacta al equipo para regenerar esta seccion.', 0, 5);
-        if ((actionPlanData as any).raw_text) {
-          const rawPreview = String((actionPlanData as any).raw_text).slice(0, 2000);
-          addBody(rawPreview, 0, 4);
-        }
       });
     } else {
       safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, actionPlanData));
@@ -3059,6 +3077,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     doc.save(`Brief_Estrategico_${clientInfo?.name || 'Marca'}_${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success('Brief estratégico descargado con éxito');
+    } catch (pdfError) {
+      console.error('Error generando PDF:', pdfError);
+      toast.error('Error al generar el PDF. Intenta nuevamente.');
+    }
   }
 
   if (loading) {
@@ -3551,7 +3573,22 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
 
             {/* Evaluación Estratégica — 7 Accionables as numbered cards */}
-            {(Array.isArray((research as any).action_plan) || (briefData?.summary && isComplete)) && (
+            {(() => {
+              const rawActionPlan = (research as any).action_plan;
+              let parsedActionPlan = Array.isArray(rawActionPlan) ? rawActionPlan : null;
+              if (!parsedActionPlan && rawActionPlan?._repair_failed && rawActionPlan?.raw_text) {
+                try {
+                  const parsed = JSON.parse(rawActionPlan.raw_text);
+                  parsedActionPlan = Array.isArray(parsed) ? parsed
+                    : Array.isArray(parsed?.action_plan) ? parsed.action_plan : null;
+                } catch {
+                  const match = rawActionPlan.raw_text.match(/\[[\s\S]+/);
+                  if (match) try { parsedActionPlan = JSON.parse(match[0].replace(/,\s*$/, '') + ']'); } catch {}
+                }
+              }
+              const showSection = (parsedActionPlan && parsedActionPlan.length > 0) || (briefData?.summary && isComplete);
+              if (!showSection) return null;
+              return (
               <Card className="border-2 border-primary/30">
                 <CardHeader className="pb-3 bg-primary/5">
                   <div className="flex items-center gap-3">
@@ -3566,8 +3603,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  {Array.isArray((research as any).action_plan) && (research as any).action_plan.length > 0 ? (
-                    <StructuredAccionables items={(research as any).action_plan} />
+                  {parsedActionPlan && parsedActionPlan.length > 0 ? (
+                    <StructuredAccionables items={parsedActionPlan} />
                   ) : (() => {
                     const raw = briefData?.summary || '';
                     const section7Match = raw.match(/##\s*7[\.\s]/);
@@ -3607,7 +3644,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   })()}
                 </CardContent>
               </Card>
-            )}
+              );
+            })()}
 
             {/* ===== NEXT STEPS CTA ===== */}
             {isComplete && (
@@ -4145,6 +4183,33 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                                   <p className="text-xs text-muted-foreground">{String(comp.value_proposition)}</p>
                                 </div>
                               )}
+                              {comp.seo_score && (
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-[10px]">SEO Score: {String(comp.seo_score)}</Badge>
+                                </div>
+                              )}
+                              {comp.estrategia_contenido && (
+                                <div>
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Estrategia de Contenido</p>
+                                  <p className="text-xs text-muted-foreground">{String(comp.estrategia_contenido)}</p>
+                                </div>
+                              )}
+                              {comp.que_hacen_mejor && (
+                                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded p-2">
+                                  <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-0.5">Qué Hacen Mejor</p>
+                                  <p className="text-xs leading-relaxed">{String(comp.que_hacen_mejor)}</p>
+                                </div>
+                              )}
+                              {Array.isArray(comp.weaknesses) && comp.weaknesses.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Debilidades</p>
+                                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                                    {comp.weaknesses.map((w: any, wi: number) => (
+                                      <li key={wi}>{safeText(w)}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                               {comp.attack_vector && (
                                 <div className="bg-destructive/5 border border-destructive/20 rounded p-2">
                                   <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-0.5">⚔️ Táctica para Quitarles Clientes</p>
@@ -4457,8 +4522,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               {Object.entries((research.positioning_strategy as any).mapa_perceptual.posiciones).map(([key, val]: [string, any]) => (
                                 <div key={key} className="flex items-center gap-3 text-xs bg-background rounded p-2 border border-border">
                                   <Badge variant="outline" className="text-[10px] capitalize">{key}</Badge>
-                                  <span className="text-muted-foreground">({val.x}, {val.y})</span>
-                                  <span className="flex-1">{val.descripcion}</span>
+                                  {(val.x || val.posicion_x || val.score_x) && (val.y || val.posicion_y || val.score_y) ? (
+                                    <span className="text-muted-foreground">({val.x || val.posicion_x || val.score_x}, {val.y || val.posicion_y || val.score_y})</span>
+                                  ) : null}
+                                  <span className="flex-1">{val.descripcion || safeText(val)}</span>
                                 </div>
                               ))}
                             </div>
