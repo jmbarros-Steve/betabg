@@ -396,21 +396,127 @@ export function renderActionPlan(
 
   helpers.addSectionHeader('E', 'PLAN DE ACCION ESTRATEGICO');
 
+  const { doc, margin, maxWidth, brandR, brandG, brandB, accentR, accentG, accentB } = ctx;
+  const scrColors: Record<string, { bg: [number,number,number]; fg: [number,number,number]; label: string }> = {
+    s: { bg: [230, 240, 255], fg: [27, 42, 74], label: 'SITUACION' },
+    c: { bg: [255, 243, 230], fg: [180, 100, 20], label: 'COMPLICACION' },
+    r: { bg: [230, 250, 235], fg: [22, 120, 50], label: 'RESOLUCION' },
+  };
+
   for (let i = 0; i < actionPlan.length; i++) {
     const item = actionPlan[i];
     if (typeof item === 'string') {
       helpers.addArrowBullet(item);
       continue;
     }
-    const title = item.title || `Accion ${i + 1}`;
+    const title = helpers.stripEmojis(item.title || `Accion ${i + 1}`);
     const priority = item.priority || '';
     const timeline = item.timeline || '';
+    const situation = helpers.stripEmojis(String(item.situation || ''));
+    const complication = helpers.stripEmojis(String(item.complication || ''));
+    const resolution = helpers.stripEmojis(String(item.resolution || ''));
+    const impact = helpers.stripEmojis(String(item.expected_impact || ''));
 
-    helpers.addSubTitle(`${i + 1}. ${helpers.stripEmojis(title)}`);
-    if (priority) helpers.addKeyValue('Prioridad', String(priority));
-    if (timeline) helpers.addKeyValue('Timeline', String(timeline));
-    if (item.situation) helpers.addBody(`Situacion: ${helpers.stripEmojis(String(item.situation))}`, 2);
-    if (item.resolution) helpers.addBody(`Solucion: ${helpers.stripEmojis(String(item.resolution))}`, 2);
+    // Calculate dynamic card height
+    doc.setFont('NotoSans', 'normal');
+    doc.setFontSize(7.5);
+    const sLines = situation ? doc.splitTextToSize(situation, maxWidth - 20) : [];
+    const cLines = complication ? doc.splitTextToSize(complication, maxWidth - 20) : [];
+    const rLines = resolution ? doc.splitTextToSize(resolution, maxWidth - 20) : [];
+    const impLines = impact ? doc.splitTextToSize(impact, maxWidth - 24) : [];
+
+    const scrH = (sLines.length > 0 ? 8 + sLines.length * 4 : 0)
+               + (cLines.length > 0 ? 8 + cLines.length * 4 : 0)
+               + (rLines.length > 0 ? 8 + rLines.length * 4 : 0);
+    const cardH = 18 + (priority || timeline ? 6 : 0) + scrH + (impLines.length > 0 ? 10 + impLines.length * 4 : 0) + 4;
+
+    helpers.checkPage(cardH + 4);
+    let y = helpers.getY();
+
+    // Card container
+    doc.setFillColor(250, 250, 254);
+    doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'F');
+    doc.setDrawColor(180, 185, 200);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'S');
+
+    // Number circle
+    doc.setFillColor(brandR, brandG, brandB);
+    doc.circle(margin + 8, y + 8, 5, 'F');
+    doc.setFont('NotoSans', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.text(String(i + 1), margin + 8, y + 9.5, { align: 'center' });
+
+    // Title
+    doc.setFont('NotoSans', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(brandR, brandG, brandB);
+    const titleLines = doc.splitTextToSize(title, maxWidth - 24);
+    doc.text(titleLines[0] || '', margin + 16, y + 9);
+    y += 14;
+
+    // Priority & Timeline
+    if (priority || timeline) {
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 120);
+      const meta = [priority ? `Prioridad: ${priority}` : '', timeline ? `Timeline: ${timeline}` : ''].filter(Boolean).join(' | ');
+      doc.text(meta, margin + 16, y);
+      y += 6;
+    }
+
+    // SCR sections — full text, all lines
+    for (const [key, text, lines] of [['s', situation, sLines], ['c', complication, cLines], ['r', resolution, rLines]] as [string, string, string[]][]) {
+      if (lines.length === 0) continue;
+      const scr = scrColors[key];
+      const blockH = 6 + lines.length * 4 + 2;
+      helpers.setY(y);
+      helpers.checkPage(blockH + 2);
+      y = helpers.getY();
+      doc.setFillColor(...scr.bg);
+      doc.roundedRect(margin + 4, y, maxWidth - 8, blockH, 1, 1, 'F');
+      doc.setFont('NotoSans', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...scr.fg);
+      doc.text(scr.label, margin + 7, y + 4);
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(40, 40, 50);
+      let ly = y + 8;
+      for (const line of lines) {
+        doc.text(line, margin + 7, ly);
+        ly += 4;
+      }
+      y = ly + 2;
+    }
+
+    // Impact
+    if (impLines.length > 0) {
+      helpers.setY(y);
+      helpers.checkPage(10 + impLines.length * 4);
+      y = helpers.getY();
+      doc.setFillColor(253, 248, 240);
+      const impBlockH = 6 + impLines.length * 4 + 2;
+      doc.roundedRect(margin + 4, y, maxWidth - 8, impBlockH, 1, 1, 'F');
+      doc.setFillColor(accentR, accentG, accentB);
+      doc.rect(margin + 4, y, 2, impBlockH, 'F');
+      doc.setFont('NotoSans', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(accentR, accentG, accentB);
+      doc.text('IMPACTO ESPERADO', margin + 9, y + 4);
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(60, 40, 0);
+      let iy = y + 8;
+      for (const line of impLines) {
+        doc.text(line, margin + 9, iy);
+        iy += 4;
+      }
+      y = iy + 2;
+    }
+
+    helpers.setY(y + 4);
   }
 }
 
@@ -773,43 +879,62 @@ export function renderGoogleAdsStrategy(
       [66, 133, 244], // Google blue
       [52, 168, 83],  // Google green
       [234, 67, 53],  // Google red
+      [251, 188, 4],  // Google yellow
+      [102, 51, 153], // Purple
     ];
-    for (let ci = 0; ci < Math.min(googleStrategy.ad_copies.length, 3); ci++) {
+    for (let ci = 0; ci < Math.min(googleStrategy.ad_copies.length, 5); ci++) {
       const copy = googleStrategy.ad_copies[ci];
       if (typeof copy !== 'object') continue;
       const cColor = copyColors[ci % copyColors.length];
-      helpers.checkPage(28);
+
+      // Calculate dynamic height
+      const headlines = [copy.headline1, copy.headline2, copy.headline3].filter(Boolean).join(' | ');
+      doc.setFont('NotoSans', 'bold');
+      doc.setFontSize(9);
+      const hLines = doc.splitTextToSize(helpers.stripEmojis(headlines), maxWidth - 14);
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(8);
+      const d1Text = helpers.stripEmojis(copy.description1 || '');
+      const d2Text = helpers.stripEmojis(copy.description2 || '');
+      const d1Lines = d1Text ? doc.splitTextToSize(d1Text, maxWidth - 14) : [];
+      const d2Lines = d2Text ? doc.splitTextToSize(d2Text, maxWidth - 14) : [];
+      const cardH = 8 + hLines.length * 5 + d1Lines.length * 4 + d2Lines.length * 4 + 6;
+
+      helpers.checkPage(cardH + 4);
       let y = helpers.getY();
-      // Card
+      // Card with dynamic height
       doc.setFillColor(248, 249, 255);
-      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'F');
       doc.setFillColor(...cColor);
-      doc.rect(margin, y, 3, 24, 'F');
+      doc.rect(margin, y, 3, cardH, 'F');
       // Variant label
       doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7);
       doc.setTextColor(...cColor);
       doc.text(`Variante ${copy.variant || ci + 1}`, margin + 7, y + 5);
-      // Headlines
+      y += 8;
+      // Headlines — all lines
       doc.setFont('NotoSans', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(40, 40, 50);
-      const headlines = [copy.headline1, copy.headline2, copy.headline3].filter(Boolean).join(' | ');
-      const hLines = doc.splitTextToSize(helpers.stripEmojis(headlines), maxWidth - 12);
-      doc.text(hLines[0] || '', margin + 7, y + 11);
-      // Descriptions
+      for (const hl of hLines) {
+        doc.text(hl, margin + 7, y);
+        y += 5;
+      }
+      // Description 1 — all lines
       doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(60, 60, 70);
-      if (copy.description1) {
-        const d1Lines = doc.splitTextToSize(helpers.stripEmojis(copy.description1), maxWidth - 12);
-        doc.text(d1Lines[0] || '', margin + 7, y + 17);
+      for (const dl of d1Lines) {
+        doc.text(dl, margin + 7, y);
+        y += 4;
       }
-      if (copy.description2) {
-        const d2Lines = doc.splitTextToSize(helpers.stripEmojis(copy.description2), maxWidth - 12);
-        doc.text(d2Lines[0] || '', margin + 7, y + 21);
+      // Description 2 — all lines
+      for (const dl of d2Lines) {
+        doc.text(dl, margin + 7, y);
+        y += 4;
       }
-      helpers.setY(y + 27);
+      helpers.setY(y + 4);
     }
   }
 
@@ -876,21 +1001,32 @@ export function renderAdsLibraryAnalysis(
       const cc = adsLibrary.creative_concepts[i];
       if (typeof cc !== 'object') { helpers.addArrowBullet(String(cc)); continue; }
       const { doc, margin, maxWidth, accentR, accentG, accentB } = ctx;
-      helpers.checkPage(40);
+
+      // Calculate dynamic card height based on content
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(8);
+      const copyText = helpers.stripEmojis(cc.copy || cc.primary_copy || '');
+      const copyLines = copyText ? doc.splitTextToSize(copyText, maxWidth - 14) : [];
+      const hookText = cc.hook ? `"${helpers.stripEmojis(cc.hook)}"` : '';
+      doc.setFont('NotoSans', 'bold');
+      doc.setFontSize(9);
+      const hookLines = hookText ? doc.splitTextToSize(hookText, maxWidth - 14) : [];
+      const dynamicH = 14 + (hookLines.length * 5) + (copyLines.length * 4) + (cc.cta ? 10 : 0) + (cc.why_it_works || cc.rationale ? 8 : 0) + 4;
+
+      helpers.checkPage(dynamicH + 4);
       let y = helpers.getY();
 
-      // Card container
+      // Card container — dynamic height
       doc.setFillColor(252, 252, 255);
-      doc.roundedRect(margin, y, maxWidth, 36, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, dynamicH, 2, 2, 'F');
       doc.setDrawColor(200, 200, 215);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, maxWidth, 36, 2, 2, 'S');
+      doc.roundedRect(margin, y, maxWidth, dynamicH, 2, 2, 'S');
 
       // Colored header bar
       const cColor = conceptColors[i % conceptColors.length];
       doc.setFillColor(...cColor);
       doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
-      // Fix bottom corners
       doc.rect(margin, y + 5, maxWidth, 4, 'F');
 
       // Concept name
@@ -911,25 +1047,38 @@ export function renderAdsLibraryAnalysis(
       }
 
       y += 12;
-      // Hook in bold
-      if (cc.hook) {
+      // Hook in bold — show ALL lines
+      if (hookLines.length > 0) {
         doc.setFont('NotoSans', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(40, 40, 50);
-        const hookLines = doc.splitTextToSize(`"${cc.hook}"`, maxWidth - 12);
-        doc.text(hookLines[0] || '', margin + 5, y);
-        y += 5;
+        for (const hl of hookLines) {
+          doc.text(hl, margin + 5, y);
+          y += 5;
+        }
       }
-      // Copy
-      if (cc.copy) {
+      // Copy — show ALL lines (no truncation)
+      if (copyLines.length > 0) {
         doc.setFont('NotoSans', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(60, 60, 70);
-        const copyLines = doc.splitTextToSize(cc.copy, maxWidth - 12);
-        for (const cl of copyLines.slice(0, 2)) {
+        for (const cl of copyLines) {
+          helpers.setY(y);
+          helpers.checkPage(5);
+          y = helpers.getY();
           doc.text(cl, margin + 5, y);
           y += 4;
         }
+      }
+      // Why it works
+      if (cc.why_it_works || cc.rationale) {
+        doc.setFont('NotoSans', 'italic' as any);
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 120);
+        const whyText = helpers.stripEmojis(String(cc.why_it_works || cc.rationale));
+        const whyLines = doc.splitTextToSize(whyText, maxWidth - 14);
+        doc.text(whyLines[0] || '', margin + 5, y + 1);
+        y += 6;
       }
       // CTA as button-like element
       if (cc.cta) {
@@ -939,7 +1088,7 @@ export function renderAdsLibraryAnalysis(
         doc.setFont('NotoSans', 'bold');
         doc.setFontSize(7);
         doc.setTextColor(255, 255, 255);
-        doc.text(String(cc.cta).slice(0, 20), margin + 25, y + 4, { align: 'center' });
+        doc.text(String(cc.cta).slice(0, 25), margin + 25, y + 4, { align: 'center' });
         y += 8;
       }
 

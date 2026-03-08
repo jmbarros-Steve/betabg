@@ -1203,8 +1203,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (research) {
       setDebug({ phase2: 'running' });
       try {
+        // Extract fase_negocio and presupuesto_ads from brief data
+        const briefFase = (briefData as any)?.fase_negocio || '';
+        const briefPresupuesto = (briefData as any)?.presupuesto_ads || '';
         const { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
-          body: { client_id: clientId, research },
+          body: { client_id: clientId, research, fase_negocio: briefFase, presupuesto_ads: briefPresupuesto },
         });
         if (strategyErr) {
           setDebug({ phase2: 'error', phase2Message: strategyErr });
@@ -1596,13 +1599,31 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const roasObj = (research as any).meta_ads_strategy?.kpis_objetivo?.bofu?.roas
       || (research as any).google_ads_strategy?.target_roas || null;
 
+    // Calculate ROAS based on real client data
+    const budgetFunnel = (research as any).budget_and_funnel;
+    const roasFromBudget = budgetFunnel?.roas_projection?.day_90?.roas || budgetFunnel?.roas_projection?.day_60?.roas;
+    const calculatedRoas = roasObj ? String(roasObj) : roasFromBudget ? String(roasFromBudget) : (financials && marginPct ? (() => {
+      const mp = Number(marginPct);
+      const minRoas = (100 / mp).toFixed(1);
+      const targetRoas = (100 / (mp * 0.3)).toFixed(1);
+      return `${minRoas}x min / ${targetRoas}x obj`;
+    })() : 'Pendiente');
+
+    // SEO Score with better fallback
+    const seoScore = research.seo_audit?.score || research.seo_audit?.score_seo;
+    const seoDisplay = seoScore ? `${seoScore}/100` : (analysisStatus === 'pending' ? 'Analizando...' : 'Pendiente analisis');
+
+    // Budget from budget_and_funnel or meta_ads_strategy
+    const budgetFromFunnel = budgetFunnel?.monthly_budget_clp;
+    const finalBudget = budgetFromFunnel || totalBudget;
+
     const kpiData = [
-      { label: 'Ticket Promedio', value: financials ? fmtCLP(financials.price) : 'N/D', dark: true },
-      { label: 'CPA Maximo Viable', value: cpaMaxCLP || 'N/D', dark: false },
-      { label: 'ROAS Objetivo', value: roasObj ? String(roasObj) : (marginPct && Number(marginPct) > 50 ? '3x - 5x' : '2x - 3x'), dark: true },
-      { label: 'Margen Bruto', value: marginPct ? `${marginPct}%` : 'N/D', dark: false },
-      { label: 'Presupuesto Sugerido', value: totalBudget ? (typeof totalBudget === 'number' ? fmtCLP(totalBudget) : String(totalBudget)) : 'A definir', dark: true },
-      { label: 'SEO Score', value: research.seo_audit?.score ? `${research.seo_audit.score}/100` : 'N/D', dark: false },
+      { label: 'Ticket Promedio', value: financials ? fmtCLP(financials.price) : 'Completar brief', dark: true },
+      { label: 'CPA Maximo Viable', value: cpaMaxCLP || 'Completar brief', dark: false },
+      { label: 'ROAS Objetivo', value: calculatedRoas, dark: true },
+      { label: 'Margen Bruto', value: marginPct ? `${marginPct}%` : 'Completar brief', dark: false },
+      { label: 'Presupuesto Sugerido', value: finalBudget ? (typeof finalBudget === 'number' ? fmtCLP(finalBudget) : String(finalBudget)) : 'A definir', dark: true },
+      { label: 'SEO Score', value: seoDisplay, dark: false },
     ];
 
     const kpiCols = 3;
@@ -2367,48 +2388,66 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     addSectionHeader('11', 'PLANTILLAS DE COPY LISTAS PARA USAR');
 
-    // Meta Ads copies — rendered as proper visual table
+    // Meta Ads copies — use AI-generated creativos if available
     const metaStrategy = (research as any).meta_ads_strategy || research.ads_library_analysis?.meta_ads_strategy;
-    // Use business name from brief (not client name/owner name)
     const businessName = stripEmojis(getResponse('business_pitch')).split(/[.,\n]/)[0].slice(0, 40).trim() || clientInfo?.company || clientInfo?.name || 'Tu Marca';
-    const metaAds = [
-      {
-        title: 'Meta Ad #1 — TOFU (Video Hook)',
-        texto: metaStrategy?.hooks?.[0] || `¿Sabias que el ${marginPct || '60'}% de tus competidores NO tienen este diferencial? ${businessName} si.`,
-        cta: 'Descubre por que',
-        audiencia: 'Cold audience — Lookalike 1-3%',
-      },
-      {
-        title: 'Meta Ad #2 — MOFU (Testimonio)',
-        texto: metaStrategy?.primary_texts?.[0] || `Miles de clientes ya eligieron ${businessName}. CPA optimizado. ROAS garantizado.`,
-        cta: 'Ver testimonios',
-        audiencia: 'Retargeting — visitaron sitio 30d',
-      },
-      {
-        title: 'Meta Ad #3 — BOFU (Oferta)',
-        texto: `Ultima oportunidad. ${getResponse('villain_guarantee').slice(0, 80) || 'Garantia sin preguntas.'}`,
-        cta: 'Comprar ahora',
-        audiencia: 'ATC + ViewContent — ultimos 14 dias',
-      },
-    ];
 
-    // Meta Ads — premium styled cards instead of plain table
+    // Build Meta Ads from AI-generated creativos (not hardcoded)
+    const aiCreativos = metaStrategy?.creativos_recomendados || [];
+    const metaAds = aiCreativos.length > 0
+      ? aiCreativos.slice(0, 5).map((c: any, i: number) => ({
+          title: `Meta Ad #${i + 1} — ${stripEmojis(c.formato || c.format || 'Creativo')}`,
+          texto: stripEmojis(c.copy || c.primary_copy || c.hook || ''),
+          cta: c.cta || 'Ver mas',
+          audiencia: c.audiencia || (i === 0 ? 'Cold audience — Prospecting' : i < 3 ? 'Tibia — Retargeting' : 'Caliente — Remarketing'),
+        }))
+      : [
+          {
+            title: 'Meta Ad #1 — TOFU (Video Hook)',
+            texto: metaStrategy?.hooks?.[0] || `Descubra por que ${businessName} se ha convertido en la primera opcion del mercado.`,
+            cta: 'Descubre por que',
+            audiencia: 'Cold audience — Lookalike 1-3%',
+          },
+          {
+            title: 'Meta Ad #2 — MOFU (Testimonio)',
+            texto: metaStrategy?.primary_texts?.[0] || `Resultados comprobados. ${businessName} ha transformado la experiencia de miles de clientes.`,
+            cta: 'Ver testimonios',
+            audiencia: 'Retargeting — visitaron sitio 30d',
+          },
+          {
+            title: 'Meta Ad #3 — BOFU (Oferta)',
+            texto: metaStrategy?.primary_texts?.[1] || `Oferta exclusiva por tiempo limitado. ${businessName} — sin riesgos, con garantia completa.`,
+            cta: 'Comprar ahora',
+            audiencia: 'ATC + ViewContent — ultimos 14 dias',
+          },
+        ];
+
+    // Meta Ads — premium styled cards with full text
     addSubTitle('Meta Ads — Copies Listos');
     const metaFunnelColors: [number,number,number][] = [
       [27, 42, 74],   // TOFU navy
       [45, 74, 122],  // MOFU mid-blue
       [200, 163, 90], // BOFU gold
+      [22, 120, 80],  // Green
+      [120, 60, 140], // Purple
     ];
     for (let mi = 0; mi < metaAds.length; mi++) {
       const ad = metaAds[mi];
       const mColor = metaFunnelColors[mi % metaFunnelColors.length];
-      checkPage(36);
-      // Card bg
+
+      // Calculate dynamic card height based on text content
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(8.5);
+      const adTextLines = doc.splitTextToSize(stripEmojis(ad.texto), maxWidth - 12);
+      const cardH = 12 + adTextLines.length * 4.5 + 10; // header + text + audiencia
+
+      checkPage(cardH + 4);
+      // Card bg — dynamic height
       doc.setFillColor(250, 250, 254);
-      doc.roundedRect(margin, y, maxWidth, 32, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'F');
       doc.setDrawColor(...mColor);
       doc.setLineWidth(0.5);
-      doc.roundedRect(margin, y, maxWidth, 32, 2, 2, 'S');
+      doc.roundedRect(margin, y, maxWidth, cardH, 2, 2, 'S');
       // Header bar
       doc.setFillColor(...mColor);
       doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
@@ -2421,76 +2460,95 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setFillColor(accentR, accentG, accentB);
       doc.roundedRect(pageWidth - margin - 30, y + 2, 28, 5, 2, 2, 'F');
       doc.setFontSize(6.5);
-      doc.text(ad.cta, pageWidth - margin - 16, y + 5.5, { align: 'center' });
-      // Body text
+      doc.text(String(ad.cta).slice(0, 18), pageWidth - margin - 16, y + 5.5, { align: 'center' });
+      // Body text — ALL lines (no truncation)
       doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 50);
-      const adTextLines = doc.splitTextToSize(stripEmojis(ad.texto), maxWidth - 12);
-      for (let tli = 0; tli < Math.min(adTextLines.length, 3); tli++) {
+      for (let tli = 0; tli < adTextLines.length; tli++) {
         doc.text(adTextLines[tli], margin + 5, y + 14 + tli * 4.5);
       }
       // Audiencia tag
+      const audY = y + 14 + adTextLines.length * 4.5 + 2;
       doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 120);
-      doc.text('Audiencia: ', margin + 5, y + 28);
+      doc.text('Audiencia: ', margin + 5, audY);
       doc.setFont('NotoSans', 'normal');
       doc.setTextColor(60, 60, 70);
-      doc.text(ad.audiencia, margin + 5 + doc.getTextWidth('Audiencia: '), y + 28);
-      y += 35;
+      doc.text(ad.audiencia, margin + 5 + doc.getTextWidth('Audiencia: '), audY);
+      y += cardH + 4;
     }
     y += 4;
 
-    // Google Ads copies — premium styled cards
+    // Google Ads copies — use AI-generated ad_copies if available
     const googleStrategy = (research as any).google_ads_strategy || research.ads_library_analysis?.google_ads_strategy;
     addSubTitle('Google Ads — Copies Listos');
-    checkPage(10 + 3 * 11);
-    const googleAds = [
-      {
-        headline: googleStrategy?.headlines?.[0] || `${businessName.slice(0, 25)} | Oficial`,
-        desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis. ${cpaMaxCLP ? `CPA: ${cpaMaxCLP}.` : ''}`,
-        url: clientInfo?.website_url || 'tusitio.com',
-      },
-      {
-        headline: googleStrategy?.headlines?.[1] || `Compra ${businessName.slice(0, 20)} — Ahora`,
-        desc: googleStrategy?.descriptions?.[1] || `Resultados probados. Miles de clientes satisfechos. Garantia incluida.`,
-        url: clientInfo?.website_url || 'tusitio.com',
-      },
-    ];
+
+    // Build Google Ads from AI ad_copies or fall back to extracted headlines
+    const aiAdCopies = googleStrategy?.ad_copies || [];
+    const googleAds = aiAdCopies.length > 0
+      ? aiAdCopies.slice(0, 5).map((c: any) => ({
+          headline: [c.headline1, c.headline2, c.headline3].filter(Boolean).join(' | '),
+          desc: [c.description1, c.description2].filter(Boolean).join(' '),
+          url: clientInfo?.website_url || 'tusitio.com',
+        }))
+      : [
+          {
+            headline: googleStrategy?.headlines?.[0] || `${businessName.slice(0, 25)} | Oficial`,
+            desc: googleStrategy?.descriptions?.[0] || `Mejor precio garantizado. Envio gratis hoy.`,
+            url: clientInfo?.website_url || 'tusitio.com',
+          },
+          {
+            headline: googleStrategy?.headlines?.[1] || `Compra ${businessName.slice(0, 20)} — Ahora`,
+            desc: googleStrategy?.descriptions?.[1] || `Resultados probados. Miles de clientes satisfechos. Garantia incluida.`,
+            url: clientInfo?.website_url || 'tusitio.com',
+          },
+        ];
     for (let gi2 = 0; gi2 < googleAds.length; gi2++) {
       const gad = googleAds[gi2];
-      checkPage(28);
-      // Card
+      // Dynamic card height
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(8);
+      const descLines = doc.splitTextToSize(stripEmojis(gad.desc), maxWidth - 14);
+      const gCardH = 14 + descLines.length * 4 + 4;
+
+      checkPage(gCardH + 4);
       doc.setFillColor(248, 249, 255);
-      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, 'F');
+      doc.roundedRect(margin, y, maxWidth, gCardH, 2, 2, 'F');
       doc.setDrawColor(brandR, brandG, brandB);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, 'S');
+      doc.roundedRect(margin, y, maxWidth, gCardH, 2, 2, 'S');
       // Google blue accent
       doc.setFillColor(66, 133, 244);
-      doc.rect(margin, y, 3, 24, 'F');
+      doc.rect(margin, y, 3, gCardH, 'F');
       // Headline
       doc.setFont('NotoSans', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(66, 133, 244);
-      doc.text(stripEmojis(gad.headline).slice(0, 40), margin + 7, y + 7);
+      const hText = stripEmojis(gad.headline);
+      const hLines = doc.splitTextToSize(hText, maxWidth - 14);
+      for (let hli = 0; hli < hLines.length; hli++) {
+        doc.text(hLines[hli], margin + 7, y + 7 + hli * 4.5);
+      }
       // URL
+      let descStartY = y + 7 + hLines.length * 4.5 + 1;
       doc.setFont('NotoSans', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(22, 130, 50);
-      doc.text(gad.url.replace(/^https?:\/\//, '').slice(0, 40), margin + 7, y + 12);
-      // Description
+      doc.text((gad.url || '').replace(/^https?:\/\//, '').slice(0, 40), margin + 7, descStartY);
+      descStartY += 5;
+      // Description — ALL lines
       doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(50, 50, 50);
-      const descLines = doc.splitTextToSize(stripEmojis(gad.desc), maxWidth - 14);
-      for (let dli = 0; dli < Math.min(descLines.length, 2); dli++) {
-        doc.text(descLines[dli], margin + 7, y + 17 + dli * 4);
+      for (const dl of descLines) {
+        doc.text(dl, margin + 7, descStartY);
+        descStartY += 4;
       }
-      y += 27;
+      y += gCardH + 4;
     }
-    y += 8;
+    y += 4;
 
     // ─── SECCIÓN: PRESUPUESTO RECOMENDADO (fallback when no budget_and_funnel) ──
     if (!(research as any).budget_and_funnel) {

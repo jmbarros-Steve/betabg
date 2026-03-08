@@ -84,81 +84,158 @@ Responde con JSON válido: { "positioning_strategy": { ... } }`,
   {
     id: 'action_plan',
     keys: ['action_plan'],
-    maxTokens: 7000,
-    prompt: `Genera ÚNICAMENTE la sección "action_plan". Debe contener exactamente 7 accionables estratégicos usando framework SCR.
-Para CADA uno de los 7 accionables:
-- "title": Nombre claro y accionable
-- "situation": La situación actual con datos reales del análisis
-- "complication": Por qué es un problema y qué pasa si NO se actúa
-- "resolution": Qué hacer exactamente — pasos específicos, herramientas, métricas de éxito
-- "priority": "alta", "media" o "baja"
-- "timeline": Tiempo estimado de implementación
-- "expected_impact": Impacto esperado cuantificado
-Los 7 accionables deben cubrir: 1) Branding, 2) Contenido, 3) SEO, 4) Paid media, 5) Conversión/CRO, 6) Retención, 7) Crecimiento
-Cada accionable debe ser ESPECÍFICO al cliente basado en datos reales. NADA genérico.
+    maxTokens: 10000,
+    prompt: `Genera ÚNICAMENTE la sección "action_plan". DEBE contener EXACTAMENTE 7 accionables estratégicos usando framework SCR.
+
+ESTRUCTURA OBLIGATORIA — Para CADA uno de los 7 accionables:
+{
+  "title": "Título claro y accionable (ej: 'Implementar estrategia de contenido SEO para capturar tráfico orgánico')",
+  "situation": "La situación actual con datos REALES del análisis — mínimo 3 oraciones. Cita datos del scraping, comparaciones con competidores, métricas observadas.",
+  "complication": "Por qué es un problema AHORA y qué pasa si NO se actúa — mínimo 3 oraciones. Cuantifica el costo de la inacción.",
+  "resolution": "Qué hacer EXACTAMENTE — mínimo 5 oraciones con: pasos concretos numerados, herramientas específicas, canales, frecuencia, responsable sugerido, métricas de éxito.",
+  "priority": "alta" / "media" / "baja",
+  "timeline": "Tiempo estimado (ej: '2-4 semanas')",
+  "expected_impact": "Impacto cuantificado (ej: '+30% tráfico orgánico en 60 días', 'Reducción CPA de $X a $Y')"
+}
+
+Los 7 accionables DEBEN cubrir estos 7 pilares:
+1) Branding/Identidad — cómo fortalecer la marca
+2) Contenido/Comunicación — qué contenido crear y dónde publicar
+3) SEO/Orgánico — optimizaciones técnicas y de contenido
+4) Paid Media (Meta/Google) — estructura de campañas y creativos
+5) Conversión/CRO — mejoras en sitio web para convertir más
+6) Retención/Email — estrategia de fidelización y lifecycle
+7) Crecimiento/Escalamiento — cómo escalar lo que funciona
+
+CRÍTICO: Cada accionable debe ser ESPECÍFICO al negocio del cliente basado en datos REALES del análisis. NADA genérico. El campo "resolution" debe tener pasos tan detallados que el cliente pueda ejecutarlos mañana.
 Responde con JSON válido: { "action_plan": [...] }`,
   },
   {
     id: 'seo_audit',
     keys: ['seo_audit'],
-    maxTokens: 6000,
+    maxTokens: 8000,
     prompt: `Genera ÚNICAMENTE la sección "seo_audit". Debe incluir:
-a) SCORE SEO (0-100): Calcula basado en datos disponibles. SOLO da 0 si literalmente NO hay ningún dato. Si tienes meta tags, títulos o contenido, analízalos y da un score real con justificación.
-b) Análisis del sitio del CLIENTE: Meta titles y evaluación, Meta descriptions y evaluación, Estructura de headings H1/H2/H3, Contenido (densidad, relevancia), Estructura de URLs, Schema markup (presencia o ausencia)
-c) Análisis SEO COMPARATIVO con los 6 competidores: Para cada competidor con datos: qué hacen bien en SEO que el cliente NO hace, meta tags comparadas, estructura de contenido comparada
-d) Problemas detectados (lista priorizada por impacto)
-e) Acciones prioritarias (lista priorizada con impacto estimado y esfuerzo)
-CRÍTICO: Usa los datos de scraping REALES. Si los competidores tienen mejor SEO, muestra específicamente POR QUÉ.
+
+a) "score" (OBLIGATORIO, número 0-100): Calcula el score SEO sumando estos criterios:
+   - Meta title presente y optimizado (0-15 pts)
+   - Meta description presente y < 160 chars (0-10 pts)
+   - H1 único y relevante (0-10 pts)
+   - Estructura de headings H2/H3 (0-10 pts)
+   - Contenido de calidad y extensión (0-15 pts)
+   - URLs amigables y descriptivas (0-10 pts)
+   - Schema markup implementado (0-10 pts)
+   - Velocidad estimada por plataforma (0-10 pts)
+   - Mobile-friendly (0-5 pts)
+   - Internal linking (0-5 pts)
+   NUNCA pongas 0 si hay datos de scraping. Evalúa lo que hay y da un score REAL con justificación.
+   "score_justification": explica cómo calculaste cada punto.
+
+b) "analisis_cliente": Para el sitio del cliente analiza con DATOS REALES del scraping:
+   - "meta_titles": { "detectado": "el title real", "evaluacion": "bueno/regular/malo y por qué", "mejora": "sugerencia específica" }
+   - "meta_descriptions": { "detectado": "la description real", "evaluacion": "...", "mejora": "..." }
+   - "headings": { "h1_detectado": "el H1 real", "evaluacion": "...", "mejora": "..." }
+   - "contenido": { "evaluacion": "análisis de calidad/extensión", "fortalezas": "...", "mejora": "..." }
+   - "urls": { "evaluacion": "...", "mejora": "..." }
+   - "schema": { "presente": true/false, "mejora": "..." }
+
+c) "analisis_competidores": Comparación SEO con CADA competidor que tenga datos. Para cada uno: qué hacen MEJOR en SEO y qué puede aprender el cliente.
+
+d) "problemas_detectados": Array de objetos [{ "problema": "...", "impacto": "alto/medio/bajo", "solucion": "paso a paso específico" }]. Mínimo 5 problemas.
+
+e) "acciones_prioritarias": Array de objetos [{ "accion": "...", "impacto_esperado": "ej: +20% tráfico orgánico", "plazo": "ej: 2 semanas", "esfuerzo": "bajo/medio/alto" }]. Mínimo 5 acciones.
+
+CRÍTICO: El score NO puede ser 0 ni N/D si hay cualquier dato de scraping. Analiza todo lo disponible.
 Responde con JSON válido: { "seo_audit": { ... } }`,
   },
   {
     id: 'keywords',
     keys: ['keywords'],
-    maxTokens: 5000,
+    maxTokens: 7000,
     prompt: `Genera ÚNICAMENTE la sección "keywords". Debe incluir:
-a) "primary_keywords": 5-6 keywords principales. Para cada una: keyword, search_intent (transaccional/informacional/comercial/navegacional), rationale (por qué es estratégica, qué competidores la usan), estimated_difficulty (alta/media/baja), priority (invertir inmediatamente o monitorear)
-b) "longtail_keywords": 5 keywords long-tail de baja competencia. Para cada una: keyword, search_intent, rationale (gaps que los competidores NO cubren), buyer_persona_match
-c) "negative_keywords": 3 keywords negativas para ads. Para cada una: keyword, reason
+
+a) "primary_keywords": 8-10 keywords principales (NO genéricas — específicas al nicho del cliente). Para cada una:
+   - "keyword": la keyword exacta como la buscaría un usuario en Google
+   - "search_intent": "transaccional" / "informacional" / "comercial" / "navegacional"
+   - "rationale": por qué es estratégica + qué competidores ya la usan + estimación de volumen mensual
+   - "estimated_difficulty": "alta" / "media" / "baja" con justificación
+   - "priority": "invertir inmediatamente" / "monitorear" / "ataque a largo plazo"
+   - "accion_concreta": QUÉ HACER exactamente con esta keyword (ej: "Crear landing page optimizada con esta keyword en H1 y meta title")
+
+b) "longtail_keywords": 8 keywords long-tail de baja competencia. Para cada una:
+   - "keyword": frase exacta 3-5 palabras
+   - "search_intent", "rationale": gaps que los competidores NO cubren
+   - "buyer_persona_match": a qué etapa del journey corresponde
+   - "contenido_sugerido": qué tipo de contenido crear (blog post, landing, FAQ, etc.)
+
+c) "negative_keywords": 5 keywords negativas para ads con razón detallada de por qué excluirlas
+
 d) "keyword_strategy_roadmap": Hoja de ruta por fases:
-   - phase_1 (mes 1-2): Quick wins — keywords fáciles con acciones rápidas
-   - phase_2 (mes 3-4): Growth — keywords de dificultad media
-   - phase_3 (mes 5-6): Dominance — keywords competitivas a largo plazo
-   Para cada fase: keywords objetivo, acciones concretas, KPIs
-Las keywords DEBEN estar basadas en el análisis real del contenido de los competidores.
+   - "phase_1" (mes 1-2): Quick wins — keywords fáciles de posicionar
+     - "focus": descripción del enfoque
+     - "keywords": array de keywords objetivo
+     - "acciones_concretas": array de pasos específicos (ej: "Optimizar meta title de homepage con [keyword]")
+     - "kpis": array de métricas medibles
+     - "timeline": "Mes 1-2"
+   - "phase_2" (mes 3-4): Growth — keywords de dificultad media
+   - "phase_3" (mes 5-6): Dominance — keywords competitivas
+
+CRÍTICO: Las keywords deben ser REALES y ESPECÍFICAS al negocio del cliente basadas en el scraping. NO pongas keywords genéricas como "comprar online" o "mejor producto". Usa el contenido de los competidores para identificar oportunidades.
 Responde con JSON válido: { "keywords": { ... } }`,
   },
   {
     id: 'meta_ads_strategy',
     keys: ['meta_ads_strategy'],
-    maxTokens: 5000,
-    prompt: `Genera ÚNICAMENTE la sección "meta_ads_strategy". Debe incluir:
-a) Objetivos de campaña recomendados por etapa de funnel
-b) Estructura de campañas: TOF (objetivo, audiencia, contenido), MOF (objetivo, retargeting, contenido), BOF (objetivo, audiencia, contenido)
-c) Segmentación de audiencias: fría (intereses, demografía, lookalikes), tibia (visitantes, engagement), caliente (remarketing, carrito abandonado)
-d) Creativos recomendados: 3 hooks creativos ESPECÍFICOS para el cliente (no genéricos), formato para cada uno (video, carrusel, imagen), copy de ejemplo, CTA recomendado
-e) Budget y distribución recomendada por funnel (ej: 60% TOF, 25% MOF, 15% BOF)
-f) KPIs objetivo por etapa de funnel
-Los hooks y creativos deben ser ESPECÍFICOS al negocio del cliente basados en su propuesta de valor.
+    maxTokens: 7000,
+    prompt: `Genera ÚNICAMENTE la sección "meta_ads_strategy". DEBE ser 100% PERSONALIZADA al negocio del cliente (usa nombre de marca, productos, propuesta de valor real).
+
+a) "objetivos_campana": Objetivos por etapa del funnel:
+   - "tofu": { "meta": "objetivo específico", "estrategia": "detallada para ESTE cliente", "formato": "video/reels/carrusel", "presupuesto_pct": 40 }
+   - "mofu": { "meta": "...", "estrategia": "...", "formato": "...", "presupuesto_pct": 30 }
+   - "bofu": { "meta": "...", "estrategia": "...", "formato": "...", "presupuesto_pct": 30 }
+
+b) "audiencias": Array de 5+ audiencias ESPECÍFICAS al nicho:
+   [{ "nombre": "nombre descriptivo", "tipo": "fría/tibia/caliente", "descripcion": "segmentación exacta con intereses, demografía y comportamientos REALES para este nicho", "tamaño_estimado": "500K-1M" }]
+
+c) "creativos_recomendados": 5 creativos ESPECÍFICOS (NO genéricos). Para cada uno:
+   - "hook": frase de apertura LISTA PARA USAR basada en el dolor real del buyer persona
+   - "formato": "Video 15s / Reels / Carrusel / Imagen estática / UGC"
+   - "copy": texto COMPLETO del anuncio listo para copiar y pegar (mínimo 3 oraciones)
+   - "cta": CTA específico
+   - "por_que_funciona": justificación basada en datos del análisis
+
+d) "kpis_objetivo": KPIs por etapa con números CALCULADOS basados en el margen del cliente:
+   - "tofu": { "cpm": "$X-$X USD", "ctr": ">X%", "cpc": "<$X" }
+   - "mofu": { "ctr": ">X%", "engagement_rate": ">X%" }
+   - "bofu": { "roas": "Xx", "cpa": "<$X CLP", "cvr": ">X%" }
+
+e) "presupuesto_sugerido": { "total": número CLP, "tofu": número, "mofu": número, "bofu": número, "justificacion": "por qué este monto para este cliente" }
+
+CRÍTICO: Los copies y hooks deben mencionar el PRODUCTO/SERVICIO real del cliente. NUNCA uses hooks genéricos como "¿Cansado de X?". Basa todo en los datos del brief y scraping.
 Responde con JSON válido: { "meta_ads_strategy": { ... } }`,
   },
   {
     id: 'google_ads_and_creative',
     keys: ['google_ads_strategy', 'ads_library_analysis'],
-    maxTokens: 7000,
+    maxTokens: 10000,
     prompt: `Genera ÚNICAMENTE estas 2 secciones en un solo JSON:
-1. "google_ads_strategy": Estrategia de Google Ads con:
-   - Tipos de campaña recomendados (Search, Display, YouTube, Performance Max)
-   - Copy de anuncios: 3 variantes de Search Ads con headlines (máx 30 chars) y descriptions (máx 90 chars)
-   - Extensiones recomendadas (sitelinks, callouts, structured snippets)
-   - Estrategia de bidding con justificación
-   - Budget recomendado por tipo de campaña
-   - Landing page recommendations
-2. "ads_library_analysis": Análisis de estrategia publicitaria competitiva con:
-   a) Para CADA competidor: tipo de mensajes que usan, propuesta de valor que promueven, CTAs detectados en su sitio, ángulos de venta, fortaleza creativa estimada (alta/media/baja)
-   b) Patrones creativos del mercado: qué contenido domina, mensajes comunes, formatos probables
-   c) 5 conceptos creativos para el cliente. Para CADA uno: concept, hook, format (video/carrusel/imagen/UGC), primary_copy, cta, why_it_works, platform (Meta/Google/ambos)
-   d) Calendario creativo mensual: semana 1-2 y semana 3-4 qué lanzar, qué variables testear
-CRÍTICO: ads_library_analysis NO PUEDE estar vacía.
+
+1. "google_ads_strategy": Estrategia COMPLETA de Google Ads:
+   - "campaign_types": Array de 4+ tipos de campaña [{ "type": "Search/Shopping/PMax/Display/YouTube", "objetivo": "...", "presupuesto_pct": X, "prioridad": "inmediata/alta/media" }]
+   - "ad_copies": 5 variantes de Search Ads COMPLETAS (no cortadas). Para cada una:
+     { "variant": 1, "headline1": "máx 30 chars", "headline2": "máx 30 chars", "headline3": "máx 30 chars", "description1": "máx 90 chars - TEXTO COMPLETO", "description2": "máx 90 chars - TEXTO COMPLETO" }
+     Los headlines y descriptions deben ser ESPECÍFICOS al negocio del cliente.
+   - "extensions": Array de 4+ extensiones [{ "type": "Sitelink/Callout/Structured Snippet/Price", "content": "texto específico", "url": "página destino sugerida" }]
+   - "bidding_strategy": { "fase_1": "Manual CPC - justificación", "fase_2": "tROAS cuando X conv/mes", "fase_3": "Maximize conversions", "justificacion": "..." }
+   - "landing_page_recommendations": Array de 3+ recomendaciones específicas para mejorar landing pages
+
+2. "ads_library_analysis": Análisis publicitario COMPLETO:
+   a) "competitor_analysis": Para CADA competidor [{ "name": "...", "mensajes": "tipo de mensajes que usan", "propuesta_valor": "...", "ctas": ["CTA1", "CTA2"], "angulos_venta": "...", "fortaleza_creativa": "alta/media/baja" }]
+   b) "market_patterns": { "dominant_content": "...", "common_messages": "...", "probable_formats": "..." }
+   c) "creative_concepts": 5 conceptos creativos COMPLETOS. Para CADA uno:
+      { "nombre": "nombre del concepto", "hook": "frase de apertura de 3 seg LISTA PARA USAR", "formato": "Video/Carrusel/Imagen/UGC", "copy": "TEXTO COMPLETO del anuncio — mínimo 4-5 oraciones, listo para copiar y pegar directamente en Meta/Google. NO lo cortes.", "cta": "CTA específico", "why_it_works": "justificación basada en datos", "platform": "Meta/Google/ambos" }
+   d) "creative_calendar": { "week_1_2": { "launch": "qué lanzar", "test_variables": ["variable1", "variable2"] }, "week_3_4": { ... } }
+
+CRÍTICO: Los copies en creative_concepts deben ser COMPLETOS (4-5 oraciones mínimo), NO cortados. Específicos al negocio del cliente.
 Responde con JSON válido: { "google_ads_strategy": { ... }, "ads_library_analysis": { ... } }`,
   },
   {
@@ -385,7 +462,21 @@ export async function analyzeBrandStrategy(c: Context) {
     // ══════════════════════════════════════════════
     //  12 LLAMADAS EN 3 OLEADAS (rate limit friendly)
     // ══════════════════════════════════════════════
-    const fullSystemBase = `Eres un estratega de marketing digital experto en e-commerce LATAM.\n\nREGLA DE PRIORIDAD: Si hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n${knowledgeContext ? `\nREGLAS APRENDIDAS (aplicar obligatoriamente):\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
+    // Include client financial data in context for all sections
+    const clientFinancials = researchData.client?.brief ? (() => {
+      const brief = typeof researchData.client.brief === 'string' ? researchData.client.brief : JSON.stringify(researchData.client.brief);
+      const priceMatch = brief.match(/(?:precio|ticket|venta)[^$\d]*[\$]?\s*([\d.,]+)/i);
+      const costMatch = brief.match(/(?:costo|cost)[^$\d]*[\$]?\s*([\d.,]+)/i);
+      const price = priceMatch ? parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      const cost = costMatch ? parseFloat(costMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+      const margin = price > 0 ? price - cost : 0;
+      const marginPct = price > 0 ? ((margin / price) * 100).toFixed(1) : '0';
+      const cpaMax = margin > 0 ? (margin * 0.3).toFixed(0) : '0';
+      return price > 0 ? `\nDATOS FINANCIEROS DEL CLIENTE: Precio promedio: $${price} CLP, Costo: $${cost} CLP, Margen bruto: $${margin} CLP (${marginPct}%), CPA máximo viable: $${cpaMax} CLP` : '';
+    })() : '';
+    const budgetContext = presupuesto_ads ? `\nPRESUPUESTO MENSUAL ADS: ${presupuesto_ads}` : '';
+
+    const fullSystemBase = `Eres un estratega senior de marketing digital con 15+ años de experiencia en e-commerce LATAM. Tu análisis debe ser de nivel McKinsey/BCG — datos concretos, cálculos reales, recomendaciones específicas.\n\nREGLA DE PRIORIDAD: Si hay conflicto entre reglas, priorizar las de orden más alto (más recientes). Las reglas con orden 99 son las más actualizadas y deben prevalecer.\n\nREGLA CRÍTICA DE REDACCIÓN: NUNCA copies texto del cliente verbatim. Reescribe TODO en tercera persona profesional. Transforma respuestas coloquiales en análisis estratégico. NO uses placeholders como [X] o N/D — calcula o estima con los datos disponibles.${clientFinancials}${budgetContext}\n${knowledgeContext ? `\nREGLAS APRENDIDAS (aplicar obligatoriamente):\n${knowledgeContext}` : ''}${bugsContext ? `\nERRORES A EVITAR:\n${bugsContext}` : ''}${phaseSection}`;
 
     const wave1 = SECTIONS.slice(0, 4);   // secciones 1-4
     const wave2 = SECTIONS.slice(4, 8);   // secciones 5-8

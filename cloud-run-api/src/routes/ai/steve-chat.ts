@@ -338,12 +338,15 @@ GENERA EL BRIEF ESTRATÉGICO COMPLETO. ESTE DOCUMENTO SERÁ DESCARGADO COMO PDF 
 
 REGLAS DE REDACCIÓN:
 0. EMPIEZA DIRECTAMENTE CON "## 1. RESUMEN EJECUTIVO" — SIN preámbulo, SIN texto introductorio.
-1. TODO en TERCERA PERSONA PROFESIONAL.
+1. TODO en TERCERA PERSONA PROFESIONAL. NUNCA uses "tú", "tu marca", "tu negocio". Usa "la empresa", "la marca", "el cliente".
 2. TONO McKinsey/BCG — Documento de consultoría estratégica de primer nivel.
 3. CERO emojis, CERO jerga perruna.
-4. DATOS CONCRETOS: métricas, porcentajes, benchmarks de industria.
+4. DATOS CONCRETOS: métricas, porcentajes, benchmarks de industria. CALCULA todos los números (margen, CPA, ROAS) con los datos financieros del cliente.
 5. COMPARACIÓN con la competencia en CADA sección relevante.
 6. FRAMEWORKS: Sección 7 usa SCR (Situación→Complicación→Resolución). Secciones 8,9,10,11 usan MECE (Hallazgo→Recomendación→Justificación→KPI).
+7. REDACCIÓN PROFESIONAL OBLIGATORIA: Reescribe TODAS las respuestas del cliente con lenguaje ejecutivo. Transforma coloquialismos en análisis estratégico. NO copies frases textuales.
+8. PROFUNDIDAD: Cada sección debe tener MÍNIMO 2-3 párrafos sustanciales. Las recomendaciones deben ser ESPECÍFICAS al negocio (nombres de herramientas, canales concretos, cifras calculadas).
+9. Los 7 ACCIONABLES de la sección 7 son TODOS OBLIGATORIOS. Cada uno con S, C, R e Impacto COMPLETOS (mínimo 3 oraciones cada campo).
 
 FORMATO (headers markdown ##):
 
@@ -1144,8 +1147,20 @@ REGLAS ABSOLUTAS:
     }).join('\n\n');
 
     // Minimal system prompt for brief generation -- skip personality, knowledge, bugs
-    const briefSystemPrompt = `Eres un consultor de marketing estratégico generando un Brief Estratégico profesional para un cliente.
-Idioma: Español latinoamericano. Tono: McKinsey/BCG.
+    const briefSystemPrompt = `Eres un consultor senior de marketing estratégico de una firma top (McKinsey/BCG) generando un Brief Estratégico profesional.
+Idioma: Español latinoamericano. Tono: Ejecutivo, formal, estratégico.
+
+REGLAS ABSOLUTAS DE REDACCIÓN:
+1. NUNCA copies ni pegues las palabras textuales del cliente. SIEMPRE reescribe profesionalmente en tercera persona.
+   - MAL: "Vendemos cremas naturales para mujeres que quieren verse bien"
+   - BIEN: "La empresa comercializa una línea de cosmética natural orientada al segmento femenino premium, con foco en ingredientes orgánicos y resultados visibles"
+2. Transforma respuestas coloquiales del cliente en análisis estratégico formal.
+3. Infiere insights que el cliente no mencionó explícitamente pero que se deducen de sus datos.
+4. TODOS los números financieros deben estar calculados (margen, CPA, ROAS) — NO dejes placeholders [X].
+5. Los 7 accionables de la sección 7 son OBLIGATORIOS y COMPLETOS. Cada uno DEBE tener S, C, R e Impacto con datos reales.
+6. CADA sección debe tener mínimo 2 párrafos sustanciales. Nada de respuestas de 1 línea.
+7. Las tablas deben tener datos REALES calculados, no "[X]" ni "N/D".
+8. Las keywords, copies y recomendaciones deben ser ESPECÍFICAS al negocio del cliente.
 ${phaseContext}
 ${questionContext}`;
 
