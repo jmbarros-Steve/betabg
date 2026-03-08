@@ -1819,11 +1819,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         doc.setTextColor(255, 255, 255);
         let valSize = 22;
         doc.setFontSize(valSize);
-        while (valSize > 10 && doc.getTextWidth(kpi.value) > kpiW - 6) {
+        let valText = kpi.value;
+        while (valSize > 8 && doc.getTextWidth(valText) > kpiW - 6) {
           valSize -= 1;
           doc.setFontSize(valSize);
         }
-        doc.text(kpi.value, kx + kpiW / 2, ky + 16, { align: 'center' });
+        // If still too wide at min size, truncate with ellipsis
+        if (doc.getTextWidth(valText) > kpiW - 6) {
+          while (valText.length > 5 && doc.getTextWidth(valText + '...') > kpiW - 6) {
+            valText = valText.slice(0, -1);
+          }
+          valText = valText.trim() + '...';
+        }
+        doc.text(valText, kx + kpiW / 2, ky + 16, { align: 'center' });
         // Label
         doc.setFontSize(7.5);
         doc.setFont('NotoSans', 'normal');
@@ -2449,9 +2457,43 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
       safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, pdfActionPlanItems!));
     } else if (actionPlanData && (actionPlanData as any)._repair_failed) {
+      // Try to extract action items from raw_text using regex
       safePdfRender('Plan de Accion', () => {
         addSectionHeader('E', 'PLAN DE ACCION ESTRATEGICO');
-        addBody('Los datos del plan de accion se generaron parcialmente. Contacta al equipo para regenerar esta seccion.', 0, 5);
+        const rawText = String(actionPlanData.raw_text || '');
+        // Try to extract individual objects like {"title": "...", ...}
+        const itemMatches = rawText.match(/\{[^{}]*"title"\s*:\s*"[^"]+[^{}]*\}/g);
+        if (itemMatches && itemMatches.length > 0) {
+          const extracted: any[] = [];
+          for (const m of itemMatches) {
+            try { extracted.push(JSON.parse(m)); } catch {
+              try { extracted.push(JSON.parse(m + '}')); } catch {}
+            }
+          }
+          if (extracted.length > 0) {
+            renderActionPlan(pdfCtx, pdfHelpers, extracted);
+            return;
+          }
+        }
+        // Fallback: try section 7 from summary
+        const summaryRaw = briefData?.summary || '';
+        const sec7Match = summaryRaw.match(/##\s*7[\.\s]/);
+        if (sec7Match && sec7Match.index !== undefined) {
+          const sec7Text = summaryRaw.slice(sec7Match.index);
+          const lines = sec7Text.split('\n').filter((l: string) => l.trim()).slice(0, 30);
+          for (const line of lines) {
+            const cleanLine = line.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim();
+            if (cleanLine.length > 5) {
+              if (/^(Accionable|\d+[\.\)])/.test(cleanLine)) {
+                addSubTitle(cleanLine);
+              } else {
+                addBody(cleanLine, 0, 4.5);
+              }
+            }
+          }
+        } else {
+          addBody('Los datos del plan de accion se generaron parcialmente. Regenera el brief para obtener el plan completo.', 0, 5);
+        }
       });
     } else {
       safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, actionPlanData));
@@ -3606,8 +3648,29 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   {parsedActionPlan && parsedActionPlan.length > 0 ? (
                     <StructuredAccionables items={parsedActionPlan} />
                   ) : (() => {
+                    // Try to extract from raw_text of action_plan even if JSON parse failed
+                    if (rawActionPlan?._repair_failed && rawActionPlan?.raw_text) {
+                      const rawText = String(rawActionPlan.raw_text);
+                      // Try to extract individual items with regex
+                      const titleMatches = rawText.match(/"title"\s*:\s*"([^"]+)"/g);
+                      if (titleMatches && titleMatches.length > 0) {
+                        const items: any[] = [];
+                        const itemBlocks = rawText.match(/\{[^{}]*"title"\s*:\s*"[^"]+[^{}]*/g) || [];
+                        for (const block of itemBlocks) {
+                          const title = block.match(/"title"\s*:\s*"([^"]+)"/)?.[1] || '';
+                          const priority = block.match(/"priority"\s*:\s*"([^"]+)"/)?.[1] || '';
+                          const timeline = block.match(/"timeline"\s*:\s*"([^"]+)"/)?.[1] || '';
+                          const situation = block.match(/"situation"\s*:\s*"([^"]+)"/)?.[1] || '';
+                          const resolution = block.match(/"resolution"\s*:\s*"([^"]+)"/)?.[1] || '';
+                          if (title) items.push({ title, priority, timeline, situation, resolution });
+                        }
+                        if (items.length > 0) {
+                          return <StructuredAccionables items={items} />;
+                        }
+                      }
+                    }
                     const raw = briefData?.summary || '';
-                    const section7Match = raw.match(/##\s*7[\.\s]/);
+                    const section7Match = raw.match(/##\s*7[\.\s]/) || raw.match(/##\s*(Evaluaci|Accionable|Plan de Acci)/i);
                     if (!section7Match || section7Match.index === undefined) {
                       return (
                         <p className="text-sm text-muted-foreground italic">La evaluacion estrategica se generara al completar el brief.</p>
@@ -4521,11 +4584,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                             <div className="space-y-2">
                               {Object.entries((research.positioning_strategy as any).mapa_perceptual.posiciones).map(([key, val]: [string, any]) => (
                                 <div key={key} className="flex items-center gap-3 text-xs bg-background rounded p-2 border border-border">
-                                  <Badge variant="outline" className="text-[10px] capitalize">{key}</Badge>
-                                  {(val.x || val.posicion_x || val.score_x) && (val.y || val.posicion_y || val.score_y) ? (
-                                    <span className="text-muted-foreground">({val.x || val.posicion_x || val.score_x}, {val.y || val.posicion_y || val.score_y})</span>
-                                  ) : null}
-                                  <span className="flex-1">{val.descripcion || safeText(val)}</span>
+                                  <Badge variant="outline" className="text-[10px] capitalize">{key.replace(/_/g, ' ')}</Badge>
+                                  {typeof val === 'string' ? (
+                                    <span className="flex-1">{val}</span>
+                                  ) : (
+                                    <>
+                                      {(val.x || val.posicion_x || val.score_x) && (val.y || val.posicion_y || val.score_y) ? (
+                                        <span className="text-muted-foreground">({val.x || val.posicion_x || val.score_x}, {val.y || val.posicion_y || val.score_y})</span>
+                                      ) : null}
+                                      <span className="flex-1">{val.descripcion || val.description || (typeof val === 'object' ? Object.entries(val).filter(([,v]) => v != null && String(v).trim()).map(([k,v]) => `${k}: ${v}`).join(' | ') : safeText(val))}</span>
+                                    </>
+                                  )}
                                 </div>
                               ))}
                             </div>

@@ -301,11 +301,27 @@ export function renderPositioningStrategy(
     if (mp.eje_y) helpers.addKeyValue('Eje Y', String(mp.eje_y));
     if (mp.posiciones && typeof mp.posiciones === 'object') {
       for (const [brand, pos] of Object.entries(mp.posiciones as Record<string, any>)) {
+        const brandLabel = brand.charAt(0).toUpperCase() + brand.slice(1).replace(/_/g, ' ');
+        if (typeof pos === 'string') {
+          if (pos.trim()) helpers.addKeyValue(brandLabel, pos);
+          continue;
+        }
+        if (typeof pos !== 'object' || pos === null) continue;
         const px = pos.x || pos.posicion_x || pos.score_x || '';
         const py = pos.y || pos.posicion_y || pos.score_y || '';
-        const coords = px && py ? `(${px}, ${py}) — ` : '';
-        helpers.addKeyValue(brand.charAt(0).toUpperCase() + brand.slice(1),
-          `${coords}${pos.descripcion || ''}`);
+        const desc = pos.descripcion || pos.description || '';
+        const coords = px && py ? `(${px}, ${py})` : '';
+        const value = [coords, desc].filter(Boolean).join(' — ');
+        if (value.trim()) {
+          helpers.addKeyValue(brandLabel, value);
+        } else {
+          // Show all available fields
+          const parts: string[] = [];
+          for (const [k, v] of Object.entries(pos)) {
+            if (v != null && String(v).trim()) parts.push(`${k}: ${String(v)}`);
+          }
+          if (parts.length > 0) helpers.addKeyValue(brandLabel, parts.join(' | '));
+        }
       }
     }
   }
@@ -643,19 +659,21 @@ export function renderKeywordPhases(
     if (Array.isArray(phase.keywords) && phase.keywords.length > 0) {
       // Keywords as inline badges
       doc.setFillColor(...style.bg);
-      const kwText = 'Keywords: ' + phase.keywords.join(', ');
-      const kwLines = doc.splitTextToSize(kwText, maxWidth - 12);
-      const kwBoxH = kwLines.length * 4.5 + 5;
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(7.5);
+      const kwContent = phase.keywords.join(', ');
+      const kwContentLines = doc.splitTextToSize(kwContent, maxWidth - 30);
+      const kwBoxH = kwContentLines.length * 4.5 + 8;
       doc.roundedRect(margin, y, maxWidth, kwBoxH, 1, 1, 'F');
       doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(...style.color);
-      doc.text('Keywords:', margin + 4, y + 4);
+      doc.text('Keywords:', margin + 4, y + 5);
       doc.setFont('NotoSans', 'normal');
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(40, 40, 50);
-      for (let kli = 0; kli < kwLines.length; kli++) {
-        doc.text(kwLines[kli], margin + 4, y + 4 + kli * 4.5);
+      for (let kli = 0; kli < kwContentLines.length; kli++) {
+        doc.text(kwContentLines[kli], margin + 24, y + 5 + kli * 4.5);
       }
       y += kwBoxH + 2;
       helpers.setY(y);
@@ -664,15 +682,20 @@ export function renderKeywordPhases(
       helpers.checkPage(8);
       y = helpers.getY();
       doc.setFillColor(248, 248, 252);
-      const kpiText = 'KPIs: ' + phase.kpis.join(', ');
-      const kpiLines = doc.splitTextToSize(kpiText, maxWidth - 12);
-      const kpiBoxH = kpiLines.length * 4.5 + 4;
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(7.5);
+      const kpiContent = phase.kpis.join(', ');
+      const kpiLines = doc.splitTextToSize(kpiContent, maxWidth - 24);
+      const kpiBoxH = kpiLines.length * 4.5 + 6;
       doc.roundedRect(margin, y, maxWidth, kpiBoxH, 1, 1, 'F');
       doc.setFont('NotoSans', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 100, 120);
+      doc.text('KPIs:', margin + 4, y + 5);
+      doc.setFont('NotoSans', 'normal');
+      doc.setTextColor(60, 60, 70);
       for (let kli = 0; kli < kpiLines.length; kli++) {
-        doc.text(kpiLines[kli], margin + 4, y + 4 + kli * 4.5);
+        doc.text(kpiLines[kli], margin + 18, y + 5 + kli * 4.5);
       }
       y += kpiBoxH + 2;
       helpers.setY(y);
