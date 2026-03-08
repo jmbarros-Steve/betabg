@@ -80,6 +80,35 @@ function safeText(val: any): string {
   return text;
 }
 
+// Extract JSON objects from truncated raw_text using bracket-counting
+function parsePartialJsonArray(raw: string): any[] {
+  const arrStart = raw.indexOf('[');
+  if (arrStart < 0) return [];
+  const s = raw.slice(arrStart + 1);
+  const items: any[] = [];
+  let depth = 0;
+  let current = '';
+  let inString = false;
+  let escaped = false;
+  for (const ch of s) {
+    if (escaped) { current += ch; escaped = false; continue; }
+    if (ch === '\\') { current += ch; escaped = true; continue; }
+    if (ch === '"') { inString = !inString; current += ch; continue; }
+    if (inString) { current += ch; continue; }
+    if (ch === '{') depth++;
+    if (ch === '}') depth--;
+    current += ch;
+    if (depth === 0 && current.trim().length > 2) {
+      const cleaned = current.trim().replace(/^,/, '').trim();
+      if (cleaned.startsWith('{')) {
+        try { items.push(JSON.parse(cleaned)); } catch { /* skip incomplete */ }
+      }
+      current = '';
+    }
+  }
+  return items;
+}
+
 // Parse SCR fields from accionable block text
 function parseSCRBlock(text: string): { title: string; S: string; C: string; R: string; impacto: string } {
   const clean = (s: string) => s.replace(/\*\*/g, '').replace(/^#+\s*/, '').trim();
@@ -1858,7 +1887,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     // Use AI-generated executive summary if available, otherwise fall back to template
     const aiExecSummary = (research as any).executive_summary?.executive_summary || (research as any).executive_summary;
-    const hasAiExec = aiExecSummary && typeof aiExecSummary === 'object' && !aiExecSummary.summary;
+    const hasAiExec = aiExecSummary && typeof aiExecSummary === 'object' &&
+      (aiExecSummary.situacion_actual || aiExecSummary.posicion_competitiva || aiExecSummary.oportunidades_detectadas || aiExecSummary.amenazas_identificadas || aiExecSummary.recomendaciones_priorizadas || !aiExecSummary.summary);
 
     if (hasAiExec) {
       // Render AI-generated executive summary as flowing content blocks
@@ -1866,22 +1896,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
       // Extract key sections from AI executive summary (flexible key names)
       const situacion = aiExecSummary.situacion_actual || aiExecSummary.current_situation || aiExecSummary.situacion || '';
-      const oportunidades = aiExecSummary.oportunidades || aiExecSummary.opportunities || [];
-      const amenazas = aiExecSummary.amenazas || aiExecSummary.threats || [];
-      const recomendaciones = aiExecSummary.recomendaciones || aiExecSummary.recommendations || aiExecSummary.top_recommendations || [];
+      const oportunidades = aiExecSummary.oportunidades_detectadas || aiExecSummary.oportunidades || aiExecSummary.opportunities || [];
+      const amenazas = aiExecSummary.amenazas_identificadas || aiExecSummary.amenazas || aiExecSummary.threats || [];
+      const recomendaciones = aiExecSummary.recomendaciones_priorizadas || aiExecSummary.recomendaciones || aiExecSummary.recommendations || aiExecSummary.top_recommendations || [];
       const posicion = aiExecSummary.posicion_competitiva || aiExecSummary.competitive_position || '';
 
       if (situacion) execSections.push({ title: 'SITUACION ACTUAL', content: typeof situacion === 'string' ? situacion : JSON.stringify(situacion) });
-      if (posicion) execSections.push({ title: 'POSICION COMPETITIVA', content: typeof posicion === 'string' ? posicion : JSON.stringify(posicion) });
+      if (posicion) {
+        if (typeof posicion === 'string') {
+          execSections.push({ title: 'POSICION COMPETITIVA', content: posicion });
+        } else if (typeof posicion === 'object') {
+          // Flatten object into readable text
+          const parts: string[] = [];
+          for (const [pk, pv] of Object.entries(posicion)) {
+            if (Array.isArray(pv)) parts.push(`${pk.replace(/_/g, ' ')}: ${(pv as any[]).slice(0, 3).join('; ')}`);
+            else if (pv) parts.push(`${pk.replace(/_/g, ' ')}: ${String(pv)}`);
+          }
+          if (parts.length > 0) execSections.push({ title: 'POSICION COMPETITIVA', content: parts.join('. ') });
+        }
+      }
 
       if (Array.isArray(oportunidades) && oportunidades.length > 0) {
-        execSections.push({ title: 'OPORTUNIDADES', content: oportunidades.slice(0, 3).map((o: any) => typeof o === 'string' ? o : o.description || o.titulo || JSON.stringify(o)).join('. ') });
+        execSections.push({ title: 'OPORTUNIDADES', content: oportunidades.slice(0, 3).map((o: any) => typeof o === 'string' ? o : o.oportunidad || o.description || o.titulo || JSON.stringify(o)).join('. ') });
       }
       if (Array.isArray(amenazas) && amenazas.length > 0) {
-        execSections.push({ title: 'AMENAZAS', content: amenazas.slice(0, 3).map((a: any) => typeof a === 'string' ? a : a.description || a.titulo || JSON.stringify(a)).join('. ') });
+        execSections.push({ title: 'AMENAZAS', content: amenazas.slice(0, 3).map((a: any) => typeof a === 'string' ? a : a.amenaza || a.description || a.titulo || JSON.stringify(a)).join('. ') });
       }
       if (Array.isArray(recomendaciones) && recomendaciones.length > 0) {
-        execSections.push({ title: 'RECOMENDACIONES TOP', content: recomendaciones.slice(0, 3).map((r: any) => typeof r === 'string' ? r : r.description || r.titulo || r.recommendation || JSON.stringify(r)).join('. ') });
+        execSections.push({ title: 'RECOMENDACIONES TOP', content: recomendaciones.slice(0, 3).map((r: any) => typeof r === 'string' ? r : r.recomendacion || r.description || r.titulo || r.recommendation || JSON.stringify(r)).join('. ') });
       }
 
       // If no structured sections were extracted, try to render the raw object keys
@@ -2450,8 +2492,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         pdfActionPlanItems = Array.isArray(parsed) ? parsed
           : Array.isArray(parsed?.action_plan) ? parsed.action_plan : null;
       } catch {
-        const match = actionPlanData.raw_text.match(/\[[\s\S]+/);
-        if (match) try { pdfActionPlanItems = JSON.parse(match[0].replace(/,\s*$/, '') + ']'); } catch {}
+        // Use bracket-counting parser for truncated JSON
+        pdfActionPlanItems = parsePartialJsonArray(actionPlanData.raw_text);
+        if (pdfActionPlanItems.length === 0) pdfActionPlanItems = null;
       }
     }
     if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
@@ -3585,7 +3628,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             )}
 
             {/* Full Strategic Brief — sections 1-6 */}
-            {briefData?.summary && isComplete && (
+            {(() => {
+              const raw = briefData?.summary || '';
+              const hasMarkdownContent = raw.includes('## ') && raw.length > 300;
+              const execSummary = (research as any)?.executive_summary;
+              const showSection = isComplete && (hasMarkdownContent || execSummary);
+              if (!showSection) return null;
+              return (
               <Card className="border-primary/20 border-2">
                 <CardHeader className="pb-3 bg-primary/5">
                   <div className="flex items-center gap-3">
@@ -3597,11 +3646,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  {/* Render sections 1-6 excluding section 7 */}
+                  {hasMarkdownContent ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>h1]:text-lg [&>h1]:font-bold [&>h1]:text-primary [&>h1]:mt-6 [&>h1]:mb-3 [&>h2]:text-base [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-5 [&>h2]:mb-2 [&>h3]:text-sm [&>h3]:font-semibold [&>h3]:text-primary/80 [&>h3]:mt-4 [&>h3]:mb-2 [&>h3]:border-l-2 [&>h3]:border-primary/30 [&>h3]:pl-3 [&>p]:mb-3 [&>table]:text-sm [&>table]:w-full [&_th]:bg-primary/10 [&_th]:text-left [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_td]:border-border [&>ul]:my-2 [&>ol]:my-2 [&>ul>li]:mb-1 [&>ol>li]:mb-1">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{
                       (() => {
-                        const raw = briefData.summary || '';
                         const firstHeader = raw.indexOf('## ');
                         const section7 = raw.match(/##\s*7\./);
                         const start = firstHeader > 0 ? firstHeader : 0;
@@ -3610,9 +3658,92 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       })()
                     }</ReactMarkdown>
                   </div>
+                  ) : execSummary ? (
+                  <div className="space-y-4">
+                    {/* Render executive_summary structured data */}
+                    {execSummary.situacion_actual && (
+                      <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
+                        <h3 className="text-sm font-bold text-primary mb-2 flex items-center gap-2">📊 Situación Actual</h3>
+                        <p className="text-sm leading-relaxed">{typeof execSummary.situacion_actual === 'string' ? execSummary.situacion_actual : safeText(execSummary.situacion_actual)}</p>
+                      </div>
+                    )}
+                    {execSummary.posicion_competitiva && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <h3 className="text-sm font-bold text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">🏆 Posición Competitiva</h3>
+                        {typeof execSummary.posicion_competitiva === 'string' ? (
+                          <p className="text-sm leading-relaxed">{execSummary.posicion_competitiva}</p>
+                        ) : typeof execSummary.posicion_competitiva === 'object' ? (
+                          <div className="space-y-2">
+                            {Object.entries(execSummary.posicion_competitiva).map(([k, v]: [string, any]) => (
+                              <div key={k}>
+                                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase mb-0.5">{k.replace(/_/g, ' ')}</p>
+                                {Array.isArray(v) ? (
+                                  <ul className="text-xs space-y-0.5 list-disc list-inside">{v.map((item: any, j: number) => <li key={j}>{safeText(item)}</li>)}</ul>
+                                ) : <p className="text-xs">{safeText(v)}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                    {execSummary.oportunidades_detectadas && (
+                      <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                        <h3 className="text-sm font-bold text-green-700 dark:text-green-400 mb-2 flex items-center gap-2">💡 Oportunidades Detectadas</h3>
+                        {Array.isArray(execSummary.oportunidades_detectadas) ? (
+                          <ul className="space-y-2">{execSummary.oportunidades_detectadas.map((op: any, j: number) => (
+                            <li key={j} className="text-sm border-l-2 border-green-400 pl-3">
+                              {typeof op === 'string' ? op : (
+                                <div>
+                                  {op.oportunidad && <p className="font-semibold text-xs">{op.oportunidad}</p>}
+                                  {op.accion_recomendada && <p className="text-xs text-muted-foreground">{op.accion_recomendada}</p>}
+                                  {op.impacto_estimado && <p className="text-xs text-green-600 dark:text-green-400 italic">{op.impacto_estimado}</p>}
+                                </div>
+                              )}
+                            </li>
+                          ))}</ul>
+                        ) : <p className="text-sm">{safeText(execSummary.oportunidades_detectadas)}</p>}
+                      </div>
+                    )}
+                    {execSummary.amenazas_identificadas && (
+                      <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                        <h3 className="text-sm font-bold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">⚠️ Amenazas Identificadas</h3>
+                        {Array.isArray(execSummary.amenazas_identificadas) ? (
+                          <ul className="space-y-1">{execSummary.amenazas_identificadas.map((a: any, j: number) => (
+                            <li key={j} className="text-sm flex items-start gap-2"><span className="text-red-500 mt-0.5">•</span>{safeText(a)}</li>
+                          ))}</ul>
+                        ) : <p className="text-sm">{safeText(execSummary.amenazas_identificadas)}</p>}
+                      </div>
+                    )}
+                    {execSummary.recomendaciones_priorizadas && (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                        <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-2">🎯 Recomendaciones Priorizadas</h3>
+                        {Array.isArray(execSummary.recomendaciones_priorizadas) ? (
+                          <ul className="space-y-2">{execSummary.recomendaciones_priorizadas.map((rec: any, j: number) => (
+                            <li key={j} className="text-sm border-l-2 border-amber-400 pl-3">
+                              {typeof rec === 'string' ? rec : (
+                                <div>
+                                  {rec.recomendacion && <p className="font-semibold text-xs">{rec.recomendacion}</p>}
+                                  {rec.justificacion && <p className="text-xs text-muted-foreground">{rec.justificacion}</p>}
+                                  {rec.impacto_estimado && <p className="text-xs text-amber-600 dark:text-amber-400 italic">{rec.impacto_estimado}</p>}
+                                </div>
+                              )}
+                            </li>
+                          ))}</ul>
+                        ) : <p className="text-sm">{safeText(execSummary.recomendaciones_priorizadas)}</p>}
+                      </div>
+                    )}
+                    {/* Render summary text if it's a JSON string with additional data */}
+                    {execSummary.summary && typeof execSummary.summary === 'string' && execSummary.summary.length > 200 && !execSummary.summary.startsWith('{') && (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{execSummary.summary}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                  ) : null}
                 </CardContent>
               </Card>
-            )}
+              );
+            })()}
 
             {/* Evaluación Estratégica — 7 Accionables as numbered cards */}
             {(() => {
@@ -3624,11 +3755,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   parsedActionPlan = Array.isArray(parsed) ? parsed
                     : Array.isArray(parsed?.action_plan) ? parsed.action_plan : null;
                 } catch {
-                  const match = rawActionPlan.raw_text.match(/\[[\s\S]+/);
-                  if (match) try { parsedActionPlan = JSON.parse(match[0].replace(/,\s*$/, '') + ']'); } catch {}
+                  // Use bracket-counting parser for truncated JSON
+                  parsedActionPlan = parsePartialJsonArray(rawActionPlan.raw_text);
+                  if (parsedActionPlan.length === 0) parsedActionPlan = null;
                 }
               }
-              const showSection = (parsedActionPlan && parsedActionPlan.length > 0) || (briefData?.summary && isComplete);
+              const showSection = (parsedActionPlan && parsedActionPlan.length > 0) || isComplete;
               if (!showSection) return null;
               return (
               <Card className="border-2 border-primary/30">
