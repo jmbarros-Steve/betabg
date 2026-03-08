@@ -2768,22 +2768,41 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         'Configurar Google Analytics 4 con conversion tracking',
         'Programar primera revision de KPIs para el dia 14',
       ];
+    // Calculate total height dynamically based on text wrapping
+    doc.setFont('NotoSans', 'normal');
+    doc.setFontSize(9);
+    const checkTextWidth = maxWidth - 18; // leave room for number prefix and checkbox
+    const wrappedChecklist = checklist.map((item: string) => {
+      const prefix = `${checklist.indexOf(item) + 1}. [  ] `;
+      return doc.splitTextToSize(item, checkTextWidth);
+    });
+    const totalCheckH = wrappedChecklist.reduce((sum: number, lines: string[]) => sum + lines.length * 5 + 2, 0) + 8;
+
     doc.setFillColor(248, 248, 250);
-    doc.roundedRect(margin, y, maxWidth, checklist.length * 9 + 6, 2, 2, 'F');
+    doc.roundedRect(margin, y, maxWidth, totalCheckH, 2, 2, 'F');
     doc.setDrawColor(accentR, accentG, accentB);
     doc.setLineWidth(1.5);
-    doc.line(margin, y, margin, y + checklist.length * 9 + 6);
+    doc.line(margin, y, margin, y + totalCheckH);
     doc.setLineWidth(0.2);
     y += 5;
     for (let ci2 = 0; ci2 < checklist.length; ci2++) {
-      checkPage(10);
+      checkPage(12);
       doc.setFont('NotoSans', 'normal');
-      doc.setFontSize(9.5);
+      doc.setFontSize(9);
       doc.setTextColor(40, 40, 40);
-      doc.text(`${ci2 + 1}. [  ] ${checklist[ci2]}`, margin + 5, y);
-      y += 9;
+      const prefix = `${ci2 + 1}. [  ] `;
+      const lines = doc.splitTextToSize(checklist[ci2], checkTextWidth);
+      // First line with prefix
+      doc.text(`${prefix}${lines[0]}`, margin + 5, y);
+      y += 5;
+      // Continuation lines indented
+      for (let li = 1; li < lines.length; li++) {
+        doc.text(lines[li], margin + 5 + doc.getTextWidth(prefix), y);
+        y += 5;
+      }
+      y += 2;
     }
-    y += 6;
+    y += 4;
 
     // ─── SECCIÓN: GLOSARIO COMPACTO ─────────────────────────────────────────────
     // No forced page break — let content flow naturally

@@ -1,5 +1,55 @@
 import jsPDF from 'jspdf';
 
+// ─── SAFE STRING UTILITY ────────────────────────────────────────────────────
+/** Convert any value to a printable string, handling nested objects gracefully. */
+function safeStr(val: any, depth = 0): string {
+  if (val == null) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) return val.map(v => safeStr(v, depth + 1)).filter(Boolean).join(', ');
+  if (typeof val === 'object') {
+    if (depth > 2) return JSON.stringify(val);
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(val)) {
+      const sv = safeStr(v, depth + 1);
+      if (sv) parts.push(`${k.replace(/_/g, ' ')}: ${sv}`);
+    }
+    return parts.join('. ');
+  }
+  return String(val);
+}
+
+/** Render all top-level keys of an object as key-value pairs (generic fallback). */
+function renderGenericObject(helpers: PdfHelpers, obj: any, maxEntries = 12) {
+  if (!obj || typeof obj !== 'object') return;
+  let count = 0;
+  for (const [key, val] of Object.entries(obj)) {
+    if (count >= maxEntries) break;
+    if (val == null) continue;
+    const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (Array.isArray(val)) {
+      helpers.addSubTitle(label);
+      for (const item of val.slice(0, 5)) {
+        if (typeof item === 'object' && item !== null) {
+          helpers.addArrowBullet(safeStr(item));
+        } else {
+          helpers.addArrowBullet(String(item));
+        }
+      }
+    } else if (typeof val === 'object') {
+      helpers.addSubTitle(label);
+      for (const [sk, sv] of Object.entries(val)) {
+        if (sv == null) continue;
+        const sLabel = sk.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        helpers.addKeyValue(sLabel, safeStr(sv));
+      }
+    } else {
+      helpers.addKeyValue(label, String(val));
+    }
+    count++;
+  }
+}
+
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 export interface PdfContext {
   doc: jsPDF;
@@ -178,20 +228,19 @@ export function renderBrandIdentity(
 
   helpers.addSectionHeader('A', 'IDENTIDAD DE MARCA');
 
-  if (bi.tono_y_voz) {
+  let hasSpecificFields = false;
+
+  // Tono y Voz (multiple possible keys)
+  const tonoData = bi.tono_y_voz || bi.tono_voz || bi.comunicacion;
+  if (tonoData && typeof tonoData === 'object') {
+    hasSpecificFields = true;
     helpers.addSubTitle('Tono y Voz');
-    const tonoFields: [string, string][] = [
-      ['Estilo', bi.tono_y_voz.estilo],
-      ['Enfoque', bi.tono_y_voz.enfoque],
-      ['Lenguaje', bi.tono_y_voz.lenguaje],
-      ['Personalidad', bi.tono_y_voz.personalidad],
-    ];
-    // Render as styled rows to avoid monospace font fallback from special chars
     const { doc, margin, maxWidth } = ctx;
-    for (const [label, val] of tonoFields) {
+    for (const [key, val] of Object.entries(tonoData)) {
       if (!val) continue;
       helpers.checkPage(10);
       const y0 = helpers.getY();
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       doc.setFillColor(245, 246, 252);
       doc.roundedRect(margin, y0 - 2, maxWidth, 8, 1, 1, 'F');
       doc.setFont('NotoSans', 'bold');
@@ -202,31 +251,86 @@ export function renderBrandIdentity(
       doc.setFont('NotoSans', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 50);
-      const cleanVal = helpers.stripEmojis(String(val));
+      const cleanVal = helpers.stripEmojis(safeStr(val));
       const valLines = doc.splitTextToSize(cleanVal, maxWidth - labelW - 10);
       doc.text(valLines[0] || '', margin + 4 + labelW, y0 + 3);
       helpers.setY(y0 + 8);
     }
   }
 
-  if (bi.gaps_de_identidad?.length > 0) {
+  // Propuesta de valor
+  const propuesta = bi.propuesta_de_valor || bi.propuesta_de_valor_actual || bi.propuesta_valor;
+  if (propuesta) {
+    hasSpecificFields = true;
+    helpers.addSubTitle('Propuesta de Valor');
+    helpers.addBody(safeStr(propuesta));
+  }
+
+  // Valores de marca
+  const valores = bi.valores_marca || bi.valores_de_marca || bi.valores;
+  if (Array.isArray(valores) && valores.length > 0) {
+    hasSpecificFields = true;
+    helpers.addSubTitle('Valores de Marca');
+    for (const v of valores.slice(0, 6)) helpers.addArrowBullet(safeStr(v));
+  } else if (valores && typeof valores === 'string') {
+    hasSpecificFields = true;
+    helpers.addSubTitle('Valores de Marca');
+    helpers.addBody(valores);
+  }
+
+  // Diferenciadores
+  const difs = bi.diferenciadores || bi.diferenciadores_vs_competidores || bi.diferenciadores_competitivos;
+  if (Array.isArray(difs) && difs.length > 0) {
+    hasSpecificFields = true;
+    helpers.addSubTitle('Diferenciadores vs Competidores');
+    for (const d of difs.slice(0, 5)) helpers.addArrowBullet(safeStr(d));
+  } else if (difs && typeof difs === 'string') {
+    hasSpecificFields = true;
+    helpers.addSubTitle('Diferenciadores vs Competidores');
+    helpers.addBody(difs);
+  }
+
+  // Gaps de identidad (multiple possible keys)
+  const gaps = bi.gaps_de_identidad || bi.gaps_identidad || bi.gaps;
+  if (Array.isArray(gaps) && gaps.length > 0) {
+    hasSpecificFields = true;
     helpers.addSubTitle('Gaps de Identidad Detectados');
-    for (const gap of bi.gaps_de_identidad.slice(0, 5)) {
-      helpers.addArrowBullet(String(gap));
+    for (const gap of gaps.slice(0, 5)) {
+      helpers.addArrowBullet(safeStr(gap));
     }
   }
 
-  if (bi.recomendaciones_branding?.length > 0) {
+  // Recomendaciones (multiple possible keys)
+  const recs = bi.recomendaciones_branding || bi.recomendaciones || bi.recomendaciones_de_branding;
+  if (Array.isArray(recs) && recs.length > 0) {
+    hasSpecificFields = true;
     helpers.addSubTitle('Recomendaciones de Branding');
-    for (const rec of bi.recomendaciones_branding.slice(0, 5)) {
-      helpers.addArrowBullet(String(rec));
+    for (const rec of recs.slice(0, 5)) {
+      helpers.addArrowBullet(safeStr(rec));
     }
   }
 
-  if (bi.arquetipos_marca) {
+  // Arquetipos (multiple possible keys)
+  const arq = bi.arquetipos_marca || bi.arquetipos || bi.personalidad_marca || bi.personalidad;
+  if (arq) {
+    hasSpecificFields = true;
     helpers.addSubTitle('Arquetipos de Marca');
-    if (bi.arquetipos_marca.primario) helpers.addKeyValue('Primario', String(bi.arquetipos_marca.primario));
-    if (bi.arquetipos_marca.secundario) helpers.addKeyValue('Secundario', String(bi.arquetipos_marca.secundario));
+    if (typeof arq === 'object' && !Array.isArray(arq)) {
+      if (arq.primario) helpers.addKeyValue('Primario', safeStr(arq.primario));
+      if (arq.secundario) helpers.addKeyValue('Secundario', safeStr(arq.secundario));
+      // Render any other keys
+      for (const [k, v] of Object.entries(arq)) {
+        if (k === 'primario' || k === 'secundario' || !v) continue;
+        helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
+      }
+    } else {
+      helpers.addBody(safeStr(arq));
+    }
+  }
+
+  // Generic fallback: render remaining keys not already handled
+  if (!hasSpecificFields) {
+    renderGenericObject(helpers, bi);
   }
 }
 
@@ -241,26 +345,61 @@ export function renderFinancialAnalysis(
 
   helpers.addSectionHeader('B', 'ANALISIS FINANCIERO');
 
-  if (fa.business_model) helpers.addKeyValue('Modelo de Negocio', String(fa.business_model));
-  if (fa.pricing_strategy) helpers.addKeyValue('Estrategia de Precios', String(fa.pricing_strategy));
-  if (fa.margin_analysis) helpers.addKeyValue('Analisis de Margenes', String(fa.margin_analysis));
-  if (fa.financial_health) {
+  let hasSpecific = false;
+
+  // Modelo de negocio (multiple keys)
+  const bm = fa.business_model || fa.modelo_negocio || fa.modelo_de_negocio || fa.modelo_negocio_identificado;
+  if (bm) { hasSpecific = true; helpers.addKeyValue('Modelo de Negocio', safeStr(bm)); }
+
+  // Estrategia de precios
+  const ps = fa.pricing_strategy || fa.estrategia_pricing || fa.estrategia_de_pricing || fa.estrategia_precios;
+  if (ps) { hasSpecific = true; helpers.addKeyValue('Estrategia de Precios', safeStr(ps)); }
+
+  // Análisis de márgenes
+  const ma = fa.margin_analysis || fa.analisis_margenes;
+  if (ma) { hasSpecific = true; helpers.addKeyValue('Analisis de Margenes', safeStr(ma)); }
+
+  // Salud financiera
+  const fh = fa.financial_health || fa.salud_financiera;
+  if (fh) {
+    hasSpecific = true;
     helpers.addSubTitle('Salud Financiera');
-    helpers.addBody(String(fa.financial_health));
+    helpers.addBody(safeStr(fh));
   }
 
-  if (fa.products_services?.length > 0) {
+  // Rango de precios
+  const rp = fa.rango_precios || fa.rango_de_precios || fa.rango_precios_comparativo;
+  if (rp) { hasSpecific = true; helpers.addKeyValue('Rango de Precios', safeStr(rp)); }
+
+  // Oportunidades de monetización
+  const opp = fa.oportunidades_monetizacion || fa.oportunidades || fa.oportunidades_no_explotadas;
+  if (Array.isArray(opp) && opp.length > 0) {
+    hasSpecific = true;
+    helpers.addSubTitle('Oportunidades de Monetizacion');
+    for (const o of opp.slice(0, 5)) helpers.addArrowBullet(safeStr(o));
+  } else if (opp && typeof opp === 'string') {
+    hasSpecific = true;
+    helpers.addSubTitle('Oportunidades de Monetizacion');
+    helpers.addBody(opp);
+  }
+
+  // Productos / Servicios (multiple keys)
+  const prods = fa.products_services || fa.productos_servicios || fa.productos_servicios_detectados || fa.productos;
+  if (Array.isArray(prods) && prods.length > 0) {
+    hasSpecific = true;
     helpers.addSubTitle('Productos / Servicios');
-    // Render as styled table
     const prodColWs = [60, 30, 80];
     helpers.addTableRow(['Producto', 'Precio', 'Descripcion'], prodColWs, 0, true);
-    for (let pi = 0; pi < Math.min(fa.products_services.length, 5); pi++) {
-      const prod = fa.products_services[pi];
+    for (let pi = 0; pi < Math.min(prods.length, 5); pi++) {
+      const prod = prods[pi];
       if (typeof prod === 'object') {
+        const name = prod.name || prod.nombre || prod.producto || 'Producto';
+        const price = prod.price || prod.precio || 'N/D';
+        const desc = prod.description || prod.descripcion || '';
         helpers.addTableRow([
-          helpers.stripEmojis(prod.name || 'Producto').slice(0, 35),
-          helpers.stripEmojis(String(prod.price || 'N/D')).slice(0, 20),
-          helpers.stripEmojis(prod.description || '').slice(0, 50),
+          helpers.stripEmojis(safeStr(name)).slice(0, 35),
+          helpers.stripEmojis(safeStr(price)).slice(0, 20),
+          helpers.stripEmojis(safeStr(desc)).slice(0, 50),
         ], prodColWs, pi + 1);
       } else {
         helpers.addTableRow([helpers.stripEmojis(String(prod)).slice(0, 35), '', ''], prodColWs, pi + 1);
@@ -268,11 +407,19 @@ export function renderFinancialAnalysis(
     }
   }
 
-  if (fa.revenue_streams?.length > 0) {
+  // Fuentes de ingreso
+  const rs = fa.revenue_streams || fa.fuentes_ingreso || fa.fuentes_de_ingreso;
+  if (Array.isArray(rs) && rs.length > 0) {
+    hasSpecific = true;
     helpers.addSubTitle('Fuentes de Ingreso');
-    for (const rs of fa.revenue_streams.slice(0, 4)) {
-      helpers.addArrowBullet(String(typeof rs === 'object' ? rs.name || JSON.stringify(rs) : rs));
+    for (const item of rs.slice(0, 4)) {
+      helpers.addArrowBullet(safeStr(typeof item === 'object' ? item.name || item.nombre || item : item));
     }
+  }
+
+  // Generic fallback
+  if (!hasSpecific) {
+    renderGenericObject(helpers, fa);
   }
 }
 
@@ -287,42 +434,121 @@ export function renderConsumerProfile(
 
   helpers.addSectionHeader('C', 'PERFIL DEL CONSUMIDOR — ANALISIS PROFUNDO');
 
-  if (cp.journey_compra) {
+  let hasSpecific = false;
+
+  // Buyer persona principal
+  const persona = cp.buyer_persona_principal || cp.buyer_persona || cp.persona_principal;
+  if (persona && typeof persona === 'object') {
+    hasSpecific = true;
+    helpers.addSubTitle('Buyer Persona Principal');
+    const name = persona.nombre_ficticio || persona.nombre || '';
+    const age = persona.edad ? `, ${persona.edad} anos` : '';
+    const gender = persona.genero ? `, ${persona.genero}` : '';
+    const occ = persona.ocupacion ? ` — ${persona.ocupacion}` : '';
+    const loc = persona.ubicacion ? ` (${persona.ubicacion})` : '';
+    if (name) helpers.addKeyValue('Perfil', `${name}${age}${gender}${occ}${loc}`);
+    if (persona.nivel_socioeconomico) helpers.addKeyValue('NSE', safeStr(persona.nivel_socioeconomico));
+    const pains = persona.pain_points || persona.dolores || [];
+    if (Array.isArray(pains) && pains.length > 0) {
+      helpers.addKeyValue('Pain Points', pains.map((p: any) => safeStr(p)).join('; '));
+    }
+    const motivs = persona.motivadores_de_compra || persona.motivadores || [];
+    if (Array.isArray(motivs) && motivs.length > 0) {
+      helpers.addKeyValue('Motivadores', motivs.map((m: any) => safeStr(m)).join('; '));
+    }
+    const barriers = persona.barreras_y_objeciones || persona.barreras || persona.objeciones || [];
+    if (Array.isArray(barriers) && barriers.length > 0) {
+      helpers.addKeyValue('Barreras', barriers.map((b: any) => safeStr(b)).join('; '));
+    }
+    if (persona.frase_que_lo_define) helpers.addInsightBox(safeStr(persona.frase_que_lo_define));
+    if (persona.psicografia && typeof persona.psicografia === 'object') {
+      for (const [k, v] of Object.entries(persona.psicografia)) {
+        if (v) helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
+      }
+    }
+    if (persona.comportamiento_digital && typeof persona.comportamiento_digital === 'object') {
+      for (const [k, v] of Object.entries(persona.comportamiento_digital)) {
+        if (v) helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
+      }
+    }
+  }
+
+  // Buyer persona secundario
+  const persona2 = cp.buyer_persona_secundario || cp.persona_secundario;
+  if (persona2 && typeof persona2 === 'object') {
+    hasSpecific = true;
+    helpers.addSubTitle('Buyer Persona Secundario');
+    const name2 = persona2.nombre_ficticio || persona2.nombre || '';
+    if (name2) helpers.addKeyValue('Perfil', safeStr(name2));
+    // Render all fields generically
+    for (const [k, v] of Object.entries(persona2)) {
+      if (k === 'nombre_ficticio' || k === 'nombre' || !v) continue;
+      helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
+    }
+  }
+
+  // Journey de compra
+  const journey = cp.journey_compra || cp.journey_de_compra || cp.customer_journey;
+  if (journey && typeof journey === 'object') {
+    hasSpecific = true;
     helpers.addSubTitle('Journey de Compra');
-    const stages = ['awareness', 'consideracion', 'decision', 'post_compra'];
+    const stages = ['awareness', 'descubrimiento', 'consideracion', 'decision', 'post_compra'];
     const stageLabels: Record<string, string> = {
-      awareness: 'Descubrimiento', consideracion: 'Consideracion',
+      awareness: 'Descubrimiento', descubrimiento: 'Descubrimiento', consideracion: 'Consideracion',
       decision: 'Decision', post_compra: 'Post-Compra'
     };
+    // Try named stages first, then all keys
+    let renderedAny = false;
     for (const stage of stages) {
-      const data = cp.journey_compra[stage];
-      if (data && typeof data === 'object') {
+      const data = journey[stage];
+      if (data) {
+        renderedAny = true;
         helpers.addKeyValue(stageLabels[stage] || stage, '');
-        for (const [key, val] of Object.entries(data)) {
-          if (val && typeof val === 'string') {
-            helpers.addBody(`  ${key.replace(/_/g, ' ')}: ${val}`, 6);
+        if (typeof data === 'object') {
+          for (const [key, val] of Object.entries(data)) {
+            if (val) helpers.addBody(`  ${key.replace(/_/g, ' ')}: ${safeStr(val)}`, 6);
           }
+        } else {
+          helpers.addBody(`  ${safeStr(data)}`, 6);
+        }
+      }
+    }
+    if (!renderedAny) {
+      for (const [key, val] of Object.entries(journey)) {
+        if (val) {
+          helpers.addKeyValue(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(val));
         }
       }
     }
   }
 
-  if (cp.objeciones_principales?.length > 0) {
+  // Objeciones principales
+  const objs = cp.objeciones_principales || cp.objeciones || [];
+  if (Array.isArray(objs) && objs.length > 0) {
+    hasSpecific = true;
     helpers.addSubTitle('Objeciones Principales');
-    for (const obj of cp.objeciones_principales.slice(0, 5)) {
+    for (const obj of objs.slice(0, 5)) {
       if (typeof obj === 'object') {
-        helpers.addArrowBullet(`${obj.objecion || obj.title || ''}: ${obj.respuesta || obj.response || ''}`);
+        helpers.addArrowBullet(`${safeStr(obj.objecion || obj.title || obj.nombre || '')}: ${safeStr(obj.respuesta || obj.response || obj.solucion || '')}`);
       } else {
         helpers.addArrowBullet(String(obj));
       }
     }
   }
 
-  if (cp.triggers_de_compra?.length > 0) {
+  // Triggers de compra
+  const triggers = cp.triggers_de_compra || cp.triggers || [];
+  if (Array.isArray(triggers) && triggers.length > 0) {
+    hasSpecific = true;
     helpers.addSubTitle('Triggers de Compra');
-    for (const t of cp.triggers_de_compra.slice(0, 5)) {
-      helpers.addArrowBullet(String(typeof t === 'object' ? t.trigger || JSON.stringify(t) : t));
+    for (const t of triggers.slice(0, 5)) {
+      helpers.addArrowBullet(safeStr(typeof t === 'object' ? t.trigger || t.nombre || t : t));
     }
+  }
+
+  // Generic fallback
+  if (!hasSpecific) {
+    renderGenericObject(helpers, cp);
   }
 }
 
@@ -339,30 +565,53 @@ export function renderPositioningStrategy(
 
   if (ps.posicionamiento_actual) {
     helpers.addSubTitle('Posicionamiento Actual');
-    helpers.addBody(String(ps.posicionamiento_actual));
+    helpers.addBody(safeStr(ps.posicionamiento_actual));
   }
 
   if (ps.posicionamiento_recomendado) {
     helpers.addSubTitle('Posicionamiento Recomendado');
-    helpers.addInsightBox(String(ps.posicionamiento_recomendado).slice(0, 250));
+    helpers.addInsightBox(safeStr(ps.posicionamiento_recomendado).slice(0, 250));
+  }
+
+  // Statement de posicionamiento
+  const stmt = ps.statement_posicionamiento || ps.statement_de_posicionamiento || ps.positioning_statement;
+  if (stmt) {
+    helpers.addSubTitle('Statement de Posicionamiento');
+    helpers.addInsightBox(safeStr(stmt).slice(0, 300));
+  }
+
+  // Posicionamiento de competidores
+  const compPos = ps.posicionamiento_competidores || ps.competidores;
+  if (compPos && typeof compPos === 'object' && !Array.isArray(compPos)) {
+    helpers.addSubTitle('Posicionamiento de Competidores');
+    for (const [k, v] of Object.entries(compPos)) {
+      if (v) helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
+    }
+  } else if (Array.isArray(compPos)) {
+    helpers.addSubTitle('Posicionamiento de Competidores');
+    for (const c of compPos.slice(0, 6)) helpers.addArrowBullet(safeStr(c));
   }
 
   if (ps.territorios_comunicacion?.length > 0) {
     helpers.addSubTitle('Territorios de Comunicacion');
     for (const t of ps.territorios_comunicacion.slice(0, 5)) {
       if (typeof t === 'object') {
-        helpers.addKeyValue(t.nombre || t.name || 'Territorio', String(t.descripcion || t.description || ''));
+        helpers.addKeyValue(safeStr(t.nombre || t.name || 'Territorio'), safeStr(t.descripcion || t.description || ''));
       } else {
         helpers.addArrowBullet(String(t));
       }
     }
   }
 
-  if (ps.mensajes_clave?.length > 0) {
+  // Mensajes clave (handle both mensajes_clave and mensajes_clave_diferenciadores)
+  const msgs = ps.mensajes_clave || ps.mensajes_clave_diferenciadores || [];
+  if (Array.isArray(msgs) && msgs.length > 0) {
     helpers.addSubTitle('Mensajes Clave');
-    for (const msg of ps.mensajes_clave.slice(0, 5)) {
+    for (const msg of msgs.slice(0, 5)) {
       if (typeof msg === 'object') {
-        helpers.addArrowBullet(`${msg.mensaje || msg.message || ''} ${msg.contexto ? `(${msg.contexto})` : ''}`);
+        const text = msg.mensaje || msg.message || msg.texto || safeStr(msg);
+        const ctx = msg.contexto || msg.contexto_uso || '';
+        helpers.addArrowBullet(`${safeStr(text)}${ctx ? ` (${safeStr(ctx)})` : ''}`);
       } else {
         helpers.addArrowBullet(String(msg));
       }
