@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,35 @@ import {
   Sparkles, Award, AlertTriangle, TrendingDown, Lightbulb, MapPin, Briefcase,
   ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
+
+// Error Boundary to prevent blank screens
+class BriefErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[BrandBriefView] Render crash:', error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-6 bg-destructive/10 border border-destructive/30 rounded-lg m-4">
+          <h3 className="font-bold text-destructive mb-2">Error al renderizar</h3>
+          <p className="text-sm text-destructive/80 mb-2">{this.state.error.message}</p>
+          <pre className="text-xs bg-background p-3 rounded overflow-auto max-h-40">{this.state.error.stack}</pre>
+          <button onClick={() => this.setState({ error: null })} className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded text-sm">
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Parse SCR fields from accionable block text
 function parseSCRBlock(text: string): { title: string; S: string; C: string; R: string; impacto: string } {
@@ -2995,6 +3024,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const hasCompetitors = !!research.competitor_analysis;
 
   return (
+    <BriefErrorBoundary>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -4508,5 +4538,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         </Tabs>
       )}
     </div>
+    </BriefErrorBoundary>
   );
 }
