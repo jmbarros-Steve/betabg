@@ -29,9 +29,14 @@ function renderGenericObject(helpers: PdfHelpers, obj: any, maxEntries = 12) {
     const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     if (Array.isArray(val)) {
       helpers.addSubTitle(label);
-      for (const item of val.slice(0, 5)) {
+      for (const item of val.slice(0, 8)) {
         if (typeof item === 'object' && item !== null) {
-          helpers.addArrowBullet(safeStr(item));
+          // Render each sub-object as key-value pairs for better readability
+          const parts: string[] = [];
+          for (const [ik, iv] of Object.entries(item)) {
+            if (iv != null) parts.push(`${ik.replace(/_/g, ' ')}: ${safeStr(iv)}`);
+          }
+          helpers.addArrowBullet(parts.join(' | '));
         } else {
           helpers.addArrowBullet(String(item));
         }
@@ -41,7 +46,23 @@ function renderGenericObject(helpers: PdfHelpers, obj: any, maxEntries = 12) {
       for (const [sk, sv] of Object.entries(val)) {
         if (sv == null) continue;
         const sLabel = sk.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        helpers.addKeyValue(sLabel, safeStr(sv));
+        if (Array.isArray(sv)) {
+          // Nested array inside sub-object
+          helpers.addKeyValue(sLabel, '');
+          for (const item of sv.slice(0, 5)) {
+            helpers.addArrowBullet(safeStr(item));
+          }
+        } else if (typeof sv === 'object' && sv !== null) {
+          // Nested object: render each property
+          helpers.addKeyValue(sLabel, '');
+          for (const [nk, nv] of Object.entries(sv)) {
+            if (nv != null) {
+              helpers.addBody(`  ${nk.replace(/_/g, ' ')}: ${safeStr(nv)}`, 6);
+            }
+          }
+        } else {
+          helpers.addKeyValue(sLabel, safeStr(sv));
+        }
       }
     } else {
       helpers.addKeyValue(label, String(val));
@@ -224,114 +245,11 @@ export function renderBrandIdentity(
   brandIdentity: any
 ) {
   if (!brandIdentity || typeof brandIdentity !== 'object') return;
-  const bi = brandIdentity;
 
   helpers.addSectionHeader('A', 'IDENTIDAD DE MARCA');
 
-  let hasSpecificFields = false;
-
-  // Tono y Voz (multiple possible keys)
-  const tonoData = bi.tono_y_voz || bi.tono_voz || bi.comunicacion;
-  if (tonoData && typeof tonoData === 'object') {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Tono y Voz');
-    const { doc, margin, maxWidth } = ctx;
-    for (const [key, val] of Object.entries(tonoData)) {
-      if (!val) continue;
-      helpers.checkPage(10);
-      const y0 = helpers.getY();
-      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      doc.setFillColor(245, 246, 252);
-      doc.roundedRect(margin, y0 - 2, maxWidth, 8, 1, 1, 'F');
-      doc.setFont('NotoSans', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(ctx.accentR, ctx.accentG, ctx.accentB);
-      doc.text(`${label}:`, margin + 4, y0 + 3);
-      const labelW = doc.getTextWidth(`${label}: `);
-      doc.setFont('NotoSans', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(40, 40, 50);
-      const cleanVal = helpers.stripEmojis(safeStr(val));
-      const valLines = doc.splitTextToSize(cleanVal, maxWidth - labelW - 10);
-      doc.text(valLines[0] || '', margin + 4 + labelW, y0 + 3);
-      helpers.setY(y0 + 8);
-    }
-  }
-
-  // Propuesta de valor
-  const propuesta = bi.propuesta_de_valor || bi.propuesta_de_valor_actual || bi.propuesta_valor;
-  if (propuesta) {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Propuesta de Valor');
-    helpers.addBody(safeStr(propuesta));
-  }
-
-  // Valores de marca
-  const valores = bi.valores_marca || bi.valores_de_marca || bi.valores;
-  if (Array.isArray(valores) && valores.length > 0) {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Valores de Marca');
-    for (const v of valores.slice(0, 6)) helpers.addArrowBullet(safeStr(v));
-  } else if (valores && typeof valores === 'string') {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Valores de Marca');
-    helpers.addBody(valores);
-  }
-
-  // Diferenciadores
-  const difs = bi.diferenciadores || bi.diferenciadores_vs_competidores || bi.diferenciadores_competitivos;
-  if (Array.isArray(difs) && difs.length > 0) {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Diferenciadores vs Competidores');
-    for (const d of difs.slice(0, 5)) helpers.addArrowBullet(safeStr(d));
-  } else if (difs && typeof difs === 'string') {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Diferenciadores vs Competidores');
-    helpers.addBody(difs);
-  }
-
-  // Gaps de identidad (multiple possible keys)
-  const gaps = bi.gaps_de_identidad || bi.gaps_identidad || bi.gaps;
-  if (Array.isArray(gaps) && gaps.length > 0) {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Gaps de Identidad Detectados');
-    for (const gap of gaps.slice(0, 5)) {
-      helpers.addArrowBullet(safeStr(gap));
-    }
-  }
-
-  // Recomendaciones (multiple possible keys)
-  const recs = bi.recomendaciones_branding || bi.recomendaciones || bi.recomendaciones_de_branding;
-  if (Array.isArray(recs) && recs.length > 0) {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Recomendaciones de Branding');
-    for (const rec of recs.slice(0, 5)) {
-      helpers.addArrowBullet(safeStr(rec));
-    }
-  }
-
-  // Arquetipos (multiple possible keys)
-  const arq = bi.arquetipos_marca || bi.arquetipos || bi.personalidad_marca || bi.personalidad;
-  if (arq) {
-    hasSpecificFields = true;
-    helpers.addSubTitle('Arquetipos de Marca');
-    if (typeof arq === 'object' && !Array.isArray(arq)) {
-      if (arq.primario) helpers.addKeyValue('Primario', safeStr(arq.primario));
-      if (arq.secundario) helpers.addKeyValue('Secundario', safeStr(arq.secundario));
-      // Render any other keys
-      for (const [k, v] of Object.entries(arq)) {
-        if (k === 'primario' || k === 'secundario' || !v) continue;
-        helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
-      }
-    } else {
-      helpers.addBody(safeStr(arq));
-    }
-  }
-
-  // Generic fallback: render remaining keys not already handled
-  if (!hasSpecificFields) {
-    renderGenericObject(helpers, bi);
-  }
+  // Render ALL keys generically — handles any AI-generated structure
+  renderGenericObject(helpers, brandIdentity, 20);
 }
 
 // ─── FINANCIAL ANALYSIS SECTION ──────────────────────────────────────────────
@@ -341,86 +259,11 @@ export function renderFinancialAnalysis(
   financialAnalysis: any
 ) {
   if (!financialAnalysis || typeof financialAnalysis !== 'object') return;
-  const fa = financialAnalysis;
 
   helpers.addSectionHeader('B', 'ANALISIS FINANCIERO');
 
-  let hasSpecific = false;
-
-  // Modelo de negocio (multiple keys)
-  const bm = fa.business_model || fa.modelo_negocio || fa.modelo_de_negocio || fa.modelo_negocio_identificado;
-  if (bm) { hasSpecific = true; helpers.addKeyValue('Modelo de Negocio', safeStr(bm)); }
-
-  // Estrategia de precios
-  const ps = fa.pricing_strategy || fa.estrategia_pricing || fa.estrategia_de_pricing || fa.estrategia_precios;
-  if (ps) { hasSpecific = true; helpers.addKeyValue('Estrategia de Precios', safeStr(ps)); }
-
-  // Análisis de márgenes
-  const ma = fa.margin_analysis || fa.analisis_margenes;
-  if (ma) { hasSpecific = true; helpers.addKeyValue('Analisis de Margenes', safeStr(ma)); }
-
-  // Salud financiera
-  const fh = fa.financial_health || fa.salud_financiera;
-  if (fh) {
-    hasSpecific = true;
-    helpers.addSubTitle('Salud Financiera');
-    helpers.addBody(safeStr(fh));
-  }
-
-  // Rango de precios
-  const rp = fa.rango_precios || fa.rango_de_precios || fa.rango_precios_comparativo;
-  if (rp) { hasSpecific = true; helpers.addKeyValue('Rango de Precios', safeStr(rp)); }
-
-  // Oportunidades de monetización
-  const opp = fa.oportunidades_monetizacion || fa.oportunidades || fa.oportunidades_no_explotadas;
-  if (Array.isArray(opp) && opp.length > 0) {
-    hasSpecific = true;
-    helpers.addSubTitle('Oportunidades de Monetizacion');
-    for (const o of opp.slice(0, 5)) helpers.addArrowBullet(safeStr(o));
-  } else if (opp && typeof opp === 'string') {
-    hasSpecific = true;
-    helpers.addSubTitle('Oportunidades de Monetizacion');
-    helpers.addBody(opp);
-  }
-
-  // Productos / Servicios (multiple keys)
-  const prods = fa.products_services || fa.productos_servicios || fa.productos_servicios_detectados || fa.productos;
-  if (Array.isArray(prods) && prods.length > 0) {
-    hasSpecific = true;
-    helpers.addSubTitle('Productos / Servicios');
-    const prodColWs = [60, 30, 80];
-    helpers.addTableRow(['Producto', 'Precio', 'Descripcion'], prodColWs, 0, true);
-    for (let pi = 0; pi < Math.min(prods.length, 5); pi++) {
-      const prod = prods[pi];
-      if (typeof prod === 'object') {
-        const name = prod.name || prod.nombre || prod.producto || 'Producto';
-        const price = prod.price || prod.precio || 'N/D';
-        const desc = prod.description || prod.descripcion || '';
-        helpers.addTableRow([
-          helpers.stripEmojis(safeStr(name)).slice(0, 35),
-          helpers.stripEmojis(safeStr(price)).slice(0, 20),
-          helpers.stripEmojis(safeStr(desc)).slice(0, 50),
-        ], prodColWs, pi + 1);
-      } else {
-        helpers.addTableRow([helpers.stripEmojis(String(prod)).slice(0, 35), '', ''], prodColWs, pi + 1);
-      }
-    }
-  }
-
-  // Fuentes de ingreso
-  const rs = fa.revenue_streams || fa.fuentes_ingreso || fa.fuentes_de_ingreso;
-  if (Array.isArray(rs) && rs.length > 0) {
-    hasSpecific = true;
-    helpers.addSubTitle('Fuentes de Ingreso');
-    for (const item of rs.slice(0, 4)) {
-      helpers.addArrowBullet(safeStr(typeof item === 'object' ? item.name || item.nombre || item : item));
-    }
-  }
-
-  // Generic fallback
-  if (!hasSpecific) {
-    renderGenericObject(helpers, fa);
-  }
+  // Render ALL keys generically — handles any AI-generated structure
+  renderGenericObject(helpers, financialAnalysis, 20);
 }
 
 // ─── CONSUMER PROFILE SECTION ────────────────────────────────────────────────
@@ -430,126 +273,11 @@ export function renderConsumerProfile(
   consumerProfile: any
 ) {
   if (!consumerProfile || typeof consumerProfile !== 'object') return;
-  const cp = consumerProfile;
 
   helpers.addSectionHeader('C', 'PERFIL DEL CONSUMIDOR — ANALISIS PROFUNDO');
 
-  let hasSpecific = false;
-
-  // Buyer persona principal
-  const persona = cp.buyer_persona_principal || cp.buyer_persona || cp.persona_principal;
-  if (persona && typeof persona === 'object') {
-    hasSpecific = true;
-    helpers.addSubTitle('Buyer Persona Principal');
-    const name = persona.nombre_ficticio || persona.nombre || '';
-    const age = persona.edad ? `, ${persona.edad} anos` : '';
-    const gender = persona.genero ? `, ${persona.genero}` : '';
-    const occ = persona.ocupacion ? ` — ${persona.ocupacion}` : '';
-    const loc = persona.ubicacion ? ` (${persona.ubicacion})` : '';
-    if (name) helpers.addKeyValue('Perfil', `${name}${age}${gender}${occ}${loc}`);
-    if (persona.nivel_socioeconomico) helpers.addKeyValue('NSE', safeStr(persona.nivel_socioeconomico));
-    const pains = persona.pain_points || persona.dolores || [];
-    if (Array.isArray(pains) && pains.length > 0) {
-      helpers.addKeyValue('Pain Points', pains.map((p: any) => safeStr(p)).join('; '));
-    }
-    const motivs = persona.motivadores_de_compra || persona.motivadores || [];
-    if (Array.isArray(motivs) && motivs.length > 0) {
-      helpers.addKeyValue('Motivadores', motivs.map((m: any) => safeStr(m)).join('; '));
-    }
-    const barriers = persona.barreras_y_objeciones || persona.barreras || persona.objeciones || [];
-    if (Array.isArray(barriers) && barriers.length > 0) {
-      helpers.addKeyValue('Barreras', barriers.map((b: any) => safeStr(b)).join('; '));
-    }
-    if (persona.frase_que_lo_define) helpers.addInsightBox(safeStr(persona.frase_que_lo_define));
-    if (persona.psicografia && typeof persona.psicografia === 'object') {
-      for (const [k, v] of Object.entries(persona.psicografia)) {
-        if (v) helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
-      }
-    }
-    if (persona.comportamiento_digital && typeof persona.comportamiento_digital === 'object') {
-      for (const [k, v] of Object.entries(persona.comportamiento_digital)) {
-        if (v) helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
-      }
-    }
-  }
-
-  // Buyer persona secundario
-  const persona2 = cp.buyer_persona_secundario || cp.persona_secundario;
-  if (persona2 && typeof persona2 === 'object') {
-    hasSpecific = true;
-    helpers.addSubTitle('Buyer Persona Secundario');
-    const name2 = persona2.nombre_ficticio || persona2.nombre || '';
-    if (name2) helpers.addKeyValue('Perfil', safeStr(name2));
-    // Render all fields generically
-    for (const [k, v] of Object.entries(persona2)) {
-      if (k === 'nombre_ficticio' || k === 'nombre' || !v) continue;
-      helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
-    }
-  }
-
-  // Journey de compra
-  const journey = cp.journey_compra || cp.journey_de_compra || cp.customer_journey;
-  if (journey && typeof journey === 'object') {
-    hasSpecific = true;
-    helpers.addSubTitle('Journey de Compra');
-    const stages = ['awareness', 'descubrimiento', 'consideracion', 'decision', 'post_compra'];
-    const stageLabels: Record<string, string> = {
-      awareness: 'Descubrimiento', descubrimiento: 'Descubrimiento', consideracion: 'Consideracion',
-      decision: 'Decision', post_compra: 'Post-Compra'
-    };
-    // Try named stages first, then all keys
-    let renderedAny = false;
-    for (const stage of stages) {
-      const data = journey[stage];
-      if (data) {
-        renderedAny = true;
-        helpers.addKeyValue(stageLabels[stage] || stage, '');
-        if (typeof data === 'object') {
-          for (const [key, val] of Object.entries(data)) {
-            if (val) helpers.addBody(`  ${key.replace(/_/g, ' ')}: ${safeStr(val)}`, 6);
-          }
-        } else {
-          helpers.addBody(`  ${safeStr(data)}`, 6);
-        }
-      }
-    }
-    if (!renderedAny) {
-      for (const [key, val] of Object.entries(journey)) {
-        if (val) {
-          helpers.addKeyValue(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(val));
-        }
-      }
-    }
-  }
-
-  // Objeciones principales
-  const objs = cp.objeciones_principales || cp.objeciones || [];
-  if (Array.isArray(objs) && objs.length > 0) {
-    hasSpecific = true;
-    helpers.addSubTitle('Objeciones Principales');
-    for (const obj of objs.slice(0, 5)) {
-      if (typeof obj === 'object') {
-        helpers.addArrowBullet(`${safeStr(obj.objecion || obj.title || obj.nombre || '')}: ${safeStr(obj.respuesta || obj.response || obj.solucion || '')}`);
-      } else {
-        helpers.addArrowBullet(String(obj));
-      }
-    }
-  }
-
-  // Triggers de compra
-  const triggers = cp.triggers_de_compra || cp.triggers || [];
-  if (Array.isArray(triggers) && triggers.length > 0) {
-    hasSpecific = true;
-    helpers.addSubTitle('Triggers de Compra');
-    for (const t of triggers.slice(0, 5)) {
-      helpers.addArrowBullet(safeStr(typeof t === 'object' ? t.trigger || t.nombre || t : t));
-    }
-  }
-
-  // Generic fallback
-  if (!hasSpecific) {
-    renderGenericObject(helpers, cp);
-  }
+  // Render ALL keys generically — handles any AI-generated structure
+  renderGenericObject(helpers, consumerProfile, 20);
 }
 
 // ─── POSITIONING STRATEGY SECTION ────────────────────────────────────────────
@@ -559,64 +287,11 @@ export function renderPositioningStrategy(
   positioningStrategy: any
 ) {
   if (!positioningStrategy || typeof positioningStrategy !== 'object') return;
-  const ps = positioningStrategy;
 
   helpers.addSectionHeader('D', 'ESTRATEGIA DE POSICIONAMIENTO');
 
-  if (ps.posicionamiento_actual) {
-    helpers.addSubTitle('Posicionamiento Actual');
-    helpers.addBody(safeStr(ps.posicionamiento_actual));
-  }
-
-  if (ps.posicionamiento_recomendado) {
-    helpers.addSubTitle('Posicionamiento Recomendado');
-    helpers.addInsightBox(safeStr(ps.posicionamiento_recomendado).slice(0, 250));
-  }
-
-  // Statement de posicionamiento
-  const stmt = ps.statement_posicionamiento || ps.statement_de_posicionamiento || ps.positioning_statement;
-  if (stmt) {
-    helpers.addSubTitle('Statement de Posicionamiento');
-    helpers.addInsightBox(safeStr(stmt).slice(0, 300));
-  }
-
-  // Posicionamiento de competidores
-  const compPos = ps.posicionamiento_competidores || ps.competidores;
-  if (compPos && typeof compPos === 'object' && !Array.isArray(compPos)) {
-    helpers.addSubTitle('Posicionamiento de Competidores');
-    for (const [k, v] of Object.entries(compPos)) {
-      if (v) helpers.addKeyValue(k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), safeStr(v));
-    }
-  } else if (Array.isArray(compPos)) {
-    helpers.addSubTitle('Posicionamiento de Competidores');
-    for (const c of compPos.slice(0, 6)) helpers.addArrowBullet(safeStr(c));
-  }
-
-  if (ps.territorios_comunicacion?.length > 0) {
-    helpers.addSubTitle('Territorios de Comunicacion');
-    for (const t of ps.territorios_comunicacion.slice(0, 5)) {
-      if (typeof t === 'object') {
-        helpers.addKeyValue(safeStr(t.nombre || t.name || 'Territorio'), safeStr(t.descripcion || t.description || ''));
-      } else {
-        helpers.addArrowBullet(String(t));
-      }
-    }
-  }
-
-  // Mensajes clave (handle both mensajes_clave and mensajes_clave_diferenciadores)
-  const msgs = ps.mensajes_clave || ps.mensajes_clave_diferenciadores || [];
-  if (Array.isArray(msgs) && msgs.length > 0) {
-    helpers.addSubTitle('Mensajes Clave');
-    for (const msg of msgs.slice(0, 5)) {
-      if (typeof msg === 'object') {
-        const text = msg.mensaje || msg.message || msg.texto || safeStr(msg);
-        const ctx = msg.contexto || msg.contexto_uso || '';
-        helpers.addArrowBullet(`${safeStr(text)}${ctx ? ` (${safeStr(ctx)})` : ''}`);
-      } else {
-        helpers.addArrowBullet(String(msg));
-      }
-    }
-  }
+  // Render ALL keys generically — handles any AI-generated structure
+  renderGenericObject(helpers, positioningStrategy, 20);
 
   // Perceptual map as text table
   if (ps.mapa_perceptual) {
