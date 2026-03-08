@@ -2492,10 +2492,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         pdfActionPlanItems = Array.isArray(parsed) ? parsed
           : Array.isArray(parsed?.action_plan) ? parsed.action_plan : null;
       } catch {
-        // Use bracket-counting parser for truncated JSON
+        // ignored — expected for truncated JSON
+      }
+      if (!pdfActionPlanItems) {
         pdfActionPlanItems = parsePartialJsonArray(actionPlanData.raw_text);
         if (pdfActionPlanItems.length === 0) pdfActionPlanItems = null;
       }
+      console.log('[PDF] action_plan _repair_failed, parsed items:', pdfActionPlanItems?.length ?? 0);
     }
     if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
       safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, pdfActionPlanItems!));
@@ -3750,15 +3753,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               const rawActionPlan = (research as any).action_plan;
               let parsedActionPlan = Array.isArray(rawActionPlan) ? rawActionPlan : null;
               if (!parsedActionPlan && rawActionPlan?._repair_failed && rawActionPlan?.raw_text) {
+                // First try: full JSON parse
                 try {
                   const parsed = JSON.parse(rawActionPlan.raw_text);
                   parsedActionPlan = Array.isArray(parsed) ? parsed
                     : Array.isArray(parsed?.action_plan) ? parsed.action_plan : null;
                 } catch {
-                  // Use bracket-counting parser for truncated JSON
+                  // ignored — expected for truncated JSON
+                }
+                // Second try: bracket-counting parser for truncated JSON
+                if (!parsedActionPlan) {
                   parsedActionPlan = parsePartialJsonArray(rawActionPlan.raw_text);
                   if (parsedActionPlan.length === 0) parsedActionPlan = null;
                 }
+                console.log('[BrandBriefView] action_plan _repair_failed, parsed items:', parsedActionPlan?.length ?? 0);
               }
               const showSection = (parsedActionPlan && parsedActionPlan.length > 0) || isComplete;
               if (!showSection) return null;
