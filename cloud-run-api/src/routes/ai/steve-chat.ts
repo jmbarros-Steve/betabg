@@ -104,7 +104,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*pone cara seria* 😰\n\n',
-      commentGuide: 'Comenta en 1-3 oraciones. Analiza si el dolor tiene las tres dimensiones (problema, intento fallido, frustración). Si falta o es genérico, RECHAZA. No inventes otros ejemplos; invita a usar el de abajo o a escribir con sus palabras.',
+      commentGuide: 'Comenta en 1-3 oraciones. Analiza si el dolor tiene las tres dimensiones (problema, intento fallido, frustración). Si falta o es genérico, RECHAZA con [RECHAZO]. Si la respuesta está completa, ACEPTA con [AVANZAR]. No inventes otros ejemplos.',
     },
     {
       id: 'persona_words',
@@ -113,7 +113,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*saca su libreta* 📝\n\n',
-      commentGuide: 'Comenta en tono conversacional. Verifica que haya MÍNIMO 2 frases literales. Si solo hay una, RECHAZA. No inventes otros ejemplos; invita a usar el de abajo.',
+      commentGuide: 'Comenta en tono conversacional. Verifica que haya MÍNIMO 2 frases literales. Si solo hay una, RECHAZA con [RECHAZO]. Si tiene 2+ frases literales, ACEPTA con [AVANZAR]. No inventes otros ejemplos.',
     },
     {
       id: 'persona_transformation',
@@ -122,7 +122,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*levanta las orejas, ojos brillantes* ✨\n\n',
-      commentGuide: 'Comenta en 1-3 oraciones. Analiza si la transformación es emocional y tangible. Si es vaga, pide detalles. No inventes otros ejemplos; invita a usar los de abajo.',
+      commentGuide: 'Comenta en 1-3 oraciones. Analiza si la transformación es emocional y tangible. Si es vaga, RECHAZA con [RECHAZO] y pide detalles. Si es concreta, ACEPTA con [AVANZAR]. No inventes otros ejemplos.',
     },
     {
       id: 'persona_lifestyle',
@@ -131,7 +131,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*mueve la cola curioso* 🐕\n\n',
-      commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona. HAZ INFERENCIAS: en base a edad, ingreso, ocupación, deduce qué consume. NO escribas otros ejemplos en tu mensaje; solo invita a usar los de abajo.',
+      commentGuide: 'Analiza si el estilo de vida es coherente con el buyer persona. HAZ INFERENCIAS: en base a edad, ingreso, ocupación, deduce qué consume. Si la respuesta es coherente, ACEPTA con [AVANZAR]. NO escribas otros ejemplos en tu mensaje.',
     },
     {
       id: 'competitors',
@@ -172,7 +172,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*se para firme* 🏆\n\n',
-      commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Analiza si la ventaja es realmente incopiable. No inventes otros ejemplos; invita a usar los de abajo.',
+      commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Analiza si la ventaja es realmente incopiable. Si es genérica, RECHAZA con [RECHAZO]. Si es específica, ACEPTA con [AVANZAR].',
     },
     {
       id: 'purple_cow_promise',
@@ -181,7 +181,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*se para en dos patas, emocionado* 🐄💜\n\n',
-      commentGuide: 'Comenta en 1-3 oraciones. Es sobre posicionamiento y diferenciación, NO logos ni colores. No inventes otros ejemplos; invita a usar los de abajo.',
+      commentGuide: 'Comenta en 1-3 oraciones. Es sobre posicionamiento y diferenciación, NO logos ni colores. Si la respuesta tiene promesa clara, ACEPTA con [AVANZAR].',
     },
     {
       id: 'villain_guarantee',
@@ -190,7 +190,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*gruñe pensando en los enemigos de tu marca* 🐕\n\n',
-      commentGuide: 'Comenta en tono conversacional. Analiza si el villano es poderoso y si la garantía elimina el riesgo. No inventes otros ejemplos; invita a usar el de abajo.',
+      commentGuide: 'Comenta en tono conversacional. Analiza si el villano es poderoso y si la garantía elimina el riesgo. Si ambos están, ACEPTA con [AVANZAR].',
     },
     {
       id: 'proof_tone',
@@ -199,7 +199,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*olfatea buscando evidencia* 📸\n\n',
-      commentGuide: 'Comenta en 1-3 oraciones. Evalúa prueba social y si el tono cuadra con el buyer persona. No inventes otros ejemplos; invita a usar el de abajo.',
+      commentGuide: 'Comenta en 1-3 oraciones. Evalúa prueba social y si el tono cuadra con el buyer persona. Si la respuesta cubre ambos temas, ACEPTA con [AVANZAR].',
     },
     {
       id: 'brand_identity',
@@ -208,7 +208,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       examples: [],
       fields: [],
       steveIntro: '*saca su paleta de colores* 🎨🐕\n\n',
-      commentGuide: 'Comenta en tono conversacional. Valida colores y estilo; si no cuadran, sugiere. NO pidas fotos ni logos (eso es solo en la pregunta 16). No inventes otros ejemplos; invita a usar los de abajo.',
+      commentGuide: 'Comenta en tono conversacional. Valida colores y estilo; si no cuadran, sugiere. NO pidas fotos ni logos (eso es solo en la pregunta 16). Si la respuesta tiene colores/estilo, ACEPTA con [AVANZAR].',
     },
     {
       id: 'brand_assets_upload',
