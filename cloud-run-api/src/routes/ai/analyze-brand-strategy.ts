@@ -6,7 +6,7 @@ const SECTIONS = [
   {
     id: 'executive_summary',
     keys: ['executive_summary'],
-    maxTokens: 4000,
+    maxTokens: 6000,
     model: 'claude-sonnet-4-6' as const,
     dataScope: 'all' as const,
     prompt: `Genera ÚNICAMENTE la sección "executive_summary". Debe incluir:
@@ -37,7 +37,7 @@ Responde con JSON válido: { "brand_identity": { ... } }`,
   {
     id: 'financial_analysis',
     keys: ['financial_analysis'],
-    maxTokens: 4000,
+    maxTokens: 5000,
     model: 'claude-sonnet-4-6' as const,
     dataScope: 'client_and_competitors' as const,
     prompt: `Genera ÚNICAMENTE la sección "financial_analysis". Debe incluir:
@@ -65,7 +65,7 @@ Responde con JSON válido: { "consumer_profile": { ... } }`,
   {
     id: 'competitive_analysis',
     keys: ['competitive_analysis'],
-    maxTokens: 6000,
+    maxTokens: 10000,
     dataScope: 'all' as const,
     prompt: `Genera ÚNICAMENTE la sección "competitive_analysis". Debe incluir:
 a) Análisis INDIVIDUAL de CADA uno de los 6 competidores:
@@ -340,6 +340,55 @@ Responde SOLO con JSON válido:
   },
 ];
 
+// ── Reparar JSON truncado por max_tokens ──
+function repairTruncatedJson(text: string): Record<string, unknown> {
+  // Primero intentar parse directo
+  try { return JSON.parse(text); } catch {}
+
+  // Quitar markdown wrappers
+  let cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
+
+  // Intentar cerrar strings y brackets abiertos
+  // Contar brackets/braces abiertos
+  let inString = false;
+  let escape = false;
+  const stack: string[] = [];
+
+  for (const ch of cleaned) {
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') stack.push('}');
+    else if (ch === '[') stack.push(']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+
+  // Si estamos dentro de un string, cerrarlo
+  if (inString) cleaned += '"';
+
+  // Cerrar brackets/braces pendientes (podría necesitar quitar trailing comma)
+  cleaned = cleaned.replace(/,\s*$/, '');
+
+  // Cerrar todo lo que quedó abierto
+  while (stack.length > 0) {
+    cleaned += stack.pop();
+  }
+
+  try { return JSON.parse(cleaned); } catch {}
+
+  // Último intento: encontrar el último } o ] que haga parse válido
+  for (let i = cleaned.length - 1; i > 0; i--) {
+    if (cleaned[i] === '}' || cleaned[i] === ']') {
+      try { return JSON.parse(cleaned.slice(0, i + 1)); } catch {}
+    }
+  }
+
+  // Falló todo, devolver lo que tenemos como string
+  console.warn('[repairJson] Could not repair JSON, returning as raw text');
+  return { raw_text: text.slice(0, 5000), _repair_failed: true };
+}
+
 // ── Llamada individual a Claude con prompt caching ──
 async function callClaudeOnce(
   baseSystemPrompt: string,
@@ -410,10 +459,22 @@ async function callClaudeOnce(
   const data: any = await res.json();
   const usage = data.usage || {};
   const cached = usage.cache_read_input_tokens || 0;
+  const stopReason = data.stop_reason || 'unknown';
   const text = data.content?.[0]?.text ?? "{}";
   const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
-  console.log(`[callClaude] ${model} OK — output: ${text.length} chars, cached: ${cached} tokens`);
-  return JSON.parse(cleaned);
+  console.log(`[callClaude] ${model} OK — output: ${text.length} chars, cached: ${cached} tokens, stop: ${stopReason}`);
+
+  if (stopReason === 'max_tokens') {
+    console.warn(`[callClaude] Response truncated (max_tokens reached). Attempting JSON repair...`);
+    return repairTruncatedJson(cleaned);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseError) {
+    console.warn(`[callClaude] JSON parse failed, attempting repair: ${(parseError as Error).message}`);
+    return repairTruncatedJson(cleaned);
+  }
 }
 
 // ── Retry con backoff exponencial ──
