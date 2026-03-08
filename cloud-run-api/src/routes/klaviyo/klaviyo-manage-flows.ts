@@ -117,18 +117,24 @@ export async function klaviyoManageFlows(c: Context) {
 // Action: list_flows
 // ===============================================================
 async function handleListFlows(c: Context, apiKey: string) {
-  const data: any = await klaviyoGet(`${KLAVIYO_BASE}/flows/`, apiKey);
+  const allFlows: any[] = [];
+  let url: string | null = `${KLAVIYO_BASE}/flows/`;
+  while (url) {
+    const data: any = await klaviyoGet(url, apiKey);
+    for (const f of (data.data || [])) {
+      allFlows.push({
+        id: f.id,
+        name: f.attributes?.name || 'Sin nombre',
+        status: f.attributes?.status || 'manual',
+        trigger_type: f.attributes?.trigger_type || null,
+        created: f.attributes?.created,
+        updated: f.attributes?.updated,
+      });
+    }
+    url = data.links?.next || null;
+  }
 
-  const flows = (data.data || []).map((f: any) => ({
-    id: f.id,
-    name: f.attributes?.name || 'Sin nombre',
-    status: f.attributes?.status || 'manual',
-    trigger_type: f.attributes?.trigger_type || null,
-    created: f.attributes?.created,
-    updated: f.attributes?.updated,
-  }));
-
-  return c.json({ flows });
+  return c.json({ flows: allFlows });
 }
 
 // ===============================================================

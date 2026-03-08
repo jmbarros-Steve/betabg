@@ -601,7 +601,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {section === 'overview' ? 'Resumen' : section === 'campaigns' ? `Campañas (${campaigns.length})` : section === 'flows' ? `Flujos (${flows.length})` : 'Horarios'}
+              {section === 'overview' ? 'Resumen' : section === 'campaigns' ? `Campañas (${campaigns.filter(c => c.metrics).length})` : section === 'flows' ? `Flujos (${flows.filter(f => f.metrics).length})` : 'Horarios'}
             </button>
           ))}
         </div>

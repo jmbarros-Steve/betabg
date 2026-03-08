@@ -33,7 +33,7 @@ export async function storeKlaviyoConnection(c: Context) {
       headers: {
         'Authorization': `Klaviyo-API-Key ${api_key}`,
         'Content-Type': 'application/json',
-        'revision': '2024-02-15',
+        'revision': '2024-10-15',
       },
     });
 

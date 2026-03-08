@@ -340,33 +340,35 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               {globalStats ? 'Actualizar' : 'Cargar'}
             </Button>
-            <Button variant="ghost" size="sm" onClick={async () => {
-              if (!connectionId) return;
-              setDebugResult('Cargando...');
-              try {
-                const startTime = Date.now();
-                const { data, error } = await callApi('sync-klaviyo-metrics', {
-                  body: { connectionId, timeframe },
-                });
-                const elapsed = Date.now() - startTime;
-                if (error) {
-                  setDebugResult(JSON.stringify({ error, elapsed_ms: elapsed }, null, 2));
-                } else {
-                  setDebugResult(JSON.stringify({
-                    elapsed_ms: elapsed,
-                    globalStats: data?.globalStats,
-                    _debug: data?._debug,
-                    flows_count: data?.flows?.length,
-                    campaigns_count: data?.campaigns?.length,
-                  }, null, 2));
+            {import.meta.env.DEV && (
+              <Button variant="ghost" size="sm" onClick={async () => {
+                if (!connectionId) return;
+                setDebugResult('Cargando...');
+                try {
+                  const startTime = Date.now();
+                  const { data, error } = await callApi('sync-klaviyo-metrics', {
+                    body: { connectionId, timeframe },
+                  });
+                  const elapsed = Date.now() - startTime;
+                  if (error) {
+                    setDebugResult(JSON.stringify({ error, elapsed_ms: elapsed }, null, 2));
+                  } else {
+                    setDebugResult(JSON.stringify({
+                      elapsed_ms: elapsed,
+                      globalStats: data?.globalStats,
+                      _debug: data?._debug,
+                      flows_count: data?.flows?.length,
+                      campaigns_count: data?.campaigns?.length,
+                    }, null, 2));
+                  }
+                } catch (e: any) {
+                  setDebugResult(`Error: ${e.message}`);
                 }
-              } catch (e: any) {
-                setDebugResult(`Error: ${e.message}`);
-              }
-            }} className="text-xs">
-              <Search className="w-3 h-3 mr-1" />
-              Debug
-            </Button>
+              }} className="text-xs">
+                <Search className="w-3 h-3 mr-1" />
+                Debug
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>

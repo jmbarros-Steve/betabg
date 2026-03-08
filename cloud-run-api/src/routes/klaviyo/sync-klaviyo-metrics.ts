@@ -40,35 +40,48 @@ async function findConversionMetricId(apiKey: string): Promise<string | null> {
   return fallback?.id || null;
 }
 
-// Fetch flows (single page)
+// Fetch flows (paginated)
 async function fetchFlows(apiKey: string) {
-  const data: any = await klaviyoGet('https://a.klaviyo.com/api/flows/', apiKey);
-  if (!data) return [];
-  return (data.data || []).map((f: any) => ({
-    id: f.id,
-    name: f.attributes?.name || 'Sin nombre',
-    status: f.attributes?.status || 'manual',
-    created: f.attributes?.created,
-    updated: f.attributes?.updated,
-    trigger_type: f.attributes?.trigger_type || null,
-  }));
+  const allFlows: any[] = [];
+  let url: string | null = 'https://a.klaviyo.com/api/flows/';
+  while (url) {
+    const data: any = await klaviyoGet(url, apiKey);
+    if (!data) break;
+    for (const f of (data.data || [])) {
+      allFlows.push({
+        id: f.id,
+        name: f.attributes?.name || 'Sin nombre',
+        status: f.attributes?.status || 'manual',
+        created: f.attributes?.created,
+        updated: f.attributes?.updated,
+        trigger_type: f.attributes?.trigger_type || null,
+      });
+    }
+    url = data.links?.next || null;
+  }
+  return allFlows;
 }
 
-// Fetch campaigns (single page, most recent)
+// Fetch campaigns (paginated)
 async function fetchCampaigns(apiKey: string) {
-  const data: any = await klaviyoGet(
-    'https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at',
-    apiKey
-  );
-  if (!data) return [];
-  return (data.data || []).map((c: any) => ({
-    id: c.id,
-    name: c.attributes?.name || 'Sin nombre',
-    status: c.attributes?.status || 'draft',
-    send_time: c.attributes?.send_time || null,
-    created_at: c.attributes?.created_at,
-    updated_at: c.attributes?.updated_at,
-  }));
+  const allCampaigns: any[] = [];
+  let url: string | null = 'https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at';
+  while (url) {
+    const data: any = await klaviyoGet(url, apiKey);
+    if (!data) break;
+    for (const c of (data.data || [])) {
+      allCampaigns.push({
+        id: c.id,
+        name: c.attributes?.name || 'Sin nombre',
+        status: c.attributes?.status || 'draft',
+        send_time: c.attributes?.send_time || null,
+        created_at: c.attributes?.created_at,
+        updated_at: c.attributes?.updated_at,
+      });
+    }
+    url = data.links?.next || null;
+  }
+  return allCampaigns;
 }
 
 // Fetch lists (first page only -- fast)
@@ -295,6 +308,9 @@ export async function syncKlaviyoMetrics(c: Context) {
       return { ...s, profile_count: (count >= 100 && hasMore) ? '100+' : count, profile_count_raw: count, has_more: hasMore };
     });
 
+    // Filter out archived flows for counts (but keep them in enrichedFlows for revenue display)
+    const nonArchivedFlows = flows.filter((f: any) => f.status !== 'archived');
+
     // Global stats
     const allFlowMetrics = Object.values(flowMetrics as Record<string, any>);
     const allCampMetrics = Object.values(campaignMetrics as Record<string, any>);
@@ -309,11 +325,19 @@ export async function syncKlaviyoMetrics(c: Context) {
     const avgClickRate = totalDelivered > 0
       ? allMetrics.reduce((s, m) => s + (m.click_rate || 0) * (m.delivered || 0), 0) / totalDelivered : 0;
 
+    // Bug #2: Log revenue per flow for diagnostics
+    for (const flow of enrichedFlows) {
+      if (flow.metrics?.revenue > 0) {
+        console.log(`[klaviyo] Flow revenue: "${flow.name}" (${flow.id}) = $${flow.metrics.revenue.toFixed(2)}`);
+      }
+    }
+    console.log(`[klaviyo] Total flow revenue from API: $${totalFlowRevenue.toFixed(2)} (${Object.keys(flowMetrics).length} flows with metrics)`);
+
     const globalStats = {
       totalProfiles,
       newProfiles: 0,
-      totalFlows: flows.length,
-      activeFlows: flows.filter((f: any) => f.status === 'live').length,
+      totalFlows: nonArchivedFlows.length,
+      activeFlows: nonArchivedFlows.filter((f: any) => f.status === 'live').length,
       totalCampaigns: campaigns.length,
       sentCampaigns: campaigns.filter((camp: any) => camp.send_time).length,
       totalRevenue: totalFlowRevenue + totalCampaignRevenue,
@@ -324,7 +348,9 @@ export async function syncKlaviyoMetrics(c: Context) {
 
     console.log(`[klaviyo] DONE in ${Date.now() - t0}ms total`);
 
-    return c.json({ flows: enrichedFlows, campaigns: enrichedCampaigns, globalStats, lists: listsWithCounts, segments: segmentsWithCounts });
+    // Return non-archived flows to frontend (archived ones still contributed to revenue via report)
+    const visibleFlows = enrichedFlows.filter((f: any) => f.status !== 'archived');
+    return c.json({ flows: visibleFlows, campaigns: enrichedCampaigns, globalStats, lists: listsWithCounts, segments: segmentsWithCounts });
 
   } catch (error: any) {
     console.error('[klaviyo] Error:', error);
