@@ -576,7 +576,7 @@ function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep
     : displayPct < 70
     ? 'Analizando sitios de competencia...'
     : displayPct < 95
-    ? 'Generando estrategia con IA premium...'
+    ? 'Generando estrategia con equipo de Marketing Steve...'
     : 'Finalizando tu análisis...';
 
   return (
@@ -589,13 +589,13 @@ function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep
               <Loader2 className="h-6 w-6 text-primary animate-spin" />
             </div>
             <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[9px] font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
-              AI
+              S
             </div>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <p className="text-base font-bold text-foreground">
-                Preparando tu estrategia premium
+                Generando estrategia con equipo de Marketing Steve
               </p>
               <div className="flex items-center gap-1.5 bg-muted/80 rounded-full px-3 py-1 flex-shrink-0">
                 <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />

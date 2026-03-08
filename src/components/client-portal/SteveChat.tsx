@@ -927,7 +927,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                   <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                     {analysisPhase === 'research'
                       ? 'Investigando tu sitio web y competidores...'
-                      : 'Generando estrategia con IA premium...'}
+                      : 'Generando estrategia con equipo de Marketing Steve...'}
                   </span>
                 </div>
                 <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
