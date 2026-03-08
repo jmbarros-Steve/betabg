@@ -469,10 +469,10 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
           <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary truncate">
-              Analizando con equipo de Marketing Steve
+              Steve está analizando con IA premium
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Analizando con equipo de Marketing Steve.
+              Tómate un café ☕ — esto toma 5-10 min porque usamos el modelo de IA más potente. Puedes navegar a otras pestañas.
             </p>
           </div>
         </div>
@@ -610,9 +610,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     })();
   }, [analysisStatus, elapsedSeconds, clientId]);
 
-  // A los 120 s aplicar automáticamente solo si ya hay datos de research (SEO, keywords, competencia). Si no, seguir comprobando cada 8s.
+  // A los 300s aplicar automáticamente solo si ya hay datos de research (SEO, keywords, competencia). Si no, seguir comprobando cada 8s.
   useEffect(() => {
-    if (analysisStatus !== 'pending' || elapsedSeconds < 120) return;
+    if (analysisStatus !== 'pending' || elapsedSeconds < 300) return;
     if (hasAutoAppliedAt120Ref.current) return;
     hasAutoAppliedAt120Ref.current = true;
 
@@ -2871,12 +2871,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               )}
             </div>
           )}
-          {elapsedSeconds >= 120 && (
+          {elapsedSeconds >= 480 && (
             <div className="flex items-center justify-between p-3 rounded-xl border border-green-400/40 bg-green-50 dark:bg-green-950/20">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                 <p className="text-xs text-green-700 dark:text-green-400">
-                  A los 2 min el análisis se aplica automáticamente en las pestañas SEO, Keywords y Competencia. Si no se ha actualizado, pulsa el botón.
+                  El análisis debería estar listo. Si no se ha actualizado automáticamente, pulsa el botón.
                 </p>
               </div>
               <Button
@@ -3420,7 +3420,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
           {/* ===== SEO TAB ===== */}
           <TabsContent value="seo" className="space-y-4">
-            {!hasSEO ? (
+            {analysisStatus === 'pending' ? (
+              <Card className="text-center py-12 border-primary/20 bg-primary/5">
+                <CardContent className="space-y-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                  <p className="text-primary font-semibold">Steve está generando tu auditoría SEO...</p>
+                  <p className="text-muted-foreground text-sm">Tómate un café ☕ — esto toma unos minutos porque usamos IA premium. Puedes navegar a otras pestañas.</p>
+                </CardContent>
+              </Card>
+            ) : !hasSEO ? (
               <Card className="text-center py-10">
                 <CardContent>
                   <p className="text-muted-foreground text-sm">Ejecuta el análisis de marca para ver la auditoría SEO.</p>
@@ -3607,7 +3615,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
           {/* ===== KEYWORDS TAB ===== */}
           <TabsContent value="keywords" className="space-y-4">
-            {!hasKeywords ? (
+            {analysisStatus === 'pending' ? (
+              <Card className="text-center py-12 border-primary/20 bg-primary/5">
+                <CardContent className="space-y-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                  <p className="text-primary font-semibold">Steve está investigando tus keywords...</p>
+                  <p className="text-muted-foreground text-sm">Analizando tu sitio y el de tu competencia para encontrar las mejores oportunidades.</p>
+                </CardContent>
+              </Card>
+            ) : !hasKeywords ? (
               <Card className="text-center py-10">
                 <CardContent>
                   <p className="text-muted-foreground text-sm">Ejecuta el análisis de marca para ver las keywords.</p>
@@ -3834,7 +3850,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 {analysisStatus === 'pending' ? 'Analizando competidores…' : 'Re-analizar (6 competidores)'}
               </Button>
             </div>
-            {!hasCompetitors && !research.ads_library_analysis ? (
+            {analysisStatus === 'pending' ? (
+              <Card className="text-center py-12 border-primary/20 bg-primary/5">
+                <CardContent className="space-y-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                  <p className="text-primary font-semibold">Steve está analizando a tu competencia...</p>
+                  <p className="text-muted-foreground text-sm">Escaneando sitios web de 6 competidores y generando análisis estratégico comparativo.</p>
+                </CardContent>
+              </Card>
+            ) : !hasCompetitors && !research.ads_library_analysis ? (
               <Card className="text-center py-10">
                 <CardContent>
                   <Trophy className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
