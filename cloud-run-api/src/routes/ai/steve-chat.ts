@@ -60,7 +60,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         ]},
       ],
       steveIntro: '*saca calculadora imaginaria* 🧮\n\n',
-      commentGuide: 'Da 1-2 oraciones de contexto (para qué sirven estos números). Luego pide el formulario. Después de que responda: CALCULA Margen bruto, Margen %, CPA Máximo; muestra tabla markdown. Di que guardaste el CPA. Menciona la fase del negocio y presupuesto. Comenta en tono conversacional.',
+      commentGuide: 'Evalúa los datos financieros recibidos. CALCULA Margen bruto, Margen %, CPA Máximo; muestra tabla markdown. Di que guardaste el CPA. Menciona la fase del negocio y presupuesto. Si los campos están completos, ACEPTA con [AVANZAR]. NO pidas que llene el formulario de nuevo.',
     },
     {
       id: 'sales_channels',
@@ -77,7 +77,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
       ],
       validation: 'sum_100',
       steveIntro: '*ladea la cabeza curioso* 🐕\n\nPara saber dónde enfocar la estrategia necesito que me digas cómo se reparten hoy tus ventas. ',
-      commentGuide: 'Comenta en 1-3 oraciones. Analiza si la distribución tiene sentido. Da contexto breve antes de pedir el formulario ("Llena los campos…").',
+      commentGuide: 'Comenta en 1-3 oraciones. Analiza si la distribución de canales tiene sentido para su negocio. Si los porcentajes suman 100% y son coherentes, ACEPTA con [AVANZAR]. NO pidas que llene el formulario de nuevo.',
     },
     {
       id: 'persona_profile',
@@ -95,7 +95,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'interest', label: '🎯 ¿Por qué te compra?', type: 'text', placeholder: 'Ej: Verse bien sin esfuerzo' },
       ],
       steveIntro: '*se pone serio* 🎯\n\nAhora necesito el perfil de tu cliente ideal para orientar todo el brief. ',
-      commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Revisa si el perfil cuadra con el producto. Da contexto breve antes de pedir el formulario.',
+      commentGuide: 'Comenta en tono conversacional (1-3 oraciones). Revisa si el perfil del buyer persona cuadra con el producto que vende. Si los 8 campos están completos y coherentes, ACEPTA con [AVANZAR]. NO pidas que llene el formulario de nuevo.',
     },
     {
       id: 'persona_pain',
@@ -147,7 +147,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'comp3_url', label: '🌐 Web / Instagram Competidor 3', type: 'text', placeholder: 'Ej: marcax.com' },
       ],
       steveIntro: '*olfatea el territorio enemigo* 🔍\n\nNecesito tu competencia directa para compararte y ver qué hacen bien o mal. ',
-      commentGuide: 'Verifica que los URLs parezcan reales y que los competidores sean del mismo sector. Da contexto breve antes de pedir el formulario.',
+      commentGuide: 'Verifica que los URLs parezcan reales y que los competidores sean del mismo sector. Si los 3 competidores están completos, ACEPTA con [AVANZAR]. NO pidas que llene el formulario de nuevo.',
     },
     {
       id: 'competitors_weakness',
@@ -163,7 +163,7 @@ function getBrandBriefQuestions(): BriefQuestion[] {
         { key: 'comp3_better', label: '✅ ¿Por qué TÚ lo haces mejor?', type: 'textarea', placeholder: '' },
       ],
       steveIntro: '*gruñe con desconfianza* 🐕\n\nAhora cuéntame para cada uno qué prometen y no cumplen, y por qué tú lo haces mejor. ',
-      commentGuide: 'Analiza si las diferenciaciones son REALES. Da contexto breve antes de pedir el formulario.',
+      commentGuide: 'Analiza si las diferenciaciones son REALES y específicas (no genéricas). Si los campos están completos y son coherentes, ACEPTA con [AVANZAR]. NO pidas que llene el formulario de nuevo.',
     },
     {
       id: 'your_advantage',
@@ -1054,6 +1054,8 @@ VALIDACIÓN DE RELEVANCIA (OBLIGATORIA): Antes de aceptar, verifica que la respu
 
 SI EL CLIENTE RESPONDIÓ BIEN → incluye [AVANZAR] al final de tu mensaje Y haz esta SIGUIENTE PREGUNTA:
 ${nextLabel} — INTRO: ${nextQ?.steveIntro || ''} — TEXTO: ${nextQ?.question}
+
+⚠️ IMPORTANTE FORMULARIOS: Si el cliente envió datos de un formulario (campos con labels como "👤 Nombre:", "🎂 Edad:", "🛒 Shopify:", etc.), eso ES su respuesta completa. Evalúa si los datos son coherentes y ACEPTA con [AVANZAR]. NUNCA le pidas que "llene el formulario" si ya lo llenó — eso genera un loop infinito.
 
 SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN (no está respondiendo, solo pregunta algo) → respóndela brevemente, recuérdale la pregunta actual, NO incluyas [AVANZAR] ni [RECHAZO].
 
