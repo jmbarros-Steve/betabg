@@ -1163,9 +1163,10 @@ ${questionContext}`;
   console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}, messages: ${chatMessages.length}/${BRAND_BRIEF_QUESTIONS.length}`);
 
   const maxTokens = isLastQuestion ? 6000 : 1200;
-  // Use Sonnet for the last question (brief generation follows a template -- Sonnet is
+  // Use Sonnet only for the last question (brief generation follows a template -- Sonnet is
   // much faster and avoids timeouts that Opus + 8000 tokens would cause).
-  const model = 'claude-sonnet-4-6';
+  // All other questions use Opus for better instruction-following (especially [AVANZAR] tags).
+  const model = isLastQuestion ? 'claude-sonnet-4-6' : 'claude-opus-4-6';
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
@@ -1211,7 +1212,18 @@ ${questionContext}`;
   const isRejection = assistantMessage.includes('[RECHAZO]');
   // BUG 1 FIX: On the last question (Q16) Steve generates the full brief and never includes [AVANZAR],
   // so treat any non-rejection on the last question as an implicit advance.
-  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion);
+  // BUG 7 FIX: Implicit advance detection — if the AI forgot [AVANZAR] but is clearly asking
+  // the NEXT question (contains its steveIntro or shortLabel), treat as advance.
+  const nextQForDetection = !isLastQuestion ? BRAND_BRIEF_QUESTIONS[currentQuestionIndex + 1] : null;
+  const implicitAdvance = !isRejection && !assistantMessage.includes('[AVANZAR]') && nextQForDetection && (
+    (nextQForDetection.steveIntro && assistantMessage.includes(nextQForDetection.steveIntro.trim().slice(0, 20))) ||
+    (nextQForDetection.shortLabel && assistantMessage.toLowerCase().includes(nextQForDetection.shortLabel.toLowerCase())) ||
+    assistantMessage.includes(`Pregunta ${currentQuestionIndex + 2} de 16`)
+  );
+  if (implicitAdvance) {
+    console.log(`[steve-chat] Implicit advance detected for Q${currentQuestionIndex} → Q${currentQuestionIndex + 1} (AI forgot [AVANZAR])`);
+  }
+  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance);
   // Strip control tags from visible message
   assistantMessage = assistantMessage
     .replace(/\s*\[RECHAZO\]\s*$/i, '')
