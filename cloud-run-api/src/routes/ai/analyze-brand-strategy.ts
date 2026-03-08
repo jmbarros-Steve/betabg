@@ -94,7 +94,7 @@ Responde con JSON válido: { "positioning_strategy": { ... } }`,
   {
     id: 'action_plan',
     keys: ['action_plan'],
-    maxTokens: 10000,
+    maxTokens: 16000,
     dataScope: 'all' as const,
     prompt: `Genera ÚNICAMENTE la sección "action_plan". DEBE contener EXACTAMENTE 7 accionables estratégicos usando framework SCR.
 
@@ -349,7 +349,6 @@ function repairTruncatedJson(text: string): Record<string, unknown> {
   let cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
 
   // Intentar cerrar strings y brackets abiertos
-  // Contar brackets/braces abiertos
   let inString = false;
   let escape = false;
   const stack: string[] = [];
@@ -367,7 +366,8 @@ function repairTruncatedJson(text: string): Record<string, unknown> {
   // Si estamos dentro de un string, cerrarlo
   if (inString) cleaned += '"';
 
-  // Cerrar brackets/braces pendientes (podría necesitar quitar trailing comma)
+  // Quitar trailing incomplete key-value (e.g. truncated mid-value)
+  cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, '');
   cleaned = cleaned.replace(/,\s*$/, '');
 
   // Cerrar todo lo que quedó abierto
@@ -376,6 +376,29 @@ function repairTruncatedJson(text: string): Record<string, unknown> {
   }
 
   try { return JSON.parse(cleaned); } catch {}
+
+  // Segundo intento: quitar el último elemento incompleto del array/object
+  // Buscar la última coma seguida de un objeto/array incompleto y cortarlo
+  const lastGoodComma = cleaned.lastIndexOf('},');
+  if (lastGoodComma > 0) {
+    const trimmed = cleaned.slice(0, lastGoodComma + 1);
+    // Re-close brackets
+    let inStr2 = false;
+    let esc2 = false;
+    const stack2: string[] = [];
+    for (const ch of trimmed) {
+      if (esc2) { esc2 = false; continue; }
+      if (ch === '\\') { esc2 = true; continue; }
+      if (ch === '"') { inStr2 = !inStr2; continue; }
+      if (inStr2) continue;
+      if (ch === '{') stack2.push('}');
+      else if (ch === '[') stack2.push(']');
+      else if (ch === '}' || ch === ']') stack2.pop();
+    }
+    let attempt = trimmed;
+    while (stack2.length > 0) attempt += stack2.pop();
+    try { return JSON.parse(attempt); } catch {}
+  }
 
   // Último intento: encontrar el último } o ] que haga parse válido
   for (let i = cleaned.length - 1; i > 0; i--) {
@@ -495,7 +518,23 @@ async function callClaude(
         console.log(`[callClaude] Retry ${attempt}/${MAX_RETRIES} for ${model} after ${backoff}ms`);
         await new Promise(resolve => setTimeout(resolve, backoff));
       }
-      return await callClaudeOnce(baseSystemPrompt, sectionPrompt, researchData, maxTokens, model);
+      const result = await callClaudeOnce(baseSystemPrompt, sectionPrompt, researchData, maxTokens, model);
+
+      // If JSON repair failed, retry once with more tokens
+      if ((result as any)._repair_failed && attempt < MAX_RETRIES) {
+        const boostedTokens = Math.min(maxTokens + 8000, 32000);
+        console.warn(`[callClaude] _repair_failed detected, retrying with ${boostedTokens} tokens (was ${maxTokens})`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const retryResult = await callClaudeOnce(baseSystemPrompt, sectionPrompt, researchData, boostedTokens, model);
+        if (!(retryResult as any)._repair_failed) {
+          console.log(`[callClaude] Retry with boosted tokens succeeded!`);
+          return retryResult;
+        }
+        console.warn(`[callClaude] Retry with boosted tokens also failed, returning partial data`);
+        return retryResult;
+      }
+
+      return result;
     } catch (error: any) {
       lastError = error;
       const code = error.statusCode || 0;

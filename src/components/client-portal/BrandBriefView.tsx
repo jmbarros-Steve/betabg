@@ -2393,38 +2393,63 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
     }
 
+    // ── Safe PDF section renderer — catches errors so one bad section doesn't kill the PDF ──
+    const safePdfRender = (label: string, fn: () => void) => {
+      try {
+        fn();
+      } catch (err) {
+        console.error(`[PDF] Error rendering "${label}":`, err);
+        try {
+          addSubTitle(`Error en seccion: ${label}`);
+          addBody('Esta seccion no pudo generarse correctamente. Los datos pueden estar incompletos.', 0, 5);
+        } catch (_) { /* ignore nested error */ }
+      }
+    };
+
     // Enhanced competitor cards with full details (AI-generated)
     const compsForCards = research.competitor_analysis?.competitors || [];
     if (compsForCards.length > 0) {
-      renderCompetitorCards(pdfCtx, pdfHelpers, compsForCards);
+      safePdfRender('Competidores', () => renderCompetitorCards(pdfCtx, pdfHelpers, compsForCards));
     }
 
     // Brand Identity
-    renderBrandIdentity(pdfCtx, pdfHelpers, (research as any).brand_identity);
+    safePdfRender('Identidad de Marca', () => renderBrandIdentity(pdfCtx, pdfHelpers, (research as any).brand_identity));
 
     // Financial Analysis
-    renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis);
+    safePdfRender('Analisis Financiero', () => renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis));
 
     // Consumer Profile
-    renderConsumerProfile(pdfCtx, pdfHelpers, (research as any).consumer_profile);
+    safePdfRender('Perfil del Consumidor', () => renderConsumerProfile(pdfCtx, pdfHelpers, (research as any).consumer_profile));
 
     // Positioning Strategy
-    renderPositioningStrategy(pdfCtx, pdfHelpers, (research as any).positioning_strategy);
+    safePdfRender('Estrategia de Posicionamiento', () => renderPositioningStrategy(pdfCtx, pdfHelpers, (research as any).positioning_strategy));
 
-    // Action Plan
-    renderActionPlan(pdfCtx, pdfHelpers, (research as any).action_plan);
+    // Action Plan — handle _repair_failed gracefully
+    const actionPlanData = (research as any).action_plan;
+    if (actionPlanData && (actionPlanData as any)._repair_failed) {
+      safePdfRender('Plan de Accion', () => {
+        addSectionHeader('E', 'PLAN DE ACCION ESTRATEGICO');
+        addBody('Los datos del plan de accion se generaron parcialmente. Contacta al equipo para regenerar esta seccion.', 0, 5);
+        if ((actionPlanData as any).raw_text) {
+          const rawPreview = String((actionPlanData as any).raw_text).slice(0, 2000);
+          addBody(rawPreview, 0, 4);
+        }
+      });
+    } else {
+      safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, actionPlanData));
+    }
 
     // Meta Ads Strategy
-    renderMetaAdsStrategy(pdfCtx, pdfHelpers, (research as any).meta_ads_strategy);
+    safePdfRender('Meta Ads', () => renderMetaAdsStrategy(pdfCtx, pdfHelpers, (research as any).meta_ads_strategy));
 
     // Google Ads Strategy
-    renderGoogleAdsStrategy(pdfCtx, pdfHelpers, (research as any).google_ads_strategy);
+    safePdfRender('Google Ads', () => renderGoogleAdsStrategy(pdfCtx, pdfHelpers, (research as any).google_ads_strategy));
 
     // Ads Library full analysis
-    renderAdsLibraryAnalysis(pdfCtx, pdfHelpers, (research as any).ads_library_analysis);
+    safePdfRender('Ads Library', () => renderAdsLibraryAnalysis(pdfCtx, pdfHelpers, (research as any).ads_library_analysis));
 
     // Budget & Funnel (Charlie Methodology) — dynamic from backend
-    renderBudgetAndFunnel(pdfCtx, pdfHelpers, (research as any).budget_and_funnel);
+    safePdfRender('Presupuesto e Inversion', () => renderBudgetAndFunnel(pdfCtx, pdfHelpers, (research as any).budget_and_funnel));
 
     // ─── SECCIÓN: EMBUDO TOFU-MOFU-BOFU (fallback when no budget_and_funnel) ──
     if (!(research as any).budget_and_funnel) {

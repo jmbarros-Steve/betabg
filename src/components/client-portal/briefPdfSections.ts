@@ -294,8 +294,8 @@ export function renderPositioningStrategy(
   renderGenericObject(helpers, positioningStrategy, 20);
 
   // Perceptual map as text table
-  if (ps.mapa_perceptual) {
-    const mp = ps.mapa_perceptual;
+  if (positioningStrategy.mapa_perceptual) {
+    const mp = positioningStrategy.mapa_perceptual;
     helpers.addSubTitle('Mapa Perceptual');
     if (mp.eje_x) helpers.addKeyValue('Eje X', String(mp.eje_x));
     if (mp.eje_y) helpers.addKeyValue('Eje Y', String(mp.eje_y));
