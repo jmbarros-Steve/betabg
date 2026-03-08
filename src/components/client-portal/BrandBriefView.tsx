@@ -427,9 +427,11 @@ const PERFORMANCE_QUOTES = [
   { quote: "Creatives are 70% of your ad performance. Test relentlessly.", author: "Andrew Foxwell", role: "Foxwell Digital" },
   { quote: "Stop trying to go viral. Start trying to be relevant.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
   { quote: "The offer is the strategy. Everything else is just execution.", author: "Charlie Tichenor", role: "Founder, The Facebook Disruptor" },
+  { quote: "Un buen análisis toma tiempo, pero un mal análisis te cuesta dinero.", author: "Steve AI", role: "Tu Consultor de Marketing" },
+  { quote: "Los datos sin estrategia son solo números. La estrategia sin datos es solo opinión.", author: "Steve AI", role: "Tu Consultor de Marketing" },
 ];
 
-function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string; detail: string; pct: number } | null }) {
+function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep: { step: string; detail: string; pct: number } | null; elapsedSeconds?: number }) {
   const [quoteIdx, setQuoteIdx] = useState(0);
   const [visible, setVisible] = useState(true);
   const maxPctRef = useRef(0);
@@ -440,6 +442,12 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
     maxPctRef.current = rawPct;
   }
   const displayPct = Math.max(rawPct, maxPctRef.current);
+
+  // Format elapsed time as mm:ss
+  const elapsed = elapsedSeconds || 0;
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const timeStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -454,36 +462,63 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
 
   const quote = PERFORMANCE_QUOTES[quoteIdx];
   const phases = [
-    { key: ['inicio', 'sitio_web'], icon: <Globe className="h-4 w-4 mx-auto mb-1" />, label: 'Tu Sitio Web' },
-    { key: ['detectando'], icon: <Search className="h-4 w-4 mx-auto mb-1" />, label: 'Detectando' },
-    { key: ['competidor_0', 'competidor_1', 'competidor_2', 'competidor_3', 'competidor_4', 'competidor_5'], icon: <Trophy className="h-4 w-4 mx-auto mb-1" />, label: 'Competidores' },
-    { key: ['ia'], icon: <Sparkles className="h-4 w-4 mx-auto mb-1" />, label: 'Estrategia IA' },
+    { key: ['inicio', 'sitio_web'], icon: <Globe className="h-4 w-4 mx-auto mb-1" />, label: 'Escaneando web', desc: 'Tu sitio' },
+    { key: ['detectando'], icon: <Search className="h-4 w-4 mx-auto mb-1" />, label: 'Detectando', desc: 'Competencia' },
+    { key: ['competidor_0', 'competidor_1', 'competidor_2', 'competidor_3', 'competidor_4', 'competidor_5'], icon: <Trophy className="h-4 w-4 mx-auto mb-1" />, label: 'Analizando', desc: '6 competidores' },
+    { key: ['ia'], icon: <Sparkles className="h-4 w-4 mx-auto mb-1" />, label: 'Estrategia IA', desc: '12 análisis' },
   ];
   const thresholds = [0, 20, 25, 70];
 
+  // Dynamic status message based on progress
+  const statusMessage = displayPct < 20
+    ? 'Escaneando tu sitio web...'
+    : displayPct < 25
+    ? 'Identificando competidores...'
+    : displayPct < 70
+    ? 'Analizando sitios de competencia...'
+    : displayPct < 95
+    ? 'Generando estrategia con IA premium...'
+    : 'Finalizando tu análisis...';
+
   return (
-    <Card className="border-primary/30 bg-primary/5 overflow-hidden">
-      <CardContent className="pt-4 pb-4">
-        {/* Status row */}
-        <div className="flex items-center gap-3 mb-3">
-          <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
+    <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-primary/3 to-background overflow-hidden shadow-lg">
+      <CardContent className="pt-5 pb-5">
+        {/* Header row with timer */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="relative flex-shrink-0">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[9px] font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+              AI
+            </div>
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-primary truncate">
-              Steve está analizando con IA premium
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-base font-bold text-foreground">
+                Preparando tu estrategia premium
+              </p>
+              <div className="flex items-center gap-1.5 bg-muted/80 rounded-full px-3 py-1 flex-shrink-0">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs font-mono font-bold text-foreground">{timeStr}</span>
+              </div>
+            </div>
+            <p className="text-sm text-primary font-medium mt-0.5">
+              {statusMessage}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Tómate un café ☕ — esto toma 5-10 min porque usamos el modelo de IA más potente. Puedes navegar a otras pestañas.
+            <p className="text-xs text-muted-foreground mt-1">
+              Tiempo estimado: 8-10 minutos. Usamos el modelo de IA mas avanzado para darte un analisis de nivel consultora.
             </p>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
-            <span className="text-[10px] font-bold text-primary">{displayPct}%</span>
+        <div className="mb-4 bg-background/60 rounded-lg p-3 border border-border/50">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Progreso del analisis</span>
+            <span className="text-sm font-bold text-primary">{displayPct}%</span>
           </div>
-          <Progress value={displayPct || 5} className="h-2" />
+          <Progress value={displayPct || 3} className="h-2.5" />
         </div>
 
         {/* Step indicators */}
@@ -492,30 +527,46 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
             const isActive = progressStep && phase.key.includes(progressStep.step);
             const isDone = displayPct > thresholds[i] && !isActive;
             return (
-              <div key={i} className={`rounded-lg p-2 border transition-all duration-300 ${isActive ? 'bg-primary/10 border-primary/40' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background border-border'}`}>
-                <div className={isActive ? 'text-primary' : isDone ? 'text-green-500' : 'text-muted-foreground'}>
+              <div key={i} className={`rounded-xl p-2.5 border transition-all duration-500 ${isActive ? 'bg-primary/10 border-primary/40 shadow-sm shadow-primary/10 scale-[1.02]' : isDone ? 'bg-green-50 dark:bg-green-950/20 border-green-400/40' : 'bg-background/80 border-border/50'}`}>
+                <div className={`transition-colors duration-300 ${isActive ? 'text-primary' : isDone ? 'text-green-500' : 'text-muted-foreground/60'}`}>
                   {isDone ? <CheckCircle2 className="h-4 w-4 mx-auto mb-1" /> : phase.icon}
                 </div>
-                <p className={`text-[10px] font-medium ${isActive ? 'text-primary' : isDone ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>{phase.label}</p>
-                {isActive && <div className="mt-1 h-0.5 bg-primary/20 rounded-full overflow-hidden"><div className="h-0.5 bg-primary rounded-full animate-pulse w-full" /></div>}
+                <p className={`text-[10px] font-semibold leading-tight ${isActive ? 'text-primary' : isDone ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/60'}`}>{phase.label}</p>
+                <p className={`text-[9px] mt-0.5 ${isActive ? 'text-primary/70' : isDone ? 'text-green-500/70' : 'text-muted-foreground/40'}`}>{phase.desc}</p>
+                {isActive && <div className="mt-1.5 h-0.5 bg-primary/20 rounded-full overflow-hidden"><div className="h-0.5 bg-primary rounded-full animate-pulse w-full" /></div>}
               </div>
             );
           })}
         </div>
 
+        {/* What you'll get section */}
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {[
+            { icon: '🔍', label: 'SEO + Keywords', sub: 'Auditoría completa' },
+            { icon: '📊', label: 'Meta + Google Ads', sub: 'Copies listos' },
+            { icon: '🎯', label: '7 Accionables', sub: 'Plan estratégico' },
+          ].map((item, i) => (
+            <div key={i} className="text-center bg-background/60 rounded-lg p-2 border border-border/30">
+              <span className="text-lg">{item.icon}</span>
+              <p className="text-[10px] font-semibold text-foreground mt-0.5">{item.label}</p>
+              <p className="text-[9px] text-muted-foreground">{item.sub}</p>
+            </div>
+          ))}
+        </div>
+
         {/* Rotating quote */}
         <div
-          className="rounded-xl border border-primary/20 bg-background/60 p-4"
+          className="rounded-xl border border-primary/15 bg-background/80 backdrop-blur-sm p-4"
           style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(6px)', transition: 'opacity 0.4s ease, transform 0.4s ease' }}
         >
           <div className="flex gap-3 items-start">
-            <span className="text-3xl leading-none text-primary/30 font-serif select-none flex-shrink-0 -mt-1">"</span>
+            <span className="text-3xl leading-none text-primary/25 font-serif select-none flex-shrink-0 -mt-1">"</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-foreground leading-snug italic">
                 {quote.quote}
               </p>
               <div className="flex items-center gap-2 mt-2.5">
-                <div className="h-px flex-1 bg-border" />
+                <div className="h-px flex-1 bg-border/50" />
                 <div className="text-right flex-shrink-0">
                   <p className="text-[11px] font-bold text-primary">{quote.author}</p>
                   <p className="text-[10px] text-muted-foreground">{quote.role}</p>
@@ -524,6 +575,11 @@ function AnalysisProgressBanner({ progressStep }: { progressStep: { step: string
             </div>
           </div>
         </div>
+
+        {/* Footer tip */}
+        <p className="text-[10px] text-center text-muted-foreground/70 mt-3">
+          Puedes navegar a otras pestanas mientras Steve trabaja. Te avisaremos cuando termine.
+        </p>
       </CardContent>
     </Card>
   );
@@ -2912,7 +2968,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       {/* Analysis progress banner */}
       {analysisStatus === 'pending' && (
         <div className="space-y-3">
-          <AnalysisProgressBanner progressStep={progressStep} />
+          <AnalysisProgressBanner progressStep={progressStep} elapsedSeconds={elapsedSeconds} />
           {diagnostic && elapsedSeconds >= 15 && user?.email === 'jmbarros@bgconsult.cl' && (
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs font-mono space-y-1">
               <p className="font-semibold text-foreground">Diagnóstico (para localizar la falla):</p>
@@ -2930,31 +2986,42 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             </div>
           )}
           {elapsedSeconds >= 480 && (
-            <div className="flex items-center justify-between p-3 rounded-xl border border-green-400/40 bg-green-50 dark:bg-green-950/20">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                <p className="text-xs text-green-700 dark:text-green-400">
-                  El análisis debería estar listo. Si no se ha actualizado automáticamente, pulsa el botón.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleForceShowAnalysis}
-                className="text-xs border-green-500 text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 ml-3 whitespace-nowrap"
-              >
-                📊 Ver análisis generado
-              </Button>
-            </div>
+            <Card className="border-green-400/50 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 shadow-sm">
+              <CardContent className="py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">Tu analisis esta listo</p>
+                    <p className="text-xs text-green-600/80 dark:text-green-400/70 mt-0.5">
+                      Si no se actualizo automaticamente, pulsa el boton para verlo.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleForceShowAnalysis}
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-sm whitespace-nowrap"
+                >
+                  Ver analisis
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
 
       {analysisStatus === 'complete' && hasResearch && (
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-green-400/40 bg-gradient-to-r from-green-50/80 to-emerald-50/80 dark:from-green-950/20 dark:to-emerald-950/20 shadow-sm">
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-primary font-medium">Análisis completado — revisa los tabs SEO, Keywords y Competencia.</p>
+            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-green-800 dark:text-green-300">Analisis estrategico completado</p>
+              <p className="text-xs text-green-600/80 dark:text-green-400/70 mt-0.5">Revisa las pestanas SEO, Keywords, Meta Ads, Google Ads y Competencia para ver los resultados.</p>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -3479,11 +3546,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           {/* ===== SEO TAB ===== */}
           <TabsContent value="seo" className="space-y-4">
             {analysisStatus === 'pending' ? (
-              <Card className="text-center py-12 border-primary/20 bg-primary/5">
-                <CardContent className="space-y-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                  <p className="text-primary font-semibold">Steve está generando tu auditoría SEO...</p>
-                  <p className="text-muted-foreground text-sm">Tómate un café ☕ — esto toma unos minutos porque usamos IA premium. Puedes navegar a otras pestañas.</p>
+              <Card className="text-center py-14 border-primary/20 bg-gradient-to-b from-primary/5 to-background">
+                <CardContent className="space-y-4">
+                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-primary font-bold text-base">Auditoria SEO en progreso</p>
+                    <p className="text-muted-foreground text-sm mt-1">Analizando estructura, meta tags, velocidad, mobile-first y posicionamiento vs competencia.</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Score detallado</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Problemas + soluciones</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Gap vs competencia</span>
+                  </div>
                 </CardContent>
               </Card>
             ) : !hasSEO ? (
@@ -3674,11 +3750,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           {/* ===== KEYWORDS TAB ===== */}
           <TabsContent value="keywords" className="space-y-4">
             {analysisStatus === 'pending' ? (
-              <Card className="text-center py-12 border-primary/20 bg-primary/5">
-                <CardContent className="space-y-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                  <p className="text-primary font-semibold">Steve está investigando tus keywords...</p>
-                  <p className="text-muted-foreground text-sm">Analizando tu sitio y el de tu competencia para encontrar las mejores oportunidades.</p>
+              <Card className="text-center py-14 border-primary/20 bg-gradient-to-b from-primary/5 to-background">
+                <CardContent className="space-y-4">
+                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-primary font-bold text-base">Investigacion de keywords en progreso</p>
+                    <p className="text-muted-foreground text-sm mt-1">Analizando tu sitio y competencia para encontrar oportunidades de posicionamiento.</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> 8-10 keywords</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Long-tail</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Negativas</span>
+                  </div>
                 </CardContent>
               </Card>
             ) : !hasKeywords ? (
@@ -3909,11 +3994,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               </Button>
             </div>
             {analysisStatus === 'pending' ? (
-              <Card className="text-center py-12 border-primary/20 bg-primary/5">
-                <CardContent className="space-y-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                  <p className="text-primary font-semibold">Steve está analizando a tu competencia...</p>
-                  <p className="text-muted-foreground text-sm">Escaneando sitios web de 6 competidores y generando análisis estratégico comparativo.</p>
+              <Card className="text-center py-14 border-primary/20 bg-gradient-to-b from-primary/5 to-background">
+                <CardContent className="space-y-4">
+                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-primary font-bold text-base">Analisis de competencia en progreso</p>
+                    <p className="text-muted-foreground text-sm mt-1">Escaneando sitios web de hasta 6 competidores y generando benchmark comparativo.</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Benchmark</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Gaps</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Oportunidades</span>
+                  </div>
                 </CardContent>
               </Card>
             ) : !hasCompetitors && !research.ads_library_analysis ? (
