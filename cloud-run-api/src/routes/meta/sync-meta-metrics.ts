@@ -239,19 +239,33 @@ export async function syncMetaMetrics(c: Context) {
 
     console.log(`Fetching Meta insights for account ${adAccountId}`);
 
-    const metaResponse = await fetch(insightsUrl.toString());
+    // Fetch all pages of insights (Meta paginates daily breakdown)
+    let allInsights: MetaInsightsResponse['data'] = [];
+    let nextUrl: string | null = insightsUrl.toString();
 
-    if (!metaResponse.ok) {
-      const errorData: any = await metaResponse.json();
-      console.error('Meta API error:', errorData);
-      return c.json({
-        error: 'Meta API error',
-        details: errorData.error?.message || 'Unknown error'
-      }, 502);
+    while (nextUrl) {
+      const metaResponse = await fetch(nextUrl);
+
+      if (!metaResponse.ok) {
+        const errorData: any = await metaResponse.json();
+        console.error('Meta API error:', errorData);
+        return c.json({
+          error: 'Meta API error',
+          details: errorData.error?.message || 'Unknown error'
+        }, 502);
+      }
+
+      const pageData: MetaInsightsResponse = await metaResponse.json() as any;
+      if (pageData.data) {
+        allInsights = allInsights.concat(pageData.data);
+      }
+      nextUrl = pageData.paging?.next || null;
+      if (nextUrl) {
+        console.log(`Fetching next page of insights (${allInsights.length} days so far)...`);
+      }
     }
 
-    const insightsData: MetaInsightsResponse = await metaResponse.json() as any;
-    console.log(`Received ${insightsData.data?.length || 0} days of insights`);
+    console.log(`Received ${allInsights.length} days of insights (all pages)`);
 
     // Process and store metrics - ALWAYS CONVERT TO CLP
     const metricsToUpsert: Array<{
@@ -262,7 +276,7 @@ export async function syncMetaMetrics(c: Context) {
       currency: string;
     }> = [];
 
-    for (const dayData of insightsData.data || []) {
+    for (const dayData of allInsights) {
       const metricDate = dayData.date_start;
 
       // Ad Spend - Convert to CLP
@@ -408,7 +422,7 @@ export async function syncMetaMetrics(c: Context) {
     return c.json({
       success: true,
       metrics_synced: metricsToUpsert.length,
-      days_processed: insightsData.data?.length || 0,
+      days_processed: allInsights.length,
       currency: 'CLP',
       source_currency: accountCurrency
     }, 200);

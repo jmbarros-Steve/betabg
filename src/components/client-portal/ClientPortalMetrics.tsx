@@ -153,11 +153,13 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
         // Fetch current and previous metrics in parallel
         // IMPORTANT: Only fetch revenue/orders from Shopify connections to avoid double attribution
-        // Ad spend comes from campaign_metrics (Meta + Google)
+        // Ad spend comes from platform_metrics (Meta sync writes ad_spend there)
         const shopifyQueryIds = shopifyConnIds.length > 0 ? shopifyConnIds : ['00000000-0000-0000-0000-000000000000'];
         const adQueryIds = adConnIds.length > 0 ? adConnIds : ['00000000-0000-0000-0000-000000000000'];
+        // Map connection_id → platform for ad spend breakdown
+        const connPlatformMap = new Map(connections.map(c => [c.id, c.platform]));
 
-        const [currentRes, prevRes, configRes, campaignCurrentRes, campaignPrevRes] = await Promise.all([
+        const [currentRes, prevRes, configRes, adSpendCurrentRes, adSpendPrevRes] = await Promise.all([
           // Only Shopify metrics for revenue/orders (no Meta purchase_value!)
           supabase
             .from('platform_metrics')
@@ -176,35 +178,37 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             .select('*')
             .eq('client_id', clientId)
             .maybeSingle(),
-          // Get ad spend from campaign_metrics (Meta + Google)
+          // Get ad spend from platform_metrics (where sync-meta-metrics writes)
           supabase
-            .from('campaign_metrics')
-            .select('spend, conversion_value, metric_date, platform')
+            .from('platform_metrics')
+            .select('metric_type, metric_value, metric_date, connection_id')
             .in('connection_id', adQueryIds)
+            .eq('metric_type', 'ad_spend')
             .gte('metric_date', startDate.toISOString().split('T')[0]),
           supabase
-            .from('campaign_metrics')
-            .select('spend, conversion_value, metric_date, platform')
+            .from('platform_metrics')
+            .select('metric_type, metric_value, metric_date, connection_id')
             .in('connection_id', adQueryIds)
+            .eq('metric_type', 'ad_spend')
             .gte('metric_date', prevStart.toISOString().split('T')[0])
             .lte('metric_date', prevEnd.toISOString().split('T')[0]),
         ]);
 
         if (currentRes.error) throw currentRes.error;
         if (prevRes.error) throw prevRes.error;
-        if (campaignCurrentRes.error) throw campaignCurrentRes.error;
-        if (campaignPrevRes.error) throw campaignPrevRes.error;
+        if (adSpendCurrentRes.error) throw adSpendCurrentRes.error;
+        if (adSpendPrevRes.error) throw adSpendPrevRes.error;
 
-        // Convert campaign metrics to platform_metrics format for ad spend
-        const campaignToMetricRows = (data: any[] | null): MetricRow[] => {
+        // Convert platform_metrics ad_spend rows into typed metric rows
+        const adSpendToMetricRows = (data: any[] | null): MetricRow[] => {
           if (!data) return [];
           // Group by date and platform to avoid duplicates
           const byDatePlatform = new Map<string, { spend: number; platform: string }>();
           for (const row of data) {
-            // IMPORTANT: date has hyphens; use a safe delimiter.
-            const key = `${row.metric_date}|${row.platform}`;
-            const existing = byDatePlatform.get(key) || { spend: 0, platform: row.platform };
-            existing.spend += Number(row.spend) || 0;
+            const platform = connPlatformMap.get(row.connection_id) || 'unknown';
+            const key = `${row.metric_date}|${platform}`;
+            const existing = byDatePlatform.get(key) || { spend: 0, platform };
+            existing.spend += Number(row.metric_value) || 0;
             byDatePlatform.set(key, existing);
           }
 
@@ -225,8 +229,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           return result;
         };
 
-        const currentCampaignMetrics = campaignToMetricRows(campaignCurrentRes.data);
-        const prevCampaignMetrics = campaignToMetricRows(campaignPrevRes.data);
+        const currentCampaignMetrics = adSpendToMetricRows(adSpendCurrentRes.data);
+        const prevCampaignMetrics = adSpendToMetricRows(adSpendPrevRes.data);
 
         const dbMetricRows = (currentRes.data ?? []).map((m) => ({
           metric_type: m.metric_type,
