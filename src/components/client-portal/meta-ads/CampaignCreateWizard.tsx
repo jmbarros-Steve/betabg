@@ -697,15 +697,23 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   const [savingDraft, setSavingDraft] = useState(false);
 
-  // Save as draft to ad_creatives table
+  // Save as draft to ad_creatives table (DCT-ready)
   const handleSaveDraft = async () => {
     setSavingDraft(true);
     try {
+      const funnelMap: Record<string, string> = {
+        CONVERSIONS: 'bofu', TRAFFIC: 'tofu', AWARENESS: 'tofu', ENGAGEMENT: 'mofu', CATALOG: 'bofu',
+      };
+      const funnel = funnelMap[objective] || 'mofu';
+      const anguloText = audienceDesc
+        ? `${OBJECTIVES.find(o => o.value === objective)?.label || objective} — ${audienceDesc.substring(0, 80)}`
+        : `${OBJECTIVES.find(o => o.value === objective)?.label || objective} — Campana directa`;
+
       const { error } = await supabase.from('ad_creatives').insert({
         client_id: clientId,
-        funnel: objective === 'CONVERSIONS' ? 'bofu' : objective === 'TRAFFIC' ? 'tofu' : 'mofu',
+        funnel,
         formato: imageUrl?.endsWith('.mp4') ? 'video' : 'static',
-        angulo: 'campana-draft',
+        angulo: anguloText,
         titulo: headline || campName || 'Borrador sin titulo',
         texto_principal: primaryText,
         descripcion: description,
@@ -713,19 +721,34 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         asset_url: imageUrl || null,
         estado: 'borrador',
         brief_visual: {
+          type: 'campaign-draft',
           campaign_name: campName,
           budget_type: budgetType,
           objective,
+          objective_label: OBJECTIVES.find(o => o.value === objective)?.label || objective,
           campaign_budget: campBudget,
           adset_name: adsetName,
           audience_description: audienceDesc,
           adset_budget: adsetBudget,
           destination_url: destinationUrl,
           start_date: startDate,
+          dolor: audienceDesc || 'Sin definir',
+          producto: campName?.split(' - ')[0] || 'Sin definir',
+          metodologia: 'DCT 3:2:2 (Charles Tichener)',
+          plan_accion: {
+            tipo_campana: budgetType === 'ABO' ? 'ABO Testing' : 'CBO Escalamiento',
+            presupuesto_diario: adsetBudget || campBudget || '10000',
+            duracion: '7 dias sin tocar',
+            regla_kill: 'Pausar si gasta 2x CPA sin conversion',
+            metricas_dia3: 'Hook Rate >25%, Hold Rate >15%, CTR >1.5%',
+          },
         },
+        dct_copies: primaryText ? [{ texto: primaryText, tipo: 'primary' }] : null,
+        dct_titulos: headline ? [headline] : null,
+        dct_descripciones: description ? [description] : null,
       });
       if (error) throw error;
-      toast.success('Borrador guardado. Puedes publicarlo despues desde la Biblioteca.');
+      toast.success('Borrador DCT guardado. Revisa en Borradores para aprobar y publicar.');
     } catch (err) {
       console.error('[CampaignCreateWizard] Save draft error:', err);
       toast.error('Error al guardar borrador');
