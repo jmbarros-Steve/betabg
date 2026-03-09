@@ -712,7 +712,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         cta: cta,
         asset_url: imageUrl || null,
         estado: 'borrador',
-        metadata: {
+        brief_visual: {
           campaign_name: campName,
           budget_type: budgetType,
           objective,
