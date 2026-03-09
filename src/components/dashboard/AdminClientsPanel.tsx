@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronDown, Eye, Edit2, Plus, Minus,
-  CheckCircle2, Clock, AlertCircle, Search, X, Save, Loader2
+  CheckCircle2, Clock, AlertCircle, Search, X, Save, Loader2,
+  Copy, Check, ShoppingBag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,7 +92,9 @@ function ClientDetail({ client, onClose, onRefresh }: {
     email: client.email ?? '',
     company: client.company ?? '',
     plan: client.credits?.plan ?? 'free_beta',
+    shopDomain: client.shop_domain ?? '',
   });
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -102,6 +105,7 @@ function ClientDetail({ client, onClose, onRefresh }: {
           name: editForm.name,
           email: editForm.email || null,
           company: editForm.company || null,
+          shop_domain: editForm.shopDomain || null,
         })
         .eq('id', client.id);
 
@@ -149,6 +153,23 @@ function ClientDetail({ client, onClose, onRefresh }: {
     } finally {
       setAddingCredits(false);
     }
+  };
+
+  const generateAndCopyLink = async () => {
+    let domain = editForm.shopDomain.trim().toLowerCase();
+    if (!domain) {
+      toast.error('Primero ingresa el dominio de Shopify');
+      return;
+    }
+    if (!domain.endsWith('.myshopify.com')) {
+      domain = domain.replace(/\.myshopify\.com$/, '') + '.myshopify.com';
+      setEditForm(f => ({ ...f, shopDomain: domain }));
+    }
+    const installUrl = `https://steve-api-850416724643.us-central1.run.app/api/shopify-install?shop=${encodeURIComponent(domain)}`;
+    await navigator.clipboard.writeText(installUrl);
+    setLinkCopied(true);
+    toast.success('Link copiado al clipboard');
+    setTimeout(() => setLinkCopied(false), 3000);
   };
 
   const briefStatus = getBriefStatus(client);
@@ -243,6 +264,40 @@ function ClientDetail({ client, onClose, onRefresh }: {
               {addingCredits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             </Button>
           </div>
+        </div>
+      </div>
+
+      {/* Shopify Integration */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <ShoppingBag className="w-4 h-4" /> Shopify
+        </h4>
+        <div className="space-y-2">
+          <div>
+            <Label className="text-xs">Dominio Shopify</Label>
+            <Input
+              placeholder="mi-tienda.myshopify.com"
+              value={editForm.shopDomain}
+              onChange={e => setEditForm({ ...editForm, shopDomain: e.target.value })}
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={generateAndCopyLink}
+            disabled={!editForm.shopDomain.trim()}
+          >
+            {linkCopied
+              ? <><Check className="w-4 h-4 mr-2 text-green-500" /> Copiado</>
+              : <><Copy className="w-4 h-4 mr-2" /> Copiar Link de Instalación</>
+            }
+          </Button>
+          {client.shop_domain && (
+            <p className="text-xs text-green-600 flex items-center gap-1">
+              <Check className="w-3 h-3" /> Shopify conectado: {client.shop_domain}
+            </p>
+          )}
         </div>
       </div>
 
