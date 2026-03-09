@@ -223,6 +223,13 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
                 social: { enabled: true },
                 video: { enabled: true },
                 columns: { enabled: true },
+                timer: { enabled: true },
+              },
+              tabs: {
+                content: { enabled: true },
+                blocks: { enabled: true },
+                body: { enabled: true },
+                images: { enabled: true },
               },
               ...unlayerMergeTagsConfig,
             }}

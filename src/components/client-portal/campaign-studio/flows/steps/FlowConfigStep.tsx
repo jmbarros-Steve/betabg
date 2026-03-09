@@ -98,19 +98,20 @@ export function FlowConfigStep({ template, clientId, state, updateState, onNext 
         body: {
           clientId,
           code: state.discountCode,
-          discountType: state.discountType === 'free_shipping' ? 'percentage' : state.discountType,
+          discountType: state.discountType,
           discountValue: state.discountType === 'free_shipping' ? 0 : state.discountValue,
           endsAt: state.discountExpiry ? new Date(state.discountExpiry).toISOString() : undefined,
           title: `Flujo ${template.nameEs} - ${state.discountCode}`,
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
+      if (data?.error) throw new Error(data.error);
       updateState({ shopifyDiscountId: data?.discountId || 'created' });
       toast.success(`Cupon "${state.discountCode}" creado en Shopify`);
     } catch (err: any) {
       console.error('Error creating discount:', err);
-      toast.error(`Error al crear cupon: ${err.message || 'Intenta de nuevo'}`);
+      toast.error(`Error al crear cupon: ${err.message || String(err) || 'Intenta de nuevo'}`);
     } finally {
       setCreatingDiscount(false);
     }

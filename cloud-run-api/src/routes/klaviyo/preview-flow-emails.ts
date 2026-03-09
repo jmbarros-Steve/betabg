@@ -84,12 +84,25 @@ function getFlowEmailContent(flowType: string, stepIndex: number, brandName: str
 
 function generateProductBlockHtml(products: any[], productStrategy: string): string {
   if (productStrategy === 'cart_items') {
+    // Dynamic Klaviyo cart items using event merge tags
     return `
         <tr><td class="mobile-padding" style="padding:8px 40px 24px;">
-          <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:20px;text-align:center;">
-            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#856404;">🛒 Productos del carrito</p>
-            <p style="margin:0;font-size:13px;color:#856404;">Aquí aparecerán automáticamente los productos que el cliente dejó en su carrito (imagen, nombre, precio y cantidad).</p>
-          </div>
+          <p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:1px;">Tu carrito</p>
+          {% for item in event.extra.line_items %}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;border-bottom:1px solid #eee;padding-bottom:16px;">
+            <tr>
+              <td width="80" valign="top" style="padding-right:16px;">
+                <img src="{{ item.product.images.0.src }}" alt="{{ item.product.title }}" width="80" style="display:block;border-radius:6px;border:1px solid #eee;">
+              </td>
+              <td valign="top">
+                <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#1a1a1a;">{{ item.product.title }}</p>
+                {% if item.variant.title != "Default Title" %}<p style="margin:0 0 4px;font-size:12px;color:#888;">{{ item.variant.title }}</p>{% endif %}
+                <p style="margin:0 0 4px;font-size:12px;color:#888;">Cantidad: {{ item.quantity }}</p>
+                <p style="margin:0;font-size:15px;font-weight:700;color:#C8A84E;">{{ item.line_price|floatformat:0 }}</p>
+              </td>
+            </tr>
+          </table>
+          {% endfor %}
         </td></tr>`;
   }
 
