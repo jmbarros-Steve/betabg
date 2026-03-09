@@ -2340,9 +2340,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (proofResp) { addSubTitle('Prueba Social y Tono de Comunicacion'); addBody(proofResp); }
 
     // ─── SECCIÓN: EVALUACIÓN ESTRATÉGICA — ACCIONABLES (SCR Cards) ─────────────
-    if (briefData.summary) {
+    // Only render from briefData.summary if it contains actual markdown analysis (not chatbot confirmation)
+    const summaryHasContent = briefData.summary && briefData.summary.includes('## ') && briefData.summary.length > 300;
+    if (summaryHasContent) {
       addSectionHeader('5', 'EVALUACION ESTRATEGICA — 7 ACCIONABLES');
-      let planText = briefData.summary;
+      let planText = briefData.summary!;
       const section7Match = planText.match(/##\s*7\./);
       const section6Match = planText.match(/##\s*6\./);
       const startMatch = section7Match || section6Match;
@@ -3551,9 +3553,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               const aiIncome = aiPersona?.nivel_socioeconomico || '';
               const aiFamily = aiPersona?.estado_civil || '';
 
-              const painText = hasAI
+              const rawPain = hasAI
                 ? (Array.isArray(aiPersona.pain_points) ? aiPersona.pain_points.slice(0, 3).join('. ') + '.' : String(aiPersona.pain_points || ''))
                 : getResponse('persona_pain') || 'Pendiente';
+              const painText = rawPain.length > 10 && !/[.!?")\]:]$/.test(rawPain.trim()) ? rawPain.trim() + '...' : rawPain;
               const quoteText = hasAI
                 ? (aiPersona.frase_que_lo_define || '')
                 : '';
@@ -4656,7 +4659,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             ) : (
               <>
                 {/* Benchmark Table — if available */}
-                {research.competitor_analysis?.benchmark_summary && (
+                {(research.competitor_analysis?.matriz_comparativa || research.competitor_analysis?.benchmark_summary) && (
                   <Card className="border-primary/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -4665,7 +4668,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm leading-relaxed text-muted-foreground">{research.competitor_analysis.benchmark_summary}</p>
+                      {(() => {
+                        const mc = research.competitor_analysis?.matriz_comparativa;
+                        if (mc && typeof mc === 'object' && mc.headers && mc.rows) {
+                          return (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-primary/10">
+                                    {(mc.headers as string[]).map((h: string, i: number) => (
+                                      <th key={i} className="text-left p-2 font-semibold text-primary border-b border-border whitespace-nowrap">{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(mc.rows as string[][]).map((row: string[], ri: number) => (
+                                    <tr key={ri} className={ri === 0 ? 'bg-primary/5 font-medium' : ri % 2 === 0 ? 'bg-muted/30' : ''}>
+                                      {row.map((cell: string, ci: number) => (
+                                        <td key={ci} className="p-2 border-b border-border/50">{cell}</td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        }
+                        return <p className="text-sm leading-relaxed text-muted-foreground">{research.competitor_analysis?.benchmark_summary || ''}</p>;
+                      })()}
                     </CardContent>
                   </Card>
                 )}
