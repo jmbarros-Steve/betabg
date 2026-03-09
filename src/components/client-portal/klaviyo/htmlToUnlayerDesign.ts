@@ -35,8 +35,37 @@ function uid(): string {
   return `u_content_html_${counter++}`;
 }
 
+/**
+ * Extracts the inner content of <body> from a full HTML document.
+ * Unlayer's custom_html block can't render full HTML documents
+ * (<!DOCTYPE>, <html>, <head>, <body> wrappers break rendering).
+ * Also preserves any <style> blocks for responsive email CSS.
+ */
+function extractBodyContent(html: string): string {
+  // Extract <style> blocks from <head> to preserve responsive CSS
+  const styleBlocks: string[] = [];
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  let styleMatch: RegExpExecArray | null;
+  while ((styleMatch = styleRegex.exec(html)) !== null) {
+    styleBlocks.push(styleMatch[0]);
+  }
+
+  // Extract body inner content
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (bodyMatch) {
+    const bodyContent = bodyMatch[1].trim();
+    // Prepend style blocks so responsive CSS still works
+    if (styleBlocks.length > 0) {
+      return styleBlocks.join('\n') + '\n' + bodyContent;
+    }
+    return bodyContent;
+  }
+  return html;
+}
+
 export function htmlToUnlayerDesign(html: string): UnlayerDesignJson {
   counter = 1;
+  const cleanHtml = extractBodyContent(html);
 
   const rowId = uid();
   const colId = uid();
@@ -58,7 +87,7 @@ export function htmlToUnlayerDesign(html: string): UnlayerDesignJson {
                   id: contentId,
                   type: 'html',
                   values: {
-                    html,
+                    html: cleanHtml,
                     containerPadding: '0px',
                     anchor: '',
                     displayCondition: null,
