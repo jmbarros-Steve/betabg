@@ -34,6 +34,9 @@ import {
   Rocket,
   ChevronRight,
   ChevronLeft,
+  Layers,
+  Plus,
+  Palette,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 import AdPreviewMockup from './AdPreviewMockup';
@@ -57,7 +60,17 @@ interface CampaignCreateWizardProps {
 type StartLevel = 'campaign' | 'adset' | 'ad';
 type BudgetType = 'ABO' | 'CBO';
 type Objective = 'CONVERSIONS' | 'TRAFFIC' | 'AWARENESS' | 'ENGAGEMENT' | 'CATALOG';
-type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'ad-creative' | 'review';
+type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'angle-select' | 'ad-creative' | 'review';
+type AdSetFormat = 'flexible' | 'carousel' | 'single';
+
+// Angle recommendations per funnel stage (from CopyGenerator.tsx)
+const ANGLE_RECOMMENDATIONS: Record<string, string[]> = {
+  tofu: ['Call Out', 'Bold Statement', 'Ugly Ads', 'Memes'],
+  mofu: ['Reviews', 'Us vs Them', 'Credenciales en Medios', 'Reviews + Beneficios'],
+  bofu: ['Descuentos/Ofertas', 'Resultados', 'Paquetes', 'Reviews + Beneficios'],
+};
+
+const ALL_ANGLES = ['Beneficios', 'Bold Statement', 'Us vs Them', 'Call Out', 'Antes y Después', 'Beneficios Principales', 'Pantalla Dividida', 'Nueva Colección', 'Reviews', 'Detalles de Producto', 'Ugly Ads', 'Cyber/Fechas Especiales', 'Ingredientes/Material', 'Credenciales en Medios', 'Reviews + Beneficios', 'Memes', 'Descuentos/Ofertas', 'Resultados', 'Paquetes', 'Mensajes y Comentarios'];
 
 const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
   { value: 'CONVERSIONS', label: 'Conversiones', desc: 'Ventas, leads, registros' },
@@ -77,6 +90,7 @@ const STEPS_CAMPAIGN: StepDef[] = [
   { key: 'campaign-config', label: 'Campaña', icon: Megaphone },
   { key: 'adset-config', label: 'Ad Set', icon: FolderOpen },
   { key: 'funnel-stage', label: 'Funnel', icon: Target },
+  { key: 'angle-select', label: 'Ángulo', icon: Palette },
   { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
@@ -85,6 +99,7 @@ const STEPS_ADSET: StepDef[] = [
   { key: 'select-campaign', label: 'Campaña', icon: Megaphone },
   { key: 'adset-config', label: 'Ad Set', icon: FolderOpen },
   { key: 'funnel-stage', label: 'Funnel', icon: Target },
+  { key: 'angle-select', label: 'Ángulo', icon: Palette },
   { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
@@ -93,6 +108,7 @@ const STEPS_AD: StepDef[] = [
   { key: 'select-campaign', label: 'Campaña', icon: Megaphone },
   { key: 'select-adset', label: 'Ad Set', icon: FolderOpen },
   { key: 'funnel-stage', label: 'Funnel', icon: Target },
+  { key: 'angle-select', label: 'Ángulo', icon: Palette },
   { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
@@ -115,6 +131,7 @@ const STEVE_FALLBACKS: Record<string, string> = {
   'adset-config': 'Cada Ad Set debe tener 1 solo ad para testear variables aisladas. Si pones múltiples ads, Meta distribuye el presupuesto desigualmente.',
   'select-adset': 'Elige un Ad Set que tenga audiencia similar a la de tu nuevo anuncio. Consistencia = mejores resultados.',
   'funnel-stage': 'TOFU para alcance, MOFU para nutrir leads, BOFU para conversión directa. El copy y CTA se adaptan a cada etapa.',
+  'angle-select': 'El ángulo define el enfoque creativo del anuncio. Para TOFU usa ángulos que interrumpan el scroll. Para BOFU usa ángulos que cierren la venta.',
   'ad-creative': 'El copy debe hablar al dolor/deseo del buyer persona con un CTA claro. Usa imágenes que destaquen en el feed.',
   'review': 'Verifica que el destino URL funcione, el copy no tenga errores y el presupuesto sea el correcto antes de publicar.',
 };
@@ -247,14 +264,61 @@ function AdSetForm({
   audienceDesc, setAudienceDesc,
   dailyBudget, setDailyBudget,
   isABO,
+  adSetFormat, setAdSetFormat,
+  cpaTarget, setCpaTarget,
 }: {
   name: string; setName: (v: string) => void;
   audienceDesc: string; setAudienceDesc: (v: string) => void;
   dailyBudget: string; setDailyBudget: (v: string) => void;
   isABO: boolean;
+  adSetFormat: AdSetFormat; setAdSetFormat: (v: AdSetFormat) => void;
+  cpaTarget: string; setCpaTarget: (v: string) => void;
 }) {
+  const cpa = Number(cpaTarget) || 0;
+  const recommendedBudget = cpa > 0 ? Math.round((cpa * 10) / 7) : 0;
+
+  // Auto-fill budget when CPA changes
+  useEffect(() => {
+    if (recommendedBudget > 0 && isABO && !dailyBudget) {
+      setDailyBudget(String(recommendedBudget));
+    }
+  }, [recommendedBudget]);
+
+  const formats: { key: AdSetFormat; label: string; desc: string; icon: React.ElementType; recommended?: boolean }[] = [
+    { key: 'flexible', label: 'Flexible', desc: 'Meta optimiza combinaciones. 3 fotos, 2 textos, 2 headlines.', icon: Layers, recommended: isABO },
+    { key: 'carousel', label: 'Carrusel', desc: 'Múltiples imágenes en swipe. 3+ fotos.', icon: ImageIcon },
+    { key: 'single', label: 'Imagen Única', desc: 'Un solo creativo. 1 foto, 1 texto, 1 headline.', icon: FileImage },
+  ];
+
   return (
     <div className="space-y-5">
+      {/* Format selector */}
+      <div>
+        <Label className="text-sm font-semibold">Formato del Ad Set</Label>
+        <div className="grid grid-cols-3 gap-3 mt-2">
+          {formats.map((f) => {
+            const Icon = f.icon;
+            const isActive = adSetFormat === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setAdSetFormat(f.key)}
+                className={`relative flex flex-col items-center gap-1.5 p-4 rounded-lg border text-center transition-all ${
+                  isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                {f.recommended && (
+                  <Badge className="absolute -top-2 right-1 text-[9px] bg-green-500/15 text-green-700 border-green-500/30">Steve recomienda</Badge>
+                )}
+                <Icon className={`w-6 h-6 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-xs font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{f.label}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{f.desc}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div>
         <Label>Nombre del Ad Set</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="[Audiencia] - [Variable test]" className="mt-1" />
@@ -266,11 +330,25 @@ function AdSetForm({
         <p className="text-xs text-muted-foreground mt-1">Puedes crear audiencias detalladas en la sección Audiencias.</p>
       </div>
 
+      {/* CPA + Budget */}
       {isABO && (
-        <div>
-          <Label>Presupuesto diario del Ad Set (CLP)</Label>
-          <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="mt-1" />
-        </div>
+        <>
+          <div>
+            <Label>CPA Objetivo (CLP)</Label>
+            <Input type="number" value={cpaTarget} onChange={(e) => setCpaTarget(e.target.value)} placeholder="15000" className="mt-1" />
+            {recommendedBudget > 0 && (
+              <p className="text-xs text-primary mt-1 font-medium">
+                Steve recomienda: ${recommendedBudget.toLocaleString('es-CL')}/día por Ad Set
+                <span className="text-muted-foreground font-normal"> (CPA × 10 compras ÷ 7 días = data suficiente para validar)</span>
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label>Presupuesto diario del Ad Set (CLP)</Label>
+            <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="mt-1" />
+          </div>
+        </>
       )}
     </div>
   );
@@ -316,46 +394,115 @@ function FunnelStageSelector({
 }
 
 // ---------------------------------------------------------------------------
-// Ad Form
+// Angle Selector
+// ---------------------------------------------------------------------------
+
+function AngleSelector({
+  funnelStage,
+  selectedAngle, setSelectedAngle,
+}: {
+  funnelStage: 'tofu' | 'mofu' | 'bofu';
+  selectedAngle: string;
+  setSelectedAngle: (v: string) => void;
+}) {
+  const recommended = ANGLE_RECOMMENDATIONS[funnelStage] || [];
+  const others = ALL_ANGLES.filter((a) => !recommended.includes(a));
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Steve recomienda estos ángulos creativos para <Badge className="text-[10px]">{funnelStage.toUpperCase()}</Badge>:
+      </p>
+
+      {/* Recommended angles */}
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold text-primary">Recomendados por Steve</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {recommended.map((angle) => {
+            const isActive = selectedAngle === angle;
+            return (
+              <button
+                key={angle}
+                onClick={() => setSelectedAngle(angle)}
+                className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-all ${
+                  isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <Sparkles className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{angle}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Other angles */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Otros ángulos disponibles</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {others.map((angle) => {
+            const isActive = selectedAngle === angle;
+            return (
+              <button
+                key={angle}
+                onClick={() => setSelectedAngle(angle)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                  isActive ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                }`}
+              >
+                {angle}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ad Form (Multi-slot)
 // ---------------------------------------------------------------------------
 
 type MediaTab = 'upload' | 'ai-image' | 'ai-video' | 'gallery' | 'url';
-type AdFormat = '1:1' | '9:16' | '16:9';
+type AspectRatio = '1:1' | '9:16' | '16:9';
 
-function AdForm({
+function AdFormMultiSlot({
   clientId,
-  headline, setHeadline,
-  primaryText, setPrimaryText,
+  adSetFormat,
+  selectedAngle,
+  headlines, setHeadlines,
+  primaryTexts, setPrimaryTexts,
   description, setDescription,
-  imageUrl, setImageUrl,
+  images, setImages,
   cta, setCta,
   destinationUrl, setDestinationUrl,
   generating,
   onGenerateCopy,
 }: {
   clientId: string;
-  headline: string; setHeadline: (v: string) => void;
-  primaryText: string; setPrimaryText: (v: string) => void;
+  adSetFormat: AdSetFormat;
+  selectedAngle: string;
+  headlines: string[]; setHeadlines: (v: string[]) => void;
+  primaryTexts: string[]; setPrimaryTexts: (v: string[]) => void;
   description: string; setDescription: (v: string) => void;
-  imageUrl: string; setImageUrl: (v: string) => void;
+  images: string[]; setImages: (v: string[]) => void;
   cta: string; setCta: (v: string) => void;
   destinationUrl: string; setDestinationUrl: (v: string) => void;
   generating: boolean;
   onGenerateCopy: () => void;
 }) {
+  const [activeImageSlot, setActiveImageSlot] = useState(0);
   const [mediaTab, setMediaTab] = useState<MediaTab>('upload');
-  const [adFormat, setAdFormat] = useState<AdFormat>('1:1');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const [uploading, setUploading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [generatingVideo, setGeneratingVideo] = useState(false);
-  const [videoPolling, setVideoPolling] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load gallery assets
   const loadGallery = useCallback(async () => {
     setLoadingGallery(true);
     try {
@@ -373,18 +520,17 @@ function AdForm({
 
   useEffect(() => { if (mediaTab === 'gallery') loadGallery(); }, [mediaTab, loadGallery]);
 
-  // File upload handler
+  const setImageAtSlot = (url: string) => {
+    const next = [...images];
+    next[activeImageSlot] = url;
+    setImages(next);
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      toast.error('Solo se permiten imágenes y videos');
-      return;
-    }
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error('Archivo muy grande. Maximo 20MB.');
-      return;
-    }
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) { toast.error('Solo imágenes y videos'); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error('Max 20MB'); return; }
     setUploading(true);
     try {
       const ext = file.name.split('.').pop() || 'png';
@@ -392,271 +538,213 @@ function AdForm({
       const { error: upErr } = await supabase.storage.from('client-assets').upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('client-assets').getPublicUrl(path);
-      setImageUrl(publicUrl);
-      toast.success('Archivo subido');
-    } catch (err: any) {
-      toast.error(err?.message || 'Error al subir archivo');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+      setImageAtSlot(publicUrl);
+      toast.success(`Imagen ${activeImageSlot + 1} subida`);
+    } catch (err: any) { toast.error(err?.message || 'Error'); }
+    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
-  // AI Image generation
   const handleGenerateImage = async () => {
-    if (!aiPrompt.trim()) { toast.error('Describe lo que quieres en la imagen'); return; }
+    if (!aiPrompt.trim()) { toast.error('Describe la imagen'); return; }
     setGeneratingImage(true);
     try {
-      const formatMap: Record<AdFormat, string> = { '1:1': 'square', '9:16': 'story', '16:9': 'feed' };
+      const formatMap: Record<AspectRatio, string> = { '1:1': 'square', '9:16': 'story', '16:9': 'feed' };
+      const anglePrompt = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
       const { data, error } = await callApi('generate-image', {
-        body: { clientId, promptGeneracion: aiPrompt, engine: imageEngine, formato: formatMap[adFormat] },
+        body: { clientId, promptGeneracion: aiPrompt + anglePrompt, engine: imageEngine, formato: formatMap[aspectRatio] },
       });
       if (error) throw error;
-      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos. Se necesitan 2 créditos por imagen.'); return; }
-      if (data?.error) throw new Error(data.error);
-      if (data?.asset_url) { setImageUrl(data.asset_url); toast.success('Imagen generada por IA'); }
-    } catch (err: any) {
-      toast.error(err?.message || 'Error generando imagen');
-    } finally {
-      setGeneratingImage(false);
-    }
+      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
+      if (data?.asset_url) { setImageAtSlot(data.asset_url); toast.success(`Imagen ${activeImageSlot + 1} generada`); }
+    } catch (err: any) { toast.error(err?.message || 'Error'); }
+    finally { setGeneratingImage(false); }
   };
 
-  // AI Video generation
-  const handleGenerateVideo = async () => {
-    if (!aiPrompt.trim()) { toast.error('Describe lo que quieres en el video'); return; }
-    setGeneratingVideo(true);
-    try {
-      const { data, error } = await callApi('generate-video', {
-        body: { clientId, promptGeneracion: aiPrompt, fotoBaseUrl: imageUrl || undefined },
-      });
-      if (error) throw error;
-      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos. Se necesitan 10 créditos por video.'); return; }
-      if (data?.prediction_id) {
-        toast.info('Video en proceso... puede tomar 1-3 minutos.');
-        setVideoPolling(true);
-        const pollInterval = setInterval(async () => {
-          try {
-            const { data: status } = await callApi('check-video-status', {
-              body: { predictionId: data.prediction_id, clientId },
-            });
-            if (status?.status === 'succeeded' && status?.asset_url) {
-              clearInterval(pollInterval);
-              setImageUrl(status.asset_url);
-              setVideoPolling(false);
-              setGeneratingVideo(false);
-              toast.success('Video generado');
-            } else if (status?.status === 'failed') {
-              clearInterval(pollInterval);
-              setVideoPolling(false);
-              setGeneratingVideo(false);
-              toast.error('Error generando video');
-            }
-          } catch { /* keep polling */ }
-        }, 5000);
-      }
-    } catch (err: any) {
-      toast.error(err?.message || 'Error generando video');
-      setGeneratingVideo(false);
-    }
-  };
+  const canAddMoreImages = adSetFormat === 'flexible' || adSetFormat === 'carousel';
+  const canAddMoreTexts = adSetFormat === 'flexible';
 
   const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: React.ElementType }> = [
     { key: 'upload', label: 'Subir', icon: Upload },
     { key: 'ai-image', label: 'IA Imagen', icon: Sparkles },
-    { key: 'ai-video', label: 'IA Video', icon: Video },
     { key: 'gallery', label: 'Galería', icon: ImageIcon },
     { key: 'url', label: 'URL', icon: LinkIcon },
   ];
 
-  const FORMAT_OPTIONS: Array<{ key: AdFormat; label: string; desc: string }> = [
-    { key: '1:1', label: 'Cuadrado', desc: 'Feed' },
-    { key: '9:16', label: 'Vertical', desc: 'Stories/Reels' },
-    { key: '16:9', label: 'Horizontal', desc: 'Landscape' },
-  ];
-
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <Badge variant="outline" className="text-xs">
+          {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : 'Imagen Única'}
+        </Badge>
         <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
           {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
           Steve genera copy
         </Button>
       </div>
 
-      {/* Creative / Media Section */}
+      {/* ---- IMAGE SLOTS ---- */}
       <div className="space-y-3">
-        <Label className="text-sm font-semibold">Creativo (Imagen / Video)</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Creativos ({images.length} {images.length === 1 ? 'imagen' : 'imágenes'})</Label>
+          {canAddMoreImages && (
+            <Button variant="ghost" size="sm" onClick={() => setImages([...images, ''])} className="text-xs text-muted-foreground">
+              <Plus className="w-3 h-3 mr-1" />Agregar
+            </Button>
+          )}
+        </div>
 
-        {/* Format selector */}
-        <div className="flex gap-2">
-          {FORMAT_OPTIONS.map((f) => (
+        {adSetFormat === 'flexible' && images.length <= 3 && (
+          <p className="text-[11px] text-muted-foreground">Steve recomienda 3 imágenes para testing óptimo (DCT 3:2:2)</p>
+        )}
+
+        {/* Image slot tabs */}
+        <div className="flex gap-1.5 flex-wrap">
+          {images.map((img, i) => (
             <button
-              key={f.key}
-              onClick={() => setAdFormat(f.key)}
-              className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
-                adFormat === f.key ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'
+              key={i}
+              onClick={() => setActiveImageSlot(i)}
+              className={`relative w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
+                activeImageSlot === i ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
-              <span className="block font-bold">{f.label}</span>
-              <span className="text-[10px] text-muted-foreground">{f.desc}</span>
+              {img ? (
+                <img src={img} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
+              <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center">{i + 1}</span>
+              {img && images.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); const next = images.filter((_, j) => j !== i); setImages(next); if (activeImageSlot >= next.length) setActiveImageSlot(Math.max(0, next.length - 1)); }}
+                  className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                >
+                  <X className="w-2 h-2" />
+                </button>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Media source tabs */}
-        <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
-          {MEDIA_TABS.map((t) => {
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setMediaTab(t.key)}
-                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  mediaTab === t.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            );
-          })}
+        {/* Aspect ratio */}
+        <div className="flex gap-2">
+          {([['1:1', 'Cuadrado'], ['9:16', 'Vertical'], ['16:9', 'Horizontal']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setAspectRatio(key)} className={`flex-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${aspectRatio === key ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'}`}>
+              {label}
+            </button>
+          ))}
         </div>
 
-        {/* Upload tab */}
+        {/* Media source tabs for active slot */}
+        <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+          {MEDIA_TABS.map((t) => { const Icon = t.icon; return (
+            <button key={t.key} onClick={() => setMediaTab(t.key)} className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${mediaTab === t.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+              <Icon className="w-3 h-3" /><span className="hidden sm:inline">{t.label}</span>
+            </button>
+          ); })}
+        </div>
+
         {mediaTab === 'upload' && (
-          <div className="space-y-2">
+          <div>
             <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors"
-            >
-              {uploading ? (
-                <><Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Subiendo...</p></>
-              ) : (
-                <><Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Click para subir imagen o video</p><p className="text-xs text-muted-foreground/70">JPG, PNG, WebP, MP4 — max 20MB</p></>
-              )}
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-full border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors">
+              {uploading ? <><Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground mb-1" /><p className="text-xs text-muted-foreground">Subiendo...</p></> : <><Upload className="w-6 h-6 mx-auto text-muted-foreground mb-1" /><p className="text-xs text-muted-foreground">Subir imagen {activeImageSlot + 1}</p></>}
             </button>
           </div>
         )}
 
-        {/* AI Image tab */}
         {mediaTab === 'ai-image' && (
-          <div className="space-y-3">
-            <Textarea
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="Describe la imagen que quieres: 'Mujer joven con producto X en mano, fondo minimalista, iluminación natural, estilo editorial...'"
-              rows={3}
-            />
-            <div className="flex items-center gap-2">
+          <div className="space-y-2">
+            <Textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder={`Describe la imagen ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}...`} rows={2} />
+            <div className="flex gap-2">
               <Select value={imageEngine} onValueChange={(v: 'gpt4o' | 'flux') => setImageEngine(v)}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="gpt4o">GPT-4o (2 cred)</SelectItem>
                   <SelectItem value="flux">Flux Pro (2 cred)</SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleGenerateImage} disabled={generatingImage || !aiPrompt.trim()} className="flex-1">
-                {generatingImage ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</> : <><Sparkles className="w-4 h-4 mr-2" />Generar Imagen</>}
+                {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando...</> : <><Sparkles className="w-3 h-3 mr-1" />Generar</>}
               </Button>
             </div>
           </div>
         )}
 
-        {/* AI Video tab */}
-        {mediaTab === 'ai-video' && (
-          <div className="space-y-3">
-            <Textarea
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="Describe el video: 'Producto girando 360 grados con fondo blanco, transiciones suaves...'"
-              rows={3}
-            />
-            <Button onClick={handleGenerateVideo} disabled={generatingVideo || !aiPrompt.trim()} className="w-full">
-              {generatingVideo ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{videoPolling ? 'Procesando video...' : 'Generando...'}</>
-              ) : (
-                <><Video className="w-4 h-4 mr-2" />Generar Video (10 cred)</>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* Gallery tab */}
         {mediaTab === 'gallery' && (
           <div>
-            {loadingGallery ? (
-              <div className="grid grid-cols-4 gap-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="aspect-square rounded" />)}</div>
-            ) : galleryAssets.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2 max-h-[250px] overflow-y-auto">
+            {loadingGallery ? <div className="grid grid-cols-4 gap-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="aspect-square rounded" />)}</div>
+            : galleryAssets.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
                 {galleryAssets.map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() => { setImageUrl(a.url); toast.success('Asset seleccionado'); }}
-                    className={`aspect-square rounded overflow-hidden border-2 transition-all ${imageUrl === a.url ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}`}
-                  >
+                  <button key={a.id} onClick={() => { setImageAtSlot(a.url); toast.success(`Imagen ${activeImageSlot + 1} seleccionada`); }} className={`aspect-square rounded overflow-hidden border-2 transition-all ${images[activeImageSlot] === a.url ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}`}>
                     <img src={a.url} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">No hay assets disponibles</p>
-            )}
+            ) : <p className="text-xs text-muted-foreground text-center py-4">No hay assets</p>}
           </div>
         )}
 
-        {/* URL tab */}
         {mediaTab === 'url' && (
-          <Input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://tu-imagen.com/foto.jpg"
-          />
-        )}
-
-        {/* Image preview */}
-        {imageUrl && (
-          <div className="relative inline-block">
-            {imageUrl.endsWith('.mp4') ? (
-              <video src={imageUrl} controls className="max-h-[200px] rounded border" />
-            ) : (
-              <img src={imageUrl} alt="" className="max-h-[200px] rounded border" />
-            )}
-            <button
-              onClick={() => setImageUrl('')}
-              className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
+          <Input value={images[activeImageSlot] || ''} onChange={(e) => setImageAtSlot(e.target.value)} placeholder="https://tu-imagen.com/foto.jpg" />
         )}
       </div>
 
-      {/* Copy fields */}
+      {/* ---- HEADLINE SLOTS ---- */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Headlines ({headlines.length})</Label>
+          {canAddMoreTexts && (
+            <Button variant="ghost" size="sm" onClick={() => setHeadlines([...headlines, ''])} className="text-xs text-muted-foreground">
+              <Plus className="w-3 h-3 mr-1" />Agregar
+            </Button>
+          )}
+        </div>
+        {headlines.map((hl, i) => (
+          <div key={i} className="flex gap-2 items-center">
+            <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}.</span>
+            <Input value={hl} onChange={(e) => { const next = [...headlines]; next[i] = e.target.value; setHeadlines(next); }} placeholder={`Headline ${i + 1}`} />
+            {headlines.length > 1 && (
+              <button onClick={() => { const next = headlines.filter((_, j) => j !== i); setHeadlines(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ---- PRIMARY TEXT SLOTS ---- */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Textos principales ({primaryTexts.length})</Label>
+          {canAddMoreTexts && (
+            <Button variant="ghost" size="sm" onClick={() => setPrimaryTexts([...primaryTexts, ''])} className="text-xs text-muted-foreground">
+              <Plus className="w-3 h-3 mr-1" />Agregar
+            </Button>
+          )}
+        </div>
+        {primaryTexts.map((txt, i) => (
+          <div key={i} className="flex gap-2 items-start">
+            <span className="text-xs text-muted-foreground w-4 shrink-0 mt-2">{i + 1}.</span>
+            <Textarea value={txt} onChange={(e) => { const next = [...primaryTexts]; next[i] = e.target.value; setPrimaryTexts(next); }} placeholder={`Texto ${i + 1} — habla al dolor/deseo de tu audiencia`} rows={2} className="flex-1" />
+            {primaryTexts.length > 1 && (
+              <button onClick={() => { const next = primaryTexts.filter((_, j) => j !== i); setPrimaryTexts(next); }} className="text-muted-foreground hover:text-destructive mt-2"><X className="w-3.5 h-3.5" /></button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Description + CTA + URL */}
       <div className="space-y-4">
         <div>
-          <Label>Headline</Label>
-          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Título principal del anuncio" className="mt-1" />
-        </div>
-        <div>
-          <Label>Texto principal (Primary Text)</Label>
-          <Textarea value={primaryText} onChange={(e) => setPrimaryText(e.target.value)} placeholder="El cuerpo del anuncio — habla al dolor/deseo de tu audiencia" rows={3} className="mt-1" />
-        </div>
-        <div>
-          <Label>Descripción</Label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción adicional (opcional)" className="mt-1" />
+          <Label>Descripción (opcional)</Label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción adicional" className="mt-1" />
         </div>
         <div>
           <Label>Botón CTA</Label>
           <Select value={cta} onValueChange={(v) => setCta(v)}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CTA_OPTIONS.map((c) => (
-                <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>
-              ))}
-            </SelectContent>
+            <SelectContent>{CTA_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
@@ -705,13 +793,44 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Funnel stage
   const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
 
-  // Ad fields
-  const [headline, setHeadline] = useState('');
-  const [primaryText, setPrimaryText] = useState('');
+  // Ad Set format + CPA
+  const [adSetFormat, setAdSetFormat] = useState<AdSetFormat>('flexible');
+  const [cpaTarget, setCpaTarget] = useState('');
+
+  // Angle
+  const [selectedAngle, setSelectedAngle] = useState('');
+
+  // Ad fields (multi-slot)
+  const [headlines, setHeadlines] = useState<string[]>(['']);
+  const [primaryTexts, setPrimaryTexts] = useState<string[]>(['']);
   const [description, setDescription] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [images, setImages] = useState<string[]>(['']);
   const [cta, setCta] = useState('SHOP_NOW');
   const [destinationUrl, setDestinationUrl] = useState('');
+
+  // Reset slot counts when format changes
+  useEffect(() => {
+    const imgCount = adSetFormat === 'single' ? 1 : 3;
+    const txtCount = adSetFormat === 'flexible' ? 2 : 1;
+    setImages((prev) => {
+      if (prev.length === imgCount) return prev;
+      const next = prev.slice(0, imgCount);
+      while (next.length < imgCount) next.push('');
+      return next;
+    });
+    setHeadlines((prev) => {
+      if (prev.length === txtCount) return prev;
+      const next = prev.slice(0, txtCount);
+      while (next.length < txtCount) next.push('');
+      return next;
+    });
+    setPrimaryTexts((prev) => {
+      if (prev.length === txtCount) return prev;
+      const next = prev.slice(0, txtCount);
+      while (next.length < txtCount) next.push('');
+      return next;
+    });
+  }, [adSetFormat]);
 
   // Loading states
   const [submitting, setSubmitting] = useState(false);
@@ -741,8 +860,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         return !!adsetName.trim() && (budgetType !== 'ABO' || !!adsetBudget);
       case 'funnel-stage':
         return true;
+      case 'angle-select':
+        return !!selectedAngle;
       case 'ad-creative':
-        return !!primaryText.trim() && !!headline.trim();
+        return primaryTexts.some((t) => t.trim()) && headlines.some((h) => h.trim());
       case 'review':
         return true;
       default:
@@ -755,24 +876,51 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const handleGenerateCopy = async () => {
     setGeneratingCopy(true);
     try {
+      const isMulti = adSetFormat === 'flexible';
+      const angleHint = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
+      const instruction = isMulti
+        ? [
+            `Genera copy para DCT 3:2:2 de Meta Ads.${angleHint}`,
+            `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.`,
+            'Necesito 2 variaciones de texto principal y 2 de headline con enfoques diferentes.',
+            'Responde SOLO con JSON: {"texts":["texto1","texto2"],"headlines":["headline1","headline2"],"description":"descripcion"}',
+          ].join('\n')
+        : `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.${angleHint}`;
+
       const { data, error } = await callApi('generate-meta-copy', {
         body: {
           clientId: clientId,
           funnelStage,
           adType: 'static',
-          customPrompt: `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}.`,
+          customPrompt: instruction,
         },
       });
       if (error) throw error;
       const raw = data?.copy || data?.text || '';
       try {
         const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}');
-        if (parsed.primary_text) setPrimaryText(parsed.primary_text);
-        if (parsed.headline) setHeadline(parsed.headline);
-        if (parsed.description) setDescription(parsed.description);
+        if (isMulti) {
+          if (parsed.texts?.length) setPrimaryTexts(parsed.texts.slice(0, 2));
+          if (parsed.headlines?.length) setHeadlines(parsed.headlines.slice(0, 2));
+          if (parsed.description) setDescription(parsed.description);
+        } else {
+          if (parsed.primary_text || parsed.texts?.[0]) {
+            const next = [...primaryTexts];
+            next[0] = parsed.primary_text || parsed.texts[0];
+            setPrimaryTexts(next);
+          }
+          if (parsed.headline || parsed.headlines?.[0]) {
+            const next = [...headlines];
+            next[0] = parsed.headline || parsed.headlines[0];
+            setHeadlines(next);
+          }
+          if (parsed.description) setDescription(parsed.description);
+        }
         toast.success('Copy generado por Steve');
       } catch {
-        setPrimaryText(raw.slice(0, 200));
+        const next = [...primaryTexts];
+        next[0] = raw.slice(0, 200);
+        setPrimaryTexts(next);
       }
     } catch {
       toast.error('Error generando copy');
@@ -786,137 +934,30 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const handleSaveDraft = async () => {
     setSavingDraft(true);
     try {
-      const funnelMap: Record<string, string> = {
-        CONVERSIONS: 'bofu', TRAFFIC: 'tofu', AWARENESS: 'tofu', ENGAGEMENT: 'mofu', CATALOG: 'bofu',
-      };
-      const funnel = funnelMap[objective] || 'mofu';
       const objLabel = OBJECTIVES.find(o => o.value === objective)?.label || objective;
-      const anguloText = audienceDesc
-        ? `${objLabel} — ${audienceDesc.substring(0, 80)}`
-        : `${objLabel} — Campana directa`;
+      const anguloText = selectedAngle || `${objLabel} — ${audienceDesc?.substring(0, 80) || 'Campaña directa'}`;
 
-      // Generate DCT copy/headline variations via AI
-      const allCopies: { texto: string; tipo: string }[] = [];
-      const allHeadlines: string[] = [];
+      const filledImages = images.filter(Boolean);
+      const filledTexts = primaryTexts.filter(Boolean);
+      const filledHeadlines = headlines.filter(Boolean);
+      const allCopies = filledTexts.map((t, i) => ({ texto: t, tipo: i === 0 ? 'original' : 'variacion' }));
 
-      if (primaryText) allCopies.push({ texto: primaryText, tipo: 'original' });
-      if (headline) allHeadlines.push(headline);
-
-      if (primaryText || headline) {
-        try {
-          toast.info('Generando variaciones DCT con Steve...');
-          const { data: aiData } = await callApi('generate-meta-copy', {
-            body: {
-              client_id: clientId,
-              instruction: [
-                'Genera variaciones para un test DCT 3:2:2 de Meta Ads.',
-                `Objetivo: ${objLabel}. Audiencia: ${audienceDesc || 'amplia'}.`,
-                primaryText ? `Copy original: "${primaryText.substring(0, 200)}"` : '',
-                headline ? `Headline original: "${headline}"` : '',
-                description ? `Descripcion: "${description}"` : '',
-                '',
-                'Necesito que generes variaciones DIFERENTES pero con el mismo mensaje core.',
-                'Cada variacion debe tener un angulo/enfoque distinto.',
-                '',
-                'Responde SOLO con JSON:',
-                '{"copy_2":"texto alternativo","headline_2":"titulo alternativo","description_2":"descripcion alternativa"}',
-              ].filter(Boolean).join('\n'),
-            },
-          });
-          const raw = aiData?.copy || aiData?.text || '';
-          const match = raw.match(/\{[\s\S]*\}/);
-          if (match) {
-            const parsed = JSON.parse(match[0]);
-            if (parsed.copy_2) allCopies.push({ texto: parsed.copy_2, tipo: 'variacion' });
-            if (parsed.headline_2) allHeadlines.push(parsed.headline_2);
-          }
-        } catch (aiErr) {
-          console.warn('[DCT] AI variation generation failed:', aiErr);
-        }
-      }
-
-      // Collect images
-      const allImages: string[] = [];
-      if (imageUrl) allImages.push(imageUrl);
-
-      if (allImages.length < 3) {
-        try {
-          const { data: shopifyConn } = await supabase
-            .from('platform_connections')
-            .select('id')
-            .eq('client_id', clientId)
-            .eq('platform', 'shopify')
-            .limit(1)
-            .single();
-          if (shopifyConn?.id) {
-            const { data: shopData } = await callApi('fetch-shopify-products', {
-              body: { connectionId: shopifyConn.id },
-            });
-            if (shopData?.products) {
-              for (const p of shopData.products) {
-                if (p.image && !allImages.includes(p.image) && allImages.length < 3) {
-                  allImages.push(p.image);
-                }
-              }
-            }
-          }
-        } catch { /* Shopify not connected */ }
-      }
-
-      if (allImages.length < 3) {
-        try {
-          const { data: adAssets } = await supabase
-            .from('ad_assets')
-            .select('asset_url')
-            .eq('client_id', clientId)
-            .not('asset_url', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(5);
-          if (adAssets) {
-            for (const a of adAssets) {
-              if (a.asset_url && !allImages.includes(a.asset_url) && allImages.length < 3) {
-                allImages.push(a.asset_url);
-              }
-            }
-          }
-        } catch { /* continue */ }
-      }
-
-      if (allImages.length < 3) {
-        try {
-          const { data: clientAssets } = await supabase
-            .from('client_assets')
-            .select('url')
-            .eq('client_id', clientId)
-            .in('tipo', ['producto', 'lifestyle'])
-            .not('url', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(5);
-          if (clientAssets) {
-            for (const a of clientAssets) {
-              const isStorageUrl = a.url?.includes('/storage/v1/object/');
-              if (a.url && !isStorageUrl && !allImages.includes(a.url) && allImages.length < 3) {
-                allImages.push(a.url);
-              }
-            }
-          }
-        } catch { /* continue */ }
-      }
-
-      // Save to DB
       const { error } = await supabase.from('ad_creatives').insert({
         client_id: clientId,
-        funnel,
-        formato: imageUrl?.endsWith('.mp4') ? 'video' : 'static',
+        funnel: funnelStage,
+        formato: adSetFormat === 'carousel' ? 'carousel' : filledImages[0]?.endsWith('.mp4') ? 'video' : 'static',
         angulo: anguloText,
-        titulo: allHeadlines[0] || campName || 'Borrador sin título',
-        texto_principal: allCopies[0]?.texto || primaryText,
+        titulo: filledHeadlines[0] || campName || 'Borrador sin título',
+        texto_principal: filledTexts[0] || '',
         descripcion: description,
         cta: cta,
-        asset_url: allImages[0] || null,
+        asset_url: filledImages[0] || null,
         estado: 'borrador',
         brief_visual: {
           type: 'campaign-draft',
+          ad_set_format: adSetFormat,
+          selected_angle: selectedAngle,
+          cpa_target: cpaTarget,
           campaign_name: existingCampaignId ? existingCampaignName : campName,
           existing_campaign_id: existingCampaignId || undefined,
           existing_adset_id: existingAdsetId || undefined,
@@ -931,7 +972,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           start_date: startDate,
           dolor: audienceDesc || 'Sin definir',
           producto: campName?.split(' - ')[0] || 'Sin definir',
-          metodologia: 'DCT 3:2:2 (Charles Tichener)',
+          metodologia: adSetFormat === 'flexible' ? 'DCT 3:2:2 (Charles Tichener)' : adSetFormat,
           plan_accion: {
             tipo_campana: budgetType === 'ABO' ? 'ABO Testing' : 'CBO Escalamiento',
             presupuesto_diario: adsetBudget || campBudget || '10000',
@@ -941,13 +982,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           },
         },
         dct_copies: allCopies.length > 0 ? allCopies : null,
-        dct_titulos: allHeadlines.length > 0 ? allHeadlines : null,
+        dct_titulos: filledHeadlines.length > 0 ? filledHeadlines : null,
         dct_descripciones: description ? [description] : null,
-        dct_imagenes: allImages.length > 0 ? allImages : null,
+        dct_imagenes: filledImages.length > 0 ? filledImages : null,
       });
       if (error) throw error;
 
-      const summary = `DCT guardado: ${allImages.length}/3 imágenes, ${allCopies.length}/2 copies, ${allHeadlines.length}/2 headlines`;
+      const summary = `Borrador guardado: ${filledImages.length} imágenes, ${filledTexts.length} copies, ${filledHeadlines.length} headlines`;
       toast.success(summary);
     } catch (err) {
       console.error('[CampaignCreateWizard] Save draft error:', err);
@@ -976,6 +1017,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         CATALOG: 'OUTCOME_SALES',
       };
 
+      const filledTexts = primaryTexts.filter(Boolean);
+      const filledHeadlines = headlines.filter(Boolean);
+      const filledImages = images.filter(Boolean);
+
       const submitData: Record<string, any> = {
         name,
         objective: objMap[objective],
@@ -983,13 +1028,17 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         billing_event: 'IMPRESSIONS',
         optimization_goal: objective === 'TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
         adset_name: adsetName || `${name} - Ad Set 1`,
-        primary_text: primaryText || undefined,
-        headline: headline || undefined,
+        primary_text: filledTexts[0] || undefined,
+        headline: filledHeadlines[0] || undefined,
         description: description || undefined,
-        image_url: imageUrl || undefined,
+        image_url: filledImages[0] || undefined,
         cta: cta || 'SHOP_NOW',
         destination_url: destinationUrl || undefined,
         page_id: ctxPageId || undefined,
+        ad_set_format: adSetFormat,
+        images: filledImages.length > 1 ? filledImages : undefined,
+        texts: filledTexts.length > 1 ? filledTexts : undefined,
+        headlines: filledHeadlines.length > 1 ? filledHeadlines : undefined,
       };
 
       // Use existing entities if selected
@@ -1039,8 +1088,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     audienceDesc,
     budgetType,
     funnelStage,
-    headline,
-    primaryText,
+    selectedAngle,
+    adSetFormat,
+    headline: headlines[0] || '',
+    primaryText: primaryTexts[0] || '',
     campName,
     adsetName,
   };
@@ -1152,6 +1203,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           audienceDesc={audienceDesc} setAudienceDesc={setAudienceDesc}
                           dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
                           isABO={budgetType === 'ABO'}
+                          adSetFormat={adSetFormat} setAdSetFormat={setAdSetFormat}
+                          cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
                         />
                       </CardContent>
                     </Card>
@@ -1177,6 +1230,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   audienceDesc={audienceDesc} setAudienceDesc={setAudienceDesc}
                   dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
                   isABO={budgetType === 'ABO'}
+                  adSetFormat={adSetFormat} setAdSetFormat={setAdSetFormat}
+                  cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
                 />
               )}
 
@@ -1185,28 +1240,39 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 <FunnelStageSelector funnelStage={funnelStage} setFunnelStage={setFunnelStage} />
               )}
 
+              {/* ANGLE SELECT step */}
+              {currentStep === 'angle-select' && (
+                <AngleSelector
+                  funnelStage={funnelStage}
+                  selectedAngle={selectedAngle}
+                  setSelectedAngle={setSelectedAngle}
+                />
+              )}
+
               {/* AD CREATIVE step */}
               {currentStep === 'ad-creative' && (
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
-                  <AdForm
+                  <AdFormMultiSlot
                     clientId={clientId}
-                    headline={headline} setHeadline={setHeadline}
-                    primaryText={primaryText} setPrimaryText={setPrimaryText}
+                    adSetFormat={adSetFormat}
+                    selectedAngle={selectedAngle}
+                    headlines={headlines} setHeadlines={setHeadlines}
+                    primaryTexts={primaryTexts} setPrimaryTexts={setPrimaryTexts}
                     description={description} setDescription={setDescription}
-                    imageUrl={imageUrl} setImageUrl={setImageUrl}
+                    images={images} setImages={setImages}
                     cta={cta} setCta={setCta}
                     destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
                     generating={generatingCopy}
                     onGenerateCopy={handleGenerateCopy}
                   />
-                  {(primaryText || headline || imageUrl) && (
+                  {(primaryTexts[0] || headlines[0] || images[0]) && (
                     <div className="hidden lg:block">
                       <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
                       <div className="sticky top-4">
                         <AdPreviewMockup
-                          imageUrl={imageUrl}
-                          primaryText={primaryText}
-                          headline={headline}
+                          imageUrl={images[0] || ''}
+                          primaryText={primaryTexts[0] || ''}
+                          headline={headlines[0] || ''}
                           description={description}
                           cta={cta}
                           pageName={pageName || 'Tu Marca'}
@@ -1234,10 +1300,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   audienceDesc={audienceDesc}
                   adsetBudget={adsetBudget}
                   funnelStage={funnelStage}
-                  headline={headline}
-                  primaryText={primaryText}
+                  headline={headlines[0] || ''}
+                  primaryText={primaryTexts[0] || ''}
                   description={description}
-                  imageUrl={imageUrl}
+                  imageUrl={images[0] || ''}
                   cta={cta}
                   destinationUrl={destinationUrl}
                   pageName={pageName || 'Tu Marca'}
