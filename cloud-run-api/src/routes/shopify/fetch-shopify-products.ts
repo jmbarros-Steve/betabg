@@ -85,8 +85,8 @@ export async function fetchShopifyProducts(c: Context) {
 
     const cleanStoreUrl = store_url.replace(/^https?:\/\//, '');
 
-    // Fetch products from Shopify
-    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2024-01/products.json?limit=250&fields=id,title,handle,status,variants,images,product_type`;
+    // Fetch products from Shopify (including body_html for SEO analysis)
+    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2024-01/products.json?limit=250&fields=id,title,handle,status,variants,images,product_type,body_html`;
 
     console.log('[fetch-shopify-products] Fetching from:', cleanStoreUrl);
 
@@ -147,7 +147,10 @@ export async function fetchShopifyProducts(c: Context) {
       handle: product.handle,
       status: product.status,
       product_type: product.product_type || '',
+      body_html: product.body_html || '',
       image: product.images?.[0]?.src || null,
+      image_count: (product.images || []).length,
+      images_without_alt: (product.images || []).filter((img: any) => !img.alt || img.alt.trim() === '').length,
       variants: (product.variants || []).map((v: any) => ({
         id: v.id,
         title: v.title,

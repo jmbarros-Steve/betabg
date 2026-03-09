@@ -87,7 +87,7 @@ export async function fetchShopifyAnalytics(c: Context) {
     const sinceDate = new Date();
     sinceDate.setDate(sinceDate.getDate() - daysBack);
 
-    // Fetch orders (with line_items) and abandoned checkouts in parallel
+    // Fetch orders (with line_items + customer + financial_status) and abandoned checkouts in parallel
     const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
     const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}`;
 
@@ -102,6 +102,12 @@ export async function fetchShopifyAnalytics(c: Context) {
     const skuMap = new Map<string, { sku: string; name: string; quantity: number; revenue: number }>();
     const channelMap = new Map<string, { channel: string; orders: number; revenue: number }>();
     const utmMap = new Map<string, { utm: string; source: string; medium: string; campaign: string; orders: number; revenue: number }>();
+
+    // Customer metrics tracking
+    const customerMap = new Map<number, { orders_count: number; total_spent: number; created_at: string }>();
+    let totalOrderCount = 0;
+    let paidOrderCount = 0;
+    const orderDates: { customerId: number; orderDate: string }[] = [];
 
     if (ordersRes.ok) {
       const { orders }: any = await ordersRes.json();
@@ -143,6 +149,23 @@ export async function fetchShopifyAnalytics(c: Context) {
             }
           } catch { /* ignore invalid URLs */ }
         }
+
+        // Customer tracking
+        totalOrderCount++;
+        if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') {
+          paidOrderCount++;
+        }
+        const cust = order.customer;
+        if (cust?.id) {
+          if (!customerMap.has(cust.id)) {
+            customerMap.set(cust.id, {
+              orders_count: Number(cust.orders_count) || 1,
+              total_spent: parseFloat(cust.total_spent || '0'),
+              created_at: cust.created_at || order.created_at,
+            });
+          }
+          orderDates.push({ customerId: cust.id, orderDate: order.created_at });
+        }
       }
     } else {
       const errText = await ordersRes.text();
@@ -159,6 +182,66 @@ export async function fetchShopifyAnalytics(c: Context) {
     const utmPerformance = Array.from(utmMap.values())
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 20);
+
+    // --- CUSTOMER METRICS ---
+    const uniqueCustomers = customerMap.size;
+    const conversionRate = totalOrderCount > 0 ? (paidOrderCount / totalOrderCount) * 100 : 0;
+    const totalLtv = Array.from(customerMap.values()).reduce((sum, c) => sum + c.total_spent, 0);
+    const averageLtv = uniqueCustomers > 0 ? totalLtv / uniqueCustomers : 0;
+    const repeatCustomers = Array.from(customerMap.values()).filter(c => c.orders_count > 1).length;
+    const repeatCustomerRate = uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0;
+
+    const customerMetrics = {
+      conversionRate: Math.round(conversionRate * 100) / 100,
+      averageLtv: Math.round(averageLtv * 100) / 100,
+      totalCustomers: uniqueCustomers,
+      repeatCustomerRate: Math.round(repeatCustomerRate * 100) / 100,
+    };
+
+    // --- COHORT ANALYSIS ---
+    const cohortMap = new Map<string, { total: number; months: Map<number, Set<number>> }>();
+    for (const [custId, custData] of customerMap) {
+      const createdDate = new Date(custData.created_at);
+      const cohortKey = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}`;
+      if (!cohortMap.has(cohortKey)) {
+        cohortMap.set(cohortKey, { total: 0, months: new Map() });
+      }
+      const cohort = cohortMap.get(cohortKey)!;
+      cohort.total++;
+      if (!cohort.months.has(0)) cohort.months.set(0, new Set());
+      cohort.months.get(0)!.add(custId);
+    }
+
+    for (const { customerId, orderDate } of orderDates) {
+      const custData = customerMap.get(customerId);
+      if (!custData) continue;
+      const createdDate = new Date(custData.created_at);
+      const cohortKey = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}`;
+      const cohort = cohortMap.get(cohortKey);
+      if (!cohort) continue;
+
+      const oDate = new Date(orderDate);
+      const monthOffset = (oDate.getFullYear() - createdDate.getFullYear()) * 12 + (oDate.getMonth() - createdDate.getMonth());
+      if (monthOffset >= 0 && monthOffset <= 5) {
+        if (!cohort.months.has(monthOffset)) cohort.months.set(monthOffset, new Set());
+        cohort.months.get(monthOffset)!.add(customerId);
+      }
+    }
+
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const cohorts = Array.from(cohortMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, data]) => {
+        const [year, month] = key.split('-');
+        const label = `${monthNames[parseInt(month) - 1]} ${year}`;
+        const result: any = { cohort: label, month0: data.months.get(0)?.size || 0 };
+        for (let i = 1; i <= 5; i++) {
+          const count = data.months.get(i)?.size;
+          if (count !== undefined) result[`month${i}`] = count;
+        }
+        return result;
+      });
 
     // --- ABANDONED CHECKOUTS ---
     let abandonedCarts: any[] = [];
@@ -183,9 +266,9 @@ export async function fetchShopifyAnalytics(c: Context) {
       console.warn('[fetch-shopify-analytics] Checkouts fetch failed:', checkoutsRes.status, errText);
     }
 
-    console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs`);
+    console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs, ${uniqueCustomers} customers, ${cohorts.length} cohorts`);
 
-    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance });
+    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts });
 
   } catch (error: any) {
     console.error('[fetch-shopify-analytics] Error:', error);
