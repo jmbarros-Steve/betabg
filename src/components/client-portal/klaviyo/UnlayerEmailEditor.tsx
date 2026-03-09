@@ -181,7 +181,7 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
 
       {/* Unlayer editor */}
       <div className="flex-1 min-h-0 relative">
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 [&>div]:!h-full [&>div>div]:!h-full">
           <EmailEditor
             ref={emailEditorRef}
             onReady={() => setEditorReady(true)}
