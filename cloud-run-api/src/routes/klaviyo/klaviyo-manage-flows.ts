@@ -758,7 +758,7 @@ async function handleCreateFlow(
   connection: any,
   body: any,
 ) {
-  const { name, flowName, triggerType, emails } = body;
+  const { name, flowName, triggerType, emails, discount, productStrategy, discountEmailIndex } = body;
   const flowDisplayName = name || flowName;
 
   if (!flowDisplayName || !emails || !Array.isArray(emails) || emails.length === 0) {

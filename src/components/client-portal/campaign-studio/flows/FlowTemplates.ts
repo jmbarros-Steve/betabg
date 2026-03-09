@@ -2,6 +2,8 @@
 
 export type FlowCategory = 'revenue' | 'engagement' | 'retention' | 'lifecycle';
 export type FlowPriority = 'critical' | 'high' | 'medium';
+export type ProductStrategy = 'cart_items' | 'most_viewed' | 'best_sellers' | 'none';
+export type DiscountType = 'percentage' | 'fixed_amount' | 'free_shipping';
 
 export interface FlowEmail {
   subject: string;
@@ -23,6 +25,10 @@ export interface FlowTemplate {
   emails: FlowEmail[];
   bestPractices: string[];
   expectedImpact: string;
+  productStrategy: ProductStrategy;
+  discountEmail: number | null; // index of email that carries coupon (2 = 3rd email)
+  defaultDiscountType: DiscountType | null;
+  defaultDiscountValue: number;
 }
 
 export const FLOW_TEMPLATES: FlowTemplate[] = [
@@ -73,6 +79,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Segmenta: si compran despues del email 1, salta al post-purchase.',
     ],
     expectedImpact: 'Tasa de conversion de suscriptor a cliente del 8-12%. Revenue incremental del 15-20% en nuevos suscriptores.',
+    productStrategy: 'most_viewed',
+    discountEmail: 2,
+    defaultDiscountType: 'percentage',
+    defaultDiscountValue: 10,
   },
 
   // 2. Abandoned Cart (critical, revenue)
@@ -115,6 +125,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Agrega resenas del producto abandonado para generar confianza.',
     ],
     expectedImpact: 'Recuperacion del 5-15% de carritos abandonados. ROI promedio de 30x sobre el costo del flujo.',
+    productStrategy: 'cart_items',
+    discountEmail: 2,
+    defaultDiscountType: 'free_shipping',
+    defaultDiscountValue: 0,
   },
 
   // 3. Post Purchase (high, retention)
@@ -157,6 +171,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Ofrece un pequeno incentivo (5-10%) por dejar una resena con foto.',
     ],
     expectedImpact: 'Aumento del 20-30% en tasa de resenas. Tasa de recompra del 15-25% desde el email de cross-sell.',
+    productStrategy: 'none',
+    discountEmail: null,
+    defaultDiscountType: null,
+    defaultDiscountValue: 0,
   },
 
   // 4. Customer Winback (high, retention)
@@ -199,6 +217,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Si no responden al tercer email, moverlos al flujo de sunset.',
     ],
     expectedImpact: 'Reactivacion del 5-10% de clientes inactivos. Mejor salud de lista al limpiar contactos no comprometidos.',
+    productStrategy: 'best_sellers',
+    discountEmail: 1,
+    defaultDiscountType: 'percentage',
+    defaultDiscountValue: 15,
   },
 
   // 5. Browse Abandonment (high, revenue)
@@ -234,6 +256,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'No incluyas descuento en browse abandonment, reservalo para cart abandonment.',
     ],
     expectedImpact: 'Conversion del 2-5% de navegantes a compradores. Complementa al flujo de carrito abandonado.',
+    productStrategy: 'none',
+    discountEmail: null,
+    defaultDiscountType: null,
+    defaultDiscountValue: 0,
   },
 
   // 6. VIP Loyalty (medium, engagement)
@@ -276,6 +302,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Envia acceso anticipado 24-48 horas antes del lanzamiento publico.',
     ],
     expectedImpact: 'Aumento del 25-40% en valor de vida del cliente VIP. Mayor tasa de recompra y referidos.',
+    productStrategy: 'none',
+    discountEmail: 0,
+    defaultDiscountType: 'percentage',
+    defaultDiscountValue: 20,
   },
 
   // 7. Sunset Flow (high, retention)
@@ -318,6 +348,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Suprime (no elimines) los contactos del flujo final para cumplir regulaciones.',
     ],
     expectedImpact: 'Mejora del 10-20% en tasa de apertura general. Mejor reputacion de dominio y entregabilidad.',
+    productStrategy: 'none',
+    discountEmail: null,
+    defaultDiscountType: null,
+    defaultDiscountValue: 0,
   },
 
   // 8. Birthday (medium, lifecycle)
@@ -353,6 +387,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Recolecta fechas de cumpleanos en el formulario de suscripcion.',
     ],
     expectedImpact: 'Tasa de conversion del 15-20% en emails de cumpleanos. Excelente herramienta de fidelizacion.',
+    productStrategy: 'none',
+    discountEmail: 0,
+    defaultDiscountType: 'percentage',
+    defaultDiscountValue: 20,
   },
 
   // 9. Back in Stock (medium, revenue)
@@ -381,6 +419,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Permite que los clientes se suscriban a alertas de stock desde la pagina del producto.',
     ],
     expectedImpact: 'Tasa de conversion del 10-20%. Los clientes que pidieron alerta tienen intencion de compra altisima.',
+    productStrategy: 'none',
+    discountEmail: null,
+    defaultDiscountType: null,
+    defaultDiscountValue: 0,
   },
 
   // 10. Price Drop (medium, revenue)
@@ -409,6 +451,10 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
       'Segmenta solo a quienes realmente vieron o guardaron el producto.',
     ],
     expectedImpact: 'Tasa de conversion del 8-15%. Muy efectivo para productos de consideracion alta.',
+    productStrategy: 'none',
+    discountEmail: null,
+    defaultDiscountType: null,
+    defaultDiscountValue: 0,
   },
 ];
 

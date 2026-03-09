@@ -69,6 +69,7 @@ function getFlowEmailContent(flowType: string, stepIndex: number, brandName: str
     welcome_series: [
       { heading: `¡Bienvenido/a a ${brandName}!`, body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Estamos felices de tenerte. Conoce nuestra historia y lo que nos hace especiales.</p>`, ctaText: 'Conocer más' },
       { heading: 'Nuestros productos más populares', body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Descubre lo que más aman nuestros clientes.</p>`, ctaText: 'Ver productos' },
+      { heading: 'Un regalo especial para ti', body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Queremos premiarte por ser parte de nuestra comunidad.</p>`, ctaText: 'Usar mi descuento' },
     ],
     post_purchase: [
       { heading: '¡Gracias por tu compra!', body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Tu pedido está en camino. Aquí tienes los detalles.</p>`, ctaText: 'Ver mi pedido' },
@@ -81,15 +82,82 @@ function getFlowEmailContent(flowType: string, stepIndex: number, brandName: str
   return step;
 }
 
+function generateProductBlockHtml(products: any[], productStrategy: string): string {
+  if (productStrategy === 'cart_items') {
+    return `
+        <tr><td class="mobile-padding" style="padding:8px 40px 24px;">
+          <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:20px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#856404;">🛒 Productos del carrito</p>
+            <p style="margin:0;font-size:13px;color:#856404;">Aquí aparecerán automáticamente los productos que el cliente dejó en su carrito (imagen, nombre, precio y cantidad).</p>
+          </div>
+        </td></tr>`;
+  }
+
+  if (!products || products.length === 0) return '';
+
+  const productCells = products.slice(0, 3).map((p: any) => `
+                <td width="33%" valign="top" style="padding:0 6px;text-align:center;">
+                  <img src="${p.image_url || 'https://placehold.co/160x160/f5f5f5/999?text=Producto'}" alt="${p.title}" width="160" style="display:block;margin:0 auto 8px;border-radius:6px;border:1px solid #eee;max-width:100%;">
+                  <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#1a1a1a;line-height:1.3;">${p.title}</p>
+                  ${p.price ? `<p style="margin:0;font-size:14px;font-weight:700;color:#C8A84E;">$${p.price}</p>` : ''}
+                </td>`).join('\n');
+
+  return `
+        <tr><td class="mobile-padding" style="padding:8px 40px 24px;">
+          <p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:1px;">Productos destacados</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>${productCells}
+            </tr>
+          </table>
+        </td></tr>`;
+}
+
+function generateDiscountBlockHtml(discount: { code: string; value: number; type: string; expiry?: string }): string {
+  const descText = discount.type === 'percentage'
+    ? `${discount.value}% de descuento`
+    : discount.type === 'fixed_amount'
+    ? `$${discount.value} de descuento`
+    : 'Envío gratis';
+
+  return `
+        <tr><td class="mobile-padding" style="padding:8px 40px 24px;">
+          <div style="background:#f8f6f0;border:2px dashed #C8A84E;border-radius:8px;padding:24px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:12px;color:#666;text-transform:uppercase;letter-spacing:2px;font-weight:600;">Tu código exclusivo</p>
+            <p style="margin:0 0 8px;font-size:28px;font-weight:700;color:#1a1a1a;letter-spacing:3px;">${discount.code}</p>
+            <p style="margin:0;font-size:14px;color:#555;">${descText}${discount.expiry ? ` · Válido hasta ${discount.expiry}` : ''}</p>
+          </div>
+        </td></tr>`;
+}
+
 function generateBrandedEmailHtml(
   brand: BrandData,
-  config: { subject: string; previewText: string; flowType: string; stepIndex: number; totalSteps: number }
+  config: {
+    subject: string;
+    previewText: string;
+    flowType: string;
+    stepIndex: number;
+    totalSteps: number;
+    products?: any[];
+    productStrategy?: string;
+    discount?: { code: string; value: number; type: string; expiry?: string } | null;
+    discountEmailIndex?: number | null;
+  }
 ): string {
   const { heading, body, ctaText } = getFlowEmailContent(config.flowType, config.stepIndex, brand.name);
 
   const logoBlock = brand.logoUrl
     ? `<img src="${brand.logoUrl}" alt="${brand.name}" width="150" style="display:block;margin:0 auto;">`
     : `<div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:3px;font-family:Georgia,serif;text-align:center;">${brand.name.toUpperCase()}</div>`;
+
+  // Product block: show on first email if productStrategy is set
+  const showProducts = config.productStrategy && config.productStrategy !== 'none' && config.stepIndex === 0;
+  const productBlock = showProducts
+    ? generateProductBlockHtml(config.products || [], config.productStrategy!)
+    : '';
+
+  // Discount block: show on the designated email
+  const showDiscount = config.discount && config.discountEmailIndex === config.stepIndex;
+  const discountBlock = showDiscount ? generateDiscountBlockHtml(config.discount!) : '';
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -116,6 +184,8 @@ function generateBrandedEmailHtml(
           <h1 style="margin:0 0 24px;font-size:24px;font-weight:700;color:#1a1a1a;line-height:1.3;font-family:Georgia,serif;">${heading}</h1>
           ${body}
         </td></tr>
+        ${productBlock}
+        ${discountBlock}
         <tr><td align="center" style="padding:20px 40px 44px;">
           <table role="presentation" cellpadding="0" cellspacing="0">
             <tr><td style="background-color:#1a1a1a;border-radius:30px;">
@@ -156,7 +226,7 @@ export async function previewFlowEmails(c: Context) {
     }
 
     const body = await c.req.json();
-    const { connectionId, flowType, emails } = body;
+    const { connectionId, flowType, emails, products, discount, productStrategy, discountEmailIndex } = body;
 
     if (!connectionId) return c.json({ error: 'connectionId required' }, 400);
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
@@ -199,6 +269,10 @@ export async function previewFlowEmails(c: Context) {
         flowType: flowType || 'welcome_series',
         stepIndex: idx,
         totalSteps: emails.length,
+        products: products || [],
+        productStrategy: productStrategy || 'none',
+        discount: discount || null,
+        discountEmailIndex: discountEmailIndex ?? null,
       });
 
       return {
