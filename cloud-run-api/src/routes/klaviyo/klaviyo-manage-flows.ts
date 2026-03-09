@@ -205,6 +205,15 @@ async function handleCreateFlow(
     return c.json({ error: 'name and emails array required' }, 400);
   }
 
+  // Map triggerType to valid flow_type for DB check constraint
+  const FLOW_TYPE_MAP: Record<string, string> = {
+    abandoned_cart: 'abandoned_cart',
+    welcome_series: 'welcome_series',
+    customer_winback: 'customer_winback',
+    campaign: 'campaign',
+  };
+  const dbFlowType = FLOW_TYPE_MAP[triggerType] || 'campaign';
+
   const templateIds: string[] = [];
   const emailSteps: any[] = [];
 
@@ -247,13 +256,11 @@ async function handleCreateFlow(
     .from('klaviyo_email_plans')
     .insert({
       client_id: connection.client_id,
-      connection_id: connection.id,
       name: flowDisplayName,
-      flow_type: 'flow',
-      trigger_type: triggerType || null,
+      flow_type: dbFlowType,
       emails: emailSteps,
-      status: 'templates_created',
-      admin_notes: `Flow plan created on ${new Date().toISOString()}. ${templateIds.length} templates created. Template IDs: ${templateIds.join(', ')}. Trigger type: ${triggerType || 'manual'}. Flow must be finalized in Klaviyo dashboard.`,
+      status: 'draft',
+      admin_notes: `Flow plan created on ${new Date().toISOString()}. ${templateIds.length} templates created. Template IDs: ${templateIds.join(', ')}. Trigger type: ${triggerType || 'manual'}. Connection: ${connection.id}. Flow must be finalized in Klaviyo dashboard.`,
     })
     .select()
     .single();
