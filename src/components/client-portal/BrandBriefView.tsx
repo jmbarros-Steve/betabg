@@ -2496,8 +2496,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
       if (!pdfActionPlanItems) {
         pdfActionPlanItems = parsePartialJsonArray(actionPlanData.raw_text);
-        if (pdfActionPlanItems.length === 0) pdfActionPlanItems = null;
       }
+      // Also extract partial titles from incomplete items
+      if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
+        const existingTitles = new Set(pdfActionPlanItems.map((p: any) => p.title));
+        const allTitles = actionPlanData.raw_text.match(/"title"\s*:\s*"([^"]+)"/g) || [];
+        for (const tm of allTitles) {
+          const title = tm.match(/"title"\s*:\s*"([^"]+)"/)?.[1] || '';
+          if (title && !existingTitles.has(title)) {
+            pdfActionPlanItems.push({ title, priority: '', timeline: '' });
+            existingTitles.add(title);
+          }
+        }
+      }
+      if (!pdfActionPlanItems || pdfActionPlanItems.length === 0) pdfActionPlanItems = null;
       console.log('[PDF] action_plan _repair_failed, parsed items:', pdfActionPlanItems?.length ?? 0);
     }
     if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
@@ -3764,21 +3776,34 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 // Second try: bracket-counting parser for truncated JSON
                 if (!parsedActionPlan) {
                   parsedActionPlan = parsePartialJsonArray(rawActionPlan.raw_text);
-                  if (parsedActionPlan.length === 0) parsedActionPlan = null;
                 }
+                // Also extract partial titles from incomplete items using regex
+                if (parsedActionPlan && parsedActionPlan.length > 0) {
+                  const existingTitles = new Set(parsedActionPlan.map((p: any) => p.title));
+                  const allTitles = rawActionPlan.raw_text.match(/"title"\s*:\s*"([^"]+)"/g) || [];
+                  for (const tm of allTitles) {
+                    const title = tm.match(/"title"\s*:\s*"([^"]+)"/)?.[1] || '';
+                    if (title && !existingTitles.has(title)) {
+                      parsedActionPlan.push({ title, priority: '', timeline: '', _partial: true });
+                      existingTitles.add(title);
+                    }
+                  }
+                }
+                if (!parsedActionPlan || parsedActionPlan.length === 0) parsedActionPlan = null;
                 console.log('[BrandBriefView] action_plan _repair_failed, parsed items:', parsedActionPlan?.length ?? 0);
               }
               const showSection = (parsedActionPlan && parsedActionPlan.length > 0) || isComplete;
               if (!showSection) return null;
+              const itemCount = parsedActionPlan?.length || 0;
               return (
               <Card className="border-2 border-primary/30">
                 <CardHeader className="pb-3 bg-primary/5">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">7</div>
+                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">{itemCount || '?'}</div>
                     <div>
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Zap className="h-5 w-5 text-primary" />
-                        Evaluación Estratégica — 7 Accionables Prioritarios
+                        Evaluación Estratégica — Accionables Prioritarios
                       </CardTitle>
                       <CardDescription className="text-xs">Plan de acción con KPIs y responsables — Dr. Steve Dogs</CardDescription>
                     </div>
