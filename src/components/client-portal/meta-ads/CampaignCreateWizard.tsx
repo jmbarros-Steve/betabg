@@ -705,6 +705,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         client_id: clientId,
         funnel: objective === 'CONVERSIONS' ? 'bofu' : objective === 'TRAFFIC' ? 'tofu' : 'mofu',
         formato: imageUrl?.endsWith('.mp4') ? 'video' : 'static',
+        angulo: 'campana-draft',
         titulo: headline || campName || 'Borrador sin titulo',
         texto_principal: primaryText,
         descripcion: description,
