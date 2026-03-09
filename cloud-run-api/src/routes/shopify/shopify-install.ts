@@ -74,8 +74,8 @@ export async function shopifyInstall(c: Context) {
     const supabaseAdmin = getSupabaseAdmin();
 
     // Resolve Shopify credentials: per-client or centralized
-    let shopifyClientId: string;
-    let shopifyClientSecret: string;
+    let shopifyClientId: string = '';
+    let shopifyClientSecret: string = '';
 
     if (perClientId) {
       // Per-client mode: look up credentials from platform_connections
@@ -111,15 +111,42 @@ export async function shopifyInstall(c: Context) {
       shopifyClientSecret = decryptedSecret;
       console.log('Using per-client Shopify credentials for client:', perClientId);
     } else {
-      // Centralized mode: use environment variables (backwards compatibility)
-      shopifyClientId = process.env.SHOPIFY_CLIENT_ID || '';
-      shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET || '';
+      // No client_id param — try looking up by shop_domain first (install-link flow)
+      let foundByShop = false;
+      if (shop) {
+        const lookupDomain = (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`).toLowerCase().trim();
+        const { data: conn } = await supabaseAdmin
+          .from('platform_connections')
+          .select('shopify_client_id, shopify_client_secret_encrypted')
+          .eq('shop_domain', lookupDomain)
+          .eq('platform', 'shopify')
+          .not('shopify_client_id', 'is', null)
+          .single();
 
-      if (!shopifyClientId || !shopifyClientSecret) {
-        return c.html(
-          '<html><body><h1>Error</h1><p>Shopify credentials not configured</p></body></html>',
-          500,
-        );
+        if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
+          const { data: decryptedSecret } = await supabaseAdmin
+            .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
+
+          if (decryptedSecret) {
+            shopifyClientId = conn.shopify_client_id;
+            shopifyClientSecret = decryptedSecret;
+            foundByShop = true;
+            console.log('Found per-client Shopify credentials by shop_domain:', lookupDomain);
+          }
+        }
+      }
+
+      if (!foundByShop) {
+        // Centralized fallback: use environment variables
+        shopifyClientId = process.env.SHOPIFY_CLIENT_ID || '';
+        shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET || '';
+
+        if (!shopifyClientId || !shopifyClientSecret) {
+          return c.html(
+            '<html><body><h1>Error</h1><p>Shopify credentials not configured. Please set up your Shopify connection in Steve first.</p></body></html>',
+            400,
+          );
+        }
       }
     }
 

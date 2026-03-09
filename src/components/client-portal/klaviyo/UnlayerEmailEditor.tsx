@@ -180,36 +180,38 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
       </div>
 
       {/* Unlayer editor */}
-      <div className="flex-1 min-h-0">
-        <EmailEditor
-          ref={emailEditorRef}
-          onReady={() => setEditorReady(true)}
-          options={{
-            displayMode: 'email',
-            locale: 'es-ES',
-            appearance: {
-              theme: 'modern_light',
-            },
-            features: {
-              stockImages: { enabled: true, safeSearch: true },
-              userUploads: true,
-            },
-            tools: {
-              html: { enabled: true },
-              image: { enabled: true },
-              text: { enabled: true },
-              button: { enabled: true },
-              divider: { enabled: true },
-              heading: { enabled: true },
-              menu: { enabled: true },
-              social: { enabled: true },
-              video: { enabled: true },
-              columns: { enabled: true },
-            },
-            ...unlayerMergeTagsConfig,
-          }}
-          style={{ height: '100%' }}
-        />
+      <div className="flex-1 min-h-0 relative">
+        <div className="absolute inset-0">
+          <EmailEditor
+            ref={emailEditorRef}
+            onReady={() => setEditorReady(true)}
+            options={{
+              displayMode: 'email',
+              locale: 'es-ES',
+              appearance: {
+                theme: 'modern_light',
+              },
+              features: {
+                stockImages: { enabled: true, safeSearch: true },
+                userUploads: true,
+              },
+              tools: {
+                html: { enabled: true },
+                image: { enabled: true },
+                text: { enabled: true },
+                button: { enabled: true },
+                divider: { enabled: true },
+                heading: { enabled: true },
+                menu: { enabled: true },
+                social: { enabled: true },
+                video: { enabled: true },
+                columns: { enabled: true },
+              },
+              ...unlayerMergeTagsConfig,
+            }}
+            style={{ height: '100%' }}
+          />
+        </div>
       </div>
     </div>
   );
