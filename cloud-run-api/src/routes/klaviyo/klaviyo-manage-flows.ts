@@ -198,9 +198,10 @@ async function handleCreateFlow(
   connection: any,
   body: any,
 ) {
-  const { name, triggerType, emails } = body;
+  const { name, flowName, triggerType, emails } = body;
+  const flowDisplayName = name || flowName;
 
-  if (!name || !emails || !Array.isArray(emails) || emails.length === 0) {
+  if (!flowDisplayName || !emails || !Array.isArray(emails) || emails.length === 0) {
     return c.json({ error: 'name and emails array required' }, 400);
   }
 
@@ -209,7 +210,7 @@ async function handleCreateFlow(
 
   for (let i = 0; i < emails.length; i++) {
     const email = emails[i];
-    const templateName = `${name} - Step ${i + 1}: ${email.subject}`;
+    const templateName = `${flowDisplayName} - Step ${i + 1}: ${email.subject}`;
 
     console.log(`[${i + 1}/${emails.length}] Creating template: ${templateName}`);
 
@@ -235,8 +236,8 @@ async function handleCreateFlow(
       subject: email.subject,
       previewText: email.previewText || '',
       content: email.htmlContent || '',
-      delayDays: Math.floor((email.delaySeconds || 0) / 86400),
-      delayHours: Math.floor(((email.delaySeconds || 0) % 86400) / 3600),
+      delayDays: Math.floor((email.delaySeconds || (email.delayHours || 0) * 3600) / 86400),
+      delayHours: Math.floor(((email.delaySeconds || (email.delayHours || 0) * 3600) % 86400) / 3600),
       templateId,
     });
   }
@@ -247,7 +248,7 @@ async function handleCreateFlow(
     .insert({
       client_id: connection.client_id,
       connection_id: connection.id,
-      name,
+      name: flowDisplayName,
       flow_type: 'flow',
       trigger_type: triggerType || null,
       emails: emailSteps,
