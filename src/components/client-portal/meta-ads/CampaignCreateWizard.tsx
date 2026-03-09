@@ -1081,8 +1081,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   // ---- AI Copy Generation ----
 
+  const generatingRef = useRef(false);
   const handleGenerateCopy = useCallback(async () => {
-    if (generatingCopy) return;
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setGeneratingCopy(true);
     try {
       const isMulti = adSetFormat === 'flexible';
@@ -1143,9 +1145,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       console.error('[Wizard] Copy generation error:', err);
       toast.error(err?.message || 'Error generando copy');
     } finally {
+      generatingRef.current = false;
       setGeneratingCopy(false);
     }
-  }, [adSetFormat, selectedAngle, focusType, selectedProduct, cpaTarget, objective, audienceDesc, funnelStage, clientId, generatingCopy]);
+  }, [adSetFormat, selectedAngle, focusType, selectedProduct, cpaTarget, objective, audienceDesc, funnelStage, clientId]);
 
   // Auto-generate copy + AI image when entering ad-creative step
   const autoGenRef = useRef(false);
