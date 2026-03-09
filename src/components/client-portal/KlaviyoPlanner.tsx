@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Mail, ShoppingCart, UserMinus, Megaphone, 
   ChevronRight, ChevronDown, Trash2, Edit2, Check, 
-  Clock, Send, Loader2, Save, Archive, Copy, FileText, Upload, Rocket, Wand2, Eye
+  Clock, Send, Loader2, Save, Archive, Copy, FileText, Upload, Rocket, Wand2, Eye, Paintbrush
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import { KlaviyoVariables } from './KlaviyoVariables';
 import { SteveFeedbackDialog } from './SteveFeedbackDialog';
 import { KlaviyoMetricsPanel } from './KlaviyoMetricsPanel';
 import { MassCampaignsWizard } from './MassCampaignsWizard';
+import { UnlayerEmailEditor, type EditorEmail } from './klaviyo/UnlayerEmailEditor';
 
 interface EmailStep {
   id: string;
@@ -628,6 +629,92 @@ function PlanCard({
   const [clientNotes, setClientNotes] = useState(plan.client_notes || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
+  const [showEmailEditor, setShowEmailEditor] = useState(false);
+  const [editorEmails, setEditorEmails] = useState<EditorEmail[] | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  async function handleOpenEditor() {
+    if (plan.emails.length === 0) {
+      toast.error('Agrega al menos un email primero');
+      return;
+    }
+    setLoadingPreview(true);
+    try {
+      // Find Klaviyo connection for this client
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .single();
+
+      if (!conn) {
+        // Fallback: use emails as-is without branded preview
+        const emails: EditorEmail[] = plan.emails.map((e) => ({
+          subject: e.subject,
+          previewText: e.previewText || '',
+          htmlContent: e.content || '<p>Escribe el contenido del email</p>',
+        }));
+        setEditorEmails(emails);
+        setShowEmailEditor(true);
+        return;
+      }
+
+      const { data, error } = await callApi('preview-flow-emails', {
+        body: {
+          connectionId: conn.id,
+          flowType: plan.flow_type,
+          emails: plan.emails.map((e) => ({
+            subject: e.subject,
+            previewText: e.previewText || '',
+            htmlContent: e.content || undefined,
+          })),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setEditorEmails(
+        (data.emails || []).map((e: any) => ({
+          subject: e.subject,
+          previewText: e.previewText || '',
+          htmlContent: e.htmlContent,
+        }))
+      );
+      setShowEmailEditor(true);
+    } catch (err: any) {
+      console.error('Preview error:', err);
+      // Fallback: open editor with raw content
+      const emails: EditorEmail[] = plan.emails.map((e) => ({
+        subject: e.subject,
+        previewText: e.previewText || '',
+        htmlContent: e.content || '<p>Escribe el contenido del email</p>',
+      }));
+      setEditorEmails(emails);
+      setShowEmailEditor(true);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  function handleEditorSave(updatedEmails: EditorEmail[]) {
+    // Update plan emails with the edited HTML
+    const newEmails = plan.emails.map((email, idx) => {
+      const edited = updatedEmails[idx];
+      if (!edited) return email;
+      return {
+        ...email,
+        subject: edited.subject,
+        previewText: edited.previewText,
+        content: edited.htmlContent,
+      };
+    });
+    onUpdate(plan.id, { emails: newEmails as any });
+    setShowEmailEditor(false);
+    setEditorEmails(null);
+    toast.success('Emails actualizados con el diseño editado');
+  }
 
   return (
     <Card className={expanded ? 'ring-2 ring-primary/20' : ''}>
@@ -745,6 +832,21 @@ function PlanCard({
                     <Save className="w-4 h-4 mr-1" />
                     Guardar
                   </Button>
+                  {plan.emails.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenEditor}
+                      disabled={loadingPreview}
+                    >
+                      {loadingPreview ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Paintbrush className="w-4 h-4 mr-1" />
+                      )}
+                      {loadingPreview ? 'Cargando...' : 'Editar Emails'}
+                    </Button>
+                  )}
                   {plan.status === 'draft' && (
                     <Button
                       size="sm"
@@ -811,6 +913,18 @@ function PlanCard({
                 onComplete={() => {
                   setShowPushDialog(false);
                   onPushComplete();
+                }}
+              />
+            )}
+
+            {/* Unlayer Email Editor */}
+            {showEmailEditor && editorEmails && (
+              <UnlayerEmailEditor
+                emails={editorEmails}
+                onSave={handleEditorSave}
+                onCancel={() => {
+                  setShowEmailEditor(false);
+                  setEditorEmails(null);
                 }}
               />
             )}

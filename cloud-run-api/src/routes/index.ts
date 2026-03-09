@@ -60,6 +60,7 @@ import { klaviyoManageFlows } from './klaviyo/klaviyo-manage-flows.js';
 import { klaviyoPushEmails } from './klaviyo/klaviyo-push-emails.js';
 import { klaviyoSmartFormat } from './klaviyo/klaviyo-smart-format.js';
 import { syncKlaviyoMetrics } from './klaviyo/sync-klaviyo-metrics.js';
+import { previewFlowEmails } from './klaviyo/preview-flow-emails.js';
 
 // Phase 3: Meta
 import { checkMetaScopes } from './meta/check-meta-scopes.js';
@@ -142,6 +143,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/klaviyo-push-emails', authMiddleware, klaviyoPushEmails);
   app.post('/api/klaviyo-smart-format', authMiddleware, klaviyoSmartFormat);
   app.post('/api/sync-klaviyo-metrics', authMiddleware, syncKlaviyoMetrics);
+  app.post('/api/preview-flow-emails', authMiddleware, previewFlowEmails);
 
   // ============================================================
   // Phase 3: Platform Integrations (Meta)
