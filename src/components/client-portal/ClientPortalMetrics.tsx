@@ -305,7 +305,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           // Fetch real SKU sales, abandoned checkouts, customer metrics, and cohorts
           try {
             const now = new Date();
-            const mtdDays = now.getDate();
+            const mtdDays = now.getDate() - 1; // March 9: 8 days back = March 1
             const ytdDays = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
             const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': mtdDays, 'ytd': ytdDays };
             const { data: analyticsData } = await callApi('fetch-shopify-analytics', {
@@ -463,27 +463,29 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   }, [rawMetrics, shopifyDailyData]);
 
   // Calculate profit metrics
+  // IMPORTANT: margin and COGS are based on NET revenue (excl. IVA)
   const profitMetrics = useMemo(() => {
+    const taxRate = 0.19; // IVA Chile
     const marginRate = financialConfig.default_margin_percentage / 100;
     const gatewayRate = financialConfig.payment_gateway_commission / 100;
 
-    const grossProfit = current.totalRevenue * marginRate;
-    const netAfterGateway = current.totalRevenue * (1 - gatewayRate);
-    const costOfGoods = current.totalRevenue - grossProfit;
+    const netRevenue = current.totalRevenue / (1 + taxRate);
+    const grossProfit = netRevenue * marginRate;
+    const costOfGoods = netRevenue * (1 - marginRate);
 
-    // POAS = (Revenue * Margin - Ad Spend) / Ad Spend
+    const prevNetRevenue = previous.totalRevenue / (1 + taxRate);
+    const prevGrossProfit = prevNetRevenue * marginRate;
+
+    // POAS = (Gross Profit - Ad Spend) / Ad Spend
     const poas = current.totalSpend > 0
       ? (grossProfit - current.totalSpend) / current.totalSpend
       : 0;
-
-    const prevGrossProfit = previous.totalRevenue * marginRate;
     const previousPoas = previous.totalSpend > 0
       ? (prevGrossProfit - previous.totalSpend) / previous.totalSpend
       : undefined;
 
-    // CAC = Total Ad Spend / Number of orders (unique customer count not available)
+    // CAC = Total Ad Spend / Number of orders
     const cac = current.totalOrders > 0 ? current.totalSpend / current.totalOrders : 0;
-
     const previousCac = previous.totalOrders > 0 ? previous.totalSpend / previous.totalOrders : undefined;
 
     // MER = Total Revenue / Total Ad Spend
@@ -582,11 +584,15 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   }
 
   const totalAdSpendWithGoogle = profitLossData.totalAdSpend;
+  // ROAS uses total ad spend (including manual Google) for consistency with KPI card
+  const effectiveRoas = totalAdSpendWithGoogle > 0
+    ? current.totalRevenue / totalAdSpendWithGoogle
+    : 0;
   const statCards = [
     { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
     { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
     { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
-    { title: 'ROAS Promedio', value: `${current.avgRoas.toFixed(2)}x`, currentNum: current.avgRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
+    { title: 'ROAS Promedio', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
   ];
 
   const hasData = current.totalRevenue > 0 || totalAdSpendWithGoogle > 0 || current.totalOrders > 0;
