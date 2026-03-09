@@ -37,6 +37,7 @@ import {
   Layers,
   Plus,
   Palette,
+  ShoppingBag,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 import AdPreviewMockup from './AdPreviewMockup';
@@ -60,7 +61,7 @@ interface CampaignCreateWizardProps {
 type StartLevel = 'campaign' | 'adset' | 'ad';
 type BudgetType = 'ABO' | 'CBO';
 type Objective = 'CONVERSIONS' | 'TRAFFIC' | 'AWARENESS' | 'ENGAGEMENT' | 'CATALOG';
-type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'angle-select' | 'ad-creative' | 'review';
+type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'angle-select' | 'creative-focus' | 'ad-creative' | 'review';
 type AdSetFormat = 'flexible' | 'carousel' | 'single';
 
 // Angle recommendations per funnel stage (from CopyGenerator.tsx)
@@ -91,6 +92,7 @@ const STEPS_CAMPAIGN: StepDef[] = [
   { key: 'adset-config', label: 'Ad Set', icon: FolderOpen },
   { key: 'funnel-stage', label: 'Funnel', icon: Target },
   { key: 'angle-select', label: 'Ángulo', icon: Palette },
+  { key: 'creative-focus', label: 'Enfoque', icon: ShoppingBag },
   { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
@@ -100,6 +102,7 @@ const STEPS_ADSET: StepDef[] = [
   { key: 'adset-config', label: 'Ad Set', icon: FolderOpen },
   { key: 'funnel-stage', label: 'Funnel', icon: Target },
   { key: 'angle-select', label: 'Ángulo', icon: Palette },
+  { key: 'creative-focus', label: 'Enfoque', icon: ShoppingBag },
   { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
@@ -109,6 +112,7 @@ const STEPS_AD: StepDef[] = [
   { key: 'select-adset', label: 'Ad Set', icon: FolderOpen },
   { key: 'funnel-stage', label: 'Funnel', icon: Target },
   { key: 'angle-select', label: 'Ángulo', icon: Palette },
+  { key: 'creative-focus', label: 'Enfoque', icon: ShoppingBag },
   { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
@@ -132,6 +136,7 @@ const STEVE_FALLBACKS: Record<string, string> = {
   'select-adset': 'Elige un Ad Set que tenga audiencia similar a la de tu nuevo anuncio. Consistencia = mejores resultados.',
   'funnel-stage': 'TOFU para alcance, MOFU para nutrir leads, BOFU para conversión directa. El copy y CTA se adaptan a cada etapa.',
   'angle-select': 'El ángulo define el enfoque creativo del anuncio. Para TOFU usa ángulos que interrumpan el scroll. Para BOFU usa ángulos que cierren la venta.',
+  'creative-focus': 'Puedes enfocar el anuncio en un producto específico (ideal para BOFU y catálogo) o en un ángulo más amplio de marca (ideal para TOFU/MOFU).',
   'ad-creative': 'El copy debe hablar al dolor/deseo del buyer persona con un CTA claro. Usa imágenes que destaquen en el feed.',
   'review': 'Verifica que el destino URL funcione, el copy no tenga errores y el presupuesto sea el correcto antes de publicar.',
 };
@@ -456,6 +461,136 @@ function AngleSelector({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Creative Focus Step (product vs broad)
+// ---------------------------------------------------------------------------
+
+interface ShopifyProduct {
+  id: string;
+  title: string;
+  image: string;
+  price: number;
+  product_type: string;
+}
+
+function CreativeFocusStep({
+  clientId,
+  focusType, setFocusType,
+  selectedProduct, setSelectedProduct,
+}: {
+  clientId: string;
+  focusType: 'product' | 'broad';
+  setFocusType: (v: 'product' | 'broad') => void;
+  selectedProduct: ShopifyProduct | null;
+  setSelectedProduct: (p: ShopifyProduct | null) => void;
+}) {
+  const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  const fetchProducts = useCallback(async () => {
+    setLoadingProducts(true);
+    try {
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'shopify')
+        .limit(1)
+        .single();
+      if (!conn?.id) { setLoadingProducts(false); return; }
+
+      const { data } = await callApi('fetch-shopify-products', { body: { connectionId: conn.id } });
+      if (data?.products) {
+        setProducts(data.products.slice(0, 20).map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          image: p.variants?.[0]?.image_url || p.image || '',
+          price: Number(p.variants?.[0]?.price) || 0,
+          product_type: p.product_type || '',
+        })));
+      }
+    } catch { /* no shopify */ }
+    setLoadingProducts(false);
+  }, [clientId]);
+
+  useEffect(() => {
+    if (focusType === 'product' && products.length === 0) fetchProducts();
+  }, [focusType, products.length, fetchProducts]);
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Steve puede enfocar el anuncio en un <strong>producto específico</strong> o en un <strong>ángulo más amplio</strong> de marca.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => { setFocusType('product'); }}
+          className={`flex flex-col items-center gap-2 p-5 rounded-lg border text-center transition-all ${
+            focusType === 'product' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+          }`}
+        >
+          <ShoppingBag className={`w-8 h-8 ${focusType === 'product' ? 'text-primary' : 'text-muted-foreground'}`} />
+          <span className="text-sm font-semibold">Producto específico</span>
+          <span className="text-xs text-muted-foreground">Ideal para BOFU, catálogo, promociones</span>
+        </button>
+        <button
+          onClick={() => { setFocusType('broad'); setSelectedProduct(null); }}
+          className={`flex flex-col items-center gap-2 p-5 rounded-lg border text-center transition-all ${
+            focusType === 'broad' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+          }`}
+        >
+          <Palette className={`w-8 h-8 ${focusType === 'broad' ? 'text-primary' : 'text-muted-foreground'}`} />
+          <span className="text-sm font-semibold">Ángulo amplio</span>
+          <span className="text-xs text-muted-foreground">Ideal para TOFU/MOFU, marca, educación</span>
+        </button>
+      </div>
+
+      {focusType === 'product' && (
+        <div className="space-y-3">
+          <Label className="text-sm font-semibold">Selecciona un producto de Shopify</Label>
+          {loadingProducts ? (
+            <div className="grid grid-cols-2 gap-2">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+            </div>
+          ) : products.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+              {products.map((p) => {
+                const isSelected = selectedProduct?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedProduct(p)}
+                    className={`flex gap-2 p-2 rounded-lg border text-left transition-all ${
+                      isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    {p.image ? (
+                      <img src={p.image} alt="" className="w-14 h-14 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded bg-muted flex items-center justify-center shrink-0">
+                        <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate">{p.title}</p>
+                      <p className="text-xs text-muted-foreground">${p.price.toLocaleString('es-CL')}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              No se encontraron productos de Shopify. Puedes continuar con ángulo amplio.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -817,6 +952,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Angle
   const [selectedAngle, setSelectedAngle] = useState('');
 
+  // Creative focus
+  const [focusType, setFocusType] = useState<'product' | 'broad'>('broad');
+  const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
+  const [autoGenerated, setAutoGenerated] = useState(false);
+
   // Ad fields (multi-slot)
   const [headlines, setHeadlines] = useState<string[]>(['']);
   const [primaryTexts, setPrimaryTexts] = useState<string[]>(['']);
@@ -855,6 +995,48 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     });
   }, [adSetFormat]);
 
+  // Auto-load CPA from brief (buyer_personas)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: brief } = await supabase
+          .from('buyer_personas')
+          .select('persona_data')
+          .eq('client_id', clientId)
+          .eq('is_complete', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (!brief?.persona_data) return;
+        const pd = brief.persona_data as any;
+        // Extract from raw_responses[2] (Q2 = LOS NÚMEROS) or structured fields
+        const rawQ2 = pd.raw_responses?.[2] || '';
+        let price = 0, cost = 0, shipping = 0;
+        if (typeof rawQ2 === 'string') {
+          const priceMatch = rawQ2.match(/precio[^:]*[:=]\s*\$?([\d.,]+)/i);
+          const costMatch = rawQ2.match(/costo[^:]*[:=]\s*\$?([\d.,]+)/i);
+          const shipMatch = rawQ2.match(/env[ií]o[^:]*[:=]\s*\$?([\d.,]+)/i);
+          if (priceMatch) price = Number(priceMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+          if (costMatch) cost = Number(costMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+          if (shipMatch) shipping = Number(shipMatch[1].replace(/\./g, '').replace(',', '.')) || 0;
+        } else if (typeof rawQ2 === 'object') {
+          // Structured form fields from brief Q2
+          price = Number(rawQ2.price) || 0;
+          cost = Number(rawQ2.cost) || 0;
+          shipping = Number(rawQ2.shipping) || 0;
+        }
+        if (price > 0) {
+          const margin = price - cost - shipping;
+          const cpaMax = Math.round(margin * 0.30);
+          if (cpaMax > 0 && !cpaTarget) {
+            setCpaTarget(String(cpaMax));
+            console.log(`[Wizard] CPA auto-loaded from brief: $${cpaMax} (price=${price}, cost=${cost}, shipping=${shipping})`);
+          }
+        }
+      } catch { /* brief not found */ }
+    })();
+  }, [clientId]);
+
   // Loading states
   const [submitting, setSubmitting] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
@@ -885,6 +1067,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         return true;
       case 'angle-select':
         return !!selectedAngle;
+      case 'creative-focus':
+        return focusType === 'broad' || !!selectedProduct;
       case 'ad-creative':
         return primaryTexts.some((t) => t.trim()) && headlines.some((h) => h.trim());
       case 'review':
@@ -901,14 +1085,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     try {
       const isMulti = adSetFormat === 'flexible';
       const angleHint = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
+      const productHint = focusType === 'product' && selectedProduct
+        ? ` Producto: ${selectedProduct.title}. Precio: $${selectedProduct.price.toLocaleString('es-CL')}. Tipo: ${selectedProduct.product_type || 'general'}.`
+        : '';
+      const cpaHint = cpaTarget ? ` CPA máximo objetivo: $${Number(cpaTarget).toLocaleString('es-CL')}.` : '';
       const instruction = isMulti
         ? [
-            `Genera copy para DCT 3:2:2 de Meta Ads.${angleHint}`,
+            `Genera copy para DCT 3:2:2 de Meta Ads.${angleHint}${productHint}${cpaHint}`,
             `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.`,
             'Necesito 2 variaciones de texto principal, 2 de headline y 2 descripciones con enfoques diferentes.',
             'Responde SOLO con JSON: {"texts":["texto1","texto2"],"headlines":["headline1","headline2"],"descriptions":["desc1","desc2"]}',
           ].join('\n')
-        : `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.${angleHint}`;
+        : `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.${angleHint}${productHint}${cpaHint}`;
 
       const { data, error } = await callApi('generate-meta-copy', {
         body: {
@@ -956,6 +1144,25 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       setGeneratingCopy(false);
     }
   };
+
+  // Auto-generate when entering ad-creative step
+  useEffect(() => {
+    if (currentStep !== 'ad-creative' || autoGenerated || generatingCopy) return;
+    // If product selected, pre-fill images with product image
+    if (focusType === 'product' && selectedProduct?.image) {
+      setImages((prev) => {
+        const next = [...prev];
+        if (!next[0]) next[0] = selectedProduct.image;
+        return next;
+      });
+    }
+    // Auto-generate copy
+    setAutoGenerated(true);
+    const timer = setTimeout(() => {
+      handleGenerateCopy();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentStep]);
 
   // ---- Save Draft ----
 
@@ -1125,6 +1332,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     primaryText: primaryTexts[0] || '',
     campName,
     adsetName,
+    focusType,
+    selectedProduct: selectedProduct?.title || '',
+    cpaTarget,
   };
 
   // ---- Render ----
@@ -1277,6 +1487,17 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   funnelStage={funnelStage}
                   selectedAngle={selectedAngle}
                   setSelectedAngle={setSelectedAngle}
+                />
+              )}
+
+              {/* CREATIVE FOCUS step */}
+              {currentStep === 'creative-focus' && (
+                <CreativeFocusStep
+                  clientId={clientId}
+                  focusType={focusType}
+                  setFocusType={setFocusType}
+                  selectedProduct={selectedProduct}
+                  setSelectedProduct={setSelectedProduct}
                 />
               )}
 
