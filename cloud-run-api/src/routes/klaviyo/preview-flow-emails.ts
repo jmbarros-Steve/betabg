@@ -141,10 +141,10 @@ function generateBrandedEmailHtml(
     productStrategy?: string;
     discount?: { code: string; value: number; type: string; expiry?: string } | null;
     discountEmailIndex?: number | null;
+    bodyHtml?: string;
+    ctaText?: string;
   }
 ): string {
-  const { heading, body, ctaText } = getFlowEmailContent(config.flowType, config.stepIndex, brand.name);
-
   const logoBlock = brand.logoUrl
     ? `<img src="${brand.logoUrl}" alt="${brand.name}" width="150" style="display:block;margin:0 auto;">`
     : `<div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:3px;font-family:Georgia,serif;text-align:center;">${brand.name.toUpperCase()}</div>`;
@@ -158,6 +158,18 @@ function generateBrandedEmailHtml(
   // Discount block: show on the designated email
   const showDiscount = config.discount && config.discountEmailIndex === config.stepIndex;
   const discountBlock = showDiscount ? generateDiscountBlockHtml(config.discount!) : '';
+
+  // Use Steve's rich bodyHtml if available, otherwise fall back to hardcoded content
+  let bodyContent: string;
+  let effectiveCtaText: string;
+  if (config.bodyHtml) {
+    bodyContent = config.bodyHtml;
+    effectiveCtaText = config.ctaText || 'Ver mas';
+  } else {
+    const fallback = getFlowEmailContent(config.flowType, config.stepIndex, brand.name);
+    bodyContent = `<h1 style="margin:0 0 24px;font-size:24px;font-weight:700;color:#1a1a1a;line-height:1.3;font-family:Georgia,serif;">${fallback.heading}</h1>\n          ${fallback.body}`;
+    effectiveCtaText = config.ctaText || fallback.ctaText;
+  }
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -181,21 +193,16 @@ function generateBrandedEmailHtml(
       <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
         <tr><td style="background-color:#000000;padding:28px 30px 20px;text-align:center;">${logoBlock}</td></tr>
         <tr><td class="mobile-padding" style="padding:40px 40px 12px;">
-          <h1 style="margin:0 0 24px;font-size:24px;font-weight:700;color:#1a1a1a;line-height:1.3;font-family:Georgia,serif;">${heading}</h1>
-          ${body}
+          ${bodyContent}
         </td></tr>
         ${productBlock}
         ${discountBlock}
         <tr><td align="center" style="padding:20px 40px 44px;">
           <table role="presentation" cellpadding="0" cellspacing="0">
             <tr><td style="background-color:#1a1a1a;border-radius:30px;">
-              <a href="${brand.storeUrl}" style="display:inline-block;padding:16px 44px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;">${ctaText}</a>
+              <a href="${brand.storeUrl}" style="display:inline-block;padding:16px 44px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;">${effectiveCtaText}</a>
             </td></tr>
           </table>
-        </td></tr>
-        <tr><td style="padding:28px 40px 12px;text-align:center;">
-          <p style="margin:0 0 4px;font-size:15px;color:#333;">Un abrazo,</p>
-          <p style="margin:0;font-size:15px;font-weight:700;color:#1a1a1a;">El equipo de ${brand.name}</p>
         </td></tr>
         <tr><td style="padding:16px 40px 28px;text-align:center;">
           <p style="margin:0;font-size:11px;color:#999;">
@@ -273,6 +280,8 @@ export async function previewFlowEmails(c: Context) {
         productStrategy: productStrategy || 'none',
         discount: discount || null,
         discountEmailIndex: discountEmailIndex ?? null,
+        bodyHtml: email.bodyHtml || undefined,
+        ctaText: email.ctaText || undefined,
       });
 
       return {

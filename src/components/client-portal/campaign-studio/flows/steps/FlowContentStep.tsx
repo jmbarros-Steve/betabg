@@ -69,14 +69,17 @@ export function FlowContentStep({ template, clientId, state, updateState, onNext
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Now get preview HTML for each email
+      // Now get preview HTML for each email, passing Steve's rich bodyHtml
+      const aiEmails = data?.emails || [];
       const { data: previewData, error: previewError } = await callApi('preview-flow-emails', {
         body: {
           connectionId: state.klaviyoConnectionId,
           flowType: template.id,
-          emails: template.emails.map((e) => ({
-            subject: e.subject,
-            previewText: e.previewText || '',
+          emails: aiEmails.map((e: any, idx: number) => ({
+            subject: e.subject || template.emails[idx]?.subject || `Email ${idx + 1}`,
+            previewText: e.previewText || template.emails[idx]?.previewText || '',
+            bodyHtml: e.bodyHtml || undefined,
+            ctaText: e.ctaText || undefined,
           })),
           products: state.products,
           discount: state.discountEnabled
@@ -88,9 +91,9 @@ export function FlowContentStep({ template, clientId, state, updateState, onNext
       });
 
       const emails: EditorEmail[] = (previewData?.emails || template.emails).map((e: any, idx: number) => ({
-        subject: data?.emails?.[idx]?.subject || e.subject || template.emails[idx].subject,
-        previewText: data?.emails?.[idx]?.previewText || e.previewText || template.emails[idx].previewText,
-        htmlContent: e.htmlContent || `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;"><h1>${template.emails[idx].subject}</h1><p>${template.emails[idx].description}</p></div>`,
+        subject: aiEmails[idx]?.subject || e.subject || template.emails[idx]?.subject,
+        previewText: aiEmails[idx]?.previewText || e.previewText || template.emails[idx]?.previewText || '',
+        htmlContent: e.htmlContent || `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;"><h1>${template.emails[idx]?.subject}</h1><p>${template.emails[idx]?.description}</p></div>`,
       }));
 
       updateState({ generatedEmails: emails });

@@ -110,12 +110,18 @@ export function htmlToUnlayerDesign(html: string): UnlayerDesignJson {
   const heading = extractTag(html, 'h1');
   const cta = extractCta(html);
 
-  // Extract body paragraphs (the <p> tags inside the body section, skip hidden preview)
+  // Extract body paragraphs - match ALL <p> tags with font-size:16px OR font-size:15px (signature),
+  // preserving inner HTML (bold, links, emojis, merge tags)
   const bodyParagraphs: string[] = [];
-  const pRegex = /<p[^>]*style="[^"]*font-size:16px[^"]*"[^>]*>([\s\S]*?)<\/p>/gi;
+  const pRegex = /<p[^>]*style="[^"]*(?:font-size:1[56]px|line-height:1\.6)[^"]*"[^>]*>([\s\S]*?)<\/p>/gi;
   let pMatch: RegExpExecArray | null;
-  while ((pMatch = pRegex.exec(html)) !== null) {
-    bodyParagraphs.push(pMatch[1].trim());
+  // Skip the hidden preview text div content
+  const bodySection = html.replace(/<div[^>]*display:\s*none[^>]*>[\s\S]*?<\/div>/gi, '');
+  while ((pMatch = pRegex.exec(bodySection)) !== null) {
+    const content = pMatch[1].trim();
+    // Skip footer/unsubscribe links only
+    if (content.includes('{%unsubscribe%}') || content.includes('manage_preferences')) continue;
+    if (content) bodyParagraphs.push(content);
   }
   const bodyHtml = bodyParagraphs.length > 0
     ? bodyParagraphs.map(p => `<p style="margin:0 0 16px;font-size:16px;color:#555555;line-height:1.6;">${p}</p>`).join('')
@@ -221,25 +227,7 @@ export function htmlToUnlayerDesign(html: string): UnlayerDesignJson {
     },
   }));
 
-  // 5. SIGNATURE ROW
-  const sigId = uid();
-  rows.push(makeRow({
-    id: sigId,
-    type: 'text',
-    values: {
-      containerPadding: '28px 40px 12px',
-      anchor: '',
-      fontSize: '15px',
-      color: '#333333',
-      textAlign: 'center',
-      lineHeight: '140%',
-      text: `<p style="margin:0 0 4px;font-size:15px;color:#333;">Un abrazo,</p><p style="margin:0;font-size:15px;font-weight:700;color:#1a1a1a;">El equipo de ${brandText || 'Tu Marca'}</p>`,
-      displayCondition: null,
-      _meta: { htmlID: sigId, htmlClassNames: 'u_content_text' },
-    },
-  }));
-
-  // 6. FOOTER ROW - Unsubscribe links
+  // 5. FOOTER ROW - Unsubscribe links
   const footerId = uid();
   rows.push(makeRow({
     id: footerId,

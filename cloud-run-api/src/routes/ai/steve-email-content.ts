@@ -339,65 +339,85 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
 // Action: generate_flow_emails
 // ═══════════════════════════════════════════════════════════════
 async function handleGenerateFlowEmails(body: any, ctx: KlaviyoContext): Promise<any> {
-  const { flowType, brandName, tone, products } = body;
+  const { flowType, brandName, tone, products, discount, productStrategy, discountEmailIndex, emails: templateEmails } = body;
 
   const effectiveBrand = brandName || ctx.brandName || 'la marca';
   const effectiveTone = tone || ctx.brandTone || '';
 
   const flowConfigs: Record<string, { description: string; emailCount: number; delays: string[] }> = {
-    welcome: {
+    welcome_series: {
       description: 'Serie de bienvenida para nuevos suscriptores',
-      emailCount: 3,
+      emailCount: templateEmails?.length || 3,
       delays: ['Inmediato', '1 dia despues', '3 dias despues'],
     },
     abandoned_cart: {
       description: 'Recuperacion de carritos abandonados',
-      emailCount: 3,
+      emailCount: templateEmails?.length || 3,
       delays: ['1 hora despues', '24 horas despues', '72 horas despues'],
     },
     post_purchase: {
       description: 'Seguimiento post-compra y fidelizacion',
-      emailCount: 3,
+      emailCount: templateEmails?.length || 3,
       delays: ['Inmediato (confirmacion)', '3 dias despues', '7 dias despues'],
     },
-    win_back: {
+    customer_winback: {
       description: 'Recuperacion de clientes inactivos',
-      emailCount: 3,
+      emailCount: templateEmails?.length || 3,
       delays: ['30 dias sin compra', '45 dias sin compra', '60 dias sin compra'],
     },
     browse_abandonment: {
       description: 'Seguimiento de navegacion sin compra',
-      emailCount: 2,
+      emailCount: templateEmails?.length || 2,
       delays: ['2 horas despues', '24 horas despues'],
     },
   };
 
   const config = flowConfigs[flowType] || {
     description: `Flow tipo "${flowType}"`,
-    emailCount: 3,
+    emailCount: templateEmails?.length || 3,
     delays: ['Inmediato', '2 dias despues', '5 dias despues'],
   };
 
-  const userMessage = `Genera una secuencia completa de ${config.emailCount} emails para un flow de tipo "${flowType}" (${config.description}) para la marca "${effectiveBrand}".
-${effectiveTone ? `Tono: ${effectiveTone}` : ''}
-${products ? `Productos principales: ${JSON.stringify(products)}` : ''}
+  // Build email context from template
+  const emailContext = templateEmails ? templateEmails.map((e: any, i: number) => {
+    const parts = [`Email ${i + 1}: "${e.subject}" — ${e.description || ''}. Objetivo: ${e.purpose || 'engagement'}.`];
+    if (productStrategy === 'cart_items' && i === 0) parts.push('INCLUYE productos del carrito abandonado.');
+    if (productStrategy && productStrategy !== 'none' && productStrategy !== 'cart_items' && i === 0) parts.push(`INCLUYE productos ${productStrategy === 'most_viewed' ? 'mas vistos' : 'mas vendidos'}.`);
+    if (discountEmailIndex === i && discount) parts.push(`INCLUYE cupon de descuento: codigo "${discount.code}", ${discount.type === 'percentage' ? `${discount.value}%` : discount.type === 'free_shipping' ? 'envio gratis' : `$${discount.value}`}.`);
+    return parts.join(' ');
+  }).join('\n') : '';
 
-Delays sugeridos: ${config.delays.join(', ')}
+  const pStyle = 'style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;"';
 
-IMPORTANTE: Personaliza los emails al negocio del cliente usando el brief de marca. Usa el dolor, la transformacion, y las palabras exactas del buyer persona.
+  const userMessage = `Genera ${config.emailCount} emails RICOS para un flow "${flowType}" (${config.description}) de la marca "${effectiveBrand}".
+${effectiveTone ? `Tono de marca: ${effectiveTone}` : ''}
+${products && products.length > 0 ? `Productos del cliente: ${JSON.stringify(products)}` : ''}
+${discount ? `Cupon configurado: codigo "${discount.code}", tipo "${discount.type}", valor ${discount.value}` : ''}
+${productStrategy ? `Estrategia de productos: ${productStrategy}` : ''}
 
-Para CADA email genera:
-- subject: Subject line (< 50 chars)
-- previewText: Preview text (< 90 chars)
-- title: Titulo principal del email
-- introText: Texto introductorio (2-3 oraciones)
-- ctaText: Texto del boton CTA
-- delayDescription: Descripcion del momento de envio
+CONTEXTO POR EMAIL:
+${emailContext || config.delays.map((d: string, i: number) => `Email ${i + 1}: ${d}`).join('\n')}
 
-La secuencia debe tener progresion logica:
-- Email 1: Primer contacto / gancho principal
-- Email 2: Refuerzo / urgencia / beneficio adicional
-- Email 3: Ultimo intento / oferta especial (si aplica)
+INSTRUCCIONES CRITICAS PARA bodyHtml:
+- Genera bodyHtml como HTML RICO con multiples parrafos <p ${pStyle}>
+- Cada <p> debe tener ${pStyle}
+- MINIMO 5-6 parrafos por email. NO 2-3 oraciones genericas.
+- Usa <b> para negritas en palabras clave y frases importantes
+- Usa emojis donde sea natural (maximo 3-4 por email)
+- Primer parrafo: saludo con merge tag: <p ${pStyle}>Hola <b>{{ first_name|default:"" }}</b> [emoji]</p>
+- Parrafos intermedios: conecta con el dolor y transformacion del buyer persona, describe beneficios, crea urgencia cuando aplique
+- Si el email tiene cupon: incluye un parrafo mencionando el codigo y beneficio
+- Si el email tiene productos: menciona las categorias/tipos de productos naturalmente
+- Ultimo parrafo antes de la firma: call to action suave
+- Firma: <p ${pStyle}>Un abrazo,<br><b>El equipo de ${effectiveBrand}</b></p>
+- USA el vocabulario exacto del buyer persona del brief
+- NO uses frases genericas como "productos increibles" — se ESPECIFICO al negocio
+
+Para CADA email responde con:
+- subject: Subject line creativo (< 50 chars, con emoji)
+- previewText: Preview text persuasivo (< 90 chars)
+- bodyHtml: HTML RICO con 5-6+ parrafos <p> con inline styles
+- ctaText: Texto del boton CTA (3-5 palabras)
 
 Responde SOLO con JSON puro (sin markdown, sin backticks):
 {
@@ -405,10 +425,8 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
     {
       "subject": "...",
       "previewText": "...",
-      "title": "...",
-      "introText": "...",
-      "ctaText": "...",
-      "delayDescription": "..."
+      "bodyHtml": "<p ${pStyle}>...</p><p ${pStyle}>...</p>...",
+      "ctaText": "..."
     }
   ]
 }`;
