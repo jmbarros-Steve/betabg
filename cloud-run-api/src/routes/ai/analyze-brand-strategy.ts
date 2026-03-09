@@ -409,7 +409,7 @@ function repairTruncatedJson(text: string): Record<string, unknown> {
 
   // Falló todo, devolver lo que tenemos como string
   console.warn('[repairJson] Could not repair JSON, returning as raw text');
-  return { raw_text: text.slice(0, 5000), _repair_failed: true };
+  return { raw_text: text.slice(0, 40000), _repair_failed: true };
 }
 
 // ── Llamada individual a Claude con prompt caching ──
