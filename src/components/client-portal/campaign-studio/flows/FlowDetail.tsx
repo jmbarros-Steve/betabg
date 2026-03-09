@@ -11,8 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Loader2, Check, Sparkles, Zap, Clock, Mail, Info } from 'lucide-react';
+import { Loader2, Check, Sparkles, Zap, Clock, Mail, Info, Paintbrush } from 'lucide-react';
 import { type FlowTemplate, FLOW_CATEGORY_LABELS, FLOW_PRIORITY_COLORS } from './FlowTemplates';
+import { UnlayerEmailEditor, type EditorEmail } from '../../klaviyo/UnlayerEmailEditor';
 
 interface FlowDetailProps {
   template: FlowTemplate;
@@ -34,6 +35,10 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
   const [contentGenerated, setContentGenerated] = useState(false);
   const [creatingFlow, setCreatingFlow] = useState(false);
   const [flowCreated, setFlowCreated] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editorEmails, setEditorEmails] = useState<EditorEmail[] | null>(null);
+  const [editedEmails, setEditedEmails] = useState<EditorEmail[] | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const handleGenerateContent = async () => {
     setGeneratingContent(true);
@@ -83,6 +88,66 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
     }
   };
 
+  const handleOpenEditor = async () => {
+    setLoadingPreview(true);
+    try {
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!conn) {
+        toast.error('No hay conexion activa de Klaviyo');
+        return;
+      }
+
+      const { data, error } = await callApi('preview-flow-emails', {
+        body: {
+          connectionId: conn.id,
+          flowType: template.id,
+          emails: template.emails.map((e) => ({
+            subject: e.subject,
+            previewText: e.previewText || '',
+          })),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const emails: EditorEmail[] = (data.emails || []).map((e: any) => ({
+        subject: e.subject,
+        previewText: e.previewText || '',
+        htmlContent: e.htmlContent,
+      }));
+      setEditorEmails(emails);
+      setShowEditor(true);
+    } catch (err: any) {
+      console.error('Preview error:', err);
+      // Fallback: open editor with basic HTML
+      const emails: EditorEmail[] = template.emails.map((e) => ({
+        subject: e.subject,
+        previewText: e.previewText || '',
+        htmlContent: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;"><h1>${e.subject}</h1><p>${e.description}</p></div>`,
+      }));
+      setEditorEmails(emails);
+      setShowEditor(true);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleEditorSave = (updated: EditorEmail[]) => {
+    setEditedEmails(updated);
+    setShowEditor(false);
+    setEditorEmails(null);
+    toast.success('Emails editados guardados. Ahora puedes crear el flujo en Klaviyo.');
+  };
+
   const handleCreateFlow = async () => {
     setCreatingFlow(true);
     try {
@@ -108,11 +173,11 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
           connectionId: conn.id,
           name: template.nameEs,
           triggerType: template.id,
-          emails: template.emails.map((e) => ({
-            subject: e.subject,
-            previewText: e.previewText,
+          emails: template.emails.map((e, idx) => ({
+            subject: editedEmails?.[idx]?.subject || e.subject,
+            previewText: editedEmails?.[idx]?.previewText || e.previewText,
             delaySeconds: (e.delayHours || 0) * 3600,
-            htmlContent: '',
+            htmlContent: editedEmails?.[idx]?.htmlContent || '',
           })),
         },
       });
@@ -135,6 +200,9 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
     // Reset state on close
     setContentGenerated(false);
     setFlowCreated(false);
+    setShowEditor(false);
+    setEditorEmails(null);
+    setEditedEmails(null);
     onClose();
   };
 
@@ -277,6 +345,32 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
                 )}
               </Button>
 
+              {contentGenerated && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleOpenEditor}
+                  disabled={loadingPreview}
+                >
+                  {loadingPreview ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Cargando editor...
+                    </>
+                  ) : editedEmails ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2 text-green-500" />
+                      Emails editados
+                    </>
+                  ) : (
+                    <>
+                      <Paintbrush className="w-4 h-4 mr-2" />
+                      Editar Emails
+                    </>
+                  )}
+                </Button>
+              )}
+
               <Button
                 className="flex-1"
                 onClick={handleCreateFlow}
@@ -295,6 +389,18 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
                 )}
               </Button>
             </div>
+          )}
+
+          {/* Unlayer Email Editor */}
+          {showEditor && editorEmails && (
+            <UnlayerEmailEditor
+              emails={editorEmails}
+              onSave={handleEditorSave}
+              onCancel={() => {
+                setShowEditor(false);
+                setEditorEmails(null);
+              }}
+            />
           )}
         </div>
       </DialogContent>
