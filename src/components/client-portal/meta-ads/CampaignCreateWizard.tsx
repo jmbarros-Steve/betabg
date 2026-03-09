@@ -473,7 +473,7 @@ function AdFormMultiSlot({
   selectedAngle,
   headlines, setHeadlines,
   primaryTexts, setPrimaryTexts,
-  description, setDescription,
+  descriptions, setDescriptions,
   images, setImages,
   cta, setCta,
   destinationUrl, setDestinationUrl,
@@ -485,7 +485,7 @@ function AdFormMultiSlot({
   selectedAngle: string;
   headlines: string[]; setHeadlines: (v: string[]) => void;
   primaryTexts: string[]; setPrimaryTexts: (v: string[]) => void;
-  description: string; setDescription: (v: string) => void;
+  descriptions: string[]; setDescriptions: (v: string[]) => void;
   images: string[]; setImages: (v: string[]) => void;
   cta: string; setCta: (v: string) => void;
   destinationUrl: string; setDestinationUrl: (v: string) => void;
@@ -734,12 +734,29 @@ function AdFormMultiSlot({
         ))}
       </div>
 
-      {/* Description + CTA + URL */}
-      <div className="space-y-4">
-        <div>
-          <Label>Descripción (opcional)</Label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción adicional" className="mt-1" />
+      {/* ---- DESCRIPTION SLOTS ---- */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Descripciones ({descriptions.length})</Label>
+          {canAddMoreTexts && (
+            <Button variant="ghost" size="sm" onClick={() => setDescriptions([...descriptions, ''])} className="text-xs text-muted-foreground">
+              <Plus className="w-3 h-3 mr-1" />Agregar
+            </Button>
+          )}
         </div>
+        {descriptions.map((desc, i) => (
+          <div key={i} className="flex gap-2 items-center">
+            <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}.</span>
+            <Input value={desc} onChange={(e) => { const next = [...descriptions]; next[i] = e.target.value; setDescriptions(next); }} placeholder={`Descripción ${i + 1} (opcional)`} />
+            {descriptions.length > 1 && (
+              <button onClick={() => { const next = descriptions.filter((_, j) => j !== i); setDescriptions(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* CTA + URL */}
+      <div className="space-y-4">
         <div>
           <Label>Botón CTA</Label>
           <Select value={cta} onValueChange={(v) => setCta(v)}>
@@ -803,7 +820,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Ad fields (multi-slot)
   const [headlines, setHeadlines] = useState<string[]>(['']);
   const [primaryTexts, setPrimaryTexts] = useState<string[]>(['']);
-  const [description, setDescription] = useState('');
+  const [descriptions, setDescriptions] = useState<string[]>(['']);
   const [images, setImages] = useState<string[]>(['']);
   const [cta, setCta] = useState('SHOP_NOW');
   const [destinationUrl, setDestinationUrl] = useState('');
@@ -825,6 +842,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       return next;
     });
     setPrimaryTexts((prev) => {
+      if (prev.length === txtCount) return prev;
+      const next = prev.slice(0, txtCount);
+      while (next.length < txtCount) next.push('');
+      return next;
+    });
+    setDescriptions((prev) => {
       if (prev.length === txtCount) return prev;
       const next = prev.slice(0, txtCount);
       while (next.length < txtCount) next.push('');
@@ -882,8 +905,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         ? [
             `Genera copy para DCT 3:2:2 de Meta Ads.${angleHint}`,
             `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.`,
-            'Necesito 2 variaciones de texto principal y 2 de headline con enfoques diferentes.',
-            'Responde SOLO con JSON: {"texts":["texto1","texto2"],"headlines":["headline1","headline2"],"description":"descripcion"}',
+            'Necesito 2 variaciones de texto principal, 2 de headline y 2 descripciones con enfoques diferentes.',
+            'Responde SOLO con JSON: {"texts":["texto1","texto2"],"headlines":["headline1","headline2"],"descriptions":["desc1","desc2"]}',
           ].join('\n')
         : `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Funnel: ${funnelStage}.${angleHint}`;
 
@@ -902,7 +925,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         if (isMulti) {
           if (parsed.texts?.length) setPrimaryTexts(parsed.texts.slice(0, 2));
           if (parsed.headlines?.length) setHeadlines(parsed.headlines.slice(0, 2));
-          if (parsed.description) setDescription(parsed.description);
+          if (parsed.descriptions?.length) setDescriptions(parsed.descriptions.slice(0, 2));
+          else if (parsed.description) setDescriptions([parsed.description, '']);
         } else {
           if (parsed.primary_text || parsed.texts?.[0]) {
             const next = [...primaryTexts];
@@ -914,7 +938,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             next[0] = parsed.headline || parsed.headlines[0];
             setHeadlines(next);
           }
-          if (parsed.description) setDescription(parsed.description);
+          if (parsed.description || parsed.descriptions?.[0]) {
+            const next = [...descriptions];
+            next[0] = parsed.description || parsed.descriptions[0];
+            setDescriptions(next);
+          }
         }
         toast.success('Copy generado por Steve');
       } catch {
@@ -940,6 +968,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const filledImages = images.filter(Boolean);
       const filledTexts = primaryTexts.filter(Boolean);
       const filledHeadlines = headlines.filter(Boolean);
+      const filledDescriptions = descriptions.filter(Boolean);
       const allCopies = filledTexts.map((t, i) => ({ texto: t, tipo: i === 0 ? 'original' : 'variacion' }));
 
       const { error } = await supabase.from('ad_creatives').insert({
@@ -949,7 +978,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         angulo: anguloText,
         titulo: filledHeadlines[0] || campName || 'Borrador sin título',
         texto_principal: filledTexts[0] || '',
-        descripcion: description,
+        descripcion: filledDescriptions[0] || '',
         cta: cta,
         asset_url: filledImages[0] || null,
         estado: 'borrador',
@@ -983,7 +1012,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         },
         dct_copies: allCopies.length > 0 ? allCopies : null,
         dct_titulos: filledHeadlines.length > 0 ? filledHeadlines : null,
-        dct_descripciones: description ? [description] : null,
+        dct_descripciones: filledDescriptions.length > 0 ? filledDescriptions : null,
         dct_imagenes: filledImages.length > 0 ? filledImages : null,
       });
       if (error) throw error;
@@ -1020,6 +1049,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const filledTexts = primaryTexts.filter(Boolean);
       const filledHeadlines = headlines.filter(Boolean);
       const filledImages = images.filter(Boolean);
+      const filledDescriptions = descriptions.filter(Boolean);
 
       const submitData: Record<string, any> = {
         name,
@@ -1030,15 +1060,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         adset_name: adsetName || `${name} - Ad Set 1`,
         primary_text: filledTexts[0] || undefined,
         headline: filledHeadlines[0] || undefined,
-        description: description || undefined,
+        description: filledDescriptions[0] || undefined,
         image_url: filledImages[0] || undefined,
         cta: cta || 'SHOP_NOW',
         destination_url: destinationUrl || undefined,
         page_id: ctxPageId || undefined,
         ad_set_format: adSetFormat,
-        images: filledImages.length > 1 ? filledImages : undefined,
-        texts: filledTexts.length > 1 ? filledTexts : undefined,
-        headlines: filledHeadlines.length > 1 ? filledHeadlines : undefined,
+        images: filledImages.length > 0 ? filledImages : undefined,
+        texts: filledTexts.length > 0 ? filledTexts : undefined,
+        headlines: filledHeadlines.length > 0 ? filledHeadlines : undefined,
+        descriptions: filledDescriptions.length > 0 ? filledDescriptions : undefined,
       };
 
       // Use existing entities if selected
@@ -1258,7 +1289,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     selectedAngle={selectedAngle}
                     headlines={headlines} setHeadlines={setHeadlines}
                     primaryTexts={primaryTexts} setPrimaryTexts={setPrimaryTexts}
-                    description={description} setDescription={setDescription}
+                    descriptions={descriptions} setDescriptions={setDescriptions}
                     images={images} setImages={setImages}
                     cta={cta} setCta={setCta}
                     destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
@@ -1273,7 +1304,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           imageUrl={images[0] || ''}
                           primaryText={primaryTexts[0] || ''}
                           headline={headlines[0] || ''}
-                          description={description}
+                          description={descriptions[0] || ''}
                           cta={cta}
                           pageName={pageName || 'Tu Marca'}
                           destinationUrl={destinationUrl}
@@ -1302,7 +1333,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   funnelStage={funnelStage}
                   headline={headlines[0] || ''}
                   primaryText={primaryTexts[0] || ''}
-                  description={description}
+                  description={descriptions[0] || ''}
                   imageUrl={images[0] || ''}
                   cta={cta}
                   destinationUrl={destinationUrl}

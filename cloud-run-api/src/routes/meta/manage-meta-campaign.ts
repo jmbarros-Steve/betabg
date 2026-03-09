@@ -50,6 +50,40 @@ async function metaApiRequest(
   return { ok: true, data: responseData };
 }
 
+// --- Helper: upload image from URL to get image_hash ---
+
+async function uploadImageFromUrl(
+  accountId: string,
+  accessToken: string,
+  imageUrl: string
+): Promise<{ ok: boolean; hash?: string; error?: string }> {
+  try {
+    const result = await metaApiRequest(
+      `act_${accountId}/adimages`,
+      accessToken,
+      'POST',
+      { url: imageUrl }
+    );
+
+    if (!result.ok) {
+      return { ok: false, error: result.error || 'Failed to upload image' };
+    }
+
+    // Response: { images: { "<key>": { hash: "abc..." } } }
+    const images = result.data?.images;
+    if (images) {
+      const firstKey = Object.keys(images)[0];
+      if (firstKey && images[firstKey]?.hash) {
+        return { ok: true, hash: images[firstKey].hash };
+      }
+    }
+
+    return { ok: false, error: 'No image hash in response' };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Image upload error' };
+  }
+}
+
 // --- Action handlers ---
 
 async function handleCreate(
@@ -74,13 +108,19 @@ async function handleCreate(
     targeting,
     start_time,
     end_time,
-    // Ad creative fields
+    // Ad creative fields (single — backward compat)
     primary_text,
     headline,
     description,
     image_url,
     cta = 'SHOP_NOW',
     destination_url,
+    // Multi-slot fields (from new wizard)
+    ad_set_format,
+    images: imageUrls,
+    texts,
+    headlines,
+    descriptions,
   } = data;
 
   // Step 1: Use existing campaign or create new one
@@ -118,6 +158,9 @@ async function handleCreate(
   // Step 2: Use existing ad set or create new one if budget/targeting data is provided
   let adSetId: string | null = existingAdsetId || null;
 
+  const isFlexible = ad_set_format === 'flexible';
+  const isCarousel = ad_set_format === 'carousel';
+
   if (!adSetId && (daily_budget || targeting)) {
     const adsetPayload: Record<string, any> = {
       campaign_id: campaignId,
@@ -126,6 +169,11 @@ async function handleCreate(
       optimization_goal,
       status,
     };
+
+    // Dynamic Creative must be enabled at the ad set level
+    if (isFlexible) {
+      adsetPayload.is_dynamic_creative = true;
+    }
 
     if (daily_budget) {
       // Meta expects budget in cents (smallest currency unit)
@@ -144,7 +192,7 @@ async function handleCreate(
       adsetPayload.end_time = end_time;
     }
 
-    console.log(`[manage-meta-campaign] Creating ad set for campaign ${campaignId}`);
+    console.log(`[manage-meta-campaign] Creating ad set for campaign ${campaignId} (format: ${ad_set_format || 'single'})`);
 
     const adsetResult = await metaApiRequest(
       `act_${accountId}/adsets`,
@@ -177,95 +225,258 @@ async function handleCreate(
   let adId: string | null = null;
   let creativeId: string | null = null;
 
-  if (adSetId && image_url && pageId) {
-    // Step 3a: Create ad creative
-    const linkData: Record<string, any> = {
-      link: destination_url || 'https://example.com',
-      message: primary_text || '',
-      name: headline || '',
-      call_to_action: { type: cta, value: { link: destination_url || 'https://example.com' } },
-    };
+  // Resolve arrays (multi-slot) or single values (backward compat)
+  const allImages: string[] = (imageUrls && imageUrls.length > 0) ? imageUrls : (image_url ? [image_url] : []);
+  const allTexts: string[] = (texts && texts.length > 0) ? texts : (primary_text ? [primary_text] : []);
+  const allHeadlines: string[] = (headlines && headlines.length > 0) ? headlines : (headline ? [headline] : []);
+  const allDescriptions: string[] = (descriptions && descriptions.length > 0) ? descriptions : (description ? [description] : []);
+  const destUrl = destination_url || 'https://example.com';
 
-    if (image_url.endsWith('.mp4') || image_url.includes('video')) {
-      // Video creative — use video_data instead of link_data
-      // For now, treat as image (Meta will handle video URLs in link_data for single video ads)
-      linkData.image_url = image_url;
+  const hasCreativeData = allImages.length > 0 || allTexts.length > 0;
+
+  if (adSetId && hasCreativeData && pageId) {
+
+    // ---- FLEXIBLE: Dynamic Creative with asset_feed_spec ----
+    if (isFlexible && allImages.length > 0) {
+      console.log(`[manage-meta-campaign] Creating Dynamic Creative (flexible) with ${allImages.length} images, ${allTexts.length} texts, ${allHeadlines.length} headlines`);
+
+      // Upload images to get hashes
+      const imageHashes: string[] = [];
+      for (const imgUrl of allImages) {
+        if (!imgUrl) continue;
+        const upload = await uploadImageFromUrl(accountId, accessToken, imgUrl);
+        if (upload.ok && upload.hash) {
+          imageHashes.push(upload.hash);
+        } else {
+          console.warn(`[manage-meta-campaign] Image upload failed for ${imgUrl}: ${upload.error}`);
+        }
+      }
+
+      if (imageHashes.length === 0) {
+        return {
+          body: {
+            success: true,
+            partial: true,
+            campaign_id: campaignId,
+            adset_id: adSetId,
+            creative_error: 'All image uploads failed — cannot create Dynamic Creative without images',
+          },
+          status: 207,
+        };
+      }
+
+      // Build asset_feed_spec
+      const assetFeedSpec: Record<string, any> = {
+        images: imageHashes.map((h) => ({ hash: h })),
+        bodies: allTexts.filter(Boolean).map((t) => ({ text: t })),
+        titles: allHeadlines.filter(Boolean).map((t) => ({ text: t })),
+        call_to_action_types: [cta || 'SHOP_NOW'],
+        link_urls: [{ website_url: destUrl }],
+      };
+
+      if (allDescriptions.filter(Boolean).length > 0) {
+        assetFeedSpec.descriptions = allDescriptions.filter(Boolean).map((d) => ({ text: d }));
+      }
+
+      const creativePayload = {
+        name: `${name} - DCT Creative`,
+        asset_feed_spec: JSON.stringify(assetFeedSpec),
+        object_story_spec: JSON.stringify({
+          page_id: pageId,
+          link_data: {
+            link: destUrl,
+            call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
+          },
+        }),
+      };
+
+      const creativeResult = await metaApiRequest(
+        `act_${accountId}/adcreatives`,
+        accessToken,
+        'POST',
+        creativePayload
+      );
+
+      if (!creativeResult.ok) {
+        console.error(`[manage-meta-campaign] Dynamic Creative creation failed: ${creativeResult.error}`);
+        return {
+          body: {
+            success: true,
+            partial: true,
+            campaign_id: campaignId,
+            adset_id: adSetId,
+            creative_error: creativeResult.error,
+            message: 'Campaign + ad set created but Dynamic Creative failed',
+          },
+          status: 207,
+        };
+      }
+
+      creativeId = creativeResult.data.id;
+      console.log(`[manage-meta-campaign] Dynamic Creative created: ${creativeId}`);
+
+    // ---- CAROUSEL: child_attachments ----
+    } else if (isCarousel && allImages.length > 1) {
+      console.log(`[manage-meta-campaign] Creating Carousel creative with ${allImages.length} images`);
+
+      // Upload images to get hashes
+      const imageHashes: string[] = [];
+      for (const imgUrl of allImages) {
+        if (!imgUrl) continue;
+        const upload = await uploadImageFromUrl(accountId, accessToken, imgUrl);
+        if (upload.ok && upload.hash) {
+          imageHashes.push(upload.hash);
+        } else {
+          console.warn(`[manage-meta-campaign] Image upload failed for ${imgUrl}: ${upload.error}`);
+        }
+      }
+
+      if (imageHashes.length < 2) {
+        return {
+          body: {
+            success: true,
+            partial: true,
+            campaign_id: campaignId,
+            adset_id: adSetId,
+            creative_error: 'Carousel requires at least 2 images — not enough uploads succeeded',
+          },
+          status: 207,
+        };
+      }
+
+      const childAttachments = imageHashes.map((hash, i) => ({
+        image_hash: hash,
+        link: destUrl,
+        name: allHeadlines[0] || '',
+        description: allDescriptions[0] || '',
+      }));
+
+      const creativePayload = {
+        name: `${name} - Carousel Creative`,
+        object_story_spec: JSON.stringify({
+          page_id: pageId,
+          link_data: {
+            link: destUrl,
+            message: allTexts[0] || '',
+            child_attachments: childAttachments,
+            call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
+          },
+        }),
+      };
+
+      const creativeResult = await metaApiRequest(
+        `act_${accountId}/adcreatives`,
+        accessToken,
+        'POST',
+        creativePayload
+      );
+
+      if (!creativeResult.ok) {
+        console.error(`[manage-meta-campaign] Carousel creative creation failed: ${creativeResult.error}`);
+        return {
+          body: {
+            success: true,
+            partial: true,
+            campaign_id: campaignId,
+            adset_id: adSetId,
+            creative_error: creativeResult.error,
+            message: 'Campaign + ad set created but Carousel creative failed',
+          },
+          status: 207,
+        };
+      }
+
+      creativeId = creativeResult.data.id;
+      console.log(`[manage-meta-campaign] Carousel creative created: ${creativeId}`);
+
+    // ---- SINGLE (default): existing logic ----
     } else {
-      linkData.image_url = image_url;
+      const singleImage = allImages[0] || image_url;
+      if (singleImage) {
+        const linkData: Record<string, any> = {
+          link: destUrl,
+          message: allTexts[0] || primary_text || '',
+          name: allHeadlines[0] || headline || '',
+          image_url: singleImage,
+          call_to_action: { type: cta, value: { link: destUrl } },
+        };
+
+        if (allDescriptions[0] || description) {
+          linkData.description = allDescriptions[0] || description;
+        }
+
+        const creativePayload = {
+          name: `${name} - Creative`,
+          object_story_spec: JSON.stringify({
+            page_id: pageId,
+            link_data: linkData,
+          }),
+        };
+
+        console.log(`[manage-meta-campaign] Creating single-image ad creative for campaign ${campaignId}`);
+
+        const creativeResult = await metaApiRequest(
+          `act_${accountId}/adcreatives`,
+          accessToken,
+          'POST',
+          creativePayload
+        );
+
+        if (!creativeResult.ok) {
+          console.error(`[manage-meta-campaign] Ad creative creation failed: ${creativeResult.error}`);
+          return {
+            body: {
+              success: true,
+              partial: true,
+              campaign_id: campaignId,
+              adset_id: adSetId,
+              creative_error: creativeResult.error,
+              message: 'Campaign + ad set created but ad creative failed',
+            },
+            status: 207,
+          };
+        }
+
+        creativeId = creativeResult.data.id;
+        console.log(`[manage-meta-campaign] Ad creative created: ${creativeId}`);
+      }
     }
 
-    if (description) {
-      linkData.description = description;
-    }
-
-    const creativePayload = {
-      name: `${name} - Creative`,
-      object_story_spec: JSON.stringify({
-        page_id: pageId,
-        link_data: linkData,
-      }),
-    };
-
-    console.log(`[manage-meta-campaign] Creating ad creative for campaign ${campaignId}`);
-
-    const creativeResult = await metaApiRequest(
-      `act_${accountId}/adcreatives`,
-      accessToken,
-      'POST',
-      creativePayload
-    );
-
-    if (!creativeResult.ok) {
-      console.error(`[manage-meta-campaign] Ad creative creation failed: ${creativeResult.error}`);
-      return {
-        body: {
-          success: true,
-          partial: true,
-          campaign_id: campaignId,
-          adset_id: adSetId,
-          creative_error: creativeResult.error,
-          message: 'Campaign + ad set created but ad creative failed',
-        },
-        status: 207
+    // Step 3b: Create ad (same for all formats)
+    if (creativeId) {
+      const adPayload = {
+        name: allHeadlines[0] || headline || `${name} - Ad`,
+        adset_id: adSetId,
+        creative: JSON.stringify({ creative_id: creativeId }),
+        status,
       };
+
+      const adResult = await metaApiRequest(
+        `act_${accountId}/ads`,
+        accessToken,
+        'POST',
+        adPayload
+      );
+
+      if (!adResult.ok) {
+        console.error(`[manage-meta-campaign] Ad creation failed: ${adResult.error}`);
+        return {
+          body: {
+            success: true,
+            partial: true,
+            campaign_id: campaignId,
+            adset_id: adSetId,
+            creative_id: creativeId,
+            ad_error: adResult.error,
+            message: 'Campaign + ad set + creative created but ad creation failed',
+          },
+          status: 207,
+        };
+      }
+
+      adId = adResult.data.id;
+      console.log(`[manage-meta-campaign] Ad created: ${adId}`);
     }
-
-    creativeId = creativeResult.data.id;
-    console.log(`[manage-meta-campaign] Ad creative created: ${creativeId}`);
-
-    // Step 3b: Create ad
-    const adPayload = {
-      name: headline || `${name} - Ad`,
-      adset_id: adSetId,
-      creative: JSON.stringify({ creative_id: creativeId }),
-      status,
-    };
-
-    const adResult = await metaApiRequest(
-      `act_${accountId}/ads`,
-      accessToken,
-      'POST',
-      adPayload
-    );
-
-    if (!adResult.ok) {
-      console.error(`[manage-meta-campaign] Ad creation failed: ${adResult.error}`);
-      return {
-        body: {
-          success: true,
-          partial: true,
-          campaign_id: campaignId,
-          adset_id: adSetId,
-          creative_id: creativeId,
-          ad_error: adResult.error,
-          message: 'Campaign + ad set + creative created but ad creation failed',
-        },
-        status: 207
-      };
-    }
-
-    adId = adResult.data.id;
-    console.log(`[manage-meta-campaign] Ad created: ${adId}`);
   }
 
   return {
