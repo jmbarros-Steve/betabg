@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -359,15 +360,8 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     // Subscribe Realtime as bonus
     subscribeToStatus();
 
-    // Two-phase analysis: research (data analysis ~30s) → strategy (Claude Opus ~60s)
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
-    };
+    // Two-phase analysis: research (data analysis ~30s) → strategy (Claude Sonnet ~60s)
+    // Both phases use callApi() which routes to Cloud Run
 
     const debugKey = `analysis_debug_${clientId}`;
     const setDebug = (updates: Record<string, unknown>) => {
@@ -381,24 +375,20 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
-      const researchRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-research`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const { data: researchData, error: researchErr } = await callApi('analyze-brand-research', {
+        body: {
           client_id: clientId,
           website_url: url.trim(),
           competitor_urls: compUrls.filter(u => u.trim()),
-        }),
+        },
       });
-      if (researchRes.ok) {
-        const researchData = await researchRes.json();
-        research = researchData.research;
+      if (researchErr) {
+        setDebug({ phase1: 'error', phase1Message: researchErr });
+        console.error('[launchAnalysis] Phase 1 error:', researchErr);
+      } else {
+        research = researchData?.research;
         setDebug({ phase1: 'ok', phase1Status: 200 });
         console.log('[launchAnalysis] Phase 1 complete — competitors analyzed:', research?.competitorContents?.length);
-      } else {
-        const errBody = await researchRes.text();
-        setDebug({ phase1: 'error', phase1Status: researchRes.status, phase1Message: errBody.slice(0, 300) });
-        console.error('[launchAnalysis] Phase 1 error:', researchRes.status, errBody.slice(0, 500));
       }
     } catch (err: any) {
       const msg = err?.message || String(err);
@@ -411,17 +401,14 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       console.log('[launchAnalysis] Phase 2 — strategy (Steve)');
       setDebug({ phase2: 'running' });
       try {
-        const strategyRes = await fetch(`https://${projectId}.supabase.co/functions/v1/analyze-brand-strategy`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ client_id: clientId, research }),
+        const { error: strategyErr } = await callApi('analyze-brand-strategy', {
+          body: { client_id: clientId, research },
         });
-        if (strategyRes.ok) {
-          setDebug({ phase2: 'ok', phase2Status: 200 });
+        if (strategyErr) {
+          setDebug({ phase2: 'error', phase2Message: strategyErr });
+          console.error('[launchAnalysis] Phase 2 error:', strategyErr);
         } else {
-          const errBody = await strategyRes.text();
-          setDebug({ phase2: 'error', phase2Status: strategyRes.status, phase2Message: errBody.slice(0, 300) });
-          console.error('[launchAnalysis] Phase 2 error:', strategyRes.status, errBody.slice(0, 500));
+          setDebug({ phase2: 'ok', phase2Status: 200 });
         }
       } catch (err: any) {
         const msg = err?.message || String(err);
