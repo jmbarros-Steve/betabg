@@ -798,9 +798,25 @@ export function renderMetaAdsStrategy(
     }
   }
 
-  if (metaStrategy.presupuesto_sugerido) {
-    helpers.addSubTitle('Presupuesto Sugerido');
-    const ps = metaStrategy.presupuesto_sugerido;
+  // Estructura de Campañas (tof/mof/bof with objetivo, audiencia, contenido)
+  const estructura = metaStrategy.estructura_campanas || metaStrategy.estructura_campañas;
+  if (estructura && typeof estructura === 'object') {
+    helpers.addSubTitle('Estructura de Campañas');
+    const stageLabels: Record<string, string> = { tof: 'TOFU', mof: 'MOFU', bof: 'BOFU', tofu: 'TOFU', mofu: 'MOFU', bofu: 'BOFU' };
+    for (const [stage, data] of Object.entries(estructura)) {
+      if (typeof data !== 'object' || !data) continue;
+      const d = data as Record<string, any>;
+      const label = stageLabels[stage] || stage.toUpperCase();
+      helpers.addKeyValue(label, d.objetivo || d.objective || '');
+      if (d.audiencia) helpers.addBody(`  Audiencia: ${String(d.audiencia)}`, 6, 4.5);
+      if (d.contenido) helpers.addBody(`  Contenido: ${String(d.contenido)}`, 6, 4.5);
+      if (d.retargeting) helpers.addBody(`  Retargeting: ${String(d.retargeting)}`, 6, 4.5);
+    }
+  }
+
+  if (metaStrategy.presupuesto_sugerido || metaStrategy.budget_distribucion) {
+    helpers.addSubTitle('Distribución de Presupuesto');
+    const ps = metaStrategy.presupuesto_sugerido || metaStrategy.budget_distribucion;
     if (typeof ps === 'object') {
       for (const [k, v] of Object.entries(ps)) {
         const label = k.replace(/_/g, ' ').toUpperCase();

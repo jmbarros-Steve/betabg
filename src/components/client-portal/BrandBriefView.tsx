@@ -1001,13 +1001,33 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           seo.competitive_seo_gap = seo.analisis_competidores;
         } else if (typeof seo.analisis_competidores === 'object') {
           // Summarize the competitor analysis object into a readable string
+          // Can be {decathlon_cl: {ventajas_sobre_cliente: [...], meta_tags_superiores: [...]}, ...}
           const parts: string[] = [];
           for (const [key, val] of Object.entries(seo.analisis_competidores)) {
-            if (typeof val === 'string') parts.push(val);
-            else if (Array.isArray(val)) parts.push(val.map(s).join(', '));
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            if (typeof val === 'string') {
+              parts.push(`${label}: ${val}`);
+            } else if (Array.isArray(val)) {
+              parts.push(`${label}: ${val.map(s).join(', ')}`);
+            } else if (typeof val === 'object' && val !== null) {
+              // Nested object per competitor: extract all sub-arrays/strings
+              const subParts: string[] = [];
+              for (const [subKey, subVal] of Object.entries(val as Record<string, any>)) {
+                const subLabel = subKey.replace(/_/g, ' ');
+                if (typeof subVal === 'string') subParts.push(`${subLabel}: ${subVal}`);
+                else if (Array.isArray(subVal)) subParts.push(`${subLabel}: ${subVal.join(', ')}`);
+              }
+              if (subParts.length > 0) parts.push(`${label} — ${subParts.join('; ')}`);
+            }
           }
-          if (parts.length > 0) seo.competitive_seo_gap = parts.join('. ');
+          if (parts.length > 0) seo.competitive_seo_gap = parts.join('\n');
+          // Also store the raw object for structured rendering
+          seo.analisis_competidores_structured = seo.analisis_competidores;
         }
+      }
+      // Normalize analisis_sitio_cliente → analisis_cliente
+      if (!seo.analisis_cliente && seo.analisis_sitio_cliente) {
+        seo.analisis_cliente = seo.analisis_sitio_cliente;
       }
       // meta_analysis from analisis_cliente.meta_titles / meta_descriptions
       if (!seo.meta_analysis && seo.analisis_cliente) {
@@ -1074,15 +1094,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
     if (r.competitor_analysis && typeof r.competitor_analysis === 'object') {
       const ca = r.competitor_analysis;
-      const indiv = ca.individual_analysis || ca.individual_analyses;
+      const indiv = ca.individual_analysis || ca.individual_analyses || ca.individual_competitor_analysis;
       if (!Array.isArray(ca.competitors) && Array.isArray(indiv)) {
         ca.competitors = indiv.map((comp: any) => ({
           ...comp,
-          strengths: comp.strengths || comp.fortalezas || [],
-          weaknesses: comp.weaknesses || comp.debilidades || [],
-          value_proposition: comp.value_proposition || comp.propuesta_de_valor || comp.propuesta_valor || '',
+          strengths: comp.strengths || comp.fortalezas || comp.fortalezas_detectadas || [],
+          weaknesses: comp.weaknesses || comp.debilidades || comp.debilidades_detectadas || [],
+          value_proposition: comp.value_proposition || comp.propuesta_de_valor || comp.propuesta_valor || comp.propuesta_valor_principal || '',
           ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido_observada || comp.estrategia_contenido || '',
-          positioning: comp.positioning || comp.propuesta_de_valor || comp.propuesta_valor || '',
+          positioning: comp.positioning || comp.propuesta_de_valor || comp.propuesta_valor || comp.propuesta_valor_principal || '',
           attack_vector: comp.attack_vector || comp.que_hace_cliente_mejor || '',
           que_hacen_mejor: comp.que_hacen_mejor || comp.que_hacen_mejor_que_cliente || '',
           que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
@@ -1096,9 +1116,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (Array.isArray(ca.competitors)) {
         ca.competitors = ca.competitors.map((comp: any) => ({
           ...comp,
-          strengths: comp.strengths || comp.fortalezas || [],
-          weaknesses: comp.weaknesses || comp.debilidades || [],
-          value_proposition: comp.value_proposition || comp.propuesta_valor || '',
+          strengths: comp.strengths || comp.fortalezas || comp.fortalezas_detectadas || [],
+          weaknesses: comp.weaknesses || comp.debilidades || comp.debilidades_detectadas || [],
+          value_proposition: comp.value_proposition || comp.propuesta_valor || comp.propuesta_valor_principal || '',
           que_hacen_mejor: comp.que_hacen_mejor || '',
           que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
           estrategia_contenido: comp.estrategia_contenido || '',
@@ -1122,6 +1142,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (!Array.isArray(ca.market_gaps)) {
         if (Array.isArray(ca.insights_estrategicos?.gaps_de_mercado_sin_cubrir)) {
           ca.market_gaps = ca.insights_estrategicos.gaps_de_mercado_sin_cubrir;
+        } else if (Array.isArray(ca.insights_estrategicos?.gaps_mercado)) {
+          ca.market_gaps = ca.insights_estrategicos.gaps_mercado;
         } else if (ca.competitors?.length > 0) {
           const gaps: string[] = [];
           for (const comp of ca.competitors) {
@@ -1159,18 +1181,159 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // ── META ADS STRATEGY: creativos_recomendados → hooks[], primary_texts[] for PDF ──
     if (r.meta_ads_strategy && typeof r.meta_ads_strategy === 'object') {
       const mas = r.meta_ads_strategy;
-      if (Array.isArray(mas.creativos_recomendados) && !Array.isArray(mas.hooks)) {
-        mas.hooks = mas.creativos_recomendados.map((c: any) => c.hook || '').filter(Boolean);
-        mas.primary_texts = mas.creativos_recomendados.map((c: any) => c.copy || '').filter(Boolean);
+      // creativos_recomendados can be an array or an object with hook_1/hook_2/hook_3 keys
+      let creativos: any[] = [];
+      if (Array.isArray(mas.creativos_recomendados)) {
+        creativos = mas.creativos_recomendados;
+      } else if (mas.creativos_recomendados && typeof mas.creativos_recomendados === 'object') {
+        creativos = Object.values(mas.creativos_recomendados);
+      }
+      if (creativos.length > 0 && !Array.isArray(mas.hooks)) {
+        mas.hooks = creativos.map((c: any) => c.hook || c.texto || '').filter(Boolean);
+        mas.primary_texts = creativos.map((c: any) => c.copy || c.texto || '').filter(Boolean);
+      }
+      // Normalize budget keys: budget_distribucion → distribucion_presupuesto
+      if (!mas.distribucion_presupuesto && mas.budget_distribucion) {
+        mas.distribucion_presupuesto = mas.budget_distribucion;
+      }
+      // Normalize estructura keys
+      if (!mas.estructura_campanas && mas.estructura_campañas) {
+        mas.estructura_campanas = mas.estructura_campañas;
+      }
+      // Normalize objetivos_campana: tof_awareness/mof_consideration/bof_conversion → tofu/mofu/bofu
+      if (mas.objetivos_campana && typeof mas.objetivos_campana === 'object') {
+        const obj = mas.objetivos_campana;
+        // If keys are tof_awareness etc instead of tofu/mofu/bofu, remap
+        if (!obj.tofu && (obj.tof_awareness || obj.tof)) {
+          const remapped: any = {};
+          for (const [k, v] of Object.entries(obj)) {
+            if (k.startsWith('tof')) remapped.tofu = typeof v === 'string' ? { objetivo: v } : v;
+            else if (k.startsWith('mof')) remapped.mofu = typeof v === 'string' ? { objetivo: v } : v;
+            else if (k.startsWith('bof')) remapped.bofu = typeof v === 'string' ? { objetivo: v } : v;
+            else remapped[k] = v;
+          }
+          mas.objetivos_campana = remapped;
+        }
+      }
+      // Normalize kpis_objetivo: tof/mof/bof → tofu/mofu/bofu
+      if (mas.kpis_objetivo && typeof mas.kpis_objetivo === 'object') {
+        const kpi = mas.kpis_objetivo;
+        if (!kpi.tofu && (kpi.tof || kpi.tof_awareness)) { kpi.tofu = kpi.tof || kpi.tof_awareness; }
+        if (!kpi.mofu && (kpi.mof || kpi.mof_consideration)) { kpi.mofu = kpi.mof || kpi.mof_consideration; }
+        if (!kpi.bofu && (kpi.bof || kpi.bof_conversion)) { kpi.bofu = kpi.bof || kpi.bof_conversion; }
+      }
+      // Normalize audiencias from segmentacion_audiencias
+      if (!mas.audiencias && mas.segmentacion_audiencias) {
+        const seg = mas.segmentacion_audiencias;
+        if (typeof seg === 'object' && !Array.isArray(seg)) {
+          mas.audiencias = Object.entries(seg).map(([k, v]: [string, any]) => ({
+            nombre: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            descripcion: typeof v === 'string' ? v : typeof v === 'object' ? Object.entries(v).map(([sk, sv]) => `${sk}: ${Array.isArray(sv) ? sv.join(', ') : sv}`).join('. ') : String(v),
+          }));
+        }
+      }
+      // Normalize presupuesto_sugerido from budget_distribucion (for PDF rendering)
+      if (!mas.presupuesto_sugerido && mas.budget_distribucion) {
+        mas.presupuesto_sugerido = mas.budget_distribucion;
       }
     }
 
-    // ── GOOGLE ADS STRATEGY: ad_copies[].headline1/2/3 → headlines[], descriptions[] for PDF ──
+    // ── GOOGLE ADS STRATEGY: ad_copies/search_ad_copies → headlines[], descriptions[] for PDF ──
     if (r.google_ads_strategy && typeof r.google_ads_strategy === 'object') {
       const gas = r.google_ads_strategy;
+      // Normalize search_ad_copies → ad_copies, then normalize each copy's keys
+      if (!Array.isArray(gas.ad_copies) && Array.isArray(gas.search_ad_copies)) {
+        gas.ad_copies = gas.search_ad_copies;
+      }
+      // Normalize headline_1 → headline1 within each ad copy for PDF rendering
+      if (Array.isArray(gas.ad_copies)) {
+        gas.ad_copies = gas.ad_copies.map((c: any) => ({
+          ...c,
+          headline1: c.headline1 || c.headline_1 || '',
+          headline2: c.headline2 || c.headline_2 || '',
+          headline3: c.headline3 || c.headline_3 || '',
+          description1: c.description1 || c.description_1 || '',
+          description2: c.description2 || c.description_2 || '',
+        }));
+      }
       if (Array.isArray(gas.ad_copies) && !Array.isArray(gas.headlines)) {
-        gas.headlines = gas.ad_copies.flatMap((c: any) => [c.headline1, c.headline2, c.headline3].filter(Boolean));
-        gas.descriptions = gas.ad_copies.flatMap((c: any) => [c.description1, c.description2].filter(Boolean));
+        gas.headlines = gas.ad_copies.flatMap((c: any) => [c.headline_1, c.headline_2, c.headline_3, c.headline1, c.headline2, c.headline3].filter(Boolean));
+        gas.descriptions = gas.ad_copies.flatMap((c: any) => [c.description_1, c.description_2, c.description1, c.description2].filter(Boolean));
+      }
+      // Normalize budget keys
+      if (!gas.presupuesto_sugerido && gas.budget_recommendation) {
+        gas.presupuesto_sugerido = gas.budget_recommendation;
+      }
+      // Normalize campaign structure
+      if (!gas.estructura_campanas && gas.campaign_types) {
+        gas.estructura_campanas = gas.campaign_types;
+      }
+      // Normalize campaign_types: object → array for PDF rendering
+      if (gas.campaign_types && typeof gas.campaign_types === 'object' && !Array.isArray(gas.campaign_types)) {
+        gas.campaign_types = Object.entries(gas.campaign_types).map(([k, v]: [string, any]) => ({
+          type: k.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          name: k.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          objetivo: typeof v === 'string' ? v : v?.objective || v?.objetivo || '',
+          priority: v?.priority || '',
+          budget_percentage: v?.budget_percentage || '',
+          description: typeof v === 'string' ? v : `${v?.objective || v?.objetivo || ''} (${v?.priority || ''}, ${v?.budget_percentage || ''})`,
+        }));
+      }
+      // Normalize ad_extensions: object → extensions array for PDF rendering
+      if (!gas.extensions && gas.ad_extensions && typeof gas.ad_extensions === 'object' && !Array.isArray(gas.ad_extensions)) {
+        gas.extensions = Object.entries(gas.ad_extensions).map(([k, v]: [string, any]) => ({
+          type: k.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          content: Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? Object.entries(v).map(([sk, sv]) => `${sk}: ${Array.isArray(sv) ? sv.join(', ') : sv}`).join('; ') : String(v),
+        }));
+      } else if (!gas.extensions && Array.isArray(gas.ad_extensions)) {
+        gas.extensions = gas.ad_extensions;
+      }
+    }
+
+    // ── CONSUMER PROFILE: normalize key names for buyer persona rendering ──
+    if (r.consumer_profile && typeof r.consumer_profile === 'object') {
+      const cp = r.consumer_profile;
+      const bp = cp.buyer_persona_principal;
+      if (bp && typeof bp === 'object') {
+        // nombre_ficticio from nombre
+        if (!bp.nombre_ficticio && bp.nombre) bp.nombre_ficticio = bp.nombre;
+        // Flatten demografia into persona for direct access
+        if (bp.demografia && typeof bp.demografia === 'object') {
+          if (!bp.edad && bp.demografia.edad) bp.edad = bp.demografia.edad;
+          if (!bp.genero && bp.demografia.genero) bp.genero = bp.demografia.genero;
+          if (!bp.ubicacion && bp.demografia.ubicacion) bp.ubicacion = bp.demografia.ubicacion;
+          if (!bp.ocupacion && bp.demografia.ocupacion) bp.ocupacion = bp.demografia.ocupacion;
+          if (!bp.nivel_socioeconomico && bp.demografia.nivel_socioeconomico) bp.nivel_socioeconomico = bp.demografia.nivel_socioeconomico;
+          if (!bp.nivel_socioeconomico && bp.demografia.ingresos) bp.nivel_socioeconomico = bp.demografia.ingresos;
+          if (!bp.estado_civil && bp.demografia.estado_civil) bp.estado_civil = bp.demografia.estado_civil;
+          if (!bp.educacion && bp.demografia.educacion) bp.educacion = bp.demografia.educacion;
+        }
+        // frase_que_lo_define from frase_definitoria
+        if (!bp.frase_que_lo_define && bp.frase_definitoria) bp.frase_que_lo_define = bp.frase_definitoria;
+        // motivadores_de_compra from motivadores_compra
+        if (!bp.motivadores_de_compra && bp.motivadores_compra) bp.motivadores_de_compra = bp.motivadores_compra;
+        // barreras_y_objeciones from barreras_objeciones
+        if (!bp.barreras_y_objeciones && bp.barreras_objeciones) bp.barreras_y_objeciones = bp.barreras_objeciones;
+        // comportamiento_digital from nested object
+        if (!bp.comportamiento_digital_desc && bp.comportamiento_digital && typeof bp.comportamiento_digital === 'object') {
+          bp.comportamiento_digital_desc = Object.entries(bp.comportamiento_digital).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : Array.isArray(v) ? v.join(', ') : JSON.stringify(v)}`).join('. ');
+        }
+        // Normalize psicografia.estilo_de_vida from estilo_vida
+        if (bp.psicografia && typeof bp.psicografia === 'object') {
+          if (!bp.psicografia.estilo_de_vida && bp.psicografia.estilo_vida) bp.psicografia.estilo_de_vida = bp.psicografia.estilo_vida;
+        }
+      }
+      // Also normalize secondary persona
+      const bp2 = cp.buyer_persona_secundario;
+      if (bp2 && typeof bp2 === 'object') {
+        if (!bp2.nombre_ficticio && bp2.nombre) bp2.nombre_ficticio = bp2.nombre;
+        if (!bp2.frase_que_lo_define && bp2.frase_definitoria) bp2.frase_que_lo_define = bp2.frase_definitoria;
+        if (bp2.demografia && typeof bp2.demografia === 'object') {
+          if (!bp2.edad && bp2.demografia.edad) bp2.edad = bp2.demografia.edad;
+          if (!bp2.genero && bp2.demografia.genero) bp2.genero = bp2.demografia.genero;
+          if (!bp2.ubicacion && bp2.demografia.ubicacion) bp2.ubicacion = bp2.demografia.ubicacion;
+          if (!bp2.ocupacion && bp2.demografia.ocupacion) bp2.ocupacion = bp2.demografia.ocupacion;
+        }
       }
     }
 
