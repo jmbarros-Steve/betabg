@@ -26,6 +26,8 @@ interface FinancialConfig {
   other_fixed_costs: number;
   other_fixed_costs_description: string | null;
   payment_gateway_commission: number;
+  shipping_cost_per_order: number;
+  shopify_commission_percentage: number;
   product_margins: Record<string, number>;
 }
 
@@ -37,6 +39,8 @@ const defaultConfig: FinancialConfig = {
   other_fixed_costs: 0,
   other_fixed_costs_description: null,
   payment_gateway_commission: 3.5,
+  shipping_cost_per_order: 0,
+  shopify_commission_percentage: 0,
   product_margins: {},
 };
 
@@ -93,6 +97,8 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           other_fixed_costs: Math.round(Number(data.other_fixed_costs)),
           other_fixed_costs_description: data.other_fixed_costs_description,
           payment_gateway_commission: Number(data.payment_gateway_commission),
+          shipping_cost_per_order: Math.round(Number(data.shipping_cost_per_order || 0)),
+          shopify_commission_percentage: Number(data.shopify_commission_percentage || 0),
           product_margins: (data.product_margins as Record<string, number>) || {},
         });
       }
@@ -124,6 +130,8 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
         other_fixed_costs: Math.round(config.other_fixed_costs),
         other_fixed_costs_description: config.other_fixed_costs_description,
         payment_gateway_commission: config.payment_gateway_commission,
+        shipping_cost_per_order: Math.round(config.shipping_cost_per_order),
+        shopify_commission_percentage: config.shopify_commission_percentage,
         product_margins: config.product_margins,
       };
 
@@ -154,7 +162,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
     }
   };
 
-  const handleCostChange = (field: 'shopify_plan_cost' | 'klaviyo_plan_cost' | 'other_fixed_costs', value: string) => {
+  const handleCostChange = (field: 'shopify_plan_cost' | 'klaviyo_plan_cost' | 'other_fixed_costs' | 'shipping_cost_per_order', value: string) => {
     const numValue = parseInt(value.replace(/\D/g, '')) || 0;
     setConfig((prev) => ({ ...prev, [field]: numValue }));
   };
@@ -407,6 +415,25 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="shipping_cost">Costo por despacho</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">$</span>
+                <Input
+                  id="shipping_cost"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCLP(config.shipping_cost_per_order)}
+                  onChange={(e) => handleCostChange('shipping_cost_per_order' as any, e.target.value)}
+                  placeholder="Ej: 3.500"
+                />
+                <span className="text-muted-foreground text-sm font-medium">CLP/pedido</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Se multiplica por la cantidad de pedidos del período
+              </p>
+            </div>
+
             <Separator />
 
             <div className="space-y-2">
@@ -433,6 +460,30 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
                 Transbank 2.95% | Mercado Pago 3.49% + IVA | Flow 2.9%
               </p>
             </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="shopify_commission">Comisión Shopify sobre ventas (%)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="shopify_commission"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.1"
+                  value={config.shopify_commission_percentage}
+                  onChange={(e) =>
+                    setConfig((prev) => ({ ...prev, shopify_commission_percentage: parseFloat(e.target.value) || 0 }))
+                  }
+                  className="w-24"
+                />
+                <span className="text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Basic 2% | Shopify 1% | Advanced 0.6% (0% si usas Shopify Payments)
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -454,6 +505,14 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
             <div>
               <p className="text-xs text-muted-foreground">Comisión pasarela</p>
               <p className="font-semibold">{config.payment_gateway_commission}%</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Costo despacho</p>
+              <p className="font-semibold">${formatCLP(config.shipping_cost_per_order)} CLP</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Comisión Shopify</p>
+              <p className="font-semibold">{config.shopify_commission_percentage}%</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">SKUs con margen específico</p>

@@ -29,6 +29,8 @@ interface FinancialConfig {
   klaviyo_plan_cost: number;
   other_fixed_costs: number;
   payment_gateway_commission: number;
+  shipping_cost_per_order: number;
+  shopify_commission_percentage: number;
 }
 
 const defaultFinancialConfig: FinancialConfig = {
@@ -37,6 +39,8 @@ const defaultFinancialConfig: FinancialConfig = {
   klaviyo_plan_cost: 0,
   other_fixed_costs: 0,
   payment_gateway_commission: 3.5,
+  shipping_cost_per_order: 0,
+  shopify_commission_percentage: 0,
 };
 
 function getDateRangeStart(range: DateRange): Date {
@@ -220,6 +224,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             klaviyo_plan_cost: Number(configRes.data.klaviyo_plan_cost),
             other_fixed_costs: Number(configRes.data.other_fixed_costs),
             payment_gateway_commission: Number(configRes.data.payment_gateway_commission),
+            shipping_cost_per_order: Number(configRes.data.shipping_cost_per_order || 0),
+            shopify_commission_percentage: Number(configRes.data.shopify_commission_percentage || 0),
           });
         }
 
@@ -466,11 +472,17 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const netRevenue = current.totalRevenue / (1 + taxRate);
     const totalFixedCosts = financialConfig.shopify_plan_cost + financialConfig.klaviyo_plan_cost + financialConfig.other_fixed_costs;
 
+    // Operational costs
+    const shippingCosts = current.totalOrders * financialConfig.shipping_cost_per_order;
+    const shopifyCommission = current.totalRevenue * (financialConfig.shopify_commission_percentage / 100);
+
     const netProfit =
       profitMetrics.grossProfit -
       current.totalSpend -
       totalFixedCosts -
-      profitMetrics.gatewayFees;
+      profitMetrics.gatewayFees -
+      shippingCosts -
+      shopifyCommission;
 
     return {
       grossRevenue: current.totalRevenue,
@@ -485,6 +497,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       otherFixedCosts: financialConfig.other_fixed_costs,
       totalFixedCosts,
       paymentGatewayFees: profitMetrics.gatewayFees,
+      shippingCosts,
+      shopifyCommission,
       netProfit,
       netProfitMargin: current.totalRevenue > 0 ? (netProfit / current.totalRevenue) * 100 : 0,
     };

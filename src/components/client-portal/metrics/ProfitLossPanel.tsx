@@ -31,7 +31,9 @@ interface ProfitLossData {
   totalFixedCosts: number;
   
   paymentGatewayFees: number;
-  
+  shippingCosts: number;
+  shopifyCommission: number;
+
   netProfit: number;
   netProfitMargin: number;
 }
@@ -217,6 +219,27 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         </div>
 
         <Separator />
+
+        {/* Operational Costs */}
+        {(data.shippingCosts > 0 || data.shopifyCommission > 0) && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Costos Operacionales</p>
+            {data.shippingCosts > 0 && (
+              <div className="flex justify-between items-center text-muted-foreground">
+                <span className="text-sm pl-4">Despachos</span>
+                <span className="text-sm text-destructive">-{formatCurrency(data.shippingCosts, currency)}</span>
+              </div>
+            )}
+            {data.shopifyCommission > 0 && (
+              <div className="flex justify-between items-center text-muted-foreground">
+                <span className="text-sm pl-4">Comisión Shopify</span>
+                <span className="text-sm text-destructive">-{formatCurrency(data.shopifyCommission, currency)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(data.shippingCosts > 0 || data.shopifyCommission > 0) && <Separator />}
 
         {/* Payment Gateway */}
         <div className="flex justify-between items-center text-muted-foreground">
