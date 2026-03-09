@@ -3688,7 +3688,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
             {/* BUYER PERSONA SECUNDARIO */}
             {(() => {
-              const bp2 = (research as any).consumer_profile?.buyer_persona_secundario;
+              const cp = (research as any).consumer_profile;
+              console.log('[BriefTab] consumer_profile:', cp ? Object.keys(cp) : 'null');
+              console.log('[BriefTab] brand_identity:', (research as any).brand_identity ? 'exists' : 'null');
+              console.log('[BriefTab] financial_analysis:', (research as any).financial_analysis ? 'exists' : 'null');
+              const bp2 = cp?.buyer_persona_secundario;
               if (!bp2 || typeof bp2 !== 'object') return null;
               const name2 = bp2.nombre_ficticio || bp2.nombre || '';
               const age2 = bp2.edad || bp2.demografia?.edad || '';
