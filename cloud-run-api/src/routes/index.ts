@@ -88,6 +88,7 @@ import { shopifyInstall } from './shopify/shopify-install.js';
 import { shopifyOauthCallback } from './shopify/shopify-oauth-callback.js';
 import { shopifyFulfillmentWebhooks } from './shopify/shopify-fulfillment-webhooks.js';
 import { shopifyGdprWebhooks } from './shopify/shopify-gdpr-webhooks.js';
+import { storeShopifyCredentials } from './shopify/store-shopify-credentials.js';
 
 /**
  * Registers all API routes on the Hono app.
@@ -168,6 +169,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/create-shopify-discount', authMiddleware, createShopifyDiscount);
   app.post('/api/shopify-session-validate', shopifySessionValidate); // Uses Shopify session token, no JWT
   app.post('/api/sync-shopify-metrics', authMiddleware, syncShopifyMetrics);
+  app.post('/api/store-shopify-credentials', authMiddleware, storeShopifyCredentials);
 
   // ============================================================
   // Phase 3: Platform Integrations (Google + Other)

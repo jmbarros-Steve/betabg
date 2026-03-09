@@ -23,11 +23,10 @@ import {
   AlertTriangle,
   ExternalLink,
   Loader2,
-  Settings,
-  AppWindow,
-  Shield,
-  Download,
+  Copy,
+  Key,
   Link2,
+  Globe,
 } from 'lucide-react';
 
 interface ShopifyCustomAppWizardProps {
@@ -37,7 +36,7 @@ interface ShopifyCustomAppWizardProps {
   onConnected: () => void;
 }
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 const REQUIRED_SCOPES = [
   { scope: 'read_orders', label: 'Pedidos' },
@@ -48,7 +47,7 @@ const REQUIRED_SCOPES = [
   { scope: 'read_products', label: 'Productos' },
 ];
 
-const stepIcons = [ShoppingBag, Settings, AppWindow, Shield, Download, Link2];
+const stepIcons = [ShoppingBag, Globe, Key, Link2, Loader2];
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -65,6 +64,10 @@ const slideVariants = {
   }),
 };
 
+const API_URL = import.meta.env.VITE_API_URL as string;
+const APP_URL = API_URL; // Cloud Run URL for Shopify app config
+const REDIRECT_URL = `${API_URL}/api/shopify-oauth-callback`;
+
 export function ShopifyCustomAppWizard({
   open,
   onClose,
@@ -74,8 +77,9 @@ export function ShopifyCustomAppWizard({
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
   const [domain, setDomain] = useState('');
-  const [accessToken, setAccessToken] = useState('');
-  const [showToken, setShowToken] = useState(false);
+  const [shopifyClientId, setShopifyClientId] = useState('');
+  const [shopifyClientSecret, setShopifyClientSecret] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState('');
 
@@ -100,8 +104,9 @@ export function ShopifyCustomAppWizard({
     setStep(1);
     setDirection(1);
     setDomain('');
-    setAccessToken('');
-    setShowToken(false);
+    setShopifyClientId('');
+    setShopifyClientSecret('');
+    setShowSecret(false);
     setConnecting(false);
     setError('');
     onClose();
@@ -109,67 +114,69 @@ export function ShopifyCustomAppWizard({
 
   const normalizeDomain = (raw: string): string => {
     let d = raw.trim().toLowerCase();
-    // Remove protocol
     d = d.replace(/^https?:\/\//, '');
-    // Remove trailing slash
     d = d.replace(/\/+$/, '');
-    // Append .myshopify.com if missing
     if (!d.endsWith('.myshopify.com')) {
-      d = d.replace(/\.myshopify\.com$/, ''); // no-op guard
       d = `${d}.myshopify.com`;
     }
     return d;
   };
 
   const isDomainValid = () => {
+    if (!domain.trim()) return false;
     const d = normalizeDomain(domain);
     return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(d);
   };
 
-  const isTokenValid = () => {
-    return accessToken.startsWith('shpat_') && accessToken.length > 20;
+  const isFormValid = () => {
+    return isDomainValid() && shopifyClientId.trim().length >= 10 && shopifyClientSecret.trim().length >= 10;
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado`);
   };
 
   const handleConnect = async () => {
     setError('');
-    if (!isDomainValid()) {
-      setError('Dominio inválido. Ejemplo: mi-tienda.myshopify.com');
-      return;
-    }
-    if (!isTokenValid()) {
-      setError('El token debe empezar con shpat_ y tener más de 20 caracteres');
+    if (!isFormValid()) {
+      setError('Completa todos los campos correctamente');
       return;
     }
 
     setConnecting(true);
-    const normalizedDomain = normalizeDomain(domain);
+    goNext(); // Go to step 5 (connecting)
 
     try {
-      const { data, error: apiError } = await callApi('store-platform-connection', {
+      const { data, error: apiError } = await callApi('store-shopify-credentials', {
         body: {
           clientId,
-          platform: 'shopify',
-          storeName: normalizedDomain,
-          storeUrl: `https://${normalizedDomain}`,
-          accessToken,
+          shopifyClientId: shopifyClientId.trim(),
+          shopifyClientSecret: shopifyClientSecret.trim(),
+          shopDomain: normalizeDomain(domain),
         },
       });
 
       if (apiError) {
-        if (apiError.includes('409') || apiError.includes('already') || apiError.includes('existe')) {
-          setError('Ya tienes Shopify conectado. Si necesitas reconectar, desconecta primero la conexión actual.');
-        } else {
-          setError(apiError);
-        }
+        setError(apiError);
+        setDirection(-1);
+        setStep(4); // Go back to form
         return;
       }
 
-      toast.success('Shopify conectado exitosamente');
-      onConnected();
-      handleClose();
+      if (data?.installUrl) {
+        // Redirect to Shopify OAuth
+        window.location.href = data.installUrl;
+      } else {
+        setError('No se recibió la URL de instalación');
+        setDirection(-1);
+        setStep(4);
+      }
     } catch (err: any) {
-      console.error('Error connecting Shopify:', err);
-      setError(err.message || 'Error al conectar. Intenta de nuevo.');
+      console.error('Error storing Shopify credentials:', err);
+      setError(err.message || 'Error al guardar credenciales');
+      setDirection(-1);
+      setStep(4);
     } finally {
       setConnecting(false);
     }
@@ -185,136 +192,103 @@ export function ShopifyCustomAppWizard({
             </div>
             <h3 className="text-xl font-semibold">Conecta tu tienda Shopify</h3>
             <p className="text-muted-foreground max-w-sm mx-auto">
-              Vamos a crear una app personalizada en tu tienda para que Steve pueda
-              acceder a tus datos de forma segura. Solo toma 3 minutos.
+              Crea una app en tu panel de Shopify para que Steve pueda acceder
+              a tus datos de forma segura via OAuth. Solo toma ~3 minutos.
             </p>
+            <div className="text-left max-w-sm mx-auto space-y-2 pt-2">
+              <p className="text-sm font-medium">Necesitas:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-green-600" />
+                  Acceso de admin a tu tienda Shopify
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-green-600" />
+                  Crear una app en Settings &gt; Apps &gt; Develop apps
+                </li>
+              </ul>
+            </div>
           </div>
         );
 
       case 2:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Habilita las apps personalizadas</h3>
+            <h3 className="text-lg font-semibold">Crea tu app en Shopify</h3>
             <ol className="space-y-3 text-sm">
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">1</span>
-                <span>Ve a tu <strong>Shopify Admin</strong> → <strong>Configuración</strong> (⚙️ abajo a la izquierda)</span>
+                <span>Ve a <strong>Shopify Admin</strong> &gt; <strong>Settings</strong> &gt; <strong>Apps and sales channels</strong> &gt; <strong>Develop apps</strong></span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">2</span>
-                <span>Click en <strong>Apps y canales de ventas</strong></span>
+                <span>Click <strong>"Create an app"</strong>, nombre: <Badge variant="secondary" className="font-mono">Steve Ads</Badge></span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</span>
-                <span>Click en <strong>Desarrollar apps</strong> (arriba a la derecha)</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">4</span>
-                <span>Click en <strong>"Permitir desarrollo de apps personalizadas"</strong></span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">5</span>
-                <span>Confirma en el popup</span>
+                <span>En la app, configura <strong>"App URL"</strong> y <strong>"Allowed redirection URL"</strong>:</span>
               </li>
             </ol>
-            {domain && (
-              <a
-                href={`https://${normalizeDomain(domain)}/admin/settings/apps`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Abrir configuración de apps en Shopify
-              </a>
-            )}
+
+            <div className="space-y-2 pl-9">
+              <div className="flex items-center gap-2">
+                <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">{APP_URL}</code>
+                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(APP_URL, 'App URL')}>
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">{REDIRECT_URL}</code>
+                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(REDIRECT_URL, 'Redirect URL')}>
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="pl-9 space-y-2">
+              <p className="text-sm font-medium">Configura estos scopes en "API access scopes":</p>
+              <div className="grid gap-1">
+                {REQUIRED_SCOPES.map((s) => (
+                  <div key={s.scope} className="flex items-center gap-2 text-sm">
+                    <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                    <Badge variant="outline" className="font-mono text-xs">{s.scope}</Badge>
+                    <span className="text-muted-foreground text-xs">— {s.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         );
 
       case 3:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Crea la app</h3>
+            <h3 className="text-lg font-semibold">Copia tus credenciales</h3>
             <ol className="space-y-3 text-sm">
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">1</span>
-                <span>Click en <strong>"Crear una app"</strong></span>
+                <span>En tu app de Shopify, ve a la pestana <strong>"API credentials"</strong></span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">2</span>
-                <span>Nombre: <Badge variant="secondary" className="font-mono">Steve Ads</Badge> (o el que prefieras)</span>
+                <span>Copia el <strong>Client ID</strong> (aparece como "API key")</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</span>
-                <span>Click en <strong>"Crear app"</strong></span>
+                <span>Copia el <strong>Client Secret</strong> (aparece como "API secret key")</span>
               </li>
             </ol>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+              <Key className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>Estas credenciales se almacenan encriptadas (AES-256) y solo se usan para la conexion OAuth con Shopify.</span>
+            </div>
           </div>
         );
 
       case 4:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Configura los permisos de la API</h3>
-            <ol className="space-y-3 text-sm">
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">1</span>
-                <span>En la app que creaste, click en <strong>"Configurar los alcances de la API de Admin"</strong></span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">2</span>
-                <span>Marca estos permisos:</span>
-              </li>
-            </ol>
-            <div className="grid gap-2 pl-9">
-              {REQUIRED_SCOPES.map((s) => (
-                <div key={s.scope} className="flex items-center gap-2 text-sm">
-                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  <Badge variant="outline" className="font-mono text-xs">{s.scope}</Badge>
-                  <span className="text-muted-foreground">— {s.label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 pl-9 pt-1">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</span>
-              <span className="text-sm">Click en <strong>"Guardar"</strong></span>
-            </div>
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Instala la app y copia el token</h3>
-            <ol className="space-y-3 text-sm">
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">1</span>
-                <span>Click en <strong>"Instalar app"</strong> (pestaña "Credenciales de la API")</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">2</span>
-                <span>Confirma la instalación</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</span>
-                <span>En <strong>"Token de acceso de la API de Admin"</strong>, click en <strong>"Revelar token una vez"</strong></span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">4</span>
-                <span className="font-semibold text-orange-700">¡COPIA EL TOKEN AHORA!</span>
-              </li>
-            </ol>
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-50 border border-orange-200 text-sm text-orange-800">
-              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>El token solo se muestra una vez. Si lo pierdes, deberás desinstalar y reinstalar la app.</span>
-            </div>
-          </div>
-        );
-
-      case 6:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Pega tus datos</h3>
+            <h3 className="text-lg font-semibold">Ingresa tus datos</h3>
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label htmlFor="shopify-domain">Dominio de la tienda</Label>
@@ -332,15 +306,28 @@ export function ShopifyCustomAppWizard({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="shopify-token">Access Token</Label>
+                <Label htmlFor="shopify-client-id">Client ID</Label>
+                <Input
+                  id="shopify-client-id"
+                  placeholder="Tu API key de Shopify"
+                  value={shopifyClientId}
+                  onChange={(e) => {
+                    setShopifyClientId(e.target.value);
+                    setError('');
+                  }}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="shopify-client-secret">Client Secret</Label>
                 <div className="relative">
                   <Input
-                    id="shopify-token"
-                    type={showToken ? 'text' : 'password'}
-                    placeholder="shpat_xxxxx..."
-                    value={accessToken}
+                    id="shopify-client-secret"
+                    type={showSecret ? 'text' : 'password'}
+                    placeholder="Tu API secret key de Shopify"
+                    value={shopifyClientSecret}
                     onChange={(e) => {
-                      setAccessToken(e.target.value);
+                      setShopifyClientSecret(e.target.value);
                       setError('');
                     }}
                     className="pr-10"
@@ -348,10 +335,10 @@ export function ShopifyCustomAppWizard({
                   />
                   <button
                     type="button"
-                    onClick={() => setShowToken(!showToken)}
+                    onClick={() => setShowSecret(!showSecret)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -362,6 +349,17 @@ export function ShopifyCustomAppWizard({
                 <span>{error}</span>
               </div>
             )}
+          </div>
+        );
+
+      case 5:
+        return (
+          <div className="text-center space-y-4 py-8">
+            <Loader2 className="w-12 h-12 mx-auto animate-spin text-green-600" />
+            <h3 className="text-lg font-semibold">Conectando con Shopify...</h3>
+            <p className="text-sm text-muted-foreground">
+              Te redirigiremos a Shopify para autorizar la conexion.
+            </p>
           </div>
         );
     }
@@ -431,39 +429,30 @@ export function ShopifyCustomAppWizard({
 
         {/* Navigation buttons */}
         <div className="flex justify-between pt-2">
-          {step > 1 ? (
+          {step > 1 && step < 5 ? (
             <Button variant="outline" onClick={goBack} disabled={connecting}>
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Atrás
+              Atras
             </Button>
           ) : (
             <div />
           )}
 
-          {step < TOTAL_STEPS ? (
+          {step < 4 ? (
             <Button onClick={goNext} className="bg-green-600 hover:bg-green-700">
               {step === 1 ? 'Empezar' : 'Siguiente'}
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
-          ) : (
+          ) : step === 4 ? (
             <Button
               onClick={handleConnect}
-              disabled={connecting || !domain.trim() || !accessToken.trim()}
+              disabled={connecting || !isFormValid()}
               className="bg-green-600 hover:bg-green-700"
             >
-              {connecting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Conectando...
-                </>
-              ) : (
-                <>
-                  <Link2 className="w-4 h-4 mr-2" />
-                  Conectar tienda
-                </>
-              )}
+              <Link2 className="w-4 h-4 mr-2" />
+              Conectar con Shopify
             </Button>
-          )}
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

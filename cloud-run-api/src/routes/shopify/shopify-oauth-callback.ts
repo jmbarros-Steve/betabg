@@ -47,13 +47,14 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
 }
 
 /**
- * Validate the OAuth state parameter against stored nonces (CSRF protection)
+ * Validate the OAuth state parameter against stored nonces (CSRF protection).
+ * Returns the client_id if this was a per-client OAuth flow.
  */
 async function validateState(
   supabaseAdmin: any,
   stateParam: string | null,
   shopDomain: string
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; error?: string; clientId?: string }> {
   if (!stateParam) {
     return { valid: false, error: 'missing_state' };
   }
@@ -61,6 +62,7 @@ async function validateState(
   try {
     const decoded = JSON.parse(atob(stateParam));
     const nonce = decoded.nonce;
+    const clientId = decoded.client_id || null;
     if (!nonce) {
       return { valid: false, error: 'invalid_state_format' };
     }
@@ -68,7 +70,7 @@ async function validateState(
     // Look up the nonce in the DB
     const { data, error } = await supabaseAdmin
       .from('oauth_states')
-      .select('id, shop_domain, expires_at')
+      .select('id, shop_domain, expires_at, client_id')
       .eq('nonce', nonce)
       .single();
 
@@ -92,15 +94,60 @@ async function validateState(
       return { valid: false, error: 'state_shop_mismatch' };
     }
 
+    // Verify client_id consistency between state param and DB record
+    if (clientId && data.client_id && clientId !== data.client_id) {
+      console.warn('State client_id mismatch:', { stateClientId: clientId, dbClientId: data.client_id });
+      return { valid: false, error: 'state_client_mismatch' };
+    }
+
     // Delete used nonce (one-time use)
     await supabaseAdmin.from('oauth_states').delete().eq('id', data.id);
 
-    console.log('State validation PASSED for nonce:', nonce);
-    return { valid: true };
+    console.log('State validation PASSED for nonce:', nonce, 'clientId:', clientId || data.client_id || 'none');
+    return { valid: true, clientId: clientId || data.client_id || undefined };
   } catch (e) {
     console.error('State validation error:', e);
     return { valid: false, error: 'state_parse_error' };
   }
+}
+
+/**
+ * Resolve Shopify credentials: per-client from DB or centralized from env vars.
+ */
+async function resolveShopifyCredentials(
+  supabaseAdmin: any,
+  perClientId: string | undefined
+): Promise<{ clientId: string; clientSecret: string } | null> {
+  if (perClientId) {
+    const { data: conn } = await supabaseAdmin
+      .from('platform_connections')
+      .select('shopify_client_id, shopify_client_secret_encrypted')
+      .eq('client_id', perClientId)
+      .eq('platform', 'shopify')
+      .single();
+
+    if (!conn?.shopify_client_id || !conn?.shopify_client_secret_encrypted) {
+      console.error('Per-client Shopify credentials not found for client:', perClientId);
+      return null;
+    }
+
+    const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
+      .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
+
+    if (decryptError || !decryptedSecret) {
+      console.error('Error decrypting Shopify client secret:', decryptError);
+      return null;
+    }
+
+    console.log('Using per-client Shopify credentials for callback, client:', perClientId);
+    return { clientId: conn.shopify_client_id, clientSecret: decryptedSecret };
+  }
+
+  // Centralized fallback
+  const envClientId = process.env.SHOPIFY_CLIENT_ID || '';
+  const envClientSecret = process.env.SHOPIFY_CLIENT_SECRET || '';
+  if (!envClientId || !envClientSecret) return null;
+  return { clientId: envClientId, clientSecret: envClientSecret };
 }
 
 /**
@@ -110,16 +157,18 @@ async function validateState(
  *   - GET: Direct Shopify redirect with code, shop, hmac, state query params
  *   - POST: Frontend call with {code, shop, state} JSON body
  *
+ * Supports two modes:
+ *   1. Per-client: state contains client_id — uses credentials from platform_connections
+ *   2. Centralized: fallback to env vars + auto-creates user/client
+ *
  * NO auth middleware — uses Shopify HMAC verification (GET) and state/nonce CSRF protection.
  */
 export async function shopifyOauthCallback(c: Context) {
-  const shopifyClientId = process.env.SHOPIFY_CLIENT_ID!;
-  const shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET!;
-
   const frontendUrl = process.env.FRONTEND_URL || 'https://betabgnuevosupa-git-main-jmbarros-steves-projects.vercel.app';
 
   try {
     const isDirectRedirect = c.req.method === 'GET';
+    const supabaseAdmin = getSupabaseAdmin();
 
     let code: string;
     let shop: string;
@@ -132,17 +181,7 @@ export async function shopifyOauthCallback(c: Context) {
       shop = url.searchParams.get('shop') || '';
       hmac = url.searchParams.get('hmac');
       stateParam = url.searchParams.get('state');
-
       console.log('Direct Shopify callback:', { shop, hasCode: !!code, hasHmac: !!hmac, hasState: !!stateParam });
-
-      if (hmac) {
-        const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
-        if (!isValid) {
-          console.error('HMAC verification FAILED on callback');
-          return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=hmac_failed`, 302);
-        }
-        console.log('HMAC verification PASSED (timing-safe)');
-      }
     } else {
       const body = await c.req.json();
       code = body.code;
@@ -161,9 +200,7 @@ export async function shopifyOauthCallback(c: Context) {
     const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
     const normalizedShopDomain = shopDomain.toLowerCase().trim();
 
-    const supabaseAdmin = getSupabaseAdmin();
-
-    // SECURITY: Validate state parameter (CSRF protection)
+    // SECURITY: Validate state parameter (CSRF protection) — also extracts client_id
     const stateResult = await validateState(supabaseAdmin, stateParam, normalizedShopDomain);
     if (!stateResult.valid) {
       console.error('State validation failed:', stateResult.error);
@@ -171,6 +208,33 @@ export async function shopifyOauthCallback(c: Context) {
         return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=${stateResult.error}`, 302);
       }
       return c.json({ error: `State validation failed: ${stateResult.error}` }, 400);
+    }
+
+    const perClientId = stateResult.clientId;
+    const isPerClient = !!perClientId;
+
+    // Resolve Shopify credentials based on mode
+    const creds = await resolveShopifyCredentials(supabaseAdmin, perClientId);
+    if (!creds) {
+      console.error('Could not resolve Shopify credentials');
+      if (isDirectRedirect) {
+        return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=credentials_not_found`, 302);
+      }
+      return c.json({ error: 'Shopify credentials not found' }, 400);
+    }
+
+    const shopifyClientId = creds.clientId;
+    const shopifyClientSecret = creds.clientSecret;
+
+    // Verify HMAC with the correct secret (per-client or centralized)
+    if (isDirectRedirect && hmac) {
+      const url = new URL(c.req.url);
+      const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
+      if (!isValid) {
+        console.error('HMAC verification FAILED on callback');
+        return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=hmac_failed`, 302);
+      }
+      console.log('HMAC verification PASSED (timing-safe)');
     }
 
     // Exchange authorization code for access token
@@ -214,6 +278,55 @@ export async function shopifyOauthCallback(c: Context) {
       shopOwnerName = shopInfo.shop?.shop_owner || storeName;
     }
 
+    // --- Per-client mode: skip user creation, just update the connection ---
+    if (isPerClient) {
+      console.log('Per-client OAuth: updating platform_connections for client:', perClientId);
+
+      // Encrypt the access token
+      const { data: encryptedToken, error: encryptError } = await supabaseAdmin
+        .rpc('encrypt_platform_token', { raw_token: accessToken });
+
+      if (encryptError) {
+        console.error('Error encrypting token:', encryptError);
+        if (isDirectRedirect) {
+          return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=encryption_failed`, 302);
+        }
+        return c.json({ error: 'Error encrypting token' }, 500);
+      }
+
+      // Update the existing platform_connections record
+      await supabaseAdmin.from('platform_connections').update({
+        store_name: storeName,
+        store_url: `https://${normalizedShopDomain}`,
+        shop_domain: normalizedShopDomain,
+        access_token_encrypted: encryptedToken,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }).eq('client_id', perClientId).eq('platform', 'shopify');
+
+      // Update client record with shop info
+      await supabaseAdmin.from('clients').update({
+        shop_domain: normalizedShopDomain,
+        company: storeName || undefined,
+      }).eq('id', perClientId);
+
+      // Register webhooks
+      await registerWebhooks(c, shopDomain, accessToken);
+
+      // Redirect back to frontend
+      if (isDirectRedirect) {
+        const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
+        redirectUrl.searchParams.set('success', 'true');
+        redirectUrl.searchParams.set('store', storeName);
+        redirectUrl.searchParams.set('shop', normalizedShopDomain);
+        console.log('Per-client redirect to:', redirectUrl.toString());
+        return c.redirect(redirectUrl.toString(), 302);
+      }
+
+      return c.json({ success: true, store_name: storeName });
+    }
+
+    // --- Centralized mode: existing logic with user creation ---
     if (!shopEmail) {
       if (isDirectRedirect) {
         return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=no_email`, 302);
@@ -222,7 +335,6 @@ export async function shopifyOauthCallback(c: Context) {
     }
 
     // PRIORITY 1: Check if a client was pre-registered with this shop_domain
-    // This handles custom distribution apps where the admin creates the client first
     const { data: preRegisteredClient } = await supabaseAdmin
       .from('clients').select('id, client_user_id')
       .eq('shop_domain', normalizedShopDomain)
@@ -234,12 +346,10 @@ export async function shopifyOauthCallback(c: Context) {
     let tempPassword: string | null = null;
 
     if (preRegisteredClient) {
-      // Client was pre-registered by admin — link Shopify to this existing account
       clientId = preRegisteredClient.id;
       userId = preRegisteredClient.client_user_id;
       console.log('Pre-registered client found for shop:', normalizedShopDomain, '-> client_id:', clientId);
 
-      // Update client with Shopify store info
       await supabaseAdmin.from('clients').update({
         shop_domain: normalizedShopDomain,
         company: storeName || undefined,
@@ -259,7 +369,6 @@ export async function shopifyOauthCallback(c: Context) {
 
         if (existingClient) {
           clientId = existingClient.id;
-          // Ensure shop_domain is set on reconnection
           await supabaseAdmin.from('clients').update({
             shop_domain: normalizedShopDomain,
             company: storeName,
@@ -333,7 +442,7 @@ export async function shopifyOauthCallback(c: Context) {
           });
         }
       }
-    } // end: pre-registered else block
+    }
 
     // Encrypt the access token
     const { data: encryptedToken, error: encryptError } = await supabaseAdmin
@@ -369,73 +478,8 @@ export async function shopifyOauthCallback(c: Context) {
       });
     }
 
-    // Register webhooks via REST API — with deduplication
-    // Webhook URLs point to the Cloud Run API
-    const requestOrigin = new URL(c.req.url).origin;
-    const gdprWebhookUrl = `${requestOrigin}/api/shopify-gdpr-webhooks`;
-    const fulfillmentWebhookUrl = `${requestOrigin}/api/shopify-fulfillment-webhooks`;
-
-    const webhooksToRegister = [
-      { topic: 'app/uninstalled', address: gdprWebhookUrl },
-      { topic: 'orders/fulfilled', address: fulfillmentWebhookUrl },
-      { topic: 'orders/partially_fulfilled', address: fulfillmentWebhookUrl },
-      { topic: 'orders/cancelled', address: fulfillmentWebhookUrl },
-    ];
-
-    // Fetch existing webhooks to avoid duplicates
-    let existingWebhooks: Array<{ topic: string; address: string }> = [];
-    try {
-      const listRes = await fetch(
-        `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
-        { headers: { 'X-Shopify-Access-Token': accessToken } },
-      );
-      if (listRes.ok) {
-        const listData: any = await listRes.json();
-        existingWebhooks = (listData.webhooks || []).map((w: any) => ({
-          topic: w.topic, address: w.address,
-        }));
-        console.log(`Found ${existingWebhooks.length} existing webhooks`);
-      }
-    } catch (e) {
-      console.warn('Could not list existing webhooks, will attempt to create all:', e);
-    }
-
-    for (const wh of webhooksToRegister) {
-      // Skip if already registered with same topic + address
-      const alreadyExists = existingWebhooks.some(
-        (ew) => ew.topic === wh.topic && ew.address === wh.address
-      );
-      if (alreadyExists) {
-        console.log(`Webhook ${wh.topic} already registered — skipping`);
-        continue;
-      }
-
-      try {
-        const webhookRes = await fetch(
-          `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Shopify-Access-Token': accessToken,
-            },
-            body: JSON.stringify({ webhook: { topic: wh.topic, address: wh.address, format: 'json' } }),
-          }
-        );
-        if (webhookRes.ok) {
-          console.log(`Webhook ${wh.topic} registered successfully`);
-        } else {
-          const errBody = await webhookRes.text();
-          if (webhookRes.status === 422) {
-            console.log(`Webhook ${wh.topic} already registered (422)`);
-          } else {
-            console.warn(`Failed to register ${wh.topic} webhook:`, webhookRes.status, errBody);
-          }
-        }
-      } catch (webhookErr) {
-        console.warn(`Non-fatal: Could not register ${wh.topic} webhook:`, webhookErr);
-      }
-    }
+    // Register webhooks
+    await registerWebhooks(c, shopDomain, accessToken);
 
     // Redirect back to frontend
     if (isDirectRedirect) {
@@ -468,5 +512,75 @@ export async function shopifyOauthCallback(c: Context) {
       return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=${encodeURIComponent(error.message)}`, 302);
     }
     return c.json({ error: error.message }, 500);
+  }
+}
+
+/**
+ * Register Shopify webhooks for the connected store.
+ */
+async function registerWebhooks(c: Context, shopDomain: string, accessToken: string) {
+  const requestOrigin = new URL(c.req.url).origin;
+  const gdprWebhookUrl = `${requestOrigin}/api/shopify-gdpr-webhooks`;
+  const fulfillmentWebhookUrl = `${requestOrigin}/api/shopify-fulfillment-webhooks`;
+
+  const webhooksToRegister = [
+    { topic: 'app/uninstalled', address: gdprWebhookUrl },
+    { topic: 'orders/fulfilled', address: fulfillmentWebhookUrl },
+    { topic: 'orders/partially_fulfilled', address: fulfillmentWebhookUrl },
+    { topic: 'orders/cancelled', address: fulfillmentWebhookUrl },
+  ];
+
+  // Fetch existing webhooks to avoid duplicates
+  let existingWebhooks: Array<{ topic: string; address: string }> = [];
+  try {
+    const listRes = await fetch(
+      `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+      { headers: { 'X-Shopify-Access-Token': accessToken } },
+    );
+    if (listRes.ok) {
+      const listData: any = await listRes.json();
+      existingWebhooks = (listData.webhooks || []).map((w: any) => ({
+        topic: w.topic, address: w.address,
+      }));
+      console.log(`Found ${existingWebhooks.length} existing webhooks`);
+    }
+  } catch (e) {
+    console.warn('Could not list existing webhooks, will attempt to create all:', e);
+  }
+
+  for (const wh of webhooksToRegister) {
+    const alreadyExists = existingWebhooks.some(
+      (ew) => ew.topic === wh.topic && ew.address === wh.address
+    );
+    if (alreadyExists) {
+      console.log(`Webhook ${wh.topic} already registered — skipping`);
+      continue;
+    }
+
+    try {
+      const webhookRes = await fetch(
+        `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': accessToken,
+          },
+          body: JSON.stringify({ webhook: { topic: wh.topic, address: wh.address, format: 'json' } }),
+        }
+      );
+      if (webhookRes.ok) {
+        console.log(`Webhook ${wh.topic} registered successfully`);
+      } else {
+        const errBody = await webhookRes.text();
+        if (webhookRes.status === 422) {
+          console.log(`Webhook ${wh.topic} already registered (422)`);
+        } else {
+          console.warn(`Failed to register ${wh.topic} webhook:`, webhookRes.status, errBody);
+        }
+      }
+    } catch (webhookErr) {
+      console.warn(`Non-fatal: Could not register ${wh.topic} webhook:`, webhookErr);
+    }
   }
 }

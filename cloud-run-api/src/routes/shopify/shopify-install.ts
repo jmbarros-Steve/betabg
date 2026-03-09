@@ -53,7 +53,11 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
 /**
  * Shopify Install handler — GET endpoint (browser redirect from Shopify).
  *
- * Receives query params: shop, hmac, host
+ * Supports two modes:
+ *   1. Per-client: ?client_id=xxx — looks up credentials from platform_connections
+ *   2. Centralized: fallback to SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET env vars
+ *
+ * Receives query params: shop, hmac, host, client_id (optional)
  * Validates shop, verifies HMAC (non-destructive), generates nonce,
  * stores in oauth_states, and redirects to Shopify OAuth.
  *
@@ -64,10 +68,60 @@ export async function shopifyInstall(c: Context) {
     const url = new URL(c.req.url);
     const shop = url.searchParams.get('shop');
     const hmac = url.searchParams.get('hmac');
-    const hostParam = url.searchParams.get('host'); // Persist for App Bridge after OAuth
+    const hostParam = url.searchParams.get('host');
+    const perClientId = url.searchParams.get('client_id'); // Per-client OAuth
 
-    const shopifyClientId = process.env.SHOPIFY_CLIENT_ID!;
-    const shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET!;
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Resolve Shopify credentials: per-client or centralized
+    let shopifyClientId: string;
+    let shopifyClientSecret: string;
+
+    if (perClientId) {
+      // Per-client mode: look up credentials from platform_connections
+      const { data: conn, error: connError } = await supabaseAdmin
+        .from('platform_connections')
+        .select('shopify_client_id, shopify_client_secret_encrypted')
+        .eq('client_id', perClientId)
+        .eq('platform', 'shopify')
+        .single();
+
+      if (connError || !conn?.shopify_client_id || !conn?.shopify_client_secret_encrypted) {
+        console.error('Per-client Shopify credentials not found for client:', perClientId);
+        return c.html(
+          '<html><body><h1>Error</h1><p>Shopify credentials not found for this client. Please configure them first.</p></body></html>',
+          400,
+        );
+      }
+
+      shopifyClientId = conn.shopify_client_id;
+
+      // Decrypt the client secret
+      const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
+        .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
+
+      if (decryptError || !decryptedSecret) {
+        console.error('Error decrypting Shopify client secret:', decryptError);
+        return c.html(
+          '<html><body><h1>Error</h1><p>Error decrypting Shopify credentials</p></body></html>',
+          500,
+        );
+      }
+
+      shopifyClientSecret = decryptedSecret;
+      console.log('Using per-client Shopify credentials for client:', perClientId);
+    } else {
+      // Centralized mode: use environment variables (backwards compatibility)
+      shopifyClientId = process.env.SHOPIFY_CLIENT_ID || '';
+      shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET || '';
+
+      if (!shopifyClientId || !shopifyClientSecret) {
+        return c.html(
+          '<html><body><h1>Error</h1><p>Shopify credentials not configured</p></body></html>',
+          500,
+        );
+      }
+    }
 
     const paramKeys = (() => {
       try {
@@ -81,9 +135,9 @@ export async function shopifyInstall(c: Context) {
       shop,
       hasHmac: !!hmac,
       hasHost: !!hostParam,
+      perClientId: perClientId || null,
       paramKeys,
       shopifyClientIdPrefix: shopifyClientId?.slice?.(0, 6) ?? null,
-      shopifyClientSecretLength: shopifyClientSecret?.trim?.()?.length ?? null,
     });
 
     // Validate shop parameter
@@ -109,11 +163,6 @@ export async function shopifyInstall(c: Context) {
     if (hmac) {
       const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
       if (!isValid) {
-        // SECURITY NOTE: We log the mismatch but allow the flow to continue.
-        // This endpoint ONLY redirects to Shopify's own OAuth page — it does NOT
-        // mutate data or expose tokens. Strict HMAC is enforced on the OAuth callback.
-        // Shopify's install entrypoint can send extra/missing params (e.g. host)
-        // that change the query string and cause legitimate HMAC mismatches.
         console.warn('HMAC verification FAILED on install endpoint; continuing to OAuth redirect (non-destructive)');
       } else {
         console.log('HMAC verification PASSED');
@@ -123,13 +172,11 @@ export async function shopifyInstall(c: Context) {
     // CRITICAL: Generate nonce and persist it in DB for CSRF validation on callback
     const nonce = crypto.randomUUID();
 
-    // Store nonce in oauth_states table for validation in callback
-    const supabaseAdmin = getSupabaseAdmin();
-
     const normalizedShop = shopDomain.toLowerCase().trim();
     await supabaseAdmin.from('oauth_states').insert({
       nonce,
       shop_domain: normalizedShop,
+      client_id: perClientId || null, // Track which client initiated OAuth
     });
 
     // Clean up expired states (fire and forget)
@@ -138,7 +185,12 @@ export async function shopifyInstall(c: Context) {
       .lt('expires_at', new Date().toISOString())
       .then(() => {});
 
-    const statePayload = JSON.stringify({ nonce, host: hostParam || '' });
+    // Include client_id in the state param so the callback can retrieve per-client credentials
+    const statePayload = JSON.stringify({
+      nonce,
+      host: hostParam || '',
+      ...(perClientId ? { client_id: perClientId } : {}),
+    });
     const state = btoa(statePayload);
 
     // Build Shopify OAuth URL
