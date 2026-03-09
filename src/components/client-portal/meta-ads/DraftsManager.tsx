@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -200,11 +201,11 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
     setPublishing(draft.id);
     try {
       if (!ctxConnectionId) {
-        toast.error('No hay conexion Meta Ads activa. Conecta Meta desde Conexiones.');
+        toast.error('No hay conexión Meta Ads activa. Conecta Meta desde Conexiones.');
         return;
       }
-      const name = draft.brief_visual?.campaign_name || draft.titulo || `Campana - ${new Date().toISOString().split('T')[0]}`;
-      const { error } = await supabase.functions.invoke('manage-meta-campaign', {
+      const name = draft.brief_visual?.campaign_name || draft.titulo || `Campaña - ${new Date().toISOString().split('T')[0]}`;
+      const { error } = await callApi('manage-meta-campaign', {
         body: {
           action: 'create',
           connection_id: ctxConnectionId,
@@ -222,7 +223,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       if (error) throw error;
       await supabase.from('ad_creatives').update({ estado: 'en_pauta' }).eq('id', draft.id);
       setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-      toast.success(`"${draft.titulo}" publicado en Meta como PAUSED.`);
+      toast.success(`"${draft.titulo}" publicado en Meta como PAUSED. Activa cuando estés listo.`);
     } catch (err: any) {
       console.error('[DraftsManager] Publish error:', err);
       toast.error(err?.message || 'Error al publicar');
@@ -607,9 +608,9 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
             <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/5 border border-destructive/20">
               <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-destructive">Esta accion no se puede deshacer</p>
+                <p className="text-sm font-medium text-destructive">Esta acción no se puede deshacer</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Se eliminara permanentemente el borrador <strong>"{deleteTarget.titulo}"</strong>.
+                  Se eliminará permanentemente el borrador <strong>"{deleteTarget.titulo}"</strong>.
                 </p>
               </div>
             </div>

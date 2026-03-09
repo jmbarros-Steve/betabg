@@ -61,13 +61,13 @@ function getPreviousPeriodDates(range: DateRange): { start: Date; end: Date } {
   const now = new Date();
   const currentStart = getDateRangeStart(range);
   const daysDiff = Math.ceil((now.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   const prevEnd = new Date(currentStart);
   prevEnd.setDate(prevEnd.getDate() - 1);
-  
+
   const prevStart = new Date(prevEnd);
   prevStart.setDate(prevStart.getDate() - daysDiff);
-  
+
   return { start: prevStart, end: prevEnd };
 }
 
@@ -81,6 +81,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [productBreakdown, setProductBreakdown] = useState<ProductMarginItem[]>([]);
   const [skuData, setSkuData] = useState<SkuData[]>([]);
   const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
+  const [customerMetrics, setCustomerMetrics] = useState<{ conversionRate: number; averageLtv: number; totalCustomers: number; repeatCustomerRate: number } | null>(null);
+  const [cohortData, setCohortData] = useState<{ cohort: string; month0: number; month1?: number; month2?: number; month3?: number; month4?: number; month5?: number }[]>([]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -119,7 +121,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         // Ad spend comes from campaign_metrics (Meta + Google)
         const shopifyQueryIds = shopifyConnIds.length > 0 ? shopifyConnIds : ['00000000-0000-0000-0000-000000000000'];
         const adQueryIds = adConnIds.length > 0 ? adConnIds : ['00000000-0000-0000-0000-000000000000'];
-        
+
         const [currentRes, prevRes, configRes, campaignCurrentRes, campaignPrevRes] = await Promise.all([
           // Only Shopify metrics for revenue/orders (no Meta purchase_value!)
           supabase
@@ -170,7 +172,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             existing.spend += Number(row.spend) || 0;
             byDatePlatform.set(key, existing);
           }
-          
+
           const result: MetricRow[] = [];
           for (const [key, value] of byDatePlatform) {
             const [date, platform] = key.split('|');
@@ -254,7 +256,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             console.warn('[Metrics] Could not fetch products for P&L breakdown:', e);
           }
 
-          // Fetch real SKU sales and abandoned checkouts
+          // Fetch real SKU sales, abandoned checkouts, customer metrics, and cohorts
           try {
             const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': 30, 'ytd': 365 };
             const { data: analyticsData } = await callApi('fetch-shopify-analytics', {
@@ -265,6 +267,12 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             }
             if (analyticsData?.abandonedCarts) {
               setAbandonedCarts(analyticsData.abandonedCarts);
+            }
+            if (analyticsData?.customerMetrics) {
+              setCustomerMetrics(analyticsData.customerMetrics);
+            }
+            if (analyticsData?.cohorts) {
+              setCohortData(analyticsData.cohorts);
             }
           } catch (e) {
             console.warn('[Metrics] Could not fetch analytics:', e);
@@ -377,13 +385,13 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const costOfGoods = current.totalRevenue - grossProfit;
 
     // POAS = (Revenue * Margin - Ad Spend) / Ad Spend
-    const poas = current.totalSpend > 0 
-      ? (grossProfit - current.totalSpend) / current.totalSpend 
+    const poas = current.totalSpend > 0
+      ? (grossProfit - current.totalSpend) / current.totalSpend
       : 0;
 
     const prevGrossProfit = previous.totalRevenue * marginRate;
-    const previousPoas = previous.totalSpend > 0 
-      ? (prevGrossProfit - previous.totalSpend) / previous.totalSpend 
+    const previousPoas = previous.totalSpend > 0
+      ? (prevGrossProfit - previous.totalSpend) / previous.totalSpend
       : undefined;
 
     // CAC = Total Ad Spend / Number of orders (unique customer count not available)
@@ -418,11 +426,11 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const taxRate = 0.19; // IVA Chile
     const netRevenue = current.totalRevenue / (1 + taxRate);
     const totalFixedCosts = financialConfig.shopify_plan_cost + financialConfig.klaviyo_plan_cost + financialConfig.other_fixed_costs;
-    
-    const netProfit = 
-      profitMetrics.grossProfit - 
-      current.totalSpend - 
-      totalFixedCosts - 
+
+    const netProfit =
+      profitMetrics.grossProfit -
+      current.totalSpend -
+      totalFixedCosts -
       profitMetrics.gatewayFees;
 
     return {
@@ -442,12 +450,6 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       netProfitMargin: current.totalRevenue > 0 ? (netProfit / current.totalRevenue) * 100 : 0,
     };
   }, [current, profitMetrics, financialConfig]);
-
-  // Cohort data: placeholder until real data is available
-  const cohortData = useMemo(() => [] as { cohort: string; month0: number; month1?: number; month2?: number; month3?: number; month4?: number; month5?: number }[], []);
-
-  // Conversion/LTV metrics: no real data available yet
-  const conversionMetrics = useMemo(() => null, []);
 
   if (loading) {
     return (
@@ -548,12 +550,12 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           />
 
           {/* Conversion & LTV */}
-          {conversionMetrics ? (
+          {customerMetrics ? (
             <ConversionLtvPanel
-              conversionRate={conversionMetrics.conversionRate}
-              averageLtv={conversionMetrics.averageLtv}
-              totalCustomers={conversionMetrics.totalCustomers}
-              repeatCustomerRate={conversionMetrics.repeatCustomerRate}
+              conversionRate={customerMetrics.conversionRate}
+              averageLtv={customerMetrics.averageLtv}
+              totalCustomers={customerMetrics.totalCustomers}
+              repeatCustomerRate={customerMetrics.repeatCustomerRate}
               currency="CLP"
             />
           ) : (

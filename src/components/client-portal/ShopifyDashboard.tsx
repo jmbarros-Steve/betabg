@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, Package } from 'lucide-react';
+import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, Package, CheckCircle, AlertTriangle } from 'lucide-react';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
@@ -51,6 +51,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
   const [salesByChannel, setSalesByChannel] = useState<ChannelData[]>([]);
   const [utmPerformance, setUtmPerformance] = useState<UtmData[]>([]);
+  const [seoProducts, setSeoProducts] = useState<any[]>([]);
   const [daysBack, setDaysBack] = useState(30);
 
   useEffect(() => {
@@ -83,14 +84,18 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
     if (!connectionId) return;
     setLoading(true);
     try {
-      const { data, error } = await callApi('fetch-shopify-analytics', {
-        body: { connectionId, daysBack },
-      });
-      if (error) throw new Error(error);
-      setSkuData(data?.topSkus || []);
-      setAbandonedCarts(data?.abandonedCarts || []);
-      setSalesByChannel(data?.salesByChannel || []);
-      setUtmPerformance(data?.utmPerformance || []);
+      const [analyticsRes, productsRes] = await Promise.all([
+        callApi('fetch-shopify-analytics', { body: { connectionId, daysBack } }),
+        callApi('fetch-shopify-products', { body: { connectionId } }),
+      ]);
+      if (analyticsRes.error) throw new Error(analyticsRes.error);
+      setSkuData(analyticsRes.data?.topSkus || []);
+      setAbandonedCarts(analyticsRes.data?.abandonedCarts || []);
+      setSalesByChannel(analyticsRes.data?.salesByChannel || []);
+      setUtmPerformance(analyticsRes.data?.utmPerformance || []);
+      if (productsRes.data?.products) {
+        setSeoProducts(productsRes.data.products);
+      }
     } catch (e: any) {
       console.warn('[ShopifyDashboard] Error:', e);
     } finally {
@@ -238,55 +243,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       </Card>
 
       {/* SEO Quick Analysis */}
-      <Card className="glow-box">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Search className="w-4 h-4" />
-            Análisis SEO Rápido
-          </CardTitle>
-          <CardDescription>Mejoras potenciales para el posicionamiento de tu tienda</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <SeoCheckItem
-              title="Títulos de productos optimizados"
-              description="Asegúrate de que tus títulos incluyan keywords relevantes y sean descriptivos"
-              status={skuData.length > 0 ? 'info' : 'warn'}
-              tip="Ejemplo: En vez de 'Polera Azul', usa 'Polera de Algodón Orgánico Azul para Mujer - EcoStyle'"
-            />
-            <SeoCheckItem
-              title="Descripciones de productos"
-              description="Las descripciones deben tener al menos 150 palabras con keywords naturales"
-              status="info"
-              tip="Incluye beneficios, materiales, medidas y usos. Google indexa este contenido."
-            />
-            <SeoCheckItem
-              title="Imágenes con texto alt"
-              description="Cada imagen de producto debe tener texto alternativo descriptivo"
-              status="info"
-              tip="Configura el alt text en Shopify > Productos > Imagen > Editar texto alternativo"
-            />
-            <SeoCheckItem
-              title="URLs amigables (handles)"
-              description="Los handles de tus productos deben ser limpios y descriptivos"
-              status="info"
-              tip="Shopify genera handles automáticos, pero puedes editarlos para ser más descriptivos"
-            />
-            <SeoCheckItem
-              title="Meta descriptions"
-              description="Cada producto y colección debe tener meta description única"
-              status="warn"
-              tip="Ve a Shopify > Producto > SEO > Editar meta description (máx 160 caracteres)"
-            />
-            <SeoCheckItem
-              title="Blog activo"
-              description="Un blog con contenido relevante mejora significativamente el SEO orgánico"
-              status="warn"
-              tip="Publica al menos 2 artículos al mes sobre temas relacionados con tus productos"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <SeoAnalysisCard products={seoProducts} />
 
       {/* Productos de Shopify */}
       <ShopifyProductsPanel clientId={clientId} />
@@ -294,19 +251,121 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   );
 }
 
-function SeoCheckItem({ title, description, status, tip }: { title: string; description: string; status: 'ok' | 'warn' | 'info'; tip: string }) {
+function SeoAnalysisCard({ products }: { products: any[] }) {
+  if (products.length === 0) {
+    return (
+      <Card className="glow-box">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Search className="w-4 h-4" />
+            Análisis SEO Rápido
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm text-center py-6">Cargando productos para análisis SEO...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const activeProducts = products.filter(p => p.status === 'active');
+  const total = activeProducts.length;
+
+  const noImage = activeProducts.filter(p => p.image_count === 0);
+  const missingAlt = activeProducts.filter(p => p.images_without_alt > 0 && p.image_count > 0);
+  const shortTitle = activeProducts.filter(p => (p.title || '').length < 20);
+  const emptyDesc = activeProducts.filter(p => {
+    const text = (p.body_html || '').replace(/<[^>]*>/g, '').trim();
+    return text.length < 50;
+  });
+  const improvableDesc = activeProducts.filter(p => {
+    const text = (p.body_html || '').replace(/<[^>]*>/g, '').trim();
+    return text.length >= 50 && text.length < 150;
+  });
+
+  const checks = [
+    {
+      title: 'Productos sin imagen',
+      count: noImage.length,
+      total,
+      items: noImage.map((p: any) => p.title).slice(0, 5),
+      tip: 'Sube al menos una imagen para cada producto. Los productos sin imagen no generan clics.',
+    },
+    {
+      title: 'Imágenes sin alt text',
+      count: missingAlt.length,
+      total,
+      items: missingAlt.map((p: any) => p.title).slice(0, 5),
+      tip: 'Configura el alt text en Shopify > Productos > Imagen > Editar texto alternativo.',
+    },
+    {
+      title: 'Títulos cortos (<20 chars)',
+      count: shortTitle.length,
+      total,
+      items: shortTitle.map((p: any) => p.title).slice(0, 5),
+      tip: 'Usa títulos descriptivos con keywords. Ej: "Polera de Algodón Orgánico Azul para Mujer".',
+    },
+    {
+      title: 'Descripciones vacías o muy cortas',
+      count: emptyDesc.length,
+      total,
+      items: emptyDesc.map((p: any) => p.title).slice(0, 5),
+      tip: 'Las descripciones deben tener al menos 150 caracteres. Google indexa este contenido.',
+    },
+    {
+      title: 'Descripciones mejorables (<150 chars)',
+      count: improvableDesc.length,
+      total,
+      items: improvableDesc.map((p: any) => p.title).slice(0, 5),
+      tip: 'Agrega beneficios, materiales, medidas y usos. Apunta a 300+ caracteres.',
+    },
+  ];
+
   return (
-    <div className="p-3 border border-border rounded-lg">
-      <div className="flex items-start gap-3">
-        <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${status === 'ok' ? 'bg-green-500' : status === 'warn' ? 'bg-orange-500' : 'bg-blue-500'}`} />
-        <div className="flex-1">
-          <p className="font-medium text-sm">{title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-          <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-            💡 <strong>Tip:</strong> {tip}
-          </div>
+    <Card className="glow-box">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <Search className="w-4 h-4" />
+          Análisis SEO Rápido
+        </CardTitle>
+        <CardDescription>Análisis basado en {total} productos activos</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {checks.map((check) => {
+            const isOk = check.count === 0;
+            return (
+              <div key={check.title} className="p-3 border border-border rounded-lg">
+                <div className="flex items-start gap-3">
+                  {isOk ? (
+                    <CheckCircle className="w-4 h-4 mt-0.5 text-green-500 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 mt-0.5 text-orange-500 shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-sm">{check.title}</p>
+                      <Badge variant={isOk ? 'default' : 'destructive'} className="text-xs">
+                        {check.count}/{check.total}
+                      </Badge>
+                    </div>
+                    {!isOk && check.items.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {check.items.join(', ')}{check.count > 5 ? ` y ${check.count - 5} más...` : ''}
+                      </p>
+                    )}
+                    {!isOk && (
+                      <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+                        <strong>Tip:</strong> {check.tip}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

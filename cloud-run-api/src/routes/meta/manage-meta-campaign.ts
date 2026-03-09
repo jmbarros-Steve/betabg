@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v18.0';
 
-type Action = 'create' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
+type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
 
 interface RequestBody {
   action: Action;
@@ -55,7 +55,8 @@ async function metaApiRequest(
 async function handleCreate(
   accountId: string,
   accessToken: string,
-  data: Record<string, any>
+  data: Record<string, any>,
+  pageId?: string | null
 ): Promise<{ body: any; status: number }> {
   const {
     name,
@@ -70,6 +71,13 @@ async function handleCreate(
     targeting,
     start_time,
     end_time,
+    // Ad creative fields
+    primary_text,
+    headline,
+    description,
+    image_url,
+    cta = 'SHOP_NOW',
+    destination_url,
   } = data;
 
   if (!name) {
@@ -138,7 +146,6 @@ async function handleCreate(
 
     if (!adsetResult.ok) {
       console.error(`[manage-meta-campaign] Ad set creation failed: ${adsetResult.error}`);
-      // Campaign was created but ad set failed - return partial success
       return {
         body: {
           success: true,
@@ -155,11 +162,108 @@ async function handleCreate(
     console.log(`[manage-meta-campaign] Ad set created: ${adSetId}`);
   }
 
+  // Step 3: Create ad creative + ad if creative data is provided
+  let adId: string | null = null;
+  let creativeId: string | null = null;
+
+  if (adSetId && image_url && pageId) {
+    // Step 3a: Create ad creative
+    const linkData: Record<string, any> = {
+      link: destination_url || 'https://example.com',
+      message: primary_text || '',
+      name: headline || '',
+      call_to_action: { type: cta, value: { link: destination_url || 'https://example.com' } },
+    };
+
+    if (image_url.endsWith('.mp4') || image_url.includes('video')) {
+      // Video creative — use video_data instead of link_data
+      // For now, treat as image (Meta will handle video URLs in link_data for single video ads)
+      linkData.image_url = image_url;
+    } else {
+      linkData.image_url = image_url;
+    }
+
+    if (description) {
+      linkData.description = description;
+    }
+
+    const creativePayload = {
+      name: `${name} - Creative`,
+      object_story_spec: JSON.stringify({
+        page_id: pageId,
+        link_data: linkData,
+      }),
+    };
+
+    console.log(`[manage-meta-campaign] Creating ad creative for campaign ${campaignId}`);
+
+    const creativeResult = await metaApiRequest(
+      `act_${accountId}/adcreatives`,
+      accessToken,
+      'POST',
+      creativePayload
+    );
+
+    if (!creativeResult.ok) {
+      console.error(`[manage-meta-campaign] Ad creative creation failed: ${creativeResult.error}`);
+      return {
+        body: {
+          success: true,
+          partial: true,
+          campaign_id: campaignId,
+          adset_id: adSetId,
+          creative_error: creativeResult.error,
+          message: 'Campaign + ad set created but ad creative failed',
+        },
+        status: 207
+      };
+    }
+
+    creativeId = creativeResult.data.id;
+    console.log(`[manage-meta-campaign] Ad creative created: ${creativeId}`);
+
+    // Step 3b: Create ad
+    const adPayload = {
+      name: headline || `${name} - Ad`,
+      adset_id: adSetId,
+      creative: JSON.stringify({ creative_id: creativeId }),
+      status,
+    };
+
+    const adResult = await metaApiRequest(
+      `act_${accountId}/ads`,
+      accessToken,
+      'POST',
+      adPayload
+    );
+
+    if (!adResult.ok) {
+      console.error(`[manage-meta-campaign] Ad creation failed: ${adResult.error}`);
+      return {
+        body: {
+          success: true,
+          partial: true,
+          campaign_id: campaignId,
+          adset_id: adSetId,
+          creative_id: creativeId,
+          ad_error: adResult.error,
+          message: 'Campaign + ad set + creative created but ad creation failed',
+        },
+        status: 207
+      };
+    }
+
+    adId = adResult.data.id;
+    console.log(`[manage-meta-campaign] Ad created: ${adId}`);
+  }
+
   return {
     body: {
       success: true,
       campaign_id: campaignId,
       adset_id: adSetId,
+      creative_id: creativeId,
+      ad_id: adId,
     },
     status: 200
   };
@@ -446,6 +550,187 @@ async function handleArchive(
   return { body: { success: true, campaign_id: campaignId, status: 'ARCHIVED' }, status: 200 };
 }
 
+// --- Helper: create a single adcreative + ad for an adset ---
+
+async function createAdForAdset(
+  accountId: string,
+  accessToken: string,
+  adsetId: string,
+  pageId: string,
+  opts: {
+    name: string;
+    imageUrl: string;
+    primaryText: string;
+    headline: string;
+    description?: string;
+    cta: string;
+    destinationUrl: string;
+    status: string;
+  }
+): Promise<{ ok: boolean; creativeId?: string; adId?: string; error?: string }> {
+  const linkData: Record<string, any> = {
+    link: opts.destinationUrl,
+    message: opts.primaryText,
+    name: opts.headline,
+    image_url: opts.imageUrl,
+    call_to_action: { type: opts.cta, value: { link: opts.destinationUrl } },
+  };
+  if (opts.description) linkData.description = opts.description;
+
+  const creativeResult = await metaApiRequest(
+    `act_${accountId}/adcreatives`,
+    accessToken,
+    'POST',
+    {
+      name: `${opts.name} - Creative`,
+      object_story_spec: JSON.stringify({ page_id: pageId, link_data: linkData }),
+    }
+  );
+
+  if (!creativeResult.ok) {
+    return { ok: false, error: `Creative failed: ${creativeResult.error}` };
+  }
+
+  const creativeId = creativeResult.data.id;
+
+  const adResult = await metaApiRequest(
+    `act_${accountId}/ads`,
+    accessToken,
+    'POST',
+    {
+      name: opts.name,
+      adset_id: adsetId,
+      creative: JSON.stringify({ creative_id: creativeId }),
+      status: opts.status,
+    }
+  );
+
+  if (!adResult.ok) {
+    return { ok: false, creativeId, error: `Ad failed: ${adResult.error}` };
+  }
+
+  return { ok: true, creativeId, adId: adResult.data.id };
+}
+
+// --- Action: create_322 (3 images x 2 copies x 2 headlines = 12 ad sets) ---
+
+async function handleCreate322(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>,
+  pageId: string
+): Promise<{ body: any; status: number }> {
+  const {
+    name,
+    objective = 'OUTCOME_SALES',
+    status = 'PAUSED',
+    combinations,
+    cta = 'SHOP_NOW',
+    destination_url,
+    billing_event = 'IMPRESSIONS',
+    optimization_goal = 'OFFSITE_CONVERSIONS',
+  } = data;
+
+  if (!name) {
+    return { body: { error: 'Missing required field: name' }, status: 400 };
+  }
+  if (!combinations || !Array.isArray(combinations) || combinations.length === 0) {
+    return { body: { error: 'Missing or empty combinations array' }, status: 400 };
+  }
+  if (!destination_url) {
+    return { body: { error: 'Missing required field: destination_url' }, status: 400 };
+  }
+
+  // Step 1: Create campaign (ABO)
+  console.log(`[manage-meta-campaign] create_322: Creating campaign "${name}" with ${combinations.length} combinations`);
+
+  const campaignResult = await metaApiRequest(
+    `act_${accountId}/campaigns`,
+    accessToken,
+    'POST',
+    { name: `${name} [ABO]`, objective, status, special_ad_categories: [] }
+  );
+
+  if (!campaignResult.ok) {
+    return { body: { error: 'Failed to create campaign', details: campaignResult.error }, status: 502 };
+  }
+
+  const campaignId = campaignResult.data.id;
+  console.log(`[manage-meta-campaign] create_322: Campaign created: ${campaignId}`);
+
+  // Step 2: Loop through combinations — create adset + creative + ad for each
+  const results: Array<{ index: number; adsetId?: string; adId?: string; error?: string }> = [];
+
+  for (let i = 0; i < combinations.length; i++) {
+    const combo = combinations[i];
+
+    // Create adset
+    const adsetPayload: Record<string, any> = {
+      campaign_id: campaignId,
+      name: combo.adset_name || `${name} - Ad Set ${i + 1}`,
+      billing_event,
+      optimization_goal,
+      status,
+    };
+
+    if (combo.daily_budget) {
+      adsetPayload.daily_budget = Math.round(Number(combo.daily_budget));
+    }
+
+    const adsetResult = await metaApiRequest(
+      `act_${accountId}/adsets`,
+      accessToken,
+      'POST',
+      adsetPayload
+    );
+
+    if (!adsetResult.ok) {
+      console.error(`[manage-meta-campaign] create_322: Ad set ${i + 1} failed: ${adsetResult.error}`);
+      results.push({ index: i, error: `Adset failed: ${adsetResult.error}` });
+      continue;
+    }
+
+    const adsetId = adsetResult.data.id;
+
+    // Create creative + ad
+    const adResult = await createAdForAdset(accountId, accessToken, adsetId, pageId, {
+      name: combo.adset_name || `${name} - Ad ${i + 1}`,
+      imageUrl: combo.image_url,
+      primaryText: combo.primary_text || '',
+      headline: combo.headline || '',
+      cta,
+      destinationUrl: destination_url,
+      status,
+    });
+
+    if (!adResult.ok) {
+      console.error(`[manage-meta-campaign] create_322: Ad ${i + 1} failed: ${adResult.error}`);
+      results.push({ index: i, adsetId, error: adResult.error });
+    } else {
+      results.push({ index: i, adsetId, adId: adResult.adId });
+    }
+
+    // Small delay between calls to avoid Meta rate limits
+    if (i < combinations.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  const successCount = results.filter((r) => r.adId).length;
+  console.log(`[manage-meta-campaign] create_322: ${successCount}/${combinations.length} ads created successfully`);
+
+  return {
+    body: {
+      success: successCount > 0,
+      campaign_id: campaignId,
+      total: combinations.length,
+      created: successCount,
+      results,
+    },
+    status: 200,
+  };
+}
+
 // --- Main handler ---
 
 export async function manageMetaCampaign(c: Context) {
@@ -477,7 +762,7 @@ export async function manageMetaCampaign(c: Context) {
       return c.json({ error: 'Missing required field: connection_id' }, 400);
     }
 
-    const validActions: Action[] = ['create', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive'];
+    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }, 400);
     }
@@ -538,12 +823,22 @@ export async function manageMetaCampaign(c: Context) {
     // Normalize account_id (strip act_ prefix if present, we add it where needed)
     const accountId = connection.account_id.replace(/^act_/, '');
 
+    // Resolve page_id from request data (sent by frontend from MetaBusinessContext)
+    const pageId: string | null = data?.page_id || null;
+
     // Route to the appropriate action handler
     let result: { body: any; status: number };
 
     switch (action) {
       case 'create':
-        result = await handleCreate(accountId, decryptedToken, data || {});
+        result = await handleCreate(accountId, decryptedToken, data || {}, pageId);
+        break;
+
+      case 'create_322':
+        if (!pageId) {
+          return c.json({ error: 'Missing page_id — select a Facebook Page in the portfolio selector' }, 400);
+        }
+        result = await handleCreate322(accountId, decryptedToken, data || {}, pageId);
         break;
 
       case 'pause':

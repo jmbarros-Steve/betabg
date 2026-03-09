@@ -140,14 +140,14 @@ interface CampaignAggregate {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'tree-view', label: 'Campanas', icon: ListTree },
+  { key: 'tree-view', label: 'Campañas', icon: ListTree },
   { key: 'create-wizard', label: 'Crear', icon: Wand2 },
   { key: 'drafts', label: 'Borradores', icon: FileCheck },
   { key: 'testing-322', label: 'Test 3:2:2', icon: FlaskConical },
   { key: 'audiences', label: 'Audiencias', icon: Users },
   { key: 'pixel', label: 'Pixel', icon: Crosshair },
   { key: 'library', label: 'Biblioteca', icon: FolderOpen },
-  { key: 'analytics', label: 'Analisis', icon: BarChart3 },
+  { key: 'analytics', label: 'Análisis', icon: BarChart3 },
   { key: 'social-inbox', label: 'Social Inbox', icon: MessageSquare },
   { key: 'rules', label: 'Reglas', icon: Zap },
   { key: 'competitors', label: 'Competencia', icon: Swords },
@@ -338,10 +338,10 @@ function DashboardSection({ clientId }: { clientId: string }) {
       <Card className="border-dashed">
         <CardContent className="py-16 text-center">
           <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
+          <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            Conecta tu cuenta de Meta Ads desde la pestana de <strong>Conexiones</strong> para comenzar
-            a ver tus metricas y gestionar campanas.
+            Conecta tu cuenta de Meta Ads desde la pestaña de <strong>Conexiones</strong> para comenzar
+            a ver tus métricas y gestionar campañas.
           </p>
         </CardContent>
       </Card>
@@ -353,7 +353,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Meta Ads Dashboard</h2>
-          <p className="text-muted-foreground text-sm">Ultimos 30 dias</p>
+          <p className="text-muted-foreground text-sm">Últimos 30 días</p>
         </div>
         <Button
           variant="outline"
@@ -377,7 +377,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
             </div>
             <p className="text-2xl font-bold">{formatCurrency(totals.spend)}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {aggregated.length} campana{aggregated.length !== 1 ? 's' : ''} (30d)
+              {aggregated.length} campaña{aggregated.length !== 1 ? 's' : ''} (30d)
             </p>
           </CardContent>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/40 to-red-500/10" />
@@ -405,7 +405,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
             </div>
             <p className="text-2xl font-bold">{totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {formatNumber(totals.conversions)} conversion{totals.conversions !== 1 ? 'es' : ''}
+              {formatNumber(totals.conversions)} conversión{totals.conversions !== 1 ? 'es' : ''}
             </p>
           </CardContent>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
@@ -429,20 +429,20 @@ function DashboardSection({ clientId }: { clientId: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Top Campanas por Gasto</CardTitle>
-            <CardDescription className="text-xs">Las 5 campanas con mayor inversion en los ultimos 30 dias</CardDescription>
+            <CardTitle className="text-base">Top Campañas por Gasto</CardTitle>
+            <CardDescription className="text-xs">Las 5 campañas con mayor inversión en los últimos 30 días</CardDescription>
           </CardHeader>
           <CardContent>
             {topCampaigns.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                No hay campanas con datos. Sincroniza para cargar metricas.
+                No hay campañas con datos. Sincroniza para cargar métricas.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/50">
-                      <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Campana</th>
+                      <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Campaña</th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Gasto</th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">ROAS</th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Conv.</th>
@@ -478,14 +478,14 @@ function DashboardSection({ clientId }: { clientId: string }) {
               <Sparkles className="w-4 h-4 text-primary" />
               <CardTitle className="text-base">Recomendaciones IA</CardTitle>
             </div>
-            <CardDescription className="text-xs">Sugerencias basadas en el rendimiento de tus campanas</CardDescription>
+            <CardDescription className="text-xs">Sugerencias basadas en el rendimiento de tus campañas</CardDescription>
           </CardHeader>
           <CardContent>
             {recommendations.length === 0 ? (
               <div className="text-center py-6">
                 <Lightbulb className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
                 <p className="text-muted-foreground text-xs">Sin recomendaciones pendientes.</p>
-                <p className="text-muted-foreground text-xs mt-1">Genera analisis desde la seccion de Analytics.</p>
+                <p className="text-muted-foreground text-xs mt-1">Genera análisis desde la sección de Analytics.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -578,8 +578,8 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       setNoConnection(false);
       setMetaConnection(conn);
 
-      // 2. Fetch business hierarchy from edge function
-      const { data, error } = await supabase.functions.invoke('fetch-meta-business-hierarchy', {
+      // 2. Fetch business hierarchy from Cloud Run API
+      const { data, error } = await callApi('fetch-meta-business-hierarchy', {
         body: { connection_id: conn.id },
       });
 
@@ -981,9 +981,9 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             <Card className="mb-4 border-dashed">
               <CardContent className="py-10 text-center">
                 <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
+                <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                  Conecta tu cuenta de Meta Ads desde la pestana de <strong>Conexiones</strong>.
+                  Conecta tu cuenta de Meta Ads desde la pestaña de <strong>Conexiones</strong>.
                 </p>
               </CardContent>
             </Card>

@@ -57,10 +57,10 @@ type Objective = 'CONVERSIONS' | 'TRAFFIC' | 'AWARENESS' | 'ENGAGEMENT' | 'CATAL
 
 const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
   { value: 'CONVERSIONS', label: 'Conversiones', desc: 'Ventas, leads, registros' },
-  { value: 'TRAFFIC', label: 'Trafico', desc: 'Visitas al sitio web' },
+  { value: 'TRAFFIC', label: 'Tráfico', desc: 'Visitas al sitio web' },
   { value: 'AWARENESS', label: 'Reconocimiento', desc: 'Alcance y awareness de marca' },
-  { value: 'ENGAGEMENT', label: 'Interaccion', desc: 'Likes, comentarios, compartidos' },
-  { value: 'CATALOG', label: 'Catalogo', desc: 'Dynamic Product Ads desde Shopify' },
+  { value: 'ENGAGEMENT', label: 'Interacción', desc: 'Likes, comentarios, compartidos' },
+  { value: 'CATALOG', label: 'Catálogo', desc: 'Dynamic Product Ads desde Shopify' },
 ];
 
 const CTA_OPTIONS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'DOWNLOAD', 'CONTACT_US', 'GET_OFFER', 'BOOK_NOW'];
@@ -84,9 +84,9 @@ function SteveTip({ children }: { children: React.ReactNode }) {
 
 function LevelSelector({ level, setLevel }: { level: StartLevel; setLevel: (l: StartLevel) => void }) {
   const levels: { key: StartLevel; icon: React.ElementType; label: string; desc: string }[] = [
-    { key: 'campaign', icon: Megaphone, label: 'Campana', desc: 'Empieza creando la campana (arriba hacia abajo)' },
+    { key: 'campaign', icon: Megaphone, label: 'Campaña', desc: 'Empieza creando la campaña (arriba hacia abajo)' },
     { key: 'adset', icon: FolderOpen, label: 'Ad Set', desc: 'Empieza con el conjunto de anuncios (audiencia + presupuesto)' },
-    { key: 'ad', icon: FileImage, label: 'Anuncio', desc: 'Empieza con el creativo y luego asignalo' },
+    { key: 'ad', icon: FileImage, label: 'Anuncio', desc: 'Empieza con el creativo y luego asígnalo' },
   ];
 
   return (
@@ -136,12 +136,12 @@ function CampaignForm({
       <SteveTip>
         {budgetType === 'ABO'
           ? 'ABO (Ad Budget Optimization): Presupuesto por cada Ad Set. Ideal para TESTING — controlas cuanto gasta cada ad set.'
-          : 'CBO (Campaign Budget Optimization): Meta distribuye el presupuesto. Ideal para ESCALAR ganadores — Meta optimiza automaticamente.'}
+          : 'CBO (Campaign Budget Optimization): Meta distribuye el presupuesto. Ideal para ESCALAR ganadores — Meta optimiza automáticamente.'}
       </SteveTip>
 
       <div>
-        <Label>Nombre de la campana</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Mi Campana - ${today}`} className="mt-1" />
+        <Label>Nombre de la campaña</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Mi Campaña - ${today}`} className="mt-1" />
         <p className="text-xs text-muted-foreground mt-1">Steve sugiere: [Marca] - [Tipo] - [Fecha]</p>
       </div>
 
@@ -184,7 +184,7 @@ function CampaignForm({
         <div>
           <Label>Presupuesto diario (CLP)</Label>
           <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="50000" className="mt-1" />
-          <p className="text-xs text-muted-foreground mt-1">Meta distribuira este presupuesto entre los Ad Sets automaticamente.</p>
+          <p className="text-xs text-muted-foreground mt-1">Meta distribuirá este presupuesto entre los Ad Sets automáticamente.</p>
         </div>
       )}
 
@@ -225,7 +225,7 @@ function AdSetForm({
       <div>
         <Label>Audiencia / Segmento</Label>
         <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Describe la audiencia: demographics, intereses, comportamiento..." rows={3} className="mt-1" />
-        <p className="text-xs text-muted-foreground mt-1">Puedes crear audiencias detalladas en la seccion Audiencias.</p>
+        <p className="text-xs text-muted-foreground mt-1">Puedes crear audiencias detalladas en la sección Audiencias.</p>
       </div>
 
       {isABO && (
@@ -301,7 +301,7 @@ function AdForm({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      toast.error('Solo se permiten imagenes y videos');
+      toast.error('Solo se permiten imágenes y videos');
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -335,7 +335,7 @@ function AdForm({
         body: { clientId, promptGeneracion: aiPrompt, engine: imageEngine, formato: formatMap[adFormat] },
       });
       if (error) throw error;
-      if (data?.error === 'NO_CREDITS') { toast.error('Sin creditos. Se necesitan 2 creditos por imagen.'); return; }
+      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos. Se necesitan 2 créditos por imagen.'); return; }
       if (data?.error) throw new Error(data.error);
       if (data?.asset_url) { setImageUrl(data.asset_url); toast.success('Imagen generada por IA'); }
     } catch (err: any) {
@@ -354,7 +354,7 @@ function AdForm({
         body: { clientId, promptGeneracion: aiPrompt, fotoBaseUrl: imageUrl || undefined },
       });
       if (error) throw error;
-      if (data?.error === 'NO_CREDITS') { toast.error('Sin creditos. Se necesitan 10 creditos por video.'); return; }
+      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos. Se necesitan 10 créditos por video.'); return; }
       if (data?.prediction_id) {
         toast.info('Video en proceso... puede tomar 1-3 minutos.');
         setVideoPolling(true);
@@ -389,7 +389,7 @@ function AdForm({
     { key: 'upload', label: 'Subir', icon: Upload },
     { key: 'ai-image', label: 'IA Imagen', icon: Sparkles },
     { key: 'ai-video', label: 'IA Video', icon: Video },
-    { key: 'gallery', label: 'Galeria', icon: ImageIcon },
+    { key: 'gallery', label: 'Galería', icon: ImageIcon },
     { key: 'url', label: 'URL', icon: LinkIcon },
   ];
 
@@ -475,7 +475,7 @@ function AdForm({
             <Textarea
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="Describe la imagen que quieres: 'Mujer joven con producto X en mano, fondo minimalista, iluminacion natural, estilo editorial...'"
+              placeholder="Describe la imagen que quieres: 'Mujer joven con producto X en mano, fondo minimalista, iluminación natural, estilo editorial...'"
               rows={3}
             />
             <div className="flex items-center gap-2">
@@ -499,7 +499,7 @@ function AdForm({
             <Textarea
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="Describe el video: 'Producto girando 360 grados sobre fondo blanco con iluminacion suave...'"
+              placeholder="Describe el video: 'Producto girando 360 grados sobre fondo blanco con iluminación suave...'"
               rows={3}
             />
             <Button onClick={handleGenerateVideo} disabled={generatingVideo || !aiPrompt.trim()} className="w-full">
@@ -579,11 +579,11 @@ function AdForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label>Headline</Label>
-          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Titulo del anuncio" className="mt-1" />
+          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Título del anuncio" className="mt-1" />
         </div>
         <div>
-          <Label>Descripcion</Label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripcion corta" className="mt-1" />
+          <Label>Descripción</Label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción corta" className="mt-1" />
         </div>
       </div>
 
@@ -642,7 +642,7 @@ function AdForm({
 // ---------------------------------------------------------------------------
 
 export default function CampaignCreateWizard({ clientId, onBack, onComplete, startFrom = 'campaign' }: CampaignCreateWizardProps) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, pageId: ctxPageId } = useMetaBusiness();
 
   const [level, setLevel] = useState<StartLevel>(startFrom);
   const [submitting, setSubmitting] = useState(false);
@@ -660,6 +660,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [audienceDesc, setAudienceDesc] = useState('');
   const [adsetBudget, setAdsetBudget] = useState('');
 
+  // Funnel stage
+  const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
+
   // Ad fields
   const [headline, setHeadline] = useState('');
   const [primaryText, setPrimaryText] = useState('');
@@ -673,8 +676,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     try {
       const { data, error } = await callApi('generate-meta-copy', {
         body: {
-          client_id: clientId,
-          instruction: `Genera copy para un anuncio de Meta Ads. Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}. Responde SOLO con JSON: {"primary_text":"...","headline":"...","description":"..."}`,
+          clientId: clientId,
+          funnelStage,
+          adType: 'static',
+          customPrompt: `Objetivo: ${objective}. Audiencia: ${audienceDesc || 'amplia'}.`,
         },
       });
       if (error) throw error;
@@ -828,7 +833,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         funnel,
         formato: imageUrl?.endsWith('.mp4') ? 'video' : 'static',
         angulo: anguloText,
-        titulo: allHeadlines[0] || campName || 'Borrador sin titulo',
+        titulo: allHeadlines[0] || campName || 'Borrador sin título',
         texto_principal: allCopies[0]?.texto || primaryText,
         descripcion: description,
         cta: cta,
@@ -864,7 +869,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       });
       if (error) throw error;
 
-      const summary = `DCT guardado: ${allImages.length}/3 imagenes, ${allCopies.length}/2 copies, ${allHeadlines.length}/2 headlines`;
+      const summary = `DCT guardado: ${allImages.length}/3 imágenes, ${allCopies.length}/2 copies, ${allHeadlines.length}/2 headlines`;
       toast.success(summary);
     } catch (err) {
       console.error('[CampaignCreateWizard] Save draft error:', err);
@@ -879,12 +884,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     try {
       // Use connectionId from MetaBusinessContext
       if (!ctxConnectionId) {
-        toast.error('No hay conexion Meta Ads activa');
+        toast.error('No hay conexión Meta Ads activa');
         return;
       }
 
       const connectionId = ctxConnectionId;
-      const name = campName || `Campana - ${new Date().toISOString().split('T')[0]}`;
+      const name = campName || `Campaña - ${new Date().toISOString().split('T')[0]}`;
       const objMap: Record<Objective, string> = {
         CONVERSIONS: 'OUTCOME_SALES',
         TRAFFIC: 'OUTCOME_TRAFFIC',
@@ -910,17 +915,25 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             optimization_goal: objective === 'TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
             adset_name: adsetName || `${name} - Ad Set 1`,
             start_time: startDate || undefined,
+            // Ad creative fields
+            primary_text: primaryText || undefined,
+            headline: headline || undefined,
+            description: description || undefined,
+            image_url: imageUrl || undefined,
+            cta: cta || 'SHOP_NOW',
+            destination_url: destinationUrl || undefined,
+            page_id: ctxPageId || undefined,
           },
         },
       });
 
       if (error) throw error;
 
-      toast.success(`Campana "${name}" creada como PAUSED en Meta. Activa cuando estes listo.`);
+      toast.success(`Campaña "${name}" creada como PAUSED en Meta. Activa cuando estés listo.`);
       onComplete?.();
     } catch (err) {
       console.error('[CampaignCreateWizard] Submit error:', err);
-      toast.error('Error al crear campana');
+      toast.error('Error al crear campaña');
     } finally {
       setSubmitting(false);
     }
@@ -934,8 +947,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Crear Campana</h2>
-          <p className="text-muted-foreground text-sm">Elige desde donde empezar: Campana, Ad Set o Anuncio</p>
+          <h2 className="text-2xl font-bold tracking-tight">Crear Campaña</h2>
+          <p className="text-muted-foreground text-sm">Elige desde donde empezar: Campaña, Ad Set o Anuncio</p>
         </div>
       </div>
 
@@ -950,9 +963,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Megaphone className="w-4 h-4 text-primary" />
-                <CardTitle className="text-base">Campana</CardTitle>
+                <CardTitle className="text-base">Campaña</CardTitle>
               </div>
-              {level !== 'campaign' && <CardDescription className="text-xs">Steve necesita una campana para asignar tu {level === 'adset' ? 'Ad Set' : 'Anuncio'}</CardDescription>}
+              {level !== 'campaign' && <CardDescription className="text-xs">Steve necesita una campaña para asignar tu {level === 'adset' ? 'Ad Set' : 'Anuncio'}</CardDescription>}
             </CardHeader>
             <CardContent>
               <CampaignForm
@@ -982,6 +995,39 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
                 isABO={budgetType === 'ABO'}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Funnel Stage selector */}
+        {(level === 'ad' || level === 'campaign' || level === 'adset') && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-500" />
+                <CardTitle className="text-base">Etapa del Funnel</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Steve ajusta el copy según la etapa del funnel de conversión</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { key: 'tofu' as const, label: 'TOFU', desc: 'Awareness — Captar atención', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
+                  { key: 'mofu' as const, label: 'MOFU', desc: 'Consideración — Educar y nutrir', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
+                  { key: 'bofu' as const, label: 'BOFU', desc: 'Conversión — Cerrar la venta', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
+                ]).map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setFunnelStage(f.key)}
+                    className={`flex flex-col items-center gap-1 p-4 rounded-lg border transition-all ${
+                      funnelStage === f.key ? `ring-1 ring-primary/20 ${f.color}` : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    <Badge className={`text-xs font-bold ${funnelStage === f.key ? f.color : 'bg-muted text-muted-foreground'}`}>{f.label}</Badge>
+                    <span className="text-[11px] text-muted-foreground text-center">{f.desc}</span>
+                  </button>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}

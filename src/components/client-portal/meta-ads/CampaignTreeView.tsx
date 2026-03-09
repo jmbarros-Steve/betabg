@@ -214,10 +214,11 @@ function CampaignRow({
     setToggling(true);
     try {
       const action = campaign.status === 'ACTIVE' ? 'pause' : 'resume';
-      await supabase.functions.invoke('manage-meta-campaign', {
+      const { error } = await callApi('manage-meta-campaign', {
         body: { action, campaign_id: campaign.campaign_id, connection_id: connectionIds[0] },
       });
-      toast.success(action === 'pause' ? 'Campana pausada' : 'Campana reanudada');
+      if (error) throw error;
+      toast.success(action === 'pause' ? 'Campaña pausada' : 'Campaña reanudada');
     } catch {
       toast.error('Error al cambiar estado');
     } finally {
@@ -257,7 +258,7 @@ function CampaignRow({
             </div>
           )}
           {!campaign.adsets_loading && campaign.adsets_loaded && campaign.adsets.length === 0 && (
-            <div className="px-6 py-4 text-sm text-muted-foreground">Sin Ad Sets encontrados para esta campana.</div>
+            <div className="px-6 py-4 text-sm text-muted-foreground">Sin Ad Sets encontrados para esta campaña.</div>
           )}
           {campaign.adsets.map((adset) => (
             <AdSetRow key={adset.id} adset={adset} />
@@ -369,7 +370,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
       setCampaigns(Array.from(map.values()).sort((a, b) => b.spend_30d - a.spend_30d));
     } catch (err) {
       console.error('[CampaignTreeView] Error:', err);
-      toast.error('Error cargando campanas');
+      toast.error('Error cargando campañas');
     } finally {
       setLoading(false);
     }
@@ -475,8 +476,8 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
       <Card className="border-dashed">
         <CardContent className="py-16 text-center">
           <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
-          <p className="text-muted-foreground text-sm max-w-md mx-auto">Conecta tu cuenta desde la pestana <strong>Conexiones</strong> para gestionar campanas.</p>
+          <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
+          <p className="text-muted-foreground text-sm max-w-md mx-auto">Conecta tu cuenta desde la pestaña <strong>Conexiones</strong> para gestionar campañas.</p>
         </CardContent>
       </Card>
     );
@@ -487,8 +488,8 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Campanas</h2>
-          <p className="text-muted-foreground text-sm">Jerarquia: Campana &gt; Ad Set &gt; Anuncio</p>
+          <h2 className="text-2xl font-bold tracking-tight">Campañas</h2>
+          <p className="text-muted-foreground text-sm">Jerarquía: Campaña &gt; Ad Set &gt; Anuncio</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
@@ -501,7 +502,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
           )}
           {onCreateCampaign && (
             <Button size="sm" onClick={onCreateCampaign}>
-              <Megaphone className="w-4 h-4 mr-2" />Nueva Campana
+              <Megaphone className="w-4 h-4 mr-2" />Nueva Campaña
             </Button>
           )}
         </div>
@@ -511,7 +512,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="relative overflow-hidden">
           <CardContent className="py-3 px-4">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Campanas</p>
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Campañas</p>
             <p className="text-xl font-bold mt-0.5">{stats.total}</p>
             <p className="text-xs text-muted-foreground">{stats.active} activas</p>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/40 to-primary/10" />
@@ -555,16 +556,16 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
         </div>
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar campana..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+          <Input placeholder="Buscar campaña..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
         </div>
       </div>
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground px-1">
-        <span className="flex items-center gap-1"><Megaphone className="w-3 h-3 text-primary" />Campana</span>
+        <span className="flex items-center gap-1"><Megaphone className="w-3 h-3 text-primary" />Campaña</span>
         <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3 text-orange-500" />Ad Set</span>
         <span className="flex items-center gap-1"><FileImage className="w-3 h-3 text-pink-500" />Anuncio</span>
-        <span className="ml-auto">Haz click en una campana para expandir su jerarquia</span>
+        <span className="ml-auto">Haz click en una campaña para expandir su jerarquía</span>
       </div>
 
       {/* Campaign tree */}
@@ -572,9 +573,9 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-            <h3 className="text-base font-semibold mb-1">{campaigns.length === 0 ? 'Sin campanas' : 'Sin resultados'}</h3>
+            <h3 className="text-base font-semibold mb-1">{campaigns.length === 0 ? 'Sin campañas' : 'Sin resultados'}</h3>
             <p className="text-muted-foreground text-sm">
-              {campaigns.length === 0 ? 'Sincroniza tus datos o crea tu primera campana.' : 'Intenta con otro filtro o busqueda.'}
+              {campaigns.length === 0 ? 'Sincroniza tus datos o crea tu primera campaña.' : 'Intenta con otro filtro o búsqueda.'}
             </p>
           </CardContent>
         </Card>

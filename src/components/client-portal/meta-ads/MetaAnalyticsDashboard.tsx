@@ -83,11 +83,11 @@ type SortField = keyof Omit<CampaignAggregate, 'campaign_id' | 'campaign_name' |
 
 const DATE_RANGE_OPTIONS: { key: DateRangeKey; label: string; days: number }[] = [
   { key: 'today', label: 'Hoy', days: 1 },
-  { key: '7d', label: '7 dias', days: 7 },
-  { key: '14d', label: '14 dias', days: 14 },
-  { key: '30d', label: '30 dias', days: 30 },
-  { key: '60d', label: '60 dias', days: 60 },
-  { key: '90d', label: '90 dias', days: 90 },
+  { key: '7d', label: '7 días', days: 7 },
+  { key: '14d', label: '14 días', days: 14 },
+  { key: '30d', label: '30 días', days: 30 },
+  { key: '60d', label: '60 días', days: 60 },
+  { key: '90d', label: '90 días', days: 90 },
 ];
 
 function daysAgo(n: number): string {
@@ -462,7 +462,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     let budgetRec: string | null = null;
     if (highRoasCampaigns.length > 0 && lowRoasCampaigns.length > 0) {
       const shiftAmount = lowRoasCampaigns.reduce((s, c) => s + c.spend * 0.3, 0);
-      budgetRec = `Redirigir ${formatCLP(shiftAmount)} desde ${lowRoasCampaigns.length} campana(s) de bajo ROAS hacia "${highRoasCampaigns[0].campaign_name}" (ROAS ${formatRoas(highRoasCampaigns[0].roas)})`;
+      budgetRec = `Redirigir ${formatCLP(shiftAmount)} desde ${lowRoasCampaigns.length} campaña(s) de bajo ROAS hacia "${highRoasCampaigns[0].campaign_name}" (ROAS ${formatRoas(highRoasCampaigns[0].roas)})`;
     }
 
     // Creative fatigue detection
@@ -475,7 +475,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
         const avgCtrFirst = firstHalf.reduce((s, d) => s + d.ctr, 0) / firstHalf.length;
         const avgCtrSecond = secondHalf.reduce((s, d) => s + d.ctr, 0) / secondHalf.length;
         if (avgCtrFirst > 0 && avgCtrSecond < avgCtrFirst * 0.8) {
-          creativeFatigue = `"${c.campaign_name}" muestra una caida de CTR del ${((1 - avgCtrSecond / avgCtrFirst) * 100).toFixed(0)}% en la segunda mitad del periodo. Considerar rotar creativos.`;
+          creativeFatigue = `"${c.campaign_name}" muestra una caída de CTR del ${((1 - avgCtrSecond / avgCtrFirst) * 100).toFixed(0)}% en la segunda mitad del periodo. Considerar rotar creativos.`;
           break;
         }
       }
@@ -715,13 +715,13 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
-            Rendimiento por Campana ({sortedCampaigns.length})
+            Rendimiento por Campaña ({sortedCampaigns.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {sortedCampaigns.length === 0 ? (
             <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-              Sin campanas en el periodo seleccionado
+              Sin campañas en el periodo seleccionado
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -730,7 +730,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-8" />
                     <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground min-w-[180px]">
-                      Campana
+                      Campaña
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                       Estado
@@ -795,7 +795,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       {/* ------------------------------------------------------------------ */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Embudo de Conversion</CardTitle>
+          <CardTitle className="text-base">Embudo de Conversión</CardTitle>
         </CardHeader>
         <CardContent>
           {totals.impressions === 0 ? (
@@ -842,13 +842,13 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            Insights de Optimizacion
+            Insights de Optimización
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!insights || campaigns.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No hay suficientes datos para generar insights. Sincroniza tus campanas primero.
+              No hay suficientes datos para generar insights. Sincroniza tus campañas primero.
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -857,7 +857,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-4 h-4 text-green-500" />
                   <span className="text-xs font-semibold text-green-600 uppercase tracking-wider">
-                    Mejor campana
+                    Mejor campaña
                   </span>
                 </div>
                 <p className="text-sm font-medium">{insights.bestCampaign.campaign_name}</p>
@@ -874,7 +874,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingDown className="w-4 h-4 text-red-500" />
                     <span className="text-xs font-semibold text-red-600 uppercase tracking-wider">
-                      Campana a optimizar
+                      Campaña a optimizar
                     </span>
                   </div>
                   <p className="text-sm font-medium">{insights.worstCampaign.campaign_name}</p>
@@ -894,7 +894,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="w-4 h-4 text-blue-500" />
                     <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
-                      Recomendacion de presupuesto
+                      Recomendación de presupuesto
                     </span>
                   </div>
                   <p className="text-sm">{insights.budgetRec}</p>
@@ -924,7 +924,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     </span>
                   </div>
                   <p className="text-sm">
-                    Las campanas se ven estables. Sin alertas de fatiga creativa ni desbalances
+                    Las campañas se ven estables. Sin alertas de fatiga creativa ni desbalances
                     de presupuesto detectados en este periodo.
                   </p>
                 </div>

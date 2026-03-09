@@ -393,9 +393,9 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       <Card className="border-dashed">
         <CardContent className="py-12 text-center">
           <MessageSquare className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-          <h3 className="text-base font-semibold mb-1">Sin conexion Meta Ads</h3>
+          <h3 className="text-base font-semibold mb-1">Sin conexión Meta Ads</h3>
           <p className="text-muted-foreground text-sm">
-            Conecta tu cuenta de Meta Ads desde la pestana <strong>Conexiones</strong>.
+            Conecta tu cuenta de Meta Ads desde la pestaña <strong>Conexiones</strong>.
           </p>
         </CardContent>
       </Card>
@@ -410,9 +410,9 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <MessageSquare className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-            <h3 className="text-base font-semibold mb-1">Sin paginas de Facebook</h3>
+            <h3 className="text-base font-semibold mb-1">Sin páginas de Facebook</h3>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
-              No se encontraron paginas de Facebook asociadas a tu cuenta. Verifica que tu token
+              No se encontraron páginas de Facebook asociadas a tu cuenta. Verifica que tu token
               de Meta tenga los permisos <strong>pages_read_engagement</strong> y{' '}
               <strong>pages_manage_ads</strong>.
             </p>
@@ -440,7 +440,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           {pages.length > 1 && (
             <Select value={selectedPageId || ''} onValueChange={setSelectedPageId}>
               <SelectTrigger className="w-[220px] h-9 text-xs">
-                <SelectValue placeholder="Selecciona pagina..." />
+                <SelectValue placeholder="Selecciona página..." />
               </SelectTrigger>
               <SelectContent>
                 {pages.map((p) => (
@@ -627,7 +627,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                   <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
                   <p className="text-sm text-muted-foreground text-center">
                     {conversations.length === 0
-                      ? 'No hay interacciones aun'
+                      ? 'No hay interacciones aún'
                       : 'No se encontraron resultados'}
                   </p>
                 </div>
@@ -712,7 +712,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
 
             {/* Footer */}
             <div className="px-3 py-2 border-t border-border/50 text-[11px] text-muted-foreground text-center shrink-0">
-              {filteredConversations.length} interaccion
+              {filteredConversations.length} interacción
               {filteredConversations.length !== 1 ? 'es' : ''}
             </div>
           </div>
@@ -867,9 +867,9 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
                 <MessageSquare className="w-16 h-16 text-muted-foreground/20 mb-4" />
-                <p className="text-lg font-medium mb-1">Selecciona una conversacion</p>
+                <p className="text-lg font-medium mb-1">Selecciona una conversación</p>
                 <p className="text-sm text-muted-foreground/70">
-                  Elige una interaccion de la lista para ver los detalles
+                  Elige una interacción de la lista para ver los detalles
                 </p>
               </div>
             )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -51,7 +51,7 @@ interface PixelEvent {
 // ---------------------------------------------------------------------------
 
 const STANDARD_EVENTS = [
-  { name: 'PageView', icon: Eye, description: 'Cada vez que se carga una pagina', priority: 'basico' },
+  { name: 'PageView', icon: Eye, description: 'Cada vez que se carga una página', priority: 'basico' },
   { name: 'ViewContent', icon: Search, description: 'Cuando un usuario ve un producto', priority: 'basico' },
   { name: 'AddToCart', icon: ShoppingCart, description: 'Cuando se agrega al carrito', priority: 'critico' },
   { name: 'InitiateCheckout', icon: CreditCard, description: 'Cuando se inicia el checkout', priority: 'critico' },
@@ -63,7 +63,7 @@ const STANDARD_EVENTS = [
 
 const PRIORITY_BADGE: Record<string, { label: string; color: string }> = {
   critico: { label: 'Crítico', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
-  basico: { label: 'Basico', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+  basico: { label: 'Básico', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
   importante: { label: 'Importante', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
   opcional: { label: 'Opcional', color: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },
 };
@@ -98,8 +98,8 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       setConnectionId(ctxConnectionId);
       setNoConnection(false);
 
-      // Call edge function to list pixels using context connectionId
-      const { data, error } = await supabase.functions.invoke('manage-meta-pixel', {
+      // Call API to list pixels using context connectionId
+      const { data, error } = await callApi('manage-meta-pixel', {
         body: { action: 'list', connection_id: ctxConnectionId },
       });
 
@@ -127,7 +127,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
     if (!connectionId) return;
     setLoadingEvents(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-meta-pixel', {
+      const { data, error } = await callApi('manage-meta-pixel', {
         body: { action: 'stats', connection_id: connectionId, pixel_id: pixelId },
       });
 
@@ -181,9 +181,9 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       <Card className="border-dashed">
         <CardContent className="py-12 text-center">
           <AlertTriangle className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-          <h3 className="text-base font-semibold mb-1">Sin conexion Meta Ads</h3>
+          <h3 className="text-base font-semibold mb-1">Sin conexión Meta Ads</h3>
           <p className="text-muted-foreground text-sm">
-            Conecta tu cuenta de Meta Ads desde la pestana de <strong>Conexiones</strong> para detectar y configurar tu Pixel.
+            Conecta tu cuenta de Meta Ads desde la pestaña de <strong>Conexiones</strong> para detectar y configurar tu Pixel.
           </p>
         </CardContent>
       </Card>
@@ -200,7 +200,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Meta Pixel</h2>
           <p className="text-muted-foreground text-sm">
-            Detecta, configura y verifica tu pixel de conversion
+            Detecta, configura y verifica tu pixel de conversión
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={detectPixels} disabled={detecting}>
@@ -225,9 +225,9 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
             <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
               <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-yellow-700">No se detecto ningun pixel</p>
+                <p className="text-sm font-medium text-yellow-700">No se detectó ningún pixel</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Necesitas crear un pixel en tu cuenta de Meta Ads. Sigue la guia de configuracion abajo.
+                  Necesitas crear un pixel en tu cuenta de Meta Ads. Sigue la guía de configuración abajo.
                 </p>
                 <Button
                   variant="outline"
@@ -273,7 +273,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>ID: {pixel.id}</span>
-                        <span>Ultimo evento: {formatDate(pixel.last_fired)}</span>
+                        <span>Último evento: {formatDate(pixel.last_fired)}</span>
                       </div>
                     </div>
 
@@ -293,9 +293,9 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       {selectedPixel && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Eventos de Conversion</CardTitle>
+            <CardTitle className="text-base">Eventos de Conversión</CardTitle>
             <CardDescription className="text-xs">
-              Estado de los eventos estandar para ecommerce. Los eventos marcados en verde estan activos.
+              Estado de los eventos estándar para ecommerce. Los eventos marcados en verde están activos.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -350,7 +350,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
       {/* Setup Guide */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Guia de Configuracion</CardTitle>
+          <CardTitle className="text-base">Guía de Configuración</CardTitle>
           <CardDescription className="text-xs">
             Pasos para instalar el pixel en tu tienda
           </CardDescription>
@@ -386,7 +386,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                 <h4 className="text-sm font-medium">Instala en Shopify</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   En Shopify, ve a <strong>Settings &gt; Customer events</strong> y agrega el pixel de Meta.
-                  Shopify tiene integracion nativa que configura automaticamente PageView, ViewContent, AddToCart, InitiateCheckout y Purchase.
+                  Shopify tiene integración nativa que configura automáticamente PageView, ViewContent, AddToCart, InitiateCheckout y Purchase.
                 </p>
               </div>
             </div>
@@ -399,7 +399,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
               <div>
                 <h4 className="text-sm font-medium">Configura la Conversions API (CAPI)</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Para mejorar la precision, activa la Conversions API desde Shopify. Esto envia eventos del servidor directamente a Meta,
+                  Para mejorar la precisión, activa la Conversions API desde Shopify. Esto envía eventos del servidor directamente a Meta,
                   evitando problemas con bloqueadores de anuncios y cookies.
                 </p>
               </div>
@@ -420,7 +420,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                   >
                     Test Events
                   </button>{' '}
-                  de Meta para verificar que los eventos se estan enviando correctamente. Luego vuelve aqui y presiona "Re-detectar".
+                  de Meta para verificar que los eventos se están enviando correctamente. Luego vuelve aquí y presiona "Re-detectar".
                 </p>
               </div>
             </div>
@@ -430,7 +430,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
           {selectedPixel?.code && (
             <div className="mt-6">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium">Codigo del Pixel (base code)</h4>
+                <h4 className="text-sm font-medium">Código del Pixel (base code)</h4>
                 <Button variant="ghost" size="sm" onClick={() => copyToClipboard(selectedPixel.code!)}>
                   <Copy className="w-3.5 h-3.5 mr-2" />
                   Copiar

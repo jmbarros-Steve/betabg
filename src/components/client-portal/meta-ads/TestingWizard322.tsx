@@ -55,7 +55,7 @@ interface Combination {
 type WizardStep = 'config' | 'images' | 'copies' | 'headlines' | 'combinations' | 'budget' | 'review';
 
 const STEPS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
-  { key: 'config', label: 'Configuracion', icon: Target },
+  { key: 'config', label: 'Configuración', icon: Target },
   { key: 'images', label: 'Creativos (3)', icon: ImageIcon },
   { key: 'copies', label: 'Copies (2)', icon: FileText },
   { key: 'headlines', label: 'Headlines (2)', icon: Type },
@@ -91,6 +91,10 @@ function StepConfig({
   setCpaTarget,
   audienceDesc,
   setAudienceDesc,
+  destinationUrl,
+  setDestinationUrl,
+  funnelStage,
+  setFunnelStage,
   clientId,
 }: {
   campaignName: string;
@@ -99,6 +103,10 @@ function StepConfig({
   setCpaTarget: (v: string) => void;
   audienceDesc: string;
   setAudienceDesc: (v: string) => void;
+  destinationUrl: string;
+  setDestinationUrl: (v: string) => void;
+  funnelStage: 'tofu' | 'mofu' | 'bofu';
+  setFunnelStage: (v: 'tofu' | 'mofu' | 'bofu') => void;
   clientId: string;
 }) {
   const today = new Date().toISOString().split('T')[0];
@@ -107,13 +115,42 @@ function StepConfig({
   return (
     <div className="space-y-5">
       <SteveTip>
-        La metodologia 3:2:2 de Charles Tichner crea 12 combinaciones unicas (3 imagenes x 2 copies x 2 headlines). Cada combinacion va en su propio Ad Set con 1 solo ad para testear variables aisladas. Campana ABO, 7 dias sin tocar.
+        La metodología 3:2:2 de Charles Tichner crea 12 combinaciones únicas (3 imágenes x 2 copies x 2 headlines). Cada combinación va en su propio Ad Set con 1 solo ad para testear variables aisladas. Campaña ABO, 7 días sin tocar.
       </SteveTip>
 
       <div>
-        <Label>Nombre de la campana</Label>
+        <Label>Nombre de la campaña</Label>
         <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder={suggestedName} className="mt-1" />
         <p className="text-xs text-muted-foreground mt-1">Steve sugiere: {suggestedName}</p>
+      </div>
+
+      <div>
+        <Label>URL de destino</Label>
+        <Input value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://tu-tienda.com" className="mt-1" />
+        <p className="text-xs text-muted-foreground mt-1">URL a la que llegarán los usuarios al hacer clic en los anuncios.</p>
+      </div>
+
+      <div>
+        <Label>Etapa del Funnel</Label>
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {([
+            { key: 'tofu' as const, label: 'TOFU', desc: 'Awareness' },
+            { key: 'mofu' as const, label: 'MOFU', desc: 'Consideración' },
+            { key: 'bofu' as const, label: 'BOFU', desc: 'Conversión' },
+          ]).map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFunnelStage(f.key)}
+              className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs transition-all ${
+                funnelStage === f.key ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+              }`}
+            >
+              <span className="font-bold">{f.label}</span>
+              <span className="text-[10px] text-muted-foreground">{f.desc}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">Steve ajusta el copy según la etapa del funnel (Sabri Suby + Russell Brunson).</p>
       </div>
 
       <div>
@@ -123,7 +160,7 @@ function StepConfig({
       </div>
 
       <div>
-        <Label>Descripcion de audiencia objetivo</Label>
+        <Label>Descripción de audiencia objetivo</Label>
         <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Ej: Mujeres 25-45, interesadas en skincare, Chile" rows={3} className="mt-1" />
       </div>
     </div>
@@ -154,7 +191,7 @@ function StepImages({
   return (
     <div className="space-y-5">
       <SteveTip>
-        3 creativos diferentes: variaciones de angulo visual (producto solo, lifestyle, before/after). Cada imagen se combinara con los 2 copies y 2 headlines = 4 ads por imagen.
+        3 creativos diferentes: variaciones de ángulo visual (producto solo, lifestyle, before/after). Cada imagen se combinará con los 2 copies y 2 headlines = 4 ads por imagen.
       </SteveTip>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -220,12 +257,12 @@ function StepTextVariants({
   onGenerate: () => void;
 }) {
   const count = values.length;
-  const label = type === 'copy' ? 'Copy (texto principal)' : 'Headline (titulo)';
+  const label = type === 'copy' ? 'Copy (texto principal)' : 'Headline (título)';
   const placeholder = type === 'copy'
     ? 'Escribe el texto principal del anuncio...'
     : 'Escribe el headline...';
   const tip = type === 'copy'
-    ? '2 copies diferentes permiten testear distintos angulos de mensaje: uno emocional y otro racional, o uno corto y otro largo.'
+    ? '2 copies diferentes permiten testear distintos ángulos de mensaje: uno emocional y otro racional, o uno corto y otro largo.'
     : '2 headlines diferentes: uno enfocado en beneficio y otro en urgencia/oferta. Meta muestra el headline debajo de la imagen.';
 
   const updateValue = (index: number, value: string) => {
@@ -271,7 +308,7 @@ function StepCombinations({ combinations }: { combinations: Combination[] }) {
   return (
     <div className="space-y-5">
       <SteveTip>
-        12 combinaciones generadas automaticamente. Cada una ira en su propio Ad Set con 1 solo ad. Asi testeas variables aisladas: si cambias imagen y el CTR sube, sabes que fue la imagen.
+        12 combinaciones generadas automáticamente. Cada una irá en su propio Ad Set con 1 solo ad. Así testeas variables aisladas: si cambias imagen y el CTR sube, sabes que fue la imagen.
       </SteveTip>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -329,13 +366,13 @@ function StepBudget({
   return (
     <div className="space-y-5">
       <SteveTip>
-        Presupuesto ideal por Ad Set = (CPA objetivo x 50) / 7 dias. Esto da suficiente data estadistica para declarar ganadores. Minimo recomendado = (CPA x 10) / 7.
+        Presupuesto ideal por Ad Set = (CPA objetivo x 50) / 7 días. Esto da suficiente data estadística para declarar ganadores. Mínimo recomendado = (CPA x 10) / 7.
       </SteveTip>
 
       {cpaTarget <= 0 && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
           <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-yellow-700">No definiste un CPA objetivo. Vuelve al paso 1 para ingresarlo o Steve lo estimara de tu Shopify.</p>
+          <p className="text-xs text-yellow-700">No definiste un CPA objetivo. Vuelve al paso 1 para ingresarlo o Steve lo estimará de tu Shopify.</p>
         </div>
       )}
 
@@ -345,33 +382,33 @@ function StepBudget({
             <CardTitle className="text-sm">Presupuesto Ideal</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm"><span>Por Ad Set / dia:</span><span className="font-bold">{fmtCLP(budgetPerAdset)}</span></div>
+            <div className="flex justify-between text-sm"><span>Por Ad Set / día:</span><span className="font-bold">{fmtCLP(budgetPerAdset)}</span></div>
             <div className="flex justify-between text-sm"><span>Total diario ({count} ad sets):</span><span className="font-bold text-primary">{fmtCLP(totalDaily)}</span></div>
-            <div className="flex justify-between text-sm"><span>Total 7 dias:</span><span className="font-bold">{fmtCLP(totalWeekly)}</span></div>
+            <div className="flex justify-between text-sm"><span>Total 7 días:</span><span className="font-bold">{fmtCLP(totalWeekly)}</span></div>
           </CardContent>
         </Card>
 
         <Card className="border-dashed">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Presupuesto Minimo</CardTitle>
+            <CardTitle className="text-sm">Presupuesto Mínimo</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm"><span>Por Ad Set / dia:</span><span className="font-bold">{fmtCLP(minBudgetPerAdset)}</span></div>
+            <div className="flex justify-between text-sm"><span>Por Ad Set / día:</span><span className="font-bold">{fmtCLP(minBudgetPerAdset)}</span></div>
             <div className="flex justify-between text-sm"><span>Total diario ({count} ad sets):</span><span className="font-bold">{fmtCLP(minDailyTotal)}</span></div>
-            <div className="flex justify-between text-sm"><span>Total 7 dias:</span><span className="font-bold">{fmtCLP(minDailyTotal * 7)}</span></div>
+            <div className="flex justify-between text-sm"><span>Total 7 días:</span><span className="font-bold">{fmtCLP(minDailyTotal * 7)}</span></div>
           </CardContent>
         </Card>
       </div>
 
       <Card className="bg-muted/30">
         <CardContent className="py-4">
-          <h4 className="text-sm font-semibold mb-2">Reglas de Ejecucion</h4>
+          <h4 className="text-sm font-semibold mb-2">Reglas de Ejecución</h4>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
-            <li>1. Tipo de campana: <strong>ABO (Ad Budget Optimization)</strong></li>
-            <li>2. Cada Ad Set tiene <strong>1 solo ad</strong> con 1 combinacion unica</li>
-            <li>3. <strong>No tocar nada durante 7 dias</strong> — recopilar data estadistica</li>
-            <li>4. Dia 7: Steve clasifica ganadores, potenciales y perdedores</li>
-            <li>5. Ganadores pasan a campana <strong>CBO para escalar</strong></li>
+            <li>1. Tipo de campaña: <strong>ABO (Ad Budget Optimization)</strong></li>
+            <li>2. Cada Ad Set tiene <strong>1 solo ad</strong> con 1 combinación única</li>
+            <li>3. <strong>No tocar nada durante 7 días</strong> — recopilar data estadística</li>
+            <li>4. Día 7: Steve clasifica ganadores, potenciales y perdedores</li>
+            <li>5. Ganadores pasan a campaña <strong>CBO para escalar</strong></li>
           </ul>
         </CardContent>
       </Card>
@@ -384,7 +421,7 @@ function StepBudget({
 // ---------------------------------------------------------------------------
 
 export default function TestingWizard322({ clientId, onBack, onComplete }: TestingWizard322Props) {
-  const { connectionId: ctxConnectionId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, pageId: ctxPageId } = useMetaBusiness();
 
   const [step, setStep] = useState<WizardStep>('config');
   const [publishing, setPublishing] = useState(false);
@@ -393,6 +430,10 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const [campaignName, setCampaignName] = useState('');
   const [cpaTarget, setCpaTarget] = useState('');
   const [audienceDesc, setAudienceDesc] = useState('');
+  const [destinationUrl, setDestinationUrl] = useState('');
+
+  // Funnel stage
+  const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
 
   // Images
   const [images, setImages] = useState<string[]>(['', '', '']);
@@ -413,7 +454,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
     setGeneratingImage(true);
     try {
       const { data, error } = await callApi('generate-image', {
-        body: { clientId, promptGeneracion: `Producto para anuncio de Meta Ads. Variacion ${index + 1}. ${audienceDesc}` },
+        body: { clientId, promptGeneracion: `Producto para anuncio de Meta Ads. Variación ${index + 1}. ${audienceDesc}` },
       });
       if (error) throw error;
       if (data?.asset_url) {
@@ -434,8 +475,10 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
     try {
       const { data, error } = await callApi('generate-meta-copy', {
         body: {
-          client_id: clientId,
-          instruction: `Genera 2 copies DIFERENTES para un anuncio de Meta Ads. Audiencia: ${audienceDesc}. Copy 1: enfoque emocional. Copy 2: enfoque racional con datos. Maximo 125 caracteres cada uno. Responde SOLO con JSON: {"copies":["copy1","copy2"]}`,
+          clientId: clientId,
+          funnelStage,
+          adType: 'static',
+          customPrompt: `Genera 2 copies DIFERENTES para testing 3:2:2. Audiencia: ${audienceDesc}. Copy 1: enfoque emocional. Copy 2: enfoque racional. Máximo 125 caracteres cada uno. Responde SOLO con JSON: {"copies":["copy1","copy2"]}`,
         },
       });
       if (error) throw error;
@@ -461,8 +504,10 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
     try {
       const { data, error } = await callApi('generate-meta-copy', {
         body: {
-          client_id: clientId,
-          instruction: `Genera 2 headlines DIFERENTES para un anuncio de Meta Ads. Audiencia: ${audienceDesc}. Headline 1: beneficio principal. Headline 2: urgencia/oferta. Maximo 40 caracteres cada uno. Responde SOLO con JSON: {"headlines":["h1","h2"]}`,
+          clientId: clientId,
+          funnelStage,
+          adType: 'static',
+          customPrompt: `Genera 2 headlines DIFERENTES para testing 3:2:2. Audiencia: ${audienceDesc}. Headline 1: beneficio principal. Headline 2: urgencia/oferta. Máximo 40 caracteres cada uno. Responde SOLO con JSON: {"headlines":["h1","h2"]}`,
         },
       });
       if (error) throw error;
@@ -511,41 +556,56 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      // Use connectionId from MetaBusinessContext
       if (!ctxConnectionId) {
-        toast.error('No hay conexion Meta Ads activa');
+        toast.error('No hay conexión Meta Ads activa');
+        return;
+      }
+      if (!ctxPageId) {
+        toast.error('No hay Facebook Page seleccionada. Selecciona un portfolio con página.');
+        return;
+      }
+      if (!destinationUrl) {
+        toast.error('Ingresa la URL de destino en el paso de configuración.');
         return;
       }
 
-      const connectionId = ctxConnectionId;
       const name = campaignName || `Testing 3:2:2 - ${new Date().toISOString().split('T')[0]}`;
       const cpa = Number(cpaTarget) || 15000;
       const budgetPerAdset = Math.round((cpa * 50) / 7);
 
-      // Create campaign (ABO)
-      const { data: campaignResult, error: campaignErr } = await callApi('manage-meta-campaign', {
+      const { data: result, error: err } = await callApi('manage-meta-campaign', {
         body: {
-          action: 'create',
-          connection_id: connectionId,
+          action: 'create_322',
+          connection_id: ctxConnectionId,
           data: {
-            name: `${name} [ABO]`,
+            name,
             objective: 'OUTCOME_SALES',
             status: 'PAUSED',
-            daily_budget: budgetPerAdset * 100,
+            cta: 'SHOP_NOW',
+            destination_url: destinationUrl,
             billing_event: 'IMPRESSIONS',
             optimization_goal: 'OFFSITE_CONVERSIONS',
-            adset_name: combinations[0]?.adsetName || 'Ad Set 1',
+            page_id: ctxPageId,
+            combinations: combinations.map((c) => ({
+              adset_name: c.adsetName,
+              image_url: c.imageUrl,
+              primary_text: c.primaryText,
+              headline: c.headline,
+              daily_budget: budgetPerAdset * 100,
+            })),
           },
         },
       });
 
-      if (campaignErr) throw campaignErr;
+      if (err) throw err;
 
-      toast.success(`Campana "${name}" creada con estructura 3:2:2. ${combinations.length} combinaciones preparadas.`);
+      const created = result?.created || 0;
+      const total = result?.total || combinations.length;
+      toast.success(`Campaña "${name}" creada: ${created}/${total} ads publicados en Meta (Paused).`);
       onComplete?.();
     } catch (err) {
       console.error('[TestingWizard322] Publish error:', err);
-      toast.error('Error al crear campana');
+      toast.error('Error al crear campaña 3:2:2');
     } finally {
       setPublishing(false);
     }
@@ -582,9 +642,9 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Zap className="w-6 h-6 text-primary" />
-            Testing 3:2:2 — Metodologia Tichner
+            Testing 3:2:2 — Metodología Tichner
           </h2>
-          <p className="text-muted-foreground text-sm">3 imagenes x 2 copies x 2 headlines = 12 Ad Sets con 1 ad cada uno</p>
+          <p className="text-muted-foreground text-sm">3 imágenes x 2 copies x 2 headlines = 12 Ad Sets con 1 ad cada uno</p>
         </div>
       </div>
 
@@ -622,6 +682,8 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
               campaignName={campaignName} setCampaignName={setCampaignName}
               cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
               audienceDesc={audienceDesc} setAudienceDesc={setAudienceDesc}
+              destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
+              funnelStage={funnelStage} setFunnelStage={setFunnelStage}
               clientId={clientId}
             />
           )}
@@ -639,29 +701,29 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
           {step === 'review' && (
             <div className="space-y-5">
               <SteveTip>
-                Todo listo. Al publicar se crea la campana ABO en Meta con los 12 Ad Sets. Steve monitorea y te avisa el dia 7 con resultados y recomendaciones.
+                Todo listo. Al publicar se crea la campaña ABO en Meta con los 12 Ad Sets. Steve monitorea y te avisa el día 7 con resultados y recomendaciones.
               </SteveTip>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                 <Card><CardContent className="py-3"><p className="text-2xl font-bold text-primary">{combinations.length}</p><p className="text-xs text-muted-foreground">Ad Sets</p></CardContent></Card>
-                <Card><CardContent className="py-3"><p className="text-2xl font-bold">{images.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Imagenes</p></CardContent></Card>
+                <Card><CardContent className="py-3"><p className="text-2xl font-bold">{images.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Imágenes</p></CardContent></Card>
                 <Card><CardContent className="py-3"><p className="text-2xl font-bold">{copies.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Copies</p></CardContent></Card>
                 <Card><CardContent className="py-3"><p className="text-2xl font-bold">{headlines.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Headlines</p></CardContent></Card>
               </div>
 
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Campana:</span><span className="font-medium">{campaignName || 'Testing 3:2:2'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Campaña:</span><span className="font-medium">{campaignName || 'Testing 3:2:2'}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Tipo:</span><Badge className="text-xs bg-blue-500/15 text-blue-700 border-blue-500/30">ABO</Badge></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">CPA Objetivo:</span><span className="font-medium">{Number(cpaTarget) > 0 ? fmtCLP(Number(cpaTarget)) : 'No definido'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Presupuesto total/dia:</span><span className="font-medium">{fmtCLP(Math.round((Number(cpaTarget) || 15000) * 50 / 7) * 12)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Duracion:</span><span className="font-medium">7 dias sin tocar</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Presupuesto total/día:</span><span className="font-medium">{fmtCLP(Math.round((Number(cpaTarget) || 15000) * 50 / 7) * 12)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Duración:</span><span className="font-medium">7 días sin tocar</span></div>
               </div>
 
               <Button className="w-full" size="lg" onClick={handlePublish} disabled={publishing}>
                 {publishing ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando campana...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando campaña...</>
                 ) : (
-                  <><Rocket className="w-4 h-4 mr-2" />Crear Campana 3:2:2</>
+                  <><Rocket className="w-4 h-4 mr-2" />Crear Campaña 3:2:2</>
                 )}
               </Button>
             </div>

@@ -130,7 +130,7 @@ const STATUS_CONFIG: Record<AudienceStatus, { label: string; className: string }
     className: 'bg-red-500/15 text-red-700 border-red-500/30',
   },
   TOO_SMALL: {
-    label: 'Muy pequena',
+    label: 'Muy pequeña',
     className: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/30',
   },
 };
@@ -138,7 +138,7 @@ const STATUS_CONFIG: Record<AudienceStatus, { label: string; className: string }
 const SOURCE_LABELS: Record<CustomAudienceSource, string> = {
   WEBSITE: 'Sitio Web (Pixel)',
   CUSTOMER_LIST: 'Lista de Clientes',
-  ENGAGEMENT: 'Interaccion',
+  ENGAGEMENT: 'Interacción',
   APP_ACTIVITY: 'Actividad en App',
 };
 
@@ -150,8 +150,8 @@ const SOURCE_ICONS: Record<CustomAudienceSource, React.ElementType> = {
 };
 
 const ENGAGEMENT_TYPE_LABELS: Record<EngagementType, string> = {
-  PAGE: 'Interaccion con Pagina de Facebook',
-  INSTAGRAM: 'Interaccion con perfil de Instagram',
+  PAGE: 'Interacción con Página de Facebook',
+  INSTAGRAM: 'Interacción con perfil de Instagram',
   VIDEO: 'Personas que vieron tus videos',
 };
 
@@ -176,12 +176,12 @@ const TAB_CONFIG: { key: AudienceTab; label: string }[] = [
 const COUNTRY_OPTIONS = [
   { value: 'CL', label: 'Chile' },
   { value: 'AR', label: 'Argentina' },
-  { value: 'MX', label: 'Mexico' },
+  { value: 'MX', label: 'México' },
   { value: 'CO', label: 'Colombia' },
-  { value: 'PE', label: 'Peru' },
+  { value: 'PE', label: 'Perú' },
   { value: 'BR', label: 'Brasil' },
   { value: 'US', label: 'Estados Unidos' },
-  { value: 'ES', label: 'Espana' },
+  { value: 'ES', label: 'España' },
 ];
 
 const EMPTY_CUSTOM_FORM: CustomAudienceFormData = {
@@ -291,14 +291,14 @@ function AudienceSuggestions({
     if (hasShopify) {
       all.push({
         id: 'frequent-buyers',
-        title: 'Compradores frecuentes (ultimos 90 dias)',
-        description: 'Clientes que han comprado 2+ veces en los ultimos 90 dias desde Shopify.',
+        title: 'Compradores frecuentes (últimos 90 días)',
+        description: 'Clientes que han comprado 2+ veces en los últimos 90 días desde Shopify.',
         source: 'CUSTOMER_LIST',
         icon: ShoppingCart,
         requires: 'Shopify',
         prefill: {
-          name: 'Compradores frecuentes - 90 dias',
-          description: 'Clientes con 2+ compras en los ultimos 90 dias sincronizados desde Shopify.',
+          name: 'Compradores frecuentes - 90 días',
+          description: 'Clientes con 2+ compras en los últimos 90 días sincronizados desde Shopify.',
           source: 'CUSTOMER_LIST',
           customer_list_source: 'SHOPIFY',
         },
@@ -307,13 +307,13 @@ function AudienceSuggestions({
 
     all.push({
       id: 'visitors-no-purchase',
-      title: 'Visitantes que no compraron (180 dias)',
-      description: 'Personas que visitaron tu sitio pero no completaron una compra en 180 dias.',
+      title: 'Visitantes que no compraron (180 días)',
+      description: 'Personas que visitaron tu sitio pero no completaron una compra en 180 días.',
       source: 'WEBSITE',
       icon: Eye,
       prefill: {
-        name: 'Visitantes sin compra - 180 dias',
-        description: 'Visitantes del sitio web que no completaron una compra en los ultimos 180 dias.',
+        name: 'Visitantes sin compra - 180 días',
+        description: 'Visitantes del sitio web que no completaron una compra en los últimos 180 días.',
         source: 'WEBSITE',
         url_rule: '/',
         url_match_type: 'CONTAINS',
@@ -324,12 +324,12 @@ function AudienceSuggestions({
     all.push({
       id: 'lookalike-buyers',
       title: 'Lookalike 1% de compradores',
-      description: 'Audiencia similar al 1% mas parecido a tus mejores compradores.',
+      description: 'Audiencia similar al 1% más parecido a tus mejores compradores.',
       source: 'CUSTOMER_LIST',
       icon: UserPlus,
       prefill: {
         name: 'Lookalike 1% - Compradores',
-        description: 'Audiencia similar basada en el 1% mas parecido a los compradores.',
+        description: 'Audiencia similar basada en el 1% más parecido a los compradores.',
       },
     });
 
@@ -337,13 +337,13 @@ function AudienceSuggestions({
       all.push({
         id: 'klaviyo-active',
         title: 'Suscriptores activos de Klaviyo',
-        description: 'Suscriptores que abrieron o clickearon emails en los ultimos 90 dias.',
+        description: 'Suscriptores que abrieron o clickearon emails en los últimos 90 días.',
         source: 'CUSTOMER_LIST',
         icon: Mail,
         requires: 'Klaviyo',
         prefill: {
-          name: 'Suscriptores activos Klaviyo - 90 dias',
-          description: 'Suscriptores activos de Klaviyo que interactuaron con emails en los ultimos 90 dias.',
+          name: 'Suscriptores activos Klaviyo - 90 días',
+          description: 'Suscriptores activos de Klaviyo que interactuaron con emails en los últimos 90 días.',
           source: 'CUSTOMER_LIST',
           customer_list_source: 'KLAVIYO',
         },
@@ -357,8 +357,8 @@ function AudienceSuggestions({
       source: 'ENGAGEMENT',
       icon: Video,
       prefill: {
-        name: 'Video Viewers 75%+ - 30 dias',
-        description: 'Personas que vieron al menos el 75% de tus videos en los ultimos 30 dias.',
+        name: 'Video Viewers 75%+ - 30 días',
+        description: 'Personas que vieron al menos el 75% de tus videos en los últimos 30 días.',
         source: 'ENGAGEMENT',
         engagement_type: 'VIDEO',
         engagement_days: 30,
@@ -464,7 +464,7 @@ function CreateCustomAudienceDialog({
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
-              placeholder="Ej: Compradores ultimos 30 dias"
+              placeholder="Ej: Compradores últimos 30 días"
               className="mt-1"
             />
           </div>
@@ -472,7 +472,7 @@ function CreateCustomAudienceDialog({
           {/* Description */}
           <div>
             <Label htmlFor="audience-desc">
-              Descripcion{' '}
+              Descripción{' '}
               <span className="text-muted-foreground font-normal">(opcional)</span>
             </Label>
             <Input
@@ -481,7 +481,7 @@ function CreateCustomAudienceDialog({
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, description: e.target.value }))
               }
-              placeholder="Descripcion interna de la audiencia"
+              placeholder="Descripción interna de la audiencia"
               className="mt-1"
             />
           </div>
@@ -533,7 +533,7 @@ function CreateCustomAudienceDialog({
           <div className="rounded-lg border border-border/60 p-4 space-y-4 bg-muted/20">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <SourceIcon className="w-4 h-4" />
-              Configuracion: {SOURCE_LABELS[formData.source]}
+              Configuración: {SOURCE_LABELS[formData.source]}
             </div>
 
             {/* WEBSITE (Pixel) */}
@@ -571,7 +571,7 @@ function CreateCustomAudienceDialog({
                   </div>
                 </div>
                 <div>
-                  <Label>Dias de retencion (1-180)</Label>
+                  <Label>Días de retención (1-180)</Label>
                   <div className="flex items-center gap-4 mt-2">
                     <Slider
                       value={[formData.retention_days]}
@@ -584,11 +584,11 @@ function CreateCustomAudienceDialog({
                       className="flex-1"
                     />
                     <span className="text-sm font-medium w-16 text-right">
-                      {formData.retention_days} dias
+                      {formData.retention_days} días
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Incluir visitantes de los ultimos {formData.retention_days} dia
+                    Incluir visitantes de los últimos {formData.retention_days} día
                     {formData.retention_days !== 1 ? 's' : ''}.
                   </p>
                 </div>
@@ -631,7 +631,7 @@ function CreateCustomAudienceDialog({
                       Arrastra un archivo CSV o haz click para seleccionar
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Formato requerido: email, nombre, telefono
+                      Formato requerido: email, nombre, teléfono
                     </p>
                     <Button variant="outline" size="sm" className="mt-3">
                       Seleccionar archivo
@@ -642,9 +642,9 @@ function CreateCustomAudienceDialog({
                   <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
                     <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-blue-700">
-                      Se sincronizaran automaticamente los suscriptores activos de tu
-                      cuenta de Klaviyo conectada. La audiencia se actualizara
-                      periodicamente.
+                      Se sincronizarán automáticamente los suscriptores activos de tu
+                      cuenta de Klaviyo conectada. La audiencia se actualizará
+                      periódicamente.
                     </p>
                   </div>
                 )}
@@ -652,8 +652,8 @@ function CreateCustomAudienceDialog({
                   <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-green-500/5 border border-green-500/20">
                     <Info className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                     <p className="text-xs text-green-700">
-                      Se sincronizaran los clientes de tu tienda Shopify conectada. La
-                      audiencia se actualizara automaticamente con nuevos compradores.
+                      Se sincronizarán los clientes de tu tienda Shopify conectada. La
+                      audiencia se actualizará automáticamente con nuevos compradores.
                     </p>
                   </div>
                 )}
@@ -664,7 +664,7 @@ function CreateCustomAudienceDialog({
             {formData.source === 'ENGAGEMENT' && (
               <>
                 <div>
-                  <Label>Tipo de interaccion</Label>
+                  <Label>Tipo de interacción</Label>
                   <Select
                     value={formData.engagement_type}
                     onValueChange={(v) =>
@@ -692,7 +692,7 @@ function CreateCustomAudienceDialog({
                   </Select>
                 </div>
                 <div>
-                  <Label>Periodo (dias)</Label>
+                  <Label>Período (días)</Label>
                   <div className="flex items-center gap-4 mt-2">
                     <Slider
                       value={[formData.engagement_days]}
@@ -705,7 +705,7 @@ function CreateCustomAudienceDialog({
                       className="flex-1"
                     />
                     <span className="text-sm font-medium w-16 text-right">
-                      {formData.engagement_days} dias
+                      {formData.engagement_days} días
                     </span>
                   </div>
                 </div>
@@ -744,7 +744,7 @@ function CreateCustomAudienceDialog({
                   </Select>
                 </div>
                 <div>
-                  <Label>Periodo (dias)</Label>
+                  <Label>Período (días)</Label>
                   <div className="flex items-center gap-4 mt-2">
                     <Slider
                       value={[formData.app_activity_days]}
@@ -757,7 +757,7 @@ function CreateCustomAudienceDialog({
                       className="flex-1"
                     />
                     <span className="text-sm font-medium w-16 text-right">
-                      {formData.app_activity_days} dias
+                      {formData.app_activity_days} días
                     </span>
                   </div>
                 </div>
@@ -856,7 +856,7 @@ function CreateLookalikeDialog({
 
           {/* Country */}
           <div>
-            <Label>Pais de destino</Label>
+            <Label>País de destino</Label>
             <Select
               value={formData.country}
               onValueChange={(v) =>
@@ -879,7 +879,7 @@ function CreateLookalikeDialog({
           {/* Lookalike size slider */}
           <div>
             <Label>
-              Tamano de audiencia:{' '}
+              Tamaño de audiencia:{' '}
               <span className="text-primary font-semibold">
                 {formData.lookalike_percent}%
               </span>
@@ -896,7 +896,7 @@ function CreateLookalikeDialog({
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                <span>1% - Mas similar</span>
+                <span>1% - Más similar</span>
                 <span>10% - Mayor alcance</span>
               </div>
             </div>
@@ -921,9 +921,9 @@ function CreateLookalikeDialog({
           <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
             <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
             <p className="text-xs text-blue-700">
-              Un porcentaje menor (1-3%) genera una audiencia mas parecida a tu
+              Un porcentaje menor (1-3%) genera una audiencia más parecida a tu
               audiencia de origen. Un porcentaje mayor (4-10%) genera un alcance
-              mas amplio pero con menor similitud.
+              más amplio pero con menor similitud.
             </p>
           </div>
         </div>
@@ -1005,13 +1005,13 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           if (errMsg.includes('Unauthorized') || errMsg.includes('403')) {
             toast.error('Sin permisos. Tu token de Meta necesita permisos ads_management y ads_read.');
           } else if (errMsg.includes('Missing Meta credentials') || errMsg.includes('account ID')) {
-            toast.error('Falta el Ad Account ID en tu conexion de Meta. Reconecta desde Conexiones.');
+            toast.error('Falta el Ad Account ID en tu conexión de Meta. Reconecta desde Conexiones.');
           } else if (errMsg.includes('decrypt')) {
             toast.error('Error con el token de Meta. Reconecta Meta Ads desde Conexiones.');
           } else if (errMsg.includes('Connection not found') || errMsg.includes('404')) {
-            toast.error('Conexion de Meta no encontrada. Verifica en Conexiones.');
+            toast.error('Conexión de Meta no encontrada. Verifica en Conexiones.');
           } else if (errMsg.includes('Failed to list')) {
-            toast.error('Meta API rechazo la solicitud. Verifica permisos del token (ads_read, ads_management).');
+            toast.error('Meta API rechazó la solicitud. Verifica permisos del token (ads_read, ads_management).');
           } else {
             toast.error(`Error al cargar audiencias: ${errMsg || 'Error desconocido'}`);
           }
@@ -1063,7 +1063,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   // Manual sync handler
   const handleSyncFromMeta = useCallback(async () => {
     if (!metaConnectionId) {
-      toast.error('No hay conexion de Meta activa');
+      toast.error('No hay conexión de Meta activa');
       return;
     }
     setSyncingFromMeta(true);
@@ -1187,7 +1187,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     }
 
     if (!metaConnectionId) {
-      toast.error('No se encontro conexion de Meta Ads activa');
+      toast.error('No se encontró conexión de Meta Ads activa');
       return;
     }
 
@@ -1277,7 +1277,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     }
 
     if (!metaConnectionId) {
-      toast.error('No se encontro conexion de Meta Ads activa');
+      toast.error('No se encontró conexión de Meta Ads activa');
       return;
     }
 
@@ -1351,7 +1351,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     if (!deleteTarget) return;
 
     if (!metaConnectionId) {
-      toast.error('No se encontro conexion de Meta Ads activa');
+      toast.error('No se encontró conexión de Meta Ads activa');
       return;
     }
 
@@ -1420,9 +1420,9 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       <Card className="border-dashed">
         <CardContent className="py-16 text-center">
           <Users className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
+          <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            Conecta tu cuenta de Meta Ads desde la seccion de{' '}
+            Conecta tu cuenta de Meta Ads desde la sección de{' '}
             <strong>Conexiones</strong> para gestionar audiencias y segmentos.
           </p>
         </CardContent>
@@ -1555,8 +1555,8 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                   ? 'Crea tu primera audiencia personalizada para comenzar.'
                   : activeTab === 'lookalike'
                     ? 'Crea una audiencia similar basada en tus audiencias personalizadas.'
-                    : 'Las audiencias guardadas aparecen aqui al asignarlas a campanas.'
-                : 'Intenta con un termino de busqueda diferente.'}
+                    : 'Las audiencias guardadas aparecen aquí al asignarlas a campañas.'
+                : 'Intenta con un término de búsqueda diferente.'}
             </p>
             {activeTab === 'custom' &&
               audiences.filter((a) => a.type === 'custom').length === 0 && (
@@ -1593,7 +1593,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                       <span>
-                        Tamano:{' '}
+                        Tamaño:{' '}
                         <span className="font-medium text-foreground">
                           {audience.size > 0
                             ? formatNumber(audience.size)
@@ -1617,7 +1617,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                       )}
                       {audience.country && (
                         <span>
-                          Pais:{' '}
+                          País:{' '}
                           <span className="font-medium text-foreground">
                             {COUNTRY_OPTIONS.find((c) => c.value === audience.country)
                               ?.label || audience.country}
@@ -1626,9 +1626,9 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                       )}
                       {audience.retention_days && (
                         <span>
-                          Retencion:{' '}
+                          Retención:{' '}
                           <span className="font-medium text-foreground">
-                            {audience.retention_days} dias
+                            {audience.retention_days} días
                           </span>
                         </span>
                       )}
@@ -1741,12 +1741,12 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                 <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-destructive">
-                    Esta accion no se puede deshacer
+                    Esta acción no se puede deshacer
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Se eliminara permanentemente la audiencia{' '}
-                    <strong>"{deleteTarget.name}"</strong> y ya no estara
-                    disponible para tus campanas.
+                    Se eliminará permanentemente la audiencia{' '}
+                    <strong>"{deleteTarget.name}"</strong> y ya no estará
+                    disponible para tus campañas.
                   </p>
                 </div>
               </div>
@@ -1757,7 +1757,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                   <TypeBadge type={deleteTarget.type} />
                 </div>
                 <div className="flex justify-between py-1">
-                  <span>Tamano:</span>
+                  <span>Tamaño:</span>
                   <span className="font-medium text-foreground">
                     {deleteTarget.size > 0
                       ? formatNumber(deleteTarget.size)

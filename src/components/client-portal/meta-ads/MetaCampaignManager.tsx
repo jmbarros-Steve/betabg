@@ -129,13 +129,13 @@ const STATUS_CONFIG: Record<
 
 const OBJECTIVE_LABELS: Record<CampaignObjective, string> = {
   CONVERSIONS: 'Conversiones',
-  TRAFFIC: 'Trafico',
+  TRAFFIC: 'Tráfico',
   AWARENESS: 'Reconocimiento',
-  ENGAGEMENT: 'Interaccion',
+  ENGAGEMENT: 'Interacción',
 };
 
 const OPTIMIZATION_LABELS: Record<OptimizationGoal, string> = {
-  LANDING_PAGE_VIEWS: 'Vistas a pagina de destino',
+  LANDING_PAGE_VIEWS: 'Vistas a página de destino',
   PURCHASES: 'Compras',
   ADD_TO_CART: 'Agregar al carrito',
 };
@@ -233,7 +233,7 @@ function BudgetAllocationChart({
   if (activeCampaigns.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-4">
-        Sin campanas activas con presupuesto asignado.
+        Sin campañas activas con presupuesto asignado.
       </p>
     );
   }
@@ -433,8 +433,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setCampaigns(Array.from(campaignMap.values()));
     } catch (err: any) {
       console.error('[MetaCampaignManager] Error fetching campaigns:', err);
-      setError(err?.message || 'Error al cargar campanas');
-      toast.error('Error al cargar campanas');
+      setError(err?.message || 'Error al cargar campañas');
+      toast.error('Error al cargar campañas');
     } finally {
       setLoading(false);
     }
@@ -581,12 +581,12 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       );
       toast.success(
         newStatus === 'ACTIVE'
-          ? `Campana "${campaign.campaign_name}" reanudada`
-          : `Campana "${campaign.campaign_name}" pausada`,
+          ? `Campaña "${campaign.campaign_name}" reanudada`
+          : `Campaña "${campaign.campaign_name}" pausada`,
       );
     } catch (err: any) {
       console.error('[MetaCampaignManager] Toggle status error:', err);
-      toast.error('Error al cambiar estado de la campana');
+      toast.error('Error al cambiar estado de la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -606,11 +606,11 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
       if (fnErr) throw new Error(fnErr);
 
-      toast.success(`Campana duplicada: "${campaign.campaign_name} (Copia)"`);
+      toast.success(`Campaña duplicada: "${campaign.campaign_name} (Copia)"`);
       await fetchCampaigns();
     } catch (err: any) {
       console.error('[MetaCampaignManager] Duplicate error:', err);
-      toast.error('Error al duplicar la campana');
+      toast.error('Error al duplicar la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -636,10 +636,10 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
             : c,
         ),
       );
-      toast.success(`Campana "${campaign.campaign_name}" archivada`);
+      toast.success(`Campaña "${campaign.campaign_name}" archivada`);
     } catch (err: any) {
       console.error('[MetaCampaignManager] Archive error:', err);
-      toast.error('Error al archivar la campana');
+      toast.error('Error al archivar la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -647,11 +647,11 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
   const handleCreateCampaign = async () => {
     if (!formData.campaign_name.trim()) {
-      toast.error('Ingresa un nombre para la campana');
+      toast.error('Ingresa un nombre para la campaña');
       return;
     }
     if (!formData.daily_budget || Number(formData.daily_budget) <= 0) {
-      toast.error('Ingresa un presupuesto diario valido');
+      toast.error('Ingresa un presupuesto diario válido');
       return;
     }
     if (!formData.start_date) {
@@ -659,7 +659,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       return;
     }
     if (formData.placements.length === 0) {
-      toast.error('Selecciona al menos una ubicacion');
+      toast.error('Selecciona al menos una ubicación');
       return;
     }
 
@@ -687,13 +687,13 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
       if (fnErr) throw new Error(fnErr);
 
-      toast.success(`Campana "${formData.campaign_name}" creada exitosamente`);
+      toast.success(`Campaña "${formData.campaign_name}" creada exitosamente`);
       setCreateDialogOpen(false);
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
     } catch (err: any) {
       console.error('[MetaCampaignManager] Create error:', err);
-      toast.error('Error al crear la campana');
+      toast.error('Error al crear la campaña');
     } finally {
       setFormSubmitting(false);
     }
@@ -702,11 +702,11 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
   const handleEditCampaign = async () => {
     if (!selectedCampaign) return;
     if (!formData.campaign_name.trim()) {
-      toast.error('Ingresa un nombre para la campana');
+      toast.error('Ingresa un nombre para la campaña');
       return;
     }
     if (!formData.daily_budget || Number(formData.daily_budget) <= 0) {
-      toast.error('Ingresa un presupuesto diario valido');
+      toast.error('Ingresa un presupuesto diario válido');
       return;
     }
 
@@ -726,14 +726,14 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
       if (fnErr) throw new Error(fnErr);
 
-      toast.success(`Campana "${formData.campaign_name}" actualizada`);
+      toast.success(`Campaña "${formData.campaign_name}" actualizada`);
       setEditDialogOpen(false);
       setSelectedCampaign(null);
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
     } catch (err: any) {
       console.error('[MetaCampaignManager] Edit error:', err);
-      toast.error('Error al actualizar la campana');
+      toast.error('Error al actualizar la campaña');
     } finally {
       setFormSubmitting(false);
     }
@@ -774,7 +774,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         ),
       );
       toast.success(
-        `Presupuesto actualizado a ${formatCLP(newBudget)}/dia`,
+        `Presupuesto actualizado a ${formatCLP(newBudget)}/día`,
       );
       setBudgetDialogOpen(false);
     } catch (err: any) {
@@ -855,7 +855,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <Card className="border-destructive/50">
         <CardContent className="py-12 text-center">
           <AlertCircle className="w-10 h-10 mx-auto text-destructive mb-3" />
-          <h3 className="text-lg font-semibold mb-2">Error al cargar campanas</h3>
+          <h3 className="text-lg font-semibold mb-2">Error al cargar campañas</h3>
           <p className="text-muted-foreground text-sm mb-4">{error}</p>
           <Button variant="outline" onClick={fetchCampaigns}>
             Reintentar
@@ -871,10 +871,10 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <Card className="border-dashed">
         <CardContent className="py-16 text-center">
           <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Sin conexion a Meta Ads</h3>
+          <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            Conecta tu cuenta de Meta Ads desde la seccion de{' '}
-            <strong>Conexiones</strong> para gestionar campanas.
+            Conecta tu cuenta de Meta Ads desde la sección de{' '}
+            <strong>Conexiones</strong> para gestionar campañas.
           </p>
         </CardContent>
       </Card>
@@ -889,10 +889,10 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
-            Gestor de Campanas
+            Gestor de Campañas
           </h2>
           <p className="text-muted-foreground text-sm">
-            {campaigns.length} campana{campaigns.length !== 1 ? 's' : ''} encontrada
+            {campaigns.length} campaña{campaigns.length !== 1 ? 's' : ''} encontrada
             {campaigns.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -901,7 +901,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           setCreateDialogOpen(true);
         }}>
           <Plus className="w-4 h-4 mr-2" />
-          Nueva Campana
+          Nueva Campaña
         </Button>
       </div>
 
@@ -923,7 +923,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               {formatCLP(budgetSummary.totalDaily)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {budgetSummary.activeCount} campana
+              {budgetSummary.activeCount} campaña
               {budgetSummary.activeCount !== 1 ? 's' : ''} activa
               {budgetSummary.activeCount !== 1 ? 's' : ''}
             </p>
@@ -935,7 +935,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Gasto 30 Dias
+                Gasto 30 Días
               </span>
               <div className="p-1.5 rounded-md bg-red-500/10">
                 <TrendingUp className="w-4 h-4 text-red-500" />
@@ -945,7 +945,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               {formatCLP(budgetSummary.totalSpend30d)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Campanas activas
+              Campañas activas
             </p>
           </CardContent>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/40 to-red-500/10" />
@@ -965,7 +965,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               {formatCLP(budgetSummary.totalDaily * 30)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Proyeccion a 30 dias
+              Proyección a 30 días
             </p>
           </CardContent>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500/40 to-green-500/10" />
@@ -978,7 +978,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            Distribucion de Presupuesto
+            Distribución de Presupuesto
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1003,7 +1003,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar campana..."
+                  placeholder="Buscar campaña..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 h-9"
@@ -1086,13 +1086,13 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
             <Filter className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
             <h3 className="text-base font-semibold mb-1">
               {campaigns.length === 0
-                ? 'Sin campanas'
+                ? 'Sin campañas'
                 : 'Sin resultados'}
             </h3>
             <p className="text-muted-foreground text-sm">
               {campaigns.length === 0
-                ? 'Crea tu primera campana para comenzar.'
-                : 'Intenta ajustar los filtros para encontrar campanas.'}
+                ? 'Crea tu primera campaña para comenzar.'
+                : 'Intenta ajustar los filtros para encontrar campañas.'}
             </p>
             {campaigns.length === 0 && (
               <Button
@@ -1103,7 +1103,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                 }}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Crear Campana
+                Crear Campaña
               </Button>
             )}
           </CardContent>
@@ -1121,7 +1121,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
                         onClick={() => handleSort('campaign_name')}
                       >
-                        Campana
+                        Campaña
                         <SortIcon
                           field="campaign_name"
                           currentField={sortField}
@@ -1151,7 +1151,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('daily_budget')}
                       >
-                        Presupuesto/Dia
+                        Presupuesto/Día
                         <SortIcon
                           field="daily_budget"
                           currentField={sortField}
@@ -1391,7 +1391,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => openAnalyticsDialog(campaign)}
-                              title="Ver analitica"
+                              title="Ver analítica"
                               disabled={isLoading}
                             >
                               <BarChart3 className="w-3.5 h-3.5" />
@@ -1428,7 +1428,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nueva Campana</DialogTitle>
+            <DialogTitle>Nueva Campaña</DialogTitle>
           </DialogHeader>
 
           <CampaignForm
@@ -1452,7 +1452,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                   Creando...
                 </>
               ) : (
-                'Crear Campana'
+                'Crear Campaña'
               )}
             </Button>
           </DialogFooter>
@@ -1465,7 +1465,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Campana</DialogTitle>
+            <DialogTitle>Editar Campaña</DialogTitle>
           </DialogHeader>
 
           <CampaignForm
@@ -1517,7 +1517,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                 <p className="text-xs text-muted-foreground">
                   Presupuesto actual:{' '}
                   <span className="font-medium text-foreground">
-                    {formatCLP(selectedCampaign.daily_budget)}/dia
+                    {formatCLP(selectedCampaign.daily_budget)}/día
                   </span>
                 </p>
               </div>
@@ -1538,7 +1538,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                   </div>
                   <span className="text-[10px] text-muted-foreground">
                     {formatCLP(Math.round(selectedCampaign.daily_budget * 1.1))}
-                    /dia
+                    /día
                   </span>
                 </Button>
                 <Button
@@ -1560,7 +1560,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         Math.round(selectedCampaign.daily_budget * 0.9),
                       ),
                     )}
-                    /dia
+                    /día
                   </span>
                 </Button>
               </div>
@@ -1568,7 +1568,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               {/* Specific amount */}
               <div>
                 <Label className="text-xs text-muted-foreground">
-                  Monto especifico (CLP/dia)
+                  Monto específico (CLP/día)
                 </Label>
                 <div className="flex gap-2 mt-1">
                   <Input
@@ -1616,7 +1616,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       <Dialog open={analyticsDialogOpen} onOpenChange={setAnalyticsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Analitica de Campana</DialogTitle>
+            <DialogTitle>Analítica de Campaña</DialogTitle>
           </DialogHeader>
 
           {selectedCampaign && (
@@ -1715,7 +1715,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      Presupuesto/Dia
+                      Presupuesto/Día
                     </span>
                     <span className="font-medium">
                       {formatCLP(selectedCampaign.daily_budget)}
@@ -1818,7 +1818,7 @@ function CampaignForm({
     <div className="space-y-4 py-2">
       {/* Campaign name */}
       <div>
-        <Label htmlFor="campaign-name">Nombre de la campana</Label>
+        <Label htmlFor="campaign-name">Nombre de la campaña</Label>
         <Input
           id="campaign-name"
           value={formData.campaign_name}
@@ -1954,14 +1954,14 @@ function CampaignForm({
         </div>
         {formData.placements.length === 0 && (
           <p className="text-xs text-destructive mt-1">
-            Selecciona al menos una ubicacion
+            Selecciona al menos una ubicación
           </p>
         )}
       </div>
 
       {/* Optimization goal */}
       <div>
-        <Label>Objetivo de optimizacion</Label>
+        <Label>Objetivo de optimización</Label>
         <Select
           value={formData.optimization_goal}
           onValueChange={(v) =>

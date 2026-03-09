@@ -88,7 +88,7 @@ export async function fetchShopifyAnalytics(c: Context) {
     sinceDate.setDate(sinceDate.getDate() - daysBack);
 
     // Fetch orders (with line_items) and abandoned checkouts in parallel
-    const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price`;
+    const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
     const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}`;
 
     console.log('[fetch-shopify-analytics] Fetching orders and checkouts from:', cleanStoreUrl);
