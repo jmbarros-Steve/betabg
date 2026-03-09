@@ -304,7 +304,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
           // Fetch real SKU sales, abandoned checkouts, customer metrics, and cohorts
           try {
-            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': 30, 'ytd': 365 };
+            const now = new Date();
+            const mtdDays = now.getDate();
+            const ytdDays = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
+            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': mtdDays, 'ytd': ytdDays };
             const { data: analyticsData } = await callApi('fetch-shopify-analytics', {
               body: { connectionId: shopifyConnIds[0], daysBack: daysMap[dateRange] || 30 },
             });
@@ -441,9 +444,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, data]) => ({ date, ...data }));
 
-    // If DB has no daily revenue data, use Shopify API daily breakdown
-    const hasDbDailyRevenue = dbChartEntries.some(d => d.revenue > 0);
-    if (!hasDbDailyRevenue && shopifyDailyData.length > 0) {
+    // If DB has no MULTI-DAY revenue data, use Shopify API daily breakdown
+    // (injected summary is a single row on today — doesn't count as real daily data)
+    const daysWithRevenue = dbChartEntries.filter(d => d.revenue > 0).length;
+    if (daysWithRevenue <= 1 && shopifyDailyData.length > 0) {
       // Merge Shopify daily revenue with any existing ad spend data
       const spendByDate: Record<string, number> = {};
       dbChartEntries.forEach(d => { if (d.spend > 0) spendByDate[d.date] = d.spend; });
