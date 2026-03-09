@@ -38,9 +38,26 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
   const handleGenerateContent = async () => {
     setGeneratingContent(true);
     try {
+      // Get Klaviyo connection for connectionId
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!conn) {
+        toast.error('No hay conexion activa de Klaviyo. Conecta Klaviyo primero.');
+        setGeneratingContent(false);
+        return;
+      }
+
       const { data, error } = await callApi('steve-email-content', {
         body: {
           action: 'generate_flow_emails',
+          connectionId: conn.id,
           flowType: template.id,
           clientId,
           emails: template.emails.map((e) => ({
