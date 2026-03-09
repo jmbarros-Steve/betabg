@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v18.0';
 
-type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
+type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad';
 
 interface RequestBody {
   action: Action;
@@ -731,6 +731,100 @@ async function handleCreate322(
   };
 }
 
+// --- Get Ad Details ---
+
+async function handleGetAdDetails(
+  adId: string,
+  accessToken: string
+): Promise<{ body: any; status: number }> {
+  const result = await metaApiRequest(adId, accessToken, 'GET', {
+    fields: 'id,name,status,creative{id,name,object_story_spec,image_url,thumbnail_url}',
+  });
+
+  if (!result.ok) {
+    return { body: { error: 'Failed to fetch ad details', details: result.error }, status: 502 };
+  }
+
+  const creative = result.data?.creative;
+  const spec = creative?.object_story_spec;
+  const linkData = spec?.link_data || {};
+
+  return {
+    body: {
+      success: true,
+      ad: {
+        id: result.data.id,
+        name: result.data.name,
+        status: result.data.status,
+        creative_id: creative?.id,
+        primary_text: linkData.message || '',
+        headline: linkData.name || '',
+        description: linkData.description || '',
+        image_url: linkData.image_url || creative?.image_url || '',
+        cta: linkData.call_to_action?.type || 'SHOP_NOW',
+        destination_url: linkData.link || '',
+        page_id: spec?.page_id || '',
+      },
+    },
+    status: 200,
+  };
+}
+
+// --- Update Ad (create new creative + point ad to it) ---
+
+async function handleUpdateAd(
+  accountId: string,
+  adId: string,
+  accessToken: string,
+  data: Record<string, any>,
+  pageId: string
+): Promise<{ body: any; status: number }> {
+  const { primary_text, headline, description, image_url, cta = 'SHOP_NOW', destination_url } = data;
+
+  if (!primary_text || !headline || !image_url || !destination_url) {
+    return { body: { error: 'Missing required creative fields (primary_text, headline, image_url, destination_url)' }, status: 400 };
+  }
+
+  // Step 1: Create new adcreative
+  const linkData: Record<string, any> = {
+    link: destination_url,
+    message: primary_text,
+    name: headline,
+    image_url: image_url,
+    call_to_action: { type: cta, value: { link: destination_url } },
+  };
+  if (description) linkData.description = description;
+
+  const creativeResult = await metaApiRequest(
+    `act_${accountId}/adcreatives`,
+    accessToken,
+    'POST',
+    {
+      name: `${headline} - Updated ${Date.now()}`,
+      object_story_spec: JSON.stringify({ page_id: pageId, link_data: linkData }),
+    }
+  );
+
+  if (!creativeResult.ok) {
+    return { body: { error: 'Failed to create new creative', details: creativeResult.error }, status: 502 };
+  }
+
+  // Step 2: Update the ad to point to the new creative
+  const newCreativeId = creativeResult.data.id;
+  const adResult = await metaApiRequest(adId, accessToken, 'POST', {
+    creative: JSON.stringify({ creative_id: newCreativeId }),
+  });
+
+  if (!adResult.ok) {
+    return { body: { error: 'Creative created but failed to update ad', details: adResult.error, creative_id: newCreativeId }, status: 502 };
+  }
+
+  return {
+    body: { success: true, ad_id: adId, new_creative_id: newCreativeId },
+    status: 200,
+  };
+}
+
 // --- Main handler ---
 
 export async function manageMetaCampaign(c: Context) {
@@ -762,13 +856,13 @@ export async function manageMetaCampaign(c: Context) {
       return c.json({ error: 'Missing required field: connection_id' }, 400);
     }
 
-    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive'];
+    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive', 'get_ad_details', 'update_ad'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }, 400);
     }
 
-    // Actions that require an existing campaign_id
-    if (['pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive'].includes(action) && !campaign_id) {
+    // Actions that require an existing campaign_id (campaign_id is also used to pass ad_id for ad operations)
+    if (['pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive', 'get_ad_details', 'update_ad'].includes(action) && !campaign_id) {
       return c.json({ error: `Missing required field: campaign_id (required for action "${action}")` }, 400);
     }
 
@@ -864,6 +958,19 @@ export async function manageMetaCampaign(c: Context) {
       case 'archive':
         result = await handleArchive(campaign_id!, decryptedToken);
         break;
+
+      case 'get_ad_details':
+        result = await handleGetAdDetails(campaign_id!, decryptedToken);
+        break;
+
+      case 'update_ad': {
+        const adPageId = pageId || data?.page_id;
+        if (!adPageId) {
+          return c.json({ error: 'Missing page_id — required for updating ad creative' }, 400);
+        }
+        result = await handleUpdateAd(accountId, campaign_id!, decryptedToken, data || {}, adPageId);
+        break;
+      }
 
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

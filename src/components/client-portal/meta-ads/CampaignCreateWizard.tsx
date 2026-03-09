@@ -39,6 +39,7 @@ import {
   Send,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
+import AdPreviewMockup from './AdPreviewMockup';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -642,7 +643,7 @@ function AdForm({
 // ---------------------------------------------------------------------------
 
 export default function CampaignCreateWizard({ clientId, onBack, onComplete, startFrom = 'campaign' }: CampaignCreateWizardProps) {
-  const { connectionId: ctxConnectionId, pageId: ctxPageId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, pageId: ctxPageId, pageName } = useMetaBusiness();
 
   const [level, setLevel] = useState<StartLevel>(startFrom);
   const [submitting, setSubmitting] = useState(false);
@@ -1042,17 +1043,36 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               </div>
             </CardHeader>
             <CardContent>
-              <AdForm
-                clientId={clientId}
-                headline={headline} setHeadline={setHeadline}
-                primaryText={primaryText} setPrimaryText={setPrimaryText}
-                description={description} setDescription={setDescription}
-                imageUrl={imageUrl} setImageUrl={setImageUrl}
-                cta={cta} setCta={setCta}
-                destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
-                generating={generatingCopy}
-                onGenerateCopy={handleGenerateCopy}
-              />
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
+                <AdForm
+                  clientId={clientId}
+                  headline={headline} setHeadline={setHeadline}
+                  primaryText={primaryText} setPrimaryText={setPrimaryText}
+                  description={description} setDescription={setDescription}
+                  imageUrl={imageUrl} setImageUrl={setImageUrl}
+                  cta={cta} setCta={setCta}
+                  destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
+                  generating={generatingCopy}
+                  onGenerateCopy={handleGenerateCopy}
+                />
+                {/* Live Preview */}
+                {(primaryText || headline || imageUrl) && (
+                  <div className="hidden lg:block">
+                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
+                    <div className="sticky top-4">
+                      <AdPreviewMockup
+                        imageUrl={imageUrl}
+                        primaryText={primaryText}
+                        headline={headline}
+                        description={description}
+                        cta={cta}
+                        pageName={pageName || 'Tu Marca'}
+                        destinationUrl={destinationUrl}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}

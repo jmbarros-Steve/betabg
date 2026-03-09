@@ -94,7 +94,7 @@ export async function syncCampaignMetrics(c: Context) {
       return c.json({ error: 'Missing authorization' }, 401);
     }
 
-    const { connection_id, platform, purge_stale } = await c.req.json();
+    const { connection_id, platform, purge_stale, sync_adsets } = await c.req.json();
 
     if (!connection_id || !platform) {
       return c.json({ error: 'Missing connection_id or platform' }, 400);
@@ -251,6 +251,41 @@ export async function syncCampaignMetrics(c: Context) {
       }
     }
 
+    // Sync adset-level metrics if requested (for 3:2:2 analysis)
+    let adsetsSynced = 0;
+    if (sync_adsets && platform === 'meta') {
+      console.log('[sync-campaign-metrics] Syncing adset-level metrics...');
+      const adsetMetrics = await syncMetaAdsetMetrics(
+        connection.account_id!,
+        decryptedToken,
+        connection_id,
+        startDate,
+        endDate,
+        shopDomain,
+        campaignMetrics
+      );
+
+      if (adsetMetrics.length > 0) {
+        // Purge old adset metrics for this connection
+        await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
+
+        for (let i = 0; i < adsetMetrics.length; i += 100) {
+          const batch = adsetMetrics.slice(i, i + 100);
+          const { error: adsetUpsertError } = await supabase
+            .from('adset_metrics')
+            .upsert(batch, {
+              onConflict: 'connection_id,campaign_id,adset_id,metric_date',
+              ignoreDuplicates: false,
+            });
+          if (adsetUpsertError) {
+            console.error('Adset upsert error:', adsetUpsertError);
+          }
+        }
+        adsetsSynced = new Set(adsetMetrics.map(m => m.adset_id)).size;
+        console.log(`[sync-campaign-metrics] Synced ${adsetsSynced} ad sets, ${adsetMetrics.length} records`);
+      }
+    }
+
     // Update last_sync_at
     await supabase
       .from('platform_connections')
@@ -261,6 +296,7 @@ export async function syncCampaignMetrics(c: Context) {
       success: true,
       campaigns_synced: new Set(campaignMetrics.map(m => m.campaign_id)).size,
       records_synced: campaignMetrics.length,
+      adsets_synced: adsetsSynced,
       currency: 'CLP'
     }, 200);
 
@@ -486,6 +522,118 @@ async function syncGoogleCampaigns(
     }
   } catch (e) {
     console.error('Google sync error:', e);
+  }
+
+  return metrics;
+}
+
+// --- Adset-level metrics for 3:2:2 analysis ---
+
+async function syncMetaAdsetMetrics(
+  accountId: string,
+  accessToken: string,
+  connectionId: string,
+  startDate: Date,
+  endDate: Date,
+  shopDomain: string | null,
+  campaignMetrics: Array<any>
+): Promise<Array<any>> {
+  const metrics: Array<any> = [];
+  const adAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
+  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+  // Get account currency for conversion
+  let accountCurrency = 'USD';
+  try {
+    const accountRes = await fetch(
+      `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency&access_token=${accessToken}`
+    );
+    if (accountRes.ok) {
+      const accountData: any = await accountRes.json();
+      accountCurrency = accountData.currency || 'USD';
+    }
+  } catch (e) {
+    console.log('Could not fetch account currency for adset sync');
+  }
+
+  // Get unique campaign IDs from already-synced campaign metrics
+  const campaignIds = [...new Set(campaignMetrics.map(m => m.campaign_id))];
+  console.log(`[syncMetaAdsetMetrics] Syncing adsets for ${campaignIds.length} campaigns`);
+
+  for (const campaignId of campaignIds) {
+    const campaignName = campaignMetrics.find(m => m.campaign_id === campaignId)?.campaign_name || '';
+
+    // Fetch adsets for this campaign
+    const adsetsUrl = new URL(`https://graph.facebook.com/v18.0/${campaignId}/adsets`);
+    adsetsUrl.searchParams.set('access_token', accessToken);
+    adsetsUrl.searchParams.set('fields', 'id,name');
+    adsetsUrl.searchParams.set('limit', '100');
+
+    try {
+      const adsetsRes = await fetch(adsetsUrl.toString());
+      if (!adsetsRes.ok) continue;
+      const adsetsData: any = await adsetsRes.json();
+      const adsets = adsetsData.data || [];
+
+      for (const adset of adsets) {
+        const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adset.id}/insights`);
+        insightsUrl.searchParams.set('access_token', accessToken);
+        insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
+        insightsUrl.searchParams.set('time_range', JSON.stringify({
+          since: formatDate(startDate),
+          until: formatDate(endDate),
+        }));
+        insightsUrl.searchParams.set('time_increment', '1');
+
+        try {
+          const insightsRes = await fetch(insightsUrl.toString());
+          if (!insightsRes.ok) continue;
+          const insightsData: any = await insightsRes.json();
+
+          for (const day of insightsData.data || []) {
+            const purchases = day.actions?.find((a: any) =>
+              a.action_type === 'purchase' || a.action_type === 'omni_purchase'
+            );
+            const purchaseValue = day.action_values?.find((a: any) =>
+              a.action_type === 'purchase' || a.action_type === 'omni_purchase'
+            );
+            const roas = day.purchase_roas?.find((a: any) =>
+              a.action_type === 'purchase' || a.action_type === 'omni_purchase'
+            );
+
+            const spendCLP = await convertToCLP(parseFloat(day.spend || '0'), accountCurrency);
+            const cpcCLP = await convertToCLP(parseFloat(day.cpc || '0'), accountCurrency);
+            const cpmCLP = await convertToCLP(parseFloat(day.cpm || '0'), accountCurrency);
+            const conversionValueCLP = await convertToCLP(parseFloat(purchaseValue?.value || '0'), accountCurrency);
+
+            metrics.push({
+              connection_id: connectionId,
+              campaign_id: campaignId,
+              campaign_name: campaignName,
+              adset_id: adset.id,
+              adset_name: adset.name,
+              platform: 'meta',
+              metric_date: day.date_start,
+              impressions: parseFloat(day.impressions || '0'),
+              clicks: parseFloat(day.clicks || '0'),
+              spend: Math.round(spendCLP),
+              conversions: parseFloat(purchases?.value || '0'),
+              conversion_value: Math.round(conversionValueCLP),
+              ctr: parseFloat(day.ctr || '0'),
+              cpc: Math.round(cpcCLP),
+              cpm: Math.round(cpmCLP),
+              roas: parseFloat(roas?.value || '0'),
+              currency: 'CLP',
+              shop_domain: shopDomain,
+            });
+          }
+        } catch (e) {
+          console.error(`Error fetching adset ${adset.id} insights:`, e);
+        }
+      }
+    } catch (e) {
+      console.error(`Error fetching adsets for campaign ${campaignId}:`, e);
+    }
   }
 
   return metrics;

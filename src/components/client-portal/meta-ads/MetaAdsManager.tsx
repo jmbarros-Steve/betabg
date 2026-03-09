@@ -53,6 +53,7 @@ import MetaAutomatedRules from './MetaAutomatedRules';
 // New professional components
 import CampaignTreeView from './CampaignTreeView';
 import TestingWizard322 from './TestingWizard322';
+import Testing322Analysis from './Testing322Analysis';
 import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
@@ -528,6 +529,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   const [visitedSections, setVisitedSections] = useState<Set<SectionKey>>(
     () => new Set(['dashboard']),
   );
+  const [testing322Tab, setTesting322Tab] = useState<'create' | 'results'>('create');
 
   // --- Connection & hierarchy state ---
   const [metaConnection, setMetaConnection] = useState<MetaConnectionInfo | null>(null);
@@ -878,11 +880,33 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           />
         )}
         {key === 'testing-322' && (
-          <TestingWizard322
-            clientId={clientId}
-            onBack={() => handleNavClick('tree-view')}
-            onComplete={() => handleNavClick('tree-view')}
-          />
+          <>
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant={testing322Tab === 'create' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTesting322Tab('create')}
+              >
+                Crear Test
+              </Button>
+              <Button
+                variant={testing322Tab === 'results' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTesting322Tab('results')}
+              >
+                Resultados
+              </Button>
+            </div>
+            {testing322Tab === 'create' ? (
+              <TestingWizard322
+                clientId={clientId}
+                onBack={() => handleNavClick('tree-view')}
+                onComplete={() => handleNavClick('tree-view')}
+              />
+            ) : (
+              <Testing322Analysis clientId={clientId} />
+            )}
+          </>
         )}
         {key === 'campaigns' && (
           <MetaCampaignManager

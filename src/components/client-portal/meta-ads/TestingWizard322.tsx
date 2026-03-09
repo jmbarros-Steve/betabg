@@ -30,6 +30,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
+import AdPreviewMockup from './AdPreviewMockup';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -718,6 +719,26 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
                 <div className="flex justify-between"><span className="text-muted-foreground">Presupuesto total/día:</span><span className="font-medium">{fmtCLP(Math.round((Number(cpaTarget) || 15000) * 50 / 7) * 12)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Duración:</span><span className="font-medium">7 días sin tocar</span></div>
               </div>
+
+              {/* Preview Grid */}
+              {combinations.length > 0 && combinations.some((c) => c.imageUrl || c.primaryText || c.headline) && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold mb-3">Vista previa de combinaciones</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {combinations.slice(0, 3).map((combo, i) => (
+                      <AdPreviewMockup
+                        key={i}
+                        imageUrl={combo.imageUrl || ''}
+                        primaryText={combo.primaryText || ''}
+                        headline={combo.headline || ''}
+                        cta="SHOP_NOW"
+                        destinationUrl={destinationUrl}
+                        compact
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <Button className="w-full" size="lg" onClick={handlePublish} disabled={publishing}>
                 {publishing ? (

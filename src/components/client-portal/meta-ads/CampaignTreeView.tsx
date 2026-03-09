@@ -27,8 +27,14 @@ import {
   Layers,
   AlertCircle,
   Zap,
+  Pencil,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
+import AdPreviewMockup from './AdPreviewMockup';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -132,7 +138,7 @@ function ClassificationBadge({ roas, cpa, ctr, cpaTarget }: { roas: number; cpa:
 // Ad Set Row (level 2)
 // ---------------------------------------------------------------------------
 
-function AdSetRow({ adset, depth = 1 }: { adset: AdSetNode; depth?: number }) {
+function AdSetRow({ adset, depth = 1, onAdClick }: { adset: AdSetNode; depth?: number; onAdClick?: (adId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const hasAds = adset.ads.length > 0;
   const cpa = adset.conversions > 0 ? adset.spend / adset.conversions : 0;
@@ -162,9 +168,10 @@ function AdSetRow({ adset, depth = 1 }: { adset: AdSetNode; depth?: number }) {
         </span>
       </button>
       {expanded && adset.ads.map((ad) => (
-        <div
+        <button
           key={ad.id}
-          className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors border-b border-border/20"
+          onClick={() => onAdClick?.(ad.id)}
+          className="group w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/5 transition-colors border-b border-border/20 cursor-pointer"
           style={{ paddingLeft: `${(depth + 1) * 24 + 12}px` }}
         >
           <span className="w-3.5 shrink-0" />
@@ -179,7 +186,8 @@ function AdSetRow({ adset, depth = 1 }: { adset: AdSetNode; depth?: number }) {
           {ad.primary_text && (
             <span className="text-xs text-muted-foreground truncate max-w-[200px] hidden lg:block">{ad.primary_text}</span>
           )}
-        </div>
+          <Pencil className="w-3 h-3 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 shrink-0" />
+        </button>
       ))}
     </>
   );
@@ -193,10 +201,12 @@ function CampaignRow({
   campaign,
   connectionIds,
   onToggleExpand,
+  onAdClick,
 }: {
   campaign: CampaignNode;
   connectionIds: string[];
   onToggleExpand: (campaignId: string) => void;
+  onAdClick?: (adId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -261,7 +271,7 @@ function CampaignRow({
             <div className="px-6 py-4 text-sm text-muted-foreground">Sin Ad Sets encontrados para esta campaña.</div>
           )}
           {campaign.adsets.map((adset) => (
-            <AdSetRow key={adset.id} adset={adset} />
+            <AdSetRow key={adset.id} adset={adset} onAdClick={onAdClick} />
           ))}
           {/* Inline actions */}
           <div className="flex items-center gap-2 px-4 py-2 border-t border-border/30">
@@ -294,6 +304,63 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
   const [syncing, setSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+
+  // ---------- Ad edit dialog state ----------
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
+  const [adEditData, setAdEditData] = useState<any>(null);
+  const [loadingAdEdit, setLoadingAdEdit] = useState(false);
+  const [savingAdEdit, setSavingAdEdit] = useState(false);
+
+  const handleAdClick = async (adId: string) => {
+    if (!connectionIds.length) return;
+    setEditingAdId(adId);
+    setLoadingAdEdit(true);
+    try {
+      const { data, error } = await callApi('manage-meta-campaign', {
+        body: { action: 'get_ad_details', connection_id: connectionIds[0], campaign_id: adId },
+      });
+      if (error) throw new Error(typeof error === 'string' ? error : 'Error fetching ad details');
+      setAdEditData(data?.ad || null);
+    } catch (err) {
+      console.error('Failed to fetch ad details:', err);
+      toast.error('Error al cargar detalles del anuncio');
+      setEditingAdId(null);
+    } finally {
+      setLoadingAdEdit(false);
+    }
+  };
+
+  const handleAdSave = async () => {
+    if (!editingAdId || !adEditData || !connectionIds.length) return;
+    setSavingAdEdit(true);
+    try {
+      const { error } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'update_ad',
+          connection_id: connectionIds[0],
+          campaign_id: editingAdId,
+          data: {
+            primary_text: adEditData.primary_text,
+            headline: adEditData.headline,
+            description: adEditData.description,
+            image_url: adEditData.image_url,
+            cta: adEditData.cta,
+            destination_url: adEditData.destination_url,
+            page_id: adEditData.page_id,
+          },
+        },
+      });
+      if (error) throw new Error(typeof error === 'string' ? error : 'Error updating ad');
+      toast.success('Anuncio actualizado correctamente');
+      setEditingAdId(null);
+      setAdEditData(null);
+    } catch (err) {
+      console.error('Failed to update ad:', err);
+      toast.error('Error al actualizar anuncio');
+    } finally {
+      setSavingAdEdit(false);
+    }
+  };
 
   // ---------- Fetch campaigns ----------
   const fetchCampaigns = useCallback(async () => {
@@ -587,10 +654,95 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
               campaign={campaign}
               connectionIds={connectionIds}
               onToggleExpand={fetchAdSets}
+              onAdClick={handleAdClick}
             />
           ))}
         </div>
       )}
+
+      {/* Ad Edit Dialog */}
+      <Dialog open={!!editingAdId} onOpenChange={(open) => { if (!open) { setEditingAdId(null); setAdEditData(null); } }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Editar anuncio</DialogTitle>
+          </DialogHeader>
+          {loadingAdEdit ? (
+            <div className="py-8 text-center text-muted-foreground">Cargando detalles...</div>
+          ) : adEditData ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label>Texto principal</Label>
+                  <Textarea
+                    value={adEditData.primary_text || ''}
+                    onChange={(e) => setAdEditData({ ...adEditData, primary_text: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label>Headline</Label>
+                  <Input
+                    value={adEditData.headline || ''}
+                    onChange={(e) => setAdEditData({ ...adEditData, headline: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Descripcion</Label>
+                  <Input
+                    value={adEditData.description || ''}
+                    onChange={(e) => setAdEditData({ ...adEditData, description: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>URL de imagen</Label>
+                  <Input
+                    value={adEditData.image_url || ''}
+                    onChange={(e) => setAdEditData({ ...adEditData, image_url: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>URL de destino</Label>
+                  <Input
+                    value={adEditData.destination_url || ''}
+                    onChange={(e) => setAdEditData({ ...adEditData, destination_url: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>CTA</Label>
+                  <Select value={adEditData.cta || 'SHOP_NOW'} onValueChange={(v) => setAdEditData({ ...adEditData, cta: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SHOP_NOW">Shop Now</SelectItem>
+                      <SelectItem value="LEARN_MORE">Learn More</SelectItem>
+                      <SelectItem value="SIGN_UP">Sign Up</SelectItem>
+                      <SelectItem value="SUBSCRIBE">Subscribe</SelectItem>
+                      <SelectItem value="CONTACT_US">Contact Us</SelectItem>
+                      <SelectItem value="GET_OFFER">Get Offer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="mb-2 block">Vista previa</Label>
+                <AdPreviewMockup
+                  imageUrl={adEditData.image_url || ''}
+                  primaryText={adEditData.primary_text || ''}
+                  headline={adEditData.headline || ''}
+                  description={adEditData.description || ''}
+                  cta={adEditData.cta || 'SHOP_NOW'}
+                  destinationUrl={adEditData.destination_url || ''}
+                />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingAdId(null); setAdEditData(null); }}>Cancelar</Button>
+            <Button onClick={handleAdSave} disabled={savingAdEdit}>
+              {savingAdEdit ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

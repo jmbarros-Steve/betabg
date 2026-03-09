@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useMetaBusiness } from './MetaBusinessContext';
 import { Button } from '@/components/ui/button';
@@ -430,6 +430,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [executing, setExecuting] = useState(false);
 
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -443,10 +444,10 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
   const fetchRules = useCallback(async () => {
     if (!clientId || !ctxConnectionId) return;
     try {
-      const { data, error } = await supabase.functions.invoke('manage-meta-rules', {
+      const { data, error } = await callApi('manage-meta-rules', {
         body: { action: 'list', client_id: clientId, connection_id: ctxConnectionId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       const dbRules: AutomatedRule[] = (data?.rules || []).map((r: any) => ({
         id: r.id,
@@ -599,7 +600,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
     setSaving(true);
     try {
       if (editingRule) {
-        const { error } = await supabase.functions.invoke('manage-meta-rules', {
+        const { error } = await callApi('manage-meta-rules', {
           body: {
             action: 'update',
             client_id: clientId,
@@ -615,10 +616,10 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             },
           },
         });
-        if (error) throw error;
+        if (error) throw new Error(error);
         toast.success('Regla actualizada correctamente');
       } else {
-        const { error } = await supabase.functions.invoke('manage-meta-rules', {
+        const { error } = await callApi('manage-meta-rules', {
           body: {
             action: 'create',
             client_id: clientId,
@@ -633,7 +634,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             },
           },
         });
-        if (error) throw error;
+        if (error) throw new Error(error);
         toast.success('Regla creada correctamente');
       }
 
@@ -658,10 +659,10 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
     setRules((prev) => prev.map((r) => r.id === ruleId ? { ...r, isActive: !r.isActive } : r));
 
     try {
-      const { error } = await supabase.functions.invoke('manage-meta-rules', {
+      const { error } = await callApi('manage-meta-rules', {
         body: { action: 'toggle', client_id: clientId, connection_id: ctxConnectionId, rule_id: ruleId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
       toast.info(`Regla "${rule.name}" ${!rule.isActive ? 'activada' : 'pausada'}`);
     } catch (err) {
       // Revert optimistic update
@@ -675,15 +676,38 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
     const rule = rules.find((r) => r.id === ruleId);
 
     try {
-      const { error } = await supabase.functions.invoke('manage-meta-rules', {
+      const { error } = await callApi('manage-meta-rules', {
         body: { action: 'delete', client_id: clientId, connection_id: ctxConnectionId, rule_id: ruleId },
       });
-      if (error) throw error;
+      if (error) throw new Error(error);
       setRules((prev) => prev.filter((r) => r.id !== ruleId));
       setDeleteConfirmId(null);
       if (rule) toast.success(`Regla "${rule.name}" eliminada`);
     } catch (err) {
       toast.error('Error al eliminar regla');
+    }
+  };
+
+  const handleExecuteRules = async () => {
+    if (!ctxConnectionId) return;
+    setExecuting(true);
+    try {
+      const { data, error } = await callApi('manage-meta-rules', {
+        body: { action: 'execute', client_id: clientId, connection_id: ctxConnectionId },
+      });
+      if (error) throw new Error(error);
+      const executed = data?.executed || 0;
+      if (executed > 0) {
+        toast.success(`${executed} acción(es) ejecutada(s)`);
+      } else {
+        toast.info('Ninguna regla se activó con los datos actuales');
+      }
+      await fetchRules();
+    } catch (err) {
+      console.error('[MetaAutomatedRules] Execute error:', err);
+      toast.error('Error al evaluar reglas');
+    } finally {
+      setExecuting(false);
     }
   };
 
@@ -1333,10 +1357,22 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             Automatiza la gestión de tus campañas con reglas inteligentes basadas en métricas.
           </p>
         </div>
-        <Button onClick={openCreate} className="shrink-0">
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva regla
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExecuteRules}
+            disabled={!activeRuleCount || executing}
+            className="gap-1.5"
+          >
+            {executing ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            {executing ? 'Evaluando...' : 'Evaluar reglas'}
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva regla
+          </Button>
+        </div>
       </div>
 
       {/* Stats bar */}
