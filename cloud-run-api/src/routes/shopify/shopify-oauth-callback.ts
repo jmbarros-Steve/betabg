@@ -200,31 +200,51 @@ export async function shopifyOauthCallback(c: Context) {
     const shopDomain = shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`;
     const normalizedShopDomain = shopDomain.toLowerCase().trim();
 
-    // SECURITY: Validate state parameter (CSRF protection) — also extracts client_id
-    const stateResult = await validateState(supabaseAdmin, stateParam, normalizedShopDomain);
-    if (!stateResult.valid) {
-      console.error('State validation failed:', stateResult.error);
-      if (isDirectRedirect) {
-        return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=${stateResult.error}`, 302);
+    let perClientId: string | undefined;
+    let isPerClient = false;
+    let shopifyClientId: string;
+    let shopifyClientSecret: string;
+
+    // Try state validation first (for flows that went through our shopify-install endpoint)
+    if (stateParam) {
+      const stateResult = await validateState(supabaseAdmin, stateParam, normalizedShopDomain);
+      if (stateResult.valid) {
+        perClientId = stateResult.clientId;
+      } else {
+        console.warn('State validation failed:', stateResult.error, '— will try shop_domain lookup');
       }
-      return c.json({ error: `State validation failed: ${stateResult.error}` }, 400);
     }
 
-    const perClientId = stateResult.clientId;
-    const isPerClient = !!perClientId;
+    // If no client_id from state, look up by shop_domain (for install-link flow)
+    if (!perClientId) {
+      const { data: conn } = await supabaseAdmin
+        .from('platform_connections')
+        .select('client_id, shopify_client_id, shopify_client_secret_encrypted')
+        .eq('shop_domain', normalizedShopDomain)
+        .eq('platform', 'shopify')
+        .not('shopify_client_id', 'is', null)
+        .single();
+
+      if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
+        perClientId = conn.client_id;
+        console.log('Found per-client credentials by shop_domain:', normalizedShopDomain, '-> client:', perClientId);
+      }
+    }
+
+    isPerClient = !!perClientId;
 
     // Resolve Shopify credentials based on mode
     const creds = await resolveShopifyCredentials(supabaseAdmin, perClientId);
     if (!creds) {
-      console.error('Could not resolve Shopify credentials');
+      console.error('Could not resolve Shopify credentials for shop:', normalizedShopDomain);
       if (isDirectRedirect) {
         return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=credentials_not_found`, 302);
       }
-      return c.json({ error: 'Shopify credentials not found' }, 400);
+      return c.json({ error: 'Shopify credentials not found. Configure your app credentials in Steve first.' }, 400);
     }
 
-    const shopifyClientId = creds.clientId;
-    const shopifyClientSecret = creds.clientSecret;
+    shopifyClientId = creds.clientId;
+    shopifyClientSecret = creds.clientSecret;
 
     // Verify HMAC with the correct secret (per-client or centralized)
     if (isDirectRedirect && hmac) {

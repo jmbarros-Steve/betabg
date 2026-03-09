@@ -4,25 +4,34 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 /**
  * Store per-client Shopify OAuth credentials.
  *
- * Receives the client's own Shopify app Client ID and Client Secret,
- * encrypts the secret, upserts into platform_connections, and returns
- * the install URL so the frontend can redirect to Shopify OAuth.
+ * Receives the client's Shopify install link and Client Secret,
+ * parses the client_id from the link, encrypts the secret,
+ * upserts into platform_connections, and returns the install link
+ * so the frontend can redirect to Shopify OAuth.
  *
  * POST /api/store-shopify-credentials (authMiddleware)
- * Body: { clientId, shopifyClientId, shopifyClientSecret, shopDomain }
+ * Body: { clientId, installLink, shopifyClientSecret, shopDomain }
  */
 export async function storeShopifyCredentials(c: Context) {
   try {
     const body = await c.req.json();
-    const { clientId, shopifyClientId, shopifyClientSecret, shopDomain } = body;
+    const { clientId, installLink, shopifyClientSecret, shopDomain } = body;
 
-    if (!clientId || !shopifyClientId || !shopifyClientSecret || !shopDomain) {
-      return c.json({ error: 'Missing required fields: clientId, shopifyClientId, shopifyClientSecret, shopDomain' }, 400);
+    if (!clientId || !installLink || !shopifyClientSecret || !shopDomain) {
+      return c.json({ error: 'Missing required fields: clientId, installLink, shopifyClientSecret, shopDomain' }, 400);
     }
 
-    // Validate shopifyClientId format (basic check)
-    if (shopifyClientId.trim().length < 10) {
-      return c.json({ error: 'Invalid Shopify Client ID' }, 400);
+    // Parse shopifyClientId from the install link
+    // Format: https://admin.shopify.com/store/{handle}/oauth/install?client_id={client_id}
+    let shopifyClientId: string;
+    try {
+      const linkUrl = new URL(installLink.trim());
+      shopifyClientId = linkUrl.searchParams.get('client_id') || '';
+      if (!shopifyClientId) {
+        return c.json({ error: 'No se encontró client_id en el enlace de instalación. Verifica que sea un enlace válido de Shopify Partners.' }, 400);
+      }
+    } catch {
+      return c.json({ error: 'El enlace de instalación no es una URL válida' }, 400);
     }
 
     // Validate shopifyClientSecret format (basic check)
@@ -55,7 +64,6 @@ export async function storeShopifyCredentials(c: Context) {
         .single();
 
       if (!client) {
-        // Check if user is super_admin
         const { data: role } = await supabaseAdmin
           .from('user_roles')
           .select('role, is_super_admin')
@@ -87,18 +95,18 @@ export async function storeShopifyCredentials(c: Context) {
 
     if (existing) {
       await supabaseAdmin.from('platform_connections').update({
-        shopify_client_id: shopifyClientId.trim(),
+        shopify_client_id: shopifyClientId,
         shopify_client_secret_encrypted: encryptedSecret,
         shop_domain: normalizedDomain,
         store_url: `https://${normalizedDomain}`,
-        is_active: false, // Will be activated after successful OAuth
+        is_active: false,
         updated_at: new Date().toISOString(),
       }).eq('id', existing.id);
     } else {
       await supabaseAdmin.from('platform_connections').insert({
         client_id: clientId,
         platform: 'shopify',
-        shopify_client_id: shopifyClientId.trim(),
+        shopify_client_id: shopifyClientId,
         shopify_client_secret_encrypted: encryptedSecret,
         shop_domain: normalizedDomain,
         store_url: `https://${normalizedDomain}`,
@@ -106,16 +114,10 @@ export async function storeShopifyCredentials(c: Context) {
       });
     }
 
-    // Build the install URL — fix protocol for Cloud Run (behind HTTPS LB)
-    const rawUrl = new URL(c.req.url);
-    const proto = c.req.header('x-forwarded-proto') || rawUrl.protocol.replace(':', '');
-    const host = c.req.header('host') || rawUrl.host;
-    const requestOrigin = `${proto}://${host}`;
-    const installUrl = `${requestOrigin}/api/shopify-install?shop=${encodeURIComponent(normalizedDomain)}&client_id=${encodeURIComponent(clientId)}`;
+    console.log('Stored Shopify credentials for client:', clientId, 'shopifyClientId:', shopifyClientId);
 
-    console.log('Stored Shopify credentials for client:', clientId, '-> installUrl:', installUrl);
-
-    return c.json({ success: true, installUrl });
+    // Return the install link directly — the client will be redirected to Shopify
+    return c.json({ success: true, installUrl: installLink.trim() });
   } catch (error: any) {
     console.error('Error in store-shopify-credentials:', error);
     return c.json({ error: error.message }, 500);
