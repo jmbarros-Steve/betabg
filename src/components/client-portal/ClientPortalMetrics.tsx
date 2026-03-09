@@ -480,21 +480,27 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const prevNetRevenue = previous.totalRevenue / (1 + taxRate);
     const prevGrossProfit = prevNetRevenue * marginRate;
 
+    // Include manual Google spend (prorated) in total ad spend for MER/POAS/CAC
+    const prorationFactor = getProrationFactor(dateRange);
+    const manualGoogleSpend = Math.round(financialConfig.manual_google_spend * prorationFactor);
+    const totalAdSpend = current.totalSpend + manualGoogleSpend;
+    const prevTotalAdSpend = previous.totalSpend + manualGoogleSpend;
+
     // POAS = (Gross Profit - Ad Spend) / Ad Spend
-    const poas = current.totalSpend > 0
-      ? (grossProfit - current.totalSpend) / current.totalSpend
+    const poas = totalAdSpend > 0
+      ? (grossProfit - totalAdSpend) / totalAdSpend
       : 0;
-    const previousPoas = previous.totalSpend > 0
-      ? (prevGrossProfit - previous.totalSpend) / previous.totalSpend
+    const previousPoas = prevTotalAdSpend > 0
+      ? (prevGrossProfit - prevTotalAdSpend) / prevTotalAdSpend
       : undefined;
 
     // CAC = Total Ad Spend / Number of orders
-    const cac = current.totalOrders > 0 ? current.totalSpend / current.totalOrders : 0;
-    const previousCac = previous.totalOrders > 0 ? previous.totalSpend / previous.totalOrders : undefined;
+    const cac = current.totalOrders > 0 ? totalAdSpend / current.totalOrders : 0;
+    const previousCac = previous.totalOrders > 0 ? prevTotalAdSpend / previous.totalOrders : undefined;
 
-    // MER = Total Revenue / Total Ad Spend
-    const mer = current.totalSpend > 0 ? current.totalRevenue / current.totalSpend : 0;
-    const previousMer = previous.totalSpend > 0 ? previous.totalRevenue / previous.totalSpend : undefined;
+    // MER = Total Revenue / Total Ad Spend (including manual Google)
+    const mer = totalAdSpend > 0 ? current.totalRevenue / totalAdSpend : 0;
+    const previousMer = prevTotalAdSpend > 0 ? previous.totalRevenue / prevTotalAdSpend : undefined;
 
     // Break-even ROAS = 1 / Margin %
     const breakEvenRoas = marginRate > 0 ? 1 / marginRate : 3.33;
@@ -512,7 +518,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       costOfGoods,
       gatewayFees: current.totalRevenue * gatewayRate,
     };
-  }, [current, previous, financialConfig]);
+  }, [current, previous, financialConfig, dateRange]);
 
   // P&L data
   const profitLossData = useMemo(() => {

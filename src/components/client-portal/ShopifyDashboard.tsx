@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
-import { toast } from 'sonner';
-import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, Package, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, CheckCircle, AlertTriangle, Image, Type, FileText, ChevronDown } from 'lucide-react';
+import { AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
@@ -52,6 +52,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [salesByChannel, setSalesByChannel] = useState<ChannelData[]>([]);
   const [utmPerformance, setUtmPerformance] = useState<UtmData[]>([]);
   const [seoProducts, setSeoProducts] = useState<any[]>([]);
+  const [dailyBreakdown, setDailyBreakdown] = useState<{ date: string; revenue: number; orders: number }[]>([]);
   const [daysBack, setDaysBack] = useState(30);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       setAbandonedCarts(analyticsRes.data?.abandonedCarts || []);
       setSalesByChannel(analyticsRes.data?.salesByChannel || []);
       setUtmPerformance(analyticsRes.data?.utmPerformance || []);
+      setDailyBreakdown(analyticsRes.data?.dailyBreakdown || []);
       if (productsRes.data?.products) {
         setSeoProducts(productsRes.data.products);
       }
@@ -124,6 +126,27 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   const totalChannelRevenue = salesByChannel.reduce((s, c) => s + c.revenue, 0);
 
+  // Aggregate abandoned carts by day
+  const abandonedCartsByDay = useMemo(() => {
+    const byDate: Record<string, { count: number; value: number }> = {};
+    abandonedCarts.forEach((cart) => {
+      const date = cart.abandonedAt ? cart.abandonedAt.split('T')[0] : null;
+      if (!date) return;
+      if (!byDate[date]) byDate[date] = { count: 0, value: 0 };
+      byDate[date].count += 1;
+      byDate[date].value += cart.totalPrice || 0;
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({ date, ...data }));
+  }, [abandonedCarts]);
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -152,6 +175,106 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
           </Button>
         </div>
       </div>
+
+      {/* Daily Sales Chart */}
+      {dailyBreakdown.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="glow-box">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Ventas por Día
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={dailyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="shopifyRevGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(val) => val.slice(5)} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={formatCurrency} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      formatter={(value: number, name: string) => [
+                        name === 'revenue' ? `$${value.toLocaleString('es-CL')} CLP` : value.toLocaleString('es-CL'),
+                        name === 'revenue' ? 'Ingresos' : 'Pedidos'
+                      ]}
+                      labelFormatter={(label) => `Fecha: ${label}`}
+                    />
+                    <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#shopifyRevGrad)" name="revenue" />
+                    <Bar yAxisId="right" dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.4} name="orders" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex items-center justify-center gap-6 mt-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-primary" />
+                  <span className="text-muted-foreground">Ingresos</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-primary opacity-40" />
+                  <span className="text-muted-foreground">Pedidos</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Abandoned Carts by Day */}
+          <Card className="glow-box">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4" />
+                Carritos Abandonados por Día
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {abandonedCartsByDay.length > 0 ? (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={abandonedCartsByDay} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(val) => val.slice(5)} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={formatCurrency} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                        formatter={(value: number, name: string) => [
+                          name === 'value' ? `$${value.toLocaleString('es-CL')} CLP` : value.toLocaleString('es-CL'),
+                          name === 'value' ? 'Valor Perdido' : 'Carritos'
+                        ]}
+                        labelFormatter={(label) => `Fecha: ${label}`}
+                      />
+                      <Bar yAxisId="left" dataKey="count" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} opacity={0.7} name="count" />
+                      <Line yAxisId="right" type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} name="value" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-6">No hay carritos abandonados en este período</p>
+              )}
+              {abandonedCartsByDay.length > 0 && (
+                <div className="flex items-center justify-center gap-6 mt-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-destructive opacity-70" />
+                    <span className="text-muted-foreground">Carritos</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-orange-500" />
+                    <span className="text-muted-foreground">Valor Perdido</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Ventas por Canal */}
       <Card className="glow-box">
@@ -252,6 +375,8 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 }
 
 function SeoAnalysisCard({ products }: { products: any[] }) {
+  const [expandedChecks, setExpandedChecks] = useState<Record<string, boolean>>({});
+
   if (products.length === 0) {
     return (
       <Card className="glow-box">
@@ -285,79 +410,144 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
 
   const checks = [
     {
+      id: 'no-image',
       title: 'Productos sin imagen',
+      icon: Image,
       count: noImage.length,
       total,
-      items: noImage.map((p: any) => p.title).slice(0, 5),
+      items: noImage.map((p: any) => p.title),
       tip: 'Sube al menos una imagen para cada producto. Los productos sin imagen no generan clics.',
     },
     {
+      id: 'missing-alt',
       title: 'Imágenes sin alt text',
+      icon: Image,
       count: missingAlt.length,
       total,
-      items: missingAlt.map((p: any) => p.title).slice(0, 5),
+      items: missingAlt.map((p: any) => p.title),
       tip: 'Configura el alt text en Shopify > Productos > Imagen > Editar texto alternativo.',
     },
     {
+      id: 'short-title',
       title: 'Títulos cortos (<20 chars)',
+      icon: Type,
       count: shortTitle.length,
       total,
-      items: shortTitle.map((p: any) => p.title).slice(0, 5),
+      items: shortTitle.map((p: any) => p.title),
       tip: 'Usa títulos descriptivos con keywords. Ej: "Polera de Algodón Orgánico Azul para Mujer".',
     },
     {
+      id: 'empty-desc',
       title: 'Descripciones vacías o muy cortas',
+      icon: FileText,
       count: emptyDesc.length,
       total,
-      items: emptyDesc.map((p: any) => p.title).slice(0, 5),
+      items: emptyDesc.map((p: any) => p.title),
       tip: 'Las descripciones deben tener al menos 150 caracteres. Google indexa este contenido.',
     },
     {
+      id: 'short-desc',
       title: 'Descripciones mejorables (<150 chars)',
+      icon: FileText,
       count: improvableDesc.length,
       total,
-      items: improvableDesc.map((p: any) => p.title).slice(0, 5),
+      items: improvableDesc.map((p: any) => p.title),
       tip: 'Agrega beneficios, materiales, medidas y usos. Apunta a 300+ caracteres.',
     },
   ];
 
+  // SEO Score: % of checks passed (weighted by affected products)
+  const totalIssues = checks.reduce((s, c) => s + c.count, 0);
+  const maxIssues = checks.length * total;
+  const seoScore = maxIssues > 0 ? Math.round(((maxIssues - totalIssues) / maxIssues) * 100) : 100;
+  const scoreColor = seoScore >= 80 ? 'text-green-500' : seoScore >= 50 ? 'text-orange-500' : 'text-red-500';
+  const scoreBg = seoScore >= 80 ? 'bg-green-500/10 border-green-500/20' : seoScore >= 50 ? 'bg-orange-500/10 border-orange-500/20' : 'bg-red-500/10 border-red-500/20';
+
+  const toggleExpanded = (id: string) => {
+    setExpandedChecks(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
     <Card className="glow-box">
       <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-          <Search className="w-4 h-4" />
-          Análisis SEO Rápido
-        </CardTitle>
-        <CardDescription>Análisis basado en {total} productos activos</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <Search className="w-4 h-4" />
+              Análisis SEO Rápido
+            </CardTitle>
+            <CardDescription className="mt-1">Análisis basado en {total} productos activos</CardDescription>
+          </div>
+          <div className={`flex items-center justify-center w-16 h-16 rounded-full border-2 ${scoreBg}`}>
+            <div className="text-center">
+              <div className={`text-xl font-bold ${scoreColor}`}>{seoScore}</div>
+              <div className="text-[9px] text-muted-foreground -mt-0.5">/ 100</div>
+            </div>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {checks.map((check) => {
             const isOk = check.count === 0;
+            const passedPct = total > 0 ? ((total - check.count) / total) * 100 : 100;
+            const CheckIcon = check.icon;
+            const isExpanded = expandedChecks[check.id] || false;
+
             return (
-              <div key={check.title} className="p-3 border border-border rounded-lg">
+              <div
+                key={check.id}
+                className={`p-3 rounded-lg border transition-colors ${
+                  isOk
+                    ? 'bg-green-500/5 border-green-500/20'
+                    : 'bg-orange-500/5 border-orange-500/20'
+                }`}
+              >
                 <div className="flex items-start gap-3">
-                  {isOk ? (
-                    <CheckCircle className="w-4 h-4 mt-0.5 text-green-500 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 mt-0.5 text-orange-500 shrink-0" />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm">{check.title}</p>
-                      <Badge variant={isOk ? 'default' : 'destructive'} className="text-xs">
+                  <div className={`p-1.5 rounded-md ${isOk ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                    <CheckIcon className={`w-3.5 h-3.5 ${isOk ? 'text-green-500' : 'text-orange-500'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-sm truncate">{check.title}</p>
+                      <Badge variant={isOk ? 'default' : 'destructive'} className="text-xs shrink-0">
                         {check.count}/{check.total}
                       </Badge>
                     </div>
-                    {!isOk && check.items.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {check.items.join(', ')}{check.count > 5 ? ` y ${check.count - 5} más...` : ''}
-                      </p>
-                    )}
+                    {/* Progress bar */}
+                    <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${isOk ? 'bg-green-500' : 'bg-orange-500'}`}
+                        style={{ width: `${passedPct}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {Math.round(passedPct)}% de productos OK
+                    </p>
                     {!isOk && (
-                      <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-                        <strong>Tip:</strong> {check.tip}
-                      </div>
+                      <>
+                        <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+                          <strong>Tip:</strong> {check.tip}
+                        </div>
+                        {check.items.length > 0 && (
+                          <button
+                            onClick={() => toggleExpanded(check.id)}
+                            className="flex items-center gap-1 mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            {isExpanded ? 'Ocultar' : 'Ver'} productos ({check.items.length})
+                          </button>
+                        )}
+                        {isExpanded && (
+                          <div className="mt-1.5 space-y-1 max-h-32 overflow-y-auto">
+                            {check.items.map((item, i) => (
+                              <p key={i} className="text-xs text-muted-foreground truncate pl-1 border-l-2 border-orange-500/30">
+                                {item}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
