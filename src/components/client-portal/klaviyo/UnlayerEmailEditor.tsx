@@ -23,6 +23,7 @@ interface UnlayerEmailEditorProps {
 
 export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: UnlayerEmailEditorProps) {
   const emailEditorRef = useRef<EditorRef>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [emails, setEmails] = useState<EditorEmail[]>(() =>
     initialEmails.map((e) => ({
@@ -39,6 +40,22 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
   useEffect(() => {
     if (editorReady && currentEmail?.designJson) {
       emailEditorRef.current?.editor?.loadDesign(currentEmail.designJson as any);
+    }
+  }, [editorReady]);
+
+  // Force react-email-editor internal divs to fill container height
+  // The library sets hardcoded heights (500px/150px) on its wrapper divs
+  useEffect(() => {
+    if (!editorReady || !editorContainerRef.current) return;
+    const container = editorContainerRef.current;
+    // Target: container > react-email-editor-root > inner-flex-div
+    const root = container.querySelector(':scope > div');
+    if (root instanceof HTMLElement) {
+      root.style.height = '100%';
+      const inner = root.querySelector(':scope > div');
+      if (inner instanceof HTMLElement) {
+        inner.style.height = '100%';
+      }
     }
   }, [editorReady]);
 
@@ -181,7 +198,7 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
 
       {/* Unlayer editor */}
       <div className="flex-1 min-h-0 relative">
-        <div className="absolute inset-0 [&>div]:!h-full [&>div>div]:!h-full">
+        <div ref={editorContainerRef} className="absolute inset-0">
           <EmailEditor
             ref={emailEditorRef}
             onReady={() => setEditorReady(true)}
