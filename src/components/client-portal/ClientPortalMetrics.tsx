@@ -83,6 +83,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
   const [customerMetrics, setCustomerMetrics] = useState<{ conversionRate: number; averageLtv: number; totalCustomers: number; repeatCustomerRate: number } | null>(null);
   const [cohortData, setCohortData] = useState<{ cohort: string; month0: number; month1?: number; month2?: number; month3?: number; month4?: number; month5?: number }[]>([]);
+  const [shopifyDailyData, setShopifyDailyData] = useState<{ date: string; revenue: number; orders: number }[]>([]);
+  const [shopifySummary, setShopifySummary] = useState<{ totalRevenue: number; totalOrders: number; averageOrderValue: number } | null>(null);
 
   useEffect(() => {
     async function fetchAll() {
@@ -193,14 +195,14 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         const currentCampaignMetrics = campaignToMetricRows(campaignCurrentRes.data);
         const prevCampaignMetrics = campaignToMetricRows(campaignPrevRes.data);
 
-        setRawMetrics([
-          ...(currentRes.data ?? []).map((m) => ({
-            metric_type: m.metric_type,
-            metric_value: Number(m.metric_value),
-            metric_date: m.metric_date,
-          })),
-          ...currentCampaignMetrics,
-        ]);
+        const dbMetricRows = (currentRes.data ?? []).map((m) => ({
+          metric_type: m.metric_type,
+          metric_value: Number(m.metric_value),
+          metric_date: m.metric_date,
+        }));
+
+        // Will be populated with Shopify API data if DB has no revenue
+        let additionalMetrics: MetricRow[] = [];
 
         setPreviousMetrics([
           ...(prevRes.data ?? []).map((m) => ({
@@ -274,10 +276,30 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             if (analyticsData?.cohorts) {
               setCohortData(analyticsData.cohorts);
             }
+            if (analyticsData?.dailyBreakdown) {
+              setShopifyDailyData(analyticsData.dailyBreakdown);
+            }
+            if (analyticsData?.summary) {
+              setShopifySummary(analyticsData.summary);
+              // Inject Shopify API revenue/orders if platform_metrics has no revenue data
+              const hasDbRevenue = dbMetricRows.some(m =>
+                ['revenue', 'gross_revenue', 'purchase_value'].includes(m.metric_type) && m.metric_value > 0
+              );
+              if (!hasDbRevenue && analyticsData.summary.totalRevenue > 0) {
+                const today = new Date().toISOString().split('T')[0];
+                additionalMetrics.push(
+                  { metric_type: 'revenue', metric_value: analyticsData.summary.totalRevenue, metric_date: today },
+                  { metric_type: 'orders', metric_value: analyticsData.summary.totalOrders, metric_date: today },
+                );
+              }
+            }
           } catch (e) {
             console.warn('[Metrics] Could not fetch analytics:', e);
           }
         }
+
+        // Set rawMetrics with DB data + any injected Shopify API data
+        setRawMetrics([...dbMetricRows, ...currentCampaignMetrics, ...additionalMetrics]);
       } catch (error) {
         console.error('Error fetching metrics:', error);
       } finally {
@@ -354,6 +376,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const previous = useMemo(() => computeAggregates(previousMetrics), [previousMetrics]);
 
   // Chart data grouped by date - now includes ad spend
+  // Falls back to Shopify daily breakdown if platform_metrics has no daily revenue data
   const chartData = useMemo(() => {
     const byDate: Record<string, { revenue: number; orders: number; spend: number }> = {};
     rawMetrics.forEach((m) => {
@@ -370,10 +393,26 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         byDate[m.metric_date].spend += m.metric_value;
       }
     });
-    return Object.entries(byDate)
+    const dbChartEntries = Object.entries(byDate)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, data]) => ({ date, ...data }));
-  }, [rawMetrics]);
+
+    // If DB has no daily revenue data, use Shopify API daily breakdown
+    const hasDbDailyRevenue = dbChartEntries.some(d => d.revenue > 0);
+    if (!hasDbDailyRevenue && shopifyDailyData.length > 0) {
+      // Merge Shopify daily revenue with any existing ad spend data
+      const spendByDate: Record<string, number> = {};
+      dbChartEntries.forEach(d => { if (d.spend > 0) spendByDate[d.date] = d.spend; });
+      return shopifyDailyData.map(d => ({
+        date: d.date,
+        revenue: d.revenue,
+        orders: d.orders,
+        spend: spendByDate[d.date] || 0,
+      }));
+    }
+
+    return dbChartEntries;
+  }, [rawMetrics, shopifyDailyData]);
 
   // Calculate profit metrics
   const profitMetrics = useMemo(() => {

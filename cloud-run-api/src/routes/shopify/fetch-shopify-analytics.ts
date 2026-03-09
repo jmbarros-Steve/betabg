@@ -103,11 +103,20 @@ export async function fetchShopifyAnalytics(c: Context) {
     const channelMap = new Map<string, { channel: string; orders: number; revenue: number }>();
     const utmMap = new Map<string, { utm: string; source: string; medium: string; campaign: string; orders: number; revenue: number }>();
 
-    // Customer metrics tracking
+    // Customer metrics tracking — accumulate revenue from orders (not customer.total_spent)
     const customerMap = new Map<number, { orders_count: number; total_spent: number; created_at: string }>();
     let totalOrderCount = 0;
     let paidOrderCount = 0;
     const orderDates: { customerId: number; orderDate: string }[] = [];
+
+    // Daily breakdown for charts
+    const dailyMap = new Map<string, { revenue: number; orders: number }>();
+
+    // Track customers who had abandoned checkouts for real conversion rate
+    const checkoutCustomerEmails = new Set<string>();
+
+    // Totals for summary
+    let totalRevenue = 0;
 
     if (ordersRes.ok) {
       const { orders }: any = await ordersRes.json();
@@ -115,6 +124,16 @@ export async function fetchShopifyAnalytics(c: Context) {
 
       for (const order of (orders || [])) {
         const orderRevenue = parseFloat(order.total_price || '0');
+        totalRevenue += orderRevenue;
+
+        // Daily breakdown for charts
+        const dateKey = (order.created_at || '').split('T')[0];
+        if (dateKey) {
+          const dayEntry = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
+          dayEntry.revenue += orderRevenue;
+          dayEntry.orders += 1;
+          dailyMap.set(dateKey, dayEntry);
+        }
 
         // SKU tracking
         for (const item of (order.line_items || [])) {
@@ -157,10 +176,15 @@ export async function fetchShopifyAnalytics(c: Context) {
         }
         const cust = order.customer;
         if (cust?.id) {
-          if (!customerMap.has(cust.id)) {
+          const existing = customerMap.get(cust.id);
+          if (existing) {
+            // Accumulate revenue from orders (more reliable than customer.total_spent)
+            existing.orders_count += 1;
+            existing.total_spent += orderRevenue;
+          } else {
             customerMap.set(cust.id, {
-              orders_count: Number(cust.orders_count) || 1,
-              total_spent: parseFloat(cust.total_spent || '0'),
+              orders_count: 1,
+              total_spent: orderRevenue,
               created_at: cust.created_at || order.created_at,
             });
           }
@@ -185,18 +209,12 @@ export async function fetchShopifyAnalytics(c: Context) {
 
     // --- CUSTOMER METRICS ---
     const uniqueCustomers = customerMap.size;
-    const conversionRate = totalOrderCount > 0 ? (paidOrderCount / totalOrderCount) * 100 : 0;
+    // Conversion rate: customers who bought / (customers who bought + customers who only abandoned checkout)
+    // checkoutCustomerEmails is populated after checkouts are fetched — will be computed below
     const totalLtv = Array.from(customerMap.values()).reduce((sum, c) => sum + c.total_spent, 0);
     const averageLtv = uniqueCustomers > 0 ? totalLtv / uniqueCustomers : 0;
     const repeatCustomers = Array.from(customerMap.values()).filter(c => c.orders_count > 1).length;
     const repeatCustomerRate = uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0;
-
-    const customerMetrics = {
-      conversionRate: Math.round(conversionRate * 100) / 100,
-      averageLtv: Math.round(averageLtv * 100) / 100,
-      totalCustomers: uniqueCustomers,
-      repeatCustomerRate: Math.round(repeatCustomerRate * 100) / 100,
-    };
 
     // --- COHORT ANALYSIS ---
     const cohortMap = new Map<string, { total: number; months: Map<number, Set<number>> }>();
@@ -250,25 +268,60 @@ export async function fetchShopifyAnalytics(c: Context) {
       const { checkouts }: any = await checkoutsRes.json();
       console.log(`[fetch-shopify-analytics] Fetched ${checkouts?.length || 0} abandoned checkouts`);
 
-      abandonedCarts = (checkouts || []).map((c: any) => ({
-        id: String(c.id),
-        customerEmail: c.email || c.customer?.email || '',
-        customerName: c.customer
-          ? `${c.customer.first_name || ''} ${c.customer.last_name || ''}`.trim()
-          : (c.email || 'Sin nombre'),
-        totalValue: parseFloat(c.total_price || '0'),
-        itemCount: (c.line_items || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
-        abandonedAt: c.created_at,
-        contacted: false,
-      }));
+      abandonedCarts = (checkouts || []).map((c: any) => {
+        const email = c.email || c.customer?.email || '';
+        if (email) checkoutCustomerEmails.add(email.toLowerCase());
+        return {
+          id: String(c.id),
+          customerEmail: email,
+          customerName: c.customer
+            ? `${c.customer.first_name || ''} ${c.customer.last_name || ''}`.trim()
+            : (c.email || 'Sin nombre'),
+          phone: c.shipping_address?.phone || c.billing_address?.phone || c.customer?.phone || null,
+          totalValue: parseFloat(c.total_price || '0'),
+          itemCount: (c.line_items || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
+          lineItems: (c.line_items || []).map((li: any) => ({
+            title: li.title || '',
+            quantity: li.quantity || 1,
+            price: parseFloat(li.price || '0'),
+            variantTitle: li.variant_title || '',
+          })),
+          abandonedAt: c.created_at,
+          contacted: false,
+        };
+      });
     } else {
       const errText = await checkoutsRes.text();
       console.warn('[fetch-shopify-analytics] Checkouts fetch failed:', checkoutsRes.status, errText);
     }
 
-    console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs, ${uniqueCustomers} customers, ${cohorts.length} cohorts`);
+    // --- REAL CONVERSION RATE (checkout → purchase) ---
+    // Completed orders / (completed orders + abandoned checkouts) as checkout-to-purchase ratio
+    const totalCheckoutAttempts = paidOrderCount + abandonedCarts.length;
+    const conversionRate = totalCheckoutAttempts > 0 ? (paidOrderCount / totalCheckoutAttempts) * 100 : 0;
 
-    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts });
+    const customerMetrics = {
+      conversionRate: Math.round(conversionRate * 100) / 100,
+      averageLtv: Math.round(averageLtv * 100) / 100,
+      totalCustomers: uniqueCustomers,
+      repeatCustomerRate: Math.round(repeatCustomerRate * 100) / 100,
+    };
+
+    // Daily breakdown for charts
+    const dailyBreakdown = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({ date, revenue: Math.round(data.revenue), orders: data.orders }));
+
+    // Summary totals
+    const summary = {
+      totalRevenue: Math.round(totalRevenue),
+      totalOrders: totalOrderCount,
+      averageOrderValue: totalOrderCount > 0 ? Math.round(totalRevenue / totalOrderCount) : 0,
+    };
+
+    console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs, ${uniqueCustomers} customers, ${cohorts.length} cohorts, revenue=${summary.totalRevenue}`);
+
+    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary });
 
   } catch (error: any) {
     console.error('[fetch-shopify-analytics] Error:', error);

@@ -20,7 +20,7 @@ export function ConversionLtvPanel({
     {
       title: 'Tasa de Conversión',
       value: `${conversionRate.toFixed(2)}%`,
-      description: 'Visitas → Compras',
+      description: 'Checkouts → Compras completadas',
       icon: Percent,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
