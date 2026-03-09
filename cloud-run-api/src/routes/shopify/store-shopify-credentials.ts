@@ -106,8 +106,11 @@ export async function storeShopifyCredentials(c: Context) {
       });
     }
 
-    // Build the install URL pointing to our own shopify-install endpoint with client_id
-    const requestOrigin = new URL(c.req.url).origin;
+    // Build the install URL — fix protocol for Cloud Run (behind HTTPS LB)
+    const rawUrl = new URL(c.req.url);
+    const proto = c.req.header('x-forwarded-proto') || rawUrl.protocol.replace(':', '');
+    const host = c.req.header('host') || rawUrl.host;
+    const requestOrigin = `${proto}://${host}`;
     const installUrl = `${requestOrigin}/api/shopify-install?shop=${encodeURIComponent(normalizedDomain)}&client_id=${encodeURIComponent(clientId)}`;
 
     console.log('Stored Shopify credentials for client:', clientId, '-> installUrl:', installUrl);

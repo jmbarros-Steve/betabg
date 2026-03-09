@@ -196,9 +196,13 @@ export async function shopifyInstall(c: Context) {
     // Build Shopify OAuth URL
     const scopes = 'read_orders,read_analytics,write_discounts,read_discounts,read_checkouts,read_products';
 
-    // Derive the callback URL from the current request origin
-    const requestOrigin = new URL(c.req.url).origin;
+    // Derive the callback URL — fix protocol for Cloud Run (behind HTTPS LB)
+    const rawUrl = new URL(c.req.url);
+    const proto = c.req.header('x-forwarded-proto') || rawUrl.protocol.replace(':', '');
+    const host = c.req.header('host') || rawUrl.host;
+    const requestOrigin = `${proto}://${host}`;
     const redirectUri = `${requestOrigin}/api/shopify-oauth-callback`;
+    console.log('Constructed redirect_uri:', redirectUri);
 
     const authUrl = new URL(`https://${shopDomain}/admin/oauth/authorize`);
     authUrl.searchParams.set('client_id', shopifyClientId);

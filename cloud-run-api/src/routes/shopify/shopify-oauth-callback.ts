@@ -519,7 +519,11 @@ export async function shopifyOauthCallback(c: Context) {
  * Register Shopify webhooks for the connected store.
  */
 async function registerWebhooks(c: Context, shopDomain: string, accessToken: string) {
-  const requestOrigin = new URL(c.req.url).origin;
+  // Fix protocol for Cloud Run (behind HTTPS LB)
+  const rawUrl = new URL(c.req.url);
+  const proto = c.req.header('x-forwarded-proto') || rawUrl.protocol.replace(':', '');
+  const host = c.req.header('host') || rawUrl.host;
+  const requestOrigin = `${proto}://${host}`;
   const gdprWebhookUrl = `${requestOrigin}/api/shopify-gdpr-webhooks`;
   const fulfillmentWebhookUrl = `${requestOrigin}/api/shopify-fulfillment-webhooks`;
 
