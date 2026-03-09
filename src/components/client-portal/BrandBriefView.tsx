@@ -34,7 +34,8 @@ import {
   Target, Heart, Shield, TrendingUp, Gem, Gift,
   Search, Globe, BarChart3, Key, Megaphone, Image,
   Sparkles, Award, AlertTriangle, TrendingDown, Lightbulb, MapPin, Briefcase,
-  ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp, Loader2
+  ArrowRight, Zap, Rocket, LayoutDashboard, ChevronDown, ChevronUp, Loader2,
+  ChevronRight, Palette
 } from 'lucide-react';
 
 // Error Boundary to prevent blank screens
@@ -3680,6 +3681,247 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       )}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+              );
+            })()}
+
+            {/* BUYER PERSONA SECUNDARIO */}
+            {(() => {
+              const bp2 = (research as any).consumer_profile?.buyer_persona_secundario;
+              if (!bp2 || typeof bp2 !== 'object') return null;
+              const name2 = bp2.nombre_ficticio || bp2.nombre || '';
+              const age2 = bp2.edad || bp2.demografia?.edad || '';
+              const gender2 = (bp2.genero || bp2.demografia?.genero || '').toLowerCase();
+              const loc2 = bp2.ubicacion || bp2.demografia?.ubicacion || '';
+              const occ2 = bp2.ocupacion || bp2.demografia?.ocupacion || '';
+              const profile2 = bp2.perfil_breve || '';
+              const motivs2 = bp2.motivadores_principales || bp2.motivadores_compra || [];
+              const img2 = gender2.includes('fem') || gender2.includes('mujer') ? personaFemale : personaMale;
+              return (
+              <Card className="border border-border/60">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    Buyer Persona Secundario
+                    <span className="text-[10px] px-2 py-0.5 bg-muted text-muted-foreground rounded-full font-medium ml-auto">AI</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex gap-4 items-start">
+                    <img src={img2} alt="Persona Secundaria" className="w-16 h-16 rounded-lg object-cover border border-border flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h4 className="font-semibold text-sm">{name2}</h4>
+                        {age2 && <span className="text-xs text-muted-foreground">{age2}</span>}
+                        {loc2 && <span className="text-xs text-muted-foreground flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{loc2}</span>}
+                      </div>
+                      {occ2 && <p className="text-xs text-muted-foreground mb-1">{occ2}</p>}
+                      {profile2 && <p className="text-xs leading-relaxed mb-2">{profile2}</p>}
+                      {Array.isArray(motivs2) && motivs2.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {motivs2.slice(0, 4).map((m: string, i: number) => (
+                            <span key={i} className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">{m}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              );
+            })()}
+
+            {/* CUSTOMER JOURNEY */}
+            {(() => {
+              const journey = (research as any).consumer_profile?.journey_compra;
+              if (!journey || typeof journey !== 'object') return null;
+              const phases = [
+                { key: 'descubrimiento', label: 'Descubrimiento', icon: '🔍', color: 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800', textColor: 'text-blue-700 dark:text-blue-400' },
+                { key: 'consideracion', label: 'Consideracion', icon: '🤔', color: 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800', textColor: 'text-amber-700 dark:text-amber-400' },
+                { key: 'decision', label: 'Decision', icon: '✅', color: 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800', textColor: 'text-green-700 dark:text-green-400' },
+                { key: 'post_compra', label: 'Post-Compra', icon: '🔄', color: 'bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800', textColor: 'text-purple-700 dark:text-purple-400' },
+              ].filter(p => journey[p.key]);
+              if (phases.length === 0) return null;
+              return (
+              <Card className="border-primary/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Customer Journey
+                    <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium ml-auto">AI</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {/* Phase arrows */}
+                  <div className="flex items-center justify-center gap-1 mb-4">
+                    {phases.map((p, i) => (
+                      <div key={p.key} className="flex items-center">
+                        <div className={`text-center px-3 py-1.5 rounded-lg border ${p.color}`}>
+                          <span className="text-sm">{p.icon}</span>
+                          <p className={`text-[10px] font-semibold ${p.textColor}`}>{p.label}</p>
+                        </div>
+                        {i < phases.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-0.5 flex-shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Phase details */}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {phases.map(p => {
+                      const d = journey[p.key];
+                      if (!d || typeof d !== 'object') return null;
+                      // Extract the main list from the phase
+                      const mainList = d.como_llegan || d.que_evaluan || d.que_los_convence || d.que_esperan_despues || [];
+                      const subtitle = d.triggers || d.fuentes_investigacion || d.momento_critico || d.oportunidad_recompra || '';
+                      return (
+                        <div key={p.key} className={`rounded-lg p-3 border ${p.color}`}>
+                          <p className={`text-xs font-bold ${p.textColor} mb-1.5`}>{p.icon} {p.label}</p>
+                          {subtitle && <p className="text-[11px] text-muted-foreground italic mb-1.5">{typeof subtitle === 'string' ? subtitle : ''}</p>}
+                          {Array.isArray(mainList) && mainList.length > 0 && (
+                            <ul className="space-y-0.5">
+                              {mainList.slice(0, 4).map((item: string, j: number) => (
+                                <li key={j} className="text-[11px] flex items-start gap-1"><span className={`${p.textColor} mt-0.5`}>-</span>{item}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+              );
+            })()}
+
+            {/* BRAND IDENTITY */}
+            {(() => {
+              const bi = (research as any).brand_identity;
+              if (!bi || typeof bi !== 'object') return null;
+              const hasSomething = bi.propuesta_valor_actual || bi.personalidad_marca || bi.tono_voz;
+              if (!hasSomething) return null;
+              return (
+              <Card className="border-primary/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-primary" />
+                    Identidad de Marca
+                    <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium ml-auto">AI</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-3">
+                  {bi.propuesta_valor_actual && (
+                    <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">Propuesta de Valor</p>
+                      <p className="text-sm leading-relaxed">{bi.propuesta_valor_actual}</p>
+                    </div>
+                  )}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {bi.personalidad_marca && (
+                      <div className="bg-muted/50 rounded-lg p-3">
+                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">Personalidad</p>
+                        <p className="text-xs leading-relaxed">{typeof bi.personalidad_marca === 'string' ? bi.personalidad_marca : safeText(bi.personalidad_marca)}</p>
+                      </div>
+                    )}
+                    {bi.tono_voz && (
+                      <div className="bg-muted/50 rounded-lg p-3">
+                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">Tono de Voz</p>
+                        {typeof bi.tono_voz === 'object' ? (
+                          <div className="space-y-1">
+                            {bi.tono_voz.estilo && <p className="text-xs"><span className="font-medium">Estilo:</span> {bi.tono_voz.estilo}</p>}
+                            {bi.tono_voz.personalidad && <p className="text-xs"><span className="font-medium">Personalidad:</span> {bi.tono_voz.personalidad}</p>}
+                          </div>
+                        ) : <p className="text-xs leading-relaxed">{String(bi.tono_voz)}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {bi.diferenciadores_vs_competidores && typeof bi.diferenciadores_vs_competidores === 'object' && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-2">Diferenciadores vs Competencia</p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {Object.entries(bi.diferenciadores_vs_competidores).map(([k, v]: [string, any]) => (
+                          <div key={k} className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 border border-green-200 dark:border-green-800">
+                            <p className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase mb-0.5">{k.replace(/^vs_/, '').replace(/_/g, ' ')}</p>
+                            <p className="text-[11px] leading-relaxed">{typeof v === 'string' ? v : safeText(v)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {Array.isArray(bi.gaps_identidad) && bi.gaps_identidad.length > 0 && (
+                    <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
+                      <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1.5">Gaps de Identidad (Oportunidades de Mejora)</p>
+                      <ul className="space-y-1">
+                        {bi.gaps_identidad.slice(0, 5).map((gap: string, i: number) => (
+                          <li key={i} className="text-[11px] flex items-start gap-1.5"><span className="text-amber-500 mt-0.5 flex-shrink-0">!</span>{gap}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              );
+            })()}
+
+            {/* FINANCIAL OVERVIEW */}
+            {(() => {
+              const fi = (research as any).financial_analysis;
+              if (!fi || typeof fi !== 'object') return null;
+              const hasSomething = fi.pricing_strategy || fi.business_model || fi.financial_insights;
+              if (!hasSomething) return null;
+              return (
+              <Card className="border-primary/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    Analisis Financiero
+                    <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium ml-auto">AI</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-3">
+                  <div className="grid sm:grid-cols-3 gap-2">
+                    {fi.business_model && (
+                      <div className="bg-primary/5 rounded-lg p-3 text-center border border-primary/10">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Modelo</p>
+                        <p className="text-xs font-semibold text-primary">{fi.business_model}</p>
+                      </div>
+                    )}
+                    {fi.pricing_strategy && (
+                      <div className="bg-primary/5 rounded-lg p-3 text-center border border-primary/10">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Pricing</p>
+                        <p className="text-xs font-semibold text-primary">{fi.pricing_strategy}</p>
+                      </div>
+                    )}
+                    {fi.price_range && (
+                      <div className="bg-primary/5 rounded-lg p-3 text-center border border-primary/10">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Rango Precios</p>
+                        <p className="text-xs font-semibold text-primary">{fi.price_range.min} — {fi.price_range.max}</p>
+                        {fi.price_range.ticket_promedio_declarado && <p className="text-[10px] text-muted-foreground">Ticket prom: {fi.price_range.ticket_promedio_declarado}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {fi.financial_insights && typeof fi.financial_insights === 'object' && (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {Object.entries(fi.financial_insights).map(([k, v]: [string, any]) => (
+                        <div key={k} className="bg-muted/50 rounded-lg p-2">
+                          <p className="text-[10px] font-semibold text-primary uppercase mb-0.5">{k.replace(/_/g, ' ')}</p>
+                          <p className="text-[11px] leading-relaxed">{typeof v === 'string' ? v : safeText(v)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {Array.isArray(fi.monetization_opportunities) && fi.monetization_opportunities.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-2">Oportunidades de Monetizacion</p>
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        {fi.monetization_opportunities.slice(0, 4).map((opp: any, i: number) => (
+                          <div key={i} className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 border border-green-200 dark:border-green-800">
+                            <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-0.5">{opp.opportunity || opp.oportunidad || ''}</p>
+                            <p className="text-[11px] leading-relaxed">{opp.description || opp.descripcion || ''}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               );
