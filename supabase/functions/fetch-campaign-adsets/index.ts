@@ -159,6 +159,32 @@ Deno.serve(async (req) => {
             a.action_type === 'purchase' || a.action_type === 'omni_purchase'
           );
 
+          // Fetch ads for this ad set
+          let ads: Array<{ id: string; name: string; status: string; creative_id?: string; thumbnail_url?: string; body?: string; title?: string; image_url?: string }> = [];
+          try {
+            const adsUrl = new URL(`https://graph.facebook.com/v18.0/${adset.id}/ads`);
+            adsUrl.searchParams.set('access_token', decryptedToken);
+            adsUrl.searchParams.set('fields', 'id,name,status,creative{id,name,thumbnail_url,body,title,image_url}');
+            adsUrl.searchParams.set('limit', '50');
+
+            const adsRes = await fetch(adsUrl.toString());
+            if (adsRes.ok) {
+              const adsData = await adsRes.json();
+              ads = (adsData.data || []).map((ad: any) => ({
+                id: ad.id,
+                name: ad.name,
+                status: ad.status,
+                creative_id: ad.creative?.id || null,
+                thumbnail_url: ad.creative?.thumbnail_url || null,
+                body: ad.creative?.body || '',
+                title: ad.creative?.title || '',
+                image_url: ad.creative?.image_url || null,
+              }));
+            }
+          } catch (adsErr) {
+            console.error(`Error fetching ads for adset ${adset.id}:`, adsErr);
+          }
+
           adSets.push({
             id: adset.id,
             name: adset.name,
@@ -172,6 +198,7 @@ Deno.serve(async (req) => {
             conversions: parseFloat(purchases?.value || '0'),
             conversion_value: parseFloat(purchaseValue?.value || '0'),
             roas: parseFloat(roas?.value || '0'),
+            ads,
           });
         } catch (e) {
           console.error(`Error fetching insights for adset ${adset.id}:`, e);

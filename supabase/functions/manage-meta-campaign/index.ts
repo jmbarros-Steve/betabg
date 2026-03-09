@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const META_API_BASE = 'https://graph.facebook.com/v18.0';
 
-type Action = 'create' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
+type Action = 'create' | 'create_creative' | 'create_ad' | 'create_full' | 'create_322_test' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
 
 interface RequestBody {
   action: Action;
@@ -498,6 +498,346 @@ async function handleArchive(
   );
 }
 
+// ─── New action handlers: Creative, Ad, Full, 322 ────────────────────────────
+
+async function handleCreateCreative(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>
+): Promise<Response> {
+  const { page_id, image_url, primary_text, headline, description, cta, destination_url, name } = data;
+
+  if (!page_id || !destination_url) {
+    return new Response(
+      JSON.stringify({ error: 'Missing required fields: page_id, destination_url' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const linkData: Record<string, any> = {
+    link: destination_url,
+    message: primary_text || '',
+  };
+  if (image_url) linkData.image_url = image_url;
+  if (headline) linkData.name = headline;
+  if (description) linkData.description = description;
+  if (cta) linkData.call_to_action = { type: cta, value: { link: destination_url } };
+
+  const creativePayload: Record<string, any> = {
+    name: name || `Creative - ${new Date().toISOString().split('T')[0]}`,
+    object_story_spec: JSON.stringify({
+      page_id,
+      link_data: linkData,
+    }),
+  };
+
+  console.log(`[manage-meta-campaign] Creating ad creative for account ${accountId}`);
+  const result = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
+
+  if (!result.ok) {
+    return new Response(
+      JSON.stringify({ error: 'Failed to create ad creative', details: result.error }),
+      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, creative_id: result.data.id }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handleCreateAd(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>
+): Promise<Response> {
+  const { adset_id, creative_id, name, status = 'PAUSED' } = data;
+
+  if (!adset_id || !creative_id) {
+    return new Response(
+      JSON.stringify({ error: 'Missing required fields: adset_id, creative_id' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  console.log(`[manage-meta-campaign] Creating ad in adset ${adset_id}`);
+  const result = await metaApiRequest(`act_${accountId}/ads`, accessToken, 'POST', {
+    name: name || `Ad - ${new Date().toISOString().split('T')[0]}`,
+    adset_id,
+    creative: JSON.stringify({ creative_id }),
+    status,
+  });
+
+  if (!result.ok) {
+    return new Response(
+      JSON.stringify({ error: 'Failed to create ad', details: result.error }),
+      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, ad_id: result.data.id }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handleCreateFull(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>
+): Promise<Response> {
+  const {
+    name,
+    objective = 'OUTCOME_TRAFFIC',
+    status = 'PAUSED',
+    special_ad_categories = [],
+    adset_name,
+    daily_budget,
+    billing_event = 'IMPRESSIONS',
+    optimization_goal = 'LINK_CLICKS',
+    targeting,
+    start_time,
+    end_time,
+    // Creative fields
+    page_id,
+    image_url,
+    primary_text,
+    headline,
+    description,
+    cta,
+    destination_url,
+  } = data;
+
+  if (!name) {
+    return new Response(
+      JSON.stringify({ error: 'Missing required field: name' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Step 1: Create campaign
+  console.log(`[manage-meta-campaign] create_full: Creating campaign "${name}"`);
+  const campaignResult = await metaApiRequest(`act_${accountId}/campaigns`, accessToken, 'POST', {
+    name, objective, status, special_ad_categories,
+  });
+
+  if (!campaignResult.ok) {
+    return new Response(
+      JSON.stringify({ error: 'Failed to create campaign', details: campaignResult.error }),
+      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  const campaignId = campaignResult.data.id;
+  console.log(`[manage-meta-campaign] create_full: Campaign ${campaignId}`);
+
+  // Step 2: Create ad set
+  let adSetId: string | null = null;
+  if (daily_budget || targeting) {
+    const adsetPayload: Record<string, any> = {
+      campaign_id: campaignId,
+      name: adset_name || `${name} - Ad Set`,
+      billing_event, optimization_goal, status,
+    };
+    if (daily_budget) adsetPayload.daily_budget = Math.round(Number(daily_budget) * 100);
+    if (targeting) adsetPayload.targeting = typeof targeting === 'string' ? targeting : JSON.stringify(targeting);
+    if (start_time) adsetPayload.start_time = start_time;
+    if (end_time) adsetPayload.end_time = end_time;
+
+    const adsetResult = await metaApiRequest(`act_${accountId}/adsets`, accessToken, 'POST', adsetPayload);
+    if (!adsetResult.ok) {
+      return new Response(
+        JSON.stringify({ success: true, partial: true, campaign_id: campaignId, adset_error: adsetResult.error }),
+        { status: 207, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    adSetId = adsetResult.data.id;
+    console.log(`[manage-meta-campaign] create_full: Ad set ${adSetId}`);
+  }
+
+  // Step 3: Create creative + ad (only if we have page_id and destination_url)
+  let creativeId: string | null = null;
+  let adId: string | null = null;
+
+  if (page_id && destination_url && adSetId) {
+    const linkData: Record<string, any> = {
+      link: destination_url,
+      message: primary_text || '',
+    };
+    if (image_url) linkData.image_url = image_url;
+    if (headline) linkData.name = headline;
+    if (description) linkData.description = description;
+    if (cta) linkData.call_to_action = { type: cta, value: { link: destination_url } };
+
+    const creativeResult = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', {
+      name: `${name} - Creative`,
+      object_story_spec: JSON.stringify({ page_id, link_data: linkData }),
+    });
+
+    if (creativeResult.ok) {
+      creativeId = creativeResult.data.id;
+      console.log(`[manage-meta-campaign] create_full: Creative ${creativeId}`);
+
+      // Step 4: Create ad
+      const adResult = await metaApiRequest(`act_${accountId}/ads`, accessToken, 'POST', {
+        name: `${name} - Ad`,
+        adset_id: adSetId,
+        creative: JSON.stringify({ creative_id: creativeId }),
+        status,
+      });
+
+      if (adResult.ok) {
+        adId = adResult.data.id;
+        console.log(`[manage-meta-campaign] create_full: Ad ${adId}`);
+      } else {
+        console.error(`[manage-meta-campaign] create_full: Ad creation failed: ${adResult.error}`);
+      }
+    } else {
+      console.error(`[manage-meta-campaign] create_full: Creative creation failed: ${creativeResult.error}`);
+    }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      campaign_id: campaignId,
+      adset_id: adSetId,
+      creative_id: creativeId,
+      ad_id: adId,
+    }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handleCreate322Test(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>
+): Promise<Response> {
+  const {
+    campaign_name,
+    objective = 'OUTCOME_SALES',
+    page_id,
+    daily_budget_per_adset,
+    destination_url,
+    cta = 'SHOP_NOW',
+    combinations,
+    targeting,
+  } = data;
+
+  if (!campaign_name || !page_id || !destination_url || !combinations?.length) {
+    return new Response(
+      JSON.stringify({ error: 'Missing required fields: campaign_name, page_id, destination_url, combinations' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Step 1: Create 1 campaign (ABO, PAUSED)
+  console.log(`[manage-meta-campaign] create_322_test: Creating campaign "${campaign_name}" with ${combinations.length} combinations`);
+
+  const campaignResult = await metaApiRequest(`act_${accountId}/campaigns`, accessToken, 'POST', {
+    name: `${campaign_name} [ABO]`,
+    objective,
+    status: 'PAUSED',
+    special_ad_categories: [],
+  });
+
+  if (!campaignResult.ok) {
+    return new Response(
+      JSON.stringify({ error: 'Failed to create campaign', details: campaignResult.error }),
+      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const campaignId = campaignResult.data.id;
+  console.log(`[manage-meta-campaign] create_322_test: Campaign ${campaignId}`);
+
+  const budgetCents = Math.round(Number(daily_budget_per_adset) * 100);
+  const createdAdsets: Array<{ adset_name: string; adset_id: string; ad_id: string }> = [];
+  const failedAdsets: Array<{ adset_name: string; error: string }> = [];
+
+  // Step 2: For each combination, create ad set + creative + ad
+  for (let i = 0; i < combinations.length; i++) {
+    const combo = combinations[i];
+    const comboName = combo.adset_name || `Combo_${i + 1}`;
+
+    try {
+      // 2a: Create ad set
+      const adsetPayload: Record<string, any> = {
+        campaign_id: campaignId,
+        name: `${campaign_name} - ${comboName}`,
+        billing_event: 'IMPRESSIONS',
+        optimization_goal: 'OFFSITE_CONVERSIONS',
+        status: 'PAUSED',
+        daily_budget: budgetCents,
+      };
+      if (targeting) adsetPayload.targeting = typeof targeting === 'string' ? targeting : JSON.stringify(targeting);
+
+      const adsetResult = await metaApiRequest(`act_${accountId}/adsets`, accessToken, 'POST', adsetPayload);
+      if (!adsetResult.ok) {
+        failedAdsets.push({ adset_name: comboName, error: adsetResult.error || 'Ad set creation failed' });
+        continue;
+      }
+      const adsetId = adsetResult.data.id;
+
+      // 2b: Create creative
+      const linkData: Record<string, any> = {
+        link: destination_url,
+        message: combo.primary_text || '',
+      };
+      if (combo.image_url) linkData.image_url = combo.image_url;
+      if (combo.headline) linkData.name = combo.headline;
+      if (cta) linkData.call_to_action = { type: cta, value: { link: destination_url } };
+
+      const creativeResult = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', {
+        name: `${campaign_name} - ${comboName} Creative`,
+        object_story_spec: JSON.stringify({ page_id, link_data: linkData }),
+      });
+
+      if (!creativeResult.ok) {
+        failedAdsets.push({ adset_name: comboName, error: `Creative failed: ${creativeResult.error}` });
+        continue;
+      }
+      const creativeId = creativeResult.data.id;
+
+      // 2c: Create ad
+      const adResult = await metaApiRequest(`act_${accountId}/ads`, accessToken, 'POST', {
+        name: `${campaign_name} - ${comboName} Ad`,
+        adset_id: adsetId,
+        creative: JSON.stringify({ creative_id: creativeId }),
+        status: 'PAUSED',
+      });
+
+      if (!adResult.ok) {
+        failedAdsets.push({ adset_name: comboName, error: `Ad failed: ${adResult.error}` });
+        continue;
+      }
+
+      createdAdsets.push({ adset_name: comboName, adset_id: adsetId, ad_id: adResult.data.id });
+      console.log(`[manage-meta-campaign] create_322_test: Created ${comboName} (${i + 1}/${combinations.length})`);
+
+      // Rate limiting: 200ms delay between combinations
+      if (i < combinations.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } catch (err) {
+      failedAdsets.push({ adset_name: comboName, error: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      campaign_id: campaignId,
+      created_adsets: createdAdsets,
+      failed_adsets: failedAdsets,
+      total_created: createdAdsets.length,
+      total_failed: failedAdsets.length,
+    }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -548,7 +888,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const validActions: Action[] = ['create', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive'];
+    const validActions: Action[] = ['create', 'create_creative', 'create_ad', 'create_full', 'create_322_test', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive'];
     if (!validActions.includes(action)) {
       return new Response(
         JSON.stringify({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }),
@@ -631,6 +971,18 @@ Deno.serve(async (req) => {
     switch (action) {
       case 'create':
         return await handleCreate(accountId, decryptedToken, data || {});
+
+      case 'create_creative':
+        return await handleCreateCreative(accountId, decryptedToken, data || {});
+
+      case 'create_ad':
+        return await handleCreateAd(accountId, decryptedToken, data || {});
+
+      case 'create_full':
+        return await handleCreateFull(accountId, decryptedToken, data || {});
+
+      case 'create_322_test':
+        return await handleCreate322Test(accountId, decryptedToken, data || {});
 
       case 'pause':
         return await handlePause(campaign_id!, decryptedToken);

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useMetaBusiness } from './MetaBusinessContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -419,11 +421,15 @@ const SAMPLE_LOG: RuleLogEntry[] = [
 // ---------------------------------------------------------------------------
 
 export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps) {
+  const { connectionId: ctxConnectionId } = useMetaBusiness();
+
   // --- State ----------------------------------------------------------------
   const [rules, setRules] = useState<AutomatedRule[]>([]);
-  const [logEntries, setLogEntries] = useState<RuleLogEntry[]>(SAMPLE_LOG);
+  const [logEntries, setLogEntries] = useState<RuleLogEntry[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('rules');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -432,6 +438,52 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
 
   // Form state
   const [form, setForm] = useState(EMPTY_FORM);
+
+  // --- Fetch rules from backend -------------------------------------------
+  const fetchRules = useCallback(async () => {
+    if (!clientId || !ctxConnectionId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-meta-rules', {
+        body: { action: 'list', client_id: clientId, connection_id: ctxConnectionId },
+      });
+      if (error) throw error;
+
+      const dbRules: AutomatedRule[] = (data?.rules || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        condition: r.condition as RuleCondition,
+        action: r.action as RuleActionConfig,
+        applyTo: r.apply_to as ApplyTo,
+        specificCampaignIds: r.specific_campaign_ids || [],
+        checkFrequency: r.check_frequency as CheckFrequency,
+        isActive: r.is_active,
+        createdAt: r.created_at,
+        lastTriggered: r.last_triggered_at,
+        triggerCount: r.trigger_count || 0,
+      }));
+      setRules(dbRules);
+
+      const dbLogs: RuleLogEntry[] = (data?.logs || []).map((l: any) => ({
+        id: l.id,
+        ruleId: l.rule_id,
+        ruleName: dbRules.find((r: AutomatedRule) => r.id === l.rule_id)?.name || 'Regla eliminada',
+        actionType: l.action_type as RuleAction,
+        campaignName: l.campaign_name,
+        campaignId: l.campaign_id,
+        details: l.details,
+        timestamp: l.executed_at,
+      }));
+      setLogEntries(dbLogs);
+    } catch (err) {
+      console.error('[MetaAutomatedRules] Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId, ctxConnectionId]);
+
+  useEffect(() => {
+    fetchRules();
+  }, [fetchRules]);
 
   // --- Derived ---------------------------------------------------------------
   const filteredRules = rules.filter((r) =>
@@ -489,9 +541,13 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
     setIsCreateOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) {
       toast.error('El nombre de la regla es obligatorio');
+      return;
+    }
+    if (!ctxConnectionId) {
+      toast.error('No hay conexion Meta Ads activa');
       return;
     }
     const numericValue = parseFloat(form.value);
@@ -540,62 +596,95 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
         : {}),
     };
 
-    if (editingRule) {
-      setRules((prev) =>
-        prev.map((r) =>
-          r.id === editingRule.id
-            ? {
-                ...r,
-                name: form.name.trim(),
-                condition,
-                action,
-                applyTo: form.applyTo,
-                specificCampaignIds: form.specificCampaignIds,
-                checkFrequency: form.checkFrequency,
-              }
-            : r
-        )
-      );
-      toast.success('Regla actualizada correctamente');
-    } else {
-      const newRule: AutomatedRule = {
-        id: generateId(),
-        name: form.name.trim(),
-        condition,
-        action,
-        applyTo: form.applyTo,
-        specificCampaignIds: form.specificCampaignIds,
-        checkFrequency: form.checkFrequency,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        lastTriggered: null,
-        triggerCount: 0,
-      };
-      setRules((prev) => [newRule, ...prev]);
-      toast.success('Regla creada correctamente');
+    setSaving(true);
+    try {
+      if (editingRule) {
+        const { error } = await supabase.functions.invoke('manage-meta-rules', {
+          body: {
+            action: 'update',
+            client_id: clientId,
+            connection_id: ctxConnectionId,
+            rule_id: editingRule.id,
+            data: {
+              name: form.name.trim(),
+              condition,
+              action,
+              apply_to: form.applyTo,
+              specific_campaign_ids: form.specificCampaignIds,
+              check_frequency: form.checkFrequency,
+            },
+          },
+        });
+        if (error) throw error;
+        toast.success('Regla actualizada correctamente');
+      } else {
+        const { error } = await supabase.functions.invoke('manage-meta-rules', {
+          body: {
+            action: 'create',
+            client_id: clientId,
+            connection_id: ctxConnectionId,
+            data: {
+              name: form.name.trim(),
+              condition,
+              action,
+              apply_to: form.applyTo,
+              specific_campaign_ids: form.specificCampaignIds,
+              check_frequency: form.checkFrequency,
+            },
+          },
+        });
+        if (error) throw error;
+        toast.success('Regla creada correctamente');
+      }
+
+      setIsCreateOpen(false);
+      resetForm();
+      setEditingRule(null);
+      await fetchRules();
+    } catch (err) {
+      console.error('[MetaAutomatedRules] Save error:', err);
+      toast.error('Error al guardar regla');
+    } finally {
+      setSaving(false);
     }
-
-    setIsCreateOpen(false);
-    resetForm();
-    setEditingRule(null);
   };
 
-  const toggleRule = (ruleId: string) => {
-    setRules((prev) =>
-      prev.map((r) => {
-        if (r.id !== ruleId) return r;
-        const next = !r.isActive;
-        toast.info(`Regla "${r.name}" ${next ? 'activada' : 'pausada'}`);
-        return { ...r, isActive: next };
-      })
-    );
-  };
-
-  const deleteRule = (ruleId: string) => {
+  const toggleRule = async (ruleId: string) => {
+    if (!ctxConnectionId) return;
     const rule = rules.find((r) => r.id === ruleId);
-    setRules((prev) => prev.filter((r) => r.id !== ruleId));
-    setDeleteConfirmId(null);
-    if (rule) toast.success(`Regla "${rule.name}" eliminada`);
+    if (!rule) return;
+
+    // Optimistic update
+    setRules((prev) => prev.map((r) => r.id === ruleId ? { ...r, isActive: !r.isActive } : r));
+
+    try {
+      const { error } = await supabase.functions.invoke('manage-meta-rules', {
+        body: { action: 'toggle', client_id: clientId, connection_id: ctxConnectionId, rule_id: ruleId },
+      });
+      if (error) throw error;
+      toast.info(`Regla "${rule.name}" ${!rule.isActive ? 'activada' : 'pausada'}`);
+    } catch (err) {
+      // Revert optimistic update
+      setRules((prev) => prev.map((r) => r.id === ruleId ? { ...r, isActive: rule.isActive } : r));
+      toast.error('Error al cambiar estado de la regla');
+    }
+  };
+
+  const deleteRule = async (ruleId: string) => {
+    if (!ctxConnectionId) return;
+    const rule = rules.find((r) => r.id === ruleId);
+
+    try {
+      const { error } = await supabase.functions.invoke('manage-meta-rules', {
+        body: { action: 'delete', client_id: clientId, connection_id: ctxConnectionId, rule_id: ruleId },
+      });
+      if (error) throw error;
+      setRules((prev) => prev.filter((r) => r.id !== ruleId));
+      setDeleteConfirmId(null);
+      if (rule) toast.success(`Regla "${rule.name}" eliminada`);
+    } catch (err) {
+      toast.error('Error al eliminar regla');
+    }
   };
 
   // --- Sub-renders -----------------------------------------------------------
@@ -1183,8 +1272,8 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             >
               Cancelar
             </Button>
-            <Button onClick={handleSave}>
-              {editingRule ? 'Guardar cambios' : 'Crear regla'}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Guardando...' : editingRule ? 'Guardar cambios' : 'Crear regla'}
             </Button>
           </DialogFooter>
         </DialogContent>

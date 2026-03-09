@@ -187,6 +187,145 @@ async function handleGetFlowDetail(c: Context, apiKey: string, body: any) {
 }
 
 // ===============================================================
+// Helper: Fetch client brand data for email templates
+// ===============================================================
+interface BrandData {
+  name: string;
+  logoUrl: string;
+  storeUrl: string;
+}
+
+async function fetchClientBrand(serviceClient: any, clientId: string, storeName?: string): Promise<BrandData> {
+  const { data: client } = await serviceClient
+    .from('clients')
+    .select('name, logo_url, website_url')
+    .eq('id', clientId)
+    .single();
+
+  const storeUrl = client?.website_url || '';
+  // Prefer store_name from platform connection (e.g. "A Rueda") over client.name (e.g. "jmbarros")
+  const brandName = storeName || client?.name || 'Tu Tienda';
+  // Skip logo_url if it's a Supabase storage URL (won't render in external email clients)
+  const logoUrl = (client?.logo_url && !client.logo_url.includes('supabase.co/storage')) ? client.logo_url : '';
+  return {
+    name: brandName,
+    logoUrl,
+    storeUrl: storeUrl.startsWith('http') ? storeUrl : storeUrl ? `https://${storeUrl}` : '#',
+  };
+}
+
+// ===============================================================
+// Helper: Get contextual email content per flow type and step
+// ===============================================================
+function getFlowEmailContent(
+  flowType: string,
+  stepIndex: number,
+  brandName: string,
+): { heading: string; body: string; ctaText: string } {
+  const name = '{{ first_name|default:"" }}';
+
+  if (flowType === 'customer_winback') {
+    const steps = [
+      {
+        heading: `${name} ¡Te echamos de menos!`,
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Hace tiempo que no nos visitas y queríamos saber cómo estás.</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">En <strong>${brandName}</strong> hemos estado trabajando en traer las mejores novedades para tu próximo desafío deportivo. Nuevas marcas, nuevos productos y la misma pasión de siempre.</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;font-weight:600;">¿Listo para volver a la ruta?</p>`,
+        ctaText: 'Ver novedades',
+      },
+      {
+        heading: 'Novedades que no te puedes perder',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Sabemos que un deportista siempre busca mejorar su equipo. Por eso seleccionamos lo mejor para ti:</p>
+<ul style="margin:0 0 20px;padding-left:20px;color:#333;font-size:16px;line-height:2;">
+  <li>Nuevos relojes GPS de <strong>COROS, Lhotse y Garmin</strong></li>
+  <li>Equipamiento de ciclismo de última generación</li>
+  <li>Nutrición deportiva para máximo rendimiento</li>
+  <li>Envío gratis en compras sobre $100.000</li>
+</ul>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Tu próximo PR te está esperando.</p>`,
+        ctaText: 'Explorar productos',
+      },
+      {
+        heading: '¡Último sprint! Un regalo para ti',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Porque valoramos a nuestra comunidad deportiva, tenemos algo especial solo para ti:</p>
+<div style="background:#f8f6f0;border-left:4px solid #C8A84E;padding:20px 24px;margin:0 0 20px;border-radius:0 8px 8px 0;">
+  <p style="margin:0 0 4px;font-size:13px;color:#666;text-transform:uppercase;letter-spacing:1px;">Código exclusivo</p>
+  <p style="margin:0 0 8px;font-size:28px;font-weight:700;color:#1a1a1a;">VUELVE10</p>
+  <p style="margin:0;font-size:14px;color:#555;">10% de descuento en toda la tienda · Válido por 7 días</p>
+</div>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">No dejes pasar esta oportunidad. Tu equipo ideal te está esperando.</p>`,
+        ctaText: 'Usar mi descuento',
+      },
+    ];
+    return steps[stepIndex] || steps[0];
+  }
+
+  if (flowType === 'abandoned_cart') {
+    const steps = [
+      {
+        heading: '¿Sigues dándole vueltas?',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Vimos que dejaste algo en tu carrito. No te preocupes, lo guardamos para ti.</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Los productos que elegiste son de <strong>alto rendimiento</strong> y están volando. Recupéralos antes que alguien más rápido se los lleve.</p>`,
+        ctaText: 'Volver a mi carrito',
+      },
+      {
+        heading: '¿Tenías dudas? Acá estamos',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Entendemos que a veces hay que pensarlo. Si tienes alguna pregunta sobre los productos en tu carrito, nuestro equipo está listo para ayudarte.</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Recuerda: <strong>envío gratis sobre $100.000</strong> a todo Chile y retiro disponible en Vitacura.</p>`,
+        ctaText: 'Completar mi compra',
+      },
+      {
+        heading: 'Última oportunidad para tu equipo',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Tu carrito sigue esperándote, pero no podemos garantizar stock por mucho más tiempo.</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;font-weight:600;">Este es tu último recordatorio. ¡No te quedes sin lo que necesitas para tu próximo entrenamiento!</p>`,
+        ctaText: 'Finalizar compra ahora',
+      },
+    ];
+    return steps[stepIndex] || steps[0];
+  }
+
+  if (flowType === 'welcome_series') {
+    const steps = [
+      {
+        heading: `¡Bienvenido a la comunidad ${brandName}!`,
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Nos alegra mucho que te unas a nuestra rueda. Somos una comunidad de deportistas apasionados por el ciclismo, running, natación y triatlón.</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">En <strong>${brandName}</strong> encontrarás las mejores marcas como Garmin, COROS y Lhotse, con asesoría especializada y envío gratis sobre $100.000.</p>`,
+        ctaText: 'Explorar la tienda',
+      },
+      {
+        heading: 'Encuentra tu equipo perfecto',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Cada deporte tiene sus herramientas. Acá te dejamos nuestras categorías más populares para que empieces con todo:</p>
+<ul style="margin:0 0 20px;padding-left:20px;color:#333;font-size:16px;line-height:2;">
+  <li><strong>Ciclismo:</strong> Bicicletas, componentes y accesorios</li>
+  <li><strong>Running & Trail:</strong> Zapatillas, textil y GPS</li>
+  <li><strong>Natación:</strong> Trajes, goggles y accesorios</li>
+  <li><strong>Nutrición:</strong> Geles, hidratación y suplementos</li>
+</ul>`,
+        ctaText: 'Ver categorías',
+      },
+      {
+        heading: '¡Un regalo de bienvenida!',
+        body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Por ser parte de nuestra comunidad, te regalamos un descuento especial en tu primera compra:</p>
+<div style="background:#f8f6f0;border-left:4px solid #C8A84E;padding:20px 24px;margin:0 0 20px;border-radius:0 8px 8px 0;">
+  <p style="margin:0 0 4px;font-size:13px;color:#666;text-transform:uppercase;letter-spacing:1px;">Tu código de bienvenida</p>
+  <p style="margin:0 0 8px;font-size:28px;font-weight:700;color:#1a1a1a;">BIENVENIDO10</p>
+  <p style="margin:0;font-size:14px;color:#555;">10% de descuento · Primera compra · Válido 30 días</p>
+</div>`,
+        ctaText: 'Comprar con descuento',
+      },
+    ];
+    return steps[stepIndex] || steps[0];
+  }
+
+  // Default/campaign
+  return {
+    heading: `${name} ${brandName} tiene algo para ti`,
+    body: `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#333;">Descubre lo último que tenemos para tu entrenamiento y estilo de vida deportivo.</p>`,
+    ctaText: 'Ver más',
+  };
+}
+
+// ===============================================================
 // Action: create_flow
 // Creates templates in Klaviyo and stores a flow plan in DB
 // (Klaviyo API does not support full programmatic flow creation)
@@ -214,6 +353,10 @@ async function handleCreateFlow(
   };
   const dbFlowType = FLOW_TYPE_MAP[triggerType] || 'campaign';
 
+  // Fetch brand data for professional templates (prefer store_name from Klaviyo connection)
+  const brand = await fetchClientBrand(serviceClient, connection.client_id, connection.store_name);
+  console.log(`[create_flow] Brand: ${brand.name}, Store: ${brand.storeUrl}`);
+
   const templateIds: string[] = [];
   const emailSteps: any[] = [];
 
@@ -223,6 +366,15 @@ async function handleCreateFlow(
 
     console.log(`[${i + 1}/${emails.length}] Creating template: ${templateName}`);
 
+    // Use provided HTML or generate branded template
+    const htmlContent = email.htmlContent || generateBrandedEmailHtml(brand, {
+      subject: email.subject,
+      previewText: email.previewText || '',
+      flowType: triggerType || 'campaign',
+      stepIndex: i,
+      totalSteps: emails.length,
+    });
+
     // Create template in Klaviyo
     const templateData: any = await klaviyoPost(`${KLAVIYO_BASE}/templates/`, apiKey, {
       data: {
@@ -230,7 +382,7 @@ async function handleCreateFlow(
         attributes: {
           name: templateName,
           editor_type: 'CODE',
-          html: email.htmlContent || generateDefaultFlowHtml(email.subject, ''),
+          html: htmlContent,
           text: email.subject,
         },
       },
@@ -349,22 +501,126 @@ async function handleGetFlowMetrics(c: Context, apiKey: string, body: any) {
 }
 
 // ===============================================================
-// Helper: Generate default HTML for flow email
+// Helper: Generate professional branded HTML email template
 // ===============================================================
-function generateDefaultFlowHtml(subject: string, content: string): string {
+function generateBrandedEmailHtml(
+  brand: BrandData,
+  config: { subject: string; previewText: string; flowType: string; stepIndex: number; totalSteps: number },
+): string {
+  const { heading, body, ctaText } = getFlowEmailContent(
+    config.flowType,
+    config.stepIndex,
+    brand.name,
+  );
+
+  const logoBlock = brand.logoUrl
+    ? `<img src="${brand.logoUrl}" alt="${brand.name}" width="160" style="display:block;margin:0 auto;">`
+    : `<div style="text-align:center;">
+        <div style="font-size:32px;color:#C8A84E;margin-bottom:4px;">&#9673;&#9673;&#9673;&#9673;</div>
+        <div style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:3px;font-family:Georgia,serif;">${brand.name.toUpperCase()}</div>
+      </div>`;
+
   return `<!DOCTYPE html>
-<html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${subject}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${config.subject}</title>
+  <!--[if mso]><style>body,table,td{font-family:Arial,sans-serif!important;}</style><![endif]-->
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .preheader { display: none; max-height: 0; overflow: hidden; }
+    @media only screen and (max-width:620px) {
+      .email-container { width:100% !important; }
+      .fluid { width:100% !important; max-width:100% !important; height:auto !important; }
+      .stack-column { display:block !important; width:100% !important; }
+      .mobile-padding { padding-left:20px !important; padding-right:20px !important; }
+    }
   </style>
 </head>
-<body>
-  ${content.replace(/\n/g, '<br>')}
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  ${config.previewText ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;color:#f4f4f4;line-height:1px;">${config.previewText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>` : ''}
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;">
+    <tr><td align="center" style="padding:24px 10px;">
+
+      <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+
+        <!-- HEADER: Logo on dark background -->
+        <tr>
+          <td style="background-color:#1a1a1a;padding:32px 30px 16px;text-align:center;">
+            ${logoBlock}
+          </td>
+        </tr>
+
+        <!-- NAV BAR -->
+        <tr>
+          <td style="background-color:#1a1a1a;padding:0 30px 24px;text-align:center;">
+            <a href="${brand.storeUrl}" style="color:#C8A84E;text-decoration:none;font-size:11px;letter-spacing:2px;padding:0 12px;font-family:Arial,sans-serif;">VER TIENDA</a>
+            <span style="color:#444;font-size:11px;">&#8226;</span>
+            <a href="${brand.storeUrl}/pages/contacto" style="color:#C8A84E;text-decoration:none;font-size:11px;letter-spacing:2px;padding:0 12px;font-family:Arial,sans-serif;">CONTACTO</a>
+          </td>
+        </tr>
+
+        <!-- BODY CONTENT -->
+        <tr>
+          <td class="mobile-padding" style="padding:40px 40px 12px;">
+            <h1 style="margin:0 0 24px;font-size:24px;font-weight:700;color:#1a1a1a;line-height:1.3;font-family:Georgia,'Times New Roman',serif;">${heading}</h1>
+            ${body}
+          </td>
+        </tr>
+
+        <!-- CTA BUTTON -->
+        <tr>
+          <td align="center" style="padding:16px 40px 44px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background-color:#1a1a1a;border-radius:30px;">
+                  <a href="${brand.storeUrl}" style="display:inline-block;padding:15px 40px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.5px;font-family:Arial,sans-serif;">${ctaText}</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- GOLDEN DIVIDER -->
+        <tr>
+          <td align="center" style="padding:0 40px;">
+            <div style="width:60px;height:2px;background-color:#C8A84E;margin:0 auto;"></div>
+          </td>
+        </tr>
+
+        <!-- SIGN-OFF -->
+        <tr>
+          <td style="padding:28px 40px 12px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:15px;color:#333;line-height:1.5;">¡Te esperamos con la mejor calidad y buena onda de siempre!</p>
+            <p style="margin:0 0 4px;font-size:15px;color:#333;">Un abrazo,</p>
+            <p style="margin:0;font-size:15px;font-weight:700;color:#1a1a1a;">El equipo de ${brand.name}</p>
+          </td>
+        </tr>
+
+        <!-- SOCIAL ICONS -->
+        <tr>
+          <td align="center" style="padding:20px 40px 8px;">
+            <a href="#" style="display:inline-block;width:34px;height:34px;line-height:34px;text-align:center;background:#1a1a1a;color:#fff;border-radius:50%;text-decoration:none;font-size:13px;font-weight:600;margin:0 4px;">IG</a>
+            <a href="#" style="display:inline-block;width:34px;height:34px;line-height:34px;text-align:center;background:#1a1a1a;color:#fff;border-radius:50%;text-decoration:none;font-size:13px;font-weight:600;margin:0 4px;">FB</a>
+            <a href="#" style="display:inline-block;width:34px;height:34px;line-height:34px;text-align:center;background:#1a1a1a;color:#fff;border-radius:50%;text-decoration:none;font-size:13px;font-weight:600;margin:0 4px;">YT</a>
+          </td>
+        </tr>
+
+        <!-- UNSUBSCRIBE -->
+        <tr>
+          <td style="padding:16px 40px 28px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#999;line-height:1.6;">
+              <a href="{%unsubscribe%}" style="color:#999;text-decoration:underline;">Cancelar suscripción</a>
+              &nbsp;·&nbsp;
+              <a href="{%manage_preferences 'Manage Preferences'%}" style="color:#999;text-decoration:underline;">Preferencias</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>`.trim();
 }

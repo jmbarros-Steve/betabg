@@ -412,6 +412,329 @@ function repairTruncatedJson(text: string): Record<string, unknown> {
   return { raw_text: text.slice(0, 40000), _repair_failed: true };
 }
 
+// ── Normalización server-side: keys canónicas antes de guardar en DB ──
+function normalizeSection(key: string, data: any): any {
+  if (!data || typeof data !== 'object') return data;
+
+  // Helper: rename keys in an object
+  const renameKeys = (obj: any, map: Record<string, string>): any => {
+    if (!obj || typeof obj !== 'object') return obj;
+    for (const [from, to] of Object.entries(map)) {
+      if (from !== to && obj[from] !== undefined && obj[to] === undefined) {
+        obj[to] = obj[from];
+        delete obj[from];
+      }
+    }
+    return obj;
+  };
+
+  // Helper: ensure value is array
+  const ensureArray = (val: any): any[] => {
+    if (Array.isArray(val)) return val;
+    if (val && typeof val === 'object') return Object.values(val);
+    return val ? [val] : [];
+  };
+
+  // Helper: extract string from array of objects
+  const extractStrings = (arr: any[], field: string): string[] => {
+    if (!Array.isArray(arr)) return arr;
+    return arr.map((item: any) =>
+      typeof item === 'string' ? item : (item?.[field] || JSON.stringify(item))
+    );
+  };
+
+  switch (key) {
+    case 'competitive_analysis': {
+      const d = { ...data };
+      // Normalize individual competitors array
+      const competitorsKey = ['individual_analysis', 'individual_analyses', 'individual_competitor_analysis', 'analisis_individual_competidores']
+        .find(k => d[k]);
+      if (competitorsKey && competitorsKey !== 'competitors') {
+        d.competitors = d[competitorsKey];
+        delete d[competitorsKey];
+      }
+      // Normalize each competitor
+      if (Array.isArray(d.competitors)) {
+        d.competitors = d.competitors.map((c: any) => {
+          if (!c || typeof c !== 'object') return c;
+          const comp = { ...c };
+          renameKeys(comp, {
+            'fortalezas': 'strengths',
+            'fortalezas_detectadas': 'strengths',
+            'debilidades': 'weaknesses',
+            'debilidades_detectadas': 'weaknesses',
+            'propuesta_de_valor': 'value_proposition',
+            'propuesta_valor': 'value_proposition',
+            'propuesta_valor_principal': 'value_proposition',
+            'estrategia_contenido_observada': 'ad_strategy_inferred',
+            'estrategia_contenido': 'ad_strategy_inferred',
+            'que_hace_mejor_que_cliente': 'que_hacen_mejor',
+            'nombre_url': 'nombre_url',
+            'nombre': 'nombre_url',
+            'url': 'nombre_url',
+          });
+          if (comp.strengths) comp.strengths = ensureArray(comp.strengths);
+          if (comp.weaknesses) comp.weaknesses = ensureArray(comp.weaknesses);
+          return comp;
+        });
+      }
+      // Normalize market gaps
+      if (d.insights_estrategicos) {
+        const gapsKey = ['gaps_de_mercado_sin_cubrir', 'gaps_de_mercado', 'gaps_mercado']
+          .find(k => d.insights_estrategicos[k]);
+        if (gapsKey && gapsKey !== 'market_gaps') {
+          d.insights_estrategicos.market_gaps = d.insights_estrategicos[gapsKey];
+          delete d.insights_estrategicos[gapsKey];
+        }
+        if (d.insights_estrategicos.market_gaps) {
+          d.insights_estrategicos.market_gaps = ensureArray(d.insights_estrategicos.market_gaps);
+        }
+      }
+      return d;
+    }
+
+    case 'meta_ads_strategy': {
+      const d = { ...data };
+      // creativos_recomendados: ensure array
+      if (d.creativos_recomendados && !Array.isArray(d.creativos_recomendados) && typeof d.creativos_recomendados === 'object') {
+        d.creativos_recomendados = Object.values(d.creativos_recomendados);
+      }
+      // Normalize funnel keys in objetivos_campana
+      if (d.objetivos_campana) {
+        const obj = { ...d.objetivos_campana };
+        renameKeys(obj, {
+          'tof_awareness': 'tofu', 'tof': 'tofu',
+          'mof_consideration': 'mofu', 'mof': 'mofu',
+          'bof_conversion': 'bofu', 'bof': 'bofu',
+        });
+        d.objetivos_campana = obj;
+      }
+      // Normalize funnel keys in kpis_objetivo
+      if (d.kpis_objetivo) {
+        const kpis = { ...d.kpis_objetivo };
+        renameKeys(kpis, {
+          'tof': 'tofu', 'tof_awareness': 'tofu',
+          'mof': 'mofu', 'mof_consideration': 'mofu',
+          'bof': 'bofu', 'bof_conversion': 'bofu',
+        });
+        d.kpis_objetivo = kpis;
+      }
+      // segmentacion_audiencias object → audiencias array
+      if (d.segmentacion_audiencias && !Array.isArray(d.segmentacion_audiencias) && typeof d.segmentacion_audiencias === 'object') {
+        if (!d.audiencias) d.audiencias = Object.values(d.segmentacion_audiencias);
+      }
+      // budget_distribucion → presupuesto_sugerido
+      if (d.budget_distribucion && !d.presupuesto_sugerido) {
+        d.presupuesto_sugerido = d.budget_distribucion;
+      }
+      // estructura_campañas → estructura_campanas (sin ñ)
+      if (d['estructura_campañas'] && !d.estructura_campanas) {
+        d.estructura_campanas = d['estructura_campañas'];
+        delete d['estructura_campañas'];
+      }
+      return d;
+    }
+
+    case 'google_ads_strategy': {
+      const d = { ...data };
+      // search_ad_copies → ad_copies
+      if (d.search_ad_copies && !d.ad_copies) {
+        d.ad_copies = d.search_ad_copies;
+        delete d.search_ad_copies;
+      }
+      // Normalize each ad copy
+      if (Array.isArray(d.ad_copies)) {
+        d.ad_copies = d.ad_copies.map((ad: any) => {
+          if (!ad || typeof ad !== 'object') return ad;
+          const copy = { ...ad };
+          renameKeys(copy, {
+            'headline_1': 'headline1', 'headline_2': 'headline2', 'headline_3': 'headline3',
+            'description_1': 'description1', 'description_2': 'description2',
+          });
+          return copy;
+        });
+      }
+      // campaign_types: object → array
+      if (d.campaign_types && !Array.isArray(d.campaign_types) && typeof d.campaign_types === 'object') {
+        d.campaign_types = Object.entries(d.campaign_types).map(([name, config]: [string, any]) => ({
+          name,
+          ...(typeof config === 'object' ? config : { description: config }),
+        }));
+      }
+      // ad_extensions / extensiones → extensions array
+      const extKey = d.ad_extensions ? 'ad_extensions' : d.extensiones ? 'extensiones' : null;
+      if (extKey) {
+        let ext = d[extKey];
+        if (ext && !Array.isArray(ext) && typeof ext === 'object') ext = Object.values(ext);
+        d.extensions = ext;
+        delete d[extKey];
+      }
+      // budget_recommendation → presupuesto_sugerido
+      if (d.budget_recommendation && !d.presupuesto_sugerido) {
+        d.presupuesto_sugerido = d.budget_recommendation;
+      }
+      return d;
+    }
+
+    case 'consumer_profile': {
+      const d = { ...data };
+      const normalizePersona = (persona: any): any => {
+        if (!persona || typeof persona !== 'object') return persona;
+        const p = { ...persona };
+        // nombre → nombre_ficticio
+        if (p.nombre && !p.nombre_ficticio) {
+          p.nombre_ficticio = p.nombre;
+          delete p.nombre;
+        }
+        // Flatten demografia
+        if (p.demografia && typeof p.demografia === 'object') {
+          const demo = p.demografia;
+          for (const field of ['edad', 'genero', 'ubicacion', 'ocupacion', 'nivel_socioeconomico', 'educacion']) {
+            if (demo[field] !== undefined && p[field] === undefined) p[field] = demo[field];
+          }
+        }
+        renameKeys(p, {
+          'frase_definitoria': 'frase_que_lo_define',
+          'motivadores_compra': 'motivadores_de_compra',
+          'barreras_objeciones': 'barreras_y_objeciones',
+        });
+        // comportamiento_digital object → string
+        if (p.comportamiento_digital && typeof p.comportamiento_digital === 'object' && !p.comportamiento_digital_desc) {
+          const cd = p.comportamiento_digital;
+          p.comportamiento_digital_desc = Object.entries(cd)
+            .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+            .join('; ');
+        }
+        // psicografia.estilo_vida → estilo_de_vida
+        if (p.psicografia && typeof p.psicografia === 'object') {
+          const psi = { ...p.psicografia };
+          if (psi.estilo_vida && !psi.estilo_de_vida) {
+            psi.estilo_de_vida = psi.estilo_vida;
+            delete psi.estilo_vida;
+          }
+          p.psicografia = psi;
+        }
+        return p;
+      };
+      if (d.buyer_persona_principal) d.buyer_persona_principal = normalizePersona(d.buyer_persona_principal);
+      if (d.buyer_persona_secundario) d.buyer_persona_secundario = normalizePersona(d.buyer_persona_secundario);
+      // journey normalization
+      const journeyKey = d.journey_de_compra ? 'journey_de_compra' : d.customer_journey ? 'customer_journey' : null;
+      if (journeyKey && !d.journey_compra) {
+        d.journey_compra = d[journeyKey];
+        delete d[journeyKey];
+      }
+      return d;
+    }
+
+    case 'seo_audit': {
+      const d = { ...data };
+      if (d.score_seo !== undefined && d.score === undefined) {
+        d.score = d.score_seo;
+        delete d.score_seo;
+      }
+      if (d.analisis_sitio_cliente && !d.analisis_cliente) {
+        d.analisis_cliente = d.analisis_sitio_cliente;
+        delete d.analisis_sitio_cliente;
+      }
+      // analisis_competidores: object → array
+      if (d.analisis_competidores && !Array.isArray(d.analisis_competidores) && typeof d.analisis_competidores === 'object') {
+        d.analisis_competidores = Object.values(d.analisis_competidores);
+      }
+      // problemas_detectados → issues
+      if (d.problemas_detectados && !d.issues) {
+        d.issues = extractStrings(ensureArray(d.problemas_detectados), 'problema');
+        delete d.problemas_detectados;
+      }
+      // acciones_prioritarias → recommendations
+      if (d.acciones_prioritarias && !d.recommendations) {
+        d.recommendations = extractStrings(ensureArray(d.acciones_prioritarias), 'accion');
+        delete d.acciones_prioritarias;
+      }
+      return d;
+    }
+
+    case 'keywords': {
+      const d = { ...data };
+      // primary_keywords → primary (strings)
+      if (d.primary_keywords && !d.primary) {
+        d.primary = extractStrings(ensureArray(d.primary_keywords), 'keyword');
+        delete d.primary_keywords;
+      }
+      // longtail_keywords / long_tail_keywords → long_tail
+      const ltKey = d.longtail_keywords ? 'longtail_keywords' : d.long_tail_keywords ? 'long_tail_keywords' : null;
+      if (ltKey && !d.long_tail) {
+        d.long_tail = extractStrings(ensureArray(d[ltKey]), 'keyword');
+        delete d[ltKey];
+      }
+      // negative_keywords: keep rich + add flat
+      if (d.negative_keywords && !d.negative) {
+        d.negative = extractStrings(ensureArray(d.negative_keywords), 'keyword');
+      }
+      return d;
+    }
+
+    case 'ads_library_analysis': {
+      const d = { ...data };
+      // creative_concepts normalization
+      if (Array.isArray(d.creative_concepts)) {
+        d.creative_concepts = d.creative_concepts.map((c: any) => {
+          if (!c || typeof c !== 'object') return c;
+          const concept = { ...c };
+          renameKeys(concept, {
+            'primary_copy': 'copy',
+            'why_it_works': 'rationale',
+          });
+          return concept;
+        });
+      }
+      // market_patterns.dominant_content → dominant_content_type
+      if (d.market_patterns && typeof d.market_patterns === 'object') {
+        const mp = { ...d.market_patterns };
+        if (mp.dominant_content && !mp.dominant_content_type) {
+          mp.dominant_content_type = mp.dominant_content;
+          delete mp.dominant_content;
+        }
+        d.market_patterns = mp;
+      }
+      // competitor_analysis → competitor_strategies
+      if (d.competitor_analysis && !d.competitor_strategies) {
+        d.competitor_strategies = d.competitor_analysis;
+        delete d.competitor_analysis;
+      }
+      return d;
+    }
+
+    case 'action_plan': {
+      let d = data;
+      // If _repair_failed, try to extract from raw_text
+      if (d._repair_failed && d.raw_text) {
+        try {
+          const match = d.raw_text.match(/\[[\s\S]*\]/);
+          if (match) d = JSON.parse(match[0]);
+        } catch {}
+      }
+      // Ensure array
+      if (d && !Array.isArray(d) && typeof d === 'object' && !d._repair_failed) {
+        const vals = Object.values(d);
+        if (vals.length > 0 && vals.every((v: any) => typeof v === 'object')) {
+          d = vals;
+        }
+      }
+      return d;
+    }
+
+    // Pass-through sections (already consistent)
+    case 'budget_and_funnel':
+    case 'brand_identity':
+    case 'financial_analysis':
+    case 'positioning_strategy':
+    case 'executive_summary':
+    default:
+      return data;
+  }
+}
+
 // ── Llamada individual a Claude con prompt caching ──
 async function callClaudeOnce(
   baseSystemPrompt: string,
@@ -686,11 +1009,15 @@ export async function analyzeBrandStrategy(c: Context) {
       // Guardado progresivo
       completedCount++;
       for (const key of section.keys) {
-        const value = data[key] || (section.keys.length === 1 ? data : null);
-        if (value) {
+        const rawValue = data[key] || (section.keys.length === 1 ? data : null);
+        if (rawValue) {
+          // Normalizar keys canónicas ANTES de guardar
+          const normalized = normalizeSection(key, rawValue);
+          // Actualizar data con la versión normalizada para consolidación posterior
+          if (data[key]) data[key] = normalized;
           const sectionResearchData = key === 'executive_summary'
-            ? { summary: typeof value === 'string' ? (value as string).slice(0, 12000) : JSON.stringify(value).slice(0, 4000), ...((typeof value === 'object' && value !== null) ? value as Record<string, unknown> : {}) }
-            : value;
+            ? { summary: typeof normalized === 'string' ? (normalized as string).slice(0, 12000) : JSON.stringify(normalized).slice(0, 4000), ...((typeof normalized === 'object' && normalized !== null) ? normalized as Record<string, unknown> : {}) }
+            : normalized;
           await supabase.from('brand_research').upsert(
             { client_id, research_type: key, research_data: sectionResearchData },
             { onConflict: 'client_id,research_type' }
@@ -764,9 +1091,9 @@ export async function analyzeBrandStrategy(c: Context) {
             completedSections.push(key);
           }
         }
-        // Si Claude respondió sin wrapper (el JSON directo sin la key), asignar a la primera key
+        // Si Claude respondió sin wrapper (el JSON directo sin la key), normalizar y asignar
         if (keys.length === 1 && !data[keys[0]]) {
-          finalBrief[keys[0]] = data;
+          finalBrief[keys[0]] = normalizeSection(keys[0], data);
           completedSections.push(keys[0]);
         }
       } else {

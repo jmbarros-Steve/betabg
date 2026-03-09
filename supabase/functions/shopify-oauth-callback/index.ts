@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
     // PRIORITY 1: Check if a client was pre-registered with this shop_domain
     // This handles custom distribution apps where the admin creates the client first
     const { data: preRegisteredClient } = await supabaseAdmin
-      .from('clients').select('id, client_user_id')
+      .from('clients').select('id, client_user_id, email')
       .eq('shop_domain', normalizedShopDomain)
       .single();
 
@@ -261,12 +261,87 @@ Deno.serve(async (req) => {
     let clientId: string;
     let isNewUser = false;
     let tempPassword: string | null = null;
+    let userEmail = shopEmail; // tracks the actual email used for the auth user
 
     if (preRegisteredClient) {
       // Client was pre-registered by admin — link Shopify to this existing account
       clientId = preRegisteredClient.id;
-      userId = preRegisteredClient.client_user_id;
       console.log('Pre-registered client found for shop:', normalizedShopDomain, '→ client_id:', clientId);
+
+      if (preRegisteredClient.client_user_id) {
+        // Pre-registered AND already has a linked auth user
+        userId = preRegisteredClient.client_user_id;
+        console.log('Pre-registered client already has user:', userId);
+      } else {
+        // Pre-registered but NO auth user yet — need to create or find one
+        // Check both: the email the admin stored AND the Shopify store email
+        const preRegisteredEmail = preRegisteredClient.email?.toLowerCase().trim();
+        const emailsToCheck = [preRegisteredEmail, shopEmail].filter(Boolean);
+        console.log('Pre-registered client has no user — resolving by emails:', emailsToCheck);
+
+        const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+        // Prefer admin-registered email over Shopify email
+        const existingUser = existingUsers?.users?.find(u =>
+          emailsToCheck.includes(u.email?.toLowerCase().trim())
+        );
+
+        if (existingUser) {
+          // User exists by email — link to pre-registered client
+          userId = existingUser.id;
+          userEmail = existingUser.email || shopEmail;
+          console.log('Found existing auth user by email for pre-registered client:', userId, '(matched:', existingUser.email, ')');
+        } else {
+          // No auth user exists — create new one with temp password
+          // Use the admin-registered email if available, otherwise use Shopify email
+          const emailForNewUser = preRegisteredEmail || shopEmail;
+          userEmail = emailForNewUser;
+          isNewUser = true;
+          tempPassword = generatePassword();
+
+          const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: emailForNewUser,
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: {
+              shop_domain: normalizedShopDomain,
+              store_name: storeName,
+              is_shopify_user: true,
+            }
+          });
+
+          if (authError || !authData.user) {
+            console.error('Failed to create auth user for pre-registered client:', authError);
+            if (isDirectRedirect) {
+              return new Response(null, { status: 302, headers: { 'Location': `${frontendUrl}/oauth/shopify/callback?error=user_creation_failed` } });
+            }
+            return new Response(JSON.stringify({ error: 'Error creating user account for pre-registered client' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+
+          userId = authData.user.id;
+          console.log('Created new auth user for pre-registered client:', userId);
+
+          // Create user role
+          await supabaseAdmin.from('user_roles').insert({
+            user_id: userId, role: 'client', is_super_admin: false
+          });
+
+          // Create free subscription
+          const { data: freePlan } = await supabaseAdmin
+            .from('subscription_plans').select('id').eq('slug', 'free').single();
+          if (freePlan) {
+            await supabaseAdmin.from('user_subscriptions').insert({
+              user_id: userId, plan_id: freePlan.id, status: 'active',
+              credits_used: 0, credits_reset_at: new Date().toISOString(),
+            });
+          }
+        }
+
+        // Link the auth user to the pre-registered client
+        await supabaseAdmin.from('clients').update({
+          client_user_id: userId,
+        }).eq('id', clientId);
+        console.log('Linked user', userId, 'to pre-registered client', clientId);
+      }
 
       // Update client with Shopify store info
       await supabaseAdmin.from('clients').update({
@@ -472,7 +547,7 @@ Deno.serve(async (req) => {
       redirectUrl.searchParams.set('shop', normalizedShopDomain);
       
       if (isNewUser && tempPassword) {
-        redirectUrl.searchParams.set('email', shopEmail);
+        redirectUrl.searchParams.set('email', userEmail);
         redirectUrl.searchParams.set('new_user', 'true');
         redirectUrl.searchParams.set('temp_pass', tempPassword);
       }
@@ -489,7 +564,7 @@ Deno.serve(async (req) => {
         success: true,
         store_name: storeName,
         is_new_user: isNewUser,
-        user_email: shopEmail,
+        user_email: userEmail,
         temp_password: isNewUser ? tempPassword : null,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
