@@ -697,7 +697,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   const [savingDraft, setSavingDraft] = useState(false);
 
-  // Save as draft to ad_creatives table (DCT-ready)
+  // Save as draft with full DCT 3:2:2 variations (3 images, 2 copies, 2 headlines)
   const handleSaveDraft = async () => {
     setSavingDraft(true);
     try {
@@ -705,27 +705,114 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         CONVERSIONS: 'bofu', TRAFFIC: 'tofu', AWARENESS: 'tofu', ENGAGEMENT: 'mofu', CATALOG: 'bofu',
       };
       const funnel = funnelMap[objective] || 'mofu';
+      const objLabel = OBJECTIVES.find(o => o.value === objective)?.label || objective;
       const anguloText = audienceDesc
-        ? `${OBJECTIVES.find(o => o.value === objective)?.label || objective} — ${audienceDesc.substring(0, 80)}`
-        : `${OBJECTIVES.find(o => o.value === objective)?.label || objective} — Campana directa`;
+        ? `${objLabel} — ${audienceDesc.substring(0, 80)}`
+        : `${objLabel} — Campana directa`;
 
+      // ── 1. Generate DCT copy/headline variations via AI ──
+      const allCopies: { texto: string; tipo: string }[] = [];
+      const allHeadlines: string[] = [];
+
+      if (primaryText) allCopies.push({ texto: primaryText, tipo: 'original' });
+      if (headline) allHeadlines.push(headline);
+
+      if (primaryText || headline) {
+        try {
+          toast.info('Generando variaciones DCT con Steve...');
+          const { data: aiData } = await callApi('generate-meta-copy', {
+            body: {
+              client_id: clientId,
+              instruction: [
+                'Genera variaciones para un test DCT 3:2:2 de Meta Ads.',
+                `Objetivo: ${objLabel}. Audiencia: ${audienceDesc || 'amplia'}.`,
+                primaryText ? `Copy original: "${primaryText.substring(0, 200)}"` : '',
+                headline ? `Headline original: "${headline}"` : '',
+                description ? `Descripcion: "${description}"` : '',
+                '',
+                'Necesito que generes variaciones DIFERENTES pero con el mismo mensaje core.',
+                'Cada variacion debe tener un angulo/enfoque distinto (ej: emocional vs racional, urgencia vs aspiracional).',
+                '',
+                'Responde SOLO con JSON:',
+                '{"copy_2":"texto alternativo del anuncio","headline_2":"titulo alternativo","description_2":"descripcion alternativa"}',
+              ].filter(Boolean).join('\n'),
+            },
+          });
+          const raw = aiData?.copy || aiData?.text || '';
+          const match = raw.match(/\{[\s\S]*\}/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            if (parsed.copy_2) allCopies.push({ texto: parsed.copy_2, tipo: 'variacion' });
+            if (parsed.headline_2) allHeadlines.push(parsed.headline_2);
+          }
+        } catch (aiErr) {
+          console.warn('[DCT] AI variation generation failed, using single copy:', aiErr);
+        }
+      }
+
+      // ── 2. Collect images: user-provided + client assets ──
+      const allImages: string[] = [];
+      if (imageUrl) allImages.push(imageUrl);
+
+      // Pull from client_assets (product/lifestyle images)
+      if (allImages.length < 3) {
+        try {
+          const { data: clientAssets } = await supabase
+            .from('client_assets')
+            .select('url')
+            .eq('client_id', clientId)
+            .in('tipo', ['producto', 'lifestyle'])
+            .not('url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          if (clientAssets) {
+            for (const a of clientAssets) {
+              if (a.url && !allImages.includes(a.url) && allImages.length < 3) {
+                allImages.push(a.url);
+              }
+            }
+          }
+        } catch { /* continue */ }
+      }
+
+      // Pull from ad_assets (previously generated creatives)
+      if (allImages.length < 3) {
+        try {
+          const { data: adAssets } = await supabase
+            .from('ad_assets')
+            .select('asset_url')
+            .eq('client_id', clientId)
+            .not('asset_url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          if (adAssets) {
+            for (const a of adAssets) {
+              if (a.asset_url && !allImages.includes(a.asset_url) && allImages.length < 3) {
+                allImages.push(a.asset_url);
+              }
+            }
+          }
+        } catch { /* continue */ }
+      }
+
+      // ── 3. Save to DB with all DCT data ──
       const { error } = await supabase.from('ad_creatives').insert({
         client_id: clientId,
         funnel,
         formato: imageUrl?.endsWith('.mp4') ? 'video' : 'static',
         angulo: anguloText,
-        titulo: headline || campName || 'Borrador sin titulo',
-        texto_principal: primaryText,
+        titulo: allHeadlines[0] || campName || 'Borrador sin titulo',
+        texto_principal: allCopies[0]?.texto || primaryText,
         descripcion: description,
         cta: cta,
-        asset_url: imageUrl || null,
+        asset_url: allImages[0] || null,
         estado: 'borrador',
         brief_visual: {
           type: 'campaign-draft',
           campaign_name: campName,
           budget_type: budgetType,
           objective,
-          objective_label: OBJECTIVES.find(o => o.value === objective)?.label || objective,
+          objective_label: objLabel,
           campaign_budget: campBudget,
           adset_name: adsetName,
           audience_description: audienceDesc,
@@ -743,13 +830,15 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             metricas_dia3: 'Hook Rate >25%, Hold Rate >15%, CTR >1.5%',
           },
         },
-        dct_copies: primaryText ? [{ texto: primaryText, tipo: 'primary' }] : null,
-        dct_titulos: headline ? [headline] : null,
+        dct_copies: allCopies.length > 0 ? allCopies : null,
+        dct_titulos: allHeadlines.length > 0 ? allHeadlines : null,
         dct_descripciones: description ? [description] : null,
-        dct_imagenes: imageUrl ? [imageUrl] : null,
+        dct_imagenes: allImages.length > 0 ? allImages : null,
       });
       if (error) throw error;
-      toast.success('Borrador DCT guardado. Revisa en Borradores para aprobar y publicar.');
+
+      const summary = `DCT guardado: ${allImages.length}/3 imagenes, ${allCopies.length}/2 copies, ${allHeadlines.length}/2 headlines`;
+      toast.success(summary);
     } catch (err) {
       console.error('[CampaignCreateWizard] Save draft error:', err);
       toast.error('Error al guardar borrador');
