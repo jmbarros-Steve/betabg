@@ -63,6 +63,9 @@ async function handleCreate(
     objective = 'OUTCOME_TRAFFIC',
     status = 'PAUSED',
     special_ad_categories = [],
+    // Optional: use existing entities instead of creating new ones
+    campaign_id: existingCampaignId,
+    adset_id: existingAdsetId,
     // Ad set fields
     adset_name,
     daily_budget,
@@ -80,36 +83,42 @@ async function handleCreate(
     destination_url,
   } = data;
 
-  if (!name) {
-    return { body: { error: 'Missing required field: name' }, status: 400 };
-  }
+  // Step 1: Use existing campaign or create new one
+  let campaignId = existingCampaignId || null;
 
-  // Step 1: Create the campaign
-  console.log(`[manage-meta-campaign] Creating campaign "${name}" for account ${accountId}`);
-
-  const campaignResult = await metaApiRequest(
-    `act_${accountId}/campaigns`,
-    accessToken,
-    'POST',
-    {
-      name,
-      objective,
-      status,
-      special_ad_categories,
+  if (!campaignId) {
+    if (!name) {
+      return { body: { error: 'Missing required field: name' }, status: 400 };
     }
-  );
 
-  if (!campaignResult.ok) {
-    return { body: { error: 'Failed to create campaign', details: campaignResult.error }, status: 502 };
+    console.log(`[manage-meta-campaign] Creating campaign "${name}" for account ${accountId}`);
+
+    const campaignResult = await metaApiRequest(
+      `act_${accountId}/campaigns`,
+      accessToken,
+      'POST',
+      {
+        name,
+        objective,
+        status,
+        special_ad_categories,
+      }
+    );
+
+    if (!campaignResult.ok) {
+      return { body: { error: 'Failed to create campaign', details: campaignResult.error }, status: 502 };
+    }
+
+    campaignId = campaignResult.data.id;
+    console.log(`[manage-meta-campaign] Campaign created: ${campaignId}`);
+  } else {
+    console.log(`[manage-meta-campaign] Using existing campaign: ${campaignId}`);
   }
 
-  const campaignId = campaignResult.data.id;
-  console.log(`[manage-meta-campaign] Campaign created: ${campaignId}`);
+  // Step 2: Use existing ad set or create new one if budget/targeting data is provided
+  let adSetId: string | null = existingAdsetId || null;
 
-  // Step 2: Create ad set if budget/targeting data is provided
-  let adSetId: string | null = null;
-
-  if (daily_budget || targeting) {
+  if (!adSetId && (daily_budget || targeting)) {
     const adsetPayload: Record<string, any> = {
       campaign_id: campaignId,
       name: adset_name || `${name} - Ad Set`,
@@ -160,6 +169,8 @@ async function handleCreate(
 
     adSetId = adsetResult.data.id;
     console.log(`[manage-meta-campaign] Ad set created: ${adSetId}`);
+  } else if (adSetId) {
+    console.log(`[manage-meta-campaign] Using existing ad set: ${adSetId}`);
   }
 
   // Step 3: Create ad creative + ad if creative data is provided

@@ -21,15 +21,9 @@ import {
   Megaphone,
   FolderOpen,
   FileImage,
-  Lightbulb,
   Loader2,
-  DollarSign,
   Target,
-  Eye,
-  Users,
   Sparkles,
-  CalendarDays,
-  Zap,
   Upload,
   Video,
   Image as ImageIcon,
@@ -37,9 +31,17 @@ import {
   X,
   Save,
   Send,
+  Rocket,
+  ChevronRight,
+  ChevronLeft,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 import AdPreviewMockup from './AdPreviewMockup';
+import StepIndicator, { type StepDef } from './wizard/StepIndicator';
+import DynamicSteveTip from './wizard/DynamicSteveTip';
+import CampaignSelector from './wizard/CampaignSelector';
+import AdSetSelector from './wizard/AdSetSelector';
+import ReviewStep from './wizard/ReviewStep';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +57,7 @@ interface CampaignCreateWizardProps {
 type StartLevel = 'campaign' | 'adset' | 'ad';
 type BudgetType = 'ABO' | 'CBO';
 type Objective = 'CONVERSIONS' | 'TRAFFIC' | 'AWARENESS' | 'ENGAGEMENT' | 'CATALOG';
+type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'ad-creative' | 'review';
 
 const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
   { value: 'CONVERSIONS', label: 'Conversiones', desc: 'Ventas, leads, registros' },
@@ -67,48 +70,92 @@ const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
 const CTA_OPTIONS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'DOWNLOAD', 'CONTACT_US', 'GET_OFFER', 'BOOK_NOW'];
 
 // ---------------------------------------------------------------------------
-// Steve tip helper
+// Step definitions per flow
 // ---------------------------------------------------------------------------
 
-function SteveTip({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20">
-      <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-      <p className="text-xs text-foreground leading-relaxed">{children}</p>
-    </div>
-  );
+const STEPS_CAMPAIGN: StepDef[] = [
+  { key: 'campaign-config', label: 'Campaña', icon: Megaphone },
+  { key: 'adset-config', label: 'Ad Set', icon: FolderOpen },
+  { key: 'funnel-stage', label: 'Funnel', icon: Target },
+  { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
+  { key: 'review', label: 'Revisar', icon: Rocket },
+];
+
+const STEPS_ADSET: StepDef[] = [
+  { key: 'select-campaign', label: 'Campaña', icon: Megaphone },
+  { key: 'adset-config', label: 'Ad Set', icon: FolderOpen },
+  { key: 'funnel-stage', label: 'Funnel', icon: Target },
+  { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
+  { key: 'review', label: 'Revisar', icon: Rocket },
+];
+
+const STEPS_AD: StepDef[] = [
+  { key: 'select-campaign', label: 'Campaña', icon: Megaphone },
+  { key: 'select-adset', label: 'Ad Set', icon: FolderOpen },
+  { key: 'funnel-stage', label: 'Funnel', icon: Target },
+  { key: 'ad-creative', label: 'Anuncio', icon: FileImage },
+  { key: 'review', label: 'Revisar', icon: Rocket },
+];
+
+function getStepsForLevel(level: StartLevel): StepDef[] {
+  switch (level) {
+    case 'campaign': return STEPS_CAMPAIGN;
+    case 'adset': return STEPS_ADSET;
+    case 'ad': return STEPS_AD;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Start Level Selector
+// Steve tip fallbacks per step
 // ---------------------------------------------------------------------------
 
-function LevelSelector({ level, setLevel }: { level: StartLevel; setLevel: (l: StartLevel) => void }) {
+const STEVE_FALLBACKS: Record<string, string> = {
+  'campaign-config': 'Elige ABO para testing (controlas cuanto gasta cada ad set) o CBO para escalar ganadores (Meta optimiza automáticamente).',
+  'select-campaign': 'Busca una campaña con el mismo objetivo que tu nuevo Ad Set. Mezclar objetivos distintos puede confundir al algoritmo.',
+  'adset-config': 'Cada Ad Set debe tener 1 solo ad para testear variables aisladas. Si pones múltiples ads, Meta distribuye el presupuesto desigualmente.',
+  'select-adset': 'Elige un Ad Set que tenga audiencia similar a la de tu nuevo anuncio. Consistencia = mejores resultados.',
+  'funnel-stage': 'TOFU para alcance, MOFU para nutrir leads, BOFU para conversión directa. El copy y CTA se adaptan a cada etapa.',
+  'ad-creative': 'El copy debe hablar al dolor/deseo del buyer persona con un CTA claro. Usa imágenes que destaquen en el feed.',
+  'review': 'Verifica que el destino URL funcione, el copy no tenga errores y el presupuesto sea el correcto antes de publicar.',
+};
+
+// ---------------------------------------------------------------------------
+// Level Selector (pre-wizard screen)
+// ---------------------------------------------------------------------------
+
+function LevelSelector({ level, setLevel, onStart }: { level: StartLevel; setLevel: (l: StartLevel) => void; onStart: () => void }) {
   const levels: { key: StartLevel; icon: React.ElementType; label: string; desc: string }[] = [
-    { key: 'campaign', icon: Megaphone, label: 'Campaña', desc: 'Empieza creando la campaña (arriba hacia abajo)' },
-    { key: 'adset', icon: FolderOpen, label: 'Ad Set', desc: 'Empieza con el conjunto de anuncios (audiencia + presupuesto)' },
-    { key: 'ad', icon: FileImage, label: 'Anuncio', desc: 'Empieza con el creativo y luego asígnalo' },
+    { key: 'campaign', icon: Megaphone, label: 'Campaña completa', desc: 'Crea todo de arriba a abajo: Campaña → Ad Set → Anuncio' },
+    { key: 'adset', icon: FolderOpen, label: 'Nuevo Ad Set', desc: 'Crea un Ad Set y enchúfalo a una campaña existente o nueva' },
+    { key: 'ad', icon: FileImage, label: 'Nuevo Anuncio', desc: 'Crea un anuncio y asígnalo a una campaña y Ad Set' },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      {levels.map((l) => {
-        const Icon = l.icon;
-        const isActive = level === l.key;
-        return (
-          <button
-            key={l.key}
-            onClick={() => setLevel(l.key)}
-            className={`flex flex-col items-center gap-2 p-5 rounded-lg border text-center transition-all ${
-              isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-background hover:border-primary/30'
-            }`}
-          >
-            <Icon className={`w-8 h-8 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-            <span className={`text-sm font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{l.label}</span>
-            <span className="text-xs text-muted-foreground">{l.desc}</span>
-          </button>
-        );
-      })}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {levels.map((l) => {
+          const Icon = l.icon;
+          const isActive = level === l.key;
+          return (
+            <button
+              key={l.key}
+              onClick={() => setLevel(l.key)}
+              className={`flex flex-col items-center gap-2 p-5 rounded-lg border text-center transition-all ${
+                isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-background hover:border-primary/30'
+              }`}
+            >
+              <Icon className={`w-8 h-8 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+              <span className={`text-sm font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{l.label}</span>
+              <span className="text-xs text-muted-foreground">{l.desc}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex justify-center">
+        <Button size="lg" onClick={onStart} className="px-8">
+          Comenzar <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -134,12 +181,6 @@ function CampaignForm({
 
   return (
     <div className="space-y-5">
-      <SteveTip>
-        {budgetType === 'ABO'
-          ? 'ABO (Ad Budget Optimization): Presupuesto por cada Ad Set. Ideal para TESTING — controlas cuanto gasta cada ad set.'
-          : 'CBO (Campaign Budget Optimization): Meta distribuye el presupuesto. Ideal para ESCALAR ganadores — Meta optimiza automáticamente.'}
-      </SteveTip>
-
       <div>
         <Label>Nombre de la campaña</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Mi Campaña - ${today}`} className="mt-1" />
@@ -214,10 +255,6 @@ function AdSetForm({
 }) {
   return (
     <div className="space-y-5">
-      <SteveTip>
-        Cada Ad Set debe tener 1 solo ad para testear variables aisladas. Si pones multiples ads en un Ad Set, Meta distribuye el presupuesto desigualmente y no sabes cual funciono.
-      </SteveTip>
-
       <div>
         <Label>Nombre del Ad Set</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="[Audiencia] - [Variable test]" className="mt-1" />
@@ -235,6 +272,45 @@ function AdSetForm({
           <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="mt-1" />
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Funnel Stage Selector
+// ---------------------------------------------------------------------------
+
+function FunnelStageSelector({
+  funnelStage, setFunnelStage,
+}: {
+  funnelStage: 'tofu' | 'mofu' | 'bofu';
+  setFunnelStage: (v: 'tofu' | 'mofu' | 'bofu') => void;
+}) {
+  const stages = [
+    { key: 'tofu' as const, label: 'TOFU', desc: 'Awareness — Captar atención', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
+    { key: 'mofu' as const, label: 'MOFU', desc: 'Consideración — Educar y nutrir', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
+    { key: 'bofu' as const, label: 'BOFU', desc: 'Conversión — Cerrar la venta', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Steve ajusta el copy y las recomendaciones según la etapa del funnel de conversión.
+      </p>
+      <div className="grid grid-cols-3 gap-3">
+        {stages.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFunnelStage(f.key)}
+            className={`flex flex-col items-center gap-1 p-4 rounded-lg border transition-all ${
+              funnelStage === f.key ? `ring-1 ring-primary/20 ${f.color}` : 'border-border hover:border-primary/30'
+            }`}
+          >
+            <Badge className={`text-xs font-bold ${funnelStage === f.key ? f.color : 'bg-muted text-muted-foreground'}`}>{f.label}</Badge>
+            <span className="text-[11px] text-muted-foreground text-center">{f.desc}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -359,7 +435,6 @@ function AdForm({
       if (data?.prediction_id) {
         toast.info('Video en proceso... puede tomar 1-3 minutos.');
         setVideoPolling(true);
-        // Poll for video status
         const pollInterval = setInterval(async () => {
           try {
             const { data: status } = await callApi('check-video-status', {
@@ -402,10 +477,6 @@ function AdForm({
 
   return (
     <div className="space-y-5">
-      <SteveTip>
-        Steve genera copy basado en tu brief. Puedes editar todo. El copy debe hablar al dolor/deseo del buyer persona y tener un CTA claro.
-      </SteveTip>
-
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
           {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
@@ -500,12 +571,12 @@ function AdForm({
             <Textarea
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="Describe el video: 'Producto girando 360 grados sobre fondo blanco con iluminación suave...'"
+              placeholder="Describe el video: 'Producto girando 360 grados con fondo blanco, transiciones suaves...'"
               rows={3}
             />
             <Button onClick={handleGenerateVideo} disabled={generatingVideo || !aiPrompt.trim()} className="w-full">
               {generatingVideo ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{videoPolling ? 'Procesando video...' : 'Iniciando...'}</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{videoPolling ? 'Procesando video...' : 'Generando...'}</>
               ) : (
                 <><Video className="w-4 h-4 mr-2" />Generar Video (10 cred)</>
               )}
@@ -515,55 +586,47 @@ function AdForm({
 
         {/* Gallery tab */}
         {mediaTab === 'gallery' && (
-          <div className="space-y-2">
+          <div>
             {loadingGallery ? (
-              <div className="grid grid-cols-4 gap-2">{[1,2,3,4].map(i => <Skeleton key={i} className="aspect-square rounded" />)}</div>
-            ) : galleryAssets.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-4">Sin creativos guardados. Genera uno primero.</p>
-            ) : (
-              <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-4 gap-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="aspect-square rounded" />)}</div>
+            ) : galleryAssets.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2 max-h-[250px] overflow-y-auto">
                 {galleryAssets.map((a) => (
                   <button
                     key={a.id}
-                    onClick={() => { setImageUrl(a.url); toast.success('Creativo seleccionado'); }}
-                    className={`aspect-square rounded-lg border-2 overflow-hidden transition-all ${
-                      imageUrl === a.url ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
-                    }`}
+                    onClick={() => { setImageUrl(a.url); toast.success('Asset seleccionado'); }}
+                    className={`aspect-square rounded overflow-hidden border-2 transition-all ${imageUrl === a.url ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}`}
                   >
-                    {a.tipo === 'video' ? (
-                      <div className="w-full h-full bg-muted flex items-center justify-center"><Video className="w-6 h-6 text-muted-foreground" /></div>
-                    ) : (
-                      <img src={a.url} alt="" className="w-full h-full object-cover" />
-                    )}
+                    <img src={a.url} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">No hay assets disponibles</p>
             )}
           </div>
         )}
 
         {/* URL tab */}
         {mediaTab === 'url' && (
-          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+          <Input
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://tu-imagen.com/foto.jpg"
+          />
         )}
 
-        {/* Preview of selected media */}
+        {/* Image preview */}
         {imageUrl && (
-          <div className="relative">
-            <div className={`rounded-lg bg-muted overflow-hidden ${
-              adFormat === '1:1' ? 'aspect-square max-w-[200px]' :
-              adFormat === '9:16' ? 'aspect-[9/16] max-w-[140px]' :
-              'aspect-video max-w-[280px]'
-            }`}>
-              {imageUrl.endsWith('.mp4') || imageUrl.includes('video') ? (
-                <video src={imageUrl} controls className="w-full h-full object-cover" />
-              ) : (
-                <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-              )}
-            </div>
+          <div className="relative inline-block">
+            {imageUrl.endsWith('.mp4') ? (
+              <video src={imageUrl} controls className="max-h-[200px] rounded border" />
+            ) : (
+              <img src={imageUrl} alt="" className="max-h-[200px] rounded border" />
+            )}
             <button
               onClick={() => setImageUrl('')}
-              className="absolute top-1 right-1 bg-background/80 rounded-full p-1 hover:bg-destructive hover:text-white transition-colors"
+              className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
             >
               <X className="w-3 h-3" />
             </button>
@@ -571,30 +634,28 @@ function AdForm({
         )}
       </div>
 
-      <div>
-        <Label>Texto principal (Primary Text)</Label>
-        <Textarea value={primaryText} onChange={(e) => setPrimaryText(e.target.value)} placeholder="El texto principal del anuncio..." rows={4} className="mt-1" />
-        <p className="text-[11px] text-muted-foreground mt-1">{primaryText.length}/125 caracteres recomendados</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Copy fields */}
+      <div className="space-y-4">
         <div>
           <Label>Headline</Label>
-          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Título del anuncio" className="mt-1" />
+          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Título principal del anuncio" className="mt-1" />
+        </div>
+        <div>
+          <Label>Texto principal (Primary Text)</Label>
+          <Textarea value={primaryText} onChange={(e) => setPrimaryText(e.target.value)} placeholder="El cuerpo del anuncio — habla al dolor/deseo de tu audiencia" rows={3} className="mt-1" />
         </div>
         <div>
           <Label>Descripción</Label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción corta" className="mt-1" />
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción adicional (opcional)" className="mt-1" />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label>CTA (Call to Action)</Label>
-          <Select value={cta} onValueChange={setCta}>
+          <Label>Botón CTA</Label>
+          <Select value={cta} onValueChange={(v) => setCta(v)}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {CTA_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>)}
+              {CTA_OPTIONS.map((c) => (
+                <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -603,37 +664,6 @@ function AdForm({
           <Input value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://tu-tienda.com" className="mt-1" />
         </div>
       </div>
-
-      {/* Full preview */}
-      {(primaryText || headline || imageUrl) && (
-        <Card className="border-primary/20 bg-muted/30">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-primary" />
-              <CardTitle className="text-xs">Preview del Anuncio</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {imageUrl && (
-              <div className={`rounded bg-muted overflow-hidden ${
-                adFormat === '1:1' ? 'aspect-square max-w-[200px]' :
-                adFormat === '9:16' ? 'aspect-[9/16] max-w-[140px]' :
-                'aspect-video max-w-xs'
-              }`}>
-                {imageUrl.endsWith('.mp4') ? (
-                  <video src={imageUrl} controls className="w-full h-full object-cover" />
-                ) : (
-                  <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                )}
-              </div>
-            )}
-            {headline && <p className="text-sm font-semibold">{headline}</p>}
-            {primaryText && <p className="text-xs text-muted-foreground line-clamp-3">{primaryText}</p>}
-            {description && <p className="text-xs text-muted-foreground/70">{description}</p>}
-            {cta && <Badge variant="outline" className="text-[10px]">{cta.replace(/_/g, ' ')}</Badge>}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
@@ -645,9 +675,20 @@ function AdForm({
 export default function CampaignCreateWizard({ clientId, onBack, onComplete, startFrom = 'campaign' }: CampaignCreateWizardProps) {
   const { connectionId: ctxConnectionId, pageId: ctxPageId, pageName } = useMetaBusiness();
 
+  // Wizard navigation
   const [level, setLevel] = useState<StartLevel>(startFrom);
-  const [submitting, setSubmitting] = useState(false);
-  const [generatingCopy, setGeneratingCopy] = useState(false);
+  const [wizardStarted, setWizardStarted] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const steps = getStepsForLevel(level);
+  const currentStep = steps[stepIndex]?.key;
+
+  // Existing entity selection
+  const [existingCampaignId, setExistingCampaignId] = useState<string | null>(null);
+  const [existingCampaignName, setExistingCampaignName] = useState('');
+  const [existingAdsetId, setExistingAdsetId] = useState<string | null>(null);
+  const [existingAdsetName, setExistingAdsetName] = useState('');
+  const [createNewCampaign, setCreateNewCampaign] = useState(false);
+  const [createNewAdset, setCreateNewAdset] = useState(false);
 
   // Campaign fields
   const [campName, setCampName] = useState('');
@@ -671,6 +712,45 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [imageUrl, setImageUrl] = useState('');
   const [cta, setCta] = useState('SHOP_NOW');
   const [destinationUrl, setDestinationUrl] = useState('');
+
+  // Loading states
+  const [submitting, setSubmitting] = useState(false);
+  const [generatingCopy, setGeneratingCopy] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  // ---- Navigation ----
+
+  const goNext = () => {
+    if (stepIndex < steps.length - 1) setStepIndex(stepIndex + 1);
+  };
+  const goPrev = () => {
+    if (stepIndex > 0) setStepIndex(stepIndex - 1);
+  };
+
+  // ---- Validation ----
+
+  const canProceed = (): boolean => {
+    switch (currentStep) {
+      case 'select-campaign':
+        return !!existingCampaignId || (createNewCampaign && !!campName.trim());
+      case 'select-adset':
+        return !!existingAdsetId || (createNewAdset && !!adsetName.trim());
+      case 'campaign-config':
+        return !!campName.trim();
+      case 'adset-config':
+        return !!adsetName.trim() && (budgetType !== 'ABO' || !!adsetBudget);
+      case 'funnel-stage':
+        return true;
+      case 'ad-creative':
+        return !!primaryText.trim() && !!headline.trim();
+      case 'review':
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  // ---- AI Copy Generation ----
 
   const handleGenerateCopy = async () => {
     setGeneratingCopy(true);
@@ -701,9 +781,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     }
   };
 
-  const [savingDraft, setSavingDraft] = useState(false);
+  // ---- Save Draft ----
 
-  // Save as draft with full DCT 3:2:2 variations (3 images, 2 copies, 2 headlines)
   const handleSaveDraft = async () => {
     setSavingDraft(true);
     try {
@@ -716,7 +795,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         ? `${objLabel} — ${audienceDesc.substring(0, 80)}`
         : `${objLabel} — Campana directa`;
 
-      // ── 1. Generate DCT copy/headline variations via AI ──
+      // Generate DCT copy/headline variations via AI
       const allCopies: { texto: string; tipo: string }[] = [];
       const allHeadlines: string[] = [];
 
@@ -737,10 +816,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 description ? `Descripcion: "${description}"` : '',
                 '',
                 'Necesito que generes variaciones DIFERENTES pero con el mismo mensaje core.',
-                'Cada variacion debe tener un angulo/enfoque distinto (ej: emocional vs racional, urgencia vs aspiracional).',
+                'Cada variacion debe tener un angulo/enfoque distinto.',
                 '',
                 'Responde SOLO con JSON:',
-                '{"copy_2":"texto alternativo del anuncio","headline_2":"titulo alternativo","description_2":"descripcion alternativa"}',
+                '{"copy_2":"texto alternativo","headline_2":"titulo alternativo","description_2":"descripcion alternativa"}',
               ].filter(Boolean).join('\n'),
             },
           });
@@ -752,15 +831,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             if (parsed.headline_2) allHeadlines.push(parsed.headline_2);
           }
         } catch (aiErr) {
-          console.warn('[DCT] AI variation generation failed, using single copy:', aiErr);
+          console.warn('[DCT] AI variation generation failed:', aiErr);
         }
       }
 
-      // ── 2. Collect images: user-provided + Shopify products + assets ──
+      // Collect images
       const allImages: string[] = [];
       if (imageUrl) allImages.push(imageUrl);
 
-      // Priority 1: Shopify product images (CDN-hosted, always valid)
       if (allImages.length < 3) {
         try {
           const { data: shopifyConn } = await supabase
@@ -782,10 +860,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               }
             }
           }
-        } catch { /* Shopify not connected or API error — continue */ }
+        } catch { /* Shopify not connected */ }
       }
 
-      // Priority 2: ad_assets (AI-generated creatives, verified working)
       if (allImages.length < 3) {
         try {
           const { data: adAssets } = await supabase
@@ -805,7 +882,6 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         } catch { /* continue */ }
       }
 
-      // Priority 3: client_assets (user uploads — filter out Supabase storage 0-byte files)
       if (allImages.length < 3) {
         try {
           const { data: clientAssets } = await supabase
@@ -818,7 +894,6 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             .limit(5);
           if (clientAssets) {
             for (const a of clientAssets) {
-              // Skip Supabase storage URLs (may be 0-byte), prefer external CDN URLs
               const isStorageUrl = a.url?.includes('/storage/v1/object/');
               if (a.url && !isStorageUrl && !allImages.includes(a.url) && allImages.length < 3) {
                 allImages.push(a.url);
@@ -828,7 +903,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         } catch { /* continue */ }
       }
 
-      // ── 3. Save to DB with all DCT data ──
+      // Save to DB
       const { error } = await supabase.from('ad_creatives').insert({
         client_id: clientId,
         funnel,
@@ -842,7 +917,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         estado: 'borrador',
         brief_visual: {
           type: 'campaign-draft',
-          campaign_name: campName,
+          campaign_name: existingCampaignId ? existingCampaignName : campName,
+          existing_campaign_id: existingCampaignId || undefined,
+          existing_adset_id: existingAdsetId || undefined,
           budget_type: budgetType,
           objective,
           objective_label: objLabel,
@@ -880,16 +957,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     }
   };
 
+  // ---- Submit to Meta ----
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Use connectionId from MetaBusinessContext
       if (!ctxConnectionId) {
         toast.error('No hay conexión Meta Ads activa');
         return;
       }
 
-      const connectionId = ctxConnectionId;
       const name = campName || `Campaña - ${new Date().toISOString().split('T')[0]}`;
       const objMap: Record<Objective, string> = {
         CONVERSIONS: 'OUTCOME_SALES',
@@ -899,38 +976,53 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         CATALOG: 'OUTCOME_SALES',
       };
 
-      const budget = budgetType === 'CBO'
-        ? Number(campBudget) * 100
-        : Number(adsetBudget) * 100;
+      const submitData: Record<string, any> = {
+        name,
+        objective: objMap[objective],
+        status: 'PAUSED',
+        billing_event: 'IMPRESSIONS',
+        optimization_goal: objective === 'TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
+        adset_name: adsetName || `${name} - Ad Set 1`,
+        primary_text: primaryText || undefined,
+        headline: headline || undefined,
+        description: description || undefined,
+        image_url: imageUrl || undefined,
+        cta: cta || 'SHOP_NOW',
+        destination_url: destinationUrl || undefined,
+        page_id: ctxPageId || undefined,
+      };
+
+      // Use existing entities if selected
+      if (existingCampaignId) {
+        submitData.campaign_id = existingCampaignId;
+      }
+      if (existingAdsetId) {
+        submitData.adset_id = existingAdsetId;
+      }
+
+      // Budget
+      if (!existingAdsetId) {
+        const budget = budgetType === 'CBO'
+          ? Number(campBudget) * 100
+          : Number(adsetBudget) * 100;
+        submitData.daily_budget = budget || 1000000;
+      }
+
+      if (!existingCampaignId && startDate) {
+        submitData.start_time = startDate;
+      }
 
       const { error } = await callApi('manage-meta-campaign', {
         body: {
           action: 'create',
-          connection_id: connectionId,
-          data: {
-            name,
-            objective: objMap[objective],
-            status: 'PAUSED',
-            daily_budget: budget || 1000000,
-            billing_event: 'IMPRESSIONS',
-            optimization_goal: objective === 'TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
-            adset_name: adsetName || `${name} - Ad Set 1`,
-            start_time: startDate || undefined,
-            // Ad creative fields
-            primary_text: primaryText || undefined,
-            headline: headline || undefined,
-            description: description || undefined,
-            image_url: imageUrl || undefined,
-            cta: cta || 'SHOP_NOW',
-            destination_url: destinationUrl || undefined,
-            page_id: ctxPageId || undefined,
-          },
+          connection_id: ctxConnectionId,
+          data: submitData,
         },
       });
 
       if (error) throw error;
 
-      toast.success(`Campaña "${name}" creada como PAUSED en Meta. Activa cuando estés listo.`);
+      toast.success('Campaña creada como PAUSED en Meta. Activa cuando estés listo.');
       onComplete?.();
     } catch (err) {
       console.error('[CampaignCreateWizard] Submit error:', err);
@@ -940,164 +1032,262 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     }
   };
 
+  // ---- Steve tip context ----
+
+  const steveContext = {
+    objective,
+    audienceDesc,
+    budgetType,
+    funnelStage,
+    headline,
+    primaryText,
+    campName,
+    adsetName,
+  };
+
+  // ---- Render ----
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8">
+        <Button variant="ghost" size="icon" onClick={wizardStarted ? () => { if (stepIndex === 0) { setWizardStarted(false); } else { goPrev(); } } : onBack} className="h-8 w-8">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Crear Campaña</h2>
-          <p className="text-muted-foreground text-sm">Elige desde donde empezar: Campaña, Ad Set o Anuncio</p>
+          <p className="text-muted-foreground text-sm">
+            {wizardStarted
+              ? `Paso ${stepIndex + 1} de ${steps.length}`
+              : 'Elige desde dónde quieres empezar'}
+          </p>
         </div>
       </div>
 
-      {/* Level selector */}
-      <LevelSelector level={level} setLevel={setLevel} />
+      {/* Pre-wizard: Level selector */}
+      {!wizardStarted && (
+        <LevelSelector
+          level={level}
+          setLevel={setLevel}
+          onStart={() => setWizardStarted(true)}
+        />
+      )}
 
-      {/* Forms based on level */}
-      <div className="space-y-6">
-        {/* Campaign form — always shown if level is campaign, or later for other levels */}
-        {(level === 'campaign' || level === 'adset' || level === 'ad') && (
+      {/* Wizard: Steps */}
+      {wizardStarted && (
+        <>
+          {/* Step indicator */}
+          <StepIndicator
+            steps={steps}
+            currentIndex={stepIndex}
+            onStepClick={(i) => setStepIndex(i)}
+          />
+
+          {/* Steve AI tip */}
+          <DynamicSteveTip
+            clientId={clientId}
+            stepKey={currentStep}
+            context={steveContext}
+            fallback={STEVE_FALLBACKS[currentStep] || ''}
+          />
+
+          {/* Step content */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-primary" />
-                <CardTitle className="text-base">Campaña</CardTitle>
+                {(() => { const Icon = steps[stepIndex].icon; return <Icon className="w-4 h-4 text-primary" />; })()}
+                <CardTitle className="text-base">{steps[stepIndex].label}</CardTitle>
               </div>
-              {level !== 'campaign' && <CardDescription className="text-xs">Steve necesita una campaña para asignar tu {level === 'adset' ? 'Ad Set' : 'Anuncio'}</CardDescription>}
+              <CardDescription className="text-xs">Paso {stepIndex + 1} de {steps.length}</CardDescription>
             </CardHeader>
             <CardContent>
-              <CampaignForm
-                name={campName} setName={setCampName}
-                budgetType={budgetType} setBudgetType={setBudgetType}
-                objective={objective} setObjective={setObjective}
-                dailyBudget={campBudget} setDailyBudget={setCampBudget}
-                startDate={startDate} setStartDate={setStartDate}
-              />
-            </CardContent>
-          </Card>
-        )}
+              {/* SELECT CAMPAIGN step */}
+              {currentStep === 'select-campaign' && ctxConnectionId && (
+                <div className="space-y-4">
+                  <CampaignSelector
+                    connectionId={ctxConnectionId}
+                    selectedCampaignId={existingCampaignId}
+                    onSelect={(id, name) => { setExistingCampaignId(id); setExistingCampaignName(name); setCreateNewCampaign(false); }}
+                    onCreateNew={() => { setCreateNewCampaign(true); setExistingCampaignId(null); setExistingCampaignName(''); }}
+                    isCreatingNew={createNewCampaign}
+                  />
+                  {createNewCampaign && (
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardContent className="pt-4">
+                        <CampaignForm
+                          name={campName} setName={setCampName}
+                          budgetType={budgetType} setBudgetType={setBudgetType}
+                          objective={objective} setObjective={setObjective}
+                          dailyBudget={campBudget} setDailyBudget={setCampBudget}
+                          startDate={startDate} setStartDate={setStartDate}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
 
-        {/* Ad Set form */}
-        {(level === 'adset' || level === 'ad' || level === 'campaign') && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <FolderOpen className="w-4 h-4 text-orange-500" />
-                <CardTitle className="text-base">Conjunto de Anuncios (Ad Set)</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <AdSetForm
-                name={adsetName} setName={setAdsetName}
-                audienceDesc={audienceDesc} setAudienceDesc={setAudienceDesc}
-                dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
-                isABO={budgetType === 'ABO'}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Funnel Stage selector */}
-        {(level === 'ad' || level === 'campaign' || level === 'adset') && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-500" />
-                <CardTitle className="text-base">Etapa del Funnel</CardTitle>
-              </div>
-              <CardDescription className="text-xs">Steve ajusta el copy según la etapa del funnel de conversión</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                {([
-                  { key: 'tofu' as const, label: 'TOFU', desc: 'Awareness — Captar atención', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
-                  { key: 'mofu' as const, label: 'MOFU', desc: 'Consideración — Educar y nutrir', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
-                  { key: 'bofu' as const, label: 'BOFU', desc: 'Conversión — Cerrar la venta', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
-                ]).map((f) => (
-                  <button
-                    key={f.key}
-                    onClick={() => setFunnelStage(f.key)}
-                    className={`flex flex-col items-center gap-1 p-4 rounded-lg border transition-all ${
-                      funnelStage === f.key ? `ring-1 ring-primary/20 ${f.color}` : 'border-border hover:border-primary/30'
-                    }`}
-                  >
-                    <Badge className={`text-xs font-bold ${funnelStage === f.key ? f.color : 'bg-muted text-muted-foreground'}`}>{f.label}</Badge>
-                    <span className="text-[11px] text-muted-foreground text-center">{f.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Ad form */}
-        {(level === 'ad' || level === 'campaign' || level === 'adset') && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <FileImage className="w-4 h-4 text-pink-500" />
-                <CardTitle className="text-base">Anuncio (Ad)</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
-                <AdForm
-                  clientId={clientId}
-                  headline={headline} setHeadline={setHeadline}
-                  primaryText={primaryText} setPrimaryText={setPrimaryText}
-                  description={description} setDescription={setDescription}
-                  imageUrl={imageUrl} setImageUrl={setImageUrl}
-                  cta={cta} setCta={setCta}
-                  destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
-                  generating={generatingCopy}
-                  onGenerateCopy={handleGenerateCopy}
-                />
-                {/* Live Preview */}
-                {(primaryText || headline || imageUrl) && (
-                  <div className="hidden lg:block">
-                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
-                    <div className="sticky top-4">
-                      <AdPreviewMockup
-                        imageUrl={imageUrl}
-                        primaryText={primaryText}
-                        headline={headline}
-                        description={description}
-                        cta={cta}
-                        pageName={pageName || 'Tu Marca'}
-                        destinationUrl={destinationUrl}
-                      />
+              {/* SELECT ADSET step */}
+              {currentStep === 'select-adset' && ctxConnectionId && (existingCampaignId || createNewCampaign) && (
+                <div className="space-y-4">
+                  {existingCampaignId ? (
+                    <AdSetSelector
+                      connectionId={ctxConnectionId}
+                      campaignId={existingCampaignId}
+                      selectedAdsetId={existingAdsetId}
+                      onSelect={(id, name) => { setExistingAdsetId(id); setExistingAdsetName(name); setCreateNewAdset(false); }}
+                      onCreateNew={() => { setCreateNewAdset(true); setExistingAdsetId(null); setExistingAdsetName(''); }}
+                      isCreatingNew={createNewAdset}
+                    />
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground">Estás creando una campaña nueva, así que también necesitas un Ad Set nuevo.</p>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                  {(createNewAdset || createNewCampaign) && (
+                    <Card className="border-orange-500/20 bg-orange-500/5">
+                      <CardContent className="pt-4">
+                        <AdSetForm
+                          name={adsetName} setName={setAdsetName}
+                          audienceDesc={audienceDesc} setAudienceDesc={setAudienceDesc}
+                          dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
+                          isABO={budgetType === 'ABO'}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* CAMPAIGN CONFIG step (Flow A only) */}
+              {currentStep === 'campaign-config' && (
+                <CampaignForm
+                  name={campName} setName={setCampName}
+                  budgetType={budgetType} setBudgetType={setBudgetType}
+                  objective={objective} setObjective={setObjective}
+                  dailyBudget={campBudget} setDailyBudget={setCampBudget}
+                  startDate={startDate} setStartDate={setStartDate}
+                />
+              )}
+
+              {/* ADSET CONFIG step (Flow A and B) */}
+              {currentStep === 'adset-config' && (
+                <AdSetForm
+                  name={adsetName} setName={setAdsetName}
+                  audienceDesc={audienceDesc} setAudienceDesc={setAudienceDesc}
+                  dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
+                  isABO={budgetType === 'ABO'}
+                />
+              )}
+
+              {/* FUNNEL STAGE step */}
+              {currentStep === 'funnel-stage' && (
+                <FunnelStageSelector funnelStage={funnelStage} setFunnelStage={setFunnelStage} />
+              )}
+
+              {/* AD CREATIVE step */}
+              {currentStep === 'ad-creative' && (
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
+                  <AdForm
+                    clientId={clientId}
+                    headline={headline} setHeadline={setHeadline}
+                    primaryText={primaryText} setPrimaryText={setPrimaryText}
+                    description={description} setDescription={setDescription}
+                    imageUrl={imageUrl} setImageUrl={setImageUrl}
+                    cta={cta} setCta={setCta}
+                    destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
+                    generating={generatingCopy}
+                    onGenerateCopy={handleGenerateCopy}
+                  />
+                  {(primaryText || headline || imageUrl) && (
+                    <div className="hidden lg:block">
+                      <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
+                      <div className="sticky top-4">
+                        <AdPreviewMockup
+                          imageUrl={imageUrl}
+                          primaryText={primaryText}
+                          headline={headline}
+                          description={description}
+                          cta={cta}
+                          pageName={pageName || 'Tu Marca'}
+                          destinationUrl={destinationUrl}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* REVIEW step */}
+              {currentStep === 'review' && (
+                <ReviewStep
+                  existingCampaignId={existingCampaignId}
+                  existingCampaignName={existingCampaignName}
+                  campName={campName}
+                  budgetType={budgetType}
+                  objective={objective}
+                  campBudget={campBudget}
+                  startDate={startDate}
+                  existingAdsetId={existingAdsetId}
+                  existingAdsetName={existingAdsetName}
+                  adsetName={adsetName}
+                  audienceDesc={audienceDesc}
+                  adsetBudget={adsetBudget}
+                  funnelStage={funnelStage}
+                  headline={headline}
+                  primaryText={primaryText}
+                  description={description}
+                  imageUrl={imageUrl}
+                  cta={cta}
+                  destinationUrl={destinationUrl}
+                  pageName={pageName || 'Tu Marca'}
+                />
+              )}
             </CardContent>
           </Card>
-        )}
-      </div>
 
-      {/* Submit */}
-      <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" onClick={onBack}>Cancelar</Button>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
-            {savingDraft ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
-            ) : (
-              <><Save className="w-4 h-4 mr-2" />Guardar Borrador</>
-            )}
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting} size="lg">
-            {submitting ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
-            ) : (
-              <><Send className="w-4 h-4 mr-2" />Publicar en Meta (Paused)</>
-            )}
-          </Button>
-        </div>
-      </div>
+          {/* Bottom navigation */}
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (stepIndex === 0) setWizardStarted(false);
+                else goPrev();
+              }}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              {stepIndex === 0 ? 'Volver' : 'Anterior'}
+            </Button>
+
+            <div className="flex items-center gap-2">
+              {/* Save draft — available from ad-creative and review steps */}
+              {(currentStep === 'ad-creative' || currentStep === 'review') && (
+                <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
+                  {savingDraft ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                  ) : (
+                    <><Save className="w-4 h-4 mr-2" />Guardar Borrador</>
+                  )}
+                </Button>
+              )}
+
+              {currentStep === 'review' ? (
+                <Button onClick={handleSubmit} disabled={submitting} size="lg">
+                  {submitting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
+                  ) : (
+                    <><Send className="w-4 h-4 mr-2" />Publicar en Meta (Paused)</>
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={goNext} disabled={!canProceed()}>
+                  Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
