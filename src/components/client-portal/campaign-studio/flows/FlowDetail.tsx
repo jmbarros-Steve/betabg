@@ -106,14 +106,13 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
         body: {
           action: 'create_flow',
           connectionId: conn.id,
-          flowType: template.id,
-          flowName: template.nameEs,
-          triggerDescription: template.triggerDescription,
+          name: template.nameEs,
+          triggerType: template.id,
           emails: template.emails.map((e) => ({
             subject: e.subject,
             previewText: e.previewText,
-            delayHours: e.delayHours,
-            description: e.description,
+            delaySeconds: (e.delayHours || 0) * 3600,
+            htmlContent: '',
           })),
         },
       });
