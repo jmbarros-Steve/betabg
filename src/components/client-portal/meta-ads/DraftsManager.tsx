@@ -22,18 +22,14 @@ import {
   Megaphone,
   AlertCircle,
   RefreshCw,
-  Video,
   Target,
   Users,
   DollarSign,
-  Link as LinkIcon,
   Zap,
-  ChevronDown,
-  ChevronUp,
-  Flame,
-  ShoppingBag,
-  BarChart3,
   Lightbulb,
+  Plus,
+  Image as ImageIcon,
+  FileText,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 
@@ -93,7 +89,7 @@ interface DraftItem {
 }
 
 // ---------------------------------------------------------------------------
-// Status config
+// Config
 // ---------------------------------------------------------------------------
 
 const STATUS_CONFIG: Record<DraftStatus, { label: string; color: string; icon: React.ElementType }> = {
@@ -103,11 +99,48 @@ const STATUS_CONFIG: Record<DraftStatus, { label: string; color: string; icon: R
   generando: { label: 'Generando', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30', icon: Loader2 },
 };
 
-const FUNNEL_CONFIG: Record<string, { label: string; color: string }> = {
-  tofu: { label: 'TOFU', color: 'bg-sky-500/15 text-sky-600 border-sky-500/30' },
-  mofu: { label: 'MOFU', color: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
-  bofu: { label: 'BOFU', color: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' },
+const FUNNEL_INFO: Record<string, { label: string; color: string; explanation: string }> = {
+  tofu: {
+    label: 'TOFU',
+    color: 'bg-sky-500/15 text-sky-600 border-sky-500/30',
+    explanation: 'Top of Funnel — Maximo alcance para nuevas audiencias. Se optimiza por impresiones y visitas.',
+  },
+  mofu: {
+    label: 'MOFU',
+    color: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
+    explanation: 'Middle of Funnel — Personas que ya conocen tu marca. Se busca engagement y consideracion.',
+  },
+  bofu: {
+    label: 'BOFU',
+    color: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
+    explanation: 'Bottom of Funnel — Alta intencion de compra. Se buscan conversiones directas: ventas, leads.',
+  },
 };
+
+const OBJECTIVE_WHY: Record<string, string> = {
+  CONVERSIONS: 'Objetivo "Conversiones" = ventas directas → BOFU porque se buscan personas listas para comprar.',
+  TRAFFIC: 'Objetivo "Trafico" = visitas al sitio → TOFU porque se busca atraer nuevas audiencias.',
+  AWARENESS: 'Objetivo "Reconocimiento" = maximo alcance → TOFU porque se busca awareness de marca.',
+  ENGAGEMENT: 'Objetivo "Interaccion" = likes/comentarios → MOFU porque se reimpacta a quienes ya conocen la marca.',
+  CATALOG: 'Objetivo "Catalogo DPA" = retargeting dinamico → BOFU porque se reimpacta a visitantes previos.',
+};
+
+// ---------------------------------------------------------------------------
+// Image with error handling
+// ---------------------------------------------------------------------------
+
+function SafeImage({ src, className }: { src: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className={`bg-muted/60 flex flex-col items-center justify-center gap-1 ${className}`}>
+        <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
+        <span className="text-[10px] text-muted-foreground/50">Error al cargar</span>
+      </div>
+    );
+  }
+  return <img src={src} alt="" className={`object-cover ${className}`} onError={() => setFailed(true)} />;
+}
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -122,8 +155,8 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
   const [deleteTarget, setDeleteTarget] = useState<DraftItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // ── Fetch ──
   const fetchDrafts = useCallback(async () => {
     setLoading(true);
     try {
@@ -133,7 +166,6 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         .eq('client_id', clientId)
         .in('estado', ['borrador', 'aprobado', 'generando'])
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       setDrafts((data as DraftItem[]) || []);
     } catch (err) {
@@ -146,15 +178,12 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
 
   useEffect(() => { fetchDrafts(); }, [fetchDrafts]);
 
+  // ── Delete ──
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from('ad_creatives')
-        .delete()
-        .eq('id', deleteTarget.id)
-        .eq('client_id', clientId);
+      const { error } = await supabase.from('ad_creatives').delete().eq('id', deleteTarget.id).eq('client_id', clientId);
       if (error) throw error;
       setDrafts((prev) => prev.filter((d) => d.id !== deleteTarget.id));
       toast.success('Borrador eliminado');
@@ -166,6 +195,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
     }
   };
 
+  // ── Publish ──
   const handlePublish = async (draft: DraftItem) => {
     setPublishing(draft.id);
     try {
@@ -201,6 +231,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
     }
   };
 
+  // ── Approve ──
   const handleApprove = async (draft: DraftItem) => {
     try {
       await supabase.from('ad_creatives').update({ estado: 'aprobado' }).eq('id', draft.id);
@@ -211,18 +242,55 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
     }
   };
 
+  // ── Helpers ──
   const filtered = filter === 'all' ? drafts : drafts.filter((d) => d.estado === filter);
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+  function getImages(draft: DraftItem): string[] {
+    const imgs: string[] = [];
+    if (draft.asset_url) imgs.push(draft.asset_url);
+    if (Array.isArray(draft.dct_imagenes)) {
+      for (const img of draft.dct_imagenes) {
+        const url = typeof img === 'string' ? img : img?.url;
+        if (url && !imgs.includes(url)) imgs.push(url);
+      }
+    }
+    return imgs;
+  }
+
+  function getCopies(draft: DraftItem): string[] {
+    const copies: string[] = [];
+    if (Array.isArray(draft.dct_copies)) {
+      for (const c of draft.dct_copies) {
+        copies.push(typeof c === 'string' ? c : c?.texto || JSON.stringify(c));
+      }
+    }
+    if (copies.length === 0 && draft.texto_principal) copies.push(draft.texto_principal);
+    return copies;
+  }
+
+  function getHeadlines(draft: DraftItem): string[] {
+    const hl: string[] = [];
+    if (Array.isArray(draft.dct_titulos)) {
+      for (const t of draft.dct_titulos) {
+        hl.push(typeof t === 'string' ? t : JSON.stringify(t));
+      }
+    }
+    if (hl.length === 0 && draft.titulo) hl.push(draft.titulo);
+    return hl;
+  }
+
+  // ── Loading ──
   if (loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 rounded-lg" />
-        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-lg" />)}
       </div>
     );
   }
 
+  // ── Render ──
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -230,7 +298,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Borradores</h2>
           <p className="text-muted-foreground text-sm">
-            {drafts.length} borrador{drafts.length !== 1 ? 'es' : ''} pendiente{drafts.length !== 1 ? 's' : ''} &middot; Metodologia DCT 3:2:2 (Charles Tichener)
+            {drafts.length} borrador{drafts.length !== 1 ? 'es' : ''} &middot; Revisa estrategia, aprueba y publica
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={fetchDrafts}>
@@ -254,7 +322,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         ))}
       </div>
 
-      {/* Drafts list */}
+      {/* Empty state */}
       {filtered.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
@@ -266,219 +334,262 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {filtered.map((draft) => {
             const statusConf = STATUS_CONFIG[draft.estado];
             const StatusIcon = statusConf.icon;
-            const funnelConf = draft.funnel ? FUNNEL_CONFIG[draft.funnel] : null;
             const bv = draft.brief_visual as BriefVisual | null;
-            const isExpanded = expandedId === draft.id;
-            const hasDct = Array.isArray(draft.dct_copies) && draft.dct_copies.length > 0;
+            const funnel = draft.funnel || 'mofu';
+            const funnelInfo = FUNNEL_INFO[funnel];
+            const images = getImages(draft);
+            const copies = getCopies(draft);
+            const headlines = getHeadlines(draft);
+            const objectiveWhy = bv?.objective ? OBJECTIVE_WHY[bv.objective] : null;
 
             return (
-              <Card key={draft.id} className="hover:shadow-md transition-shadow overflow-hidden">
+              <Card key={draft.id} className="overflow-hidden border-l-4 border-l-primary/60">
                 <CardContent className="p-0">
-                  {/* Main row */}
-                  <div className="flex gap-0">
-                    {/* Image / Creative */}
-                    <div className="w-48 min-h-[200px] bg-muted shrink-0 relative">
-                      {draft.asset_url ? (
-                        draft.formato === 'video' ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
-                            <Video className="w-10 h-10 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">Video</span>
-                          </div>
-                        ) : (
-                          <img src={draft.asset_url} alt="" className="w-full h-full object-cover" />
-                        )
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
-                          <FileImage className="w-10 h-10 text-muted-foreground/30" />
-                          <span className="text-xs text-muted-foreground/50">Sin creativo</span>
+
+                  {/* ───── CAMPAIGN HEADER ───── */}
+                  <div className="px-5 pt-5 pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Target className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Campana</span>
                         </div>
-                      )}
-                      {/* Format badge overlay */}
-                      {draft.formato && (
-                        <Badge className="absolute top-2 left-2 text-[10px] bg-black/60 text-white border-0">
-                          {draft.formato === 'video' ? 'VIDEO' : 'IMAGEN'}
+                        <h3 className="text-lg font-bold leading-tight mb-1">
+                          {bv?.campaign_name || draft.titulo || 'Sin nombre'}
+                        </h3>
+                        {bv?.adset_name && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 shrink-0" />
+                            Ad Set: {bv.adset_name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                        <Badge className={`text-[10px] ${statusConf.color}`}>
+                          <StatusIcon className={`w-3 h-3 mr-1 ${draft.estado === 'generando' ? 'animate-spin' : ''}`} />
+                          {statusConf.label}
                         </Badge>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 p-5 min-w-0">
-                      {/* Title + badges */}
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-base mb-1.5">{draft.titulo || 'Sin titulo'}</h3>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge className={`text-[10px] ${statusConf.color}`}>
-                              <StatusIcon className={`w-3 h-3 mr-1 ${draft.estado === 'generando' ? 'animate-spin' : ''}`} />
-                              {statusConf.label}
-                            </Badge>
-                            {funnelConf && <Badge className={`text-[10px] ${funnelConf.color}`}>{funnelConf.label}</Badge>}
-                            {hasDct && <Badge className="text-[10px] bg-violet-500/15 text-violet-600 border-violet-500/30">DCT 3:2:2</Badge>}
-                            {bv?.budget_type && <Badge variant="outline" className="text-[10px]">{bv.budget_type}</Badge>}
-                          </div>
-                        </div>
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          {draft.estado === 'borrador' && (
-                            <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleApprove(draft)}>
-                              <CheckCircle className="w-3.5 h-3.5 mr-1" /> Aprobar
-                            </Button>
-                          )}
-                          {(draft.estado === 'borrador' || draft.estado === 'aprobado') && (
-                            <Button variant="default" size="sm" className="h-8 text-xs" onClick={() => handlePublish(draft)} disabled={publishing === draft.id}>
-                              {publishing === draft.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1" />}
-                              Publicar
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(draft)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Angulo / Dolor */}
-                      {draft.angulo && draft.angulo !== 'campana-draft' && (
-                        <div className="flex items-center gap-2 mb-2 text-sm">
-                          <Flame className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                          <span className="text-muted-foreground">Angulo:</span>
-                          <span className="font-medium">{draft.angulo}</span>
-                        </div>
-                      )}
-
-                      {/* Producto */}
-                      {bv?.producto && bv.producto !== 'Sin definir' && (
-                        <div className="flex items-center gap-2 mb-2 text-sm">
-                          <ShoppingBag className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                          <span className="text-muted-foreground">Producto:</span>
-                          <span className="font-medium">{bv.producto}</span>
-                        </div>
-                      )}
-
-                      {/* Primary Text (full) */}
-                      {draft.texto_principal && (
-                        <div className="mt-3 p-3 rounded-lg bg-muted/50 border">
-                          <p className="text-sm leading-relaxed">{draft.texto_principal}</p>
-                        </div>
-                      )}
-
-                      {/* Headline + Description */}
-                      {(draft.titulo || draft.descripcion) && (
-                        <div className="mt-2 flex items-center gap-4 text-sm">
-                          {draft.descripcion && (
-                            <span className="text-muted-foreground italic">{draft.descripcion}</span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Meta row: date, CTA, URL */}
-                      <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(draft.created_at)}</span>
-                        {draft.cta && <span className="flex items-center gap-1"><Zap className="w-3 h-3" />CTA: {(draft.cta as string).replace(/_/g, ' ')}</span>}
-                        {bv?.destination_url && (
-                          <span className="flex items-center gap-1"><LinkIcon className="w-3 h-3" />{bv.destination_url}</span>
-                        )}
-                        {bv?.adset_budget && (
-                          <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />${Number(bv.adset_budget).toLocaleString('es-CL')} CLP/dia</span>
+                        {funnelInfo && <Badge className={`text-[10px] ${funnelInfo.color}`}>{funnelInfo.label}</Badge>}
+                        {bv?.budget_type && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {bv.budget_type === 'ABO' ? 'ABO Testing' : 'CBO Escalar'}
+                          </Badge>
                         )}
                       </div>
-
-                      {/* Expand toggle */}
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : draft.id)}
-                        className="flex items-center gap-1 mt-3 text-xs text-primary hover:underline"
-                      >
-                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        {isExpanded ? 'Ocultar detalles' : 'Ver detalles DCT completos'}
-                      </button>
                     </div>
                   </div>
 
-                  {/* Expanded details */}
-                  {isExpanded && (
-                    <div className="border-t px-5 py-4 bg-muted/20 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Campaign info */}
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                            <Target className="w-3.5 h-3.5" /> Campana
-                          </h4>
-                          <div className="text-sm space-y-1">
-                            {bv?.campaign_name && <p><span className="text-muted-foreground">Nombre:</span> {bv.campaign_name}</p>}
-                            {bv?.objective_label && <p><span className="text-muted-foreground">Objetivo:</span> {bv.objective_label}</p>}
-                            {bv?.budget_type && <p><span className="text-muted-foreground">Tipo:</span> {bv.budget_type === 'ABO' ? 'ABO (Testing)' : 'CBO (Escalamiento)'}</p>}
-                            {bv?.start_date && <p><span className="text-muted-foreground">Inicio:</span> {bv.start_date}</p>}
-                          </div>
-                        </div>
+                  {/* ───── WHY THIS STRATEGY ───── */}
+                  <div className="mx-5 mb-4 rounded-lg bg-muted/40 border p-4 space-y-3">
+                    <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                      ¿Por que esta estrategia?
+                    </h4>
 
-                        {/* Audience */}
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                            <Users className="w-3.5 h-3.5" /> Audiencia
-                          </h4>
-                          <div className="text-sm space-y-1">
-                            {bv?.adset_name && <p><span className="text-muted-foreground">Ad Set:</span> {bv.adset_name}</p>}
-                            {bv?.audience_description && <p className="leading-relaxed">{bv.audience_description}</p>}
-                          </div>
-                        </div>
-
-                        {/* Plan DCT */}
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                            <BarChart3 className="w-3.5 h-3.5" /> Plan DCT
-                          </h4>
-                          {bv?.plan_accion ? (
-                            <div className="text-sm space-y-1">
-                              <p><span className="text-muted-foreground">Tipo:</span> {bv.plan_accion.tipo_campana}</p>
-                              <p><span className="text-muted-foreground">Budget:</span> ${Number(bv.plan_accion.presupuesto_diario).toLocaleString('es-CL')}/dia</p>
-                              <p><span className="text-muted-foreground">Duracion:</span> {bv.plan_accion.duracion}</p>
-                              <p><span className="text-muted-foreground">Kill rule:</span> {bv.plan_accion.regla_kill}</p>
-                              <p><span className="text-muted-foreground">Dia 3:</span> {bv.plan_accion.metricas_dia3}</p>
-                            </div>
-                          ) : (
-                            <div className="text-sm space-y-1">
-                              <p className="text-muted-foreground">Metodologia: DCT 3:2:2</p>
-                              <p className="text-muted-foreground">7 dias sin tocar</p>
-                              <p className="text-muted-foreground">Dia 7: Steve clasifica ganadores</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* DCT Copies/Titles if available */}
-                      {hasDct && (
-                        <div className="pt-3 border-t space-y-2">
-                          <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                            <Lightbulb className="w-3.5 h-3.5" /> Variaciones DCT
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {Array.isArray(draft.dct_copies) && draft.dct_copies.map((c: any, i: number) => (
-                              <div key={i} className="p-2 rounded bg-background border text-xs">
-                                <span className="font-medium text-primary">Copy {i + 1}:</span> {typeof c === 'string' ? c : c?.texto || JSON.stringify(c)}
-                              </div>
-                            ))}
-                            {Array.isArray(draft.dct_titulos) && draft.dct_titulos.map((t: any, i: number) => (
-                              <div key={`t-${i}`} className="p-2 rounded bg-background border text-xs">
-                                <span className="font-medium text-primary">Headline {i + 1}:</span> {typeof t === 'string' ? t : JSON.stringify(t)}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Metodologia note */}
-                      <div className="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                        <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                        <p className="text-xs text-foreground leading-relaxed">
-                          {bv?.metodologia || 'DCT 3:2:2 (Charles Tichener)'}: Cada Ad Set tiene 1 solo ad.
-                          No tocar por 7 dias. Dia 7 Steve clasifica ganadores, potenciales y perdedores.
+                    {/* Objective → Funnel */}
+                    <div className="flex items-start gap-2">
+                      <Target className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">
+                          {bv?.objective_label || 'Conversiones'} → {funnelInfo?.label || 'BOFU'}
+                        </p>
+                        <p className="text-muted-foreground text-xs mt-0.5">
+                          {objectiveWhy || funnelInfo?.explanation || ''}
                         </p>
                       </div>
                     </div>
-                  )}
+
+                    {/* Segmentation */}
+                    {(bv?.audience_description || bv?.dolor) && (
+                      <div className="flex items-start gap-2">
+                        <Users className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                          <p className="font-medium">Segmentacion</p>
+                          {bv?.dolor && bv.dolor !== 'Sin definir' && (
+                            <p className="text-xs mt-0.5">
+                              <span className="text-foreground font-medium">Dolor:</span>{' '}
+                              <span className="text-muted-foreground">{bv.dolor}</span>
+                            </p>
+                          )}
+                          {bv?.producto && bv.producto !== 'Sin definir' && (
+                            <p className="text-xs mt-0.5">
+                              <span className="text-foreground font-medium">Producto:</span>{' '}
+                              <span className="text-muted-foreground">{bv.producto}</span>
+                            </p>
+                          )}
+                          {bv?.audience_description && bv.audience_description !== bv.dolor && (
+                            <p className="text-muted-foreground text-xs mt-1 leading-relaxed">{bv.audience_description}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Budget */}
+                    <div className="flex items-start gap-2">
+                      <DollarSign className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">
+                          {bv?.budget_type === 'CBO' ? 'CBO — Meta distribuye el presupuesto entre ad sets' : 'ABO — Presupuesto fijo por cada ad set (ideal para testing)'}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          ${Number(bv?.plan_accion?.presupuesto_diario || bv?.adset_budget || bv?.campaign_budget || '0').toLocaleString('es-CL')} CLP/dia
+                          {bv?.budget_type === 'ABO' && ' por ad set'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ───── DCT 3:2:2 MATRIX ───── */}
+                  <div className="mx-5 mb-4 rounded-lg border p-4 space-y-4">
+                    <div>
+                      <h4 className="text-sm font-bold flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-violet-500" />
+                        DCT 3:2:2 — Matriz de Variaciones
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        3 imagenes × 2 copies × 2 headlines = 12 combinaciones de anuncios para testear
+                      </p>
+                    </div>
+
+                    {/* Images (3 slots) */}
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        Imagenes ({images.length}/3)
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[0, 1, 2].map((i) => (
+                          <div key={i} className="aspect-square rounded-lg overflow-hidden border-2 border-border">
+                            {images[i] ? (
+                              <SafeImage src={images[i]} className="w-full h-full" />
+                            ) : (
+                              <div className="w-full h-full bg-muted/30 flex flex-col items-center justify-center gap-1.5 p-2">
+                                <Plus className="w-6 h-6 text-muted-foreground/25" />
+                                <span className="text-[11px] text-muted-foreground/50 text-center">
+                                  Imagen {i + 1}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground/40">Pendiente</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Copies (2 slots) */}
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        Copies — Texto Principal ({copies.length}/2)
+                      </p>
+                      <div className="space-y-2">
+                        {[0, 1].map((i) => (
+                          <div key={i} className={`rounded-lg border p-3 ${copies[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
+                            {copies[i] ? (
+                              <>
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Copy {i + 1} ✓</span>
+                                <p className="mt-1 text-xs leading-relaxed">{copies[i]}</p>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50">
+                                Copy {i + 1} — Pendiente. Crea otra variacion desde "Crear".
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Headlines (2 slots) */}
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        Headlines — Titulos ({headlines.length}/2)
+                      </p>
+                      <div className="space-y-2">
+                        {[0, 1].map((i) => (
+                          <div key={i} className={`rounded-lg border p-3 ${headlines[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
+                            {headlines[i] ? (
+                              <>
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Headline {i + 1} ✓</span>
+                                <p className="mt-1 text-sm font-semibold">{headlines[i]}</p>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50">
+                                Headline {i + 1} — Pendiente. Crea otra variacion desde "Crear".
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Description if exists */}
+                    {draft.descripcion && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                          Descripcion del enlace
+                        </p>
+                        <div className="rounded-lg border bg-background p-3">
+                          <p className="text-xs text-muted-foreground italic">{draft.descripcion}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ───── METHODOLOGY NOTE ───── */}
+                  <div className="mx-5 mb-4 flex items-start gap-2.5 p-3 rounded-lg bg-violet-500/5 border border-violet-500/20">
+                    <Lightbulb className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                    <div className="text-xs leading-relaxed">
+                      <span className="font-semibold">Metodologia DCT 3:2:2 (Charles Tichener):</span>{' '}
+                      Cada Ad Set tiene 1 solo anuncio para aislar variables. No tocar por 7 dias.
+                      Dia 7, Steve clasifica en ganadores, potenciales y perdedores segun Hook Rate (&gt;25%), Hold Rate (&gt;15%) y CTR (&gt;1.5%).
+                      {bv?.plan_accion?.regla_kill && (
+                        <span className="block mt-1 text-muted-foreground">
+                          Kill rule: {bv.plan_accion.regla_kill}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ───── ACTIONS FOOTER ───── */}
+                  <div className="px-5 py-3 border-t bg-muted/10 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatDate(draft.created_at)}
+                      </span>
+                      {draft.cta && (
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3 h-3" />
+                          CTA: {(draft.cta as string).replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {bv?.destination_url && (
+                        <span className="truncate max-w-[180px]">{bv.destination_url}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {draft.estado === 'borrador' && (
+                        <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleApprove(draft)}>
+                          <CheckCircle className="w-3.5 h-3.5 mr-1" /> Aprobar
+                        </Button>
+                      )}
+                      {(draft.estado === 'borrador' || draft.estado === 'aprobado') && (
+                        <Button variant="default" size="sm" className="h-8 text-xs" onClick={() => handlePublish(draft)} disabled={publishing === draft.id}>
+                          {publishing === draft.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1" />}
+                          Publicar
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(draft)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
                 </CardContent>
               </Card>
             );

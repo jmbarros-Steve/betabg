@@ -746,6 +746,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         dct_copies: primaryText ? [{ texto: primaryText, tipo: 'primary' }] : null,
         dct_titulos: headline ? [headline] : null,
         dct_descripciones: description ? [description] : null,
+        dct_imagenes: imageUrl ? [imageUrl] : null,
       });
       if (error) throw error;
       toast.success('Borrador DCT guardado. Revisa en Borradores para aprobar y publicar.');
