@@ -15,21 +15,25 @@ export interface ProductMarginItem {
   quantity: number;
 }
 
+interface FixedCostItem {
+  name: string;
+  amount: number;
+}
+
 interface ProfitLossData {
   grossRevenue: number;
   netRevenue: number;
   costOfGoods: number;
   grossProfit: number;
-  
+
   metaSpend: number;
   googleSpend: number;
+  manualGoogleSpend: number;
   totalAdSpend: number;
-  
-  shopifyCost: number;
-  klaviyoCost: number;
-  otherFixedCosts: number;
+
+  fixedCostItems: FixedCostItem[];
   totalFixedCosts: number;
-  
+
   paymentGatewayFees: number;
   shippingCosts: number;
   shopifyCommission: number;
@@ -179,14 +183,24 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         {/* Marketing Expenses */}
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Inversión en Marketing</p>
-          <div className="flex justify-between items-center text-muted-foreground">
-            <span className="text-sm pl-4">Meta Ads</span>
-            <span className="text-sm text-destructive">-{formatCurrency(data.metaSpend, currency)}</span>
-          </div>
-          <div className="flex justify-between items-center text-muted-foreground">
-            <span className="text-sm pl-4">Google Ads</span>
-            <span className="text-sm text-destructive">-{formatCurrency(data.googleSpend, currency)}</span>
-          </div>
+          {data.metaSpend > 0 && (
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="text-sm pl-4">Meta Ads</span>
+              <span className="text-sm text-destructive">-{formatCurrency(data.metaSpend, currency)}</span>
+            </div>
+          )}
+          {data.googleSpend > 0 && (
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="text-sm pl-4">Google Ads</span>
+              <span className="text-sm text-destructive">-{formatCurrency(data.googleSpend, currency)}</span>
+            </div>
+          )}
+          {data.manualGoogleSpend > 0 && (
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="text-sm pl-4">Google Ads (manual)</span>
+              <span className="text-sm text-destructive">-{formatCurrency(data.manualGoogleSpend, currency)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Total Marketing</span>
             <span className="font-medium text-destructive">-{formatCurrency(data.totalAdSpend, currency)}</span>
@@ -195,27 +209,23 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
 
         <Separator />
 
-        {/* Fixed Costs */}
+        {/* Fixed Costs - Dynamic */}
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Costos Fijos</p>
-          <div className="flex justify-between items-center text-muted-foreground">
-            <span className="text-sm pl-4">Shopify</span>
-            <span className="text-sm text-destructive">-{formatCurrency(data.shopifyCost, currency)}</span>
-          </div>
-          <div className="flex justify-between items-center text-muted-foreground">
-            <span className="text-sm pl-4">Klaviyo</span>
-            <span className="text-sm text-destructive">-{formatCurrency(data.klaviyoCost, currency)}</span>
-          </div>
-          {data.otherFixedCosts > 0 && (
-            <div className="flex justify-between items-center text-muted-foreground">
-              <span className="text-sm pl-4">Otros</span>
-              <span className="text-sm text-destructive">-{formatCurrency(data.otherFixedCosts, currency)}</span>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Costos Fijos (prorrateados)</p>
+          {data.fixedCostItems.map((item, idx) => (
+            item.amount > 0 && (
+              <div key={idx} className="flex justify-between items-center text-muted-foreground">
+                <span className="text-sm pl-4">{item.name || 'Sin nombre'}</span>
+                <span className="text-sm text-destructive">-{formatCurrency(item.amount, currency)}</span>
+              </div>
+            )
+          ))}
+          {data.totalFixedCosts > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Total Costos Fijos</span>
+              <span className="font-medium text-destructive">-{formatCurrency(data.totalFixedCosts, currency)}</span>
             </div>
           )}
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Total Costos Fijos</span>
-            <span className="font-medium text-destructive">-{formatCurrency(data.totalFixedCosts, currency)}</span>
-          </div>
         </div>
 
         <Separator />

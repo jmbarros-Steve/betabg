@@ -17,6 +17,11 @@ interface FinancialConfigPanelProps {
   clientId: string;
 }
 
+interface FixedCostItem {
+  name: string;
+  amount: number;
+}
+
 interface FinancialConfig {
   id?: string;
   default_margin_percentage: number;
@@ -28,6 +33,8 @@ interface FinancialConfig {
   payment_gateway_commission: number;
   shipping_cost_per_order: number;
   shopify_commission_percentage: number;
+  manual_google_spend: number;
+  fixed_cost_items: FixedCostItem[];
   product_margins: Record<string, number>;
 }
 
@@ -41,6 +48,8 @@ const defaultConfig: FinancialConfig = {
   payment_gateway_commission: 3.5,
   shipping_cost_per_order: 0,
   shopify_commission_percentage: 0,
+  manual_google_spend: 0,
+  fixed_cost_items: [],
   product_margins: {},
 };
 
@@ -67,10 +76,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
   const [newMargin, setNewMargin] = useState('');
 
   // Detect if values look like USD (too low for CLP)
-  const hasLowValues = 
-    (config.shopify_plan_cost > 0 && config.shopify_plan_cost < MIN_CLP_THRESHOLD) ||
-    (config.klaviyo_plan_cost > 0 && config.klaviyo_plan_cost < MIN_CLP_THRESHOLD) ||
-    (config.other_fixed_costs > 0 && config.other_fixed_costs < MIN_CLP_THRESHOLD);
+  const hasLowValues = config.fixed_cost_items.some(i => i.amount > 0 && i.amount < MIN_CLP_THRESHOLD);
 
   useEffect(() => {
     fetchConfig();
@@ -88,6 +94,16 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
       if (error) throw error;
 
       if (data) {
+        // Auto-migrate legacy fixed costs to dynamic items
+        let fixedItems = (data.fixed_cost_items as FixedCostItem[]) || [];
+        if (fixedItems.length === 0) {
+          const legacyItems: FixedCostItem[] = [];
+          if (Number(data.shopify_plan_cost) > 0) legacyItems.push({ name: 'Shopify', amount: Math.round(Number(data.shopify_plan_cost)) });
+          if (Number(data.klaviyo_plan_cost) > 0) legacyItems.push({ name: 'Klaviyo', amount: Math.round(Number(data.klaviyo_plan_cost)) });
+          if (Number(data.other_fixed_costs) > 0) legacyItems.push({ name: data.other_fixed_costs_description || 'Otros', amount: Math.round(Number(data.other_fixed_costs)) });
+          fixedItems = legacyItems;
+        }
+
         setConfig({
           id: data.id,
           default_margin_percentage: Number(data.default_margin_percentage),
@@ -99,6 +115,8 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           payment_gateway_commission: Number(data.payment_gateway_commission),
           shipping_cost_per_order: Math.round(Number(data.shipping_cost_per_order || 0)),
           shopify_commission_percentage: Number(data.shopify_commission_percentage || 0),
+          manual_google_spend: Math.round(Number(data.manual_google_spend || 0)),
+          fixed_cost_items: fixedItems,
           product_margins: (data.product_margins as Record<string, number>) || {},
         });
       }
@@ -125,13 +143,15 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
         client_id: clientId,
         default_margin_percentage: config.default_margin_percentage,
         use_shopify_costs: config.use_shopify_costs,
-        shopify_plan_cost: Math.round(config.shopify_plan_cost),
-        klaviyo_plan_cost: Math.round(config.klaviyo_plan_cost),
-        other_fixed_costs: Math.round(config.other_fixed_costs),
-        other_fixed_costs_description: config.other_fixed_costs_description,
+        shopify_plan_cost: 0, // Legacy — now using fixed_cost_items
+        klaviyo_plan_cost: 0,
+        other_fixed_costs: 0,
+        other_fixed_costs_description: null,
         payment_gateway_commission: config.payment_gateway_commission,
         shipping_cost_per_order: Math.round(config.shipping_cost_per_order),
         shopify_commission_percentage: config.shopify_commission_percentage,
+        manual_google_spend: Math.round(config.manual_google_spend),
+        fixed_cost_items: config.fixed_cost_items,
         product_margins: config.product_margins,
       };
 
@@ -340,81 +360,112 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           </CardContent>
         </Card>
 
-        {/* Fixed Costs - CLP Only */}
+        {/* Fixed Costs & Operational Costs */}
         <Card className="glow-box">
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
-              Costos Fijos Mensuales
+              Costos y Comisiones
               <Badge variant="secondary" className="ml-2">CLP</Badge>
             </CardTitle>
             <CardDescription>
-              Ingresa tus costos fijos en <strong>Pesos Chilenos (CLP)</strong>. No uses USD.
+              Ingresa tus costos en <strong>Pesos Chilenos (CLP)</strong>. Los costos fijos se prorratean según el período seleccionado.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Dynamic Fixed Cost Items */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">Costos Fijos Mensuales</Label>
+              {config.fixed_cost_items.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    placeholder="Nombre (ej: Shopify, Klaviyo, Apps...)"
+                    value={item.name}
+                    onChange={(e) => {
+                      const updated = [...config.fixed_cost_items];
+                      updated[idx] = { ...updated[idx], name: e.target.value };
+                      setConfig((prev) => ({ ...prev, fixed_cost_items: updated }));
+                    }}
+                    className="flex-1"
+                  />
+                  <span className="text-muted-foreground font-medium">$</span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatCLP(item.amount)}
+                    onChange={(e) => {
+                      const updated = [...config.fixed_cost_items];
+                      updated[idx] = { ...updated[idx], amount: parseInt(e.target.value.replace(/\D/g, '')) || 0 };
+                      setConfig((prev) => ({ ...prev, fixed_cost_items: updated }));
+                    }}
+                    placeholder="0"
+                    className="w-32"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const updated = config.fixed_cost_items.filter((_, i) => i !== idx);
+                      setConfig((prev) => ({ ...prev, fixed_cost_items: updated }));
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setConfig((prev) => ({
+                    ...prev,
+                    fixed_cost_items: [...prev.fixed_cost_items, { name: '', amount: 0 }],
+                  }));
+                }}
+                className="w-full"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar costo fijo
+              </Button>
+              {config.fixed_cost_items.length > 0 && (
+                <div className="flex justify-between items-center pt-2 border-t border-border">
+                  <span className="text-sm font-medium">Total costos fijos</span>
+                  <span className="font-semibold">
+                    ${formatCLP(config.fixed_cost_items.reduce((sum, i) => sum + i.amount, 0))} CLP/mes
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Google Ads Manual */}
             <div className="space-y-2">
-              <Label htmlFor="shopify_cost">Plan de Shopify</Label>
+              <Label htmlFor="google_manual">Gasto Google Ads (manual)</Label>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground font-medium">$</span>
                 <Input
-                  id="shopify_cost"
+                  id="google_manual"
                   type="text"
                   inputMode="numeric"
-                  value={formatCLP(config.shopify_plan_cost)}
-                  onChange={(e) => handleCostChange('shopify_plan_cost', e.target.value)}
-                  placeholder="Ej: 27.550"
-                  className={config.shopify_plan_cost > 0 && config.shopify_plan_cost < MIN_CLP_THRESHOLD ? 'border-destructive' : ''}
+                  value={formatCLP(config.manual_google_spend)}
+                  onChange={(e) => {
+                    const numValue = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                    setConfig((prev) => ({ ...prev, manual_google_spend: numValue }));
+                  }}
+                  placeholder="Ej: 50.000"
                 />
                 <span className="text-muted-foreground text-sm font-medium">CLP/mes</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Plan Basic ~$27.550 | Shopify ~$74.100 | Advanced ~$296.400
+                Ingresa tu gasto mensual de Google Ads mientras no esté integrado
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="klaviyo_cost">Plan de Klaviyo</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground font-medium">$</span>
-                <Input
-                  id="klaviyo_cost"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatCLP(config.klaviyo_plan_cost)}
-                  onChange={(e) => handleCostChange('klaviyo_plan_cost', e.target.value)}
-                  placeholder="Ej: 42.750"
-                  className={config.klaviyo_plan_cost > 0 && config.klaviyo_plan_cost < MIN_CLP_THRESHOLD ? 'border-destructive' : ''}
-                />
-                <span className="text-muted-foreground text-sm font-medium">CLP/mes</span>
-              </div>
-            </div>
+            <Separator />
 
-            <div className="space-y-2">
-              <Label htmlFor="other_costs">Otros costos fijos</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground font-medium">$</span>
-                <Input
-                  id="other_costs"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatCLP(config.other_fixed_costs)}
-                  onChange={(e) => handleCostChange('other_fixed_costs', e.target.value)}
-                  placeholder="Ej: 15.000"
-                  className={config.other_fixed_costs > 0 && config.other_fixed_costs < MIN_CLP_THRESHOLD ? 'border-destructive' : ''}
-                />
-                <span className="text-muted-foreground text-sm font-medium">CLP/mes</span>
-              </div>
-              <Input
-                placeholder="Descripción (ej: Hosting, Apps adicionales...)"
-                value={config.other_fixed_costs_description || ''}
-                onChange={(e) =>
-                  setConfig((prev) => ({ ...prev, other_fixed_costs_description: e.target.value || null }))
-                }
-                maxLength={200}
-              />
-            </div>
-
+            {/* Shipping Cost */}
             <div className="space-y-2">
               <Label htmlFor="shipping_cost">Costo por despacho</Label>
               <div className="flex items-center gap-2">
@@ -499,8 +550,12 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
             <div>
               <p className="text-xs text-muted-foreground">Costos fijos totales</p>
               <p className="font-semibold">
-                ${formatCLP(config.shopify_plan_cost + config.klaviyo_plan_cost + config.other_fixed_costs)} CLP/mes
+                ${formatCLP(config.fixed_cost_items.reduce((sum, i) => sum + i.amount, 0))} CLP/mes
               </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Google Ads (manual)</p>
+              <p className="font-semibold">${formatCLP(config.manual_google_spend)} CLP/mes</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Comisión pasarela</p>

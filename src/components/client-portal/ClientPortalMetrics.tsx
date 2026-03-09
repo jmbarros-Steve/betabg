@@ -23,6 +23,11 @@ interface MetricRow {
   metric_date: string;
 }
 
+interface FixedCostItem {
+  name: string;
+  amount: number;
+}
+
 interface FinancialConfig {
   default_margin_percentage: number;
   shopify_plan_cost: number;
@@ -31,6 +36,8 @@ interface FinancialConfig {
   payment_gateway_commission: number;
   shipping_cost_per_order: number;
   shopify_commission_percentage: number;
+  manual_google_spend: number;
+  fixed_cost_items: FixedCostItem[];
 }
 
 const defaultFinancialConfig: FinancialConfig = {
@@ -41,7 +48,29 @@ const defaultFinancialConfig: FinancialConfig = {
   payment_gateway_commission: 3.5,
   shipping_cost_per_order: 0,
   shopify_commission_percentage: 0,
+  manual_google_spend: 0,
+  fixed_cost_items: [],
 };
+
+function getProrationFactor(dateRange: DateRange): number {
+  const now = new Date();
+  switch (dateRange) {
+    case 'mtd': {
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const dayOfMonth = now.getDate();
+      return dayOfMonth / daysInMonth;
+    }
+    case '7d': return 7 / 30;
+    case '30d': return 1;
+    case '90d': return 3;
+    case 'ytd': {
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const daysDiff = Math.ceil((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff / 30;
+    }
+    default: return 1;
+  }
+}
 
 function getDateRangeStart(range: DateRange): Date {
   const now = new Date();
@@ -218,6 +247,13 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         ]);
 
         if (configRes.data) {
+          // Auto-migrate legacy fixed costs
+          let fixedItems = (configRes.data.fixed_cost_items as FixedCostItem[]) || [];
+          if (fixedItems.length === 0) {
+            if (Number(configRes.data.shopify_plan_cost) > 0) fixedItems.push({ name: 'Shopify', amount: Number(configRes.data.shopify_plan_cost) });
+            if (Number(configRes.data.klaviyo_plan_cost) > 0) fixedItems.push({ name: 'Klaviyo', amount: Number(configRes.data.klaviyo_plan_cost) });
+            if (Number(configRes.data.other_fixed_costs) > 0) fixedItems.push({ name: 'Otros', amount: Number(configRes.data.other_fixed_costs) });
+          }
           setFinancialConfig({
             default_margin_percentage: Number(configRes.data.default_margin_percentage),
             shopify_plan_cost: Number(configRes.data.shopify_plan_cost),
@@ -226,6 +262,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             payment_gateway_commission: Number(configRes.data.payment_gateway_commission),
             shipping_cost_per_order: Number(configRes.data.shipping_cost_per_order || 0),
             shopify_commission_percentage: Number(configRes.data.shopify_commission_percentage || 0),
+            manual_google_spend: Number(configRes.data.manual_google_spend || 0),
+            fixed_cost_items: fixedItems,
           });
         }
 
@@ -470,7 +508,20 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const profitLossData = useMemo(() => {
     const taxRate = 0.19; // IVA Chile
     const netRevenue = current.totalRevenue / (1 + taxRate);
-    const totalFixedCosts = financialConfig.shopify_plan_cost + financialConfig.klaviyo_plan_cost + financialConfig.other_fixed_costs;
+
+    // Prorate monthly costs based on date range
+    const prorationFactor = getProrationFactor(dateRange);
+
+    // Dynamic fixed costs — prorated
+    const fixedCostItems = financialConfig.fixed_cost_items.map(item => ({
+      name: item.name,
+      amount: Math.round(item.amount * prorationFactor),
+    }));
+    const totalFixedCosts = fixedCostItems.reduce((sum, i) => sum + i.amount, 0);
+
+    // Google manual spend — prorated
+    const manualGoogleSpend = Math.round(financialConfig.manual_google_spend * prorationFactor);
+    const totalAdSpendWithGoogle = current.totalSpend + manualGoogleSpend;
 
     // Operational costs
     const shippingCosts = current.totalOrders * financialConfig.shipping_cost_per_order;
@@ -478,7 +529,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
     const netProfit =
       profitMetrics.grossProfit -
-      current.totalSpend -
+      totalAdSpendWithGoogle -
       totalFixedCosts -
       profitMetrics.gatewayFees -
       shippingCosts -
@@ -491,10 +542,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       grossProfit: profitMetrics.grossProfit,
       metaSpend: current.metaSpend,
       googleSpend: current.googleSpend,
-      totalAdSpend: current.totalSpend,
-      shopifyCost: financialConfig.shopify_plan_cost,
-      klaviyoCost: financialConfig.klaviyo_plan_cost,
-      otherFixedCosts: financialConfig.other_fixed_costs,
+      manualGoogleSpend,
+      totalAdSpend: totalAdSpendWithGoogle,
+      fixedCostItems,
       totalFixedCosts,
       paymentGatewayFees: profitMetrics.gatewayFees,
       shippingCosts,
@@ -502,7 +552,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       netProfit,
       netProfitMargin: current.totalRevenue > 0 ? (netProfit / current.totalRevenue) * 100 : 0,
     };
-  }, [current, profitMetrics, financialConfig]);
+  }, [current, profitMetrics, financialConfig, dateRange]);
 
   if (loading) {
     return (
@@ -527,14 +577,15 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     );
   }
 
+  const totalAdSpendWithGoogle = profitLossData.totalAdSpend;
   const statCards = [
     { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
-    { title: 'Inversión Publicitaria', value: `$${current.totalSpend.toLocaleString('es-CL')} CLP`, currentNum: current.totalSpend, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
+    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
     { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
     { title: 'ROAS Promedio', value: `${current.avgRoas.toFixed(2)}x`, currentNum: current.avgRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
   ];
 
-  const hasData = current.totalRevenue > 0 || current.totalSpend > 0 || current.totalOrders > 0;
+  const hasData = current.totalRevenue > 0 || totalAdSpendWithGoogle > 0 || current.totalOrders > 0;
 
   const getChangePercent = (curr: number, prev: number) => {
     if (prev === 0) return undefined;
