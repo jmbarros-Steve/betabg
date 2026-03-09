@@ -750,32 +750,36 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         }
       }
 
-      // ── 2. Collect images: user-provided + client assets ──
+      // ── 2. Collect images: user-provided + Shopify products + assets ──
       const allImages: string[] = [];
       if (imageUrl) allImages.push(imageUrl);
 
-      // Pull from client_assets (product/lifestyle images)
+      // Priority 1: Shopify product images (CDN-hosted, always valid)
       if (allImages.length < 3) {
         try {
-          const { data: clientAssets } = await supabase
-            .from('client_assets')
-            .select('url')
+          const { data: shopifyConn } = await supabase
+            .from('platform_connections')
+            .select('id')
             .eq('client_id', clientId)
-            .in('tipo', ['producto', 'lifestyle'])
-            .not('url', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(5);
-          if (clientAssets) {
-            for (const a of clientAssets) {
-              if (a.url && !allImages.includes(a.url) && allImages.length < 3) {
-                allImages.push(a.url);
+            .eq('platform', 'shopify')
+            .limit(1)
+            .single();
+          if (shopifyConn?.id) {
+            const { data: shopData } = await callApi('fetch-shopify-products', {
+              body: { connectionId: shopifyConn.id },
+            });
+            if (shopData?.products) {
+              for (const p of shopData.products) {
+                if (p.image && !allImages.includes(p.image) && allImages.length < 3) {
+                  allImages.push(p.image);
+                }
               }
             }
           }
-        } catch { /* continue */ }
+        } catch { /* Shopify not connected or API error — continue */ }
       }
 
-      // Pull from ad_assets (previously generated creatives)
+      // Priority 2: ad_assets (AI-generated creatives, verified working)
       if (allImages.length < 3) {
         try {
           const { data: adAssets } = await supabase
@@ -789,6 +793,29 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             for (const a of adAssets) {
               if (a.asset_url && !allImages.includes(a.asset_url) && allImages.length < 3) {
                 allImages.push(a.asset_url);
+              }
+            }
+          }
+        } catch { /* continue */ }
+      }
+
+      // Priority 3: client_assets (user uploads — filter out Supabase storage 0-byte files)
+      if (allImages.length < 3) {
+        try {
+          const { data: clientAssets } = await supabase
+            .from('client_assets')
+            .select('url')
+            .eq('client_id', clientId)
+            .in('tipo', ['producto', 'lifestyle'])
+            .not('url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          if (clientAssets) {
+            for (const a of clientAssets) {
+              // Skip Supabase storage URLs (may be 0-byte), prefer external CDN URLs
+              const isStorageUrl = a.url?.includes('/storage/v1/object/');
+              if (a.url && !isStorageUrl && !allImages.includes(a.url) && allImages.length < 3) {
+                allImages.push(a.url);
               }
             }
           }
