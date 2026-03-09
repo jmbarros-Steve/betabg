@@ -333,14 +333,18 @@ export async function shopifyOauthCallback(c: Context) {
       // Register webhooks
       await registerWebhooks(c, shopDomain, accessToken);
 
-      // Redirect back to frontend
+      // Redirect back to Steve — use JS top-level navigation to break out of Shopify admin iframe
       if (isDirectRedirect) {
         const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
         redirectUrl.searchParams.set('success', 'true');
         redirectUrl.searchParams.set('store', storeName);
         redirectUrl.searchParams.set('shop', normalizedShopDomain);
-        console.log('Per-client redirect to:', redirectUrl.toString());
-        return c.redirect(redirectUrl.toString(), 302);
+        const targetUrl = redirectUrl.toString();
+        console.log('Per-client redirect to:', targetUrl);
+        return c.html(`<!DOCTYPE html><html><head><title>Redirecting...</title></head><body>
+<script>window.top.location.href = ${JSON.stringify(targetUrl)};</script>
+<noscript><a href="${targetUrl}">Click here to continue to Steve</a></noscript>
+</body></html>`);
       }
 
       return c.json({ success: true, store_name: storeName });
