@@ -209,7 +209,20 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
   const borderColor = FLOW_PRIORITY_COLORS[template.priority];
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+    <>
+    {/* Unlayer Email Editor - rendered OUTSIDE dialog to avoid Radix transform breaking fixed positioning */}
+    {showEditor && editorEmails && (
+      <UnlayerEmailEditor
+        emails={editorEmails}
+        onSave={handleEditorSave}
+        onCancel={() => {
+          setShowEditor(false);
+          setEditorEmails(null);
+        }}
+      />
+    )}
+
+    <Dialog open={open && !showEditor} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -391,19 +404,9 @@ export function FlowDetail({ template, clientId, open, onClose, onFlowCreated }:
             </div>
           )}
 
-          {/* Unlayer Email Editor */}
-          {showEditor && editorEmails && (
-            <UnlayerEmailEditor
-              emails={editorEmails}
-              onSave={handleEditorSave}
-              onCancel={() => {
-                setShowEditor(false);
-                setEditorEmails(null);
-              }}
-            />
-          )}
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
