@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-const SYSTEM_PROMPT = `Eres un experto en email marketing con Klaviyo. Tu trabajo es tomar el contenido de un email en texto plano y convertirlo en HTML optimizado para Klaviyo, detectando automaticamente donde deben ir:
+const BASE_SYSTEM_PROMPT = `Eres un experto en email marketing con Klaviyo. Tu trabajo es tomar el contenido de un email en texto plano y convertirlo en HTML optimizado para Klaviyo, detectando automaticamente donde deben ir:
 
 1. **Variables de personalizacion** de Klaviyo:
    - Nombres: {{ first_name }}, {{ last_name }}
@@ -42,6 +42,56 @@ REGLAS:
 - Preserva todo el texto original, solo agrega la estructura HTML y los features de Klaviyo
 - NO inventes contenido nuevo, solo formatea y enriquece lo existente`;
 
+async function loadBrandContext(supabase: any, connectionId: string): Promise<string> {
+  const { data: connection } = await supabase
+    .from('platform_connections')
+    .select('client_id')
+    .eq('id', connectionId)
+    .eq('platform', 'klaviyo')
+    .single();
+
+  if (!connection?.client_id) return '';
+
+  const [{ data: personaData }, { data: knowledgeData }] = await Promise.all([
+    supabase
+      .from('buyer_personas')
+      .select('persona_data, is_complete')
+      .eq('client_id', connection.client_id)
+      .eq('is_complete', true)
+      .maybeSingle(),
+    supabase
+      .from('steve_knowledge')
+      .select('titulo, contenido')
+      .eq('categoria', 'klaviyo')
+      .eq('activo', true)
+      .order('orden', { ascending: false })
+      .limit(10),
+  ]);
+
+  let brandContext = '';
+
+  if (personaData?.is_complete && personaData?.persona_data) {
+    const pd = personaData.persona_data as any;
+    const tone = pd.tono_marca || pd.tone || pd.brand_tone || '';
+    const brandName = pd.nombre_marca || pd.brand_name || pd.nombre_negocio || '';
+    const colors = pd.colores_marca || pd.brand_colors || '';
+
+    if (tone || brandName || colors) {
+      brandContext += `\n\nIDENTIDAD DE MARCA:`;
+      if (brandName) brandContext += `\n- Marca: ${brandName}`;
+      if (tone) brandContext += `\n- Tono de voz: ${tone}`;
+      if (colors) brandContext += `\n- Colores de marca: ${JSON.stringify(colors)}`;
+      brandContext += `\n- Adapta el diseno visual al tono y colores de la marca cuando sea posible`;
+    }
+  }
+
+  if (knowledgeData && knowledgeData.length > 0) {
+    brandContext += `\n\nREGLAS APRENDIDAS PARA KLAVIYO:\n${knowledgeData.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}`;
+  }
+
+  return brandContext;
+}
+
 export async function klaviyoSmartFormat(c: Context) {
   try {
     const authHeader = c.req.header('Authorization');
@@ -62,11 +112,19 @@ export async function klaviyoSmartFormat(c: Context) {
       return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
     }
 
-    const { subject, preview_text, content, flow_type } = await c.req.json();
+    const { subject, preview_text, content, flow_type, connectionId } = await c.req.json();
 
     if (!content) {
       return c.json({ error: 'content is required' }, 400);
     }
+
+    // Load brand context if connectionId is provided (backwards compatible)
+    let brandContext = '';
+    if (connectionId) {
+      brandContext = await loadBrandContext(supabase, connectionId);
+    }
+
+    const systemPrompt = BASE_SYSTEM_PROMPT + brandContext;
 
     const flowContext = flow_type === 'abandoned_cart'
       ? '\nCONTEXTO: Este email es para un flujo de CARRITO ABANDONADO. Usa variables de evento de carrito como {{ event.extra.line_items }}, {{ event.extra.checkout_url }}, {{ event.extra.total_price }}.'
@@ -96,7 +154,7 @@ Convierte esto en HTML optimizado para Klaviyo con todas las variables, bloques 
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       }),
     });

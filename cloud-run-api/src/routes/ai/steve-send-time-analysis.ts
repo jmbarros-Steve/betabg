@@ -263,7 +263,8 @@ async function getClaudeInsights(
   bestSlots: { day: number; hour: number; score: number }[],
   worstSlots: { day: number; hour: number; score: number }[],
   totalAnalyzed: number,
-  dateRange: { from: string; to: string }
+  dateRange: { from: string; to: string },
+  briefContext?: string
 ): Promise<{ insights: any[]; bestSlots: any[]; worstSlots: any[] } | null> {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
@@ -294,13 +295,14 @@ async function getClaudeInsights(
   }
 
   const systemPrompt = `Eres Steve, un experto en email marketing. Analiza los datos de rendimiento de envío por hora y día de la semana y proporciona insights accionables en español.
-
+${briefContext || ''}
 IMPORTANTE:
 - Los días van de 0 (Lunes) a 6 (Domingo)
 - Las horas son en formato 24h (UTC)
 - El score es una puntuación compuesta (0-100) basada en open_rate, click_rate, revenue y conversions
 - Solo analiza las celdas que tienen datos (count > 0)
 - Sé específico con días y horas
+- Si tienes contexto de la industria/audiencia del cliente, personaliza las recomendaciones (ej: horarios de almuerzo para oficinistas, noches para millennials, etc.)
 - Responde SOLO con JSON válido, sin markdown ni texto adicional`;
 
   const userMessage = `Analiza estos datos de rendimiento de envío de campañas de email:
@@ -418,6 +420,37 @@ export async function steveSendTimeAnalysis(c: Context) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
+  // === LOAD BRIEF CONTEXT FOR PERSONALIZED INSIGHTS ===
+  const clientId = connection.client_id;
+  let briefContext = '';
+  if (clientId) {
+    const { data: personaData } = await serviceClient
+      .from('buyer_personas')
+      .select('persona_data, is_complete')
+      .eq('client_id', clientId)
+      .eq('is_complete', true)
+      .maybeSingle();
+
+    if (personaData?.is_complete && personaData?.persona_data) {
+      const pd = personaData.persona_data as any;
+      const industry = pd.industria || pd.industry || pd.sector || pd.rubro || '';
+      const audience = pd.audiencia || pd.target_audience || pd.buyer_persona_nombre || '';
+      const ageRange = pd.rango_etario || pd.age_range || '';
+      const occupation = pd.ocupacion || pd.occupation || '';
+      const location = pd.ubicacion || pd.location || pd.zona_horaria || '';
+
+      if (industry || audience || ageRange || occupation || location) {
+        briefContext = `\nCONTEXTO DEL NEGOCIO:`;
+        if (industry) briefContext += `\n- Industria/Sector: ${industry}`;
+        if (audience) briefContext += `\n- Audiencia objetivo: ${audience}`;
+        if (ageRange) briefContext += `\n- Rango etario: ${ageRange}`;
+        if (occupation) briefContext += `\n- Ocupacion tipica: ${occupation}`;
+        if (location) briefContext += `\n- Ubicacion/Zona horaria: ${location}`;
+        briefContext += `\n\nUsa este contexto para personalizar tus recomendaciones de horarios de envio.`;
+      }
+    }
+  }
+
   // === DECRYPT API KEY ===
   const { data: apiKey, error: decryptError } = await serviceClient
     .rpc('decrypt_platform_token', { encrypted_token: connection.api_key_encrypted });
@@ -473,7 +506,7 @@ export async function steveSendTimeAnalysis(c: Context) {
   console.log(`[send-time-analysis] Heatmap built. ${totalAnalyzed} campaigns analyzed. Requesting Claude insights...`);
 
   // === STEP 5: Get Claude insights ===
-  const claudeResult = await getClaudeInsights(heatmap, bestSlots, worstSlots, totalAnalyzed, dateRange);
+  const claudeResult = await getClaudeInsights(heatmap, bestSlots, worstSlots, totalAnalyzed, dateRange, briefContext);
 
   const elapsed = Date.now() - t0;
   console.log(`[send-time-analysis] DONE in ${elapsed}ms`);

@@ -1,7 +1,140 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-const STEVE_EMAIL_SYSTEM_PROMPT = `Eres Steve, un experto en email marketing y Klaviyo. Generas contenido de email profesional, persuasivo y optimizado para conversión. Sigues las mejores prácticas: subjects < 50 chars, preview text < 90 chars, 1 CTA principal, urgency real, mobile-first. Siempre respondes en español. Tu tono es profesional pero cercano.`;
+// ═══════════════════════════════════════════════════════════════
+// Klaviyo Context Types & Loader
+// ═══════════════════════════════════════════════════════════════
+
+interface KlaviyoContext {
+  briefSection: string;
+  bugSection: string;
+  knowledgeSection: string;
+  learningContext: string;
+  brandTone: string;
+  brandName: string;
+}
+
+async function loadKlaviyoContext(supabase: any, clientId: string): Promise<KlaviyoContext> {
+  const [
+    { data: personaData },
+    { data: knowledgeData },
+    { data: bugsData },
+    { data: globalFeedback },
+    { data: clientFeedback },
+  ] = await Promise.all([
+    supabase
+      .from('buyer_personas')
+      .select('persona_data, is_complete')
+      .eq('client_id', clientId)
+      .eq('is_complete', true)
+      .maybeSingle(),
+    supabase
+      .from('steve_knowledge')
+      .select('titulo, contenido')
+      .eq('categoria', 'klaviyo')
+      .eq('activo', true)
+      .order('orden', { ascending: false })
+      .limit(20),
+    supabase
+      .from('steve_bugs')
+      .select('descripcion, ejemplo_malo, ejemplo_bueno')
+      .eq('categoria', 'klaviyo')
+      .eq('activo', true),
+    supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type')
+      .eq('content_type', 'klaviyo_email')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type, improvement_notes')
+      .eq('client_id', clientId)
+      .eq('content_type', 'klaviyo_email')
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ]);
+
+  // Brief section
+  let briefSection = 'Brief no completado. Genera contenido generico profesional.';
+  let brandTone = '';
+  let brandName = '';
+  if (personaData?.is_complete && personaData?.persona_data) {
+    briefSection = JSON.stringify(personaData.persona_data, null, 2);
+    const pd = personaData.persona_data as any;
+    brandTone = pd.tono_marca || pd.tone || pd.brand_tone || '';
+    brandName = pd.nombre_marca || pd.brand_name || pd.nombre_negocio || '';
+  }
+
+  // Bugs section
+  const bugSection = bugsData && bugsData.length > 0
+    ? `\nERRORES CRITICOS QUE DEBES EVITAR EN KLAVIYO:\n${bugsData.map((b: any) => `\u274C ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n`
+    : '';
+
+  // Knowledge section
+  const knowledgeSection = knowledgeData && knowledgeData.length > 0
+    ? `\nCONOCIMIENTO BASE KLAVIYO:\n${knowledgeData.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`
+    : '';
+
+  // Learning context (dual-layer: global + client)
+  let learningContext = '';
+
+  if (globalFeedback && globalFeedback.length > 0) {
+    const globalAvg = globalFeedback.reduce((s: number, f: any) => s + (f.rating || 0), 0) / globalFeedback.length;
+    const globalPositive = globalFeedback.filter((f: any) => (f.rating || 0) >= 4 && f.feedback_text);
+    const globalNegative = globalFeedback.filter((f: any) => (f.rating || 0) <= 2 && f.feedback_text);
+
+    learningContext += `
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+STEVE'S GLOBAL LEARNING - Klaviyo (${globalFeedback.length} generaciones)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Rating promedio global: ${globalAvg.toFixed(1)}/5
+${globalPositive.length > 0 ? `\n\u2705 PATRONES EXITOSOS EN KLAVIYO:\n${globalPositive.slice(0, 5).map((f: any) => `- "${f.feedback_text}"`).join('\n')}` : ''}
+${globalNegative.length > 0 ? `\n\u26A0\uFE0F ERRORES COMUNES A EVITAR:\n${globalNegative.slice(0, 5).map((f: any) => `- "${f.feedback_text}"`).join('\n')}` : ''}
+`;
+  }
+
+  if (clientFeedback && clientFeedback.length > 0) {
+    const clientAvg = clientFeedback.reduce((s: number, f: any) => s + (f.rating || 0), 0) / clientFeedback.length;
+    const clientPositive = clientFeedback.filter((f: any) => (f.rating || 0) >= 4 && f.feedback_text);
+    const clientNegative = clientFeedback.filter((f: any) => (f.rating || 0) <= 2 && f.feedback_text);
+
+    learningContext += `
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+PREFERENCIAS DE ESTE CLIENTE
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Rating del cliente: ${clientAvg.toFixed(1)}/5
+${clientPositive.length > 0 ? `\n\u2705 LO QUE PREFIERE (PRIORIDAD):\n${clientPositive.map((f: any) => `- "${f.feedback_text}"`).join('\n')}` : ''}
+${clientNegative.length > 0 ? `\n\u26D4 LO QUE RECHAZA:\n${clientNegative.map((f: any) => `- "${f.feedback_text}"`).join('\n')}` : ''}
+`;
+  }
+
+  return { briefSection, bugSection, knowledgeSection, learningContext, brandTone, brandName };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Dynamic System Prompt Builder
+// ═══════════════════════════════════════════════════════════════
+
+function buildEmailSystemPrompt(ctx: KlaviyoContext): string {
+  return `${ctx.bugSection}${ctx.knowledgeSection}Eres Steve, un experto en email marketing y Klaviyo. Generas contenido de email profesional, persuasivo y optimizado para conversion. Sigues las mejores practicas: subjects < 50 chars, preview text < 90 chars, 1 CTA principal, urgency real, mobile-first. Siempre respondes en espanol. Tu tono es profesional pero cercano.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+BRIEF DE MARCA DEL CLIENTE
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+${ctx.briefSection}
+
+${ctx.learningContext}
+
+REGLAS ADICIONALES:
+- USA el vocabulario y tono del buyer persona del brief
+- Personaliza el contenido al dolor y transformacion del cliente
+- Aplica las preferencias aprendidas del feedback`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main Handler
+// ═══════════════════════════════════════════════════════════════
 
 export async function steveEmailContent(c: Context) {
   try {
@@ -36,20 +169,24 @@ export async function steveEmailContent(c: Context) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
+    // Load full Klaviyo context (brief, knowledge, bugs, feedback)
+    const clientId = connection.client_id;
+    const klaviyoContext = await loadKlaviyoContext(serviceClient, clientId);
+
     // Route to action handler
     switch (action) {
       case 'generate_subject':
-        return c.json(await handleGenerateSubject(body));
+        return c.json(await handleGenerateSubject(body, klaviyoContext));
       case 'generate_copy':
-        return c.json(await handleGenerateCopy(body));
+        return c.json(await handleGenerateCopy(body, klaviyoContext));
       case 'analyze_content':
-        return c.json(await handleAnalyzeContent(body));
+        return c.json(await handleAnalyzeContent(body, klaviyoContext));
       case 'generate_ab_variants':
-        return c.json(await handleGenerateABVariants(body));
+        return c.json(await handleGenerateABVariants(body, klaviyoContext));
       case 'generate_flow_emails':
-        return c.json(await handleGenerateFlowEmails(body));
+        return c.json(await handleGenerateFlowEmails(body, klaviyoContext));
       case 'chat':
-        return c.json(await handleChat(body));
+        return c.json(await handleChat(body, klaviyoContext));
       default:
         return c.json({ error: `Unknown action: ${action}` }, 400);
     }
@@ -63,19 +200,23 @@ export async function steveEmailContent(c: Context) {
 // ═══════════════════════════════════════════════════════════════
 // Action: generate_subject
 // ═══════════════════════════════════════════════════════════════
-async function handleGenerateSubject(body: any): Promise<any> {
+async function handleGenerateSubject(body: any, ctx: KlaviyoContext): Promise<any> {
   const { campaignType, brandName, productNames, tone, industry } = body;
 
-  const userMessage = `Genera 5 variantes de subject line y 5 preview texts para un email de tipo "${campaignType}" de la marca "${brandName}".
+  const effectiveBrand = brandName || ctx.brandName || 'la marca';
+  const effectiveTone = tone || ctx.brandTone || '';
+
+  const userMessage = `Genera 5 variantes de subject line y 5 preview texts para un email de tipo "${campaignType}" de la marca "${effectiveBrand}".
 ${productNames ? `Productos: ${Array.isArray(productNames) ? productNames.join(', ') : productNames}` : ''}
-${tone ? `Tono: ${tone}` : ''}
+${effectiveTone ? `Tono: ${effectiveTone}` : ''}
 ${industry ? `Industria: ${industry}` : ''}
 
 REGLAS:
 - Cada subject line debe tener MENOS de 50 caracteres
-- Usa emojis con moderación (máximo 1 por subject)
+- Usa emojis con moderacion (maximo 1 por subject)
 - Cada preview text debe tener MENOS de 90 caracteres
 - Variedad: urgencia, curiosidad, beneficio, social proof, exclusividad
+- USA las palabras y expresiones del buyer persona del brief
 
 Responde SOLO con JSON puro (sin markdown, sin backticks):
 {
@@ -83,26 +224,31 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
   "previewTexts": ["preview1", "preview2", "preview3", "preview4", "preview5"]
 }`;
 
-  return await callClaude(userMessage);
+  return await callClaude(userMessage, buildEmailSystemPrompt(ctx));
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Action: generate_copy
 // ═══════════════════════════════════════════════════════════════
-async function handleGenerateCopy(body: any): Promise<any> {
+async function handleGenerateCopy(body: any, ctx: KlaviyoContext): Promise<any> {
   const { campaignType, subject, brandName, products, tone, instructions } = body;
 
-  const userMessage = `Genera el contenido completo de un email de tipo "${campaignType}" para la marca "${brandName}".
+  const effectiveBrand = brandName || ctx.brandName || 'la marca';
+  const effectiveTone = tone || ctx.brandTone || '';
+
+  const userMessage = `Genera el contenido completo de un email de tipo "${campaignType}" para la marca "${effectiveBrand}".
 Subject line: "${subject}"
 ${products ? `Productos: ${JSON.stringify(products)}` : ''}
-${tone ? `Tono: ${tone}` : ''}
+${effectiveTone ? `Tono: ${effectiveTone}` : ''}
 ${instructions ? `Instrucciones adicionales: ${instructions}` : ''}
 
 Genera:
-- title: Título principal del email (atractivo, directo)
+- title: Titulo principal del email (atractivo, directo)
 - introText: Texto introductorio (2-3 oraciones persuasivas)
-- ctaText: Texto del botón CTA principal
+- ctaText: Texto del boton CTA principal
 - sections: Array de secciones adicionales con heading y body
+
+IMPORTANTE: Usa el lenguaje, dolor y transformacion del buyer persona. El email debe sentirse personalizado al negocio del cliente.
 
 Responde SOLO con JSON puro (sin markdown, sin backticks):
 {
@@ -114,13 +260,13 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
   ]
 }`;
 
-  return await callClaude(userMessage);
+  return await callClaude(userMessage, buildEmailSystemPrompt(ctx));
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Action: analyze_content
 // ═══════════════════════════════════════════════════════════════
-async function handleAnalyzeContent(body: any): Promise<any> {
+async function handleAnalyzeContent(body: any, ctx: KlaviyoContext): Promise<any> {
   const { subject, previewText, bodyHtml } = body;
 
   const userMessage = `Analiza este contenido de email marketing y da feedback detallado:
@@ -129,7 +275,7 @@ Subject: "${subject}"
 Preview text: "${previewText || '(sin preview text)'}"
 ${bodyHtml ? `Body HTML: ${bodyHtml.substring(0, 3000)}` : '(sin body)'}
 
-Evalúa estos criterios:
+Evalua estos criterios:
 1. Longitud del subject (ideal < 50 chars)
 2. Longitud del preview text (ideal < 90 chars)
 3. Claridad del CTA
@@ -137,10 +283,11 @@ Evalúa estos criterios:
 5. Palabras spam (GRATIS, $$$, URGENTE, etc.)
 6. Ratio texto/imagen si hay HTML
 7. Mobile-friendliness
-8. Personalización
+8. Personalizacion
 9. Coherencia subject + preview + body
+10. Alineacion con el brief de marca y buyer persona del cliente
 
-Da un score de 0 a 100 y feedback específico.
+Da un score de 0 a 100 y feedback especifico.
 
 Responde SOLO con JSON puro (sin markdown, sin backticks):
 {
@@ -152,13 +299,13 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
   ]
 }`;
 
-  return await callClaude(userMessage);
+  return await callClaude(userMessage, buildEmailSystemPrompt(ctx));
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Action: generate_ab_variants
 // ═══════════════════════════════════════════════════════════════
-async function handleGenerateABVariants(body: any): Promise<any> {
+async function handleGenerateABVariants(body: any, ctx: KlaviyoContext): Promise<any> {
   const { subject, count = 3 } = body;
 
   const userMessage = `Genera ${count} variantes A/B del siguiente subject line para testing:
@@ -170,11 +317,13 @@ Para cada variante, usa una estrategia diferente:
 - Curiosidad
 - Beneficio directo
 - Social proof
-- Personalización
+- Personalizacion
 - Pregunta
-- Número/dato específico
+- Numero/dato especifico
 
 Cada variante debe tener MENOS de 50 caracteres.
+Usa el tono y vocabulario del buyer persona del brief.
+Aplica los patrones exitosos del feedback de aprendizaje.
 
 Responde SOLO con JSON puro (sin markdown, sin backticks):
 {
@@ -183,67 +332,72 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
   ]
 }`;
 
-  return await callClaude(userMessage);
+  return await callClaude(userMessage, buildEmailSystemPrompt(ctx));
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Action: generate_flow_emails
 // ═══════════════════════════════════════════════════════════════
-async function handleGenerateFlowEmails(body: any): Promise<any> {
+async function handleGenerateFlowEmails(body: any, ctx: KlaviyoContext): Promise<any> {
   const { flowType, brandName, tone, products } = body;
+
+  const effectiveBrand = brandName || ctx.brandName || 'la marca';
+  const effectiveTone = tone || ctx.brandTone || '';
 
   const flowConfigs: Record<string, { description: string; emailCount: number; delays: string[] }> = {
     welcome: {
       description: 'Serie de bienvenida para nuevos suscriptores',
       emailCount: 3,
-      delays: ['Inmediato', '1 día después', '3 días después'],
+      delays: ['Inmediato', '1 dia despues', '3 dias despues'],
     },
     abandoned_cart: {
-      description: 'Recuperación de carritos abandonados',
+      description: 'Recuperacion de carritos abandonados',
       emailCount: 3,
-      delays: ['1 hora después', '24 horas después', '72 horas después'],
+      delays: ['1 hora despues', '24 horas despues', '72 horas despues'],
     },
     post_purchase: {
-      description: 'Seguimiento post-compra y fidelización',
+      description: 'Seguimiento post-compra y fidelizacion',
       emailCount: 3,
-      delays: ['Inmediato (confirmación)', '3 días después', '7 días después'],
+      delays: ['Inmediato (confirmacion)', '3 dias despues', '7 dias despues'],
     },
     win_back: {
-      description: 'Recuperación de clientes inactivos',
+      description: 'Recuperacion de clientes inactivos',
       emailCount: 3,
-      delays: ['30 días sin compra', '45 días sin compra', '60 días sin compra'],
+      delays: ['30 dias sin compra', '45 dias sin compra', '60 dias sin compra'],
     },
     browse_abandonment: {
-      description: 'Seguimiento de navegación sin compra',
+      description: 'Seguimiento de navegacion sin compra',
       emailCount: 2,
-      delays: ['2 horas después', '24 horas después'],
+      delays: ['2 horas despues', '24 horas despues'],
     },
   };
 
   const config = flowConfigs[flowType] || {
     description: `Flow tipo "${flowType}"`,
     emailCount: 3,
-    delays: ['Inmediato', '2 días después', '5 días después'],
+    delays: ['Inmediato', '2 dias despues', '5 dias despues'],
   };
 
-  const userMessage = `Genera una secuencia completa de ${config.emailCount} emails para un flow de tipo "${flowType}" (${config.description}) para la marca "${brandName}".
-${tone ? `Tono: ${tone}` : ''}
+  const userMessage = `Genera una secuencia completa de ${config.emailCount} emails para un flow de tipo "${flowType}" (${config.description}) para la marca "${effectiveBrand}".
+${effectiveTone ? `Tono: ${effectiveTone}` : ''}
 ${products ? `Productos principales: ${JSON.stringify(products)}` : ''}
 
 Delays sugeridos: ${config.delays.join(', ')}
 
+IMPORTANTE: Personaliza los emails al negocio del cliente usando el brief de marca. Usa el dolor, la transformacion, y las palabras exactas del buyer persona.
+
 Para CADA email genera:
 - subject: Subject line (< 50 chars)
 - previewText: Preview text (< 90 chars)
-- title: Título principal del email
+- title: Titulo principal del email
 - introText: Texto introductorio (2-3 oraciones)
-- ctaText: Texto del botón CTA
-- delayDescription: Descripción del momento de envío
+- ctaText: Texto del boton CTA
+- delayDescription: Descripcion del momento de envio
 
-La secuencia debe tener progresión lógica:
+La secuencia debe tener progresion logica:
 - Email 1: Primer contacto / gancho principal
 - Email 2: Refuerzo / urgencia / beneficio adicional
-- Email 3: Último intento / oferta especial (si aplica)
+- Email 3: Ultimo intento / oferta especial (si aplica)
 
 Responde SOLO con JSON puro (sin markdown, sin backticks):
 {
@@ -259,13 +413,13 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
   ]
 }`;
 
-  return await callClaude(userMessage);
+  return await callClaude(userMessage, buildEmailSystemPrompt(ctx));
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Action: chat
 // ═══════════════════════════════════════════════════════════════
-async function handleChat(body: any): Promise<any> {
+async function handleChat(body: any, ctx: KlaviyoContext): Promise<any> {
   const { message, history } = body;
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -273,28 +427,36 @@ async function handleChat(body: any): Promise<any> {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  const systemPrompt = `Eres Steve, un experto senior en email marketing, Klaviyo y estrategia de ecommerce. Respondes en español de forma clara, práctica y accionable. Tienes 10+ años de experiencia.
+  const systemPrompt = `${ctx.bugSection}${ctx.knowledgeSection}Eres Steve, un experto senior en email marketing, Klaviyo y estrategia de ecommerce. Respondes en espanol de forma clara, practica y accionable. Tienes 10+ anos de experiencia.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+BRIEF DE MARCA DEL CLIENTE
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+${ctx.briefSection}
+
+${ctx.learningContext}
 
 REGLAS:
 - Responde de forma concisa pero completa
-- Da consejos específicos y accionables, no genéricos
-- Cuando te pregunten sobre frecuencia, segmentación, o mejores prácticas, da números concretos
+- Da consejos especificos y accionables, no genericos
+- Cuando te pregunten sobre frecuencia, segmentacion, o mejores practicas, da numeros concretos
 - Usa markdown para formatear (listas, negritas, encabezados)
 - Si no sabes algo, dilo honestamente
-- Siempre relaciona tus consejos con métricas y resultados medibles
+- Siempre relaciona tus consejos con metricas y resultados medibles
+- PERSONALIZA tus respuestas al negocio del cliente usando el brief
 
-MEJORES PRÁCTICAS QUE SIEMPRE RECOMIENDAS:
-- Segmentación por engagement: activos 30/60/90 días
-- A/B testing en subject lines para campañas grandes
-- Preview text optimizado (nunca vacío)
+MEJORES PRACTICAS QUE SIEMPRE RECOMIENDAS:
+- Segmentacion por engagement: activos 30/60/90 dias
+- A/B testing en subject lines para campanas grandes
+- Preview text optimizado (nunca vacio)
 - Frecuencia: 2-3 emails/semana para engaged, 1 para tibios
-- Mobile-first (60%+ abre en móvil)
+- Mobile-first (60%+ abre en movil)
 - Subject < 50 chars, preview text < 90 chars
 - 1 CTA principal por email
 - Ratio texto/imagen 60/40
 - Enviar martes-jueves 10am-2pm hora local
-- Limpieza de lista cada 90 días con sunset flow
-- Welcome series es el flow más importante (5-10% de revenue)
+- Limpieza de lista cada 90 dias con sunset flow
+- Welcome series es el flow mas importante (5-10% de revenue)
 - Abandoned cart con urgency progresiva (1hr, 24hr, 72hr)`;
 
   const messages: { role: string; content: string }[] = [];
@@ -335,9 +497,9 @@ MEJORES PRÁCTICAS QUE SIEMPRE RECOMIENDAS:
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Claude API helper
+// Claude API helper (now accepts dynamic system prompt)
 // ═══════════════════════════════════════════════════════════════
-async function callClaude(userMessage: string): Promise<any> {
+async function callClaude(userMessage: string, systemPrompt: string): Promise<any> {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured');
@@ -353,7 +515,7 @@ async function callClaude(userMessage: string): Promise<any> {
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4000,
-      system: STEVE_EMAIL_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
   });
