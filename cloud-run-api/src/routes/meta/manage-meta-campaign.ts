@@ -144,6 +144,7 @@ async function handleCreate(
         special_ad_categories,
         // Required by Meta for ABO campaigns (ad-set-level budget)
         is_campaign_budget_optimization: false,
+        is_adset_budget_sharing_enabled: false,
       }
     );
 
