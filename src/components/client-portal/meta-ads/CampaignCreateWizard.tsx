@@ -635,7 +635,7 @@ function AdFormMultiSlot({
   const [uploading, setUploading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(productContext || '');
-  const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
+  const [imageEngine, setImageEngine] = useState<'imagen' | 'gpt4o' | 'flux'>('imagen');
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -805,9 +805,10 @@ function AdFormMultiSlot({
           <div className="space-y-2">
             <Textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder={`Describe la imagen ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}...`} rows={2} />
             <div className="flex gap-2">
-              <Select value={imageEngine} onValueChange={(v: 'gpt4o' | 'flux') => setImageEngine(v)}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <Select value={imageEngine} onValueChange={(v: 'imagen' | 'gpt4o' | 'flux') => setImageEngine(v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="imagen">Imagen 4 (2 cred)</SelectItem>
                   <SelectItem value="gpt4o">GPT-4o (2 cred)</SelectItem>
                   <SelectItem value="flux">Flux Pro (2 cred)</SelectItem>
                 </SelectContent>
@@ -1191,7 +1192,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         (async () => {
           try {
             const { data, error } = await callApi('generate-image', {
-              body: { clientId, promptGeneracion: imgPrompt, engine: 'gpt4o', formato: 'square' },
+              body: { clientId, promptGeneracion: imgPrompt, engine: 'imagen', formato: 'square' },
             });
             if (error) { console.error('[Wizard] AI image error:', error); return; }
             if (data?.asset_url) {
