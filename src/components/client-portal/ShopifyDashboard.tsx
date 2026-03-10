@@ -105,6 +105,21 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
     }
   };
 
+  // Aggregate abandoned carts by day — must be before early returns to respect hook rules
+  const abandonedCartsByDay = useMemo(() => {
+    const byDate: Record<string, { count: number; value: number }> = {};
+    abandonedCarts.forEach((cart) => {
+      const date = cart.abandonedAt ? cart.abandonedAt.split('T')[0] : null;
+      if (!date) return;
+      if (!byDate[date]) byDate[date] = { count: 0, value: 0 };
+      byDate[date].count += 1;
+      byDate[date].value += cart.totalPrice || 0;
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({ date, ...data }));
+  }, [abandonedCarts]);
+
   if (!hasConnection) {
     return (
       <Card className="glow-box">
@@ -125,21 +140,6 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   }
 
   const totalChannelRevenue = salesByChannel.reduce((s, c) => s + c.revenue, 0);
-
-  // Aggregate abandoned carts by day
-  const abandonedCartsByDay = useMemo(() => {
-    const byDate: Record<string, { count: number; value: number }> = {};
-    abandonedCarts.forEach((cart) => {
-      const date = cart.abandonedAt ? cart.abandonedAt.split('T')[0] : null;
-      if (!date) return;
-      if (!byDate[date]) byDate[date] = { count: 0, value: 0 };
-      byDate[date].count += 1;
-      byDate[date].value += cart.totalPrice || 0;
-    });
-    return Object.entries(byDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, data]) => ({ date, ...data }));
-  }, [abandonedCarts]);
 
   const formatCurrency = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
