@@ -58,6 +58,7 @@ async function uploadImageFromUrl(
   imageUrl: string
 ): Promise<{ ok: boolean; hash?: string; error?: string }> {
   try {
+    // First try: upload via URL parameter
     const result = await metaApiRequest(
       `act_${accountId}/adimages`,
       accessToken,
@@ -65,20 +66,52 @@ async function uploadImageFromUrl(
       { url: imageUrl }
     );
 
-    if (!result.ok) {
-      return { ok: false, error: result.error || 'Failed to upload image' };
-    }
-
-    // Response: { images: { "<key>": { hash: "abc..." } } }
-    const images = result.data?.images;
-    if (images) {
-      const firstKey = Object.keys(images)[0];
-      if (firstKey && images[firstKey]?.hash) {
-        return { ok: true, hash: images[firstKey].hash };
+    if (result.ok) {
+      const images = result.data?.images;
+      if (images) {
+        const firstKey = Object.keys(images)[0];
+        if (firstKey && images[firstKey]?.hash) {
+          return { ok: true, hash: images[firstKey].hash };
+        }
       }
     }
 
-    return { ok: false, error: 'No image hash in response' };
+    // Fallback: download image and upload as base64 bytes
+    console.log(`[manage-meta-campaign] URL upload failed, trying base64 fallback for ${imageUrl}`);
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) {
+      return { ok: false, error: `Failed to download image: ${imgResponse.status}` };
+    }
+    const imgBuffer = await imgResponse.arrayBuffer();
+    const base64 = Buffer.from(imgBuffer).toString('base64');
+
+    const formData = new FormData();
+    formData.append('access_token', accessToken);
+    // Meta adimages API accepts filename + bytes (base64)
+    formData.append('filename', 'ad_image.jpg');
+    formData.append('bytes', base64);
+
+    const uploadUrl = `${META_API_BASE}/act_${accountId}/adimages`;
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+    const uploadData: any = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      return { ok: false, error: uploadData?.error?.message || 'Base64 upload failed' };
+    }
+
+    const imgs = uploadData?.images;
+    if (imgs) {
+      const key = Object.keys(imgs)[0];
+      if (key && imgs[key]?.hash) {
+        console.log(`[manage-meta-campaign] Image uploaded via base64: hash=${imgs[key].hash}`);
+        return { ok: true, hash: imgs[key].hash };
+      }
+    }
+
+    return { ok: false, error: 'No image hash in base64 upload response' };
   } catch (err: any) {
     return { ok: false, error: err?.message || 'Image upload error' };
   }
@@ -180,12 +213,30 @@ async function handleCreate(
     }
 
     if (daily_budget) {
-      // Meta expects budget in cents (smallest currency unit)
-      adsetPayload.daily_budget = Math.round(Number(daily_budget) * 100);
+      // Frontend already sends budget in cents (smallest currency unit)
+      adsetPayload.daily_budget = Math.round(Number(daily_budget));
     }
 
     if (targeting) {
       adsetPayload.targeting = typeof targeting === 'string' ? targeting : JSON.stringify(targeting);
+    }
+
+    // For conversion-optimized ad sets, Meta requires a promoted_object with pixel_id
+    if (optimization_goal === 'OFFSITE_CONVERSIONS') {
+      try {
+        const pixelResult = await metaApiRequest(`act_${accountId}/adspixels`, accessToken, 'GET', { fields: 'id,name', limit: '1' });
+        if (pixelResult.ok && pixelResult.data?.data?.[0]?.id) {
+          adsetPayload.promoted_object = JSON.stringify({
+            pixel_id: pixelResult.data.data[0].id,
+            custom_event_type: 'PURCHASE',
+          });
+          console.log(`[manage-meta-campaign] Using pixel ${pixelResult.data.data[0].id} for promoted_object`);
+        } else {
+          console.warn(`[manage-meta-campaign] No pixel found for account ${accountId}, conversion tracking may fail`);
+        }
+      } catch (pixelErr: any) {
+        console.warn(`[manage-meta-campaign] Failed to fetch pixel: ${pixelErr?.message}`);
+      }
     }
 
     if (start_time) {
@@ -238,6 +289,8 @@ async function handleCreate(
 
   const hasCreativeData = allImages.length > 0 || allTexts.length > 0;
 
+  console.log(`[manage-meta-campaign] Creative check: adSetId=${adSetId}, hasCreativeData=${hasCreativeData}, pageId=${pageId}, images=${allImages.length}, texts=${allTexts.length}`);
+
   if (adSetId && hasCreativeData && pageId) {
 
     // ---- FLEXIBLE: Dynamic Creative with asset_feed_spec ----
@@ -269,28 +322,28 @@ async function handleCreate(
         };
       }
 
-      // Build asset_feed_spec
+      // Build asset_feed_spec for Dynamic Creative
       const assetFeedSpec: Record<string, any> = {
         images: imageHashes.map((h) => ({ hash: h })),
         bodies: allTexts.filter(Boolean).map((t) => ({ text: t })),
         titles: allHeadlines.filter(Boolean).map((t) => ({ text: t })),
         call_to_action_types: [cta || 'SHOP_NOW'],
         link_urls: [{ website_url: destUrl }],
+        ad_formats: ['SINGLE_IMAGE'],
       };
 
       if (allDescriptions.filter(Boolean).length > 0) {
         assetFeedSpec.descriptions = allDescriptions.filter(Boolean).map((d) => ({ text: d }));
       }
 
-      const creativePayload = {
+      console.log(`[manage-meta-campaign] DCT asset_feed_spec:`, JSON.stringify(assetFeedSpec));
+
+      // For DCT: object_story_spec only needs page_id — link_data comes from asset_feed_spec
+      const creativePayload: Record<string, any> = {
         name: `${name} - DCT Creative`,
         asset_feed_spec: JSON.stringify(assetFeedSpec),
         object_story_spec: JSON.stringify({
           page_id: pageId,
-          link_data: {
-            link: destUrl,
-            call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
-          },
         }),
       };
 
@@ -1144,7 +1197,18 @@ export async function manageMetaCampaign(c: Context) {
     const accountId = connection.account_id.replace(/^act_/, '');
 
     // Resolve page_id from request data (sent by frontend from MetaBusinessContext)
-    const pageId: string | null = data?.page_id || null;
+    let pageId: string | null = data?.page_id || null;
+
+    // Auto-fetch page_id if not provided — needed for creative creation
+    if (!pageId) {
+      try {
+        const pagesResult = await metaApiRequest(`act_${accountId}/promote_pages`, decryptedToken, 'GET', { fields: 'id,name', limit: '1' });
+        if (pagesResult.ok && pagesResult.data?.data?.[0]?.id) {
+          pageId = pagesResult.data.data[0].id;
+          console.log(`[manage-meta-campaign] Auto-resolved page_id: ${pageId}`);
+        }
+      } catch (_) { /* ignore */ }
+    }
 
     // Route to the appropriate action handler
     let result: { body: any; status: number };
