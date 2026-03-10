@@ -290,7 +290,7 @@ function AdSetForm({
   }, [recommendedBudget]);
 
   const formats: { key: AdSetFormat; label: string; desc: string; icon: React.ElementType; recommended?: boolean }[] = [
-    { key: 'flexible', label: 'Flexible', desc: 'Meta optimiza combinaciones. 3 fotos, 2 textos, 2 headlines.', icon: Layers, recommended: isABO },
+    { key: 'flexible', label: 'Flexible (DCT)', desc: 'Metodología 3:2:2 — 3 imágenes, 2 textos, 2 títulos. Meta optimiza combinaciones ganadoras.', icon: Layers, recommended: isABO },
     { key: 'carousel', label: 'Carrusel', desc: 'Múltiples imágenes en swipe. 3+ fotos.', icon: ImageIcon },
     { key: 'single', label: 'Imagen Única', desc: 'Un solo creativo. 1 foto, 1 texto, 1 headline.', icon: FileImage },
   ];
@@ -709,14 +709,24 @@ function AdFormMultiSlot({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="text-xs">
-          {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : 'Imagen Única'}
-        </Badge>
-        <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
-          {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-          Steve genera copy
-        </Button>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Badge variant="outline" className="text-xs">
+            {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : 'Imagen Única'}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
+            {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+            Steve genera copy
+          </Button>
+        </div>
+        {adSetFormat === 'flexible' && (
+          <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+            <Sparkles className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
+            <p className="text-[11px] text-blue-700 dark:text-blue-300 leading-relaxed">
+              <strong>Metodología 3:2:2:</strong> 3 imágenes x 2 textos x 2 títulos. Meta optimiza automáticamente las combinaciones ganadoras.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ---- IMAGE SLOTS ---- */}
@@ -1164,27 +1174,37 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     console.log('[Wizard] Auto-generating copy on ad-creative step entry');
     handleGenerateCopy();
 
-    // Auto-generate AI image if product selected
-    if (focusType === 'product' && selectedProduct) {
-      const angleLabel = selectedAngle || 'general';
-      const imgPrompt = `Imagen publicitaria profesional para Meta Ads. Producto: ${selectedProduct.title}. Ángulo creativo: ${angleLabel}. Estilo: anuncio de alto rendimiento para redes sociales, colores vibrantes, composición llamativa.`;
-      console.log('[Wizard] Auto-generating AI image for product:', selectedProduct.title);
-      (async () => {
-        try {
-          const { data, error } = await callApi('generate-image', {
-            body: { clientId, promptGeneracion: imgPrompt, engine: 'gpt4o', formato: 'square' },
-          });
-          if (error) { console.error('[Wizard] AI image error:', error); return; }
-          if (data?.asset_url) {
-            setImages((prev) => {
-              const next = [...prev];
-              next[0] = data.asset_url;
-              return next;
+    // Auto-generate AI image
+    {
+      let imgPrompt = '';
+      if (focusType === 'product' && selectedProduct) {
+        const angleLabel = selectedAngle || 'general';
+        imgPrompt = `Imagen publicitaria profesional para Meta Ads. Producto: ${selectedProduct.title}. Ángulo creativo: ${angleLabel}. Estilo: anuncio de alto rendimiento para redes sociales, colores vibrantes, composición llamativa.`;
+        console.log('[Wizard] Auto-generating AI image for product:', selectedProduct.title);
+      } else {
+        // Broad focus: generate image based on angle + objective + audience context
+        const angleLabel = selectedAngle || 'general';
+        imgPrompt = `Imagen publicitaria profesional para Meta Ads. Ángulo creativo: ${angleLabel}. Objetivo: ${objective}. Audiencia: ${audienceDesc || 'general'}. Estilo: anuncio de alto rendimiento para redes sociales, colores vibrantes, composición llamativa.`;
+        console.log('[Wizard] Auto-generating AI image for broad focus:', angleLabel);
+      }
+      if (imgPrompt) {
+        (async () => {
+          try {
+            const { data, error } = await callApi('generate-image', {
+              body: { clientId, promptGeneracion: imgPrompt, engine: 'gpt4o', formato: 'square' },
             });
-            toast.success('Steve generó imagen del producto');
-          }
-        } catch (err) { console.error('[Wizard] AI image generation failed:', err); }
-      })();
+            if (error) { console.error('[Wizard] AI image error:', error); return; }
+            if (data?.asset_url) {
+              setImages((prev) => {
+                const next = [...prev];
+                next[0] = data.asset_url;
+                return next;
+              });
+              toast.success('Steve generó imagen automáticamente');
+            }
+          } catch (err) { console.error('[Wizard] AI image generation failed:', err); }
+        })();
+      }
     }
   }, [currentStep, handleGenerateCopy, focusType, selectedProduct, selectedAngle, clientId]);
 
@@ -1332,6 +1352,30 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       });
 
       if (error) throw error;
+
+      // Save creative to ad_creatives library
+      try {
+        const objLabel = OBJECTIVES.find(o => o.value === objective)?.label || objective;
+        const anguloText = selectedAngle || `${objLabel} — ${audienceDesc?.substring(0, 80) || 'Campaña directa'}`;
+        await supabase.from('ad_creatives').insert({
+          client_id: clientId,
+          funnel: funnelStage,
+          formato: adSetFormat === 'carousel' ? 'carousel' : filledImages[0]?.endsWith('.mp4') ? 'video' : 'static',
+          angulo: anguloText,
+          titulo: filledHeadlines[0] || name,
+          texto_principal: filledTexts[0] || '',
+          descripcion: filledDescriptions[0] || '',
+          cta: cta,
+          asset_url: filledImages[0] || null,
+          estado: 'en_pauta',
+          dct_copies: filledTexts.length > 0 ? filledTexts.map((t, i) => ({ texto: t, tipo: i === 0 ? 'original' : 'variacion' })) : null,
+          dct_titulos: filledHeadlines.length > 0 ? filledHeadlines : null,
+          dct_descripciones: filledDescriptions.length > 0 ? filledDescriptions : null,
+          dct_imagenes: filledImages.length > 0 ? filledImages : null,
+        });
+      } catch (saveErr) {
+        console.warn('[CampaignCreateWizard] Could not save creative to library:', saveErr);
+      }
 
       toast.success('Campaña creada como PAUSED en Meta. Activa cuando estés listo.');
       onComplete?.();

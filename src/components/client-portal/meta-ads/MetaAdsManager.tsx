@@ -28,7 +28,6 @@ import {
   AlertTriangle,
   Lightbulb,
   ListTree,
-  FlaskConical,
   Wand2,
   FileCheck,
   Crosshair,
@@ -52,8 +51,6 @@ import MetaAutomatedRules from './MetaAutomatedRules';
 
 // New professional components
 import CampaignTreeView from './CampaignTreeView';
-import TestingWizard322 from './TestingWizard322';
-import Testing322Analysis from './Testing322Analysis';
 import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
@@ -80,7 +77,6 @@ type SectionKey =
   | 'dashboard'
   | 'tree-view'
   | 'create-wizard'
-  | 'testing-322'
   | 'campaigns'
   | 'create-ad'
   | 'audiences'
@@ -144,7 +140,6 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'tree-view', label: 'Campañas', icon: ListTree },
   { key: 'create-wizard', label: 'Crear', icon: Wand2 },
   { key: 'drafts', label: 'Borradores', icon: FileCheck },
-  { key: 'testing-322', label: 'Test 3:2:2', icon: FlaskConical },
   { key: 'audiences', label: 'Audiencias', icon: Users },
   { key: 'pixel', label: 'Pixel', icon: Crosshair },
   { key: 'library', label: 'Biblioteca', icon: FolderOpen },
@@ -529,7 +524,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
   const [visitedSections, setVisitedSections] = useState<Set<SectionKey>>(
     () => new Set(['dashboard']),
   );
-  const [testing322Tab, setTesting322Tab] = useState<'create' | 'results'>('create');
 
   // --- Connection & hierarchy state ---
   const [metaConnection, setMetaConnection] = useState<MetaConnectionInfo | null>(null);
@@ -869,7 +863,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           <CampaignTreeView
             clientId={clientId}
             onCreateCampaign={() => handleNavClick('create-wizard')}
-            onCreate322={() => handleNavClick('testing-322')}
           />
         )}
         {key === 'create-wizard' && (
@@ -878,35 +871,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             onBack={() => handleNavClick('tree-view')}
             onComplete={() => handleNavClick('tree-view')}
           />
-        )}
-        {key === 'testing-322' && (
-          <>
-            <div className="flex gap-2 mb-4">
-              <Button
-                variant={testing322Tab === 'create' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTesting322Tab('create')}
-              >
-                Crear Test
-              </Button>
-              <Button
-                variant={testing322Tab === 'results' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTesting322Tab('results')}
-              >
-                Resultados
-              </Button>
-            </div>
-            {testing322Tab === 'create' ? (
-              <TestingWizard322
-                clientId={clientId}
-                onBack={() => handleNavClick('tree-view')}
-                onComplete={() => handleNavClick('tree-view')}
-              />
-            ) : (
-              <Testing322Analysis clientId={clientId} />
-            )}
-          </>
         )}
         {key === 'campaigns' && (
           <MetaCampaignManager

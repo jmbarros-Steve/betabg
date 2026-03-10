@@ -26,7 +26,6 @@ import {
   Eye,
   Layers,
   AlertCircle,
-  Zap,
   Pencil,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
@@ -43,7 +42,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface CampaignTreeViewProps {
   clientId: string;
   onCreateCampaign?: () => void;
-  onCreate322?: () => void;
 }
 
 interface AdSetNode {
@@ -295,7 +293,7 @@ function CampaignRow({
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate322 }: CampaignTreeViewProps) {
+export default function CampaignTreeView({ clientId, onCreateCampaign }: CampaignTreeViewProps) {
   const { connectionId: ctxConnectionId, lastSyncAt } = useMetaBusiness();
 
   const [campaigns, setCampaigns] = useState<CampaignNode[]>([]);
@@ -400,7 +398,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
           map.set(m.campaign_id, {
             campaign_id: m.campaign_id,
             campaign_name: m.campaign_name,
-            status: 'ACTIVE',
+            status: (m.campaign_status as CampaignNode['status']) || 'ACTIVE',
             budget_type: m.campaign_name?.includes('CBO') || m.campaign_name?.includes('Ganador') ? 'CBO' : 'ABO',
             daily_budget: 0,
             objective: 'CONVERSIONS',
@@ -425,11 +423,6 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
         c.roas = c.spend_30d > 0 ? c.revenue / c.spend_30d : 0;
         c.cpa = c.conversions > 0 ? c.spend_30d / c.conversions : 0;
         c.ctr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
-        // Infer status: no recent data → PAUSED
-        const recent = (metrics || []).filter(
-          (m) => m.campaign_id === c.campaign_id && m.metric_date >= new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
-        );
-        if (recent.length === 0) c.status = 'PAUSED';
         const uniqueDays = new Set((metrics || []).filter((m) => m.campaign_id === c.campaign_id).map((m) => m.metric_date));
         c.daily_budget = uniqueDays.size > 0 ? Math.round(c.spend_30d / uniqueDays.size) : 0;
       }
@@ -562,11 +555,6 @@ export default function CampaignTreeView({ clientId, onCreateCampaign, onCreate3
           <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
-          {onCreate322 && (
-            <Button size="sm" variant="secondary" onClick={onCreate322}>
-              <Zap className="w-4 h-4 mr-2" />Testing 3:2:2
-            </Button>
-          )}
           {onCreateCampaign && (
             <Button size="sm" onClick={onCreateCampaign}>
               <Megaphone className="w-4 h-4 mr-2" />Nueva Campaña

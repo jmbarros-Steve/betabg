@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -44,6 +45,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishedAdSetId, setPublishedAdSetId] = useState<string | null>(null);
   const [hasMetaConnection, setHasMetaConnection] = useState(false);
+  const [metaConnectionId, setMetaConnectionId] = useState<string | null>(null);
   const [cpaMaximo, setCpaMaximo] = useState<number | null>(null);
 
   useEffect(() => { fetchCreatives(); loadMetaStatus(); loadCpaData(); }, [clientId]);
@@ -58,6 +60,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
         .eq('is_active', true)
         .maybeSingle();
       setHasMetaConnection(!!data);
+      setMetaConnectionId(data?.id || null);
     } catch { /* ignore */ }
   };
 
@@ -130,20 +133,42 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
   };
 
   const handleConfirmPublish = async () => {
-    if (!publishModal) return;
+    if (!publishModal || !metaConnectionId) return;
     setPublishLoading(true);
-    // Simulate Meta API call (real integration would use Meta Marketing API)
-    await new Promise(r => setTimeout(r, 2000));
-    const adSetId = `adset_dct_${Date.now()}`;
-    setPublishedAdSetId(adSetId);
-    // Update estado to en_pauta
     try {
+      const { data, error } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'create',
+          connection_id: metaConnectionId,
+          data: {
+            name: `DCT — ${publishModal.angulo}`,
+            objective: 'OUTCOME_SALES',
+            status: 'PAUSED',
+            primary_text: publishModal.texto_principal || undefined,
+            headline: publishModal.titulo || undefined,
+            description: publishModal.descripcion || undefined,
+            image_url: publishModal.asset_url || (publishModal.dct_imagenes?.[0]) || undefined,
+            images: publishModal.dct_imagenes || undefined,
+            texts: publishModal.dct_copies?.map((c: any) => c.texto || c) || undefined,
+            headlines: publishModal.dct_titulos || undefined,
+            descriptions: publishModal.dct_descripciones || undefined,
+            cta: publishModal.cta || 'SHOP_NOW',
+            ad_set_format: 'flexible',
+            daily_budget: cpaMaximo ? cpaMaximo * 2 * 100 : 1000000,
+          },
+        },
+      });
+      if (error) throw new Error(typeof error === 'string' ? error : 'Error al publicar');
+      setPublishedAdSetId(data?.campaign_id || data?.adset_id || 'published');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from('ad_creatives').update({ estado: 'en_pauta' }).eq('id', publishModal.id);
       setCreatives(prev => prev.map(c => c.id === publishModal.id ? { ...c, estado: 'en_pauta' } : c));
-    } catch { /* non-blocking */ }
-    setPublishLoading(false);
-    toast.success('🚀 DCT publicado en Meta Ads Manager');
+      toast.success('DCT publicado en Meta Ads Manager');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al publicar en Meta');
+    } finally {
+      setPublishLoading(false);
+    }
   };
 
   const uniqueAngulos = [...new Set(creatives.map(c => c.angulo))].filter(Boolean);
