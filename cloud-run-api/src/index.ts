@@ -29,7 +29,7 @@ app.onError(errorHandler);
 
 // Health check
 app.get('/health', (c) =>
-  c.json({ status: 'ok', timestamp: new Date().toISOString() })
+  c.json({ status: 'ok', version: '2026-03-10-diag', timestamp: new Date().toISOString() })
 );
 
 // Register all API routes
