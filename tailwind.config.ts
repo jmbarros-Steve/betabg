@@ -14,8 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Montserrat", "system-ui", "sans-serif"],
-        mono: ["Inter", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
       },
       letterSpacing: {
         'widest': '0.2em',
