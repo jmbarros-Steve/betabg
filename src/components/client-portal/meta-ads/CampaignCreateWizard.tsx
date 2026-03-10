@@ -1331,12 +1331,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         submitData.adset_id = existingAdsetId;
       }
 
-      // Budget
+      // Budget + targeting (required by Meta for new ad sets)
       if (!existingAdsetId) {
         const budget = budgetType === 'CBO'
           ? Number(campBudget) * 100
           : Number(adsetBudget) * 100;
         submitData.daily_budget = budget || 1000000;
+
+        // Meta requires at least geo_locations in targeting spec
+        submitData.targeting = {
+          geo_locations: { countries: ['CL'] },
+          age_min: 18,
+          age_max: 65,
+        };
       }
 
       if (!existingCampaignId && startDate) {
