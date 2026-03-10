@@ -170,6 +170,7 @@ async function handleCreate(
       name: adset_name || `${name} - Ad Set`,
       billing_event,
       optimization_goal,
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       status,
     };
 
