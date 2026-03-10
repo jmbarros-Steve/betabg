@@ -10,7 +10,7 @@ export async function generateImage(c: Context) {
     fotoBaseUrl,
     formato,
     rechazoTexto,
-    engine = 'gpt4o',
+    engine = 'imagen',
   } = await c.req.json();
 
   const supabase = getSupabaseAdmin();
@@ -40,7 +40,50 @@ export async function generateImage(c: Context) {
   let imageUrl: string | null = null;
   let imageBytes: Uint8Array | null = null;
 
-  if (engine === 'flux') {
+  if (engine === 'imagen') {
+    // -- Google Imagen 4 (AI Studio) path --
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      console.error('[generate-image] GEMINI_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+
+    const aspectRatio = formato === 'story' ? '9:16' :
+                        formato === 'feed' ? '1:1' :
+                        '1:1';
+
+    const imagenResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt: promptFinal }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio,
+          },
+        }),
+      }
+    );
+
+    if (!imagenResponse.ok) {
+      const errText = await imagenResponse.text();
+      console.error('[generate-image] Imagen 4 API error:', imagenResponse.status, errText);
+      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
+    }
+
+    const imagenResult: any = await imagenResponse.json();
+    const prediction = imagenResult.predictions?.[0];
+
+    if (prediction?.bytesBase64Encoded) {
+      imageBytes = new Uint8Array(Buffer.from(prediction.bytesBase64Encoded, 'base64'));
+    } else {
+      console.error('[generate-image] No image returned from Imagen 4:', JSON.stringify(imagenResult).substring(0, 500));
+      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
+    }
+
+  } else if (engine === 'flux') {
     // -- Flux (Fal.ai) path --
     const FAL_API_KEY = process.env.FAL_API_KEY;
     if (!FAL_API_KEY) {
@@ -178,7 +221,7 @@ export async function generateImage(c: Context) {
   });
 
   // Deduct credits
-  const engineLabel = engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
+  const engineLabel = engine === 'imagen' ? 'Google Imagen 4' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
   await supabase.from('client_credits').update({
     creditos_disponibles: (credits?.creditos_disponibles || 99999) - 2,
     creditos_usados: (credits?.creditos_usados || 0) + 2,
@@ -188,7 +231,7 @@ export async function generateImage(c: Context) {
     client_id: clientId,
     accion: `Generar imagen — ${engineLabel}`,
     creditos_usados: 2,
-    costo_real_usd: engine === 'flux' ? 0.05 : 0.04,
+    costo_real_usd: engine === 'imagen' ? 0.02 : engine === 'flux' ? 0.05 : 0.04,
   });
 
   return c.json({ asset_url: publicUrl });
