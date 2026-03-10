@@ -943,7 +943,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [createNewAdset, setCreateNewAdset] = useState(false);
 
   // Campaign fields
-  const [campName, setCampName] = useState('');
+  const [campName, setCampName] = useState(`Mi Campaña - ${new Date().toISOString().split('T')[0]}`);
   const [budgetType, setBudgetType] = useState<BudgetType>('ABO');
   const [objective, setObjective] = useState<Objective>('CONVERSIONS');
   const [campBudget, setCampBudget] = useState('');
