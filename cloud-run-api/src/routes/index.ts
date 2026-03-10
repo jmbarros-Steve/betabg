@@ -90,6 +90,25 @@ import { shopifyFulfillmentWebhooks } from './shopify/shopify-fulfillment-webhoo
 import { shopifyGdprWebhooks } from './shopify/shopify-gdpr-webhooks.js';
 import { storeShopifyCredentials } from './shopify/store-shopify-credentials.js';
 
+// Phase 5: Steve Mail (Email Marketing)
+import { sendEmailHandler } from './email/send-email.js';
+import { syncSubscribers } from './email/sync-subscribers.js';
+import { manageEmailCampaigns, executeScheduledCampaign } from './email/manage-campaigns.js';
+import { trackOpen, trackClick, sesWebhooks } from './email/track-events.js';
+import { emailUnsubscribe } from './email/unsubscribe.js';
+import { emailFlowExecute, manageEmailFlows } from './email/flow-engine.js';
+import { emailFlowWebhooks } from './email/flow-webhooks.js';
+import { queryEmailSubscribers } from './email/query-subscribers.js';
+import { verifyEmailDomain } from './email/verify-domain.js';
+import { emailCampaignAnalytics } from './email/campaign-analytics.js';
+import { generateSteveMailContent } from './email/generate-email-content.js';
+import { productAlerts } from './email/product-alerts.js';
+import { productAlertWidget } from './email/product-alert-widget.js';
+import { productRecommendations } from './email/product-recommendations.js';
+import { emailAbTesting, executeAbTestWinner } from './email/ab-testing.js';
+import { signupForms, signupFormPublic } from './email/signup-forms.js';
+import { formWidget } from './email/form-widget.js';
+
 /**
  * Registers all API routes on the Hono app.
  * Convention: each route maps to /api/{original-function-name}
@@ -189,4 +208,44 @@ export function registerRoutes(app: Hono) {
   app.all('/api/shopify-oauth-callback', shopifyOauthCallback); // GET + POST, no JWT
   app.post('/api/shopify-fulfillment-webhooks', shopifyFulfillmentWebhooks); // No JWT - HMAC verified
   app.post('/api/shopify-gdpr-webhooks', shopifyGdprWebhooks); // No JWT - HMAC verified
+
+  // ============================================================
+  // Phase 5: Steve Mail (Email Marketing)
+  // ============================================================
+  // Authenticated endpoints (require JWT)
+  app.post('/api/send-email', authMiddleware, sendEmailHandler);
+  app.post('/api/sync-email-subscribers', authMiddleware, syncSubscribers);
+  app.post('/api/manage-email-campaigns', authMiddleware, manageEmailCampaigns);
+  app.post('/api/manage-email-flows', authMiddleware, manageEmailFlows);
+  app.post('/api/query-email-subscribers', authMiddleware, queryEmailSubscribers);
+  app.post('/api/verify-email-domain', authMiddleware, verifyEmailDomain);
+  app.post('/api/email-campaign-analytics', authMiddleware, emailCampaignAnalytics);
+  app.post('/api/generate-steve-mail-content', authMiddleware, generateSteveMailContent);
+
+  // Product recommendations (auth required)
+  app.post('/api/email-product-recommendations', authMiddleware, productRecommendations);
+
+  // A/B testing (auth required)
+  app.post('/api/email-ab-testing', authMiddleware, emailAbTesting);
+  app.post('/api/execute-ab-test-winner', authMiddleware, executeAbTestWinner); // Cloud Tasks internal call
+
+  // Signup forms (auth for management)
+  app.post('/api/email-signup-forms', authMiddleware, signupForms);
+
+  // Product alerts (subscribe is public, management requires auth)
+  app.post('/api/email-product-alerts', productAlerts); // Public — subscribe action has no auth
+  app.get('/api/email-product-alert-widget', productAlertWidget); // Public — serves JS widget
+
+  // Public endpoints for forms (no JWT - accessed from Shopify stores)
+  app.post('/api/email-signup-form-public', signupFormPublic); // Public — form submit + get_config
+  app.get('/api/email-form-widget', formWidget); // Public — serves JS widget
+
+  // Public endpoints (no JWT - accessed from emails or external services)
+  app.get('/api/email-track/open', trackOpen); // Tracking pixel in emails
+  app.get('/api/email-track/click', trackClick); // Link click redirect
+  app.get('/api/email-unsubscribe', emailUnsubscribe); // Unsubscribe link
+  app.post('/api/email-ses-webhooks', sesWebhooks); // SES bounce/complaint notifications
+  app.post('/api/email-flow-webhooks', emailFlowWebhooks); // Shopify webhook triggers - HMAC verified
+  app.post('/api/email-flow-execute', authMiddleware, emailFlowExecute); // Cloud Tasks internal call
+  app.post('/api/execute-scheduled-campaign', authMiddleware, executeScheduledCampaign); // Cloud Tasks internal call
 }

@@ -550,12 +550,18 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
   const requestOrigin = `${proto}://${host}`;
   const gdprWebhookUrl = `${requestOrigin}/api/shopify-gdpr-webhooks`;
   const fulfillmentWebhookUrl = `${requestOrigin}/api/shopify-fulfillment-webhooks`;
+  const emailFlowWebhookUrl = `${requestOrigin}/api/email-flow-webhooks`;
 
   const webhooksToRegister = [
     { topic: 'app/uninstalled', address: gdprWebhookUrl },
     { topic: 'orders/fulfilled', address: fulfillmentWebhookUrl },
     { topic: 'orders/partially_fulfilled', address: fulfillmentWebhookUrl },
     { topic: 'orders/cancelled', address: fulfillmentWebhookUrl },
+    // Steve Mail: flow triggers
+    { topic: 'checkouts/create', address: emailFlowWebhookUrl },
+    { topic: 'customers/create', address: emailFlowWebhookUrl },
+    { topic: 'orders/create', address: emailFlowWebhookUrl },
+    { topic: 'products/update', address: emailFlowWebhookUrl },
   ];
 
   // Fetch existing webhooks to avoid duplicates
