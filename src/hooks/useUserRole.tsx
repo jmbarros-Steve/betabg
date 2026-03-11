@@ -64,19 +64,19 @@ export function useUserRole(): UseUserRoleReturn {
         }
 
         setIsSuperAdmin(superAdminCheck ?? false);
-        setIsShopifyUser(shopifyUserCheck ?? false);
+        // Super admins should NOT be flagged as Shopify users even if linked to a shop
+        setIsShopifyUser(superAdminCheck ? false : (shopifyUserCheck ?? false));
 
-        // SECURITY FIX: Shopify users should ALWAYS be treated as 'client' role
-        // Even if they somehow have 'admin' role assigned, they cannot access admin features
-        // Only super admins (manually set in DB) can have real admin access
+        // SECURITY FIX: Super admins ALWAYS get admin role, even if linked to a Shopify client.
+        // Non-super-admin Shopify users are ALWAYS treated as 'client' role.
         let userRole: AppRole | null;
-        
-        if (shopifyUserCheck) {
-          // Shopify users are ALWAYS clients, regardless of role table
-          userRole = 'client';
-        } else if (superAdminCheck) {
-          // Only super admins get admin role
+
+        if (superAdminCheck) {
+          // Super admins ALWAYS get admin role — highest priority
           userRole = 'admin';
+        } else if (shopifyUserCheck) {
+          // Shopify users are clients, regardless of role table
+          userRole = 'client';
         } else if (isAdmin && !shopifyUserCheck) {
           // Regular admin (but this should be deprecated - use super_admin)
           userRole = 'admin';
