@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { callApi } from '@/lib/api';
 import { Search, FileText, Sparkles, X } from 'lucide-react';
@@ -1268,6 +1268,7 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle className="text-xl font-bold">Galeria de Plantillas</DialogTitle>
+          <DialogDescription className="sr-only">Selecciona una plantilla para tu email</DialogDescription>
         </DialogHeader>
 
         {/* Search */}

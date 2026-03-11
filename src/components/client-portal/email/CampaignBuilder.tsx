@@ -138,6 +138,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     })();
   }, [clientId]);
 
+  // Close sub-dialogs when editor closes to prevent orphan Radix portals
+  useEffect(() => {
+    if (!showEditor) {
+      setShowTemplateGallery(false);
+      setShowUniversalBlocks(false);
+      setShowImageEditor(false);
+    }
+  }, [showEditor]);
+
   // Force Unlayer inner divs to fill container height
   useEffect(() => {
     if (!editorReady || !editorContainerRef.current) return;
