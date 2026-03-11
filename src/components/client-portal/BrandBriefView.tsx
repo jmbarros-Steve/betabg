@@ -90,21 +90,22 @@ function sanitizeForRender(data: any, depth = 0): any {
   if (Array.isArray(data)) return data.map((item) => sanitizeForRender(item, depth + 1));
   if (typeof data === 'object') {
     const entries = Object.entries(data);
-    // Detect "leaf" objects (all values are scalars) — flatten to readable text
-    // regardless of depth. These can never be valid React children.
-    const isLeaf = entries.length > 0 && entries.every(([, v]) =>
-      v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
-    );
-    if (isLeaf || depth >= 4) {
+    // Flatten to string helper
+    const flatten = () => {
       const parts = entries
         .filter(([, v]) => v != null && String(v).trim())
         .map(([k, v]) => {
           const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          const val = typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : JSON.stringify(v);
-          return `${label}: ${val}`;
+          if (typeof v === 'string') return `${label}: ${v}`;
+          if (typeof v === 'number' || typeof v === 'boolean') return `${label}: ${String(v)}`;
+          if (Array.isArray(v)) return `${label}: ${v.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(', ')}`;
+          return `${label}: ${JSON.stringify(v)}`;
         });
       return parts.join('. ') || JSON.stringify(data);
-    }
+    };
+    // At depth >= 2 always flatten — prevents ANY nested object from reaching React as a child
+    if (depth >= 2) return flatten();
+    // At depth 0-1, recurse into children to preserve top-level structure
     const result: Record<string, any> = {};
     for (const [key, val] of Object.entries(data)) {
       result[key] = sanitizeForRender(val, depth + 1);
