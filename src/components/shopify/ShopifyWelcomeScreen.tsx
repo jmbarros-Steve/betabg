@@ -39,8 +39,8 @@ export function ShopifyWelcomeScreen({ storeName, credentials, onLogin }: Shopif
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg shadow-xl border-2">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg rounded-2xl shadow-xl border border-slate-200">
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
             <div className="relative">
@@ -139,9 +139,9 @@ export function ShopifyWelcomeScreen({ storeName, credentials, onLogin }: Shopif
           </div>
 
           {/* CTA */}
-          <Button 
-            onClick={handleLogin} 
-            className="w-full h-12 text-base"
+          <Button
+            onClick={handleLogin}
+            className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 rounded-lg"
             disabled={isLoggingIn}
           >
             {isLoggingIn ? (

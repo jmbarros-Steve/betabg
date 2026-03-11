@@ -14,10 +14,12 @@
     "@hono/node-server": "^1.13.7",
     "@supabase/supabase-js": "^2.90.1",
     "hono": "^4.6.0",
+    "nunjucks": "^3.2.4",
     "resend": "^6.9.3"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
+    "@types/nunjucks": "^3.2.6",
     "tsx": "^4.19.0",
     "typescript": "^5.8.3"
   }

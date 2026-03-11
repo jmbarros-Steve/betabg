@@ -227,7 +227,7 @@ export function ClientMetricsPanel() {
 
   if (connections.length === 0) {
     return (
-      <div className="text-center py-12 bg-card rounded-lg border border-border">
+      <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
         <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
         <p className="text-muted-foreground">No hay conexiones de Shopify activas</p>
         <p className="text-sm text-muted-foreground mt-1">

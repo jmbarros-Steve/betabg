@@ -28,14 +28,14 @@ const ONBOARDING_STEPS = [
     title: '¡Bienvenido a BG Consult!',
     description: 'Tu portal de marketing digital está listo. Te explicamos rápidamente cómo sacarle el máximo provecho.',
     icon: Sparkles,
-    color: 'from-primary/20 to-purple-500/20',
+    color: 'from-blue-500/20 to-blue-600/20',
   },
   {
     id: 'store_setup',
     title: 'Tu Tienda',
     description: 'Cuéntanos sobre tu tienda para que podamos conectarla automáticamente cuando instales la app de Shopify.',
     icon: Store,
-    color: 'from-emerald-500/20 to-green-500/20',
+    color: 'from-blue-400/20 to-blue-500/20',
     isInteractive: true,
   },
   {
@@ -43,7 +43,7 @@ const ONBOARDING_STEPS = [
     title: 'Conecta tus Plataformas',
     description: 'En la pestaña "Conexiones" puedes vincular Shopify, Meta Ads, Google Ads y Klaviyo. Así veremos tus métricas en tiempo real.',
     icon: Link2,
-    color: 'from-green-500/20 to-emerald-500/20',
+    color: 'from-blue-500/20 to-blue-600/20',
     tips: [
       'Shopify: Para ver ventas, pedidos e ingresos',
       'Meta Ads: Para métricas de campañas de Facebook/Instagram',
@@ -56,7 +56,7 @@ const ONBOARDING_STEPS = [
     title: 'Conoce a Steve 🐕',
     description: 'Steve es un Bulldog Francés PhD de Stanford. Te hará preguntas para crear tu Brief de Marca - la base para todos tus anuncios.',
     icon: MessageCircle,
-    color: 'from-blue-500/20 to-indigo-500/20',
+    color: 'from-blue-600/20 to-blue-700/20',
     avatar: avatarSteve,
     tips: [
       'Responde con honestidad y detalle',
@@ -69,21 +69,21 @@ const ONBOARDING_STEPS = [
     title: 'Genera Copies de Meta',
     description: 'Una vez tengas tu Brief, podrás generar anuncios de Meta Ads personalizados con un clic. Headlines, descripciones y textos primarios.',
     icon: Megaphone,
-    color: 'from-orange-500/20 to-amber-500/20',
+    color: 'from-blue-500/20 to-blue-400/20',
   },
   {
     id: 'klaviyo',
     title: 'Email Marketing con Klaviyo',
     description: 'Planifica secuencias de email: bienvenida, carrito abandonado, winback y campañas puntuales. Con variables de Klaviyo listas para copiar.',
     icon: Mail,
-    color: 'from-purple-500/20 to-pink-500/20',
+    color: 'from-blue-400/20 to-blue-600/20',
   },
   {
     id: 'chonga',
     title: '¿Dudas? Pregunta a Chonga 🐕',
     description: 'Chonga es una English Bulldog que te ayuda con soporte técnico. Está siempre en la esquina inferior derecha, lista para ayudarte.',
     icon: FileText,
-    color: 'from-teal-500/20 to-cyan-500/20',
+    color: 'from-blue-500/20 to-blue-600/20',
     avatar: avatarChonga,
   },
   {
@@ -91,7 +91,7 @@ const ONBOARDING_STEPS = [
     title: '¡Todo Listo!',
     description: 'Ya conoces las herramientas principales. Comienza conectando tus plataformas y completando tu Brief con Steve.',
     icon: Rocket,
-    color: 'from-primary/30 to-accent/30',
+    color: 'from-blue-600/20 to-blue-500/20',
   },
 ];
 
@@ -161,11 +161,11 @@ export function ClientOnboarding({ onComplete, clientName }: ClientOnboardingPro
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg overflow-hidden">
+      <Card className="w-full max-w-lg overflow-hidden bg-white rounded-2xl shadow-2xl">
         {/* Progress */}
         <div className="h-1 bg-muted">
           <motion.div
-            className="h-full bg-primary"
+            className="h-full bg-blue-600"
             initial={{ width: 0 }}
             animate={{ width: `${((currentStep + 1) / ONBOARDING_STEPS.length) * 100}%` }}
             transition={{ duration: 0.3 }}
@@ -212,7 +212,7 @@ export function ClientOnboarding({ onComplete, clientName }: ClientOnboardingPro
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                   {step.tips.map((tip, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <span>{tip}</span>
                     </div>
                   ))}
@@ -257,10 +257,10 @@ export function ClientOnboarding({ onComplete, clientName }: ClientOnboardingPro
                     onClick={() => setCurrentStep(i)}
                     className={cn(
                       'h-2 rounded-full transition-all',
-                      i === currentStep 
-                        ? 'w-6 bg-primary' 
-                        : i < currentStep 
-                          ? 'w-2 bg-primary/50' 
+                      i === currentStep
+                        ? 'w-6 bg-blue-600'
+                        : i < currentStep
+                          ? 'w-2 bg-blue-400'
                           : 'w-2 bg-muted-foreground/30'
                     )}
                   />

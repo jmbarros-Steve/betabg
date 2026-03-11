@@ -127,7 +127,7 @@ export function KnowledgeRulesExplorer() {
   ];
 
   return (
-    <Card className="border-border">
+    <Card className="border-slate-200 bg-white rounded-xl">
       <CardContent className="pt-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -232,7 +232,7 @@ export function KnowledgeRulesExplorer() {
               return (
                 <div
                   key={rule.id}
-                  className="border border-border rounded-lg p-3 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="border border-slate-200 rounded-xl p-3 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : rule.id)}
                 >
                   <div className="flex items-start justify-between gap-2">

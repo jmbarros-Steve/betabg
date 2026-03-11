@@ -59,7 +59,7 @@ export function FloatingDiscountButton({ clientId }: FloatingDiscountButtonProps
                 <Button
                   onClick={() => setIsOpen(true)}
                   size="lg"
-                  className="rounded-full w-14 h-14 shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="rounded-full w-14 h-14 shadow-lg bg-orange-500 hover:bg-orange-500/90 text-white"
                 >
                   <Tag className="w-6 h-6" />
                 </Button>

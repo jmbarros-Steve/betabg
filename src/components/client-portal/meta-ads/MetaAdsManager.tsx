@@ -368,7 +368,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gasto Total</span>
+              <span className="text-sm font-medium text-muted-foreground">Gasto Total</span>
               <div className="p-1.5 rounded-md bg-red-500/10"><DollarSign className="w-4 h-4 text-red-500" /></div>
             </div>
             <p className="text-2xl font-bold">{formatCurrency(totals.spend)}</p>
@@ -382,7 +382,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">ROAS</span>
+              <span className="text-sm font-medium text-muted-foreground">ROAS</span>
               <div className="p-1.5 rounded-md bg-green-500/10"><TrendingUp className="w-4 h-4 text-green-500" /></div>
             </div>
             <p className={`text-2xl font-bold ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
@@ -396,7 +396,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPA</span>
+              <span className="text-sm font-medium text-muted-foreground">CPA</span>
               <div className="p-1.5 rounded-md bg-blue-500/10"><Target className="w-4 h-4 text-blue-500" /></div>
             </div>
             <p className="text-2xl font-bold">{totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}</p>
@@ -410,7 +410,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CTR</span>
+              <span className="text-sm font-medium text-muted-foreground">CTR</span>
               <div className="p-1.5 rounded-md bg-purple-500/10"><MousePointerClick className="w-4 h-4 text-purple-500" /></div>
             </div>
             <p className="text-2xl font-bold">{formatPercent(overallCtr)}</p>
@@ -438,11 +438,11 @@ function DashboardSection({ clientId }: { clientId: string }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/50">
-                      <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Campaña</th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Gasto</th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">ROAS</th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Conv.</th>
-                      <th className="text-right py-2 pl-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">CTR</th>
+                      <th className="text-left py-2 pr-4 text-sm font-medium text-muted-foreground">Campaña</th>
+                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Gasto</th>
+                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">ROAS</th>
+                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Conv.</th>
+                      <th className="text-right py-2 pl-3 text-sm font-medium text-muted-foreground">CTR</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -908,8 +908,8 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         {/* Sidebar */}
         <aside
           className={`
-            flex flex-col shrink-0 border-r border-border
-            bg-muted/30 transition-all duration-200 ease-in-out
+            flex flex-col shrink-0 border-r border-slate-200
+            bg-white transition-all duration-200 ease-in-out
             ${sidebarCollapsed ? 'w-[56px]' : 'w-[200px]'}
           `}
         >
@@ -937,14 +937,14 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                   onClick={() => handleNavClick(item.key)}
                   title={sidebarCollapsed ? item.label : undefined}
                   className={`
-                    group flex items-center gap-2.5 rounded-md px-2.5 py-2
+                    group flex items-center gap-2.5 rounded-lg px-2.5 py-2
                     text-sm font-medium transition-colors duration-150
                     outline-none focus-visible:ring-2 focus-visible:ring-ring
-                    ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                    ${isActive ? 'bg-blue-50 text-blue-700' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
                     ${sidebarCollapsed ? 'justify-center' : ''}
                   `}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-700' : 'text-muted-foreground group-hover:text-foreground'}`} />
                   {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                 </button>
               );

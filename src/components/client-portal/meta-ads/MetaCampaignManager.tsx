@@ -912,7 +912,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <span className="text-sm font-medium text-muted-foreground">
                 Presupuesto Diario Total
               </span>
               <div className="p-1.5 rounded-md bg-blue-500/10">
@@ -934,7 +934,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <span className="text-sm font-medium text-muted-foreground">
                 Gasto 30 Días
               </span>
               <div className="p-1.5 rounded-md bg-red-500/10">
@@ -954,7 +954,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <span className="text-sm font-medium text-muted-foreground">
                 Presupuesto Mensual Est.
               </span>
               <div className="p-1.5 rounded-md bg-green-500/10">
@@ -1118,7 +1118,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Campaign Name */}
                     <th className="text-left py-3 px-4">
                       <button
-                        className="flex items-center text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                        className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                         onClick={() => handleSort('campaign_name')}
                       >
                         Campaña
@@ -1133,7 +1133,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Status */}
                     <th className="text-center py-3 px-3">
                       <button
-                        className="flex items-center justify-center text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('status')}
                       >
                         Estado
@@ -1148,7 +1148,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Daily Budget */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('daily_budget')}
                       >
                         Presupuesto/Día
@@ -1163,7 +1163,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Spend 30d */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('spend')}
                       >
                         Gasto (30d)
@@ -1178,7 +1178,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* ROAS */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('roas')}
                       >
                         ROAS
@@ -1193,7 +1193,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* CPA */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('cpa')}
                       >
                         CPA
@@ -1208,7 +1208,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* CTR */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('ctr')}
                       >
                         CTR
@@ -1223,7 +1223,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Conversions */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('conversions')}
                       >
                         Conv.
@@ -1237,7 +1237,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
                     {/* Actions */}
                     <th className="text-center py-3 px-4">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <span className="text-sm font-medium text-muted-foreground">
                         Acciones
                       </span>
                     </th>
@@ -1636,7 +1636,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               {/* Metrics grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
                     Gasto
                   </p>
                   <p className="text-lg font-bold">
@@ -1644,7 +1644,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                   </p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
                     ROAS
                   </p>
                   <p
@@ -1662,7 +1662,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                   </p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
                     CPA
                   </p>
                   <p className="text-lg font-bold">
@@ -1672,7 +1672,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                   </p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
                     CTR
                   </p>
                   <p className="text-lg font-bold">

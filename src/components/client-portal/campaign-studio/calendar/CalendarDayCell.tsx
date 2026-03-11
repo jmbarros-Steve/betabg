@@ -19,13 +19,13 @@ interface CalendarDayCellProps {
 
 export function CalendarDayCell({ day, isToday, campaigns, onCampaignClick, onQuickCreate }: CalendarDayCellProps) {
   if (day === null) {
-    return <div className="min-h-[100px] bg-muted/30 border border-border/50 rounded-md" />;
+    return <div className="min-h-[100px] bg-muted/30 border border-slate-200 rounded-xl" />;
   }
 
   return (
     <div
-      className={`min-h-[100px] border rounded-md p-1.5 flex flex-col gap-1 transition-colors ${
-        isToday ? 'border-orange-400 bg-orange-50/50 dark:bg-orange-950/20' : 'border-border hover:bg-muted/30'
+      className={`min-h-[100px] border rounded-xl p-1.5 flex flex-col gap-1 transition-colors ${
+        isToday ? 'border-orange-400 bg-orange-50/50 dark:bg-orange-950/20' : 'border-slate-200 hover:bg-muted/30'
       }`}
     >
       <div className="flex items-center justify-between">

@@ -471,7 +471,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
             {queue.length > 0 && (
               <div className="space-y-2 border border-border rounded-lg p-3 bg-muted/20">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <p className="text-sm font-medium text-muted-foreground">
                     Cola de aprendizaje ({queue.length})
                   </p>
                   <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => setQueue([])}>

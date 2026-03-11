@@ -627,7 +627,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
 
   if (isInitializing) {
     return (
-      <Card className="h-[900px]">
+      <Card className="h-[900px] bg-white border border-slate-200 rounded-2xl">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -641,7 +641,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }
 
   return (
-    <Card className="h-[calc(100vh-120px)] min-h-[700px] max-h-[1100px] flex flex-col">
+    <Card className="h-[calc(100vh-120px)] min-h-[700px] max-h-[1100px] flex flex-col bg-white border border-slate-200 rounded-2xl">
       {/* Header */}
       <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
@@ -718,7 +718,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
             <div key={message.id}>
               {message.role === 'user' ? (
                 <div className={cn("flex gap-3 justify-end", message.rejected && "opacity-50")}>
-                  <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-primary text-primary-foreground rounded-br-md shadow-sm">
+                  <div className="max-w-[75%] px-4 py-3 text-sm bg-blue-600 text-white rounded-xl rounded-tr-sm shadow-sm">
                     <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     {message.rejected && (
                       <span className="text-xs text-destructive block mt-1">&#10005; Respuesta no aceptada</span>
@@ -754,10 +754,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
                     </Avatar>
                     
                     <div className={cn(
-                      "max-w-[85%] rounded-2xl px-5 py-4 text-[0.9rem] rounded-bl-md shadow-sm",
-                      part.type === 'chonga' 
-                        ? "bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800" 
-                        : "bg-muted"
+                      "max-w-[85%] px-5 py-4 text-[0.9rem] shadow-sm",
+                      part.type === 'chonga'
+                        ? "bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-2xl rounded-bl-md"
+                        : "bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm"
                     )}>
                       {part.type === 'chonga' && (
                         <div className="flex items-center gap-1 mb-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
@@ -783,7 +783,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 <AvatarImage src={avatarSteve} alt="Steve" />
                 <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
-              <div className="bg-muted rounded-2xl rounded-bl-md px-5 py-4">
+              <div className="bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm px-5 py-4">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -914,7 +914,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       )}
 
       {/* Input */}
-      <div className="p-4 border-t flex-shrink-0">
+      <div className="p-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
         {!isComplete && currentQuestionLabel && (
           <p className="text-xs text-muted-foreground mb-2">Responde sobre: <span className="font-medium text-foreground">{currentQuestionLabel}</span></p>
         )}
@@ -968,7 +968,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
               disabled={isLoading}
               className="flex-1"
             />
-            <Button type="submit" disabled={!input.trim() || isLoading} size="icon">
+            <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-blue-600 rounded-full">
               <Send className="h-4 w-4" />
             </Button>
           </form>

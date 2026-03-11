@@ -309,7 +309,13 @@ async function handleCreate(
         }
       }
 
-      if (imageHashes.length === 0) {
+      // Deduplicate hashes — Meta rejects duplicate asset values in DCT
+      const uniqueHashes = [...new Set(imageHashes)];
+      if (uniqueHashes.length < imageHashes.length) {
+        console.log(`[manage-meta-campaign] Deduplicated image hashes: ${imageHashes.length} → ${uniqueHashes.length}`);
+      }
+
+      if (uniqueHashes.length === 0) {
         return {
           body: {
             success: true,
@@ -322,18 +328,23 @@ async function handleCreate(
         };
       }
 
+      // Deduplicate texts, headlines, descriptions — Meta rejects duplicate values
+      const uniqueTexts = [...new Set(allTexts.filter(Boolean))];
+      const uniqueHeadlines = [...new Set(allHeadlines.filter(Boolean))];
+      const uniqueDescriptions = [...new Set(allDescriptions.filter(Boolean))];
+
       // Build asset_feed_spec for Dynamic Creative
       const assetFeedSpec: Record<string, any> = {
-        images: imageHashes.map((h) => ({ hash: h })),
-        bodies: allTexts.filter(Boolean).map((t) => ({ text: t })),
-        titles: allHeadlines.filter(Boolean).map((t) => ({ text: t })),
+        images: uniqueHashes.map((h) => ({ hash: h })),
+        bodies: uniqueTexts.map((t) => ({ text: t })),
+        titles: uniqueHeadlines.map((t) => ({ text: t })),
         call_to_action_types: [cta || 'SHOP_NOW'],
         link_urls: [{ website_url: destUrl }],
         ad_formats: ['SINGLE_IMAGE'],
       };
 
-      if (allDescriptions.filter(Boolean).length > 0) {
-        assetFeedSpec.descriptions = allDescriptions.filter(Boolean).map((d) => ({ text: d }));
+      if (uniqueDescriptions.length > 0) {
+        assetFeedSpec.descriptions = uniqueDescriptions.map((d) => ({ text: d }));
       }
 
       console.log(`[manage-meta-campaign] DCT asset_feed_spec:`, JSON.stringify(assetFeedSpec));

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { unlayerMergeTagsConfig } from './klaviyoMergeTags';
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from './htmlToUnlayerDesign';
+import { getSteveMailEditorOptions, registerSteveMailTools } from '@/components/client-portal/email/steveMailEditorConfig';
 
 export interface EditorEmail {
   subject: string;
@@ -201,38 +202,11 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
         <div ref={editorContainerRef} className="absolute inset-0">
           <EmailEditor
             ref={emailEditorRef}
-            onReady={() => setEditorReady(true)}
-            options={{
-              displayMode: 'email',
-              locale: 'es-ES',
-              appearance: {
-                theme: 'modern_light',
-              },
-              features: {
-                stockImages: { enabled: true, safeSearch: true },
-                userUploads: true,
-              },
-              tools: {
-                html: { enabled: true },
-                image: { enabled: true },
-                text: { enabled: true },
-                button: { enabled: true },
-                divider: { enabled: true },
-                heading: { enabled: true },
-                menu: { enabled: true },
-                social: { enabled: true },
-                video: { enabled: true },
-                columns: { enabled: true },
-                timer: { enabled: true },
-              },
-              tabs: {
-                content: { enabled: true },
-                blocks: { enabled: true },
-                body: { enabled: true },
-                images: { enabled: true },
-              },
-              ...unlayerMergeTagsConfig,
+            onReady={() => {
+              setEditorReady(true);
+              registerSteveMailTools(emailEditorRef.current?.editor);
             }}
+            options={getSteveMailEditorOptions({ mergeTagsOverride: unlayerMergeTagsConfig.mergeTags })}
             style={{ height: '100%' }}
           />
         </div>

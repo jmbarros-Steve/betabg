@@ -48,11 +48,11 @@ export function DashboardStats({ userId }: Props) {
   };
 
   const statCards = [
-    { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'text-primary' },
-    { label: 'Horas Totales', value: stats.totalHours.toFixed(1), icon: Clock, color: 'text-primary' },
-    { label: 'Horas Este Mes', value: stats.monthlyHours.toFixed(1), icon: Clock, color: 'text-green-500' },
-    { label: 'Recibos Generados', value: stats.totalInvoices, icon: FileText, color: 'text-primary' },
-    { label: 'Ingresos Totales', value: `€${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-green-500' },
+    { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Horas Totales', value: stats.totalHours.toFixed(1), icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Horas Este Mes', value: stats.monthlyHours.toFixed(1), icon: Clock, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Recibos Generados', value: stats.totalInvoices, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Ingresos Totales', value: `€${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
   ];
 
   return (
@@ -69,11 +69,11 @@ export function DashboardStats({ userId }: Props) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-colors"
+            className="bg-white border border-slate-200 rounded-xl p-5 card-hover"
           >
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.bg} ${stat.color}`}>
+                <stat.icon className="w-5 h-5" />
               </div>
             </div>
             <p className="text-2xl font-bold mb-1">{stat.value}</p>

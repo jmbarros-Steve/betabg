@@ -592,7 +592,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
               image_url: c.imageUrl,
               primary_text: c.primaryText,
               headline: c.headline,
-              daily_budget: budgetPerAdset * 100,
+              daily_budget: budgetPerAdset, // CLP has no cents — send as-is
             })),
           },
         },

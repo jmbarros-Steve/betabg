@@ -133,7 +133,7 @@ export function TimeEntryPanel({ userId }: Props) {
   }, {} as Record<string, { entries: TimeEntry[]; totalHours: number; hourlyRate: number }>);
 
   if (loading) {
-    return <div className="animate-pulse h-40 bg-card rounded-xl" />;
+    return <div className="animate-pulse h-40 bg-white rounded-xl border border-slate-200" />;
   }
 
   return (
@@ -213,17 +213,17 @@ export function TimeEntryPanel({ userId }: Props) {
       </div>
 
       {clients.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-xl border border-border">
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <p className="text-muted-foreground">Primero debes añadir clientes</p>
         </div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-xl border border-border">
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <p className="text-muted-foreground">No hay horas registradas</p>
         </div>
       ) : (
         <div className="space-y-6">
           {Object.entries(entriesByClient).map(([clientName, data]) => (
-            <div key={clientName} className="rounded-xl bg-card border border-border overflow-hidden">
+            <div key={clientName} className="rounded-xl bg-white border border-slate-200 overflow-hidden">
               <div className="p-4 bg-secondary/50 flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold">{clientName}</h3>
@@ -242,7 +242,7 @@ export function TimeEntryPanel({ userId }: Props) {
                     key={entry.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+                    className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex-1">
                       <p className="text-sm text-muted-foreground mb-1">

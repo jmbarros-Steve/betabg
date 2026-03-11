@@ -26,10 +26,10 @@ export default function StepIndicator({ steps, currentIndex, onStepClick }: Step
             disabled={!isPast && !isCurrent}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
               isCurrent
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-blue-600 text-white'
                 : isPast
-                ? 'bg-primary/10 text-primary cursor-pointer hover:bg-primary/20'
-                : 'bg-muted text-muted-foreground cursor-default'
+                ? 'bg-blue-600 text-white cursor-pointer hover:bg-blue-700'
+                : 'bg-slate-200 text-muted-foreground cursor-default'
             }`}
           >
             {isPast ? <CheckCircle className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}

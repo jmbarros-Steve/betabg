@@ -103,7 +103,7 @@ function KpiCard({ label, value, subtitle, icon: Icon }: { label: string; value:
     <div className="flex flex-col gap-1 p-4 bg-muted/50 rounded-xl border border-border/50">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="w-4 h-4" />
-        <span className="text-[11px] uppercase tracking-wider font-medium">{label}</span>
+        <span className="text-sm font-medium">{label}</span>
       </div>
       <span className="text-xl font-bold">{value}</span>
       {subtitle && (
@@ -301,7 +301,7 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
 
   if (!hasConnection) {
     return (
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardContent className="py-8 text-center">
           <Mail className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-muted-foreground text-sm">
@@ -315,11 +315,11 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const timeframeLabel = TIMEFRAME_OPTIONS.find(o => o.value === timeframe)?.label || '90 días';
 
   return (
-    <Card className="glow-box">
+    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Rendimiento de Klaviyo
             </CardTitle>

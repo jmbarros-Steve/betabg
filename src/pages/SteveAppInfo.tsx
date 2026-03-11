@@ -21,7 +21,7 @@ const benefits = [
 
 export default function SteveAppInfo() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <main className="flex-1">
         {/* Hero */}
         <section className="py-20 border-b border-border">

@@ -435,7 +435,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                 <Button variant="ghost" size="sm" onClick={() => setStep('formato')}><ArrowLeft className="w-4 h-4 mr-1" />Volver</Button>
                 <h3 className="text-lg font-semibold">¿Qué ángulo creativo usamos?</h3>
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">⭐ Recomendados para {funnel.toUpperCase()}</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Recomendados para {funnel.toUpperCase()}</p>
                   <div className="flex flex-wrap gap-2">
                     {recommendedAngles.map(a => (
                       <div key={a} className="flex flex-col">
@@ -449,7 +449,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Otros ángulos</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Otros ángulos</p>
                   <div className="flex flex-wrap gap-2">
                     {otherAngles.map(a => (
                       <button key={a} onClick={() => { setAngulo(a); setShowCustomAngulo(false); }}
@@ -488,7 +488,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                   <p className="text-sm text-muted-foreground mb-3">Opcional — ofertas específicas, temporadas, productos destacados, etc.</p>
                   {briefChips.length > 0 && (
                     <div className="mb-3">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📋 Contexto del brief — click para incluir/excluir</p>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Contexto del brief -- click para incluir/excluir</p>
                       <div className="flex flex-wrap gap-2">
                         {briefChips.map(chip => (
                           <button
@@ -585,7 +585,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                     <div className="grid gap-3">
                       {Object.entries(briefVisual).filter(([k]) => k !== 'tipo').map(([key, val]) => (
                         <div key={key} className="p-3 rounded-lg border border-border bg-card">
-                          <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-1">{key.replace(/_/g, ' ')}</p>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">{key.replace(/_/g, ' ')}</p>
                           {renderBriefField(key, val)}
                         </div>
                       ))}

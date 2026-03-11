@@ -70,10 +70,10 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
   const estimatedRecovery = Math.round(uncontactedValue * 0.12); // ~12% avg e-commerce recovery rate
 
   return (
-    <Card className="glow-box">
+    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <ShoppingCart className="w-4 h-4" />
             Carritos Abandonados
           </CardTitle>

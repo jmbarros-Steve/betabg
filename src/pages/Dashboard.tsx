@@ -79,13 +79,13 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-50">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
         <div className="container px-6 h-16 flex items-center justify-between">
-          <img src={logo} alt="Consultoría BG" className="h-10 w-auto" />
+          <img src={logo} alt="Steve Ads" className="h-12 w-auto" />
 
           <div className="flex items-center gap-4">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground hidden sm:block">{user.email}</span>
-            <Button variant="ghost" size="icon" onClick={signOut}>
+            <span className="text-sm font-medium text-slate-400 hidden sm:block">{user.email}</span>
+            <Button variant="ghost" size="icon" onClick={signOut} className="text-slate-400 hover:text-slate-700">
               <LogOut className="w-5 h-5" />
             </Button>
           </div>
@@ -96,15 +96,18 @@ export default function Dashboard() {
         {/* Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {tabs.map((tab) => (
-            <Button
+            <button
               key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
               onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-2 uppercase tracking-wider text-xs whitespace-nowrap"
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                activeTab === tab.id
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
-            </Button>
+            </button>
           ))}
         </div>
 

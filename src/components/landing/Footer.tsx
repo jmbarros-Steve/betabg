@@ -22,7 +22,7 @@ export function Footer() {
             </Link>
           </div>
           
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          <p className="text-sm font-medium text-muted-foreground">
             © {new Date().getFullYear()} Consultoría BG
           </p>
         </div>

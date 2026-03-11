@@ -567,7 +567,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="relative overflow-hidden">
           <CardContent className="py-3 px-4">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Campañas</p>
+            <p className="text-sm font-medium text-muted-foreground">Campañas</p>
             <p className="text-xl font-bold mt-0.5">{stats.total}</p>
             <p className="text-xs text-muted-foreground">{stats.active} activas</p>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary/40 to-primary/10" />
@@ -575,21 +575,21 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
         </Card>
         <Card className="relative overflow-hidden">
           <CardContent className="py-3 px-4">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Gasto 30d</p>
+            <p className="text-sm font-medium text-muted-foreground">Gasto 30d</p>
             <p className="text-xl font-bold mt-0.5">{fmtCLP(stats.spend)}</p>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-500/40 to-red-500/10" />
           </CardContent>
         </Card>
         <Card className="relative overflow-hidden">
           <CardContent className="py-3 px-4">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">ROAS Promedio</p>
+            <p className="text-sm font-medium text-muted-foreground">ROAS Promedio</p>
             <p className={`text-xl font-bold mt-0.5 ${stats.avgRoas >= 3 ? 'text-green-600' : stats.avgRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>{fmtRoas(stats.avgRoas)}</p>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-green-500/40 to-green-500/10" />
           </CardContent>
         </Card>
         <Card className="relative overflow-hidden">
           <CardContent className="py-3 px-4">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Conversiones</p>
+            <p className="text-sm font-medium text-muted-foreground">Conversiones</p>
             <p className="text-xl font-bold mt-0.5">{fmtNum(campaigns.reduce((s, c) => s + c.conversions, 0))}</p>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
           </CardContent>

@@ -33,7 +33,7 @@ const steps = [
 
 export default function Tutorial() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <main className="flex-1 py-16">
         <div className="container max-w-3xl px-6">
           <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">

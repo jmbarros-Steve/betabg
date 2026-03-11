@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getPersonalizedRecommendations } from './product-recommendation-engine.js';
 
 // In-memory product cache per client (TTL: 1 hour)
 const productCache = new Map<string, { products: any[]; cachedAt: number }>();
@@ -59,7 +60,7 @@ export async function productRecommendations(c: Context) {
 /**
  * Get product catalog from Shopify API with caching.
  */
-async function getProductCatalog(supabase: any, clientId: string): Promise<any[]> {
+export async function getProductCatalog(supabase: any, clientId: string): Promise<any[]> {
   // Check cache
   const cached = productCache.get(clientId);
   if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
@@ -302,6 +303,30 @@ export async function replaceProductRecommendations(
   }
 
   const supabase = getSupabaseAdmin();
+  const effectiveConfig = config || { type: 'best_sellers', count: 4 };
+
+  // Use personalized engine when subscriber_id is provided and type is personalized or not_purchased
+  if (subscriberId && (effectiveConfig.type === 'personalized' || effectiveConfig.type === 'not_purchased')) {
+    try {
+      const personalizedProducts = await getPersonalizedRecommendations(
+        supabase,
+        clientId,
+        subscriberId,
+        { type: effectiveConfig.type as 'personalized' | 'not_purchased', count: effectiveConfig.count }
+      );
+
+      if (personalizedProducts.length > 0) {
+        const shopUrl = personalizedProducts[0]?.url?.split('/products/')[0] || '#';
+        const recommendationHtml = renderProductGrid(personalizedProducts, effectiveConfig.count, shopUrl);
+        return html.replace(/\{\{\s*product_recommendations\s*\}\}/g, recommendationHtml);
+      }
+    } catch (err) {
+      console.error('Personalized recommendation engine failed, falling back:', err);
+    }
+    // Fall through to standard best_sellers if personalized returned nothing
+    effectiveConfig.type = 'best_sellers';
+  }
+
   const products = await getProductCatalog(supabase, clientId);
 
   const subscriber = subscriberId
@@ -312,7 +337,7 @@ export async function replaceProductRecommendations(
     supabase,
     products,
     subscriber,
-    config || { type: 'best_sellers', count: 4 },
+    effectiveConfig,
     clientId
   );
 

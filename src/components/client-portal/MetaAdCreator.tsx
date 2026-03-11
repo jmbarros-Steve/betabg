@@ -744,7 +744,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
 
             {recommendedAngles.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">⭐ Recomendados para {faseNegocio}</p>
+                <p className="text-sm font-medium text-primary">⭐ Recomendados para {faseNegocio}</p>
                 <div className="grid gap-2">
                   {recommendedAngles.map(a => {
                     const explanation = getAngleExplanation(selectedCampaign, a);
@@ -770,7 +770,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
 
             {otherAngles.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Otros ángulos</p>
+                <p className="text-sm font-medium text-muted-foreground">Otros ángulos</p>
                 <div className="grid grid-cols-2 gap-2">
                   {otherAngles.map(a => (
                     <div
@@ -818,7 +818,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
             <h3 className="text-lg font-semibold">Instrucciones adicionales (opcional)</h3>
             {briefChips.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📋 Contexto del brief — click para incluir/excluir</p>
+                <p className="text-sm font-medium text-muted-foreground mb-2">📋 Contexto del brief — click para incluir/excluir</p>
                 <div className="flex flex-wrap gap-2">
                   {briefChips.map(chip => (
                     <button
@@ -882,7 +882,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
             {/* COPIES — checkbox múltiple, mínimo 3 de 3 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold uppercase tracking-wider">Copies</p>
+                <p className="text-sm font-medium">Copies</p>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedCopies.length === 3 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                   {selectedCopies.length}/3 seleccionados
                 </span>
@@ -918,7 +918,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
                         <span className="ml-1 text-xs">Regenerar</span>
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Texto principal</p>
+                    <p className="text-sm font-medium text-muted-foreground">Texto principal</p>
                     <p className="text-sm whitespace-pre-wrap">{v.texto_principal}</p>
                     {v.cta && <Badge variant="secondary">{v.cta}</Badge>}
                   </div>
@@ -929,7 +929,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
             {/* 2 TÍTULOS — checkboxes, select any 2 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold uppercase tracking-wider">Títulos</p>
+                <p className="text-sm font-medium">Títulos</p>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedTitles.length === 2 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                   {selectedTitles.length}/2 seleccionados
                 </span>
@@ -962,7 +962,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
             {/* 2 DESCRIPCIONES — checkboxes, select any 2 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold uppercase tracking-wider">Descripciones</p>
+                <p className="text-sm font-medium">Descripciones</p>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedDescriptions.length === 2 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                   {selectedDescriptions.length}/2 seleccionadas
                 </span>
@@ -1066,7 +1066,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
                         )}
                         {Object.entries(brief).filter(([k]) => k !== 'prompt_generacion').map(([k, v]) => (
                           <div key={k}>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{k.replace(/_/g, ' ')}</p>
+                            <p className="text-sm font-medium text-muted-foreground">{k.replace(/_/g, ' ')}</p>
                             <p className="text-xs">{String(v)}</p>
                           </div>
                         ))}
@@ -1178,7 +1178,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
             {selectedVariacion && (
               <Card>
                 <CardContent className="p-4 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Copy aprobado</p>
+                  <p className="text-sm font-medium text-muted-foreground">Copy aprobado</p>
                   <p className="text-sm font-semibold">{selectedVariacion.titulo}</p>
                   <p className="text-sm text-muted-foreground line-clamp-3">{selectedVariacion.texto_principal}</p>
                   {selectedVariacion.cta && <Badge>{selectedVariacion.cta}</Badge>}

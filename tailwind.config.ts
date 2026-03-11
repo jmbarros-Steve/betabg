@@ -17,8 +17,7 @@ export default {
         sans: ["Inter", "system-ui", "sans-serif"],
       },
       letterSpacing: {
-        'widest': '0.2em',
-        'super-wide': '0.3em',
+        'widest': '0.1em',
       },
       colors: {
         border: "hsl(var(--border))",

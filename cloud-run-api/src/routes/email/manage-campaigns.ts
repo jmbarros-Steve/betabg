@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { replaceProductRecommendations } from './product-recommendations.js';
+import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 
 /**
  * Campaign management: CRUD + send + schedule.
@@ -197,9 +198,26 @@ export async function manageEmailCampaigns(c: Context) {
       const recConfig = campaign.recommendation_config || null;
       let baseHtml = campaign.html_content;
       if (baseHtml.includes('product_recommendations')) {
-        // Replace with generic recommendations (personalization per-subscriber happens later if needed)
         baseHtml = await replaceProductRecommendations(baseHtml, client_id, null, recConfig);
       }
+
+      // Load brand info for nunjucks template rendering
+      const { data: brandClient } = await supabase
+        .from('clients')
+        .select('name, logo_url, brand_color, brand_secondary_color, brand_font, website_url')
+        .eq('id', client_id)
+        .single();
+      const brandInfo = {
+        name: brandClient?.name || '',
+        logo_url: brandClient?.logo_url || '',
+        color: brandClient?.brand_color || '#18181b',
+        secondary_color: brandClient?.brand_secondary_color || '#6366f1',
+        font: brandClient?.brand_font || 'Inter',
+        shop_url: brandClient?.website_url || '',
+      };
+
+      // Check if HTML uses nunjucks syntax ({% or advanced {{ person. )
+      const usesNunjucks = baseHtml.includes('{%') || baseHtml.includes('person.');
 
       // Send emails in batches
       let sentCount = 0;
@@ -290,11 +308,25 @@ export async function manageEmailCampaigns(c: Context) {
       for (let i = 0; i < subscribers.length; i += batchSize) {
         const batch = subscribers.slice(i, i + batchSize);
 
-        const promises = batch.map((sub) =>
-          sendSingleEmail({
+        const promises = batch.map((sub) => {
+          // Render per-subscriber template if nunjucks syntax is used
+          let personalizedHtml = baseHtml;
+          let personalizedSubject = campaign.subject;
+          if (usesNunjucks) {
+            const ctx = buildTemplateContext(
+              { first_name: sub.first_name ?? undefined, email: sub.email },
+              { discount_code: campaign.recommendation_config?.discount_code },
+              brandInfo,
+              []
+            );
+            personalizedHtml = renderEmailTemplate(baseHtml, ctx);
+            personalizedSubject = renderEmailTemplate(campaign.subject, ctx);
+          }
+
+          return sendSingleEmail({
             to: sub.email,
-            subject: campaign.subject,
-            htmlContent: baseHtml,
+            subject: personalizedSubject,
+            htmlContent: personalizedHtml,
             fromEmail,
             fromName,
             replyTo: campaign.reply_to || undefined,
@@ -304,8 +336,8 @@ export async function manageEmailCampaigns(c: Context) {
           }).then((result) => {
             if (result.success) sentCount++;
             return result;
-          })
-        );
+          });
+        });
 
         await Promise.all(promises);
 
@@ -390,6 +422,25 @@ export async function manageEmailCampaigns(c: Context) {
 
       if (error) return c.json({ error: error.message }, 500);
       return c.json({ success: true, campaign: data });
+    }
+
+    case 'get_client_brand': {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('name, logo_url, brand_color, brand_secondary_color, brand_font, website_url')
+        .eq('id', client_id)
+        .single();
+
+      if (!client) return c.json({ error: 'Client not found' }, 404);
+
+      return c.json({
+        brand_name: client.name || '',
+        brand_logo: client.logo_url || '',
+        brand_color: client.brand_color || '#18181b',
+        brand_secondary_color: client.brand_secondary_color || '#6366f1',
+        brand_font: client.brand_font || 'Inter',
+        shop_url: client.website_url || '',
+      });
     }
 
     default:

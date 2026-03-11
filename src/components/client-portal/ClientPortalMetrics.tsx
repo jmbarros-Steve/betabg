@@ -631,9 +631,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             stat.prevValue || 0
           );
           return (
-            <Card key={stat.title} className="glow-box">
+            <Card key={stat.title} className="bg-white border border-slate-200 rounded-xl card-hover">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-slate-700">
                   {stat.title}
                 </CardTitle>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />

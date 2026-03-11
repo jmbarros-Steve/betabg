@@ -179,7 +179,7 @@ function ClientDetail({ client, onClose, onRefresh }: {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
-      className="mt-2 mb-4 rounded-xl border border-primary/20 bg-card/80 p-5 space-y-5"
+      className="mt-2 mb-4 rounded-xl border border-slate-200 bg-white p-5 space-y-5"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -202,7 +202,7 @@ function ClientDetail({ client, onClose, onRefresh }: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Editar info */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Información</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Información</h4>
           <div className="space-y-2">
             <div>
               <Label className="text-xs">Nombre</Label>
@@ -221,7 +221,7 @@ function ClientDetail({ client, onClose, onRefresh }: {
 
         {/* Créditos y plan */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Plan y Créditos</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Plan y Créditos</h4>
 
           <div>
             <Label className="text-xs">Plan</Label>
@@ -269,7 +269,7 @@ function ClientDetail({ client, onClose, onRefresh }: {
 
       {/* Shopify Integration */}
       <div className="space-y-3">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+        <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           <ShoppingBag className="w-4 h-4" /> Shopify
         </h4>
         <div className="space-y-2">
@@ -303,7 +303,7 @@ function ClientDetail({ client, onClose, onRefresh }: {
 
       {/* Research status */}
       <div className="space-y-2">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Estado del Brief</h4>
+        <h4 className="text-sm font-medium text-muted-foreground">Estado del Brief</h4>
         <div className="flex flex-wrap gap-2">
           {['brand_analysis', 'market_research', 'competitor_analysis'].map(type => {
             const has = client.research?.some(r => r.research_type === type);
@@ -442,7 +442,7 @@ export function AdminClientsPanel() {
           { label: 'En proceso', value: clients.filter(c => getBriefStatus(c) === 'in_progress').length, color: 'text-yellow-600' },
           { label: 'Sin empezar', value: clients.filter(c => getBriefStatus(c) === 'not_started').length, color: 'text-red-500' },
         ].map(stat => (
-          <div key={stat.label} className="rounded-lg bg-card border border-border p-3 text-center">
+          <div key={stat.label} className="rounded-xl bg-white border border-slate-200 p-3 text-center card-hover">
             <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
             <div className="text-xs text-muted-foreground mt-0.5">{stat.label}</div>
           </div>
@@ -466,8 +466,8 @@ export function AdminClientsPanel() {
                 transition={{ delay: index * 0.02 }}
                 className={`rounded-xl border transition-colors cursor-pointer ${
                   isExpanded
-                    ? 'border-primary/40 bg-card'
-                    : 'border-border bg-card hover:border-primary/20'
+                    ? 'border-primary/40 bg-white'
+                    : 'border-slate-200 bg-white hover:border-primary/20'
                 }`}
                 onClick={() => setExpandedId(isExpanded ? null : client.id)}
               >

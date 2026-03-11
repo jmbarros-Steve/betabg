@@ -1252,7 +1252,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             {form.name && form.value && (
               <Card className="bg-muted/50">
                 <CardContent className="p-4">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">
                     Vista previa
                   </p>
                   <p className="text-sm">

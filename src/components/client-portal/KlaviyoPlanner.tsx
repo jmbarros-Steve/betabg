@@ -1088,11 +1088,11 @@ function PushToKlaviyoDialog({
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Asunto</p>
+                    <p className="text-sm font-medium text-muted-foreground">Asunto</p>
                     <p className="text-sm font-medium">{currentEmail.subject || '(sin asunto)'}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preview Text</p>
+                    <p className="text-sm font-medium text-muted-foreground">Preview Text</p>
                     <p className="text-sm text-muted-foreground">{currentEmail.previewText || '(sin preview)'}</p>
                   </div>
                 </div>

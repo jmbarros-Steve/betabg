@@ -773,7 +773,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                               <div className="space-y-3 pt-2 border-t border-dashed">
                                 <div className="flex items-center gap-2 mb-3">
                                   <Layers className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                  <span className="text-sm font-medium text-muted-foreground">
                                     Ad Sets ({adSets.length})
                                   </span>
                                 </div>

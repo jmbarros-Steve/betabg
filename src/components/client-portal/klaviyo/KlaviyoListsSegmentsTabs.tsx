@@ -54,10 +54,10 @@ export function KlaviyoListsContent({ items, type }: { items: KlaviyoListItem[];
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-muted/50">
-            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Nombre</th>
-            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider w-28">Perfiles</th>
-            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden sm:table-cell">Creada</th>
-            <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden sm:table-cell">Actualizada</th>
+            <th className="text-left p-3 text-sm font-medium text-muted-foreground">Nombre</th>
+            <th className="text-left p-3 text-sm font-medium text-muted-foreground w-28">Perfiles</th>
+            <th className="text-left p-3 text-sm font-medium text-muted-foreground hidden sm:table-cell">Creada</th>
+            <th className="text-left p-3 text-sm font-medium text-muted-foreground hidden sm:table-cell">Actualizada</th>
           </tr>
         </thead>
         <tbody>

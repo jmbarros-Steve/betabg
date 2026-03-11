@@ -74,10 +74,10 @@ export default function OAuthMetaCallback() {
   }, [searchParams, navigate]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-2xl border border-slate-200 shadow-xl">
         <CardContent className="pt-6 text-center space-y-4">
-          <img src={logo} alt="Consultoría BG" className="h-16 w-auto mx-auto mb-4" />
+          <img src={logo} alt="Steve Ads" className="h-16 w-auto mx-auto mb-4" />
 
           {status === 'loading' && (
             <>

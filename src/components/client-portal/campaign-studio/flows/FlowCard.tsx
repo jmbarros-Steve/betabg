@@ -79,7 +79,7 @@ export function FlowCard({ template, status, metrics, recommended, onAction }: F
 
   return (
     <Card
-      className="cursor-pointer transition-all duration-200 hover:shadow-md relative overflow-hidden"
+      className="cursor-pointer transition-all duration-200 border-slate-200 rounded-xl card-hover relative overflow-hidden"
       style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
       onClick={handleAction}
     >
@@ -95,7 +95,7 @@ export function FlowCard({ template, status, metrics, recommended, onAction }: F
             </div>
             <div className="min-w-0">
               <h3 className="font-semibold text-sm leading-tight truncate">{template.nameEs}</h3>
-              <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground/70">
+              <span className="text-sm font-medium text-muted-foreground/70">
                 {FLOW_CATEGORY_LABELS[template.category]}
               </span>
             </div>

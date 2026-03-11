@@ -49,7 +49,7 @@ export default function BlockConfigPanel({ block, onChange, assets, clientId }: 
 // ═══ Helpers ═══
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-4 mb-2 first:mt-0">{children}</p>;
+  return <p className="text-sm font-medium text-muted-foreground mt-4 mb-2 first:mt-0">{children}</p>;
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -676,7 +676,7 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
           )}
 
           <Separator />
-          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">O editar manualmente</p>
+          <p className="text-sm font-medium text-muted-foreground">O editar manualmente</p>
 
           <div><Label className="text-xs font-medium">Nombre del producto</Label><Input value={p.name || ''} onChange={e => set('name', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="Nombre del producto" /></div>
           <div><Label className="text-xs font-medium">URL de imagen</Label><Input value={p.imageUrl || ''} onChange={e => set('imageUrl', e.target.value)} className="h-9 text-sm mt-1.5" /></div>

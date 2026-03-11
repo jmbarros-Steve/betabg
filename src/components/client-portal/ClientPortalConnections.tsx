@@ -309,7 +309,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={connection.is_active ? 'default' : 'secondary'}>
+                      <Badge variant={connection.is_active ? 'default' : 'secondary'} className={connection.is_active ? 'bg-emerald-50 text-emerald-700 rounded-full' : ''}>
                         {connection.is_active ? (
                           <><CheckCircle className="w-3 h-3 mr-1" /> Activo</>
                         ) : (
@@ -359,14 +359,14 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       )}
 
       {/* Connect New Platform */}
-      <Card>
+      <Card className="bg-white border border-slate-200 rounded-xl">
         <CardHeader>
           <CardTitle className="text-lg">Conectar Nueva Plataforma</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Shopify Connection */}
           {!hasShopifyConnection && (
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center justify-between p-6 border border-slate-200 rounded-xl card-hover">
               <div className="flex items-center gap-4">
                 <img src={logoShopify} alt="Shopify" className="h-10 w-10 object-contain" />
                 <div>
@@ -376,7 +376,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                   </p>
                 </div>
               </div>
-              <Button onClick={handleConnectShopify}>
+              <Button onClick={handleConnectShopify} className="bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 <ShoppingBag className="w-4 h-4 mr-2" />
                 Conectar Shopify
               </Button>
@@ -385,7 +385,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
           {/* Meta Ads Connection */}
           {!hasMetaConnection && (
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center justify-between p-6 border border-slate-200 rounded-xl card-hover">
               <div className="flex items-center gap-4">
                 <img src={logoMeta} alt="Meta" className="h-10 w-10 object-contain" />
                 <div>
@@ -395,9 +395,10 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                   </p>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={handleConnectMeta}
                 disabled={connectingMeta}
+                className="bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 {connectingMeta ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -411,7 +412,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
           {/* Google Ads Connection */}
           {!hasGoogleConnection && (
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center justify-between p-6 border border-slate-200 rounded-xl card-hover">
               <div className="flex items-center gap-4">
                 <img src={logoGoogle} alt="Google Ads" className="h-10 w-10 object-contain" />
                 <div>
@@ -421,9 +422,10 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                   </p>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={handleConnectGoogle}
                 disabled={connectingGoogle}
+                className="bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 {connectingGoogle ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -437,7 +439,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
           {/* Klaviyo Connection */}
           {!hasKlaviyoConnection && (
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center justify-between p-6 border border-slate-200 rounded-xl card-hover">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-purple-100 text-purple-800">
                   <Mail className="w-5 h-5" />
@@ -449,9 +451,10 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                   </p>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={() => setShowKlaviyoDialog(true)}
                 disabled={connectingKlaviyo}
+                className="bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 {connectingKlaviyo ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />

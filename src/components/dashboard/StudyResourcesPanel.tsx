@@ -162,7 +162,7 @@ export function StudyResourcesPanel({ userId }: Props) {
   };
 
   if (loading) {
-    return <div className="animate-pulse h-40 bg-card rounded-xl" />;
+    return <div className="animate-pulse h-40 bg-white rounded-xl border border-slate-200" />;
   }
 
   return (
@@ -253,7 +253,7 @@ export function StudyResourcesPanel({ userId }: Props) {
       </div>
 
       {resources.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-xl border border-border">
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <p className="text-muted-foreground">No hay recursos aún</p>
           <p className="text-sm text-muted-foreground mt-1">Crea tu primer recurso para el centro de estudios</p>
         </div>
@@ -265,7 +265,7 @@ export function StudyResourcesPanel({ userId }: Props) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="p-4 rounded-xl bg-card border border-border hover:border-primary/30 transition-colors flex items-center justify-between"
+              className="p-4 bg-white border border-slate-200 rounded-xl card-hover flex items-center justify-between"
             >
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">

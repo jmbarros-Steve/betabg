@@ -643,7 +643,7 @@ export function TemplateBuilder({ clientId, onBrandUpdate }: TemplateBuilderProp
                   <AccordionContent className="pb-5 space-y-3">
                     {SOCIAL_PLATFORMS.map((p) => (
                       <div key={p.key} className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                        <Label className="text-sm font-medium text-muted-foreground">
                           {p.label}
                         </Label>
                         <Input

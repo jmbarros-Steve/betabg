@@ -269,7 +269,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
   }
 
   return (
-    <div className="space-y-4 min-h-[400px] border rounded-xl p-4 bg-card">
+    <div className="space-y-4 min-h-[400px] border border-slate-200 rounded-xl p-4 bg-white">
       {/* Chat History */}
       <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
         <AnimatePresence initial={false}>
@@ -282,7 +282,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
               className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
               )}
@@ -305,7 +305,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
             animate={{ opacity: 1 }}
             className="flex gap-3 justify-start"
           >
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Bot className="w-4 h-4 text-primary" />
             </div>
             <div className="bg-muted/60 border border-border rounded-xl px-4 py-3 flex items-center gap-2">

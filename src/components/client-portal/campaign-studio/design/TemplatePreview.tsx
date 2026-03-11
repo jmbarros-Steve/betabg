@@ -58,7 +58,7 @@ export function TemplatePreview({
     <div className="space-y-4">
       {/* ---------- Device toggle bar ---------- */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest select-none">
+        <span className="text-sm font-medium text-muted-foreground select-none">
           Preview
         </span>
 

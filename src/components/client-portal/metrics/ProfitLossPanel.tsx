@@ -72,9 +72,9 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
   const [showProductDetail, setShowProductDetail] = useState(false);
 
   return (
-    <Card className="glow-box">
+    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <FileText className="w-4 h-4" />
           Estado de Resultados
           <span className="ml-auto text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded">CLP</span>
@@ -182,7 +182,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
 
         {/* Marketing Expenses */}
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Inversión en Marketing</p>
+          <p className="text-sm font-semibold text-slate-700">Inversión en Marketing</p>
           {data.metaSpend > 0 && (
             <div className="flex justify-between items-center text-muted-foreground">
               <span className="text-sm pl-4">Meta Ads</span>
@@ -211,7 +211,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
 
         {/* Fixed Costs - Dynamic */}
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Costos Fijos (prorrateados)</p>
+          <p className="text-sm font-semibold text-slate-700">Costos Fijos (prorrateados)</p>
           {data.fixedCostItems.map((item, idx) => (
             item.amount > 0 && (
               <div key={idx} className="flex justify-between items-center text-muted-foreground">
@@ -233,7 +233,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         {/* Operational Costs */}
         {(data.shippingCosts > 0 || data.shopifyCommission > 0) && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Costos Operacionales</p>
+            <p className="text-sm font-semibold text-slate-700">Costos Operacionales</p>
             {data.shippingCosts > 0 && (
               <div className="flex justify-between items-center text-muted-foreground">
                 <span className="text-sm pl-4">Despachos</span>

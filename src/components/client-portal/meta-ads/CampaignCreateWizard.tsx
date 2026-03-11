@@ -1340,10 +1340,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
       // Budget + targeting (required by Meta for new ad sets)
       if (!existingAdsetId) {
+        // CLP has no cents — Meta expects smallest currency unit (1 CLP = 1)
         const budget = budgetType === 'CBO'
-          ? Number(campBudget) * 100
-          : Number(adsetBudget) * 100;
-        submitData.daily_budget = budget || 1000000;
+          ? Number(campBudget)
+          : Number(adsetBudget);
+        submitData.daily_budget = budget || 10000;
 
         // Meta requires at least geo_locations in targeting spec
         submitData.targeting = {

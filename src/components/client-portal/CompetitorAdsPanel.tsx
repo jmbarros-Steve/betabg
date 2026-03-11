@@ -474,7 +474,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                 <div className="grid gap-4 md:grid-cols-2">
                   {/* Patterns */}
                   <div className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                       <Target className="h-3.5 w-3.5" /> Patrones Detectados
                     </h4>
                     <ul className="space-y-1">
@@ -489,7 +489,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
                   {/* Angles & Formats */}
                   <div className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                       <BarChart3 className="h-3.5 w-3.5" /> Ángulos y Formatos
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
@@ -501,7 +501,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                       ))}
                     </div>
                     <div className="mt-2">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
+                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                         <Zap className="h-3.5 w-3.5" /> CTAs Populares
                       </h4>
                       <div className="flex flex-wrap gap-1.5">
@@ -515,7 +515,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
                 {/* Spend Estimation */}
                 <div className="p-3 rounded-lg bg-background border border-border/50">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
+                  <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
                     <BarChart3 className="h-3.5 w-3.5" /> Estimación de Gasto
                   </h4>
                   <p className="text-sm font-medium">{analysis.estimacion_gasto}</p>
@@ -524,7 +524,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                 {/* Winner Insights */}
                 {analysis.ganadores_insight.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-2">
                       <Trophy className="h-3.5 w-3.5" /> Top Ads Ganadores
                     </h4>
                     <div className="space-y-2">
@@ -539,7 +539,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
                 {/* Recommendations */}
                 <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5 mb-2">
+                  <h4 className="text-sm font-medium text-primary flex items-center gap-1.5 mb-2">
                     <Lightbulb className="h-3.5 w-3.5" /> Recomendaciones de Steve
                   </h4>
                   <ul className="space-y-1.5">

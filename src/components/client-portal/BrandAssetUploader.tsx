@@ -76,7 +76,7 @@ function AnalysisBanner({ progressStep }: { progressStep: { step: string; detail
 
       <div>
         <div className="flex justify-between items-center mb-1">
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Progreso</span>
+          <span className="text-sm font-medium text-muted-foreground">Progreso</span>
           <span className="text-[10px] font-bold text-primary">{progressStep.pct}%</span>
         </div>
         <Progress value={progressStep.pct} className="h-2" />

@@ -108,6 +108,7 @@ import { productRecommendations } from './email/product-recommendations.js';
 import { emailAbTesting, executeAbTestWinner } from './email/ab-testing.js';
 import { signupForms, signupFormPublic } from './email/signup-forms.js';
 import { formWidget } from './email/form-widget.js';
+import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-api.js';
 
 /**
  * Registers all API routes on the Hono app.
@@ -224,6 +225,10 @@ export function registerRoutes(app: Hono) {
 
   // Product recommendations (auth required)
   app.post('/api/email-product-recommendations', authMiddleware, productRecommendations);
+
+  // Email templates gallery & universal blocks
+  app.post('/api/email-templates', authMiddleware, emailTemplatesApi);
+  app.post('/api/universal-blocks', authMiddleware, universalBlocksApi);
 
   // A/B testing (auth required)
   app.post('/api/email-ab-testing', authMiddleware, emailAbTesting);

@@ -472,7 +472,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           <CardContent className="py-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <p className="text-sm font-medium text-muted-foreground">
                   Total
                 </p>
                 <p className="text-xl font-bold mt-0.5">{conversations.length}</p>
@@ -488,7 +488,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           <CardContent className="py-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <p className="text-sm font-medium text-muted-foreground">
                   Sin Leer
                 </p>
                 <p className="text-xl font-bold mt-0.5 text-orange-600">{totalUnread}</p>
@@ -504,7 +504,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           <CardContent className="py-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <p className="text-sm font-medium text-muted-foreground">
                   Mensajes
                 </p>
                 <p className="text-xl font-bold mt-0.5">{tabCounts.messages}</p>
@@ -520,7 +520,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           <CardContent className="py-3 px-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <p className="text-sm font-medium text-muted-foreground">
                   Comentarios
                 </p>
                 <p className="text-xl font-bold mt-0.5">{tabCounts.comments + tabCounts.ad_comments}</p>

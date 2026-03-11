@@ -856,7 +856,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
               <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="text-xs font-semibold text-green-600 uppercase tracking-wider">
+                  <span className="text-sm font-medium text-green-600">
                     Mejor campaña
                   </span>
                 </div>
@@ -873,7 +873,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingDown className="w-4 h-4 text-red-500" />
-                    <span className="text-xs font-semibold text-red-600 uppercase tracking-wider">
+                    <span className="text-sm font-medium text-red-600">
                       Campaña a optimizar
                     </span>
                   </div>
@@ -893,7 +893,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="w-4 h-4 text-blue-500" />
-                    <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                    <span className="text-sm font-medium text-blue-600">
                       Recomendación de presupuesto
                     </span>
                   </div>
@@ -906,7 +906,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Eye className="w-4 h-4 text-orange-500" />
-                    <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                    <span className="text-sm font-medium text-orange-600">
                       Fatiga creativa detectada
                     </span>
                   </div>
@@ -919,7 +919,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                    <span className="text-sm font-medium text-primary">
                       Estado general
                     </span>
                   </div>

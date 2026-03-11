@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
+import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 
 /**
  * Flow engine: executes flow steps when triggered by Cloud Tasks.
@@ -661,18 +662,29 @@ async function scheduleFlowStep(
 // ============================================================
 
 function replaceMergeTags(content: string, subscriber: any, metadata: any = {}): string {
-  const replacements: Record<string, string> = {
-    first_name: subscriber.first_name || 'there',
-    last_name: subscriber.last_name || '',
-    email: subscriber.email || '',
-    full_name: [subscriber.first_name, subscriber.last_name].filter(Boolean).join(' ') || 'there',
-    cart_url: metadata?.abandoned_checkout_url || metadata?.cart_url || '#',
-    cart_total: metadata?.total_price || '0',
-  };
+  // Use Nunjucks engine for full template support ({% if %}, {% for %}, filters)
+  const context = buildTemplateContext(
+    {
+      first_name: subscriber.first_name,
+      last_name: subscriber.last_name,
+      email: subscriber.email,
+      tags: subscriber.tags || [],
+      total_orders: subscriber.total_orders || 0,
+      total_spent: subscriber.total_spent || 0,
+      last_order_at: subscriber.last_order_at,
+      custom_fields: subscriber.custom_fields || {},
+    },
+    {
+      cart_url: metadata?.abandoned_checkout_url || metadata?.cart_url,
+      cart_total: metadata?.total_price,
+      discount_code: metadata?.discount_code,
+      unsubscribe_url: metadata?.unsubscribe_url,
+    },
+    metadata?.brand || {},
+    metadata?.products || []
+  );
 
-  return content.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) => {
-    return replacements[key.toLowerCase()] || match;
-  });
+  return renderEmailTemplate(content, context);
 }
 
 // ============================================================

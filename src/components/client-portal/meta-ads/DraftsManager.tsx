@@ -357,7 +357,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
                           <Target className="w-4 h-4 text-primary shrink-0" />
-                          <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Campana</span>
+                          <span className="text-sm font-medium text-muted-foreground">Campana</span>
                         </div>
                         <h3 className="text-lg font-bold leading-tight mb-1">
                           {bv?.campaign_name || draft.titulo || 'Sin nombre'}
@@ -386,7 +386,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
 
                   {/* ───── WHY THIS STRATEGY ───── */}
                   <div className="mx-5 mb-4 rounded-lg bg-muted/40 border p-4 space-y-3">
-                    <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                    <h4 className="text-sm font-medium text-muted-foreground">
                       ¿Por que esta estrategia?
                     </h4>
 
@@ -457,7 +457,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
 
                     {/* Images (3 slots) */}
                     <div>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                         <ImageIcon className="w-3.5 h-3.5" />
                         Imagenes ({images.length}/3)
                       </p>
@@ -482,7 +482,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
 
                     {/* Copies (2 slots) */}
                     <div>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5" />
                         Copies — Texto Principal ({copies.length}/2)
                       </p>
@@ -491,7 +491,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                           <div key={i} className={`rounded-lg border p-3 ${copies[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
                             {copies[i] ? (
                               <>
-                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Copy {i + 1} ✓</span>
+                                <span className="text-sm font-medium text-emerald-600">Copy {i + 1} ✓</span>
                                 <p className="mt-1 text-xs leading-relaxed">{copies[i]}</p>
                               </>
                             ) : (
@@ -506,7 +506,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
 
                     {/* Headlines (2 slots) */}
                     <div>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5" />
                         Headlines — Titulos ({headlines.length}/2)
                       </p>
@@ -515,7 +515,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                           <div key={i} className={`rounded-lg border p-3 ${headlines[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
                             {headlines[i] ? (
                               <>
-                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Headline {i + 1} ✓</span>
+                                <span className="text-sm font-medium text-emerald-600">Headline {i + 1} ✓</span>
                                 <p className="mt-1 text-sm font-semibold">{headlines[i]}</p>
                               </>
                             ) : (
@@ -531,7 +531,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     {/* Description if exists */}
                     {draft.descripcion && (
                       <div>
-                        <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">
                           Descripcion del enlace
                         </p>
                         <div className="rounded-lg border bg-background p-3">

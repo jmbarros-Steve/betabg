@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, Video, FileText, Download, Lock } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
-import { Footer } from '@/components/landing/Footer';
+import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -67,7 +67,7 @@ export default function CentroEstudios() {
   // Show login required screen
   if (!authLoading && !user) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-slate-50">
         <Navbar />
         
         <main className="pt-32 pb-24">
@@ -92,7 +92,7 @@ export default function CentroEstudios() {
               
               <div className="flex flex-col gap-4">
                 <Link to="/auth">
-                  <Button variant="hero" size="lg" className="w-full uppercase tracking-wider">
+                  <Button variant="hero" size="lg" className="w-full text-sm font-medium">
                     Iniciar Sesión / Registrarse
                   </Button>
                 </Link>
@@ -107,13 +107,13 @@ export default function CentroEstudios() {
           </div>
         </main>
 
-        <Footer />
+        <SteveFooter />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
       
       <main className="pt-32 pb-24">
@@ -123,7 +123,7 @@ export default function CentroEstudios() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <Link to="/" className="inline-flex items-center gap-2 text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors mb-8">
               <ArrowLeft className="w-4 h-4" />
               Volver
             </Link>
@@ -135,7 +135,7 @@ export default function CentroEstudios() {
             transition={{ delay: 0.1 }}
             className="text-center mb-16"
           >
-            <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Aprende</p>
+            <p className="text-sm font-medium text-primary mb-4">Aprende</p>
             <h1 className="text-4xl md:text-6xl font-light mb-4">
               Centro de <span className="text-primary font-medium">Estudios</span>
             </h1>
@@ -147,11 +147,11 @@ export default function CentroEstudios() {
           {loading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="animate-pulse p-6 rounded-lg bg-card border border-border h-48" />
+                <div key={i} className="animate-pulse p-6 bg-white border border-slate-200 rounded-xl h-48" />
               ))}
             </div>
           ) : resources.length === 0 ? (
-            <div className="text-center py-16 bg-card rounded-lg border border-border">
+            <div className="text-center py-16 bg-white border border-slate-200 rounded-xl">
               <p className="text-muted-foreground">No hay recursos publicados aún</p>
               <p className="text-sm text-muted-foreground mt-1">Vuelve pronto para ver nuevo contenido</p>
             </div>
@@ -167,14 +167,14 @@ export default function CentroEstudios() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 + index * 0.1 }}
-                    className="group p-6 rounded-lg bg-card border border-border hover:border-primary/50 transition-all duration-300"
+                    className="group p-6 bg-white border border-slate-200 rounded-xl hover:border-primary/50 transition-all duration-300"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className={`p-3 rounded-lg ${colorClass}`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       {resource.duration && (
-                        <span className="text-xs text-muted-foreground uppercase tracking-widest">
+                        <span className="text-sm font-medium text-muted-foreground">
                           {resource.duration}
                         </span>
                       )}
@@ -190,7 +190,7 @@ export default function CentroEstudios() {
                       </p>
                     )}
                     
-                    <Button variant="outline" size="sm" className="w-full uppercase tracking-wider text-xs">
+                    <Button variant="outline" size="sm" className="w-full text-sm font-medium">
                       Acceder
                     </Button>
                   </motion.div>
@@ -201,7 +201,7 @@ export default function CentroEstudios() {
         </div>
       </main>
 
-      <Footer />
+      <SteveFooter />
     </div>
   );
 }

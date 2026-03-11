@@ -255,11 +255,11 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
 
   return (
     <>
-      <div className="flex h-[calc(100vh-160px)] min-h-[600px] border rounded-xl overflow-hidden bg-muted/30">
+      <div className="flex h-[calc(100vh-160px)] min-h-[600px] border-slate-200 border rounded-xl overflow-hidden bg-muted/30">
         {/* ═══ LEFT SIDEBAR — Block palette (200px fixed) ═══ */}
         <div className="w-[200px] min-w-[200px] border-r bg-background flex flex-col">
           <div className="px-3 py-2.5 border-b">
-            <p className="text-xs font-bold text-foreground tracking-wide uppercase">Bloques</p>
+            <p className="text-sm font-medium text-foreground">Bloques</p>
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
@@ -267,7 +267,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
                 <BlockPaletteItem key={def.type} def={def} onDragStart={handleDragStart} onAdd={addBlock} />
               ))}
               <div className="pt-2 pb-1">
-                <p className="text-[10px] font-bold text-muted-foreground tracking-wide uppercase px-2">Diseño</p>
+                <p className="text-[10px] font-medium text-muted-foreground px-2">Diseño</p>
               </div>
               {designDefs.map(def => (
                 <BlockPaletteItem key={def.type} def={def} onDragStart={handleDragStart} onAdd={addBlock} />
@@ -389,7 +389,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
                 </Button>
               </>
             ) : (
-              <p className="text-xs font-bold text-foreground tracking-wide uppercase">Configuración</p>
+              <p className="text-sm font-medium text-foreground">Configuración</p>
             )}
           </div>
           <ScrollArea className="flex-1">

@@ -174,31 +174,28 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
-      <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
-
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-md mx-4"
       >
         <div className="mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
             <ArrowLeft className="w-4 h-4" />
             Volver
           </Link>
         </div>
 
-        <div className="p-8 rounded-lg bg-card border border-border">
+        <div className="p-8 rounded-2xl bg-white border border-slate-200 shadow-xl">
           <div className="flex justify-center mb-8">
-            <img src={logo} alt="Consultoría BG" className="h-16 w-auto" />
+            <img src={logo} alt="Steve Ads" className="h-16 w-auto" />
           </div>
 
-          <h1 className="text-xl font-medium text-center mb-2 tracking-wide">
+          <h1 className="text-2xl font-bold text-slate-900 text-center mb-2">
             {mode === 'login' ? 'Acceder al Panel' : mode === 'signup' ? 'Crear Cuenta' : 'Recuperar Contraseña'}
           </h1>
-          <p className="text-sm text-muted-foreground text-center mb-8">
+          <p className="text-sm text-slate-500 text-center mb-8">
             {mode === 'login' ? 'Ingresa tus credenciales' : mode === 'signup' ? 'Regístrate para continuar' : 'Te enviaremos un link de recuperación'}
           </p>
 
@@ -252,7 +249,7 @@ export default function Auth() {
             ) : (
               <form onSubmit={handleForgotPassword} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs uppercase tracking-widest">Email</Label>
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -267,7 +264,7 @@ export default function Auth() {
                   </div>
                 </div>
 
-                <Button type="submit" variant="hero" size="lg" className="w-full uppercase tracking-wider" disabled={loading}>
+                <Button type="submit" size="lg" className="w-full bg-blue-600 text-white rounded-lg py-3 font-semibold hover:bg-blue-700" disabled={loading}>
                   {loading ? 'Enviando...' : 'Enviar Link de Recuperación'}
                 </Button>
 
@@ -286,7 +283,7 @@ export default function Auth() {
             <>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs uppercase tracking-widest">Email</Label>
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -302,7 +299,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-xs uppercase tracking-widest">Contraseña</Label>
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">Contraseña</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -335,17 +332,17 @@ export default function Auth() {
                   </div>
                 )}
 
-                <Button type="submit" variant="hero" size="lg" className="w-full uppercase tracking-wider" disabled={loading}>
+                <Button type="submit" size="lg" className="w-full bg-blue-600 text-white rounded-lg py-3 font-semibold hover:bg-blue-700" disabled={loading}>
                   {loading ? 'Cargando...' : mode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
                 </Button>
               </form>
 
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
+                  <span className="w-full border-t border-slate-200" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground tracking-widest">O continúa con</span>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-2 text-slate-400">O continúa con</span>
                 </div>
               </div>
 
@@ -353,7 +350,7 @@ export default function Auth() {
                 type="button"
                 variant="outline"
                 size="lg"
-                className="w-full"
+                className="w-full bg-white border border-slate-200 hover:bg-slate-50 rounded-lg"
                 onClick={async () => {
                   setOauthError(null);
                   try {
@@ -402,5 +399,6 @@ export default function Auth() {
         </div>
       </motion.div>
     </div>
+
   );
 }

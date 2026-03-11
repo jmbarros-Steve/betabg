@@ -15,8 +15,10 @@ import {
   Send, Plus, Edit, Trash2, Clock, Play, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag,
 } from 'lucide-react';
-import { steveMailMergeTagsConfig } from './steveMailMergeTags';
+import { getSteveMailEditorOptions, registerSteveMailTools } from './steveMailEditorConfig';
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
+import { EmailTemplateGallery } from './EmailTemplateGallery';
+import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -88,6 +90,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [recType, setRecType] = useState('best_sellers');
   const [recCount, setRecCount] = useState(4);
 
+  // Template Gallery & Universal Blocks
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
+  const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
+
   // Schedule
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -116,6 +123,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   }, [clientId]);
 
   useEffect(() => { loadSubscriberCount(); }, [loadSubscriberCount]);
+
+  // Load brand info for editor designTags
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await callApi<any>('manage-email-campaigns', {
+          body: { action: 'get_client_brand', client_id: clientId },
+        });
+        if (data) setBrandInfo(data);
+      } catch { /* Brand info is optional */ }
+    })();
+  }, [clientId]);
 
   // Force Unlayer inner divs to fill container height
   useEffect(() => {
@@ -300,7 +319,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
   const goToDesignStep = () => {
     if (!editingCampaign?.name) { toast.error('Nombre es requerido'); return; }
+    // Show template gallery for new campaigns (no existing design)
+    if (!designJson && !editingCampaign?.html_content) {
+      setShowTemplateGallery(true);
+    }
     setEditorStep('design');
+  };
+
+  const handleTemplateSelect = (templateDesign: any) => {
+    setShowTemplateGallery(false);
+    if (templateDesign && emailEditorRef.current?.editor) {
+      emailEditorRef.current.editor.loadDesign(templateDesign);
+    }
   };
 
   const goToReviewStep = async () => {
@@ -620,6 +650,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   placeholder="Preview text"
                 />
               </div>
+              <Button variant="outline" size="sm" onClick={() => setShowTemplateGallery(true)}>
+                Templates
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
+                Bloques
+              </Button>
               <Button size="sm" onClick={goToReviewStep}>
                 Revisar y Enviar
               </Button>
@@ -630,42 +666,33 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <div ref={editorContainerRef} className="absolute inset-0">
                 <EmailEditor
                   ref={emailEditorRef}
-                  onReady={() => setEditorReady(true)}
-                  options={{
-                    displayMode: 'email',
-                    locale: 'es-ES',
-                    appearance: {
-                      theme: 'modern_light',
-                    },
-                    features: {
-                      stockImages: { enabled: true, safeSearch: true },
-                      userUploads: true,
-                    },
-                    tools: {
-                      html: { enabled: true },
-                      image: { enabled: true },
-                      text: { enabled: true },
-                      button: { enabled: true },
-                      divider: { enabled: true },
-                      heading: { enabled: true },
-                      menu: { enabled: true },
-                      social: { enabled: true },
-                      video: { enabled: true },
-                      columns: { enabled: true },
-                      timer: { enabled: true },
-                    },
-                    tabs: {
-                      content: { enabled: true },
-                      blocks: { enabled: true },
-                      body: { enabled: true },
-                      images: { enabled: true },
-                    },
-                    ...steveMailMergeTagsConfig,
+                  onReady={() => {
+                    setEditorReady(true);
+                    registerSteveMailTools(emailEditorRef.current?.editor);
                   }}
+                  options={getSteveMailEditorOptions({
+                    designTags: Object.keys(brandInfo).length > 0 ? brandInfo : undefined,
+                  })}
                   style={{ height: '100%' }}
                 />
               </div>
             </div>
+
+            {/* Template Gallery */}
+            <EmailTemplateGallery
+              clientId={clientId}
+              isOpen={showTemplateGallery}
+              onClose={() => setShowTemplateGallery(false)}
+              onSelect={handleTemplateSelect}
+            />
+
+            {/* Universal Blocks Panel */}
+            <UniversalBlocksPanel
+              clientId={clientId}
+              editor={emailEditorRef.current?.editor}
+              isOpen={showUniversalBlocks}
+              onClose={() => setShowUniversalBlocks(false)}
+            />
           </>
         )}
 

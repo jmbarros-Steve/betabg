@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, User, ArrowRight } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
-import { Footer } from '@/components/landing/Footer';
+import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -40,7 +40,7 @@ export default function Blog() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
       
       <main className="pt-32 pb-24">
@@ -50,7 +50,7 @@ export default function Blog() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <Link to="/" className="inline-flex items-center gap-2 text-sm uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors mb-8">
               <ArrowLeft className="w-4 h-4" />
               Volver
             </Link>
@@ -62,9 +62,9 @@ export default function Blog() {
             transition={{ delay: 0.1 }}
             className="text-center mb-16"
           >
-            <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Recursos</p>
-            <h1 className="text-4xl md:text-6xl font-light mb-4">
-              <span className="text-primary font-medium">Blog</span>
+            <p className="text-sm font-medium text-blue-600 mb-4">Recursos</p>
+            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+              Blog
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-light">
               Artículos, guías y estrategias de performance marketing
@@ -90,11 +90,11 @@ export default function Blog() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 + index * 0.1 }}
-                  className="group p-8 rounded-lg bg-card border border-border hover:border-primary/50 transition-all duration-300"
+                  className="group p-8 rounded-xl bg-white border border-slate-200 card-hover transition-all duration-300"
                 >
                   <div className="flex items-center gap-4 mb-4">
                     {post.category && (
-                      <span className="px-3 py-1 text-xs uppercase tracking-widest bg-primary/10 text-primary rounded-full">
+                      <span className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
                         {post.category}
                       </span>
                     )}
@@ -134,7 +134,7 @@ export default function Blog() {
         </div>
       </main>
 
-      <Footer />
+      <SteveFooter />
     </div>
   );
 }

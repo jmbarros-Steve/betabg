@@ -87,7 +87,7 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
 
   if (!hasConnection) {
     return (
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardContent className="py-8 text-center">
           <Package className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-muted-foreground text-sm">
@@ -107,11 +107,11 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
     : 0;
 
   return (
-    <Card className="glow-box">
+    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Package className="w-4 h-4" />
               Productos de Shopify
             </CardTitle>

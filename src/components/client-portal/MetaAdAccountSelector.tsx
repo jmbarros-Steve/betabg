@@ -278,7 +278,7 @@ export function MetaAdAccountSelector({
             <SelectContent className="bg-popover z-50 max-h-80">
               {businessNames.map((businessName) => (
                 <SelectGroup key={businessName}>
-                  <SelectLabel className="font-semibold text-xs uppercase tracking-wider text-muted-foreground px-2 py-1.5">
+                  <SelectLabel className="text-sm font-medium text-muted-foreground px-2 py-1.5">
                     {businessName}
                   </SelectLabel>
                   {groupedAccounts[businessName].map((account) => (

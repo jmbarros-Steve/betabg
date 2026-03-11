@@ -120,11 +120,11 @@ export function ServicesSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Lo que hacemos</p>
-          <h2 className="text-3xl md:text-5xl font-light mb-4">
-            Consultoría de <span className="text-primary font-medium">Escalamiento</span>
+          <p className="text-sm font-medium text-muted-foreground mb-4">Lo que hacemos</p>
+          <h2 className="text-3xl md:text-5xl font-medium mb-4 text-foreground">
+            Consultoría de <span className="text-primary">Escalamiento</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-light">
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             Soluciones integrales para hacer crecer tu negocio de forma sostenible y rentable
           </p>
         </motion.div>
@@ -138,8 +138,8 @@ export function ServicesSection() {
         >
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
-              <div className="text-3xl md:text-4xl font-light text-primary mb-1">{stat.value}</div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">{stat.label}</div>
+              <div className="text-3xl md:text-4xl font-semibold text-foreground mb-1">{stat.value}</div>
+              <div className="text-sm font-medium text-muted-foreground">{stat.label}</div>
             </div>
           ))}
         </motion.div>
@@ -182,8 +182,8 @@ export function ServicesSection() {
           {/* E-Commerce */}
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-emerald-600" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ShoppingCart className="w-5 h-5 text-primary" />
               </div>
               <h4 className="font-semibold">E-Commerce</h4>
             </div>
@@ -197,14 +197,14 @@ export function ServicesSection() {
           {/* Lead Management */}
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary" />
               </div>
               <h4 className="font-semibold">Gestión de Leads</h4>
             </div>
             <div className="flex flex-wrap gap-2">
               {leadTools.map((tool) => (
-                <Badge key={tool} variant="outline" className={tool === 'Bots IA' ? 'bg-primary/10 border-primary' : ''}>
+                <Badge key={tool} variant="outline">
                   {tool === 'Bots IA' && <Bot className="w-3 h-3 mr-1" />}
                   {tool}
                 </Badge>
@@ -215,8 +215,8 @@ export function ServicesSection() {
           {/* Financial Strategies */}
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <PieChart className="w-5 h-5 text-amber-600" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <PieChart className="w-5 h-5 text-primary" />
               </div>
               <h4 className="font-semibold">Estrategias Financieras</h4>
             </div>
@@ -258,7 +258,7 @@ export function ServicesSection() {
                         onClick={() => handleNeedSelect('ecommerce')}
                         className="p-6 rounded-lg border-2 hover:border-primary transition-colors text-left group"
                       >
-                        <ShoppingCart className="w-8 h-8 text-emerald-600 mb-3" />
+                        <ShoppingCart className="w-8 h-8 text-primary mb-3" />
                         <h4 className="font-semibold mb-1">E-Commerce</h4>
                         <p className="text-sm text-muted-foreground">Escalar mi tienda online</p>
                       </button>
@@ -266,7 +266,7 @@ export function ServicesSection() {
                         onClick={() => handleNeedSelect('leads')}
                         className="p-6 rounded-lg border-2 hover:border-primary transition-colors text-left group"
                       >
-                        <Users className="w-8 h-8 text-blue-600 mb-3" />
+                        <Users className="w-8 h-8 text-primary mb-3" />
                         <h4 className="font-semibold mb-1">Escalar en Leads</h4>
                         <p className="text-sm text-muted-foreground">Conseguir más prospectos</p>
                       </button>

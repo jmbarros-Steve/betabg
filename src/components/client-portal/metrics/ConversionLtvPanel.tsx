@@ -54,10 +54,10 @@ export function ConversionLtvPanel({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {metrics.map((metric) => (
-        <Card key={metric.title} className="glow-box">
+        <Card key={metric.title} className="bg-white border border-slate-200 rounded-xl card-hover">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <CardTitle className="text-sm font-semibold text-slate-700">
                 {metric.title}
               </CardTitle>
               <div className={`p-2 rounded-lg ${metric.bgColor}`}>

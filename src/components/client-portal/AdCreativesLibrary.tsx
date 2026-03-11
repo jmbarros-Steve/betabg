@@ -288,7 +288,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         {/* DCT Images grid */}
                         {hasDctImages && (
                           <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Imágenes DCT</p>
+                            <p className="text-sm font-medium text-muted-foreground mb-2">Imágenes DCT</p>
                             <div className="grid grid-cols-3 gap-2">
                               {creative.dct_imagenes!.map((url, i) => (
                                 <div key={i} className="rounded-lg overflow-hidden border">
@@ -312,10 +312,10 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
 
                         {/* Copy fields */}
                         <div className="space-y-3">
-                          {creative.titulo && <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Título</p><p className="text-sm">{creative.titulo}</p></div>}
-                          {creative.texto_principal && <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Texto Principal</p><p className="text-sm whitespace-pre-wrap">{creative.texto_principal}</p></div>}
-                          {creative.descripcion && <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Descripción</p><p className="text-sm">{creative.descripcion}</p></div>}
-                          {creative.cta && <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">CTA</p><p className="text-sm font-medium text-primary">{creative.cta}</p></div>}
+                          {creative.titulo && <div><p className="text-sm font-medium text-muted-foreground mb-1">Título</p><p className="text-sm">{creative.titulo}</p></div>}
+                          {creative.texto_principal && <div><p className="text-sm font-medium text-muted-foreground mb-1">Texto Principal</p><p className="text-sm whitespace-pre-wrap">{creative.texto_principal}</p></div>}
+                          {creative.descripcion && <div><p className="text-sm font-medium text-muted-foreground mb-1">Descripción</p><p className="text-sm">{creative.descripcion}</p></div>}
+                          {creative.cta && <div><p className="text-sm font-medium text-muted-foreground mb-1">CTA</p><p className="text-sm font-medium text-primary">{creative.cta}</p></div>}
                         </div>
 
                         {creative.brief_visual && (

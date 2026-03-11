@@ -14,8 +14,10 @@ import {
   GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowDown,
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Eye, Bell, TrendingDown, Split,
 } from 'lucide-react';
-import { steveMailMergeTagsConfig } from './steveMailMergeTags';
+import { getSteveMailEditorOptions, registerSteveMailTools } from './steveMailEditorConfig';
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
+import { EmailTemplateGallery } from './EmailTemplateGallery';
+import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 
 interface FlowBuilderProps {
   clientId: string;
@@ -155,6 +157,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   // Preview
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+
+  // Template Gallery & Universal Blocks
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
 
   const loadFlows = useCallback(async () => {
     setLoading(true);
@@ -420,6 +426,14 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               placeholder="Preview text"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowTemplateGallery(true)}>
+              Templates
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
+              Bloques
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 relative">
@@ -428,6 +442,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               ref={emailEditorRef}
               onReady={() => {
                 setEditorReady(true);
+                registerSteveMailTools(emailEditorRef.current?.editor);
                 // Load existing design
                 const step = editingFlow?.steps?.[editingStepIndex];
                 if (step?.design_json) {
@@ -437,24 +452,32 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                   emailEditorRef.current?.editor?.loadDesign(design as any);
                 }
               }}
-              options={{
-                displayMode: 'email',
-                locale: 'es-ES',
-                appearance: { theme: 'modern_light' },
-                features: { stockImages: { enabled: true, safeSearch: true }, userUploads: true },
-                tools: {
-                  html: { enabled: true }, image: { enabled: true }, text: { enabled: true },
-                  button: { enabled: true }, divider: { enabled: true }, heading: { enabled: true },
-                  menu: { enabled: true }, social: { enabled: true }, video: { enabled: true },
-                  columns: { enabled: true }, timer: { enabled: true },
-                },
-                tabs: { content: { enabled: true }, blocks: { enabled: true }, body: { enabled: true }, images: { enabled: true } },
-                ...steveMailMergeTagsConfig,
-              }}
+              options={getSteveMailEditorOptions()}
               style={{ height: '100%' }}
             />
           </div>
         </div>
+
+        {/* Template Gallery */}
+        <EmailTemplateGallery
+          clientId={clientId}
+          isOpen={showTemplateGallery}
+          onClose={() => setShowTemplateGallery(false)}
+          onSelect={(design) => {
+            setShowTemplateGallery(false);
+            if (design && emailEditorRef.current?.editor) {
+              emailEditorRef.current.editor.loadDesign(design);
+            }
+          }}
+        />
+
+        {/* Universal Blocks Panel */}
+        <UniversalBlocksPanel
+          clientId={clientId}
+          editor={emailEditorRef.current?.editor}
+          isOpen={showUniversalBlocks}
+          onClose={() => setShowUniversalBlocks(false)}
+        />
       </div>
     );
   }

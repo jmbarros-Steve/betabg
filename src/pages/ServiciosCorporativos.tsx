@@ -150,7 +150,7 @@ const ServiciosCorporativos = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <motion.nav
         initial={{ opacity: 0, y: -20 }}
@@ -170,7 +170,7 @@ const ServiciosCorporativos = () => {
                 <Link
                   key={link.name}
                   to={link.to}
-                  className={`flex items-center gap-2 text-sm uppercase tracking-widest transition-colors ${
+                  className={`flex items-center gap-2 text-sm font-medium transition-colors ${
                     link.active 
                       ? 'text-primary font-medium' 
                       : 'text-muted-foreground hover:text-primary'
@@ -184,7 +184,7 @@ const ServiciosCorporativos = () => {
           </div>
 
           <Link to="/">
-            <Button variant="outline" size="sm" className="uppercase tracking-wider text-xs">
+            <Button variant="outline" size="sm" className="text-sm font-medium">
               Inicio
             </Button>
           </Link>
@@ -200,7 +200,7 @@ const ServiciosCorporativos = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <p className="text-xs uppercase tracking-super-wide text-primary mb-4">Servicios Corporativos</p>
+            <p className="text-sm font-medium text-primary mb-4">Servicios Corporativos</p>
             <h1 className="text-3xl md:text-5xl font-light mb-4">
               Consultoría de <span className="text-primary font-medium">Escalamiento</span>
             </h1>
@@ -220,7 +220,7 @@ const ServiciosCorporativos = () => {
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
                 <div className="text-3xl md:text-4xl font-light text-primary mb-1">{stat.value}</div>
-                <div className="text-xs uppercase tracking-widest text-muted-foreground">{stat.label}</div>
+                <div className="text-sm font-medium text-muted-foreground">{stat.label}</div>
               </div>
             ))}
           </motion.div>

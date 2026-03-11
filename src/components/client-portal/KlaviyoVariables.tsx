@@ -90,7 +90,7 @@ export function KlaviyoVariables({ onInsert, compact = false }: KlaviyoVariables
   if (compact) {
     return (
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <p className="text-sm font-medium text-muted-foreground">
           Variables Klaviyo
         </p>
         <div className="flex flex-wrap gap-1">

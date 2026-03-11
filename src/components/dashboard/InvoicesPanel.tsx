@@ -199,7 +199,7 @@ Gracias por confiar en BG Consult.
   };
 
   if (loading) {
-    return <div className="animate-pulse h-40 bg-card rounded-xl" />;
+    return <div className="animate-pulse h-40 bg-white rounded-xl border border-slate-200" />;
   }
 
   return (
@@ -278,11 +278,11 @@ Gracias por confiar en BG Consult.
       </div>
 
       {clients.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-xl border border-border">
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <p className="text-muted-foreground">Primero debes añadir clientes</p>
         </div>
       ) : invoices.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-xl border border-border">
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-muted-foreground">No hay recibos generados</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -297,11 +297,11 @@ Gracias por confiar en BG Consult.
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="p-4 rounded-xl bg-card border border-border hover:border-primary/30 transition-colors flex items-center justify-between"
+              className="p-4 bg-white border border-slate-200 rounded-xl card-hover flex items-center justify-between"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-primary" />
+                <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-semibold">{invoice.invoice_number}</h3>

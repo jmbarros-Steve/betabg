@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { Footer } from '@/components/landing/Footer';
+import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const faqs = [
@@ -40,7 +40,7 @@ const faqs = [
 
 export default function FAQ() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <main className="flex-1 py-16">
         <div className="container max-w-3xl px-6">
           <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">
@@ -61,7 +61,7 @@ export default function FAQ() {
           </Accordion>
         </div>
       </main>
-      <Footer />
+      <SteveFooter />
     </div>
   );
 }

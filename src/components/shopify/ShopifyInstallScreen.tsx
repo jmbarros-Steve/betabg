@@ -46,8 +46,8 @@ export function ShopifyInstallScreen({ storeName, onConfirmInstall }: ShopifyIns
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg shadow-xl border-2">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-lg rounded-2xl shadow-xl border border-slate-200">
         <CardHeader className="text-center pb-2">
           <img src={logo} alt="Steve" className="h-16 mx-auto mb-4" />
           <CardTitle className="text-2xl">Conectar {storeName}</CardTitle>
@@ -65,7 +65,7 @@ export function ShopifyInstallScreen({ storeName, onConfirmInstall }: ShopifyIns
 
           {/* Steps */}
           <div className="space-y-4">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+            <h3 className="text-sm font-medium text-slate-700">
               Cómo funciona
             </h3>
             <div className="space-y-3">
@@ -88,7 +88,7 @@ export function ShopifyInstallScreen({ storeName, onConfirmInstall }: ShopifyIns
 
           {/* Features */}
           <div className="space-y-3">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+            <h3 className="text-sm font-medium text-slate-700">
               Lo que obtendrás
             </h3>
             <div className="grid grid-cols-1 gap-2">
@@ -102,9 +102,9 @@ export function ShopifyInstallScreen({ storeName, onConfirmInstall }: ShopifyIns
           </div>
 
           {/* CTA */}
-          <Button 
-            onClick={handleConfirm} 
-            className="w-full h-12 text-base"
+          <Button
+            onClick={handleConfirm}
+            className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 rounded-lg"
             disabled={isRedirecting}
           >
             {isRedirecting ? (

@@ -58,11 +58,11 @@ export function PreviewEditor({
       {/* Subject and preview text display */}
       <div className="border rounded-lg p-3 bg-muted/30 space-y-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Asunto:</span>
+          <span className="text-sm font-medium text-muted-foreground">Asunto:</span>
           <span className="text-sm font-medium truncate">{campaignData.subject || '(sin asunto)'}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Preview:</span>
+          <span className="text-sm font-medium text-muted-foreground">Preview:</span>
           <span className="text-sm text-muted-foreground truncate">
             {campaignData.previewText || '(sin texto de vista previa)'}
           </span>

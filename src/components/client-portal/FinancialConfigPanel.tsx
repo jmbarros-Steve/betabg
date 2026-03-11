@@ -258,9 +258,9 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Margin Settings */}
-        <Card className="glow-box">
+        <Card className="bg-white border border-slate-200 rounded-xl p-6">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Percent className="w-4 h-4" />
               Configuración de Márgenes
             </CardTitle>
@@ -361,9 +361,9 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
         </Card>
 
         {/* Fixed Costs & Operational Costs */}
-        <Card className="glow-box">
+        <Card className="bg-white border border-slate-200 rounded-xl p-6">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
               Costos y Comisiones
               <Badge variant="secondary" className="ml-2">CLP</Badge>

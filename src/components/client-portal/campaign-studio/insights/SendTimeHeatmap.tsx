@@ -321,7 +321,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
   // --- No connection state ---
   if (hasConnection === false) {
     return (
-      <Card className="glow-box">
+      <Card className="card-hover">
         <CardContent className="py-8 text-center">
           <Clock className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-muted-foreground text-sm">
@@ -335,7 +335,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
   // --- Still checking connection ---
   if (hasConnection === null) {
     return (
-      <Card className="glow-box">
+      <Card className="card-hover">
         <CardContent className="py-8">
           <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
@@ -351,9 +351,9 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
   // --- Loading state ---
   if (loading) {
     return (
-      <Card className="glow-box">
+      <Card className="card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Horarios Optimos de Envio
           </CardTitle>
@@ -391,7 +391,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
   // --- Not enough data state ---
   if (error === 'NOT_ENOUGH_DATA') {
     return (
-      <Card className="glow-box">
+      <Card className="card-hover">
         <CardContent className="py-8 text-center">
           <Info className="w-8 h-8 mx-auto text-blue-500 mb-2" />
           <p className="text-sm font-medium mb-1">Datos insuficientes</p>
@@ -406,7 +406,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
   // --- Error state ---
   if (error) {
     return (
-      <Card className="glow-box">
+      <Card className="card-hover">
         <CardContent className="py-8 text-center">
           <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-yellow-500" />
           <p className="text-sm text-muted-foreground mb-3">{error}</p>
@@ -436,11 +436,11 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
       )}
 
       {/* Header + Heatmap Grid */}
-      <Card className="glow-box">
+      <Card className="card-hover">
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 Horarios Optimos de Envio
               </CardTitle>
@@ -626,7 +626,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-sm font-medium text-muted-foreground">
               Insights de Steve
             </h3>
           </div>

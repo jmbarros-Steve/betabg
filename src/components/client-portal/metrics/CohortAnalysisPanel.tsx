@@ -29,9 +29,9 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
   const months = ['M0', 'M1', 'M2', 'M3', 'M4', 'M5'];
 
   return (
-    <Card className="glow-box">
+    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <Users className="w-4 h-4" />
           Cohort Analysis - Retención de Clientes
         </CardTitle>

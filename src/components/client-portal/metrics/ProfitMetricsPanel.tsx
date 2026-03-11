@@ -110,10 +110,10 @@ export function ProfitMetricsPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
-          <Card key={metric.label} className="glow-box">
+          <Card key={metric.label} className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-slate-700">
                   {metric.label}
                 </CardTitle>
                 <metric.icon className="w-4 h-4 text-muted-foreground" />

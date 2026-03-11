@@ -228,25 +228,25 @@ function ExpandableAccionables({ blocks }: { blocks: string[] }) {
               <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
                 {scr.S && (
                   <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Situación (S)</p>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">Situación (S)</p>
                     <p className="text-xs text-foreground leading-relaxed">{scr.S}</p>
                   </div>
                 )}
                 {scr.C && (
                   <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border-l-4 border-orange-400">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1">Complicación (C)</p>
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">Complicación (C)</p>
                     <p className="text-xs text-foreground leading-relaxed">{scr.C}</p>
                   </div>
                 )}
                 {scr.R && (
                   <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border-l-4 border-green-500">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-500 mb-1">Resolución (R)</p>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-500 mb-1">Resolución (R)</p>
                     <p className="text-xs text-foreground leading-relaxed">{scr.R}</p>
                   </div>
                 )}
                 {scr.impacto && (
                   <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Impacto de Negocio</p>
+                    <p className="text-sm font-medium text-primary mb-1">Impacto de Negocio</p>
                     <p className="text-xs text-foreground leading-relaxed font-medium">{scr.impacto}</p>
                   </div>
                 )}
@@ -290,25 +290,25 @@ function StructuredAccionables({ items }: { items: any[] }) {
               <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
                 {item.situation && (
                   <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Situacion (S)</p>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">Situacion (S)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.situation}</p>
                   </div>
                 )}
                 {item.complication && (
                   <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border-l-4 border-orange-400">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1">Complicacion (C)</p>
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">Complicacion (C)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.complication}</p>
                   </div>
                 )}
                 {item.resolution && (
                   <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border-l-4 border-green-500">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-500 mb-1">Resolucion (R)</p>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-500 mb-1">Resolucion (R)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.resolution}</p>
                   </div>
                 )}
                 {item.expected_impact && (
                   <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Impacto de Negocio</p>
+                    <p className="text-sm font-medium text-primary mb-1">Impacto de Negocio</p>
                     <p className="text-xs text-foreground leading-relaxed font-medium">{item.expected_impact}</p>
                   </div>
                 )}
@@ -365,7 +365,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
                   </div>
                   <div className={`flex-1 ${cfg.light} rounded-xl border ${cfg.border} p-4 min-w-0`}>
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                      <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${cfg.badge}`}>
                         FASE {phaseNum}
                       </span>
                       {focus && <span className={`text-xs font-semibold ${cfg.text} truncate max-w-[200px]`} title={focus}>{focus}</span>}
@@ -375,7 +375,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
                     {/* Keywords as badges */}
                     {keywords.length > 0 && (
                       <div className="mb-3">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Keywords</p>
+                        <p className="text-sm font-medium text-muted-foreground mb-1.5">Keywords</p>
                         <div className="flex flex-wrap gap-1.5">
                           {keywords.map((kw, ki) => (
                             <Badge key={ki} variant="secondary" className="text-xs">{kw}</Badge>
@@ -387,7 +387,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
                     {/* KPIs as checklist */}
                     {kpis.length > 0 && (
                       <div className="mb-3">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">KPIs</p>
+                        <p className="text-sm font-medium text-muted-foreground mb-1.5">KPIs</p>
                         <ul className="space-y-1">
                           {kpis.map((kpi, ki) => (
                             <li key={ki} className="flex items-start gap-2 text-xs">
@@ -402,7 +402,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
                     {/* Actions as numbered list */}
                     {actions.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Acciones Concretas</p>
+                        <p className="text-sm font-medium text-muted-foreground mb-1.5">Acciones Concretas</p>
                         <ol className="space-y-1.5">
                           {actions.map((action, ai) => (
                             <li key={ai} className="flex gap-2 text-xs leading-relaxed">
@@ -439,7 +439,7 @@ function CreativeCalendarTimeline({ calendar }: { calendar: any }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-2">📅 Calendario Creativo</p>
+      <p className="text-sm font-medium text-primary flex items-center gap-2">📅 Calendario Creativo</p>
       <div className="relative">
         {weekKeys.length > 1 && (
           <div className="absolute left-3 top-4 bottom-4 w-0.5 bg-border" />
@@ -463,13 +463,13 @@ function CreativeCalendarTimeline({ calendar }: { calendar: any }) {
                   <p className="text-xs font-bold text-foreground mb-1 capitalize">{label}</p>
                   {launch && (
                     <div className="mb-2">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Lanzar:</span>
+                      <span className="text-sm font-medium text-muted-foreground">Lanzar:</span>
                       <p className="text-xs text-foreground">{launch}</p>
                     </div>
                   )}
                   {testVars.length > 0 && (
                     <div>
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Variables a testear:</span>
+                      <span className="text-sm font-medium text-muted-foreground">Variables a testear:</span>
                       <ul className="mt-1 space-y-0.5">
                         {testVars.map((tv, ti) => (
                           <li key={ti} className="text-xs flex items-start gap-1.5">
@@ -680,7 +680,7 @@ function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep
         {/* Progress bar */}
         <div className="mb-4 bg-background/60 rounded-lg p-3 border border-border/50">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Progreso del analisis</span>
+            <span className="text-sm font-medium text-muted-foreground">Progreso del analisis</span>
             <span className="text-sm font-bold text-primary">{displayPct}%</span>
           </div>
           <Progress value={displayPct || 3} className="h-2.5" />
@@ -3841,20 +3841,20 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 <CardContent className="pt-0 space-y-3">
                   {bi.propuesta_valor_actual && (
                     <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
-                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">Propuesta de Valor</p>
+                      <p className="text-sm font-medium text-primary mb-1">Propuesta de Valor</p>
                       <p className="text-sm leading-relaxed">{bi.propuesta_valor_actual}</p>
                     </div>
                   )}
                   <div className="grid sm:grid-cols-2 gap-3">
                     {bi.personalidad_marca && (
                       <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">Personalidad</p>
+                        <p className="text-sm font-medium text-primary mb-1">Personalidad</p>
                         <p className="text-xs leading-relaxed">{typeof bi.personalidad_marca === 'string' ? bi.personalidad_marca : safeText(bi.personalidad_marca)}</p>
                       </div>
                     )}
                     {bi.tono_voz && (
                       <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">Tono de Voz</p>
+                        <p className="text-sm font-medium text-primary mb-1">Tono de Voz</p>
                         {typeof bi.tono_voz === 'object' ? (
                           <div className="space-y-1">
                             {bi.tono_voz.estilo && <p className="text-xs"><span className="font-medium">Estilo:</span> {bi.tono_voz.estilo}</p>}
@@ -3866,11 +3866,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </div>
                   {bi.diferenciadores_vs_competidores && typeof bi.diferenciadores_vs_competidores === 'object' && (
                     <div>
-                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-2">Diferenciadores vs Competencia</p>
+                      <p className="text-sm font-medium text-primary mb-2">Diferenciadores vs Competencia</p>
                       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {Object.entries(bi.diferenciadores_vs_competidores).map(([k, v]: [string, any]) => (
                           <div key={k} className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 border border-green-200 dark:border-green-800">
-                            <p className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase mb-0.5">{k.replace(/^vs_/, '').replace(/_/g, ' ')}</p>
+                            <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-0.5">{k.replace(/^vs_/, '').replace(/_/g, ' ')}</p>
                             <p className="text-[11px] leading-relaxed">{typeof v === 'string' ? v : safeText(v)}</p>
                           </div>
                         ))}
@@ -3879,7 +3879,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   )}
                   {Array.isArray(bi.gaps_identidad) && bi.gaps_identidad.length > 0 && (
                     <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
-                      <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1.5">Gaps de Identidad (Oportunidades de Mejora)</p>
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-1.5">Gaps de Identidad (Oportunidades de Mejora)</p>
                       <ul className="space-y-1">
                         {bi.gaps_identidad.slice(0, 5).map((gap: string, i: number) => (
                           <li key={i} className="text-[11px] flex items-start gap-1.5"><span className="text-amber-500 mt-0.5 flex-shrink-0">!</span>{gap}</li>
@@ -3911,19 +3911,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   <div className="grid sm:grid-cols-3 gap-2">
                     {fi.business_model && (
                       <div className="bg-primary/5 rounded-lg p-3 text-center border border-primary/10">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Modelo</p>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Modelo</p>
                         <p className="text-xs font-semibold text-primary">{fi.business_model}</p>
                       </div>
                     )}
                     {fi.pricing_strategy && (
                       <div className="bg-primary/5 rounded-lg p-3 text-center border border-primary/10">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Pricing</p>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Pricing</p>
                         <p className="text-xs font-semibold text-primary">{fi.pricing_strategy}</p>
                       </div>
                     )}
                     {fi.price_range && (
                       <div className="bg-primary/5 rounded-lg p-3 text-center border border-primary/10">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Rango Precios</p>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Rango Precios</p>
                         <p className="text-xs font-semibold text-primary">{fi.price_range.min} — {fi.price_range.max}</p>
                         {fi.price_range.ticket_promedio_declarado && <p className="text-[10px] text-muted-foreground">Ticket prom: {fi.price_range.ticket_promedio_declarado}</p>}
                       </div>
@@ -3933,7 +3933,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {Object.entries(fi.financial_insights).map(([k, v]: [string, any]) => (
                         <div key={k} className="bg-muted/50 rounded-lg p-2">
-                          <p className="text-[10px] font-semibold text-primary uppercase mb-0.5">{k.replace(/_/g, ' ')}</p>
+                          <p className="text-sm font-medium text-primary mb-0.5">{k.replace(/_/g, ' ')}</p>
                           <p className="text-[11px] leading-relaxed">{typeof v === 'string' ? v : safeText(v)}</p>
                         </div>
                       ))}
@@ -3941,7 +3941,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   )}
                   {Array.isArray(fi.monetization_opportunities) && fi.monetization_opportunities.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-2">Oportunidades de Monetizacion</p>
+                      <p className="text-sm font-medium text-primary mb-2">Oportunidades de Monetizacion</p>
                       <div className="grid sm:grid-cols-2 gap-2">
                         {fi.monetization_opportunities.slice(0, 4).map((opp: any, i: number) => (
                           <div key={i} className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 border border-green-200 dark:border-green-800">
@@ -4010,26 +4010,26 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                                 {/* Financial KPI Cards */}
                                 <div className="grid grid-cols-2 gap-2 mb-2">
                                   <div className="bg-muted/60 rounded-lg p-3 text-center">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Precio Venta</p>
+                                    <p className="text-sm font-medium text-muted-foreground mb-0.5">Precio Venta</p>
                                     <p className="text-lg font-bold text-primary">{formatCurrency(financials.price)}</p>
                                   </div>
                                   <div className="bg-muted/60 rounded-lg p-3 text-center">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Costo Producto</p>
+                                    <p className="text-sm font-medium text-muted-foreground mb-0.5">Costo Producto</p>
                                     <p className="text-lg font-bold text-foreground">{formatCurrency(financials.cost)}</p>
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                   <div className="bg-muted/60 rounded-lg p-3 text-center">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Envío</p>
+                                    <p className="text-sm font-medium text-muted-foreground mb-0.5">Envío</p>
                                     <p className="text-base font-bold text-foreground">{formatCurrency(financials.shipping)}</p>
                                   </div>
                                   <div className="bg-primary/10 rounded-lg p-3 text-center border border-primary/20">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Margen Bruto</p>
+                                    <p className="text-sm font-medium text-muted-foreground mb-0.5">Margen Bruto</p>
                                     <p className="text-base font-bold text-primary">{formatCurrency(margin)}</p>
                                     <p className="text-[10px] text-primary font-semibold">{marginPct}%</p>
                                   </div>
                                   <div className="bg-secondary rounded-lg p-3 text-center border-2 border-primary/30">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">CPA Máximo</p>
+                                    <p className="text-sm font-medium text-muted-foreground mb-0.5">CPA Máximo</p>
                                     <p className="text-base font-bold text-primary">${cpaMax}</p>
                                     <p className="text-[10px] text-muted-foreground">30% margen</p>
                                   </div>
@@ -4129,7 +4129,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <div className="space-y-2">
                             {Object.entries(execSummary.posicion_competitiva).map(([k, v]: [string, any]) => (
                               <div key={k}>
-                                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase mb-0.5">{k.replace(/_/g, ' ')}</p>
+                                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-0.5">{k.replace(/_/g, ' ')}</p>
                                 {Array.isArray(v) ? (
                                   <ul className="text-xs space-y-0.5 list-disc list-inside">{v.map((item: any, j: number) => <li key={j}>{safeText(item)}</li>)}</ul>
                                 ) : <p className="text-xs">{safeText(v)}</p>}
@@ -4473,19 +4473,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     <CardContent className="space-y-3">
                       {research.seo_audit.competitive_seo_gap && (
                         <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
-                          <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">Gap SEO vs Competencia</p>
+                          <p className="text-sm font-medium text-destructive mb-1">Gap SEO vs Competencia</p>
                           <p className="text-xs leading-relaxed">{String(research.seo_audit.competitive_seo_gap)}</p>
                         </div>
                       )}
                       {research.seo_audit.meta_analysis && (
                         <div className="bg-muted/50 rounded-lg p-3">
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Meta Tags: Cliente vs Competidores</p>
+                          <p className="text-sm font-medium text-primary mb-1">Meta Tags: Cliente vs Competidores</p>
                           <p className="text-xs leading-relaxed">{String(research.seo_audit.meta_analysis)}</p>
                         </div>
                       )}
                       {research.seo_audit.content_structure && (
                         <div className="bg-muted/50 rounded-lg p-3">
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Estructura de Contenido</p>
+                          <p className="text-sm font-medium text-primary mb-1">Estructura de Contenido</p>
                           <p className="text-xs leading-relaxed">{String(research.seo_audit.content_structure)}</p>
                         </div>
                       )}
@@ -4569,7 +4569,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {comp.strengths?.length > 0 && (
                               <div>
-                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">✅ Fortalezas</p>
+                                <p className="text-sm font-medium text-primary mb-1">✅ Fortalezas</p>
                                 <ul className="text-xs space-y-0.5">
                                   {comp.strengths.map((s: string, j: number) => (
                                     <li key={j} className="flex items-start gap-1"><span className="text-primary">✅</span>{s == null ? '' : String(s)}</li>
@@ -4579,7 +4579,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                             )}
                             {comp.weaknesses?.length > 0 && (
                               <div>
-                                <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">❌ Debilidades</p>
+                                <p className="text-sm font-medium text-destructive mb-1">❌ Debilidades</p>
                                 <ul className="text-xs space-y-0.5">
                                   {comp.weaknesses.map((w: string, j: number) => (
                                     <li key={j} className="flex items-start gap-1"><span className="text-destructive">❌</span>{w == null ? '' : String(w)}</li>
@@ -4593,13 +4593,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {comp.que_hacen_mejor && (
                               <div className="bg-yellow-500/5 border border-yellow-500/20 rounded p-2">
-                                <p className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wide mb-0.5">⚠️ Qué Hacen Mejor</p>
+                                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-0.5">⚠️ Qué Hacen Mejor</p>
                                 <p className="text-xs">{String(comp.que_hacen_mejor)}</p>
                               </div>
                             )}
                             {comp.que_hace_cliente_mejor && (
                               <div className="bg-primary/5 border border-primary/20 rounded p-2">
-                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-0.5">💪 Qué Hacemos Mejor</p>
+                                <p className="text-sm font-medium text-primary mb-0.5">💪 Qué Hacemos Mejor</p>
                                 <p className="text-xs">{String(comp.que_hace_cliente_mejor)}</p>
                               </div>
                             )}
@@ -4608,7 +4608,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           {/* Content Strategy */}
                           {comp.estrategia_contenido && (
                             <div>
-                              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">📋 Estrategia de Contenido</p>
+                              <p className="text-sm font-medium text-muted-foreground mb-0.5">📋 Estrategia de Contenido</p>
                               <p className="text-xs text-muted-foreground">{String(comp.estrategia_contenido)}</p>
                             </div>
                           )}
@@ -4746,25 +4746,25 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                           <CardContent className="space-y-2">
                             {comp.positioning && (
                               <div>
-                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Posicionamiento</p>
+                                <p className="text-sm font-medium text-muted-foreground mb-0.5">Posicionamiento</p>
                                 <p className="text-xs text-muted-foreground italic">"{String(comp.positioning)}"</p>
                               </div>
                             )}
                             {(comp.ad_strategy_inferred || comp.ad_strategy) && (
                               <div>
-                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-0.5">Estrategia de Ads</p>
+                                <p className="text-sm font-medium text-primary mb-0.5">Estrategia de Ads</p>
                                 <p className="text-xs leading-relaxed">{String(comp.ad_strategy_inferred || comp.ad_strategy)}</p>
                               </div>
                             )}
                             {comp.attack_vector && (
                               <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-2">
-                                <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-0.5">⚔️ Cómo Atacarlos</p>
+                                <p className="text-sm font-medium text-destructive mb-0.5">⚔️ Cómo Atacarlos</p>
                                 <p className="text-xs leading-relaxed">{String(comp.attack_vector)}</p>
                               </div>
                             )}
                             {vulnEntry && (
                               <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 space-y-1">
-                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide">🎯 Keywords a Usar Contra Ellos</p>
+                                <p className="text-sm font-medium text-primary">🎯 Keywords a Usar Contra Ellos</p>
                                 {vulnEntry.attack_tactic && (
                                   <p className="text-xs leading-relaxed">{String(vulnEntry.attack_tactic)}</p>
                                 )}
@@ -4816,7 +4816,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Keywords generales de competidores */}
                       {Array.isArray(research.keywords?.competitor_keywords) && research.keywords.competitor_keywords.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">Keywords de Competidores</p>
+                          <p className="text-sm font-medium text-primary mb-2">Keywords de Competidores</p>
                           <div className="flex flex-wrap gap-1.5">
                             {research.keywords.competitor_keywords.map((kw: any, i: number) => (
                               <Badge key={i} variant="outline" className="text-xs">
@@ -4839,13 +4839,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               </div>
                               {comp.positioning && (
                                 <div>
-                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Posicionamiento</p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-0.5">Posicionamiento</p>
                                   <p className="text-xs text-muted-foreground italic">"{String(comp.positioning)}"</p>
                                 </div>
                               )}
                               {comp.value_proposition && (
                                 <div>
-                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Propuesta de Valor</p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-0.5">Propuesta de Valor</p>
                                   <p className="text-xs text-muted-foreground">{String(comp.value_proposition)}</p>
                                 </div>
                               )}
@@ -4856,19 +4856,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               )}
                               {comp.estrategia_contenido && (
                                 <div>
-                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Estrategia de Contenido</p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-0.5">Estrategia de Contenido</p>
                                   <p className="text-xs text-muted-foreground">{String(comp.estrategia_contenido)}</p>
                                 </div>
                               )}
                               {comp.que_hacen_mejor && (
                                 <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded p-2">
-                                  <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-0.5">Qué Hacen Mejor</p>
+                                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-0.5">Qué Hacen Mejor</p>
                                   <p className="text-xs leading-relaxed">{String(comp.que_hacen_mejor)}</p>
                                 </div>
                               )}
                               {Array.isArray(comp.weaknesses) && comp.weaknesses.length > 0 && (
                                 <div>
-                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Debilidades</p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-0.5">Debilidades</p>
                                   <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
                                     {comp.weaknesses.map((w: any, wi: number) => (
                                       <li key={wi}>{safeText(w)}</li>
@@ -4878,7 +4878,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               )}
                               {comp.attack_vector && (
                                 <div className="bg-destructive/5 border border-destructive/20 rounded p-2">
-                                  <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-0.5">⚔️ Táctica para Quitarles Clientes</p>
+                                  <p className="text-sm font-medium text-destructive mb-0.5">⚔️ Táctica para Quitarles Clientes</p>
                                   <p className="text-xs leading-relaxed">{String(comp.attack_vector)}</p>
                                 </div>
                               )}
@@ -5055,7 +5055,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                             {/* Estrategia de Contenido */}
                             {comp.estrategia_contenido && (
                               <div className="bg-muted/40 rounded-lg p-3 border border-border">
-                                <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">📝 Estrategia de Contenido</p>
+                                <p className="text-sm font-medium text-primary mb-1">📝 Estrategia de Contenido</p>
                                 <p className="text-xs leading-relaxed">{comp.estrategia_contenido}</p>
                               </div>
                             )}
@@ -5063,7 +5063,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                             {/* Attack Vector */}
                             {comp.attack_vector && comp.attack_vector !== comp.que_hace_cliente_mejor && (
                               <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
-                                <p className="text-[10px] font-semibold text-destructive uppercase tracking-wide mb-1">⚔️ Cómo Atacarlos</p>
+                                <p className="text-sm font-medium text-destructive mb-1">⚔️ Cómo Atacarlos</p>
                                 <p className="text-xs leading-relaxed text-foreground">{comp.attack_vector}</p>
                               </div>
                             )}
@@ -5147,7 +5147,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Statement */}
                       {(research.positioning_strategy as any).statement_posicionamiento && (
                         <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Positioning Statement</p>
+                          <p className="text-sm font-medium text-primary mb-2">Positioning Statement</p>
                           <p className="text-sm leading-relaxed font-medium italic">"{typeof (research.positioning_strategy as any).statement_posicionamiento === 'string' ? (research.positioning_strategy as any).statement_posicionamiento : JSON.stringify((research.positioning_strategy as any).statement_posicionamiento)}"</p>
                         </div>
                       )}
@@ -5155,7 +5155,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Posicionamiento Recomendado */}
                       {(research.positioning_strategy as any).posicionamiento_recomendado && (
                         <div className="bg-muted/50 rounded-lg p-3 border border-border">
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">🎯 Posicionamiento Recomendado</p>
+                          <p className="text-sm font-medium text-primary mb-1">🎯 Posicionamiento Recomendado</p>
                           <p className="text-xs leading-relaxed">{typeof (research.positioning_strategy as any).posicionamiento_recomendado === 'string' ? (research.positioning_strategy as any).posicionamiento_recomendado : JSON.stringify((research.positioning_strategy as any).posicionamiento_recomendado)}</p>
                         </div>
                       )}
@@ -5163,7 +5163,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Posicionamiento Actual */}
                       {(research.positioning_strategy as any).posicionamiento_actual && (
                         <div className="bg-muted/50 rounded-lg p-3 border border-border">
-                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">📍 Posicionamiento Actual</p>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">📍 Posicionamiento Actual</p>
                           <p className="text-xs leading-relaxed">{typeof (research.positioning_strategy as any).posicionamiento_actual === 'string' ? (research.positioning_strategy as any).posicionamiento_actual : JSON.stringify((research.positioning_strategy as any).posicionamiento_actual)}</p>
                         </div>
                       )}
@@ -5171,7 +5171,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Territorios de Comunicación */}
                       {Array.isArray((research.positioning_strategy as any).territorios_comunicacion) && (research.positioning_strategy as any).territorios_comunicacion.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">🏷️ Territorios de Comunicación</p>
+                          <p className="text-sm font-medium text-primary mb-2">🏷️ Territorios de Comunicación</p>
                           <div className="flex flex-wrap gap-2">
                             {(research.positioning_strategy as any).territorios_comunicacion.map((t: any, i: number) => (
                               <Badge key={i} variant="secondary" className="text-xs">{typeof t === 'string' ? t : (t?.nombre || t?.territorio || JSON.stringify(t))}</Badge>
@@ -5183,7 +5183,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Mensajes Clave Diferenciadores */}
                       {Array.isArray((research.positioning_strategy as any).mensajes_clave_diferenciadores) && (research.positioning_strategy as any).mensajes_clave_diferenciadores.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">💬 Mensajes Clave</p>
+                          <p className="text-sm font-medium text-primary mb-2">💬 Mensajes Clave</p>
                           <ul className="space-y-2">
                             {(research.positioning_strategy as any).mensajes_clave_diferenciadores.map((m: any, i: number) => {
                               const text = typeof m === 'string' ? m : (m?.mensaje || m?.text || JSON.stringify(m));
@@ -5205,7 +5205,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Mapa Perceptual */}
                       {(research.positioning_strategy as any).mapa_perceptual && (
                         <div className="bg-muted/30 rounded-lg p-4 border border-border">
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-2">📊 Mapa Perceptual</p>
+                          <p className="text-sm font-medium text-primary mb-2">📊 Mapa Perceptual</p>
                           <div className="grid grid-cols-2 gap-2 mb-3">
                             <div className="text-xs"><span className="text-muted-foreground">Eje X:</span> <span className="font-medium">{(research.positioning_strategy as any).mapa_perceptual.eje_x}</span></div>
                             <div className="text-xs"><span className="text-muted-foreground">Eje Y:</span> <span className="font-medium">{(research.positioning_strategy as any).mapa_perceptual.eje_y}</span></div>
@@ -5235,7 +5235,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Posicionamiento de Competidores */}
                       {(research.positioning_strategy as any).posicionamiento_competidores && typeof (research.positioning_strategy as any).posicionamiento_competidores === 'object' && (
                         <div>
-                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">🏆 Cómo se Posicionan los Competidores</p>
+                          <p className="text-sm font-medium text-muted-foreground mb-2">🏆 Cómo se Posicionan los Competidores</p>
                           <div className="space-y-2">
                             {Object.entries((research.positioning_strategy as any).posicionamiento_competidores).map(([name, desc]: [string, any]) => (
                               <div key={name} className="flex items-start gap-2 text-xs border-l-2 border-muted pl-3 py-1">
@@ -5263,7 +5263,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Competitor Strategies */}
                       {research.ads_library_analysis.competitor_strategies?.length > 0 && (
                         <div className="space-y-3">
-                          <p className="text-xs font-semibold text-primary uppercase tracking-wide">🎯 Estrategia Publicitaria por Competidor</p>
+                          <p className="text-sm font-medium text-primary">🎯 Estrategia Publicitaria por Competidor</p>
                           {research.ads_library_analysis.competitor_strategies.map((cs: any, i: number) => (
                             <div key={i} className="border border-border rounded-lg p-3 space-y-2">
                               <p className="font-semibold text-sm">{cs.name || `Competidor ${i + 1}`}</p>
@@ -5280,7 +5280,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Market Patterns */}
                       {research.ads_library_analysis.market_patterns && (
                         <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                          <p className="text-xs font-semibold text-primary uppercase tracking-wide">📊 Patrones del Mercado</p>
+                          <p className="text-sm font-medium text-primary">📊 Patrones del Mercado</p>
                           {research.ads_library_analysis.market_patterns.dominant_content_type && <div className="text-xs"><span className="text-muted-foreground">Contenido dominante:</span> {research.ads_library_analysis.market_patterns.dominant_content_type}</div>}
                           {research.ads_library_analysis.market_patterns.probable_formats && <div className="text-xs"><span className="text-muted-foreground">Formatos más usados:</span> {research.ads_library_analysis.market_patterns.probable_formats}</div>}
                           {research.ads_library_analysis.market_patterns.common_messages && <div className="text-xs"><span className="text-muted-foreground">Mensajes comunes:</span> {research.ads_library_analysis.market_patterns.common_messages}</div>}
@@ -5290,7 +5290,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Creative Concepts */}
                       {research.ads_library_analysis.creative_concepts?.length > 0 && (
                         <div className="space-y-3">
-                          <p className="text-xs font-semibold text-primary uppercase tracking-wide">💡 Conceptos Creativos Recomendados</p>
+                          <p className="text-sm font-medium text-primary">💡 Conceptos Creativos Recomendados</p>
                           {research.ads_library_analysis.creative_concepts.map((cc: any, i: number) => (
                             <div key={i} className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1.5">
                               <div className="flex items-center gap-2">

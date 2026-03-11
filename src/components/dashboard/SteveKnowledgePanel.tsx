@@ -811,7 +811,7 @@ export function SteveKnowledgePanel() {
       </div>
 
       {/* Date filter + counter */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-border bg-muted/30">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-white">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="text-xl">📚</span>
           <span>
@@ -879,7 +879,7 @@ export function SteveKnowledgePanel() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  <h3 className="font-semibold text-sm uppercase tracking-wider">
+                  <h3 className="text-sm font-medium">
                     Conocimiento
                   </h3>
                   <Badge variant="outline" className="text-xs">
@@ -930,7 +930,7 @@ export function SteveKnowledgePanel() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Bug className="w-4 h-4 text-destructive" />
-                  <h3 className="font-semibold text-sm uppercase tracking-wider">
+                  <h3 className="text-sm font-medium">
                     Bugs / Comportamientos a Evitar
                   </h3>
                   <Badge variant="outline" className="text-xs">

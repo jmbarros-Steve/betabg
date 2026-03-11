@@ -18,9 +18,9 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Revenue vs Spend Chart */}
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          <CardTitle className="text-sm font-semibold text-slate-700">
             {hasSpendData ? 'Ingresos vs Inversión por Día' : 'Ingresos por Día'}
           </CardTitle>
         </CardHeader>
@@ -149,9 +149,9 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
       </Card>
 
       {/* Orders Chart */}
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          <CardTitle className="text-sm font-semibold text-slate-700">
             Órdenes por Día
           </CardTitle>
         </CardHeader>

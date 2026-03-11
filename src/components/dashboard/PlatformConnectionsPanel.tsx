@@ -378,7 +378,7 @@ export function PlatformConnectionsPanel() {
       </div>
 
       {connections.length === 0 ? (
-        <div className="text-center py-12 bg-card rounded-lg border border-border">
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <Store className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-muted-foreground">No hay conexiones configuradas</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -392,7 +392,7 @@ export function PlatformConnectionsPanel() {
             return (
               <div
                 key={connection.id}
-                className="p-4 rounded-lg bg-card border border-border flex items-center justify-between"
+                className="p-4 bg-white border border-slate-200 rounded-xl card-hover flex items-center justify-between"
               >
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-lg ${config.color}`}>

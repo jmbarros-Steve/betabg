@@ -30,6 +30,7 @@ export const steveMailMergeTags = {
     name: 'Productos',
     mergeTags: {
       product_recommendations: { name: 'Recomendaciones de productos', value: '{{ product_recommendations }}' },
+      discount_code: { name: 'Código de descuento', value: '{{ discount_code }}' },
     },
   },
   suscripcion: {

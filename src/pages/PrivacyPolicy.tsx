@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { Footer } from '@/components/landing/Footer';
+import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <main className="flex-1 py-16">
         <div className="container max-w-3xl px-6">
           <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">
@@ -14,7 +14,7 @@ export default function PrivacyPolicy() {
           
           <h1 className="text-3xl font-bold mb-8">Política de Privacidad</h1>
           
-          <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
+          <div className="prose prose-slate max-w-none space-y-6 text-muted-foreground">
             <p className="text-sm text-muted-foreground">
               Última actualización: {new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
@@ -120,7 +120,7 @@ export default function PrivacyPolicy() {
           </div>
         </div>
       </main>
-      <Footer />
+      <SteveFooter />
     </div>
   );
 }

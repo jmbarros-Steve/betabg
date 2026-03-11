@@ -122,7 +122,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   if (!hasConnection) {
     return (
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardContent className="py-12 text-center">
           <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">Conecta Shopify en la pestaña "Conexiones" para ver tu dashboard</p>
@@ -179,9 +179,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* Daily Sales Chart */}
       {dailyBreakdown.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="glow-box">
+          <Card className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
                 Ventas por Día
               </CardTitle>
@@ -227,9 +227,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
           </Card>
 
           {/* Abandoned Carts by Day */}
-          <Card className="glow-box">
+          <Card className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
                 Carritos Abandonados por Día
               </CardTitle>
@@ -277,9 +277,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       )}
 
       {/* Ventas por Canal */}
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Globe className="w-4 h-4" />
             Ventas por Canal
           </CardTitle>
@@ -321,9 +321,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       </div>
 
       {/* UTMs con más ventas */}
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Link2 className="w-4 h-4" />
             UTMs con Más Ventas
           </CardTitle>
@@ -379,9 +379,9 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
 
   if (products.length === 0) {
     return (
-      <Card className="glow-box">
+      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Search className="w-4 h-4" />
             Análisis SEO Rápido
           </CardTitle>
@@ -468,11 +468,11 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
   };
 
   return (
-    <Card className="glow-box">
+    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Search className="w-4 h-4" />
               Análisis SEO Rápido
             </CardTitle>

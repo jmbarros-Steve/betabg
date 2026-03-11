@@ -18,7 +18,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Footer } from '@/components/landing/Footer';
+import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 import logoSteve from '@/assets/logo-steve.png';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -153,7 +153,7 @@ export default function ShopifyApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -460,7 +460,7 @@ export default function ShopifyApp() {
         </div>
       </section>
 
-      <Footer />
+      <SteveFooter />
     </div>
   );
 }

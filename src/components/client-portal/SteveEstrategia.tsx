@@ -153,7 +153,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
 
   if (isInitializing) {
     return (
-      <Card className="h-[750px]">
+      <Card className="h-[750px] bg-white border border-slate-200 rounded-2xl">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -167,7 +167,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }
 
   return (
-    <Card className="h-[800px] flex flex-col">
+    <Card className="h-[800px] flex flex-col bg-white border border-slate-200 rounded-2xl">
       {/* Header */}
       <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center gap-3">
@@ -220,7 +220,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
             <div key={message.id}>
               {message.role === 'user' ? (
                 <div className="flex gap-3 justify-end">
-                  <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-primary text-primary-foreground rounded-br-md shadow-sm">
+                  <div className="max-w-[75%] px-4 py-3 text-sm bg-blue-600 text-white rounded-xl rounded-tr-sm shadow-sm">
                     <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                   </div>
                   <Avatar className="h-8 w-8 flex-shrink-0">
@@ -235,7 +235,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
                     <AvatarImage src={avatarSteve} alt="Steve" />
                     <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
                   </Avatar>
-                  <div className="max-w-[80%] rounded-2xl px-4 py-3 text-sm rounded-bl-md shadow-sm bg-muted">
+                  <div className="max-w-[80%] px-4 py-3 text-sm shadow-sm bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm">
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed">
                       <ReactMarkdown>{message.content}</ReactMarkdown>
                     </div>
@@ -251,7 +251,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
                 <AvatarImage src={avatarSteve} alt="Steve" />
                 <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
-              <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm px-4 py-3">
                 <div className="flex gap-1">
                   <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -264,7 +264,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-4 border-t flex-shrink-0">
+      <div className="p-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <Input
             ref={inputRef}
@@ -274,7 +274,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
             disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit" disabled={!input.trim() || isLoading} size="icon">
+          <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-blue-600 rounded-full">
             <Send className="h-4 w-4" />
           </Button>
         </form>

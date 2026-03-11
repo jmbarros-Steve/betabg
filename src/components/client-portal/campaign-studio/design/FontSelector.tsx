@@ -51,19 +51,19 @@ export function FontSelector({ label, value, onChange }: FontSelectorProps) {
           </SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-64">
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Sans-serif</div>
+          <div className="px-2 py-1 text-sm font-medium text-muted-foreground">Sans-serif</div>
           {FONT_OPTIONS.filter(f => f.type === 'sans-serif').map(f => (
             <SelectItem key={f.value} value={f.value}>
               <span style={{ fontFamily: `'${f.value}', sans-serif` }}>{f.label}</span>
             </SelectItem>
           ))}
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium mt-1">Serif</div>
+          <div className="px-2 py-1 text-sm font-medium text-muted-foreground mt-1">Serif</div>
           {FONT_OPTIONS.filter(f => f.type === 'serif').map(f => (
             <SelectItem key={f.value} value={f.value}>
               <span style={{ fontFamily: `'${f.value}', serif` }}>{f.label}</span>
             </SelectItem>
           ))}
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium mt-1">Monospace</div>
+          <div className="px-2 py-1 text-sm font-medium text-muted-foreground mt-1">Monospace</div>
           {FONT_OPTIONS.filter(f => f.type === 'monospace').map(f => (
             <SelectItem key={f.value} value={f.value}>
               <span style={{ fontFamily: `'${f.value}', monospace` }}>{f.label}</span>
