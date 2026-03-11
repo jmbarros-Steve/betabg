@@ -137,7 +137,7 @@ export default function Steve() {
               {isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}
             </h2>
             <p className="text-sm text-muted-foreground text-center mb-6">
-              {isLogin ? 'Ingresa para continuar' : 'Comienza gratis, sin tarjeta de crédito'}
+              {isLogin ? 'Ingresa para continuar' : 'Accede a toda la plataforma'}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">

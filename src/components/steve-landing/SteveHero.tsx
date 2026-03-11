@@ -36,7 +36,7 @@ export function SteveHero({ onOpenAuth }: SteveHeroProps) {
                 onClick={onOpenAuth}
                 className="px-6 py-3 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm"
               >
-                Comenzar Gratis &rarr;
+                Comenzar PRO &rarr;
               </button>
               <a
                 href="#features"
@@ -47,7 +47,7 @@ export function SteveHero({ onOpenAuth }: SteveHeroProps) {
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
-              {['Gratis para siempre', 'Sin tarjeta de credito', 'Setup en 5 min'].map((text) => (
+              {['Todo incluido', 'Precio beta disponible', 'Setup en 5 min'].map((text) => (
                 <span key={text} className="flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                   {text}

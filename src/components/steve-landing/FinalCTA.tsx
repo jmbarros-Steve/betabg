@@ -22,14 +22,14 @@ export function FinalCTA({ onOpenAuth }: FinalCTAProps) {
           <span className="text-gradient">inteligente</span>
         </h2>
         <p className="text-slate-400 max-w-lg mx-auto mb-8">
-          Unete a los equipos de e-commerce que ya usan Steve para crecer mas rapido. Gratis para siempre, sin tarjeta.
+          Unete a los equipos de e-commerce que ya usan Steve para crecer mas rapido.
         </p>
 
         <button
           onClick={onOpenAuth}
           className="px-8 py-3.5 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm shadow-lg shadow-blue-600/25"
         >
-          Comenzar Gratis &rarr;
+          Comenzar PRO &rarr;
         </button>
       </div>
     </section>

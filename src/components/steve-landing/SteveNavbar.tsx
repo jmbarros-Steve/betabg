@@ -87,7 +87,7 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
                   onClick={onOpenAuth}
                   className="text-sm font-medium px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
-                  Comenzar Gratis
+                  Comenzar PRO
                 </button>
               </>
             )}

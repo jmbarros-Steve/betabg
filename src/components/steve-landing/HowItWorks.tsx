@@ -5,8 +5,8 @@ const steps = [
   {
     number: '01',
     icon: UserPlus,
-    title: 'Crea tu cuenta gratis',
-    description: 'Registrate en menos de 1 minuto. Sin tarjeta de credito, sin compromisos.',
+    title: 'Crea tu cuenta',
+    description: 'Registrate en menos de 1 minuto y accede al plan PRO.',
     color: 'bg-blue-50 text-blue-600 border-blue-200',
   },
   {
