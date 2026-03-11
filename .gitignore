@@ -23,3 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Temporary files
+qa-screenshots/
+qa-script*.ts
+analisis-costos.html
+ANALISIS_COSTOS_PLATAFORMA.md
