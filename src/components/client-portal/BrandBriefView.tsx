@@ -3798,7 +3798,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             {(() => {
               const bi = (research as any).brand_identity;
               if (!bi || typeof bi !== 'object') return null;
-              const hasSomething = bi.propuesta_valor_actual || bi.personalidad_marca || bi.tono_voz;
+              const tonoVoz = bi.tono_voz || bi.tono_y_voz;
+              const personalidad = bi.personalidad_marca || bi.personalidad_de_marca;
+              const hasSomething = bi.propuesta_valor_actual || personalidad || tonoVoz;
               if (!hasSomething) return null;
               return (
               <Card className="border-primary/10">
@@ -3813,25 +3815,47 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   {bi.propuesta_valor_actual && (
                     <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
                       <p className="text-sm font-medium text-primary mb-1">Propuesta de Valor</p>
-                      <p className="text-sm leading-relaxed">{bi.propuesta_valor_actual}</p>
+                      {typeof bi.propuesta_valor_actual === 'string' ? (
+                        <p className="text-sm leading-relaxed">{bi.propuesta_valor_actual}</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {bi.propuesta_valor_actual.promesa_principal && <p className="text-sm leading-relaxed font-medium">{bi.propuesta_valor_actual.promesa_principal}</p>}
+                          {bi.propuesta_valor_actual.diferenciador_clave && <p className="text-xs text-muted-foreground">{bi.propuesta_valor_actual.diferenciador_clave}</p>}
+                          {Array.isArray(bi.propuesta_valor_actual.frases_exactas) && (
+                            <ul className="text-xs space-y-0.5 mt-1">{bi.propuesta_valor_actual.frases_exactas.map((f: string, i: number) => (
+                              <li key={i} className="italic text-muted-foreground">"{f}"</li>
+                            ))}</ul>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="grid sm:grid-cols-2 gap-3">
-                    {bi.personalidad_marca && (
+                    {personalidad && (
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-sm font-medium text-primary mb-1">Personalidad</p>
-                        <p className="text-xs leading-relaxed">{typeof bi.personalidad_marca === 'string' ? bi.personalidad_marca : safeText(bi.personalidad_marca)}</p>
+                        {typeof personalidad === 'string' ? (
+                          <p className="text-xs leading-relaxed">{personalidad}</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {personalidad.arquetipo_principal && <p className="text-xs"><span className="font-medium">Arquetipo:</span> {personalidad.arquetipo_principal}</p>}
+                            {Array.isArray(personalidad.caracteristicas) && <p className="text-xs">{personalidad.caracteristicas.join(', ')}</p>}
+                            {!personalidad.arquetipo_principal && !personalidad.caracteristicas && <p className="text-xs leading-relaxed">{safeText(personalidad)}</p>}
+                          </div>
+                        )}
                       </div>
                     )}
-                    {bi.tono_voz && (
+                    {tonoVoz && (
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-sm font-medium text-primary mb-1">Tono de Voz</p>
-                        {typeof bi.tono_voz === 'object' ? (
+                        {typeof tonoVoz === 'object' ? (
                           <div className="space-y-1">
-                            {bi.tono_voz.estilo && <p className="text-xs"><span className="font-medium">Estilo:</span> {bi.tono_voz.estilo}</p>}
-                            {bi.tono_voz.personalidad && <p className="text-xs"><span className="font-medium">Personalidad:</span> {bi.tono_voz.personalidad}</p>}
+                            {tonoVoz.estilo && <p className="text-xs"><span className="font-medium">Estilo:</span> {tonoVoz.estilo}</p>}
+                            {tonoVoz.registro && <p className="text-xs"><span className="font-medium">Registro:</span> {tonoVoz.registro}</p>}
+                            {tonoVoz.personalidad && <p className="text-xs"><span className="font-medium">Personalidad:</span> {tonoVoz.personalidad}</p>}
+                            {Array.isArray(tonoVoz.caracteristicas) && <p className="text-xs">{tonoVoz.caracteristicas.join('; ')}</p>}
                           </div>
-                        ) : <p className="text-xs leading-relaxed">{String(bi.tono_voz)}</p>}
+                        ) : <p className="text-xs leading-relaxed">{String(tonoVoz)}</p>}
                       </div>
                     )}
                   </div>
@@ -3848,16 +3872,26 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </div>
                     </div>
                   )}
-                  {Array.isArray(bi.gaps_identidad) && bi.gaps_identidad.length > 0 && (
+                  {(() => {
+                    // Handle both gaps_identidad (string[]) and gaps_de_identidad (object with sub-arrays)
+                    const gapsArr: string[] = Array.isArray(bi.gaps_identidad) ? bi.gaps_identidad : [];
+                    if (gapsArr.length === 0 && bi.gaps_de_identidad && typeof bi.gaps_de_identidad === 'object') {
+                      const gd = bi.gaps_de_identidad;
+                      if (Array.isArray(gd.no_comunican_claramente)) gapsArr.push(...gd.no_comunican_claramente);
+                      if (Array.isArray(gd.deberian_reforzar)) gapsArr.push(...gd.deberian_reforzar);
+                    }
+                    if (gapsArr.length === 0) return null;
+                    return (
                     <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
                       <p className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-1.5">Gaps de Identidad (Oportunidades de Mejora)</p>
                       <ul className="space-y-1">
-                        {bi.gaps_identidad.slice(0, 5).map((gap: string, i: number) => (
-                          <li key={i} className="text-[11px] flex items-start gap-1.5"><span className="text-amber-500 mt-0.5 flex-shrink-0">!</span>{gap}</li>
+                        {gapsArr.slice(0, 8).map((gap: string, i: number) => (
+                          <li key={i} className="text-[11px] flex items-start gap-1.5"><span className="text-amber-500 mt-0.5 flex-shrink-0">!</span>{typeof gap === 'string' ? gap : safeText(gap)}</li>
                         ))}
                       </ul>
                     </div>
-                  )}
+                    );
+                  })()}
                 </CardContent>
               </Card>
               );
