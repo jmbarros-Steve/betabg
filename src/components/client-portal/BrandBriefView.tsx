@@ -89,14 +89,9 @@ function sanitizeForRender(data: any, depth = 0): any {
   if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') return data;
   if (Array.isArray(data)) return data.map((item) => sanitizeForRender(item, depth + 1));
   if (typeof data === 'object') {
-    const entries = Object.entries(data);
-    // Detect "leaf" objects (all values are scalars) — flatten to readable text
-    // regardless of depth. These can never be valid React children.
-    const isLeaf = entries.length > 0 && entries.every(([, v]) =>
-      v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
-    );
-    if (isLeaf || depth >= 4) {
-      const parts = entries
+    // At depth >= 4, flatten objects to readable strings to prevent deep nesting crashes
+    if (depth >= 4) {
+      const parts = Object.entries(data)
         .filter(([, v]) => v != null && String(v).trim())
         .map(([k, v]) => {
           const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
