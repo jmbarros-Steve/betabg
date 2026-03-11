@@ -81,34 +81,6 @@ function safeText(val: any): string {
   return text;
 }
 
-// Recursively sanitize research data so no nested object ends up as a React child.
-// Leaf objects (no arrays, not recognized sections) are flattened to readable strings.
-// This protects against AI returning varying JSON structures per client.
-function sanitizeForRender(data: any, depth = 0): any {
-  if (data == null) return data;
-  if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') return data;
-  if (Array.isArray(data)) return data.map((item) => sanitizeForRender(item, depth + 1));
-  if (typeof data === 'object') {
-    // At depth >= 4, flatten objects to readable strings to prevent deep nesting crashes
-    if (depth >= 4) {
-      const parts = Object.entries(data)
-        .filter(([, v]) => v != null && String(v).trim())
-        .map(([k, v]) => {
-          const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          const val = typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : JSON.stringify(v);
-          return `${label}: ${val}`;
-        });
-      return parts.join('. ') || JSON.stringify(data);
-    }
-    const result: Record<string, any> = {};
-    for (const [key, val] of Object.entries(data)) {
-      result[key] = sanitizeForRender(val, depth + 1);
-    }
-    return result;
-  }
-  return data;
-}
-
 // Extract JSON objects from truncated raw_text using bracket-counting
 function parsePartialJsonArray(raw: string): any[] {
   const arrStart = raw.indexOf('[');
@@ -1433,8 +1405,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const normalized = normalizeResearchData(r);
 
     // Always set both states — research first so render sees data when status changes
-    // Sanitize to prevent React #31 errors from unexpected nested objects in AI-generated data
-    setResearch(sanitizeForRender(normalized) as ResearchData);
+    setResearch(normalized);
     if (newStatus) setAnalysisStatus(newStatus);
   }
 
