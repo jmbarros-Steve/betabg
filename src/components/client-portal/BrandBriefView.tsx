@@ -3800,7 +3800,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               if (!bi || typeof bi !== 'object') return null;
               const tonoVoz = bi.tono_voz || bi.tono_y_voz;
               const personalidad = bi.personalidad_marca || bi.personalidad_de_marca;
-              const hasSomething = bi.propuesta_valor_actual || personalidad || tonoVoz;
+              const propuestaValor = bi.propuesta_valor_actual || bi.propuesta_de_valor_actual;
+              const valoresMarca = bi.valores_marca_identificados || bi.valores_de_marca;
+              const hasSomething = propuestaValor || personalidad || tonoVoz;
               if (!hasSomething) return null;
               return (
               <Card className="border-primary/10">
@@ -3812,17 +3814,19 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-3">
-                  {bi.propuesta_valor_actual && (
+                  {propuestaValor && (
                     <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
                       <p className="text-sm font-medium text-primary mb-1">Propuesta de Valor</p>
-                      {typeof bi.propuesta_valor_actual === 'string' ? (
-                        <p className="text-sm leading-relaxed">{bi.propuesta_valor_actual}</p>
+                      {typeof propuestaValor === 'string' ? (
+                        <p className="text-sm leading-relaxed">{propuestaValor}</p>
                       ) : (
                         <div className="space-y-1">
-                          {bi.propuesta_valor_actual.promesa_principal && <p className="text-sm leading-relaxed font-medium">{bi.propuesta_valor_actual.promesa_principal}</p>}
-                          {bi.propuesta_valor_actual.diferenciador_clave && <p className="text-xs text-muted-foreground">{bi.propuesta_valor_actual.diferenciador_clave}</p>}
-                          {Array.isArray(bi.propuesta_valor_actual.frases_exactas) && (
-                            <ul className="text-xs space-y-0.5 mt-1">{bi.propuesta_valor_actual.frases_exactas.map((f: string, i: number) => (
+                          {(propuestaValor.promesa_principal || propuestaValor.promesa_central) && <p className="text-sm leading-relaxed font-medium">{propuestaValor.promesa_principal || propuestaValor.promesa_central}</p>}
+                          {propuestaValor.frase_principal && <p className="text-xs italic text-muted-foreground">"{propuestaValor.frase_principal}"</p>}
+                          {propuestaValor.eslogan && !propuestaValor.frase_principal && <p className="text-xs italic text-muted-foreground">"{propuestaValor.eslogan}"</p>}
+                          {(propuestaValor.diferenciador_clave || propuestaValor.diferenciador) && <p className="text-xs text-muted-foreground">{propuestaValor.diferenciador_clave || propuestaValor.diferenciador}</p>}
+                          {Array.isArray(propuestaValor.frases_exactas) && (
+                            <ul className="text-xs space-y-0.5 mt-1">{propuestaValor.frases_exactas.map((f: string, i: number) => (
                               <li key={i} className="italic text-muted-foreground">"{f}"</li>
                             ))}</ul>
                           )}
@@ -3873,12 +3877,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     </div>
                   )}
                   {(() => {
-                    // Handle both gaps_identidad (string[]) and gaps_de_identidad (object with sub-arrays)
-                    const gapsArr: string[] = Array.isArray(bi.gaps_identidad) ? bi.gaps_identidad : [];
+                    // Handle gaps_identidad (string[]), gaps_de_identidad (object with sub-arrays OR string values)
+                    const gapsArr: string[] = Array.isArray(bi.gaps_identidad) ? [...bi.gaps_identidad] : [];
                     if (gapsArr.length === 0 && bi.gaps_de_identidad && typeof bi.gaps_de_identidad === 'object') {
                       const gd = bi.gaps_de_identidad;
+                      // Jardín de Eva format: sub-arrays
                       if (Array.isArray(gd.no_comunican_claramente)) gapsArr.push(...gd.no_comunican_claramente);
                       if (Array.isArray(gd.deberian_reforzar)) gapsArr.push(...gd.deberian_reforzar);
+                      // La Soluzione format: {key: string_value} — collect all string values
+                      if (gapsArr.length === 0) {
+                        Object.values(gd).forEach((v: any) => { if (typeof v === 'string') gapsArr.push(v); });
+                      }
                     }
                     if (gapsArr.length === 0) return null;
                     return (

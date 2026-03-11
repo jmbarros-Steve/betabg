@@ -465,8 +465,16 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           onClose={() => setShowTemplateGallery(false)}
           onSelect={(design) => {
             setShowTemplateGallery(false);
-            if (design && emailEditorRef.current?.editor) {
-              emailEditorRef.current.editor.loadDesign(design);
+            if (design) {
+              // Wait for editor to be ready if it isn't yet
+              const tryLoad = () => {
+                if (emailEditorRef.current?.editor) {
+                  emailEditorRef.current.editor.loadDesign(design);
+                } else {
+                  setTimeout(tryLoad, 200);
+                }
+              };
+              tryLoad();
             }
           }}
         />

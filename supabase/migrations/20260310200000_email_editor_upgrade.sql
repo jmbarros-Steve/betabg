@@ -52,7 +52,7 @@ CREATE POLICY "Super admin full access to templates" ON email_templates
   );
 
 -- 3. Universal Content Blocks
-CREATE TABLE IF NOT EXISTS universal_blocks (
+CREATE TABLE IF NOT EXISTS email_universal_blocks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -64,21 +64,21 @@ CREATE TABLE IF NOT EXISTS universal_blocks (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_universal_blocks_client ON universal_blocks(client_id);
+CREATE INDEX IF NOT EXISTS idx_email_universal_blocks_client ON email_universal_blocks(client_id);
 
-ALTER TABLE universal_blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_universal_blocks ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Clients can view own universal blocks" ON universal_blocks
+CREATE POLICY "Clients can view own universal blocks" ON email_universal_blocks
   FOR SELECT USING (client_id IN (
     SELECT id FROM clients WHERE user_id = auth.uid() OR client_user_id = auth.uid()
   ));
 
-CREATE POLICY "Clients can manage own universal blocks" ON universal_blocks
+CREATE POLICY "Clients can manage own universal blocks" ON email_universal_blocks
   FOR ALL USING (client_id IN (
     SELECT id FROM clients WHERE user_id = auth.uid() OR client_user_id = auth.uid()
   ));
 
-CREATE POLICY "Super admin full access to universal blocks" ON universal_blocks
+CREATE POLICY "Super admin full access to universal blocks" ON email_universal_blocks
   FOR ALL USING (
     auth.uid() IN (SELECT id FROM auth.users WHERE email = 'jmbarros@bgconsult.cl')
   );

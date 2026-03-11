@@ -30,6 +30,7 @@ import { generateMassCampaigns } from './ai/generate-mass-campaigns.js';
 import { analyzeBrand } from './ai/analyze-brand.js';
 import { analyzeBrandResearch } from './ai/analyze-brand-research.js';
 import { analyzeBrandStrategy } from './ai/analyze-brand-strategy.js';
+import { editImageGemini } from './ai/edit-image-gemini.js';
 
 // Phase 2: Analytics
 import { syncCompetitorAds } from './analytics/sync-competitor-ads.js';
@@ -148,6 +149,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/analyze-brand', authMiddleware, analyzeBrand);
   app.post('/api/analyze-brand-research', authMiddleware, analyzeBrandResearch);
   app.post('/api/analyze-brand-strategy', authMiddleware, analyzeBrandStrategy);
+  app.post('/api/edit-image-gemini', authMiddleware, editImageGemini);
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
   app.post('/api/deep-dive-competitor', authMiddleware, deepDiveCompetitor);
   app.post('/api/fetch-campaign-adsets', authMiddleware, fetchCampaignAdsets);

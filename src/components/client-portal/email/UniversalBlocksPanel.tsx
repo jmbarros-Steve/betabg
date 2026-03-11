@@ -39,7 +39,7 @@ interface UniversalBlock {
   id: string;
   name: string;
   category: string;
-  design_json: any;
+  block_json: any;
   usage_count: number;
   created_at: string;
 }
@@ -136,7 +136,7 @@ export function UniversalBlocksPanel({
           client_id: clientId,
           name: saveName.trim(),
           category: saveCategory,
-          design_json: designJson,
+          block_json: designJson,
         },
       });
 
@@ -164,7 +164,7 @@ export function UniversalBlocksPanel({
     }
 
     try {
-      editor.loadDesign(block.design_json);
+      editor.loadDesign(block.block_json);
 
       // Increment usage count
       await callApi('universal-blocks', {

@@ -19,6 +19,7 @@ import { getSteveMailEditorOptions, registerSteveMailTools } from './steveMailEd
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
+import { ImageEditorPanel } from './ImageEditorPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -93,6 +94,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Template Gallery & Universal Blocks
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
+  const [showImageEditor, setShowImageEditor] = useState(false);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
 
   // Schedule
@@ -148,12 +150,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   }, [editorReady]);
 
-  // Load design when editor becomes ready
+  // Load design when editor becomes ready or designJson changes
   useEffect(() => {
     if (editorReady && designJson) {
       emailEditorRef.current?.editor?.loadDesign(designJson as any);
     }
-  }, [editorReady]);
+  }, [editorReady, designJson]);
 
   const handleGenerateWithAI = async () => {
     setGenerating(true);
@@ -328,8 +330,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
   const handleTemplateSelect = (templateDesign: any) => {
     setShowTemplateGallery(false);
-    if (templateDesign && emailEditorRef.current?.editor) {
-      emailEditorRef.current.editor.loadDesign(templateDesign);
+    if (templateDesign) {
+      // Store in state — useEffect will load when editor is ready
+      setDesignJson(templateDesign);
+      // Also load immediately if editor is already ready
+      if (editorReady && emailEditorRef.current?.editor) {
+        emailEditorRef.current.editor.loadDesign(templateDesign);
+      }
     }
   };
 
@@ -656,6 +663,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                 Bloques
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowImageEditor(true)}>
+                Editar Imagen
+              </Button>
               <Button size="sm" onClick={goToReviewStep}>
                 Revisar y Enviar
               </Button>
@@ -692,6 +702,19 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               editor={emailEditorRef.current?.editor}
               isOpen={showUniversalBlocks}
               onClose={() => setShowUniversalBlocks(false)}
+            />
+
+            {/* Image Editor (Gemini AI) */}
+            <ImageEditorPanel
+              clientId={clientId}
+              isOpen={showImageEditor}
+              onClose={() => setShowImageEditor(false)}
+              onImageReady={(url) => {
+                // Insert the edited image into the editor
+                toast.success('Imagen lista — arrástrala al canvas desde la URL copiada');
+              }}
+              brandColor={brandInfo.brand_color}
+              brandSecondaryColor={brandInfo.brand_secondary_color}
             />
           </>
         )}
