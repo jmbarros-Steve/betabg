@@ -41,45 +41,45 @@ export async function generateImage(c: Context) {
   let imageBytes: Uint8Array | null = null;
 
   if (engine === 'imagen') {
-    // -- Google Imagen 4 (AI Studio) path --
+    // -- Gemini 2.0 Flash native image generation --
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       console.error('[generate-image] GEMINI_API_KEY not configured');
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
-    const aspectRatio = formato === 'story' ? '9:16' :
-                        formato === 'feed' ? '1:1' :
-                        '1:1';
-
-    const imagenResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`,
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instances: [{ prompt: promptFinal }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio,
+          contents: [{ parts: [{ text: promptFinal }] }],
+          generationConfig: {
+            responseModalities: ['IMAGE'],
           },
         }),
       }
     );
 
-    if (!imagenResponse.ok) {
-      const errText = await imagenResponse.text();
-      console.error('[generate-image] Imagen 4 API error:', imagenResponse.status, errText);
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      console.error('[generate-image] Gemini Flash error:', geminiResponse.status, errText);
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
-    const imagenResult: any = await imagenResponse.json();
-    const prediction = imagenResult.predictions?.[0];
+    const geminiResult: any = await geminiResponse.json();
+    const responseParts = geminiResult.candidates?.[0]?.content?.parts || [];
 
-    if (prediction?.bytesBase64Encoded) {
-      imageBytes = new Uint8Array(Buffer.from(prediction.bytesBase64Encoded, 'base64'));
-    } else {
-      console.error('[generate-image] No image returned from Imagen 4:', JSON.stringify(imagenResult).substring(0, 500));
+    for (const part of responseParts) {
+      if (part.inlineData?.data) {
+        imageBytes = new Uint8Array(Buffer.from(part.inlineData.data, 'base64'));
+        break;
+      }
+    }
+
+    if (!imageBytes) {
+      console.error('[generate-image] No image in Gemini response:', JSON.stringify(geminiResult).substring(0, 500));
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -221,7 +221,7 @@ export async function generateImage(c: Context) {
   });
 
   // Deduct credits
-  const engineLabel = engine === 'imagen' ? 'Google Imagen 4' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
+  const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
   await supabase.from('client_credits').update({
     creditos_disponibles: (credits?.creditos_disponibles || 99999) - 2,
     creditos_usados: (credits?.creditos_usados || 0) + 2,

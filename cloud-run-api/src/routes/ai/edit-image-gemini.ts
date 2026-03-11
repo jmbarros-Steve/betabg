@@ -126,32 +126,34 @@ export async function editImageGemini(c: Context) {
     let imageBytes: Uint8Array | null = null;
 
     if (action === 'generate_email_banner' || (!imageBase64 && action === 'variation')) {
-      // Pure generation — use Imagen 4
-      const aspectRatio = (width && height && width > height * 1.5) ? '16:9' :
-                          (width && height && height > width * 1.5) ? '9:16' : '1:1';
-
-      const imagenResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`,
+      // Pure generation — use Gemini 2.0 Flash native image generation
+      const geminiGenResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            instances: [{ prompt: editPrompt }],
-            parameters: { sampleCount: 1, aspectRatio },
+            contents: [{ parts: [{ text: editPrompt }] }],
+            generationConfig: {
+              responseModalities: ['IMAGE'],
+            },
           }),
         }
       );
 
-      if (!imagenResponse.ok) {
-        const errText = await imagenResponse.text();
-        console.error('[edit-image-gemini] Imagen 4 error:', imagenResponse.status, errText);
+      if (!geminiGenResponse.ok) {
+        const errText = await geminiGenResponse.text();
+        console.error('[edit-image-gemini] Gemini Flash generation error:', geminiGenResponse.status, errText);
         return c.json({ error: 'Error procesando la imagen' }, 500);
       }
 
-      const imagenResult: any = await imagenResponse.json();
-      const prediction = imagenResult.predictions?.[0];
-      if (prediction?.bytesBase64Encoded) {
-        imageBytes = new Uint8Array(Buffer.from(prediction.bytesBase64Encoded, 'base64'));
+      const geminiGenResult: any = await geminiGenResponse.json();
+      const genParts = geminiGenResult.candidates?.[0]?.content?.parts || [];
+      for (const part of genParts) {
+        if (part.inlineData?.data) {
+          imageBytes = new Uint8Array(Buffer.from(part.inlineData.data, 'base64'));
+          break;
+        }
       }
     } else {
       // Image editing — use Gemini 2.0 Flash with image input
@@ -173,23 +175,27 @@ export async function editImageGemini(c: Context) {
         const errText = await geminiResponse.text();
         console.error('[edit-image-gemini] Gemini Flash error:', geminiResponse.status, errText);
 
-        // Fallback: try Imagen 4 with the edit prompt
+        // Fallback: try Gemini Flash generation with the edit prompt
         const fallbackResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              instances: [{ prompt: editPrompt }],
-              parameters: { sampleCount: 1, aspectRatio: '1:1' },
+              contents: [{ parts: [{ text: editPrompt }] }],
+              generationConfig: { responseModalities: ['IMAGE'] },
             }),
           }
         );
 
         if (fallbackResponse.ok) {
           const fbResult: any = await fallbackResponse.json();
-          if (fbResult.predictions?.[0]?.bytesBase64Encoded) {
-            imageBytes = new Uint8Array(Buffer.from(fbResult.predictions[0].bytesBase64Encoded, 'base64'));
+          const fbParts = fbResult.candidates?.[0]?.content?.parts || [];
+          for (const part of fbParts) {
+            if (part.inlineData?.data) {
+              imageBytes = new Uint8Array(Buffer.from(part.inlineData.data, 'base64'));
+              break;
+            }
           }
         }
 
@@ -209,29 +215,33 @@ export async function editImageGemini(c: Context) {
         }
 
         if (!imageBytes) {
-          // No image in response — try extracting text description and re-generate
-          console.warn('[edit-image-gemini] No image in Gemini response, falling back to Imagen 4');
+          // No image in response — try re-generating with Gemini Flash
+          console.warn('[edit-image-gemini] No image in Gemini response, retrying generation');
           const textPart = responseParts.find((p: any) => p.text);
           const regeneratePrompt = textPart?.text
             ? `${editPrompt}. Additional context: ${textPart.text.substring(0, 200)}`
             : editPrompt;
 
           const fallbackResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                instances: [{ prompt: regeneratePrompt }],
-                parameters: { sampleCount: 1, aspectRatio: '1:1' },
+                contents: [{ parts: [{ text: regeneratePrompt }] }],
+                generationConfig: { responseModalities: ['IMAGE'] },
               }),
             }
           );
 
           if (fallbackResponse.ok) {
             const fbResult: any = await fallbackResponse.json();
-            if (fbResult.predictions?.[0]?.bytesBase64Encoded) {
-              imageBytes = new Uint8Array(Buffer.from(fbResult.predictions[0].bytesBase64Encoded, 'base64'));
+            const fbParts = fbResult.candidates?.[0]?.content?.parts || [];
+            for (const part of fbParts) {
+              if (part.inlineData?.data) {
+                imageBytes = new Uint8Array(Buffer.from(part.inlineData.data, 'base64'));
+                break;
+              }
             }
           }
         }

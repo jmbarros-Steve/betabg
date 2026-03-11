@@ -690,8 +690,8 @@ function AdFormMultiSlot({
       const { data, error } = await callApi('generate-image', {
         body: { clientId, promptGeneracion: aiPrompt + anglePrompt, engine: imageEngine, formato: formatMap[aspectRatio] },
       });
+      if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
       if (error) throw error;
-      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
       if (data?.asset_url) { setImageAtSlot(data.asset_url); toast.success(`Imagen ${activeImageSlot + 1} generada`); }
     } catch (err: any) { toast.error(err?.message || 'Error'); }
     finally { setGeneratingImage(false); }
@@ -1194,7 +1194,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             const { data, error } = await callApi('generate-image', {
               body: { clientId, promptGeneracion: imgPrompt, engine: 'imagen', formato: 'square' },
             });
-            if (error) { console.error('[Wizard] AI image error:', error); return; }
+            if (error) { console.error('[Wizard] AI image error:', error); toast.error('Error generando imagen: ' + error); return; }
             if (data?.asset_url) {
               setImages((prev) => {
                 const next = [...prev];
