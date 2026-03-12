@@ -1220,8 +1220,9 @@ REGLAS ABSOLUTAS:
   const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance);
   // Strip control tags from visible message
   assistantMessage = assistantMessage
-    .replace(/\s*\[RECHAZO\]\s*$/i, '')
-    .replace(/\s*\[AVANZAR\]\s*/gi, '')
+    .replace(/\s*\[RECHAZO\]\s*/gi, ' ')
+    .replace(/\s*\[AVANZAR\]\s*/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 
   // BUG 6 FIX: newAnsweredCount can only ever be currentQuestionIndex or currentQuestionIndex + 1.

@@ -213,8 +213,8 @@ export async function manageEmailCampaigns(c: Context) {
         shop_url: brandClient?.website_url || '',
       };
 
-      // Check if HTML uses nunjucks syntax ({% or advanced {{ person. )
-      const usesNunjucks = baseHtml.includes('{%') || baseHtml.includes('person.');
+      // Check if HTML uses nunjucks syntax
+      const usesNunjucks = baseHtml.includes('{%') || baseHtml.includes('{{');
 
       // Send emails in batches
       let sentCount = 0;
@@ -248,30 +248,48 @@ export async function manageEmailCampaigns(c: Context) {
           })
           .eq('id', abTest.id);
 
+        // Helper: per-subscriber processing for A/B test
+        const processAndSend = async (sub: any, html: string, subject: string, variant: 'a' | 'b') => {
+          try {
+            const ctx = buildTemplateContext(
+              { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at, custom_fields: sub.custom_fields },
+              { discount_code: campaign.recommendation_config?.discount_code },
+              brandInfo,
+              []
+            );
+            let personalizedHtml = usesNunjucks ? renderEmailTemplate(html, ctx) : html;
+            let personalizedSubject = usesNunjucks ? renderEmailTemplate(subject, ctx) : subject;
+
+            const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+            if (hasCustomBlocks) {
+              personalizedHtml = await processEmailHtml(personalizedHtml, {
+                clientId: client_id, subscriberId: sub.id, templateContext: ctx, recommendationConfig: recConfig,
+              });
+            }
+
+            const r = await sendSingleEmail({
+              to: sub.email, subject: personalizedSubject, htmlContent: personalizedHtml,
+              fromEmail, fromName, replyTo: campaign.reply_to || undefined,
+              subscriberId: sub.id, clientId: client_id, campaignId: campaign_id, abVariant: variant,
+            });
+            if (r.success) sentCount++;
+            return r;
+          } catch (err) {
+            console.error(`[campaign-send] A/B variant ${variant} failed for ${sub.email}:`, err);
+            return { success: false, error: (err as Error).message };
+          }
+        };
+
         // Send variant A
         for (let i = 0; i < groupA.length; i += batchSize) {
           const batch = groupA.slice(i, i + batchSize);
-          const promises = batch.map((sub) =>
-            sendSingleEmail({
-              to: sub.email, subject: campaign.subject, htmlContent: baseHtml,
-              fromEmail, fromName, replyTo: campaign.reply_to || undefined,
-              subscriberId: sub.id, clientId: client_id, campaignId: campaign_id, abVariant: 'a',
-            }).then((r) => { if (r.success) sentCount++; return r; })
-          );
-          await Promise.all(promises);
+          await Promise.all(batch.map((sub) => processAndSend(sub, baseHtml, campaign.subject, 'a')));
         }
 
         // Send variant B
         for (let i = 0; i < groupB.length; i += batchSize) {
           const batch = groupB.slice(i, i + batchSize);
-          const promises = batch.map((sub) =>
-            sendSingleEmail({
-              to: sub.email, subject: variantBSubject, htmlContent: variantBHtml,
-              fromEmail, fromName, replyTo: campaign.reply_to || undefined,
-              subscriberId: sub.id, clientId: client_id, campaignId: campaign_id, abVariant: 'b',
-            }).then((r) => { if (r.success) sentCount++; return r; })
-          );
-          await Promise.all(promises);
+          await Promise.all(batch.map((sub) => processAndSend(sub, variantBHtml, variantBSubject, 'b')));
         }
 
         // Schedule Cloud Task to pick winner after test_duration_hours
@@ -303,43 +321,48 @@ export async function manageEmailCampaigns(c: Context) {
         const batch = subscribers.slice(i, i + batchSize);
 
         const promises = batch.map(async (sub) => {
-          // Build per-subscriber template context
-          const ctx = buildTemplateContext(
-            { first_name: sub.first_name ?? undefined, email: sub.email },
-            { discount_code: campaign.recommendation_config?.discount_code },
-            brandInfo,
-            []
-          );
+          try {
+            // Build per-subscriber template context with full subscriber data
+            const ctx = buildTemplateContext(
+              { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at ?? undefined, custom_fields: sub.custom_fields ?? undefined },
+              { discount_code: campaign.recommendation_config?.discount_code },
+              brandInfo,
+              []
+            );
 
-          // Render per-subscriber template (nunjucks)
-          let personalizedHtml = usesNunjucks ? renderEmailTemplate(baseHtml, ctx) : baseHtml;
-          let personalizedSubject = usesNunjucks ? renderEmailTemplate(campaign.subject, ctx) : campaign.subject;
+            // Render per-subscriber template (nunjucks)
+            let personalizedHtml = usesNunjucks ? renderEmailTemplate(baseHtml, ctx) : baseHtml;
+            let personalizedSubject = usesNunjucks ? renderEmailTemplate(campaign.subject, ctx) : campaign.subject;
 
-          // Process custom blocks (products, discounts, conditionals) per subscriber
-          const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
-          if (hasCustomBlocks) {
-            personalizedHtml = await processEmailHtml(personalizedHtml, {
-              clientId: client_id,
+            // Process custom blocks (products, discounts, conditionals) per subscriber
+            const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+            if (hasCustomBlocks) {
+              personalizedHtml = await processEmailHtml(personalizedHtml, {
+                clientId: client_id,
+                subscriberId: sub.id,
+                templateContext: ctx,
+                recommendationConfig: recConfig,
+              });
+            }
+
+            return sendSingleEmail({
+              to: sub.email,
+              subject: personalizedSubject,
+              htmlContent: personalizedHtml,
+              fromEmail,
+              fromName,
+              replyTo: campaign.reply_to || undefined,
               subscriberId: sub.id,
-              templateContext: ctx,
-              recommendationConfig: recConfig,
+              clientId: client_id,
+              campaignId: campaign_id,
+            }).then((result) => {
+              if (result.success) sentCount++;
+              return result;
             });
+          } catch (err) {
+            console.error(`[campaign-send] Failed for subscriber ${sub.id}:`, err);
+            return { success: false, error: (err as Error).message };
           }
-
-          return sendSingleEmail({
-            to: sub.email,
-            subject: personalizedSubject,
-            htmlContent: personalizedHtml,
-            fromEmail,
-            fromName,
-            replyTo: campaign.reply_to || undefined,
-            subscriberId: sub.id,
-            clientId: client_id,
-            campaignId: campaign_id,
-          }).then((result) => {
-            if (result.success) sentCount++;
-            return result;
-          });
         });
 
         await Promise.all(promises);
@@ -458,10 +481,10 @@ async function getFilteredSubscribers(
   supabase: any,
   clientId: string,
   filter: any
-): Promise<Array<{ id: string; email: string; first_name: string | null }>> {
+): Promise<Array<{ id: string; email: string; first_name: string | null; last_name: string | null; tags: string[]; total_orders: number; total_spent: number; last_order_at: string | null; custom_fields: Record<string, any> | null }>> {
   let query = supabase
     .from('email_subscribers')
-    .select('id, email, first_name')
+    .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
     .eq('client_id', clientId)
     .eq('status', 'subscribed');
 

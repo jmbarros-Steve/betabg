@@ -204,11 +204,14 @@ export async function generateRecommendationBlock(
         }
       }
 
-      // Final fallback: highest priced
-      if (recommended.length === 0) {
-        recommended = [...allProducts]
+      // Final fallback: highest priced (also tops up partial results)
+      if (recommended.length < config.count) {
+        const existing = new Set(recommended.map(p => p.id));
+        const additional = [...allProducts]
+          .filter(p => !existing.has(p.id))
           .sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
-          .slice(0, config.count);
+          .slice(0, config.count - recommended.length);
+        recommended = [...recommended, ...additional];
       }
       break;
     }

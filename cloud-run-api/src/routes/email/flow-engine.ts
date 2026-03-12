@@ -218,32 +218,36 @@ export async function emailFlowExecute(c: Context) {
   // Process custom blocks (products, discounts, conditionals) per subscriber
   const hasCustomBlocks = htmlContent.includes('data-steve-') || htmlContent.includes('product_recommendations');
   if (hasCustomBlocks) {
-    const templateCtx = buildTemplateContext(
-      {
-        first_name: subscriber.first_name,
-        last_name: subscriber.last_name,
-        email: subscriber.email,
-        tags: subscriber.tags || [],
-        total_orders: subscriber.total_orders || 0,
-        total_spent: subscriber.total_spent || 0,
-        last_order_at: subscriber.last_order_at,
-        custom_fields: subscriber.custom_fields || {},
-      },
-      {
-        cart_url: enrollment.metadata?.abandoned_checkout_url || enrollment.metadata?.cart_url,
-        cart_total: enrollment.metadata?.total_price,
-        discount_code: enrollment.metadata?.discount_code,
-      },
-      enrollment.metadata?.brand || {},
-      enrollment.metadata?.products || []
-    );
+    try {
+      const templateCtx = buildTemplateContext(
+        {
+          first_name: subscriber.first_name,
+          last_name: subscriber.last_name,
+          email: subscriber.email,
+          tags: subscriber.tags || [],
+          total_orders: subscriber.total_orders || 0,
+          total_spent: subscriber.total_spent || 0,
+          last_order_at: subscriber.last_order_at,
+          custom_fields: subscriber.custom_fields || {},
+        },
+        {
+          cart_url: enrollment.metadata?.abandoned_checkout_url || enrollment.metadata?.cart_url,
+          cart_total: enrollment.metadata?.total_price,
+          discount_code: enrollment.metadata?.discount_code,
+        },
+        enrollment.metadata?.brand || {},
+        enrollment.metadata?.products || []
+      );
 
-    htmlContent = await processEmailHtml(htmlContent, {
-      clientId: enrollment.client_id,
-      subscriberId: subscriber.id,
-      enrollmentMetadata: enrollment.metadata,
-      templateContext: templateCtx,
-    });
+      htmlContent = await processEmailHtml(htmlContent, {
+        clientId: enrollment.client_id,
+        subscriberId: subscriber.id,
+        enrollmentMetadata: enrollment.metadata,
+        templateContext: templateCtx,
+      });
+    } catch (err) {
+      console.error(`[flow-engine] processEmailHtml failed, sending with merge-tags only:`, err);
+    }
   }
 
   const result = await sendSingleEmail({
