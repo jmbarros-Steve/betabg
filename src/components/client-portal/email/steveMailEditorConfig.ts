@@ -2,9 +2,9 @@
  * Shared Unlayer editor configuration for Steve Mail.
  * Used by CampaignBuilder, FlowBuilder, and UnlayerEmailEditor.
  *
- * Custom tools (steve_products, steve_discount) are registered via customJS
- * since Unlayer's registerTool API is only available inside the editor iframe.
- * See: public/unlayer-product-tool.js
+ * Custom tools are registered in registerSteveMailTools() via editor.registerTool()
+ * after the editor is ready. This is more reliable than customJS which can fail
+ * silently due to CORS/iframe issues.
  */
 import { steveMailMergeTagsConfig } from './steveMailMergeTags';
 
@@ -75,7 +75,7 @@ function makeBlockDesign(cells: number[], columns: any[]): any {
   };
 }
 
-// Pre-built rows that appear in the Blocks tab (Unlayer format: id, data, category, tags)
+// Pre-built rows that appear in the Blocks tab
 const customBlocks = [
   {
     id: 100001,
@@ -332,15 +332,100 @@ const customBlocks = [
   },
 ];
 
-export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
-  // Construct customJS URL — loads custom tools inside the Unlayer iframe
-  const customJsUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/unlayer-product-tool.js`
-    : '/unlayer-product-tool.js';
+// ===== Spanish translations for Unlayer =====
+const spanishTranslations = {
+  'es-ES': {
+    // Tabs
+    'editor.content.title': 'Contenido',
+    'editor.blocks.title': 'Bloques',
+    'editor.body.title': 'General',
+    'editor.images.title': 'Imágenes',
+    'editor.uploads.title': 'Subidas',
+    // Built-in tool names
+    'tools.text.name': 'Texto',
+    'tools.image.name': 'Imagen',
+    'tools.button.name': 'Botón',
+    'tools.divider.name': 'Divisor',
+    'tools.heading.name': 'Título',
+    'tools.html.name': 'HTML',
+    'tools.menu.name': 'Menú',
+    'tools.social.name': 'Redes Sociales',
+    'tools.video.name': 'Video',
+    'tools.timer.name': 'Temporizador',
+    'tools.columns.name': 'Columnas',
+    // Common properties
+    'editor.action.label': 'Acción',
+    'editor.action.web': 'Abrir sitio web',
+    'editor.action.email': 'Enviar email',
+    'editor.action.phone': 'Llamar teléfono',
+    'editor.action.url': 'URL',
+    'editor.align.label': 'Alineación',
+    'editor.background_color.label': 'Color de fondo',
+    'editor.border.label': 'Borde',
+    'editor.border_radius.label': 'Radio del borde',
+    'editor.color.label': 'Color',
+    'editor.container_padding.label': 'Espaciado',
+    'editor.font_family.label': 'Fuente',
+    'editor.font_size.label': 'Tamaño de fuente',
+    'editor.font_weight.label': 'Grosor de fuente',
+    'editor.line_height.label': 'Altura de línea',
+    'editor.link_color.label': 'Color del enlace',
+    'editor.padding.label': 'Espaciado interno',
+    'editor.text_align.label': 'Alineación de texto',
+    'editor.text_color.label': 'Color de texto',
+    'editor.width.label': 'Ancho',
+    // Buttons
+    'editor.button.text': 'Texto del botón',
+    'editor.button.url': 'URL del botón',
+    'editor.button.colors': 'Colores del botón',
+    'editor.button.background_color': 'Color de fondo',
+    'editor.button.text_color': 'Color de texto',
+    'editor.button.hover_color': 'Color hover',
+    'editor.button.border_radius': 'Radio del borde',
+    'editor.button.padding': 'Espaciado interno',
+    'editor.button.width': 'Ancho',
+    // Image
+    'editor.image.alt_text': 'Texto alternativo',
+    'editor.image.url': 'URL de la imagen',
+    'editor.image.upload': 'Subir imagen',
+    // Row/Column
+    'editor.row.label': 'Fila',
+    'editor.column.label': 'Columna',
+    'editor.columns.label': 'Columnas',
+    'editor.row.background_color': 'Color de fondo',
+    'editor.row.content_background_color': 'Color de contenido',
+    'editor.row.background_image': 'Imagen de fondo',
+    // Body
+    'editor.body.background_color': 'Color de fondo',
+    'editor.body.content_width': 'Ancho de contenido',
+    'editor.body.font_family': 'Fuente',
+    'editor.body.preheader': 'Texto de previsualización',
+    // Actions
+    'editor.done': 'Listo',
+    'editor.cancel': 'Cancelar',
+    'editor.save': 'Guardar',
+    'editor.delete': 'Eliminar',
+    'editor.duplicate': 'Duplicar',
+    'editor.move_up': 'Mover arriba',
+    'editor.move_down': 'Mover abajo',
+    // Drag & drop
+    'editor.drag_here': 'Arrastra contenido aquí',
+    'editor.drop_here': 'Suelta aquí',
+    // Search
+    'editor.search': 'Buscar',
+    'editor.search_placeholder': 'Buscar...',
+    // Stock images
+    'editor.stock_images.title': 'Imágenes de stock',
+    'editor.stock_images.search': 'Buscar imágenes',
+  },
+};
 
+export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
   return {
     displayMode: 'email' as const,
     locale: 'es-ES',
+    translations: spanishTranslations,
+    projectId: 1, // Required for some Unlayer features
     appearance: {
       theme: 'modern_light',
       panels: {
@@ -358,7 +443,21 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
       html: { enabled: true },
       image: { enabled: true },
       text: { enabled: true },
-      button: { enabled: true },
+      button: {
+        enabled: true,
+        properties: {
+          borderRadius: { value: '8px' },
+          padding: { value: '14px 32px' },
+          buttonColors: {
+            value: {
+              color: '#ffffff',
+              backgroundColor: '#18181b',
+              hoverColor: '#ffffff',
+              hoverBackgroundColor: '#333333',
+            },
+          },
+        },
+      },
       divider: { enabled: true },
       heading: { enabled: true },
       menu: { enabled: true },
@@ -374,7 +473,12 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
       images: { enabled: true },
     },
     customCSS: [],
-    customJS: [customJsUrl],
+    customJS: [
+      // Fallback: also load tools via customJS in case editor.registerTool() isn't available
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/unlayer-product-tool.js`
+        : '/unlayer-product-tool.js',
+    ],
     blocks: customBlocks,
     ...(opts?.mergeTagsOverride
       ? { mergeTags: opts.mergeTagsOverride }
@@ -384,12 +488,464 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
 };
 
 /**
- * Post-init editor setup. Called in onReady.
- * Custom tools are registered via customJS (not here).
+ * Register Steve Mail custom tools on the editor instance.
+ * Called in onReady after the editor is initialized.
+ *
+ * This registers directly via editor.registerTool() which is more reliable
+ * than customJS (which loads in the iframe and can fail silently).
  */
-export function registerSteveMailTools(_editor: any) {
-  // Custom tools (steve_products, steve_discount) are registered via customJS
-  // since registerTool is only available in the Unlayer iframe context.
-  // Pre-built blocks are passed via the `blocks` editor option.
-  // This function is kept as a hook for future post-init logic.
+export function registerSteveMailTools(editor: any) {
+  if (!editor) return;
+
+  // ===== Productos =====
+  try {
+    editor.registerTool({
+      name: 'steve_products',
+      label: 'Productos',
+      icon: 'fa-shopping-bag',
+      supportedDisplayModes: ['email'],
+      values: {},
+      options: {
+        productType: {
+          title: 'Tipo de Productos',
+          position: 1,
+          options: {
+            productType: {
+              label: 'Tipo',
+              defaultValue: 'best_sellers',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: 'Más vendidos', value: 'best_sellers' },
+                  { label: 'Nuevos', value: 'new_arrivals' },
+                  { label: 'Últimos vistos', value: 'recently_viewed' },
+                  { label: 'Carrito abandonado', value: 'abandoned_cart' },
+                  { label: 'Complementarios', value: 'complementary' },
+                  { label: 'Todos los productos', value: 'all' },
+                ],
+              },
+            },
+            productCount: {
+              label: 'Cantidad',
+              defaultValue: '4',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: '2 productos', value: '2' },
+                  { label: '3 productos', value: '3' },
+                  { label: '4 productos', value: '4' },
+                  { label: '6 productos', value: '6' },
+                ],
+              },
+            },
+            columns: {
+              label: 'Columnas',
+              defaultValue: '2',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: '1 columna', value: '1' },
+                  { label: '2 columnas', value: '2' },
+                  { label: '3 columnas', value: '3' },
+                ],
+              },
+            },
+          },
+        },
+        display: {
+          title: 'Mostrar',
+          position: 2,
+          options: {
+            showPrice: { label: 'Mostrar precio', defaultValue: true, widget: 'toggle' },
+            showButton: { label: 'Mostrar botón', defaultValue: true, widget: 'toggle' },
+            buttonText: { label: 'Texto del botón', defaultValue: 'Comprar', widget: 'text' },
+            buttonColor: { label: 'Color del botón', defaultValue: '#18181b', widget: 'color_picker' },
+          },
+        },
+      },
+      transformer: (values: any, _source: any) => values,
+      renderer: {
+        Viewer: editor.createViewer({
+          render: (values: any) => generateProductGridHTML(values),
+        }),
+        exporters: {
+          email: (values: any) => generateProductGridHTML(values),
+        },
+      },
+    });
+  } catch (e) {
+    console.warn('Steve Mail: could not register steve_products tool', e);
+  }
+
+  // ===== Código de Descuento =====
+  try {
+    editor.registerTool({
+      name: 'steve_discount',
+      label: 'Código Descuento',
+      icon: 'fa-tag',
+      supportedDisplayModes: ['email'],
+      values: {},
+      options: {
+        discount: {
+          title: 'Descuento',
+          position: 1,
+          options: {
+            discountSource: {
+              label: 'Fuente del código',
+              defaultValue: 'manual',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: 'Escribir código manual', value: 'manual' },
+                  { label: 'Crear en Shopify (automático)', value: 'shopify_create' },
+                ],
+              },
+            },
+            discountCode: { label: 'Código', defaultValue: 'DESCUENTO20', widget: 'text' },
+            discountType: {
+              label: 'Tipo descuento (Shopify)',
+              defaultValue: 'percentage',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: 'Porcentaje (%)', value: 'percentage' },
+                  { label: 'Monto fijo ($)', value: 'fixed_amount' },
+                  { label: 'Envío gratis', value: 'free_shipping' },
+                ],
+              },
+            },
+            discountValue: { label: 'Valor', defaultValue: '20', widget: 'text' },
+          },
+        },
+        style: {
+          title: 'Estilo',
+          position: 2,
+          options: {
+            bgColor: { label: 'Color de fondo', defaultValue: '#fafafa', widget: 'color_picker' },
+            textColor: { label: 'Color de texto', defaultValue: '#18181b', widget: 'color_picker' },
+            borderColor: { label: 'Color de borde', defaultValue: '#d4d4d8', widget: 'color_picker' },
+          },
+        },
+        cta: {
+          title: 'Botón',
+          position: 3,
+          options: {
+            ctaText: { label: 'Texto', defaultValue: 'Usar Código', widget: 'text' },
+            ctaUrl: { label: 'URL', defaultValue: '', widget: 'text' },
+            ctaColor: { label: 'Color', defaultValue: '#18181b', widget: 'color_picker' },
+          },
+        },
+      },
+      transformer: (values: any, _source: any) => values,
+      renderer: {
+        Viewer: editor.createViewer({
+          render: (values: any) => generateDiscountHTML(values),
+        }),
+        exporters: {
+          email: (values: any) => generateDiscountHTML(values),
+        },
+      },
+    });
+  } catch (e) {
+    console.warn('Steve Mail: could not register steve_discount tool', e);
+  }
+
+  // ===== Botón Diseñable =====
+  try {
+    editor.registerTool({
+      name: 'steve_button',
+      label: 'Botón Diseño',
+      icon: 'fa-hand-pointer-o',
+      supportedDisplayModes: ['email'],
+      values: {},
+      options: {
+        content: {
+          title: 'Contenido',
+          position: 1,
+          options: {
+            btnText: { label: 'Texto', defaultValue: 'Comprar Ahora', widget: 'text' },
+            btnUrl: { label: 'URL de destino', defaultValue: '', widget: 'text' },
+          },
+        },
+        design: {
+          title: 'Diseño',
+          position: 2,
+          options: {
+            btnStyle: {
+              label: 'Estilo',
+              defaultValue: 'filled',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: 'Relleno', value: 'filled' },
+                  { label: 'Solo borde', value: 'outline' },
+                  { label: 'Píldora', value: 'pill' },
+                  { label: 'Sombra', value: 'shadow' },
+                  { label: 'Gradiente', value: 'gradient' },
+                ],
+              },
+            },
+            btnSize: {
+              label: 'Tamaño',
+              defaultValue: 'medium',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: 'Pequeño', value: 'small' },
+                  { label: 'Mediano', value: 'medium' },
+                  { label: 'Grande', value: 'large' },
+                  { label: 'Ancho completo', value: 'full' },
+                ],
+              },
+            },
+            btnColor: { label: 'Color principal', defaultValue: '#18181b', widget: 'color_picker' },
+            btnTextColor: { label: 'Color del texto', defaultValue: '#ffffff', widget: 'color_picker' },
+            btnAlign: {
+              label: 'Alineación',
+              defaultValue: 'center',
+              widget: 'dropdown',
+              data: {
+                options: [
+                  { label: 'Izquierda', value: 'left' },
+                  { label: 'Centro', value: 'center' },
+                  { label: 'Derecha', value: 'right' },
+                ],
+              },
+            },
+          },
+        },
+      },
+      transformer: (values: any, _source: any) => values,
+      renderer: {
+        Viewer: editor.createViewer({
+          render: (values: any) => generateButtonHTML(values),
+        }),
+        exporters: {
+          email: (values: any) => generateButtonHTML(values),
+        },
+      },
+    });
+  } catch (e) {
+    console.warn('Steve Mail: could not register steve_button tool', e);
+  }
+
+  // ===== Cuenta Regresiva =====
+  try {
+    editor.registerTool({
+      name: 'steve_countdown',
+      label: 'Cuenta Regresiva',
+      icon: 'fa-clock-o',
+      supportedDisplayModes: ['email'],
+      values: {},
+      options: {
+        countdown: {
+          title: 'Cuenta Regresiva',
+          position: 1,
+          options: {
+            endDate: {
+              label: 'Fecha de término',
+              defaultValue: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+              widget: 'text',
+            },
+            labelText: {
+              label: 'Texto superior',
+              defaultValue: 'La oferta termina en',
+              widget: 'text',
+            },
+            expiredText: {
+              label: 'Texto expirado',
+              defaultValue: 'Esta oferta ha expirado',
+              widget: 'text',
+            },
+          },
+        },
+        style: {
+          title: 'Estilo',
+          position: 2,
+          options: {
+            bgColor: { label: 'Color de fondo', defaultValue: '#18181b', widget: 'color_picker' },
+            textColor: { label: 'Color de texto', defaultValue: '#ffffff', widget: 'color_picker' },
+          },
+        },
+      },
+      transformer: (values: any, _source: any) => values,
+      renderer: {
+        Viewer: editor.createViewer({
+          render: (values: any) => generateCountdownHTML(values),
+        }),
+        exporters: {
+          email: (values: any) => generateCountdownHTML(values),
+        },
+      },
+    });
+  } catch (e) {
+    console.warn('Steve Mail: could not register steve_countdown tool', e);
+  }
+}
+
+// ===== HTML Generators =====
+
+function generateProductGridHTML(values: any): string {
+  const count = parseInt(values.productCount, 10) || 4;
+  const cols = parseInt(values.columns, 10) || 2;
+  const colWidth = Math.floor(100 / cols);
+  const placeholderImg = 'https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto';
+  const typeLabels: Record<string, string> = {
+    best_sellers: 'Más vendidos',
+    new_arrivals: 'Nuevos',
+    recently_viewed: 'Últimos vistos',
+    abandoned_cart: 'Carrito abandonado',
+    complementary: 'Complementarios',
+    all: 'Todos los productos',
+  };
+
+  let cells = '';
+  for (let i = 0; i < count; i++) {
+    cells += `<td style="width:${colWidth}%;padding:8px;vertical-align:top;text-align:center;">`;
+    cells += `<img src="${placeholderImg}" alt="Producto ${i + 1}" style="width:100%;max-width:280px;border-radius:8px;" />`;
+    cells += `<p style="margin:8px 0 4px;font-weight:600;font-size:14px;color:#18181b;">Producto ${i + 1}</p>`;
+    if (values.showPrice !== false) {
+      cells += '<p style="margin:0 0 8px;font-size:13px;color:#71717a;">$XX.XX</p>';
+    }
+    if (values.showButton !== false) {
+      cells += `<a href="#" style="display:inline-block;padding:8px 20px;background:${values.buttonColor || '#18181b'};color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">${values.buttonText || 'Comprar'}</a>`;
+    }
+    cells += '</td>';
+    if ((i + 1) % cols === 0 && i + 1 < count) {
+      cells += '</tr><tr>';
+    }
+  }
+
+  return `<div data-steve-products="true" data-product-type="${values.productType || 'best_sellers'}" data-product-count="${count}" data-columns="${cols}" data-show-price="${values.showPrice !== false}" data-show-button="${values.showButton !== false}" data-button-text="${values.buttonText || 'Comprar'}" data-button-color="${values.buttonColor || '#18181b'}">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">` +
+      `<tr><td colspan="${cols}" style="padding:0 0 8px;text-align:center;">` +
+        `<p style="margin:0;font-size:11px;color:#a1a1aa;text-transform:uppercase;letter-spacing:1px;">${typeLabels[values.productType] || 'Productos'}</p>` +
+      `</td></tr>` +
+      `<tr>${cells}</tr>` +
+    `</table>` +
+  `</div>`;
+}
+
+function generateDiscountHTML(values: any): string {
+  const source = values.discountSource || 'manual';
+  const code = source === 'shopify_create'
+    ? '{{ shopify_discount_code }}'
+    : (values.discountCode || '{{ discount_code }}');
+  const displayCode = source === 'shopify_create'
+    ? ('STEVE-' + (values.discountType === 'free_shipping' ? 'ENVIO' : (values.discountValue || '20') + (values.discountType === 'percentage' ? '%OFF' : 'OFF')))
+    : code;
+  const bg = values.bgColor || '#fafafa';
+  const textColor = values.textColor || '#18181b';
+  const border = values.borderColor || '#d4d4d8';
+  const subtitle = source === 'shopify_create'
+    ? (values.discountType === 'free_shipping' ? 'Envío gratis' : (values.discountType === 'percentage' ? values.discountValue + '% de descuento' : '$' + values.discountValue + ' de descuento'))
+    : 'Tu código de descuento';
+  let cta = '';
+  if (values.ctaText) {
+    cta = `<a href="${values.ctaUrl || '#'}" style="display:inline-block;padding:10px 28px;background:${values.ctaColor || '#18181b'};color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">${values.ctaText}</a>`;
+  }
+
+  return `<div data-steve-discount="true" data-discount-code="${code}" data-discount-source="${source}" data-discount-type="${values.discountType || 'percentage'}" data-discount-value="${values.discountValue || '20'}" style="text-align:center;padding:24px;">` +
+    `<div style="display:inline-block;border:2px dashed ${border};border-radius:12px;padding:24px 40px;background:${bg};">` +
+      `<p style="margin:0 0 4px;font-size:12px;color:${textColor};text-transform:uppercase;letter-spacing:1px;">${subtitle}</p>` +
+      `<p style="margin:0 0 16px;font-size:28px;font-weight:700;color:${textColor};letter-spacing:3px;">${displayCode}</p>` +
+      cta +
+    `</div>` +
+  `</div>`;
+}
+
+function generateButtonHTML(values: any): string {
+  const text = values.btnText || 'Comprar Ahora';
+  const url = values.btnUrl || '#';
+  const style = values.btnStyle || 'filled';
+  const size = values.btnSize || 'medium';
+  const color = values.btnColor || '#18181b';
+  const textColor = values.btnTextColor || '#ffffff';
+  const align = values.btnAlign || 'center';
+
+  // Size mapping
+  const sizeMap: Record<string, { padding: string; fontSize: string; width: string }> = {
+    small: { padding: '8px 20px', fontSize: '13px', width: 'auto' },
+    medium: { padding: '14px 32px', fontSize: '15px', width: 'auto' },
+    large: { padding: '18px 48px', fontSize: '17px', width: 'auto' },
+    full: { padding: '16px 32px', fontSize: '16px', width: '100%' },
+  };
+  const s = sizeMap[size] || sizeMap.medium;
+
+  // Style mapping
+  let bgStyle = `background:${color};color:${textColor};border:2px solid ${color};`;
+  let borderRadius = '8px';
+  let extraStyle = '';
+
+  switch (style) {
+    case 'outline':
+      bgStyle = `background:transparent;color:${color};border:2px solid ${color};`;
+      break;
+    case 'pill':
+      borderRadius = '50px';
+      break;
+    case 'shadow':
+      extraStyle = `box-shadow:0 4px 14px ${color}40;`;
+      break;
+    case 'gradient':
+      bgStyle = `background:linear-gradient(135deg, ${color}, ${color}cc);color:${textColor};border:none;`;
+      break;
+    default: // filled
+      break;
+  }
+
+  const widthAttr = size === 'full' ? 'width="100%"' : '';
+  const displayStyle = size === 'full' ? 'display:block;' : 'display:inline-block;';
+
+  return `<div style="text-align:${align};padding:16px 24px;">` +
+    `<a href="${url}" ${widthAttr} style="${displayStyle}padding:${s.padding};font-size:${s.fontSize};font-weight:600;${bgStyle}border-radius:${borderRadius};text-decoration:none;text-align:center;letter-spacing:0.5px;${extraStyle}${size === 'full' ? 'width:100%;box-sizing:border-box;' : ''}">${text}</a>` +
+  `</div>`;
+}
+
+function generateCountdownHTML(values: any): string {
+  const endDate = values.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+  const labelText = values.labelText || 'La oferta termina en';
+  const expiredText = values.expiredText || 'Esta oferta ha expirado';
+  const bgColor = values.bgColor || '#18181b';
+  const textColor = values.textColor || '#ffffff';
+
+  const uid = 'cd_' + Math.random().toString(36).substr(2, 9);
+
+  const digitBoxStyle = `display:inline-block;min-width:56px;padding:10px 8px;margin:0 4px;background:rgba(255,255,255,0.08);border-radius:8px;text-align:center;`;
+  const digitStyle = `display:block;font-size:28px;font-weight:700;line-height:1.2;color:${textColor};`;
+  const unitStyle = `display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${textColor};opacity:0.6;margin-top:4px;`;
+
+  return `<div data-steve-countdown="true" data-end-date="${endDate}" ` +
+    `style="text-align:center;padding:28px 16px;background:${bgColor};border-radius:12px;">` +
+      `<p style="margin:0 0 16px;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:${textColor};opacity:0.75;">${labelText}</p>` +
+      `<div id="${uid}" style="display:inline-block;">` +
+        `<span style="${digitBoxStyle}"><span class="cd-val" data-unit="days" style="${digitStyle}">00</span><span style="${unitStyle}">Días</span></span>` +
+        `<span style="${digitBoxStyle}"><span class="cd-val" data-unit="hours" style="${digitStyle}">00</span><span style="${unitStyle}">Horas</span></span>` +
+        `<span style="${digitBoxStyle}"><span class="cd-val" data-unit="minutes" style="${digitStyle}">00</span><span style="${unitStyle}">Min</span></span>` +
+        `<span style="${digitBoxStyle}"><span class="cd-val" data-unit="seconds" style="${digitStyle}">00</span><span style="${unitStyle}">Seg</span></span>` +
+      `</div>` +
+      `<p id="${uid}_expired" style="display:none;margin:8px 0 0;font-size:16px;font-weight:600;color:${textColor};">${expiredText}</p>` +
+      `<script>` +
+        `(function(){` +
+          `var end=new Date("${endDate}").getTime();` +
+          `var wrap=document.getElementById("${uid}");` +
+          `var expEl=document.getElementById("${uid}_expired");` +
+          `if(!wrap)return;` +
+          `function pad(n){return n<10?"0"+n:String(n);}` +
+          `function tick(){` +
+            `var diff=end-Date.now();` +
+            `if(diff<=0){wrap.style.display="none";expEl.style.display="block";return;}` +
+            `var d=Math.floor(diff/86400000);var h=Math.floor((diff%86400000)/3600000);` +
+            `var m=Math.floor((diff%3600000)/60000);var s=Math.floor((diff%60000)/1000);` +
+            `var vals=wrap.querySelectorAll(".cd-val");` +
+            `for(var i=0;i<vals.length;i++){` +
+              `var u=vals[i].getAttribute("data-unit");` +
+              `if(u==="days")vals[i].textContent=pad(d);if(u==="hours")vals[i].textContent=pad(h);` +
+              `if(u==="minutes")vals[i].textContent=pad(m);if(u==="seconds")vals[i].textContent=pad(s);` +
+            `}` +
+          `}` +
+          `tick();setInterval(tick,1000);` +
+        `})();` +
+      `<\/script>` +
+  `</div>`;
 }

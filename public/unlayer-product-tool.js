@@ -17,6 +17,10 @@
   // Guard: only run inside Unlayer context
   if (typeof unlayer === 'undefined') return;
 
+  // Guard: don't double-register if already registered via editor API
+  if (window.__steveMailToolsRegistered) return;
+  window.__steveMailToolsRegistered = true;
+
   // ===== Product Grid Tool =====
   unlayer.registerTool({
     name: 'steve_products',
@@ -225,6 +229,85 @@
     },
   });
 
+  // ===== Botón Diseñable Tool =====
+  unlayer.registerTool({
+    name: 'steve_button',
+    label: 'Botón Diseño',
+    icon: 'fa-hand-pointer-o',
+    supportedDisplayModes: ['email'],
+    values: {},
+    options: {
+      content: {
+        title: 'Contenido',
+        position: 1,
+        options: {
+          btnText: { label: 'Texto', defaultValue: 'Comprar Ahora', widget: 'text' },
+          btnUrl: { label: 'URL de destino', defaultValue: '', widget: 'text' },
+        },
+      },
+      design: {
+        title: 'Diseño',
+        position: 2,
+        options: {
+          btnStyle: {
+            label: 'Estilo',
+            defaultValue: 'filled',
+            widget: 'dropdown',
+            data: {
+              options: [
+                { label: 'Relleno', value: 'filled' },
+                { label: 'Solo borde', value: 'outline' },
+                { label: 'Píldora', value: 'pill' },
+                { label: 'Sombra', value: 'shadow' },
+                { label: 'Gradiente', value: 'gradient' },
+              ],
+            },
+          },
+          btnSize: {
+            label: 'Tamaño',
+            defaultValue: 'medium',
+            widget: 'dropdown',
+            data: {
+              options: [
+                { label: 'Pequeño', value: 'small' },
+                { label: 'Mediano', value: 'medium' },
+                { label: 'Grande', value: 'large' },
+                { label: 'Ancho completo', value: 'full' },
+              ],
+            },
+          },
+          btnColor: { label: 'Color principal', defaultValue: '#18181b', widget: 'color_picker' },
+          btnTextColor: { label: 'Color del texto', defaultValue: '#ffffff', widget: 'color_picker' },
+          btnAlign: {
+            label: 'Alineación',
+            defaultValue: 'center',
+            widget: 'dropdown',
+            data: {
+              options: [
+                { label: 'Izquierda', value: 'left' },
+                { label: 'Centro', value: 'center' },
+                { label: 'Derecha', value: 'right' },
+              ],
+            },
+          },
+        },
+      },
+    },
+    transformer: function (values, source) { return values; },
+    renderer: {
+      Viewer: unlayer.createViewer({
+        render: function (values) {
+          return generateButtonHTML(values);
+        },
+      }),
+      exporters: {
+        email: function (values) {
+          return generateButtonHTML(values);
+        },
+      },
+    },
+  });
+
   // ===== HTML Generators =====
 
   function generateProductGridHTML(values) {
@@ -291,6 +374,44 @@
       '</div>' +
     '</div>';
   }
+  function generateButtonHTML(values) {
+    var text = values.btnText || 'Comprar Ahora';
+    var url = values.btnUrl || '#';
+    var style = values.btnStyle || 'filled';
+    var size = values.btnSize || 'medium';
+    var color = values.btnColor || '#18181b';
+    var textColor = values.btnTextColor || '#ffffff';
+    var align = values.btnAlign || 'center';
+
+    var sizeMap = {
+      small: { padding: '8px 20px', fontSize: '13px' },
+      medium: { padding: '14px 32px', fontSize: '15px' },
+      large: { padding: '18px 48px', fontSize: '17px' },
+      full: { padding: '16px 32px', fontSize: '16px' },
+    };
+    var s = sizeMap[size] || sizeMap.medium;
+
+    var bgStyle = 'background:' + color + ';color:' + textColor + ';border:2px solid ' + color + ';';
+    var borderRadius = '8px';
+    var extraStyle = '';
+
+    if (style === 'outline') {
+      bgStyle = 'background:transparent;color:' + color + ';border:2px solid ' + color + ';';
+    } else if (style === 'pill') {
+      borderRadius = '50px';
+    } else if (style === 'shadow') {
+      extraStyle = 'box-shadow:0 4px 14px ' + color + '40;';
+    } else if (style === 'gradient') {
+      bgStyle = 'background:linear-gradient(135deg, ' + color + ', ' + color + 'cc);color:' + textColor + ';border:none;';
+    }
+
+    var displayStyle = size === 'full' ? 'display:block;width:100%;box-sizing:border-box;' : 'display:inline-block;';
+
+    return '<div style="text-align:' + align + ';padding:16px 24px;">' +
+      '<a href="' + url + '" style="' + displayStyle + 'padding:' + s.padding + ';font-size:' + s.fontSize + ';font-weight:600;' + bgStyle + 'border-radius:' + borderRadius + ';text-decoration:none;text-align:center;letter-spacing:0.5px;' + extraStyle + '">' + text + '</a>' +
+    '</div>';
+  }
+
   function generateCountdownHTML(values) {
     var endDate = values.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
     var labelText = values.labelText || 'La oferta termina en';
