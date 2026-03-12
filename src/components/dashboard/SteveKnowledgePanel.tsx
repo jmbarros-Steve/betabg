@@ -181,6 +181,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
 
       if (uploadErr) {
         console.error('Upload error:', uploadErr);
+        toast.error(`Error subiendo ${item.file.name}: ${uploadErr.message}`);
         return;
       }
 
@@ -197,28 +198,34 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
 
       const qualityScore = performance === 'funciono' ? 8 : performance === 'no_funciono' ? 3 : 5;
 
-      // Get client_id from session
+      // Try to get client_id from session (optional — admin uploads are global with client_id = null)
+      let clientId: string | null = null;
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (user) {
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('id')
+          .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+          .limit(1)
+          .maybeSingle();
+        clientId = clientData?.id || null;
+      }
 
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('id')
-        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-        .limit(1)
-        .maybeSingle();
-
-      if (!clientData) return;
-
-      await supabase.from('ad_references').insert({
-        client_id: clientData.id,
+      const { error: insertErr } = await supabase.from('ad_references').insert({
+        client_id: clientId,
         angulo,
         image_url: urlData.publicUrl,
         visual_patterns: visualPatterns,
         quality_score: qualityScore,
       });
+
+      if (insertErr) {
+        console.error('Insert error:', insertErr);
+        toast.error(`Error guardando referencia ${item.file.name}: ${insertErr.message}`);
+      }
     } catch (err) {
       console.error('Error saving reference:', err);
+      toast.error(`Error inesperado guardando referencia: ${err instanceof Error ? err.message : 'desconocido'}`);
     }
   }
 

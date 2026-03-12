@@ -28,7 +28,7 @@ export async function generateBriefVisual(c: Context) {
       .order('created_at', { ascending: false })
       .limit(15),
     supabase.from('ad_references').select('visual_patterns, quality_score, image_url')
-      .eq('client_id', clientId)
+      .or(`client_id.eq.${clientId},client_id.is.null`)
       .eq('angulo', angulo)
       .order('quality_score', { ascending: false })
       .limit(3),
