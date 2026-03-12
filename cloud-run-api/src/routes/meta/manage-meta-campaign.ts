@@ -39,7 +39,18 @@ async function metaApiRequest(
   }
 
   const response = await fetch(url.toString(), fetchOptions);
-  const responseData: any = await response.json();
+  const responseText = await response.text();
+
+  let responseData: any;
+  try {
+    responseData = JSON.parse(responseText);
+  } catch {
+    console.error(`Meta API non-JSON response [${method} ${endpoint}] (status ${response.status}):`, responseText.slice(0, 500));
+    if (!response.ok) {
+      return { ok: false, error: `Meta API error (${response.status}): ${responseText.slice(0, 200)}` };
+    }
+    return { ok: true, data: {} };
+  }
 
   if (!response.ok) {
     const errorMessage = responseData?.error?.message || responseData?.error?.error_user_msg || 'Unknown Meta API error';
