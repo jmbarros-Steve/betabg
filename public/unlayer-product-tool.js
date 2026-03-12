@@ -14,8 +14,16 @@
 (function () {
   'use strict';
 
+  try {
+  console.log('[Steve Mail customJS] Script loaded. unlayer available:', typeof unlayer !== 'undefined');
+
   // Guard: only run inside Unlayer context
-  if (typeof unlayer === 'undefined') return;
+  if (typeof unlayer === 'undefined') {
+    console.warn('[Steve Mail customJS] unlayer is undefined — not inside Unlayer iframe');
+    return;
+  }
+
+  console.log('[Steve Mail customJS] Registering custom tools...');
 
   // ===== Product Grid Tool =====
   unlayer.registerTool({
@@ -96,6 +104,7 @@
       },
     },
   });
+  console.log('[Steve Mail customJS] steve_products registered OK');
 
   // ===== Discount Code Tool =====
   unlayer.registerTool({
@@ -478,5 +487,10 @@
           '})();' +
         '<\/script>' +
     '</div>';
+  }
+
+  console.log('[Steve Mail customJS] All tools registered successfully');
+  } catch (err) {
+    console.error('[Steve Mail customJS] FATAL ERROR:', err);
   }
 })();
