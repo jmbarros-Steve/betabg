@@ -33,11 +33,12 @@ const signupSchema = z.object({
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
   const { signIn, signUp, signOut, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
@@ -47,12 +48,15 @@ export default function Auth() {
   useEffect(() => {
     const hash = window.location.hash;
     const search = window.location.search;
-    
+    const urlParams = new URLSearchParams(search);
+    const isResetMode = urlParams.get('mode') === 'reset';
+
     if (hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1));
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
-      
+      const type = params.get('type');
+
       if (accessToken && refreshToken) {
         supabase.auth.setSession({
           access_token: accessToken,
@@ -62,28 +66,44 @@ export default function Auth() {
             console.error('[Auth] setSession error:', error);
             setOauthError(`Error setSession: ${error.message}`);
           } else if (data.user) {
-            window.location.assign('/auth');
+            // If this is a password reset flow, show the reset form
+            if (type === 'recovery' || isResetMode) {
+              setMode('reset');
+            } else {
+              window.location.assign('/auth');
+            }
           }
         });
+        return;
       }
     }
-    
-    const urlParams = new URLSearchParams(search);
+
     const code = urlParams.get('code');
     const error = urlParams.get('error');
     const errorDescription = urlParams.get('error_description');
-    
+
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
         if (error) {
           console.error('[Auth] exchangeCodeForSession error:', error);
           setOauthError(`Error exchange: ${error.message}`);
         } else if (data.user) {
-          window.location.assign('/auth');
+          // If this is a password reset flow, show the reset form
+          if (isResetMode) {
+            setMode('reset');
+          } else {
+            window.location.assign('/auth');
+          }
         }
       });
+      return;
     }
-    
+
+    // If already logged in and mode=reset, show reset form
+    if (isResetMode && user) {
+      setMode('reset');
+    }
+
     if (error) {
       setOauthError(`OAuth Error: ${error} - ${errorDescription}`);
     }
@@ -91,7 +111,9 @@ export default function Auth() {
 
   useEffect(() => {
     if (authLoading || roleLoading) return;
-    
+    // Don't redirect if user is resetting password
+    if (mode === 'reset') return;
+
     if (user) {
       if (isClient) {
         navigate('/portal', { replace: true });
@@ -102,7 +124,7 @@ export default function Auth() {
         return;
       }
     }
-  }, [user, authLoading, roleLoading, isClient, isAdmin, navigate]);
+  }, [user, authLoading, roleLoading, isClient, isAdmin, navigate, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,6 +195,34 @@ export default function Auth() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) { toast.error('Ingresa tu nueva contraseña'); return; }
+    const validation = passwordSchema.safeParse(password);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        setResetDone(true);
+        toast.success('Contraseña actualizada');
+        setTimeout(() => {
+          setMode('login');
+          setPassword('');
+          setResetDone(false);
+          navigate('/auth', { replace: true });
+        }, 2000);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <motion.div
@@ -193,10 +243,10 @@ export default function Auth() {
           </div>
 
           <h1 className="text-2xl font-bold text-slate-900 text-center mb-2">
-            {mode === 'login' ? 'Acceder al Panel' : mode === 'signup' ? 'Crear Cuenta' : 'Recuperar Contraseña'}
+            {mode === 'login' ? 'Acceder al Panel' : mode === 'signup' ? 'Crear Cuenta' : mode === 'reset' ? 'Nueva Contraseña' : 'Recuperar Contraseña'}
           </h1>
           <p className="text-sm text-slate-500 text-center mb-8">
-            {mode === 'login' ? 'Ingresa tus credenciales' : mode === 'signup' ? 'Regístrate para continuar' : 'Te enviaremos un link de recuperación'}
+            {mode === 'login' ? 'Ingresa tus credenciales' : mode === 'signup' ? 'Regístrate para continuar' : mode === 'reset' ? 'Ingresa tu nueva contraseña' : 'Te enviaremos un link de recuperación'}
           </p>
 
           {!authLoading && !roleLoading && user && !isAdmin && !isClient && (
@@ -225,7 +275,45 @@ export default function Auth() {
             </div>
           )}
 
-          {mode === 'forgot' ? (
+          {mode === 'reset' ? (
+            resetDone ? (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                  <Lock className="w-8 h-8 text-green-600" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Contraseña actualizada correctamente. Redirigiendo...
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPassword} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password" className="text-sm font-medium text-slate-700">Nueva contraseña</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-11"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <PasswordStrengthMeter password={password} />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Mínimo 8 caracteres, mayúsculas, minúsculas, números y símbolos
+                  </p>
+                </div>
+
+                <Button type="submit" size="lg" className="w-full bg-blue-600 text-white rounded-lg py-3 font-semibold hover:bg-blue-700" disabled={loading}>
+                  {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
+                </Button>
+              </form>
+            )
+          ) : mode === 'forgot' ? (
             resetSent ? (
               <div className="text-center space-y-4">
                 <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
