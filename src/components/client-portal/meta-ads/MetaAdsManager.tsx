@@ -145,7 +145,7 @@ interface CampaignAggregate {
 // ---------------------------------------------------------------------------
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'dashboard', label: 'Resumen', icon: LayoutDashboard },
   { key: 'tree-view', label: 'Campañas', icon: ListTree },
   { key: 'create-wizard', label: 'Crear', icon: Wand2 },
   { key: 'drafts', label: 'Borradores', icon: FileCheck },
@@ -153,7 +153,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'pixel', label: 'Pixel', icon: Crosshair },
   { key: 'library', label: 'Biblioteca', icon: FolderOpen },
   { key: 'analytics', label: 'Análisis', icon: BarChart3 },
-  { key: 'social-inbox', label: 'Social Inbox', icon: MessageSquare },
+  { key: 'social-inbox', label: 'Bandeja Social', icon: MessageSquare },
   { key: 'rules', label: 'Reglas', icon: Zap },
   { key: 'competitors', label: 'Competencia', icon: Swords },
 ];

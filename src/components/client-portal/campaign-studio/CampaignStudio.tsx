@@ -296,8 +296,8 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
               setSelectedType(type);
               setWizardOpen(true);
             }}
-            onEditCampaign={(campaignId) => {
-              console.log('Edit campaign:', campaignId);
+            onEditCampaign={() => {
+              // Edit campaign - to be implemented
             }}
             key={refreshKey}
           />

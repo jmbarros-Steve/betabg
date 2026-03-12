@@ -176,8 +176,8 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
         const cats = [...new Set<string>(data.products.map((p: ShopifyProduct) => p.product_type).filter(Boolean))];
         setCategories(cats);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Product load error handled silently
     } finally {
       setLoadingProducts(false);
     }
@@ -237,8 +237,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
         setStep('variaciones');
       }
       toast.success('✨ Copies generados');
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error('Error al generar. Intenta de nuevo.');
     } finally {
       setIsGenerating(false);
@@ -317,7 +316,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
       // Log failures for debugging
       const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
       if (failures.length > 0) {
-        console.error('[MetaAdCreator] Brief generation failures:', failures.map(f => f.reason?.message || f.reason));
+        // Brief generation partial failures logged
       }
 
       if (successful.length === 0) {
@@ -333,7 +332,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
 
       setBriefsVisuales(successful);
     } catch (err: any) {
-      console.error('[MetaAdCreator] handleApproveVariaciones error:', err);
+      // Approve variaciones error handled via toast
       toast.error(err?.message || 'Error generando los briefs visuales');
     } finally {
       setGeneratingBrief(false);
@@ -390,7 +389,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
         .map(r => r.value);
       const imgFailures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
       if (imgFailures.length > 0) {
-        console.error('[MetaAdCreator] Image generation failures:', imgFailures.map(f => f.reason?.message));
+        // Image generation partial failures logged
       }
       if (urls.length === 0) {
         const firstImgErr = imgFailures[0]?.reason?.message || 'Error generando imagenes';

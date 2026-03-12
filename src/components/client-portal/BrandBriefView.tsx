@@ -262,19 +262,19 @@ function StructuredAccionables({ items }: { items: any[] }) {
               <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
                 {item.situation && (
                   <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
-                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">Situacion (S)</p>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">Situación (S)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.situation}</p>
                   </div>
                 )}
                 {item.complication && (
                   <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border-l-4 border-orange-400">
-                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">Complicacion (C)</p>
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">Complicación (C)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.complication}</p>
                   </div>
                 )}
                 {item.resolution && (
                   <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border-l-4 border-green-500">
-                    <p className="text-sm font-medium text-green-600 dark:text-green-500 mb-1">Resolucion (R)</p>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-500 mb-1">Resolución (R)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.resolution}</p>
                   </div>
                 )}
@@ -644,7 +644,7 @@ function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep
               {statusMessage}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Tiempo estimado: 8-10 minutos. Usamos el modelo de IA mas avanzado para darte un analisis de nivel consultora.
+              Tiempo estimado: 8-10 minutos. Usamos el modelo de IA más avanzado para darte un análisis de nivel consultora.
             </p>
           </div>
         </div>
@@ -652,7 +652,7 @@ function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep
         {/* Progress bar */}
         <div className="mb-4 bg-background/60 rounded-lg p-3 border border-border/50">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-sm font-medium text-muted-foreground">Progreso del analisis</span>
+            <span className="text-sm font-medium text-muted-foreground">Progreso del análisis</span>
             <span className="text-sm font-bold text-primary">{displayPct}%</span>
           </div>
           <Progress value={displayPct || 3} className="h-2.5" />
@@ -847,15 +847,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     (async () => {
       const hasData = await hasResearchData();
       if (hasData) {
-        console.log('[BrandBriefView] A los 120s — hay datos, aplicando análisis en las pestañas');
+        // Data found at 120s — applying analysis
         await applyComplete();
         return;
       }
-      console.log('[BrandBriefView] A los 120s — aún no hay datos, esperando resultados del backend…');
+      // No data yet at 120s — waiting for backend
       toast.info('Análisis en progreso, se aplicará automáticamente');
       dataCheckIntervalRef.current = setInterval(async () => {
         if (await hasResearchData()) {
-          console.log('[BrandBriefView] Datos de análisis detectados — aplicando en las pestañas');
+          // Analysis data detected — applying to tabs
           await applyComplete();
         }
       }, 8000);
@@ -863,7 +863,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   }, [analysisStatus, elapsedSeconds, clientId]);
 
   async function handleForceShowAnalysis() {
-    console.log('[BrandBriefView] 🚨 Emergency force-render triggered after', elapsedSeconds, 's');
+    // Emergency force-render triggered
     if (pollingRef.current) clearInterval(pollingRef.current);
     if (progressPollingRef.current) clearInterval(progressPollingRef.current);
     await supabase.from('brand_research').upsert({
@@ -917,9 +917,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         .eq('research_type', 'analysis_status')
         .maybeSingle();
       const status = (data?.research_data as any)?.status;
-      console.log('[BrandBriefView] polling analysis_status:', status, data?.research_data);
+      // Polling analysis status
       if (status === 'complete') {
-        console.log('[BrandBriefView] ✅ Analysis complete — fetching research data...');
+        // Analysis complete — fetching research data
         clearInterval(pollingRef.current!);
         clearInterval(progressPollingRef.current!);
         await fetchResearch();
@@ -1577,7 +1577,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         }
       } catch (err: any) {
         setDebug({ phase2: 'error', phase2Message: err?.message || String(err) });
-        console.log('analyze-brand-strategy ended (polling tracks status):', err?.message);
+        // analyze-brand-strategy ended — polling tracks status
       }
     } else {
       setDebug({ phase2: 'skipped', phase2Message: 'Fase 1 falló' });
@@ -1972,7 +1972,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     // SEO Score with better fallback
     const seoScore = research.seo_audit?.score || research.seo_audit?.score_seo;
-    const seoDisplay = seoScore ? `${seoScore}/100` : (analysisStatus === 'pending' ? 'Analizando...' : 'Pendiente analisis');
+    const seoDisplay = seoScore ? `${seoScore}/100` : (analysisStatus === 'pending' ? 'Analizando...' : 'Pendiente análisis');
 
     // Budget from budget_and_funnel or meta_ads_strategy
     const budgetFromFunnel = budgetFunnel?.monthly_budget_clp;
@@ -2065,10 +2065,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const recomendaciones = aiExecSummary.recomendaciones_priorizadas || aiExecSummary.recomendaciones || aiExecSummary.recommendations || aiExecSummary.top_recommendations || [];
       const posicion = aiExecSummary.posicion_competitiva || aiExecSummary.competitive_position || '';
 
-      if (situacion) execSections.push({ title: 'SITUACION ACTUAL', content: typeof situacion === 'string' ? situacion : JSON.stringify(situacion) });
+      if (situacion) execSections.push({ title: 'SITUACIÓN ACTUAL', content: typeof situacion === 'string' ? situacion : JSON.stringify(situacion) });
       if (posicion) {
         if (typeof posicion === 'string') {
-          execSections.push({ title: 'POSICION COMPETITIVA', content: posicion });
+          execSections.push({ title: 'POSICIÓN COMPETITIVA', content: posicion });
         } else if (typeof posicion === 'object') {
           // Flatten object into readable text
           const parts: string[] = [];
@@ -2076,7 +2076,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             if (Array.isArray(pv)) parts.push(`${pk.replace(/_/g, ' ')}: ${(pv as any[]).slice(0, 3).join('; ')}`);
             else if (pv) parts.push(`${pk.replace(/_/g, ' ')}: ${String(pv)}`);
           }
-          if (parts.length > 0) execSections.push({ title: 'POSICION COMPETITIVA', content: parts.join('. ') });
+          if (parts.length > 0) execSections.push({ title: 'POSICIÓN COMPETITIVA', content: parts.join('. ') });
         }
       }
 
@@ -2361,9 +2361,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       let currentSCR: { s: string; c: string; r: string } = { s: '', c: '', r: '' };
       let currentImpacto = '';
       const scrColors: Record<string, { bg: [number,number,number]; fg: [number,number,number]; label: string }> = {
-        s: { bg: [230, 240, 255], fg: [27, 42, 74], label: 'SITUACION' },
-        c: { bg: [255, 243, 230], fg: [180, 100, 20], label: 'COMPLICACION' },
-        r: { bg: [230, 250, 235], fg: [22, 120, 50], label: 'RESOLUCION' },
+        s: { bg: [230, 240, 255], fg: [27, 42, 74], label: 'SITUACIÓN' },
+        c: { bg: [255, 243, 230], fg: [180, 100, 20], label: 'COMPLICACIÓN' },
+        r: { bg: [230, 250, 235], fg: [22, 120, 50], label: 'RESOLUCIÓN' },
       };
 
       const flushSCR = () => {
@@ -2572,7 +2572,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const hasCompetitorAnalysis = !!research.competitor_analysis;
       const compResp = getResponse('competitors');
       if (hasCompetitorAnalysis || compResp) {
-        addSectionHeader('8', 'ANALISIS COMPETITIVO E INTELIGENCIA DE MERCADO');
+        addSectionHeader('8', 'ANÁLISIS COMPETITIVO E INTELIGENCIA DE MERCADO');
 
         // Show competitor listing from brief (simple table)
         if (compResp) {
@@ -2641,7 +2641,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     safePdfRender('Identidad de Marca', () => renderBrandIdentity(pdfCtx, pdfHelpers, (research as any).brand_identity));
 
     // Financial Analysis
-    safePdfRender('Analisis Financiero', () => renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis));
+    safePdfRender('Análisis Financiero', () => renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis));
 
     // Consumer Profile
     safePdfRender('Perfil del Consumidor', () => renderConsumerProfile(pdfCtx, pdfHelpers, (research as any).consumer_profile));
@@ -2676,7 +2676,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         }
       }
       if (!pdfActionPlanItems || pdfActionPlanItems.length === 0) pdfActionPlanItems = null;
-      console.log('[PDF] action_plan _repair_failed, parsed items:', pdfActionPlanItems?.length ?? 0);
+      // Action plan repair attempted
     }
     if (pdfActionPlanItems && pdfActionPlanItems.length > 0) {
       safePdfRender('Plan de Accion', () => renderActionPlan(pdfCtx, pdfHelpers, pdfActionPlanItems!));
@@ -3191,7 +3191,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFont('NotoSans', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(200, 200, 220);
-    const steveDesc = 'El analisis esta hecho. Los competidores estan mapeados. El buyer persona esta definido. El CPA maximo esta calculado. Lo que sigue es convertir esta estrategia en anuncios reales que generen ventas.';
+    const steveDesc = 'El análisis está hecho. Los competidores están mapeados. El buyer persona está definido. El CPA máximo está calculado. Lo que sigue es convertir esta estrategia en anuncios reales que generen ventas.';
     const steveLines = doc.splitTextToSize(steveDesc, maxWidth - 20);
     let steveY = pageHeight * 0.2 + 42;
     for (const sl of steveLines) { doc.text(sl, pageWidth / 2, steveY, { align: 'center' }); steveY += 5; }
@@ -3429,9 +3429,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">Tu analisis esta listo</p>
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">Tu análisis está listo</p>
                     <p className="text-xs text-green-600/80 dark:text-green-400/70 mt-0.5">
-                      Si no se actualizo automaticamente, pulsa el boton para verlo.
+                      Si no se actualizó automáticamente, pulsa el botón para verlo.
                     </p>
                   </div>
                 </div>
@@ -3440,7 +3440,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   onClick={handleForceShowAnalysis}
                   className="bg-green-600 hover:bg-green-700 text-white shadow-sm whitespace-nowrap"
                 >
-                  Ver analisis
+                  Ver análisis
                 </Button>
               </CardContent>
             </Card>
@@ -3455,8 +3455,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-green-800 dark:text-green-300">Analisis estrategico completado</p>
-              <p className="text-xs text-green-600/80 dark:text-green-400/70 mt-0.5">Revisa las pestanas SEO, Keywords, Meta Ads, Google Ads y Competencia para ver los resultados.</p>
+              <p className="text-sm font-bold text-green-800 dark:text-green-300">Análisis estratégico completado</p>
+              <p className="text-xs text-green-600/80 dark:text-green-400/70 mt-0.5">Revisa las pestañas SEO, Keywords, Meta Ads, Google Ads y Competencia para ver los resultados.</p>
             </div>
           </CardContent>
         </Card>
@@ -3917,7 +3917,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-primary" />
-                    Analisis Financiero
+                    Análisis Financiero
                     <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium ml-auto">AI</span>
                   </CardTitle>
                 </CardHeader>
@@ -4242,7 +4242,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   }
                 }
                 if (!parsedActionPlan || parsedActionPlan.length === 0) parsedActionPlan = null;
-                console.log('[BrandBriefView] action_plan _repair_failed, parsed items:', parsedActionPlan?.length ?? 0);
+                // Action plan repair attempted
               }
               const showSection = (parsedActionPlan && parsedActionPlan.length > 0) || isComplete;
               if (!showSection) return null;
@@ -4922,7 +4922,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     <Loader2 className="h-7 w-7 animate-spin text-primary" />
                   </div>
                   <div>
-                    <p className="text-primary font-bold text-base">Analisis de competencia en progreso</p>
+                    <p className="text-primary font-bold text-base">Análisis de competencia en progreso</p>
                     <p className="text-muted-foreground text-sm mt-1">Escaneando sitios web de hasta 6 competidores y generando benchmark comparativo.</p>
                   </div>
                   <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">

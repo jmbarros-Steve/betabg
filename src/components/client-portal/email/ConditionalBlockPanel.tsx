@@ -88,11 +88,15 @@ function buildPreviewText(conditions: BlockCondition[]): string {
 
 /**
  * Serialize conditions to a data-attribute string for embedding in HTML.
- * Used by CampaignBuilder to inject conditions into editor blocks.
+ * Uses double quotes for the attribute and HTML-encodes the JSON value
+ * to prevent XSS from condition values containing quotes.
  */
 export function serializeConditionsToAttr(conditions: BlockCondition[]): string {
   if (conditions.length === 0) return '';
-  return `data-steve-condition='${JSON.stringify(conditions)}'`;
+  const json = JSON.stringify(conditions)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+  return `data-steve-condition="${json}"`;
 }
 
 export function ConditionalBlockPanel({

@@ -107,6 +107,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedVariaciones, setGeneratedVariaciones] = useState<GeneratedVariaciones | null>(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
+  const [isSavingBrief, setIsSavingBrief] = useState(false);
 
   // Brief visual
   const [selectedVariacion, setSelectedVariacion] = useState<Variacion | null>(null);
@@ -221,7 +222,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   };
 
   const handleApproveBrief = async () => {
-    if (!briefVisual || !selectedVariacion || !funnel || !formato || !efectiveAngulo) return;
+    if (!briefVisual || !selectedVariacion || !funnel || !formato || !efectiveAngulo || isSavingBrief) return;
+    setIsSavingBrief(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any).from('ad_creatives').insert({
@@ -235,6 +237,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       setSavedCreativeId(data?.id || null);
       toast.success('Creativo guardado en la Biblioteca');
     } catch { toast.error('Error al guardar'); }
+    finally { setIsSavingBrief(false); }
   };
 
   const handleGenerateImage = async () => {
@@ -297,7 +300,17 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const startVideoPolling = useCallback(async (predictionId: string) => {
     const messages = ['Procesando escenas...', 'Generando movimiento...', 'Aplicando efectos...', 'Finalizando video...'];
     let msgIdx = 0;
+    let pollCount = 0;
+    const MAX_POLLS = 120; // 10 minutos máximo
     const interval = setInterval(async () => {
+      pollCount++;
+      if (pollCount > MAX_POLLS) {
+        clearInterval(interval);
+        setGeneratingVideo(false);
+        setVideoPollingId(null);
+        toast.error('La generación del video tardó demasiado. Intenta de nuevo.');
+        return;
+      }
       setVideoProgress(messages[msgIdx % messages.length]);
       msgIdx++;
       try {
@@ -317,7 +330,9 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
           setVideoPollingId(null);
           toast.error('Error en la generación del video');
         }
-      } catch { /* keep polling */ }
+      } catch {
+        // Continuar polling en caso de error transitorio de red
+      }
     }, 5000);
   }, [savedCreativeId, clientId]);
 
@@ -616,8 +631,9 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                     {/* Approve & Save */}
                     {!savedCreativeId ? (
                       <div className="flex gap-3">
-                        <Button className="flex-1" onClick={handleApproveBrief}>
-                          <CheckCircle className="w-4 h-4 mr-2" />✅ Aprobar Brief y Guardar
+                        <Button className="flex-1" onClick={handleApproveBrief} disabled={isSavingBrief}>
+                          {isSavingBrief ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                          {isSavingBrief ? 'Guardando...' : '✅ Aprobar Brief y Guardar'}
                         </Button>
                         <Button variant="outline" onClick={() => selectedVariacion && handleChooseVariacion(selectedVariacion)}>
                           <RefreshCw className="w-4 h-4 mr-1" />Regenerar
@@ -637,7 +653,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                             {briefVisual.tipo === 'video' ? (
                               <video src={generatedAssetUrl} controls className="w-full max-h-80 object-contain bg-black" />
                             ) : (
-                              <img src={generatedAssetUrl} alt="Generado" className="w-full max-h-80 object-contain" />
+                              <img src={generatedAssetUrl} alt="Generado" className="w-full max-h-80 object-contain" onError={(e) => { (e.target as HTMLImageElement).alt = 'Error al cargar imagen'; (e.target as HTMLImageElement).className = 'w-full h-40 flex items-center justify-center bg-muted text-muted-foreground text-sm'; }} />
                             )}
                             <div className="p-3 flex justify-end">
                               <Button size="sm" variant="outline" asChild>

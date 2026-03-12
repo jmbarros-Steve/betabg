@@ -213,12 +213,16 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
             .select('id')
             .single();
 
-          if (newConv) setConversationId(newConv.id);
-          setMessages([]);
+          if (newConv) {
+            setConversationId(newConv.id);
+            setMessages([]);
+          } else {
+            toast.error('No se pudo crear la conversación');
+          }
         }
       } catch (err) {
         console.error('Error loading conversation:', err);
-        toast.error('Error al cargar el historial de conversacion');
+        toast.error('Error al cargar el historial de conversación');
       } finally {
         setLoadingHistory(false);
       }
@@ -298,11 +302,11 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
       if (newConv) {
         setConversationId(newConv.id);
         setMessages([]);
-        toast.success('Nueva conversacion iniciada');
+        toast.success('Nueva conversación iniciada');
       }
     } catch (err) {
       console.error('Error creating new conversation:', err);
-      toast.error('Error al crear nueva conversacion');
+      toast.error('Error al crear nueva conversación');
     }
   };
 
@@ -453,7 +457,7 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
             size="sm"
             onClick={handleNewConversation}
             className="text-xs gap-1.5"
-            title="Nueva conversacion"
+            title="Nueva conversación"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Nueva

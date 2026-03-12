@@ -97,7 +97,10 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                     `$${value.toLocaleString('es-CL')} ${currency}`,
                     name === 'prevRevenue' ? 'Período anterior' : name === 'revenue' ? 'Ingresos' : 'Inversión'
                   ]}
-                  labelFormatter={(label) => `Fecha: ${label}`}
+                  labelFormatter={(label: string) => {
+                    const d = new Date(label + 'T12:00:00');
+                    return isNaN(d.getTime()) ? label : d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+                  }}
                 />
                 <Area
                   yAxisId="left"
@@ -159,7 +162,10 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                     `$${value.toLocaleString('es-CL')} ${currency}`,
                     name === 'prevRevenue' ? 'Período anterior' : 'Ingresos'
                   ]}
-                  labelFormatter={(label) => `Fecha: ${label}`}
+                  labelFormatter={(label: string) => {
+                    const d = new Date(label + 'T12:00:00');
+                    return isNaN(d.getTime()) ? label : d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+                  }}
                 />
                 <Area
                   type="monotone"
@@ -227,7 +233,10 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                   borderRadius: '8px',
                 }}
                 formatter={(value: number) => [value.toLocaleString('es-CL'), 'Órdenes']}
-                labelFormatter={(label) => `Fecha: ${label}`}
+                labelFormatter={(label: string) => {
+                    const d = new Date(label + 'T12:00:00');
+                    return isNaN(d.getTime()) ? label : d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+                  }}
               />
               <Bar
                 dataKey="orders"

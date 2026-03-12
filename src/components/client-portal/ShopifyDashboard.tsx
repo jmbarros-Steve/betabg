@@ -195,6 +195,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   ] as const;
 
   const formatCurrency = (value: number) => {
+    if (!isFinite(value) || isNaN(value)) return '$0';
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value.toFixed(0)}`;
@@ -348,7 +349,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-0.5 bg-orange-500" />
-                    <span className="text-muted-foreground">Valor Perdido</span>
+                    <span className="text-muted-foreground">Valor en Carritos</span>
                   </div>
                 </div>
               )}
@@ -469,7 +470,7 @@ function UtmTable({ utmPerformance }: { utmPerformance: UtmData[] }) {
         <Badge variant="outline" className="text-xs">{utm.source || '—'}</Badge>
       </td>
       <td className="py-2 pr-4 text-muted-foreground">{utm.medium || '—'}</td>
-      <td className="py-2 pr-4 font-medium truncate max-w-[200px]">{utm.campaign || '—'}</td>
+      <td className="py-2 pr-4 font-medium truncate max-w-[200px]" title={utm.campaign || ''}>{utm.campaign || '—'}</td>
       <td className="py-2 pr-4 text-right">{utm.orders}</td>
       <td className="py-2 text-right font-semibold">${utm.revenue.toLocaleString('es-CL')}</td>
     </tr>
@@ -517,7 +518,7 @@ function UtmTable({ utmPerformance }: { utmPerformance: UtmData[] }) {
                       <Badge variant="outline" className="text-xs">{utm.source || '—'}</Badge>
                     </td>
                     <td className="py-2 pr-4 text-muted-foreground">{utm.medium || '—'}</td>
-                    <td className="py-2 pr-4 font-medium truncate max-w-[200px]">{utm.campaign || '—'}</td>
+                    <td className="py-2 pr-4 font-medium truncate max-w-[200px]" title={utm.campaign || ''}>{utm.campaign || '—'}</td>
                     <td className="py-2 pr-4 text-right">{utm.orders}</td>
                     <td className="py-2 text-right font-semibold">${utm.revenue.toLocaleString('es-CL')}</td>
                   </tr>

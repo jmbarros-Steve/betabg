@@ -243,7 +243,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
       toast.error('No se pudieron parsear mails. Revisa el formato.');
       return;
     }
-    console.log('parseBulkText — parsed:', parsed.map(c => ({ name: c.name, subject: c.subject, content: c.content?.substring(0, 40) })));
+    // Parsed bulk text successfully
     setCampaigns(parsed.slice(0, 30));
     toast.success(`${parsed.length} mail(s) parseados`);
   }
@@ -283,7 +283,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
     if (!selectedTemplate) { toast.error('Selecciona una plantilla primero'); return; }
     // Accept campaigns with name OR content (either is enough to generate)
     const validCampaigns = campaigns.filter(c => (c.name?.trim()) || (c.content?.trim()));
-    console.log('generateAll — validCampaigns:', validCampaigns.length, 'of', campaigns.length, validCampaigns.map(c => ({ name: c.name, content: c.content?.substring(0, 40) })));
+    // Generate all valid campaigns
     if (validCampaigns.length === 0) { toast.error('Agrega al menos un mail con nombre o contenido'); return; }
 
     setGenerating(true);
@@ -351,7 +351,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
           },
         });
 
-        console.log('Generate response:', { data, error });
+        // Process generate response
         if (error) {
           let errorDetail = error.message || 'Error desconocido';
           try {
@@ -360,7 +360,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
               errorDetail = errBody?.error || errBody?.details || JSON.stringify(errBody).substring(0, 300);
             }
           } catch (_) {}
-          console.error('Generate error detail:', errorDetail);
+          // Generate error detail captured for throw
           throw new Error(errorDetail);
         }
         const blocks = data?.blocks || [];
@@ -500,7 +500,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
           },
         });
 
-        console.log('Upload response:', { data, error });
+        // Process upload response
         if (error) {
           // Try to read body from FunctionsHttpError context
           let errorDetail = error.message || 'Error desconocido';

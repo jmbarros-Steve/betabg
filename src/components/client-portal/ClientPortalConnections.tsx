@@ -177,7 +177,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       await retrySync(async () => {
         // Use callEdgeFunction which includes Session Token when embedded
         if (isEmbedded) {
-          console.log(`[Sync] Using Session Token auth for ${functionName}`);
+          // Using Session Token auth for embedded sync
           const { data, error } = await callEdgeFunction(functionName, {
             body: { [bodyKey]: connection.id },
           });

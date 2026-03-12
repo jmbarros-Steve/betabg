@@ -293,6 +293,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const handleSend = async (campaignId: string) => {
+    const confirmed = window.confirm(
+      `¿Estás seguro de enviar esta campaña a ${subscriberCount} suscriptores?\n\nEsta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
     setSending(true);
     try {
       const abConfig = abEnabled ? {

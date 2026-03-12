@@ -287,7 +287,7 @@ function StepTextVariants({
       <div className="space-y-4">
         {values.map((val, i) => (
           <div key={i}>
-            <Label className="text-xs">{type === 'copy' ? 'Copy' : 'Headline'} {i + 1}</Label>
+            <Label className="text-xs">{type === 'copy' ? 'Copy' : 'Título'} {i + 1}</Label>
             {type === 'copy' ? (
               <Textarea value={val} onChange={(e) => updateValue(i, e.target.value)} placeholder={placeholder} rows={4} className="mt-1" />
             ) : (

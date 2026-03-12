@@ -183,7 +183,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   // ─── Status polling (PRIMARY — reliable, no RLS/INSERT issues) ──
   function startStatusPolling() {
     if (statusPollingRef.current) { clearInterval(statusPollingRef.current); }
-    console.log('[StatusPoll] Starting status polling every 4s');
+    // Start status polling every 4s
     statusPollingRef.current = setInterval(async () => {
       const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0', 10);
       const elapsed = Date.now() - startedMs;
@@ -200,12 +200,12 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       const updatedMs = new Date(data.updated_at || 0).getTime();
 
       if (status === 'complete' && updatedMs > startedMs) {
-        console.log('[StatusPoll] ✅ complete detected — closing banner');
+        // Analysis complete — closing banner
         finishAnalysis(true);
         return;
       }
       if (status === 'error' && updatedMs > startedMs) {
-        console.log('[StatusPoll] ❌ error detected — closing banner');
+        // Analysis error — closing banner
         finishAnalysis(false);
         return;
       }
@@ -224,7 +224,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           .maybeSingle();
         const hasBrandStrategy = !!strategyRow?.research_data;
         if (hasBrandStrategy) {
-          console.log('[StatusPoll] ⏱️ pending >8min and brand_strategy marker found — Phase 2 ran. Writing complete.');
+          // Pending >8min with brand_strategy marker — Phase 2 ran, writing complete
           await supabase.from('brand_research').upsert({
             client_id: clientId,
             research_type: 'analysis_status',
@@ -232,7 +232,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           }, { onConflict: 'client_id,research_type' });
           finishAnalysis(true);
         } else {
-          console.log('[StatusPoll] ⏱️ pending >8min but no brand_strategy marker yet — still waiting for Phase 2');
+          // Pending >8min, no brand_strategy marker yet — still waiting for Phase 2
         }
       }
     }, 4000);
@@ -243,7 +243,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     if (realtimeChannelRef.current) {
       supabase.removeChannel(realtimeChannelRef.current);
     }
-    console.log('[Realtime] Subscribing as bonus channel for client:', clientId);
+    // Subscribing to realtime channel for analysis status
     const channel = supabase
       .channel(`brand-analysis-${clientId}-${Date.now()}`)
       .on(
@@ -260,19 +260,19 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
           const status = row.research_data?.status;
           const updatedMs = new Date(row.updated_at || 0).getTime();
           const startedMs = parseInt(sessionStorage.getItem(`analysis_started_${clientId}`) || '0', 10);
-          console.log('[Realtime] Received event — status:', status, '| updatedMs:', updatedMs, '| startedMs:', startedMs, '| diff:', updatedMs - startedMs);
+          // Realtime event received
 
           if (status === 'complete' && updatedMs > startedMs) {
-            console.log('[Realtime] ✅ complete via Realtime — closing banner early');
+            // Complete via Realtime — closing banner early
             finishAnalysis(true);
           } else if (status === 'error' && updatedMs > startedMs) {
-            console.log('[Realtime] ❌ error via Realtime — closing banner');
+            // Error via Realtime — closing banner
             finishAnalysis(false);
           }
         }
       )
       .subscribe((subscriptionStatus) => {
-        console.log('[Realtime] Subscription status:', subscriptionStatus);
+        // Realtime subscription status update
       });
     realtimeChannelRef.current = channel;
   }
@@ -287,7 +287,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         .eq('research_type', 'analysis_status')
         .maybeSingle();
       if ((statusRow?.research_data as any)?.status === 'pending') {
-        console.log('[BrandAssetUploader] Resuming in-progress analysis on mount');
+        // Resuming in-progress analysis on mount
         // If no sessionStorage timestamp, set one to "far in the past" so poll detects complete
         if (!sessionStorage.getItem(`analysis_started_${clientId}`)) {
           sessionStorage.setItem(`analysis_started_${clientId}`, (Date.now() - 3600000).toString());
@@ -327,7 +327,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     setAnalyzing(true);
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
 
-    console.log('[launchAnalysis] STARTING — url:', url, '| startedMs:', startedMs);
+    // Starting analysis pipeline
 
     // Kill any lingering intervals/channels
     clearAll();
@@ -338,14 +338,14 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       research_type: 'analysis_status',
       research_data: { status: 'pending' },
     }, { onConflict: 'client_id,research_type' });
-    console.log('[launchAnalysis] DB status set to pending ✓');
+    // DB status set to pending
 
     // Clear stale research sections from any previous analysis so StatusPoll
     // doesn't find old data and prematurely close the banner
     await supabase.from('brand_research').delete()
       .eq('client_id', clientId)
       .in('research_type', ['seo_audit', 'competitor_analysis', 'keywords', 'executive_summary']);
-    console.log('[launchAnalysis] Cleared stale research sections ✓');
+    // Cleared stale research sections
 
     await supabase.from('brand_research').upsert({
       client_id: clientId,
@@ -371,7 +371,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       } catch (_) {}
     };
 
-    console.log('[launchAnalysis] Phase 1 — research (data analysis)');
+    // Phase 1 — research (data analysis)
     setDebug({ phase1: 'running', phase2: 'pending' });
     let research: any = null;
     try {
@@ -388,7 +388,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       } else {
         research = researchData?.research;
         setDebug({ phase1: 'ok', phase1Status: 200 });
-        console.log('[launchAnalysis] Phase 1 complete — competitors analyzed:', research?.competitorContents?.length);
+        // Phase 1 complete
       }
     } catch (err: any) {
       const msg = err?.message || String(err);
@@ -398,7 +398,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
     // Phase 2: await to capture error for diagnóstico
     if (research) {
-      console.log('[launchAnalysis] Phase 2 — strategy (Steve)');
+      // Phase 2 — strategy (Steve)
       setDebug({ phase2: 'running' });
       try {
         const { error: strategyErr } = await callApi('analyze-brand-strategy', {
@@ -516,7 +516,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       // Trigger if brief is complete AND analysis has not started or previously errored
       const shouldTrigger = isBriefDone && (!statusResult.data || analysisStatus === 'error');
       if (shouldTrigger) {
-        console.log('[loadAssets] Brief complete but analysis not started/errored — auto-triggering. status:', analysisStatus);
+        // Brief complete but analysis not started — auto-triggering
         setAutoTriggered(true);
         setTimeout(() => launchAnalysis(savedWebUrl, extractedCompUrls), 800);
       }
@@ -646,7 +646,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
 
           <Button
             onClick={() => {
-              console.log('[Button] Clicked — analyzing:', analyzing, 'websiteUrl:', websiteUrl);
+              // Analysis button clicked
               launchAnalysis(websiteUrl, competitorUrls);
             }}
             disabled={analyzing || !websiteUrl.trim()}
