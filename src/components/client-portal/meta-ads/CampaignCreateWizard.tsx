@@ -441,7 +441,7 @@ function AdSetForm({
 
       <div>
         <Label>Audiencia / Segmento</Label>
-        <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Describe la audiencia: demographics, intereses, comportamiento..." rows={2} className="mt-1" />
+        <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Describe la audiencia: edad, género, intereses, comportamiento..." rows={2} className="mt-1" />
       </div>
 
       {/* Targeting controls */}
@@ -829,7 +829,7 @@ function AdFormMultiSlot({
       const { data: { publicUrl } } = supabase.storage.from('client-assets').getPublicUrl(path);
       setImageAtSlot(publicUrl);
       toast.success(`Imagen ${activeImageSlot + 1} subida`);
-    } catch (err: any) { toast.error(err?.message || 'Error'); }
+    } catch (err: any) { toast.error(err?.message || 'Error al procesar'); }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
@@ -894,7 +894,7 @@ function AdFormMultiSlot({
       if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
       if (error) throw error;
       if (data?.asset_url) { setImageAtSlot(data.asset_url); toast.success(`Imagen ${activeImageSlot + 1} generada`); }
-    } catch (err: any) { toast.error(err?.message || 'Error'); }
+    } catch (err: any) { toast.error(err?.message || 'Error al procesar'); }
     finally { setGeneratingImage(false); }
   };
 
@@ -1043,7 +1043,7 @@ function AdFormMultiSlot({
                   </button>
                 ))}
               </div>
-            ) : <p className="text-xs text-muted-foreground text-center py-4">No hay assets</p>}
+            ) : <p className="text-xs text-muted-foreground text-center py-4">No hay recursos disponibles</p>}
           </div>
         )}
 
@@ -1055,7 +1055,7 @@ function AdFormMultiSlot({
       {/* ---- HEADLINE SLOTS ---- */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-semibold">Headlines ({headlines.length})</Label>
+          <Label className="text-sm font-semibold">Títulos ({headlines.length})</Label>
           {canAddMoreTexts && (
             <Button variant="ghost" size="sm" onClick={() => setHeadlines([...headlines, ''])} className="text-xs text-muted-foreground">
               <Plus className="w-3 h-3 mr-1" />Agregar
@@ -1065,7 +1065,7 @@ function AdFormMultiSlot({
         {headlines.map((hl, i) => (
           <div key={i} className="flex gap-2 items-center">
             <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}.</span>
-            <Input value={hl} onChange={(e) => { const next = [...headlines]; next[i] = e.target.value; setHeadlines(next); }} placeholder={`Headline ${i + 1}`} />
+            <Input value={hl} onChange={(e) => { const next = [...headlines]; next[i] = e.target.value; setHeadlines(next); }} placeholder={`Título ${i + 1}`} />
             {headlines.length > 1 && (
               <button aria-label="Eliminar título" onClick={() => { const next = headlines.filter((_, j) => j !== i); setHeadlines(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
             )}

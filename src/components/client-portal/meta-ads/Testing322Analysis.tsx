@@ -458,7 +458,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
       {chartData.length > 0 && topAdsetNames.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">ROAS Diario — Top 4 Ad Sets</CardTitle>
+            <CardTitle className="text-sm font-medium">ROAS Diario — Top 4 Conjuntos</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -503,13 +503,13 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Rendimiento por Ad Set</CardTitle>
+            <CardTitle className="text-sm font-medium">Rendimiento por Conjunto</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ad Set</TableHead>
+                  <TableHead>Conjunto</TableHead>
                   <TableHead className="text-right">Gasto</TableHead>
                   <TableHead className="text-right">Conv.</TableHead>
                   <TableHead className="text-right">CPA</TableHead>

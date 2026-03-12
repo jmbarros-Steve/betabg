@@ -131,7 +131,7 @@ export default function AdSetSelector({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{as.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {as.daily_budget > 0 ? `Budget: ${fmtCLP(as.daily_budget / 100)}/día` : ''}
+                      {as.daily_budget > 0 ? `Presupuesto: ${fmtCLP(as.daily_budget / 100)}/día` : ''}
                       {as.spend > 0 ? ` · Gasto: ${fmtCLP(as.spend)}` : ''}
                     </p>
                   </div>

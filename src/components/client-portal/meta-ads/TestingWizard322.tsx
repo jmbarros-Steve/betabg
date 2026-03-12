@@ -59,7 +59,7 @@ const STEPS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
   { key: 'config', label: 'Configuración', icon: Target },
   { key: 'images', label: 'Creativos (3)', icon: ImageIcon },
   { key: 'copies', label: 'Copies (2)', icon: FileText },
-  { key: 'headlines', label: 'Headlines (2)', icon: Type },
+  { key: 'headlines', label: 'Títulos (2)', icon: Type },
   { key: 'combinations', label: 'Combinaciones', icon: Grid3X3 },
   { key: 'budget', label: 'Presupuesto', icon: Calculator },
   { key: 'review', label: 'Revisar y Lanzar', icon: Rocket },
@@ -258,10 +258,10 @@ function StepTextVariants({
   onGenerate: () => void;
 }) {
   const count = values.length;
-  const label = type === 'copy' ? 'Copy (texto principal)' : 'Headline (título)';
+  const label = type === 'copy' ? 'Copy (texto principal)' : 'Título';
   const placeholder = type === 'copy'
     ? 'Escribe el texto principal del anuncio...'
-    : 'Escribe el headline...';
+    : 'Escribe el título...';
   const tip = type === 'copy'
     ? '2 copies diferentes permiten testear distintos ángulos de mensaje: uno emocional y otro racional, o uno corto y otro largo.'
     : '2 headlines diferentes: uno enfocado en beneficio y otro en urgencia/oferta. Meta muestra el headline debajo de la imagen.';
@@ -335,8 +335,8 @@ function StepCombinations({ combinations }: { combinations: Combination[] }) {
                 </div>
               )}
 
-              <p className="text-xs font-semibold line-clamp-1">{combo.headline || '(headline)'}</p>
-              <p className="text-[11px] text-muted-foreground line-clamp-2">{combo.primaryText || '(copy)'}</p>
+              <p className="text-xs font-semibold line-clamp-1">{combo.headline || '(título)'}</p>
+              <p className="text-[11px] text-muted-foreground line-clamp-2">{combo.primaryText || '(texto)'}</p>
               <p className="text-[10px] text-muted-foreground/70 truncate">{combo.adsetName}</p>
             </CardContent>
           </Card>
@@ -705,10 +705,10 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
               </SteveTip>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                <Card><CardContent className="py-3"><p className="text-2xl font-bold text-primary">{combinations.length}</p><p className="text-xs text-muted-foreground">Ad Sets</p></CardContent></Card>
+                <Card><CardContent className="py-3"><p className="text-2xl font-bold text-primary">{combinations.length}</p><p className="text-xs text-muted-foreground">Conjuntos</p></CardContent></Card>
                 <Card><CardContent className="py-3"><p className="text-2xl font-bold">{images.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Imágenes</p></CardContent></Card>
                 <Card><CardContent className="py-3"><p className="text-2xl font-bold">{copies.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Copies</p></CardContent></Card>
-                <Card><CardContent className="py-3"><p className="text-2xl font-bold">{headlines.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Headlines</p></CardContent></Card>
+                <Card><CardContent className="py-3"><p className="text-2xl font-bold">{headlines.filter(Boolean).length}</p><p className="text-xs text-muted-foreground">Títulos</p></CardContent></Card>
               </div>
 
               <div className="space-y-2 text-sm">

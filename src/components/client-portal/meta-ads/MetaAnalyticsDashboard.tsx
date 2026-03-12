@@ -426,7 +426,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
 
     const steps = [
       { name: 'Impresiones', value: impressions },
-      { name: 'Clicks', value: clicks },
+      { name: 'Clics', value: clicks },
       { name: 'Vistas LP', value: landingPageViews },
       { name: 'Agregar al Carro', value: addToCart },
       { name: 'Compras', value: purchases },

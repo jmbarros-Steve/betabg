@@ -1456,7 +1456,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
             title="Sincronizar audiencias desde Meta"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncingFromMeta ? 'animate-spin' : ''}`} />
-            {syncingFromMeta ? 'Sincronizando...' : 'Sync Meta'}
+            {syncingFromMeta ? 'Sincronizando...' : 'Sincronizar Meta'}
           </Button>
           <Button
             variant="outline"

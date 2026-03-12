@@ -1696,7 +1696,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Clicks</span>
+                    <span className="text-muted-foreground">Clics</span>
                     <span className="font-medium">
                       {formatNumber(selectedCampaign.clicks)}
                     </span>
@@ -1749,7 +1749,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Conversion Rate</span>
+                    <span className="text-muted-foreground">Tasa de Conversión</span>
                     <span className="font-medium">
                       {selectedCampaign.clicks > 0
                         ? formatPercent(
