@@ -23,11 +23,17 @@ async function getExchangeRates(): Promise<Record<string, number>> {
   }
 }
 
+// Cache exchange rates per request to avoid repeated API calls
+let cachedRates: Record<string, number> | null = null;
+
 async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
   const currency = fromCurrency.toUpperCase();
   if (currency === 'CLP') return amount;
 
-  const rates = await getExchangeRates();
+  if (!cachedRates) {
+    cachedRates = await getExchangeRates();
+  }
+  const rates = cachedRates;
 
   if (currency === 'USD') {
     return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
@@ -195,27 +201,43 @@ export async function syncShopifyMetrics(c: Context) {
     const cleanStoreUrl = store_url.replace(/^https?:\/\//, '');
     console.log('Fetching orders from Shopify:', cleanStoreUrl);
 
+    const SHOPIFY_API_VERSION = '2025-01';
+    const shopifyHeaders = {
+      'X-Shopify-Access-Token': decryptedToken,
+      'Content-Type': 'application/json',
+    };
+
+    // Paginated fetch — follows Shopify's Link header pagination
+    async function fetchAllOrders(initialUrl: string): Promise<ShopifyOrder[]> {
+      const results: ShopifyOrder[] = [];
+      let url: string | null = initialUrl;
+      while (url) {
+        const res = await fetch(url, { headers: shopifyHeaders });
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Shopify API error:', res.status, errorText);
+          throw new Error(`Shopify API error: ${res.status}`);
+        }
+        const json: any = await res.json();
+        results.push(...(json.orders || []));
+        const linkHeader = res.headers.get('Link') || '';
+        const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        url = nextMatch ? nextMatch[1] : null;
+      }
+      return results;
+    }
+
     // Fetch orders from Shopify (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
+    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
 
-    const shopifyResponse = await fetch(shopifyUrl, {
-      headers: {
-        'X-Shopify-Access-Token': decryptedToken,
-        'Content-Type': 'application/json',
-      },
-    });
+    // Reset cached rates for this request
+    cachedRates = null;
 
-    if (!shopifyResponse.ok) {
-      const errorText = await shopifyResponse.text();
-      console.error('Shopify API error:', shopifyResponse.status, errorText);
-      return c.json({ error: `Shopify API error: ${shopifyResponse.status}` }, 500);
-    }
-
-    const { orders }: any = await shopifyResponse.json() as { orders: ShopifyOrder[] };
-    console.log('Fetched orders:', orders?.length || 0);
+    const orders = await fetchAllOrders(shopifyUrl);
+    console.log('Fetched orders (paginated):', orders.length);
 
     // Calculate daily metrics - ALL CONVERTED TO CLP
     const dailyMetrics: Record<string, { revenue: number; orders: number; originalCurrency: string }> = {};

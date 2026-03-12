@@ -87,15 +87,37 @@ export async function fetchShopifyAnalytics(c: Context) {
     const sinceDate = new Date();
     sinceDate.setDate(sinceDate.getDate() - daysBack);
 
-    // Fetch orders (with line_items + customer + financial_status) and abandoned checkouts in parallel
-    const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
-    const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}`;
+    const SHOPIFY_API_VERSION = '2025-01';
+
+    // Paginated fetch helper — follows Shopify's Link header pagination
+    async function fetchAllPages<T>(initialUrl: string, key: string): Promise<T[]> {
+      const results: T[] = [];
+      let url: string | null = initialUrl;
+      while (url) {
+        const res = await fetch(url, { headers: shopifyHeaders });
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn(`[fetch-shopify-analytics] Paginated fetch failed: ${res.status}`, errText);
+          break;
+        }
+        const json: any = await res.json();
+        results.push(...(json[key] || []));
+        // Parse Link header for next page
+        const linkHeader = res.headers.get('Link') || '';
+        const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        url = nextMatch ? nextMatch[1] : null;
+      }
+      return results;
+    }
+
+    const ordersUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
+    const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}`;
 
     console.log('[fetch-shopify-analytics] Fetching orders and checkouts from:', cleanStoreUrl);
 
-    const [ordersRes, checkoutsRes] = await Promise.all([
-      fetch(ordersUrl, { headers: shopifyHeaders }),
-      fetch(checkoutsUrl, { headers: shopifyHeaders }),
+    const [orders, checkouts] = await Promise.all([
+      fetchAllPages<any>(ordersUrl, 'orders'),
+      fetchAllPages<any>(checkoutsUrl, 'checkouts'),
     ]);
 
     // --- TOP SKUs + Channel + UTM ---
@@ -118,82 +140,75 @@ export async function fetchShopifyAnalytics(c: Context) {
     // Totals for summary
     let totalRevenue = 0;
 
-    if (ordersRes.ok) {
-      const { orders }: any = await ordersRes.json();
-      console.log(`[fetch-shopify-analytics] Fetched ${orders?.length || 0} orders`);
+    console.log(`[fetch-shopify-analytics] Fetched ${orders.length} orders (paginated)`);
 
-      for (const order of (orders || [])) {
-        const orderRevenue = parseFloat(order.total_price || '0');
-        totalRevenue += orderRevenue;
+    for (const order of orders) {
+      const orderRevenue = parseFloat(order.total_price || '0');
+      totalRevenue += orderRevenue;
 
-        // Daily breakdown for charts
-        const dateKey = (order.created_at || '').split('T')[0];
-        if (dateKey) {
-          const dayEntry = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
-          dayEntry.revenue += orderRevenue;
-          dayEntry.orders += 1;
-          dailyMap.set(dateKey, dayEntry);
-        }
-
-        // SKU tracking
-        for (const item of (order.line_items || [])) {
-          const sku = item.sku || item.variant_title || `ID-${item.variant_id || item.product_id}`;
-          const existing = skuMap.get(sku) || { sku, name: item.title || item.name || sku, quantity: 0, revenue: 0 };
-          existing.quantity += item.quantity || 0;
-          existing.revenue += parseFloat(item.price || '0') * (item.quantity || 0);
-          skuMap.set(sku, existing);
-        }
-
-        // Channel tracking
-        const channel = order.source_name || 'direct';
-        const channelEntry = channelMap.get(channel) || { channel, orders: 0, revenue: 0 };
-        channelEntry.orders += 1;
-        channelEntry.revenue += orderRevenue;
-        channelMap.set(channel, channelEntry);
-
-        // UTM tracking from landing_site
-        const landingSite = order.landing_site || '';
-        if (landingSite.includes('utm_')) {
-          try {
-            const url = new URL(landingSite.startsWith('http') ? landingSite : `https://example.com${landingSite}`);
-            const source = url.searchParams.get('utm_source') || '';
-            const medium = url.searchParams.get('utm_medium') || '';
-            const campaign = url.searchParams.get('utm_campaign') || '';
-            if (source || campaign) {
-              const utmKey = `${source}|${medium}|${campaign}`;
-              const utmEntry = utmMap.get(utmKey) || { utm: utmKey, source, medium, campaign, orders: 0, revenue: 0 };
-              utmEntry.orders += 1;
-              utmEntry.revenue += orderRevenue;
-              utmMap.set(utmKey, utmEntry);
-            }
-          } catch { /* ignore invalid URLs */ }
-        }
-
-        // Customer tracking
-        totalOrderCount++;
-        if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') {
-          paidOrderCount++;
-        }
-        const cust = order.customer;
-        if (cust?.id) {
-          const existing = customerMap.get(cust.id);
-          if (existing) {
-            // Accumulate revenue from orders (more reliable than customer.total_spent)
-            existing.orders_count += 1;
-            existing.total_spent += orderRevenue;
-          } else {
-            customerMap.set(cust.id, {
-              orders_count: 1,
-              total_spent: orderRevenue,
-              created_at: cust.created_at || order.created_at,
-            });
-          }
-          orderDates.push({ customerId: cust.id, orderDate: order.created_at });
-        }
+      // Daily breakdown for charts
+      const dateKey = (order.created_at || '').split('T')[0];
+      if (dateKey) {
+        const dayEntry = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
+        dayEntry.revenue += orderRevenue;
+        dayEntry.orders += 1;
+        dailyMap.set(dateKey, dayEntry);
       }
-    } else {
-      const errText = await ordersRes.text();
-      console.warn('[fetch-shopify-analytics] Orders fetch failed:', ordersRes.status, errText);
+
+      // SKU tracking
+      for (const item of (order.line_items || [])) {
+        const sku = item.sku || item.variant_title || `ID-${item.variant_id || item.product_id}`;
+        const existing = skuMap.get(sku) || { sku, name: item.title || item.name || sku, quantity: 0, revenue: 0 };
+        existing.quantity += item.quantity || 0;
+        existing.revenue += parseFloat(item.price || '0') * (item.quantity || 0);
+        skuMap.set(sku, existing);
+      }
+
+      // Channel tracking
+      const channel = order.source_name || 'direct';
+      const channelEntry = channelMap.get(channel) || { channel, orders: 0, revenue: 0 };
+      channelEntry.orders += 1;
+      channelEntry.revenue += orderRevenue;
+      channelMap.set(channel, channelEntry);
+
+      // UTM tracking from landing_site
+      const landingSite = order.landing_site || '';
+      if (landingSite.includes('utm_')) {
+        try {
+          const url = new URL(landingSite.startsWith('http') ? landingSite : `https://example.com${landingSite}`);
+          const source = url.searchParams.get('utm_source') || '';
+          const medium = url.searchParams.get('utm_medium') || '';
+          const campaign = url.searchParams.get('utm_campaign') || '';
+          if (source || campaign) {
+            const utmKey = `${source}|${medium}|${campaign}`;
+            const utmEntry = utmMap.get(utmKey) || { utm: utmKey, source, medium, campaign, orders: 0, revenue: 0 };
+            utmEntry.orders += 1;
+            utmEntry.revenue += orderRevenue;
+            utmMap.set(utmKey, utmEntry);
+          }
+        } catch { /* ignore invalid URLs */ }
+      }
+
+      // Customer tracking
+      totalOrderCount++;
+      if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') {
+        paidOrderCount++;
+      }
+      const cust = order.customer;
+      if (cust?.id) {
+        const existing = customerMap.get(cust.id);
+        if (existing) {
+          existing.orders_count += 1;
+          existing.total_spent += orderRevenue;
+        } else {
+          customerMap.set(cust.id, {
+            orders_count: 1,
+            total_spent: orderRevenue,
+            created_at: cust.created_at || order.created_at,
+          });
+        }
+        orderDates.push({ customerId: cust.id, orderDate: order.created_at });
+      }
     }
 
     const topSkus = Array.from(skuMap.values())
@@ -264,36 +279,30 @@ export async function fetchShopifyAnalytics(c: Context) {
     // --- ABANDONED CHECKOUTS ---
     let abandonedCarts: any[] = [];
 
-    if (checkoutsRes.ok) {
-      const { checkouts }: any = await checkoutsRes.json();
-      console.log(`[fetch-shopify-analytics] Fetched ${checkouts?.length || 0} abandoned checkouts`);
+    console.log(`[fetch-shopify-analytics] Fetched ${checkouts.length} abandoned checkouts (paginated)`);
 
-      abandonedCarts = (checkouts || []).map((c: any) => {
-        const email = c.email || c.customer?.email || '';
-        if (email) checkoutCustomerEmails.add(email.toLowerCase());
-        return {
-          id: String(c.id),
-          customerEmail: email,
-          customerName: c.customer
-            ? `${c.customer.first_name || ''} ${c.customer.last_name || ''}`.trim()
-            : (c.email || 'Sin nombre'),
-          phone: c.shipping_address?.phone || c.billing_address?.phone || c.customer?.phone || null,
-          totalValue: parseFloat(c.total_price || '0'),
-          itemCount: (c.line_items || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
-          lineItems: (c.line_items || []).map((li: any) => ({
-            title: li.title || '',
-            quantity: li.quantity || 1,
-            price: parseFloat(li.price || '0'),
-            variantTitle: li.variant_title || '',
-          })),
-          abandonedAt: c.created_at,
-          contacted: false,
-        };
-      });
-    } else {
-      const errText = await checkoutsRes.text();
-      console.warn('[fetch-shopify-analytics] Checkouts fetch failed:', checkoutsRes.status, errText);
-    }
+    abandonedCarts = checkouts.map((c: any) => {
+      const email = c.email || c.customer?.email || '';
+      if (email) checkoutCustomerEmails.add(email.toLowerCase());
+      return {
+        id: String(c.id),
+        customerEmail: email,
+        customerName: c.customer
+          ? `${c.customer.first_name || ''} ${c.customer.last_name || ''}`.trim()
+          : (c.email || 'Sin nombre'),
+        phone: c.shipping_address?.phone || c.billing_address?.phone || c.customer?.phone || null,
+        totalValue: parseFloat(c.total_price || '0'),
+        itemCount: (c.line_items || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
+        lineItems: (c.line_items || []).map((li: any) => ({
+          title: li.title || '',
+          quantity: li.quantity || 1,
+          price: parseFloat(li.price || '0'),
+          variantTitle: li.variant_title || '',
+        })),
+        abandonedAt: c.created_at,
+        contacted: false,
+      };
+    });
 
     // --- REAL CONVERSION RATE (checkout → purchase) ---
     // Completed orders / (completed orders + abandoned checkouts) as checkout-to-purchase ratio
