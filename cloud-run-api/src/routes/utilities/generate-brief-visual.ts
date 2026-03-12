@@ -101,10 +101,13 @@ ${formato === 'video' ? `Responde en JSON para VIDEO:
   "prompt_generacion": "prompt detallado en inglés para Fal.ai Flux Pro"
 }`}
 
-IMPORTANTE para prompt_generacion:
-${productDesc ? `- Describe el producto en el prompt: "${productDesc}". The product should appear prominently in the image.` : ''}
+IMPORTANTE para prompt_generacion (seguir OBLIGATORIAMENTE):
+${productDesc ? `- Describe el producto EXACTO en el prompt: "${productDesc}". The product must appear prominently and realistically — same shape, colors, packaging.` : ''}
 - ${personaPhotoDesc}
-- Siempre terminar el prompt con: "Professional advertising photography, no text or watermarks in the image, sharp focus, high resolution. The image must look like a real photograph, never AI-generated or stock-like."
+- CLAVE PARA REALISMO: El prompt debe especificar detalles físicos reales: textura de piel con poros e imperfecciones naturales, ropa con arrugas y pliegues reales, superficies con reflejos naturales, profundidad de campo con bokeh sutil, iluminación con sombras suaves y direccionales.
+- Mencionar un entorno REAL y específico (ej: "en una cocina moderna con mesón de mármol" NO "en un fondo limpio").
+- NUNCA usar palabras como "digital art", "illustration", "3D render", "graphic design" — todo debe ser "photograph".
+- Siempre terminar el prompt con: "Ultra-realistic commercial photograph, professional advertising photo shoot, real textures, natural imperfections, shot on Canon EOS R5. No illustrations, no AI artifacts, no plastic-looking skin, no floating objects, no text overlays."
 
 Responde SOLO el JSON sin markdown ni backticks.`;
 

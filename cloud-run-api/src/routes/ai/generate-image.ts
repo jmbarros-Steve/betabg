@@ -35,7 +35,7 @@ export async function generateImage(c: Context) {
     ? `${promptGeneracion}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
     : promptGeneracion;
 
-  const promptFinal = `${promptBase}, shot on Canon EOS R5, 85mm f/1.4 lens, natural window lighting, editorial style`;
+  const promptFinal = `${promptBase}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
   let imageUrl: string | null = null;
   let imageBytes: Uint8Array | null = null;
@@ -64,7 +64,7 @@ export async function generateImage(c: Context) {
             inlineData: { mimeType, data: refBase64 },
           });
           parts.push({
-            text: `Use this product photo as the main visual reference. The product in the generated image MUST look exactly like this real product. Do not invent a different product. Incorporate this product into the following advertising scene:\n\n${promptFinal}`,
+            text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this — same shape, same colors, same packaging, same labels, same textures. Do not alter, stylize, or reimagine the product. Place this exact real product into the advertising scene described below. The final image must look like a real photograph taken with a professional camera, NOT an AI illustration.\n\n${promptFinal}`,
           });
         } else {
           console.warn('[generate-image] Could not download reference photo:', refResponse.status);

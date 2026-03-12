@@ -88,9 +88,9 @@ const CTA_OPTIONS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'DOWNLOAD', 'CONTACT_U
 
 // Different visual compositions for DCT 3:2:2 (3 images with different approaches)
 const IMAGE_COMPOSITIONS = [
-  'Product hero shot: the product is the main subject, centered, clean background, dramatic lighting. Show the product prominently from its best angle.',
-  'Lifestyle shot: a real person actively using or enjoying the product in a natural everyday setting. The product must be clearly visible. The scene tells a story of transformation or satisfaction.',
-  'Close-up detail shot: extreme close-up highlighting the product texture, material quality, packaging or a key feature. Macro photography style, shallow depth of field.',
+  'Product hero shot: the product is the main subject on a real surface (marble countertop, wooden table, textured fabric). Dramatic side lighting with soft shadows. Shot from a slight angle to show depth and dimension. Background softly blurred with natural bokeh.',
+  'Lifestyle shot: a real person actively using or enjoying the product in a specific real environment (modern kitchen, cozy living room, outdoor café). The person has natural skin texture, genuine expression, real clothing with wrinkles. The product is clearly visible in their hands or in use. Warm natural lighting from a window or golden hour.',
+  'Close-up detail shot: extreme macro close-up highlighting the product texture, material quality, label text, or a key feature. Shallow depth of field at f/2.8. Real surface reflections and micro-textures visible. The background is a soft, out-of-focus real environment.',
 ];
 
 // ---------------------------------------------------------------------------
