@@ -104,26 +104,26 @@ const FUNNEL_INFO: Record<string, { label: string; color: string; explanation: s
   tofu: {
     label: 'TOFU',
     color: 'bg-sky-500/15 text-sky-600 border-sky-500/30',
-    explanation: 'Top of Funnel — Maximo alcance para nuevas audiencias. Se optimiza por impresiones y visitas.',
+    explanation: 'Top of Funnel — Máximo alcance para nuevas audiencias. Se optimiza por impresiones y visitas.',
   },
   mofu: {
     label: 'MOFU',
     color: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
-    explanation: 'Middle of Funnel — Personas que ya conocen tu marca. Se busca engagement y consideracion.',
+    explanation: 'Middle of Funnel — Personas que ya conocen tu marca. Se busca engagement y consideración.',
   },
   bofu: {
     label: 'BOFU',
     color: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
-    explanation: 'Bottom of Funnel — Alta intencion de compra. Se buscan conversiones directas: ventas, leads.',
+    explanation: 'Bottom of Funnel — Alta intención de compra. Se buscan conversiones directas: ventas, leads.',
   },
 };
 
 const OBJECTIVE_WHY: Record<string, string> = {
   CONVERSIONS: 'Objetivo "Conversiones" = ventas directas → BOFU porque se buscan personas listas para comprar.',
-  TRAFFIC: 'Objetivo "Trafico" = visitas al sitio → TOFU porque se busca atraer nuevas audiencias.',
-  AWARENESS: 'Objetivo "Reconocimiento" = maximo alcance → TOFU porque se busca awareness de marca.',
-  ENGAGEMENT: 'Objetivo "Interaccion" = likes/comentarios → MOFU porque se reimpacta a quienes ya conocen la marca.',
-  CATALOG: 'Objetivo "Catalogo DPA" = retargeting dinamico → BOFU porque se reimpacta a visitantes previos.',
+  TRAFFIC: 'Objetivo "Tráfico" = visitas al sitio → TOFU porque se busca atraer nuevas audiencias.',
+  AWARENESS: 'Objetivo "Reconocimiento" = máximo alcance → TOFU porque se busca awareness de marca.',
+  ENGAGEMENT: 'Objetivo "Interacción" = likes/comentarios → MOFU porque se reimpacta a quienes ya conocen la marca.',
+  CATALOG: 'Objetivo "Catálogo DPA" = retargeting dinámico → BOFU porque se reimpacta a visitantes previos.',
 };
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       if (error) throw error;
       await supabase.from('ad_creatives').update({ estado: 'en_pauta' }).eq('id', draft.id);
       setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-      toast.success(`"${draft.titulo}" publicado en Meta como PAUSED. Activa cuando estés listo.`);
+      toast.success(`"${draft.titulo}" publicado en Meta como pausado. Activa cuando estés listo.`);
     } catch (err: any) {
       console.error('[DraftsManager] Publish error:', err);
       toast.error(err?.message || 'Error al publicar');
@@ -330,7 +330,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
             <FileImage className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
             <h3 className="text-base font-semibold mb-1">Sin borradores</h3>
             <p className="text-muted-foreground text-sm">
-              Crea anuncios desde "Crear" y guardalos como borrador para revisarlos antes de publicar.
+              Crea anuncios desde "Crear" y guárdalos como borrador para revisarlos antes de publicar.
             </p>
           </CardContent>
         </Card>
@@ -357,7 +357,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
                           <Target className="w-4 h-4 text-primary shrink-0" />
-                          <span className="text-sm font-medium text-muted-foreground">Campana</span>
+                          <span className="text-sm font-medium text-muted-foreground">Campaña</span>
                         </div>
                         <h3 className="text-lg font-bold leading-tight mb-1">
                           {bv?.campaign_name || draft.titulo || 'Sin nombre'}
@@ -387,7 +387,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                   {/* ───── WHY THIS STRATEGY ───── */}
                   <div className="mx-5 mb-4 rounded-lg bg-muted/40 border p-4 space-y-3">
                     <h4 className="text-sm font-medium text-muted-foreground">
-                      ¿Por que esta estrategia?
+                      ¿Por qué esta estrategia?
                     </h4>
 
                     {/* Objective → Funnel */}
@@ -408,7 +408,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                       <div className="flex items-start gap-2">
                         <Users className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                         <div className="text-sm">
-                          <p className="font-medium">Segmentacion</p>
+                          <p className="font-medium">Segmentación</p>
                           {bv?.dolor && bv.dolor !== 'Sin definir' && (
                             <p className="text-xs mt-0.5">
                               <span className="text-foreground font-medium">Dolor:</span>{' '}
@@ -436,7 +436,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                           {bv?.budget_type === 'CBO' ? 'CBO — Meta distribuye el presupuesto entre ad sets' : 'ABO — Presupuesto fijo por cada ad set (ideal para testing)'}
                         </p>
                         <p className="text-muted-foreground text-xs">
-                          ${Number(bv?.plan_accion?.presupuesto_diario || bv?.adset_budget || bv?.campaign_budget || '0').toLocaleString('es-CL')} CLP/dia
+                          ${Number(bv?.plan_accion?.presupuesto_diario || bv?.adset_budget || bv?.campaign_budget || '0').toLocaleString('es-CL')} CLP/día
                           {bv?.budget_type === 'ABO' && ' por ad set'}
                         </p>
                       </div>
@@ -451,7 +451,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                         DCT 3:2:2 — Matriz de Variaciones
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        3 imagenes × 2 copies × 2 headlines = 12 combinaciones de anuncios para testear
+                        3 imágenes × 2 copies × 2 headlines = 12 combinaciones de anuncios para testear
                       </p>
                     </div>
 
@@ -459,7 +459,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                         <ImageIcon className="w-3.5 h-3.5" />
-                        Imagenes ({images.length}/3)
+                        Imágenes ({images.length}/3)
                       </p>
                       <div className="grid grid-cols-3 gap-3">
                         {[0, 1, 2].map((i) => (
@@ -496,7 +496,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                               </>
                             ) : (
                               <span className="text-xs text-muted-foreground/50">
-                                Copy {i + 1} — Pendiente. Crea otra variacion desde "Crear".
+                                Copy {i + 1} — Pendiente. Crea otra variación desde "Crear".
                               </span>
                             )}
                           </div>
@@ -508,7 +508,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5" />
-                        Headlines — Titulos ({headlines.length}/2)
+                        Headlines — Títulos ({headlines.length}/2)
                       </p>
                       <div className="space-y-2">
                         {[0, 1].map((i) => (
@@ -520,7 +520,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                               </>
                             ) : (
                               <span className="text-xs text-muted-foreground/50">
-                                Headline {i + 1} — Pendiente. Crea otra variacion desde "Crear".
+                                Headline {i + 1} — Pendiente. Crea otra variación desde "Crear".
                               </span>
                             )}
                           </div>
@@ -532,7 +532,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     {draft.descripcion && (
                       <div>
                         <p className="text-sm font-medium text-muted-foreground mb-2">
-                          Descripcion del enlace
+                          Descripción del enlace
                         </p>
                         <div className="rounded-lg border bg-background p-3">
                           <p className="text-xs text-muted-foreground italic">{draft.descripcion}</p>
@@ -545,9 +545,9 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                   <div className="mx-5 mb-4 flex items-start gap-2.5 p-3 rounded-lg bg-violet-500/5 border border-violet-500/20">
                     <Lightbulb className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
                     <div className="text-xs leading-relaxed">
-                      <span className="font-semibold">Metodologia DCT 3:2:2 (Charles Tichener):</span>{' '}
-                      Cada Ad Set tiene 1 solo anuncio para aislar variables. No tocar por 7 dias.
-                      Dia 7, Steve clasifica en ganadores, potenciales y perdedores segun Hook Rate (&gt;25%), Hold Rate (&gt;15%) y CTR (&gt;1.5%).
+                      <span className="font-semibold">Metodología DCT 3:2:2 (Charles Tichener):</span>{' '}
+                      Cada Ad Set tiene 1 solo anuncio para aislar variables. No tocar por 7 días.
+                      Día 7, Steve clasifica en ganadores, potenciales y perdedores según Hook Rate (&gt;25%), Hold Rate (&gt;15%) y CTR (&gt;1.5%).
                       {bv?.plan_accion?.regla_kill && (
                         <span className="block mt-1 text-muted-foreground">
                           Kill rule: {bv.plan_accion.regla_kill}

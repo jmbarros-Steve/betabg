@@ -79,8 +79,8 @@ export function ProfitMetricsPanel({
     },
     {
       label: 'CAC',
-      value: `$${cac.toLocaleString('es-CL')}`,
-      previousValue: previousCac ? `$${previousCac.toLocaleString('es-CL')}` : undefined,
+      value: `$${Math.round(cac).toLocaleString('es-CL')}`,
+      previousValue: previousCac ? `$${Math.round(previousCac).toLocaleString('es-CL')}` : undefined,
       changePercent: cacChange ? -cacChange : undefined, // Invert because lower CAC is better
       description: 'Costo de Adquisición por Cliente',
       tooltip: 'Costo de Adquisición de Cliente — cuánto cuesta conseguir un nuevo cliente. Mientras más bajo, mejor',
@@ -171,8 +171,9 @@ export function ProfitMetricsPanel({
             </div>
             <div className="text-right">
               <p className={cn('text-2xl font-bold tabular-nums', isRoasAboveBreakeven ? 'text-primary' : 'text-destructive')}>
-                {isRoasAboveBreakeven ? '+' : ''}
-                {((currentRoas - breakEvenRoas) / breakEvenRoas * 100).toFixed(0)}%
+                {breakEvenRoas > 0
+                  ? `${isRoasAboveBreakeven ? '+' : ''}${((currentRoas - breakEvenRoas) / breakEvenRoas * 100).toFixed(0)}%`
+                  : '—'}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isRoasAboveBreakeven ? 'sobre break-even' : 'bajo break-even'}

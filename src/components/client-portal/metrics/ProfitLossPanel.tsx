@@ -207,26 +207,26 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
           </div>
         </div>
 
-        <Separator />
-
-        {/* Fixed Costs - Dynamic */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Costos Fijos (prorrateados)</p>
-          {data.fixedCostItems.map((item, idx) => (
-            item.amount > 0 && (
-              <div key={idx} className="flex justify-between items-center text-muted-foreground">
-                <span className="text-sm pl-4">{item.name || 'Sin nombre'}</span>
-                <span className="text-sm tabular-nums text-destructive">-{formatCurrency(item.amount, currency)}</span>
+        {data.fixedCostItems.some(i => i.amount > 0) && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Costos Fijos (prorrateados)</p>
+              {data.fixedCostItems.map((item, idx) => (
+                item.amount > 0 && (
+                  <div key={idx} className="flex justify-between items-center text-muted-foreground">
+                    <span className="text-sm pl-4">{item.name || 'Sin nombre'}</span>
+                    <span className="text-sm tabular-nums text-destructive">-{formatCurrency(item.amount, currency)}</span>
+                  </div>
+                )
+              ))}
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Total Costos Fijos</span>
+                <span className="font-semibold tabular-nums text-destructive">-{formatCurrency(data.totalFixedCosts, currency)}</span>
               </div>
-            )
-          ))}
-          {data.totalFixedCosts > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Total Costos Fijos</span>
-              <span className="font-semibold tabular-nums text-destructive">-{formatCurrency(data.totalFixedCosts, currency)}</span>
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         <Separator />
 

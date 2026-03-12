@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,11 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
   const [localCarts, setLocalCarts] = useState(carts);
   const [filter, setFilter] = useState<'all' | 'contacted' | 'not_contacted'>('all');
   const [expandedCarts, setExpandedCarts] = useState<Set<string>>(new Set());
+
+  // Sync localCarts when prop changes (e.g. date range switch)
+  useEffect(() => {
+    setLocalCarts(carts);
+  }, [carts]);
 
   const handleToggleContacted = (cartId: string, contacted: boolean) => {
     setLocalCarts((prev) =>
@@ -153,7 +158,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
           <EmptyState
             icon={ShoppingCart}
             title="Sin carritos abandonados"
-            description="¡Buenas noticias! No hay carritos abandonados en este periodo"
+            description="¡Buenas noticias! No hay carritos abandonados en este período"
           />
         ) : (
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">

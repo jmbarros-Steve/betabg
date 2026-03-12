@@ -53,14 +53,9 @@ export function useUserRole(): UseUserRoleReturn {
           supabase.rpc('is_shopify_user', { _user_id: user.id }),
         ]);
 
+        // Silently handle RPC errors — functions may not exist for all users
         if (adminErr || clientErr) {
-          console.error('Error checking roles:', adminErr ?? clientErr);
-        }
-        if (superAdminErr) {
-          console.error('Error checking super admin:', superAdminErr);
-        }
-        if (shopifyErr) {
-          console.error('Error checking Shopify user:', shopifyErr);
+          console.warn('[useUserRole] Role check unavailable');
         }
 
         setIsSuperAdmin(superAdminCheck ?? false);

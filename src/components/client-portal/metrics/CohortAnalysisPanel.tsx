@@ -67,76 +67,28 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
                       {cohort.month0}
                     </span>
                   </td>
-                  <td className="py-2 px-3 text-center">
-                    {cohort.month1 !== undefined ? (
-                      <span
-                        className={cn(
-                          'px-2 py-1 rounded text-xs font-medium',
-                          getRetentionColor((cohort.month1 / cohort.month0) * 100)
+                  {[1, 2, 3, 4, 5].map((m) => {
+                    const monthVal = cohort[`month${m}` as keyof CohortData] as number | undefined;
+                    const rate = monthVal !== undefined && cohort.month0 > 0
+                      ? (monthVal / cohort.month0) * 100
+                      : undefined;
+                    return (
+                      <td key={m} className="py-2 px-3 text-center">
+                        {rate !== undefined ? (
+                          <span
+                            className={cn(
+                              'px-2 py-1 rounded text-xs font-medium',
+                              getRetentionColor(rate)
+                            )}
+                          >
+                            {rate.toFixed(0)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
-                      >
-                        {((cohort.month1 / cohort.month0) * 100).toFixed(0)}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    {cohort.month2 !== undefined ? (
-                      <span
-                        className={cn(
-                          'px-2 py-1 rounded text-xs font-medium',
-                          getRetentionColor((cohort.month2 / cohort.month0) * 100)
-                        )}
-                      >
-                        {((cohort.month2 / cohort.month0) * 100).toFixed(0)}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    {cohort.month3 !== undefined ? (
-                      <span
-                        className={cn(
-                          'px-2 py-1 rounded text-xs font-medium',
-                          getRetentionColor((cohort.month3 / cohort.month0) * 100)
-                        )}
-                      >
-                        {((cohort.month3 / cohort.month0) * 100).toFixed(0)}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    {cohort.month4 !== undefined ? (
-                      <span
-                        className={cn(
-                          'px-2 py-1 rounded text-xs font-medium',
-                          getRetentionColor((cohort.month4 / cohort.month0) * 100)
-                        )}
-                      >
-                        {((cohort.month4 / cohort.month0) * 100).toFixed(0)}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    {cohort.month5 !== undefined ? (
-                      <span
-                        className={cn(
-                          'px-2 py-1 rounded text-xs font-medium',
-                          getRetentionColor((cohort.month5 / cohort.month0) * 100)
-                        )}
-                      >
-                        {((cohort.month5 / cohort.month0) * 100).toFixed(0)}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, Users, Percent, DollarSign, HelpCircle } from 'lucide-react';
+import { TrendingUp, Users, Percent, DollarSign, HelpCircle, Heart } from 'lucide-react';
 
 interface ConversionLtvPanelProps {
   conversionRate: number;
@@ -57,6 +57,11 @@ export function ConversionLtvPanel({
   ];
 
   return (
+    <div className="space-y-4">
+      <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+        <Heart className="w-5 h-5" />
+        Clientes y Conversión
+      </h3>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {metrics.map((metric) => (
         <Card key={metric.title} className="bg-white border border-slate-200 rounded-xl card-hover">
@@ -86,6 +91,7 @@ export function ConversionLtvPanel({
           </CardContent>
         </Card>
       ))}
+    </div>
     </div>
   );
 }

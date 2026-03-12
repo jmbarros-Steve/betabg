@@ -112,7 +112,7 @@ const formatPercent = (value: number): string => `${value.toFixed(2)}%`;
 const formatRoas = (value: number): string => `${value.toFixed(2)}x`;
 
 const pctChange = (current: number, previous: number): number | null => {
-  if (previous === 0) return current > 0 ? 100 : null;
+  if (previous === 0) return null;
   return ((current - previous) / previous) * 100;
 };
 
@@ -428,7 +428,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       { name: 'Impresiones', value: impressions },
       { name: 'Clicks', value: clicks },
       { name: 'Vistas LP', value: landingPageViews },
-      { name: 'Add to Cart', value: addToCart },
+      { name: 'Agregar al Carro', value: addToCart },
       { name: 'Compras', value: purchases },
     ];
 
@@ -563,7 +563,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
               className="text-xs h-7 px-3"
               onClick={() => setDateRange('custom')}
             >
-              Custom
+              Personalizado
             </Button>
           </div>
           {dateRange === 'custom' && (

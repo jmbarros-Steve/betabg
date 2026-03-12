@@ -723,8 +723,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             </div>
             <h3 className="text-lg font-semibold mb-2">Sin reglas automatizadas</h3>
             <p className="text-muted-foreground max-w-md mb-6">
-              Las reglas automatizadas monitorean tus campañas y ejecutan acciones automáticamente
-              cuando se cumplen ciertas condiciones. Crea tu primera regla o usa una plantilla.
+              Crea reglas para pausar campañas con bajo rendimiento, escalar presupuesto en las ganadoras, o recibir alertas cuando las métricas cambien.
             </p>
             <div className="flex gap-3">
               <Button onClick={openCreate}>

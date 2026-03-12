@@ -94,8 +94,8 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                     borderRadius: '8px',
                   }}
                   formatter={(value: number, name: string) => [
-                    `$${value.toLocaleString('es-CL')} ${name === 'spend' ? 'USD' : 'CLP'}`,
-                    name === 'prevRevenue' ? 'Periodo anterior' : name === 'revenue' ? 'Ingresos' : 'Inversión'
+                    `$${value.toLocaleString('es-CL')} CLP`,
+                    name === 'prevRevenue' ? 'Período anterior' : name === 'revenue' ? 'Ingresos' : 'Inversión'
                   ]}
                   labelFormatter={(label) => `Fecha: ${label}`}
                 />
@@ -157,7 +157,7 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                   }}
                   formatter={(value: number, name: string) => [
                     `$${value.toLocaleString('es-CL')} ${currency}`,
-                    name === 'prevRevenue' ? 'Periodo anterior' : 'Ingresos'
+                    name === 'prevRevenue' ? 'Período anterior' : 'Ingresos'
                   ]}
                   labelFormatter={(label) => `Fecha: ${label}`}
                 />
@@ -185,21 +185,21 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
             )}
           </ResponsiveContainer>
           {(hasSpendData || hasPreviousData) && (
-            <div className={`flex items-center justify-center gap-${isMobile ? '4' : '6'} mt-4 text-xs flex-wrap`}>
+            <div className={`flex items-center justify-center ${isMobile ? 'gap-4' : 'gap-6'} mt-4 text-xs flex-wrap`}>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-primary" />
                 <span className="text-muted-foreground">Ingresos</span>
               </div>
               {hasSpendData && (
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-0.5 bg-destructive" style={{ borderStyle: 'dashed' }} />
+                  <div className="w-5 h-0" style={{ borderTop: '2px dashed hsl(var(--destructive))' }} />
                   <span className="text-muted-foreground">Inversión Publicitaria</span>
                 </div>
               )}
               {hasPreviousData && (
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-0.5" style={{ borderTop: '2px dashed #94a3b8' }} />
-                  <span className="text-muted-foreground">Periodo anterior</span>
+                  <span className="text-muted-foreground">Período anterior</span>
                 </div>
               )}
             </div>

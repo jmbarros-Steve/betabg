@@ -963,7 +963,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
 
           {!sidebarCollapsed && (
             <div className="px-3 pb-3">
-              <div className="text-[10px] text-muted-foreground/50 text-center">Meta Ads Manager</div>
+              <div className="text-[10px] text-muted-foreground/20 text-center">Meta Ads Manager</div>
             </div>
           )}
         </aside>

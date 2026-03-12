@@ -297,7 +297,12 @@ export default function ClientPortal() {
             <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1" />
             <div className="hidden sm:flex flex-col items-start justify-center">
               {clientLogoUrl && (
-                <img src={clientLogoUrl} alt={displayClient?.name} className="h-8 w-auto max-w-[120px] object-contain mb-0.5" />
+                <img
+                  src={clientLogoUrl}
+                  alt={displayClient?.name}
+                  className="h-8 w-auto max-w-[120px] object-contain mb-0.5"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
               )}
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-slate-900 leading-tight">{displayClient?.name}</p>

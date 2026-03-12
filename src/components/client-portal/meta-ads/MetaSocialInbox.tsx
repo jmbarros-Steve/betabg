@@ -629,10 +629,10 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
               ) : filteredConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4">
                   <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    {conversations.length === 0
-                      ? 'No hay interacciones aún'
-                      : 'No se encontraron resultados'}
+                  <p className="text-sm text-muted-foreground text-center max-w-[260px]">
+                    {searchQuery
+                      ? 'Sin resultados para tu búsqueda.'
+                      : 'Aún no hay mensajes. Las conversaciones aparecerán aquí cuando tus clientes interactúen con tus anuncios o página.'}
                   </p>
                 </div>
               ) : (

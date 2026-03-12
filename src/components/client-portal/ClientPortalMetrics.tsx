@@ -337,7 +337,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           // Fetch real SKU sales, abandoned checkouts, customer metrics, and cohorts
           try {
             const now = new Date();
-            const mtdDays = now.getDate() - 1; // March 9: 8 days back = March 1
+            const mtdDays = Math.max(now.getDate() - 1, 1);
             const ytdDays = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
             const customDays = customDateRange
               ? Math.ceil((customDateRange.to.getTime() - customDateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -634,8 +634,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const roasFormatter = useCallback((n: number) => n.toFixed(2) + "x", []);
 
   const statCards = useMemo(() => [
-    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600', tooltip: 'Ingresos totales de Shopify en el periodo seleccionado', formatter: currencyFormatter },
-    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el periodo', formatter: currencyFormatter },
+    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600', tooltip: 'Ingresos totales de Shopify en el período seleccionado', formatter: currencyFormatter },
+    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el período', formatter: currencyFormatter },
     { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600', tooltip: 'Número total de pedidos completados en Shopify', formatter: undefined },
     { title: 'ROAS Promedio', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600', tooltip: 'Return On Ad Spend — ingresos generados por cada $1 invertido en publicidad. Sobre 3x es bueno, sobre 5x es excelente', formatter: roasFormatter },
   ], [current, previous, totalAdSpendWithGoogle, effectiveRoas, currencyFormatter, roasFormatter]);
@@ -644,7 +644,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
   const exportToCSV = useCallback(() => {
     const rows = [
-      ['Métrica', 'Valor', 'Periodo anterior', 'Cambio %'],
+      ['Métrica', 'Valor', 'Período anterior', 'Cambio %'],
       ['Ingresos Totales (CLP)', String(Math.round(current.totalRevenue)), String(Math.round(previous.totalRevenue)), previous.totalRevenue > 0 ? (((current.totalRevenue - previous.totalRevenue) / previous.totalRevenue) * 100).toFixed(1) + '%' : 'N/A'],
       ['Inversión Publicitaria (CLP)', String(Math.round(totalAdSpendWithGoogle)), String(Math.round(previous.totalSpend)), previous.totalSpend > 0 ? (((totalAdSpendWithGoogle - previous.totalSpend) / previous.totalSpend) * 100).toFixed(1) + '%' : 'N/A'],
       ['Pedidos', String(current.totalOrders), String(previous.totalOrders), previous.totalOrders > 0 ? (((current.totalOrders - previous.totalOrders) / previous.totalOrders) * 100).toFixed(1) + '%' : 'N/A'],
@@ -756,7 +756,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                       ) : null}
                       {Math.abs(change).toFixed(1)}%
                     </span>
-                    <span className="text-xs text-muted-foreground">vs periodo anterior</span>
+                    <span className="text-xs text-muted-foreground">vs período anterior</span>
                   </div>
                 )}
               </CardContent>
@@ -796,7 +796,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             <Card className="bg-muted/50">
               <CardContent className="py-8 text-center">
                 <p className="text-muted-foreground text-sm">
-                  Proximamente — Conecta Shopify y acumula ventas para ver estas metricas.
+                  Próximamente — Conecta Shopify y acumula ventas para ver estas métricas.
                 </p>
               </CardContent>
             </Card>
@@ -811,7 +811,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               <Card className="bg-muted/50">
                 <CardContent className="py-8 text-center">
                   <p className="text-muted-foreground text-sm">
-                    Proximamente — Conecta Shopify y acumula ventas para ver estas metricas.
+                    Próximamente — Conecta Shopify y acumula ventas para ver estas métricas.
                   </p>
                 </CardContent>
               </Card>
@@ -821,11 +821,11 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           {/* Removed: SKUs & Abandoned Carts moved to Shopify tab */}
         </>
       ) : (
-        <Card className="bg-muted/50">
-          <CardContent className="py-8 text-center">
-            <p className="text-muted-foreground">
-              No hay métricas disponibles. Conecta tus plataformas para ver tus datos.
-            </p>
+        <Card className="bg-white border border-slate-200 rounded-xl">
+          <CardContent className="py-16 text-center">
+            <Target className="w-10 h-10 mx-auto text-muted-foreground/40 mb-4" />
+            <p className="font-medium text-muted-foreground mb-1">Sin métricas disponibles</p>
+            <p className="text-sm text-muted-foreground/70">Conecta Shopify, Meta o Google en la pestaña "Conexiones" para empezar</p>
           </CardContent>
         </Card>
       )}

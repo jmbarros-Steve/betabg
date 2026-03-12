@@ -49,15 +49,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
           supabase.rpc('get_user_shop_domain', { _user_id: user.id }),
         ]);
 
-        if (shopifyCheck.error) {
-          console.error('Error checking Shopify user:', shopifyCheck.error);
-        }
-        if (superAdminCheck.error) {
-          console.error('Error checking super admin:', superAdminCheck.error);
-        }
-        if (shopDomainResult.error) {
-          console.error('Error getting shop domain:', shopDomainResult.error);
-        }
+        // Silently handle — RPC functions may not exist for all users
 
         setIsShopifyUser(shopifyCheck.data ?? false);
         setIsSuperAdmin(superAdminCheck.data ?? false);

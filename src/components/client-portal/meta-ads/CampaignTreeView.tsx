@@ -620,7 +620,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
         <span className="flex items-center gap-1"><Megaphone className="w-3 h-3 text-primary" />Campaña</span>
         <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3 text-orange-500" />Ad Set</span>
         <span className="flex items-center gap-1"><FileImage className="w-3 h-3 text-pink-500" />Anuncio</span>
-        <span className="ml-auto">Haz click en una campaña para expandir su jerarquía</span>
+        <span className="ml-auto">Haz clic en una campaña para expandir su jerarquía</span>
       </div>
 
       {/* Campaign tree */}
@@ -675,7 +675,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
                   />
                 </div>
                 <div>
-                  <Label>Descripcion</Label>
+                  <Label>Descripción</Label>
                   <Input
                     value={adEditData.description || ''}
                     onChange={(e) => setAdEditData({ ...adEditData, description: e.target.value })}

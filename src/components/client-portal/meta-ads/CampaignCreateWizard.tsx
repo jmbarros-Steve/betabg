@@ -161,7 +161,7 @@ function getStepsForLevel(level: StartLevel): StepDef[] {
 // ---------------------------------------------------------------------------
 
 const STEVE_FALLBACKS: Record<string, string> = {
-  'campaign-config': 'Elige ABO para testing (controlas cuanto gasta cada ad set) o CBO para escalar ganadores (Meta optimiza automáticamente).',
+  'campaign-config': 'Elige ABO para testing (controlas cuánto gasta cada ad set) o CBO para escalar ganadores (Meta optimiza automáticamente).',
   'select-campaign': 'Busca una campaña con el mismo objetivo que tu nuevo Ad Set. Mezclar objetivos distintos puede confundir al algoritmo.',
   'adset-config': 'Cada Ad Set debe tener 1 solo ad para testear variables aisladas. Si pones múltiples ads, Meta distribuye el presupuesto desigualmente.',
   'select-adset': 'Elige un Ad Set que tenga audiencia similar a la de tu nuevo anuncio. Consistencia = mejores resultados.',
@@ -175,40 +175,40 @@ const STEVE_FALLBACKS: Record<string, string> = {
 // Step titles and descriptions for idiot-proof UX
 const STEP_UI: Record<string, { title: string; subtitle: string }> = {
   'select-campaign': {
-    title: 'Elige una campana existente',
-    subtitle: 'Selecciona la campana donde quieres agregar tu nuevo anuncio, o crea una nueva.',
+    title: 'Elige una campaña existente',
+    subtitle: 'Selecciona la campaña donde quieres agregar tu nuevo anuncio, o crea una nueva.',
   },
   'select-adset': {
     title: 'Elige un conjunto de anuncios',
     subtitle: 'El Ad Set define la audiencia y el presupuesto. Elige uno existente o crea uno nuevo.',
   },
   'campaign-config': {
-    title: 'Configura tu campana',
-    subtitle: 'Dale un nombre, elige el objetivo de la campana y define el presupuesto.',
+    title: 'Configura tu campaña',
+    subtitle: 'Dale un nombre, elige el objetivo de la campaña y define el presupuesto.',
   },
   'adset-config': {
     title: 'Configura tu audiencia y presupuesto',
-    subtitle: 'Define a quien le vas a mostrar el anuncio, cuanto vas a gastar y el formato creativo.',
+    subtitle: 'Define a quién le vas a mostrar el anuncio, cuánto vas a gastar y el formato creativo.',
   },
   'funnel-stage': {
-    title: 'En que etapa del funnel estas?',
+    title: '¿En qué etapa del funnel estás?',
     subtitle: 'Esto cambia el tono del copy y las recomendaciones de Steve. Si no sabes, elige TOFU.',
   },
   'angle-select': {
-    title: 'Elige el angulo creativo',
-    subtitle: 'El angulo define como vas a comunicar tu mensaje. Steve te recomienda los mejores segun tu etapa.',
+    title: 'Elige el ángulo creativo',
+    subtitle: 'El ángulo define cómo vas a comunicar tu mensaje. Steve te recomienda los mejores según tu etapa.',
   },
   'creative-focus': {
-    title: 'Sobre que va el anuncio?',
-    subtitle: 'Puedes promocionar un producto especifico de tu tienda, o hacer un anuncio general de marca.',
+    title: '¿Sobre qué va el anuncio?',
+    subtitle: 'Puedes promocionar un producto específico de tu tienda, o hacer un anuncio general de marca.',
   },
   'ad-creative': {
     title: 'Tu anuncio',
-    subtitle: 'Steve genera el copy y las imagenes automaticamente. Puedes editar todo antes de publicar.',
+    subtitle: 'Steve genera el copy y las imágenes automáticamente. Puedes editar todo antes de publicar.',
   },
   'review': {
     title: 'Revisa antes de publicar',
-    subtitle: 'Todo listo! Revisa que todo este correcto. La campana se crea en PAUSA, la activas cuando quieras.',
+    subtitle: '¡Todo listo! Revisa que todo esté correcto. La campaña se crea en pausa, la activas cuando quieras.',
   },
 };
 
@@ -218,16 +218,16 @@ const STEP_UI: Record<string, { title: string; subtitle: string }> = {
 
 function LevelSelector({ level, setLevel, onStart }: { level: StartLevel; setLevel: (l: StartLevel) => void; onStart: () => void }) {
   const levels: { key: StartLevel; icon: React.ElementType; label: string; desc: string; recommended?: boolean }[] = [
-    { key: 'campaign', icon: Megaphone, label: 'Campana completa', desc: 'Crea todo desde cero: campana, audiencia y anuncio. Ideal si es tu primera vez.', recommended: true },
-    { key: 'adset', icon: FolderOpen, label: 'Nuevo Ad Set', desc: 'Agrega una nueva audiencia o test a una campana que ya existe.' },
-    { key: 'ad', icon: FileImage, label: 'Nuevo Anuncio', desc: 'Agrega un anuncio nuevo a una campana y audiencia que ya tienes.' },
+    { key: 'campaign', icon: Megaphone, label: 'Campaña completa', desc: 'Crea todo desde cero: campaña, audiencia y anuncio. Ideal si es tu primera vez.', recommended: true },
+    { key: 'adset', icon: FolderOpen, label: 'Nuevo Ad Set', desc: 'Agrega una nueva audiencia o test a una campaña que ya existe.' },
+    { key: 'ad', icon: FileImage, label: 'Nuevo Anuncio', desc: 'Agrega un anuncio nuevo a una campaña y audiencia que ya tienes.' },
   ];
 
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-lg font-bold">Que quieres crear?</h2>
-        <p className="text-sm text-muted-foreground">Si no sabes, elige "Campana completa" y Steve te guia paso a paso.</p>
+        <h2 className="text-lg font-bold">¿Qué quieres crear?</h2>
+        <p className="text-sm text-muted-foreground">Si no sabes, elige "Campaña completa" y Steve te guía paso a paso.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {levels.map((l) => {
@@ -291,7 +291,7 @@ function CampaignForm({
         <Label>Tipo de presupuesto</Label>
         <div className="flex gap-3 mt-2">
           {([
-            { key: 'ABO' as BudgetType, label: 'ABO', name: 'Tu controlas', desc: 'Tu defines cuanto gasta cada audiencia. Ideal para probar.' },
+            { key: 'ABO' as BudgetType, label: 'ABO', name: 'Tú controlas', desc: 'Tú defines cuánto gasta cada audiencia. Ideal para probar.' },
             { key: 'CBO' as BudgetType, label: 'CBO', name: 'Meta controla', desc: 'Meta distribuye el dinero donde mejor funcione. Ideal para escalar.' },
           ]).map((t) => (
             <button
@@ -427,23 +427,23 @@ function AdSetForm({
       {/* Targeting controls */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs">Pais</Label>
+          <Label className="text-xs">País</Label>
           <Select value={targetCountries[0] || 'CL'} onValueChange={(v) => setTargetCountries([v])}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="CL">Chile</SelectItem>
-              <SelectItem value="MX">Mexico</SelectItem>
+              <SelectItem value="MX">México</SelectItem>
               <SelectItem value="CO">Colombia</SelectItem>
               <SelectItem value="AR">Argentina</SelectItem>
-              <SelectItem value="PE">Peru</SelectItem>
+              <SelectItem value="PE">Perú</SelectItem>
               <SelectItem value="US">Estados Unidos</SelectItem>
-              <SelectItem value="ES">Espana</SelectItem>
+              <SelectItem value="ES">España</SelectItem>
               <SelectItem value="BR">Brasil</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label className="text-xs">Genero</Label>
+          <Label className="text-xs">Género</Label>
           <Select value={String(targetGender)} onValueChange={(v) => setTargetGender(Number(v) as 0 | 1 | 2)}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -456,11 +456,11 @@ function AdSetForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs">Edad minima</Label>
+          <Label className="text-xs">Edad mínima</Label>
           <Input type="number" min={18} max={65} value={targetAgeMin} onChange={(e) => setTargetAgeMin(Math.max(18, Number(e.target.value)))} className="mt-1" />
         </div>
         <div>
-          <Label className="text-xs">Edad maxima</Label>
+          <Label className="text-xs">Edad máxima</Label>
           <Input type="number" min={18} max={65} value={targetAgeMax} onChange={(e) => setTargetAgeMax(Math.min(65, Number(e.target.value)))} className="mt-1" />
         </div>
       </div>
@@ -500,9 +500,9 @@ function FunnelStageSelector({
   setFunnelStage: (v: 'tofu' | 'mofu' | 'bofu') => void;
 }) {
   const stages = [
-    { key: 'tofu' as const, label: 'TOFU', name: 'Captar atencion', desc: 'Gente que NO te conoce. Quieres que te vean por primera vez.', example: 'Ej: "Sabias que...?", contenido viral, educativo', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
-    { key: 'mofu' as const, label: 'MOFU', name: 'Generar interes', desc: 'Gente que ya te vio. Quieres que confien en ti.', example: 'Ej: Testimonios, comparaciones, beneficios', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
-    { key: 'bofu' as const, label: 'BOFU', name: 'Vender', desc: 'Gente lista para comprar. Quieres que hagan click y compren.', example: 'Ej: Descuentos, urgencia, ofertas limitadas', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
+    { key: 'tofu' as const, label: 'TOFU', name: 'Captar atención', desc: 'Gente que NO te conoce. Quieres que te vean por primera vez.', example: 'Ej: "¿Sabías que...?", contenido viral, educativo', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
+    { key: 'mofu' as const, label: 'MOFU', name: 'Generar interés', desc: 'Gente que ya te vio. Quieres que confíen en ti.', example: 'Ej: Testimonios, comparaciones, beneficios', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
+    { key: 'bofu' as const, label: 'BOFU', name: 'Vender', desc: 'Gente lista para comprar. Quieres que hagan clic y compren.', example: 'Ej: Descuentos, urgencia, ofertas limitadas', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
   ];
 
   return (
@@ -663,7 +663,7 @@ function CreativeFocusStep({
         >
           <ShoppingBag className={`w-8 h-8 ${focusType === 'product' ? 'text-primary' : 'text-muted-foreground'}`} />
           <span className="text-sm font-semibold">Un producto</span>
-          <span className="text-xs text-muted-foreground">Elige un producto de tu tienda. Steve genera el copy y la foto basandose en el.</span>
+          <span className="text-xs text-muted-foreground">Elige un producto de tu tienda. Steve genera el copy y la foto basándose en él.</span>
         </button>
         <button
           onClick={() => { setFocusType('broad'); setSelectedProduct(null); }}
@@ -673,7 +673,7 @@ function CreativeFocusStep({
         >
           <Palette className={`w-8 h-8 ${focusType === 'broad' ? 'text-primary' : 'text-muted-foreground'}`} />
           <span className="text-sm font-semibold">Marca en general</span>
-          <span className="text-xs text-muted-foreground">No sobre un producto. Steve genera un anuncio de marca, educacion o estilo de vida.</span>
+          <span className="text-xs text-muted-foreground">No sobre un producto. Steve genera un anuncio de marca, educación o estilo de vida.</span>
         </button>
       </div>
 
@@ -1608,8 +1608,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           plan_accion: {
             tipo_campana: budgetType === 'ABO' ? 'ABO Testing' : 'CBO Escalamiento',
             presupuesto_diario: adsetBudget || campBudget || '10000',
-            duracion: '7 dias sin tocar',
-            regla_kill: 'Pausar si gasta 2x CPA sin conversion',
+            duracion: '7 días sin tocar',
+            regla_kill: 'Pausar si gasta 2x CPA sin conversión',
             metricas_dia3: 'Hook Rate >25%, Hold Rate >15%, CTR >1.5%',
           },
         },
@@ -1747,7 +1747,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         console.warn('[CampaignCreateWizard] Could not save creative to library:', saveErr);
       }
 
-      toast.success('Campaña creada como PAUSED en Meta. Activa cuando estés listo.');
+      toast.success('Campaña creada como pausada en Meta. Activa cuando estés listo.');
       onComplete?.();
     } catch (err) {
       console.error('[CampaignCreateWizard] Submit error:', err);
@@ -1969,7 +1969,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                         <Sparkles className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                       </div>
                       <div className="text-center space-y-1">
-                        <p className="text-sm font-semibold text-foreground">Steve esta creando tu anuncio</p>
+                        <p className="text-sm font-semibold text-foreground">Steve está creando tu anuncio</p>
                         <p className="text-xs text-muted-foreground animate-pulse">{autoGenProgress}</p>
                       </div>
                       <p className="text-[11px] text-muted-foreground max-w-xs text-center">Esto puede tomar unos segundos. No cierres esta ventana.</p>
@@ -2064,7 +2064,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               {currentStep === 'review' ? (
                 <Button onClick={handleSubmit} disabled={submitting} size="lg" className="bg-green-600 hover:bg-green-700">
                   {submitting ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando campana...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando campaña...</>
                   ) : (
                     <><Send className="w-4 h-4 mr-2" />Publicar en Meta (en Pausa)</>
                   )}
@@ -2072,7 +2072,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               ) : (
                 <Button onClick={goNext} disabled={!canProceed() || autoGenerating} size="lg">
                   {autoGenerating ? (
-                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Steve esta trabajando...</>
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Steve está trabajando...</>
                   ) : !canProceed() ? (
                     <>Completa este paso</>
                   ) : stepIndex === steps.length - 2 ? (
