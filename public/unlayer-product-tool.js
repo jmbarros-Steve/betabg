@@ -37,7 +37,10 @@
               options: [
                 { label: 'Más vendidos', value: 'best_sellers' },
                 { label: 'Nuevos', value: 'new_arrivals' },
+                { label: 'Últimos vistos', value: 'recently_viewed' },
+                { label: 'Carrito abandonado', value: 'abandoned_cart' },
                 { label: 'Complementarios', value: 'complementary' },
+                { label: 'Todos los productos', value: 'all' },
               ],
             },
           },
@@ -106,7 +109,31 @@
         title: 'Descuento',
         position: 1,
         options: {
-          discountCode: { label: 'Código', defaultValue: 'DESCUENTO20', widget: 'text' },
+          discountSource: {
+            label: 'Fuente del código',
+            defaultValue: 'manual',
+            widget: 'dropdown',
+            data: {
+              options: [
+                { label: 'Escribir código manual', value: 'manual' },
+                { label: 'Crear en Shopify (automático)', value: 'shopify_create' },
+              ],
+            },
+          },
+          discountCode: { label: 'Código (manual)', defaultValue: 'DESCUENTO20', widget: 'text' },
+          discountType: {
+            label: 'Tipo de descuento (Shopify)',
+            defaultValue: 'percentage',
+            widget: 'dropdown',
+            data: {
+              options: [
+                { label: 'Porcentaje (%)', value: 'percentage' },
+                { label: 'Monto fijo ($)', value: 'fixed_amount' },
+                { label: 'Envío gratis', value: 'free_shipping' },
+              ],
+            },
+          },
+          discountValue: { label: 'Valor del descuento', defaultValue: '20', widget: 'text' },
           bgColor: { label: 'Color de fondo', defaultValue: '#fafafa', widget: 'color_picker' },
           textColor: { label: 'Color de texto', defaultValue: '#18181b', widget: 'color_picker' },
           borderColor: { label: 'Color de borde', defaultValue: '#d4d4d8', widget: 'color_picker' },
@@ -208,7 +235,10 @@
     var typeLabels = {
       best_sellers: 'Más vendidos',
       new_arrivals: 'Nuevos',
+      recently_viewed: 'Últimos vistos',
+      abandoned_cart: 'Carrito abandonado',
       complementary: 'Complementarios',
+      all: 'Todos los productos',
     };
 
     var cells = '';
@@ -239,19 +269,24 @@
   }
 
   function generateDiscountHTML(values) {
-    var code = values.discountCode || '{{ discount_code }}';
+    var source = values.discountSource || 'manual';
+    var code = source === 'shopify_create' ? '{{ shopify_discount_code }}' : (values.discountCode || '{{ discount_code }}');
+    var displayCode = source === 'shopify_create' ? ('STEVE-' + (values.discountType === 'free_shipping' ? 'ENVIO' : (values.discountValue || '20') + (values.discountType === 'percentage' ? '%OFF' : 'OFF'))) : code;
     var bg = values.bgColor || '#fafafa';
     var textColor = values.textColor || '#18181b';
     var border = values.borderColor || '#d4d4d8';
+    var subtitle = source === 'shopify_create'
+      ? (values.discountType === 'free_shipping' ? 'Envío gratis' : (values.discountType === 'percentage' ? values.discountValue + '% de descuento' : '$' + values.discountValue + ' de descuento'))
+      : 'Tu código de descuento';
     var cta = '';
     if (values.ctaText) {
       cta = '<a href="' + (values.ctaUrl || '#') + '" style="display:inline-block;padding:10px 28px;background:' + (values.ctaColor || '#18181b') + ';color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">' + values.ctaText + '</a>';
     }
 
-    return '<div data-steve-discount="true" data-discount-code="' + code + '" style="text-align:center;padding:24px;">' +
+    return '<div data-steve-discount="true" data-discount-code="' + code + '" data-discount-source="' + source + '" data-discount-type="' + (values.discountType || 'percentage') + '" data-discount-value="' + (values.discountValue || '20') + '" style="text-align:center;padding:24px;">' +
       '<div style="display:inline-block;border:2px dashed ' + border + ';border-radius:12px;padding:24px 40px;background:' + bg + ';">' +
-        '<p style="margin:0 0 4px;font-size:12px;color:' + textColor + ';text-transform:uppercase;letter-spacing:1px;">Tu código de descuento</p>' +
-        '<p style="margin:0 0 16px;font-size:28px;font-weight:700;color:' + textColor + ';letter-spacing:3px;">' + code + '</p>' +
+        '<p style="margin:0 0 4px;font-size:12px;color:' + textColor + ';text-transform:uppercase;letter-spacing:1px;">' + subtitle + '</p>' +
+        '<p style="margin:0 0 16px;font-size:28px;font-weight:700;color:' + textColor + ';letter-spacing:3px;">' + displayCode + '</p>' +
         cta +
       '</div>' +
     '</div>';

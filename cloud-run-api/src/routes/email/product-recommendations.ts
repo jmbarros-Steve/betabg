@@ -208,6 +208,86 @@ async function generateRecommendationBlock(
       break;
     }
 
+    case 'recently_viewed': {
+      // Get products the subscriber clicked on recently via email links
+      if (subscriber) {
+        const { data: clickEvents } = await supabase
+          .from('email_events')
+          .select('metadata')
+          .eq('client_id', clientId)
+          .eq('subscriber_id', subscriber.id)
+          .eq('event_type', 'clicked')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        const viewedHandles: string[] = [];
+        for (const event of clickEvents || []) {
+          const url = event.metadata?.url || '';
+          const match = url.match(/\/products\/([^?&#/]+)/);
+          if (match && !viewedHandles.includes(match[1])) {
+            viewedHandles.push(match[1]);
+          }
+        }
+
+        if (viewedHandles.length > 0) {
+          recommended = viewedHandles
+            .map(handle => allProducts.find(p => p.handle === handle))
+            .filter(Boolean)
+            .slice(0, config.count);
+        }
+      }
+      // Fallback to new arrivals
+      if (recommended.length === 0) {
+        recommended = allProducts.slice(0, config.count);
+      }
+      break;
+    }
+
+    case 'abandoned_cart': {
+      // Get products from subscriber's abandoned cart via flow enrollments
+      if (subscriber) {
+        const { data: enrollments } = await supabase
+          .from('email_flow_enrollments')
+          .select('metadata')
+          .eq('client_id', clientId)
+          .eq('subscriber_id', subscriber.id)
+          .order('enrolled_at', { ascending: false })
+          .limit(5);
+
+        const cartProductIds: string[] = [];
+        for (const enrollment of enrollments || []) {
+          const lineItems = enrollment.metadata?.line_items || enrollment.metadata?.checkout?.line_items || [];
+          for (const item of lineItems) {
+            const pid = String(item.product_id || '');
+            if (pid && !cartProductIds.includes(pid)) {
+              cartProductIds.push(pid);
+            }
+          }
+        }
+
+        if (cartProductIds.length > 0) {
+          recommended = cartProductIds
+            .map(pid => allProducts.find(p => p.id === pid))
+            .filter(Boolean)
+            .slice(0, config.count);
+        }
+      }
+      // Fallback to best sellers
+      if (recommended.length === 0) {
+        recommended = [...allProducts]
+          .sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
+          .slice(0, config.count);
+      }
+      break;
+    }
+
+    case 'all': {
+      // Random selection from all products
+      const shuffled = [...allProducts].sort(() => Math.random() - 0.5);
+      recommended = shuffled.slice(0, config.count);
+      break;
+    }
+
     default:
       recommended = allProducts.slice(0, config.count);
   }

@@ -395,13 +395,21 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       '{{ cart_url }}': '#',
       '{{ cart_total }}': '$49.990',
       '{{ cart_items_count }}': '3',
+      '{{ cart_first_item_name }}': 'Polera Básica',
+      '{{ cart_first_item_image }}': 'https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto',
       '{{ discount_code }}': 'STEVE20',
+      '{{ shopify_discount_code }}': 'STEVE-20%OFF',
       '{{ product_name }}': 'Producto Ejemplo',
       '{{ product_price }}': '$29.990',
+      '{{ product_image }}': 'https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto',
       '{{ product_url }}': '#',
+      '{{ product_recommendations }}': '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td colspan="2" style="padding:0 8px 12px;font-size:18px;font-weight:bold;color:#1a1a1a;">Productos recomendados para ti</td></tr><tr><td style="width:50%;padding:8px;vertical-align:top;text-align:center;"><img src="https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto+1" style="width:100%;max-width:280px;border-radius:8px;" /><p style="margin:8px 0 4px;font-weight:600;font-size:14px;">Producto 1</p><p style="margin:0;font-size:13px;color:#71717a;">$29.990</p></td><td style="width:50%;padding:8px;vertical-align:top;text-align:center;"><img src="https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto+2" style="width:100%;max-width:280px;border-radius:8px;" /><p style="margin:8px 0 4px;font-weight:600;font-size:14px;">Producto 2</p><p style="margin:0;font-size:13px;color:#71717a;">$39.990</p></td></tr></table>',
       '{{ unsubscribe_url }}': '#',
       '{{ subscriber_tags }}': 'vip, frecuente',
       '{{ subscribed_date }}': '1 Ene 2026',
+      '{{ current_date }}': '12 Mar 2026',
+      '{{ current_month }}': 'Marzo',
+      '{{ current_year }}': '2026',
     };
     let result = html;
     for (const [tag, value] of Object.entries(sampleData)) {
@@ -657,7 +665,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                             <SelectContent>
                               <SelectItem value="best_sellers">Más vendidos</SelectItem>
                               <SelectItem value="new_arrivals">Nuevos</SelectItem>
+                              <SelectItem value="recently_viewed">Últimos vistos</SelectItem>
+                              <SelectItem value="abandoned_cart">Carrito abandonado</SelectItem>
                               <SelectItem value="complementary">Complementarios</SelectItem>
+                              <SelectItem value="all">Todos los productos</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -783,8 +794,49 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               isOpen={showImageEditor}
               onClose={() => setShowImageEditor(false)}
               onImageReady={(url) => {
-                // Insert the edited image into the editor
-                toast.success('Imagen lista — arrástrala al canvas desde la URL copiada');
+                const editor = emailEditorRef.current?.editor;
+                if (!editor) {
+                  toast.info('Copia la URL: ' + url);
+                  return;
+                }
+                editor.saveDesign((design: any) => {
+                  const ts = Date.now();
+                  const newRow = {
+                    id: `ai_img_row_${ts}`,
+                    cells: [1],
+                    columns: [{
+                      id: `ai_img_col_${ts}`,
+                      contents: [{
+                        type: 'image',
+                        values: {
+                          containerPadding: '10px',
+                          anchor: '',
+                          src: { url, width: 600, height: 300, autoWidth: true },
+                          textAlign: 'center',
+                          altText: 'Imagen editada',
+                          action: { name: 'web', values: { href: '', target: '_blank' } },
+                          hideDesktop: false,
+                          displayCondition: null,
+                          _meta: { htmlID: `u_ai_img_${ts}`, htmlClassNames: 'u_content_image' },
+                          selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
+                        },
+                      }],
+                      values: { _meta: { htmlID: `u_ai_col_${ts}`, htmlClassNames: 'u_column' } },
+                    }],
+                    values: {
+                      displayCondition: null, columns: false, backgroundColor: '', columnsBackgroundColor: '',
+                      backgroundImage: { url: '', fullWidth: true, repeat: 'no-repeat', size: 'custom', position: 'center' },
+                      padding: '0px', anchor: '', hideDesktop: false,
+                      _meta: { htmlID: `u_ai_row_${ts}`, htmlClassNames: 'u_row' },
+                      selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
+                    },
+                  };
+                  design.body.rows.push(newRow);
+                  design.counters.u_row = (design.counters.u_row || 1) + 1;
+                  design.counters.u_content_image = (design.counters.u_content_image || 1) + 1;
+                  editor.loadDesign(design);
+                  toast.success('Imagen insertada al final del email');
+                });
               }}
               brandColor={brandInfo.brand_color}
               brandSecondaryColor={brandInfo.brand_secondary_color}
@@ -876,7 +928,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     srcDoc={previewHtml}
                     className="w-full min-h-[600px]"
                     title="Email Preview"
-                    sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-popups"
                   />
                 </div>
               </div>
@@ -1064,7 +1116,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 srcDoc={previewHtml}
                 className="w-full min-h-[500px]"
                 title="Email Preview"
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-popups"
               />
             </div>
           </div>

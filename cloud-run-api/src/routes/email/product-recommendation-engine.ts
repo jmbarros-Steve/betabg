@@ -5,7 +5,7 @@ import { getProductCatalog } from './product-recommendations.js';
 // ---------------------------------------------------------------------------
 
 export interface RecommendationConfig {
-  type: 'best_sellers' | 'new_arrivals' | 'complementary' | 'personalized' | 'not_purchased';
+  type: 'best_sellers' | 'new_arrivals' | 'complementary' | 'personalized' | 'not_purchased' | 'recently_viewed' | 'abandoned_cart' | 'all';
   count: number;
 }
 
