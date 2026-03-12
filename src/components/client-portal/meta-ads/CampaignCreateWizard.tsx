@@ -172,19 +172,63 @@ const STEVE_FALLBACKS: Record<string, string> = {
   'review': 'Verifica que el destino URL funcione, el copy no tenga errores y el presupuesto sea el correcto antes de publicar.',
 };
 
+// Step titles and descriptions for idiot-proof UX
+const STEP_UI: Record<string, { title: string; subtitle: string }> = {
+  'select-campaign': {
+    title: 'Elige una campana existente',
+    subtitle: 'Selecciona la campana donde quieres agregar tu nuevo anuncio, o crea una nueva.',
+  },
+  'select-adset': {
+    title: 'Elige un conjunto de anuncios',
+    subtitle: 'El Ad Set define la audiencia y el presupuesto. Elige uno existente o crea uno nuevo.',
+  },
+  'campaign-config': {
+    title: 'Configura tu campana',
+    subtitle: 'Dale un nombre, elige el objetivo de la campana y define el presupuesto.',
+  },
+  'adset-config': {
+    title: 'Configura tu audiencia y presupuesto',
+    subtitle: 'Define a quien le vas a mostrar el anuncio, cuanto vas a gastar y el formato creativo.',
+  },
+  'funnel-stage': {
+    title: 'En que etapa del funnel estas?',
+    subtitle: 'Esto cambia el tono del copy y las recomendaciones de Steve. Si no sabes, elige TOFU.',
+  },
+  'angle-select': {
+    title: 'Elige el angulo creativo',
+    subtitle: 'El angulo define como vas a comunicar tu mensaje. Steve te recomienda los mejores segun tu etapa.',
+  },
+  'creative-focus': {
+    title: 'Sobre que va el anuncio?',
+    subtitle: 'Puedes promocionar un producto especifico de tu tienda, o hacer un anuncio general de marca.',
+  },
+  'ad-creative': {
+    title: 'Tu anuncio',
+    subtitle: 'Steve genera el copy y las imagenes automaticamente. Puedes editar todo antes de publicar.',
+  },
+  'review': {
+    title: 'Revisa antes de publicar',
+    subtitle: 'Todo listo! Revisa que todo este correcto. La campana se crea en PAUSA, la activas cuando quieras.',
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Level Selector (pre-wizard screen)
 // ---------------------------------------------------------------------------
 
 function LevelSelector({ level, setLevel, onStart }: { level: StartLevel; setLevel: (l: StartLevel) => void; onStart: () => void }) {
-  const levels: { key: StartLevel; icon: React.ElementType; label: string; desc: string }[] = [
-    { key: 'campaign', icon: Megaphone, label: 'Campaña completa', desc: 'Crea todo de arriba a abajo: Campaña → Ad Set → Anuncio' },
-    { key: 'adset', icon: FolderOpen, label: 'Nuevo Ad Set', desc: 'Crea un Ad Set y enchúfalo a una campaña existente o nueva' },
-    { key: 'ad', icon: FileImage, label: 'Nuevo Anuncio', desc: 'Crea un anuncio y asígnalo a una campaña y Ad Set' },
+  const levels: { key: StartLevel; icon: React.ElementType; label: string; desc: string; recommended?: boolean }[] = [
+    { key: 'campaign', icon: Megaphone, label: 'Campana completa', desc: 'Crea todo desde cero: campana, audiencia y anuncio. Ideal si es tu primera vez.', recommended: true },
+    { key: 'adset', icon: FolderOpen, label: 'Nuevo Ad Set', desc: 'Agrega una nueva audiencia o test a una campana que ya existe.' },
+    { key: 'ad', icon: FileImage, label: 'Nuevo Anuncio', desc: 'Agrega un anuncio nuevo a una campana y audiencia que ya tienes.' },
   ];
 
   return (
     <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h2 className="text-lg font-bold">Que quieres crear?</h2>
+        <p className="text-sm text-muted-foreground">Si no sabes, elige "Campana completa" y Steve te guia paso a paso.</p>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {levels.map((l) => {
           const Icon = l.icon;
@@ -193,10 +237,13 @@ function LevelSelector({ level, setLevel, onStart }: { level: StartLevel; setLev
             <button
               key={l.key}
               onClick={() => setLevel(l.key)}
-              className={`flex flex-col items-center gap-2 p-5 rounded-lg border text-center transition-all ${
+              className={`relative flex flex-col items-center gap-2 p-5 rounded-lg border text-center transition-all ${
                 isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-background hover:border-primary/30'
               }`}
             >
+              {l.recommended && (
+                <Badge className="absolute -top-2 right-2 text-[9px] bg-green-500/15 text-green-700 border-green-500/30">Recomendado</Badge>
+              )}
               <Icon className={`w-8 h-8 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
               <span className={`text-sm font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{l.label}</span>
               <span className="text-xs text-muted-foreground">{l.desc}</span>
@@ -243,16 +290,20 @@ function CampaignForm({
       <div>
         <Label>Tipo de presupuesto</Label>
         <div className="flex gap-3 mt-2">
-          {(['ABO', 'CBO'] as BudgetType[]).map((t) => (
+          {([
+            { key: 'ABO' as BudgetType, label: 'ABO', name: 'Tu controlas', desc: 'Tu defines cuanto gasta cada audiencia. Ideal para probar.' },
+            { key: 'CBO' as BudgetType, label: 'CBO', name: 'Meta controla', desc: 'Meta distribuye el dinero donde mejor funcione. Ideal para escalar.' },
+          ]).map((t) => (
             <button
-              key={t}
-              onClick={() => setBudgetType(t)}
-              className={`flex-1 flex flex-col items-center gap-1 p-4 rounded-lg border transition-all ${
-                budgetType === t ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+              key={t.key}
+              onClick={() => setBudgetType(t.key)}
+              className={`flex-1 flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-all ${
+                budgetType === t.key ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
-              <Badge className={`text-xs font-bold ${t === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}>{t}</Badge>
-              <span className="text-xs text-muted-foreground">{t === 'ABO' ? 'Testing' : 'Escalamiento'}</span>
+              <Badge className={`text-xs font-bold ${t.key === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}>{t.label}</Badge>
+              <span className={`text-xs font-semibold ${budgetType === t.key ? 'text-foreground' : 'text-muted-foreground'}`}>{t.name}</span>
+              <span className="text-[10px] text-muted-foreground text-center">{t.desc}</span>
             </button>
           ))}
         </div>
@@ -449,27 +500,28 @@ function FunnelStageSelector({
   setFunnelStage: (v: 'tofu' | 'mofu' | 'bofu') => void;
 }) {
   const stages = [
-    { key: 'tofu' as const, label: 'TOFU', desc: 'Awareness — Captar atención', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
-    { key: 'mofu' as const, label: 'MOFU', desc: 'Consideración — Educar y nutrir', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
-    { key: 'bofu' as const, label: 'BOFU', desc: 'Conversión — Cerrar la venta', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
+    { key: 'tofu' as const, label: 'TOFU', name: 'Captar atencion', desc: 'Gente que NO te conoce. Quieres que te vean por primera vez.', example: 'Ej: "Sabias que...?", contenido viral, educativo', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
+    { key: 'mofu' as const, label: 'MOFU', name: 'Generar interes', desc: 'Gente que ya te vio. Quieres que confien en ti.', example: 'Ej: Testimonios, comparaciones, beneficios', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
+    { key: 'bofu' as const, label: 'BOFU', name: 'Vender', desc: 'Gente lista para comprar. Quieres que hagan click y compren.', example: 'Ej: Descuentos, urgencia, ofertas limitadas', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
   ];
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Steve ajusta el copy y las recomendaciones según la etapa del funnel de conversión.
-      </p>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {stages.map((f) => (
           <button
             key={f.key}
             onClick={() => setFunnelStage(f.key)}
-            className={`flex flex-col items-center gap-1 p-4 rounded-lg border transition-all ${
+            className={`flex flex-col items-start gap-2 p-4 rounded-lg border transition-all text-left ${
               funnelStage === f.key ? `ring-1 ring-primary/20 ${f.color}` : 'border-border hover:border-primary/30'
             }`}
           >
-            <Badge className={`text-xs font-bold ${funnelStage === f.key ? f.color : 'bg-muted text-muted-foreground'}`}>{f.label}</Badge>
-            <span className="text-[11px] text-muted-foreground text-center">{f.desc}</span>
+            <div className="flex items-center gap-2">
+              <Badge className={`text-xs font-bold ${funnelStage === f.key ? f.color : 'bg-muted text-muted-foreground'}`}>{f.label}</Badge>
+              <span className={`text-sm font-semibold ${funnelStage === f.key ? 'text-foreground' : 'text-muted-foreground'}`}>{f.name}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{f.desc}</span>
+            <span className="text-[10px] text-muted-foreground/70 italic">{f.example}</span>
           </button>
         ))}
       </div>
@@ -602,10 +654,6 @@ function CreativeFocusStep({
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-muted-foreground">
-        Steve puede enfocar el anuncio en un <strong>producto específico</strong> o en un <strong>ángulo más amplio</strong> de marca.
-      </p>
-
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => { setFocusType('product'); }}
@@ -614,8 +662,8 @@ function CreativeFocusStep({
           }`}
         >
           <ShoppingBag className={`w-8 h-8 ${focusType === 'product' ? 'text-primary' : 'text-muted-foreground'}`} />
-          <span className="text-sm font-semibold">Producto específico</span>
-          <span className="text-xs text-muted-foreground">Ideal para BOFU, catálogo, promociones</span>
+          <span className="text-sm font-semibold">Un producto</span>
+          <span className="text-xs text-muted-foreground">Elige un producto de tu tienda. Steve genera el copy y la foto basandose en el.</span>
         </button>
         <button
           onClick={() => { setFocusType('broad'); setSelectedProduct(null); }}
@@ -624,8 +672,8 @@ function CreativeFocusStep({
           }`}
         >
           <Palette className={`w-8 h-8 ${focusType === 'broad' ? 'text-primary' : 'text-muted-foreground'}`} />
-          <span className="text-sm font-semibold">Ángulo amplio</span>
-          <span className="text-xs text-muted-foreground">Ideal para TOFU/MOFU, marca, educación</span>
+          <span className="text-sm font-semibold">Marca en general</span>
+          <span className="text-xs text-muted-foreground">No sobre un producto. Steve genera un anuncio de marca, educacion o estilo de vida.</span>
         </button>
       </div>
 
@@ -1776,11 +1824,22 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           {/* Step content */}
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                {(() => { const Icon = steps[stepIndex].icon; return <Icon className="w-4 h-4 text-primary" />; })()}
-                <CardTitle className="text-base">{steps[stepIndex].label}</CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
+                  {stepIndex + 1}
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="text-base">{STEP_UI[currentStep]?.title || steps[stepIndex].label}</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">{STEP_UI[currentStep]?.subtitle || `Paso ${stepIndex + 1} de ${steps.length}`}</CardDescription>
+                </div>
               </div>
-              <CardDescription className="text-xs">Paso {stepIndex + 1} de {steps.length}</CardDescription>
+              {/* Progress bar */}
+              <div className="w-full bg-muted rounded-full h-1.5 mt-3">
+                <div
+                  className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {/* SELECT CAMPAIGN step */}
@@ -1984,6 +2043,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 if (stepIndex === 0) setWizardStarted(false);
                 else goPrev();
               }}
+              disabled={autoGenerating}
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               {stepIndex === 0 ? 'Volver' : 'Anterior'}
@@ -1992,7 +2052,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             <div className="flex items-center gap-2">
               {/* Save draft — available from ad-creative and review steps */}
               {(currentStep === 'ad-creative' || currentStep === 'review') && (
-                <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
+                <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft || autoGenerating}>
                   {savingDraft ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
                   ) : (
@@ -2002,17 +2062,21 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               )}
 
               {currentStep === 'review' ? (
-                <Button onClick={handleSubmit} disabled={submitting} size="lg">
+                <Button onClick={handleSubmit} disabled={submitting} size="lg" className="bg-green-600 hover:bg-green-700">
                   {submitting ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando campana...</>
                   ) : (
-                    <><Send className="w-4 h-4 mr-2" />Publicar en Meta (Paused)</>
+                    <><Send className="w-4 h-4 mr-2" />Publicar en Meta (en Pausa)</>
                   )}
                 </Button>
               ) : (
-                <Button onClick={goNext} disabled={!canProceed() || autoGenerating}>
+                <Button onClick={goNext} disabled={!canProceed() || autoGenerating} size="lg">
                   {autoGenerating ? (
-                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Generando...</>
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Steve esta trabajando...</>
+                  ) : !canProceed() ? (
+                    <>Completa este paso</>
+                  ) : stepIndex === steps.length - 2 ? (
+                    <>Revisar y publicar <ChevronRight className="w-4 h-4 ml-1" /></>
                   ) : (
                     <>Siguiente <ChevronRight className="w-4 h-4 ml-1" /></>
                   )}
