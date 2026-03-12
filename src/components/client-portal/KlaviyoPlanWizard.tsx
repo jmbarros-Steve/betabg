@@ -226,8 +226,8 @@ export function KlaviyoPlanWizard({
           ];
           setTopProducts(sampleProducts);
         }
-      } catch (error) {
-        console.error('Error fetching products:', error);
+      } catch {
+        // silently ignore
       } finally {
         setLoadingProducts(false);
       }

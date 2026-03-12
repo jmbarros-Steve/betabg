@@ -97,8 +97,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
       if (error) throw error;
       setConnections(data || []);
-    } catch (error) {
-      console.error('Error fetching connections:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al cargar conexiones');
     } finally {
       setLoading(false);
@@ -196,7 +196,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       // Notify other views (e.g., Metrics dashboard) to refresh instantly
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error: any) {
-      console.error('Error syncing:', error);
+      // Error handled by toast
       toast.error(error.message || `Error al sincronizar ${platformLabel} después de reintentar`, { id: 'sync' });
     } finally {
       setSyncingConnectionId(null);
@@ -214,8 +214,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       if (error) throw error;
       setConnections((prev) => prev.filter((c) => c.id !== connection.id));
       toast.success(`${platformConfig[connection.platform].name} desconectado`);
-    } catch (err) {
-      console.error('Error disconnecting:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al desconectar');
     } finally {
       setDisconnecting(null);
@@ -249,8 +249,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       setShowKlaviyoDialog(false);
       setKlaviyoApiKey('');
       fetchConnections();
-    } catch (error) {
-      console.error('Error connecting Klaviyo:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al conectar Klaviyo');
     } finally {
       setConnectingKlaviyo(false);

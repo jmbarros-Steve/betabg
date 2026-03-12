@@ -69,7 +69,7 @@ export function FlowPublishStep({ template, clientId, state, flowCreated, onFlow
       onFlowCreated();
       toast.success(`Flujo "${template.nameEs}" creado en Klaviyo`);
     } catch (err: any) {
-      console.error('Error publishing flow:', err);
+      // Error handled by toast below
       toast.error(`Error al publicar: ${err.message || 'Intenta de nuevo'}`);
     } finally {
       setPublishing(false);

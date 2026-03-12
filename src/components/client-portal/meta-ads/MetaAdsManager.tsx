@@ -220,8 +220,8 @@ function DashboardSection({ clientId }: { clientId: string }) {
 
       setMetrics((metricsRes.data as CampaignMetricRow[]) || []);
       setRecommendations((recsRes.data as Recommendation[]) || []);
-    } catch (err) {
-      console.error('[MetaAdsManager] Dashboard fetch error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error cargando datos del dashboard');
     } finally {
       setLoading(false);
@@ -296,7 +296,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         body: { connection_id: connectionId, platform: 'meta' },
       });
       if (error) {
-        console.error('Sync error:', error);
+        // Error handled by toast
         toast.error('Error sincronizando Meta Ads');
       }
       toast.success('Datos sincronizados');
@@ -590,7 +590,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       });
 
       if (error) {
-        console.error('[MetaAdsManager] Hierarchy fetch error:', error);
         // Fallback: try old fetch-meta-ad-accounts
         const { data: fallbackData } = await callApi('fetch-meta-ad-accounts', {
           body: { connection_id: conn.id },
@@ -719,8 +718,8 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           }
         }
       }
-    } catch (err) {
-      console.error('[MetaAdsManager] Hierarchy error:', err);
+    } catch {
+      // Error handled silently
     } finally {
       setHierarchyLoading(false);
     }
@@ -800,8 +799,8 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
 
       // 5. Also fire event for any other listeners
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
-    } catch (err) {
-      console.error('[MetaAdsManager] Portfolio switch error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al seleccionar negocio', { id: 'portfolio-switch' });
     } finally {
       setPortfolioSwitching(false);

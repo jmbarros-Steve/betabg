@@ -99,7 +99,7 @@ export function FlowContentStep({ template, clientId, state, updateState, onNext
       updateState({ generatedEmails: emails });
       toast.success('Contenido generado por Steve');
     } catch (err: any) {
-      console.error('Error generating content:', err);
+      // Error handled by toast below
       toast.error(`Error al generar contenido: ${err.message || 'Intenta de nuevo'}`);
     } finally {
       setGenerating(false);

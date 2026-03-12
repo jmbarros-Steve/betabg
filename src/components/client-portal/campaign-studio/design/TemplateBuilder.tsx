@@ -250,8 +250,8 @@ export function TemplateBuilder({ clientId, onBrandUpdate }: TemplateBuilderProp
         url: shopDomain ? `https://${shopDomain}/products/${p.handle}` : '#',
       }));
       setSampleProducts(mapped);
-    } catch (err) {
-      console.error('Error loading products:', err);
+    } catch {
+      // Error handled by toast below
       toast.error('Error al cargar productos');
     } finally {
       setLoadingProducts(false);
@@ -327,7 +327,7 @@ export function TemplateBuilder({ clientId, onBrandUpdate }: TemplateBuilderProp
       setSaved(true);
       toast.success('Template guardado');
     } catch (err: any) {
-      console.error('Error saving template:', err);
+      // Error handled by toast below
       toast.error('Error al guardar el template');
     } finally {
       setSaving(false);

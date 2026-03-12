@@ -60,8 +60,8 @@ export function FlowConfigStep({ template, clientId, state, updateState, onNext 
       if (shopify && klaviyo && template.productStrategy !== 'none' && template.productStrategy !== 'cart_items') {
         loadProducts(klaviyo.id);
       }
-    } catch (err) {
-      console.error('Error loading connections:', err);
+    } catch {
+      // silently ignore
     } finally {
       setLoadingConnections(false);
     }
@@ -80,7 +80,7 @@ export function FlowConfigStep({ template, clientId, state, updateState, onNext 
         updateState({ products: data.products });
       }
     } catch (err: any) {
-      console.error('Error loading products:', err);
+      // Error handled by toast below
       toast.error('No se pudieron cargar productos. Puedes continuar sin ellos.');
     } finally {
       setLoadingProducts(false);
@@ -110,7 +110,7 @@ export function FlowConfigStep({ template, clientId, state, updateState, onNext 
       updateState({ shopifyDiscountId: data?.discountId || 'created' });
       toast.success(`Cupon "${state.discountCode}" creado en Shopify`);
     } catch (err: any) {
-      console.error('Error creating discount:', err);
+      // Error handled by toast below
       toast.error(`Error al crear cupon: ${err.message || String(err) || 'Intenta de nuevo'}`);
     } finally {
       setCreatingDiscount(false);

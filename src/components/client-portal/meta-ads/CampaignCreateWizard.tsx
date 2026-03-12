@@ -477,11 +477,11 @@ function AdSetForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">Edad mínima</Label>
-          <Input type="number" min={18} max={65} value={targetAgeMin} onChange={(e) => setTargetAgeMin(Math.max(18, Number(e.target.value)))} className="mt-1" />
+          <Input type="number" min={18} max={65} value={targetAgeMin} onChange={(e) => { const v = Math.max(18, Math.min(65, Number(e.target.value))); setTargetAgeMin(v); if (v > targetAgeMax) setTargetAgeMax(v); }} className="mt-1" />
         </div>
         <div>
           <Label className="text-xs">Edad máxima</Label>
-          <Input type="number" min={18} max={65} value={targetAgeMax} onChange={(e) => setTargetAgeMax(Math.min(65, Number(e.target.value)))} className="mt-1" />
+          <Input type="number" min={18} max={65} value={targetAgeMax} onChange={(e) => { const v = Math.max(18, Math.min(65, Number(e.target.value))); setTargetAgeMax(v); if (v < targetAgeMin) setTargetAgeMin(v); }} className="mt-1" />
         </div>
       </div>
 
@@ -968,6 +968,7 @@ function AdFormMultiSlot({
                   onClick={(e) => { e.stopPropagation(); setLightboxUrl(img); }}
                   className="absolute top-0 left-0 bg-black/60 text-white rounded-br p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Ver en grande"
+                  aria-label="Ver imagen en grande"
                 >
                   <Maximize2 className="w-2.5 h-2.5" />
                 </button>
@@ -976,6 +977,7 @@ function AdFormMultiSlot({
                 <button
                   onClick={(e) => { e.stopPropagation(); const next = images.filter((_, j) => j !== i); setImages(next); if (activeImageSlot >= next.length) setActiveImageSlot(Math.max(0, next.length - 1)); }}
                   className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                  aria-label="Eliminar imagen"
                 >
                   <X className="w-2 h-2" />
                 </button>
@@ -1065,7 +1067,7 @@ function AdFormMultiSlot({
             <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}.</span>
             <Input value={hl} onChange={(e) => { const next = [...headlines]; next[i] = e.target.value; setHeadlines(next); }} placeholder={`Headline ${i + 1}`} />
             {headlines.length > 1 && (
-              <button onClick={() => { const next = headlines.filter((_, j) => j !== i); setHeadlines(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+              <button aria-label="Eliminar título" onClick={() => { const next = headlines.filter((_, j) => j !== i); setHeadlines(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
             )}
           </div>
         ))}
@@ -1086,7 +1088,7 @@ function AdFormMultiSlot({
             <span className="text-xs text-muted-foreground w-4 shrink-0 mt-2">{i + 1}.</span>
             <Textarea value={txt} onChange={(e) => { const next = [...primaryTexts]; next[i] = e.target.value; setPrimaryTexts(next); }} placeholder={`Texto ${i + 1} — habla al dolor/deseo de tu audiencia`} rows={2} className="flex-1" />
             {primaryTexts.length > 1 && (
-              <button onClick={() => { const next = primaryTexts.filter((_, j) => j !== i); setPrimaryTexts(next); }} className="text-muted-foreground hover:text-destructive mt-2"><X className="w-3.5 h-3.5" /></button>
+              <button aria-label="Eliminar texto" onClick={() => { const next = primaryTexts.filter((_, j) => j !== i); setPrimaryTexts(next); }} className="text-muted-foreground hover:text-destructive mt-2"><X className="w-3.5 h-3.5" /></button>
             )}
           </div>
         ))}
@@ -1107,7 +1109,7 @@ function AdFormMultiSlot({
             <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}.</span>
             <Input value={desc} onChange={(e) => { const next = [...descriptions]; next[i] = e.target.value; setDescriptions(next); }} placeholder={`Descripción ${i + 1} (opcional)`} />
             {descriptions.length > 1 && (
-              <button onClick={() => { const next = descriptions.filter((_, j) => j !== i); setDescriptions(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+              <button aria-label="Eliminar descripción" onClick={() => { const next = descriptions.filter((_, j) => j !== i); setDescriptions(next); }} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
             )}
           </div>
         ))}
@@ -1604,7 +1606,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           }
         }
       } catch (err) {
-        console.error('[Wizard] AI image generation failed:', err);
+        // AI image generation failed — toast already shown
       } finally {
         setAutoGenerating(false);
         setAutoGenProgress('');
@@ -1675,7 +1677,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const summary = `Borrador guardado: ${filledImages.length} imágenes, ${filledTexts.length} copies, ${filledHeadlines.length} headlines`;
       toast.success(summary);
     } catch (err) {
-      console.error('[CampaignCreateWizard] Save draft error:', err);
+      // Save draft error — toast shown below
       toast.error('Error al guardar borrador');
     } finally {
       setSavingDraft(false);
@@ -1689,6 +1691,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     try {
       if (!ctxConnectionId) {
         toast.error('No hay conexión Meta Ads activa');
+        return;
+      }
+
+      if (destinationUrl && !/^https?:\/\/.+\..+/.test(destinationUrl)) {
+        toast.error('URL de destino inválida — debe comenzar con https://');
+        setSubmitting(false);
+        return;
+      }
+
+      if (!images.some(Boolean)) {
+        toast.error('Agrega al menos 1 imagen para el anuncio');
+        setSubmitting(false);
         return;
       }
 
@@ -1796,13 +1810,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           dct_imagenes: filledImages.length > 0 ? filledImages : null,
         });
       } catch (saveErr) {
-        console.warn('[CampaignCreateWizard] Could not save creative to library:', saveErr);
+        // Non-critical: creative library save failed silently
       }
 
       toast.success('Campaña creada como pausada en Meta. Activa cuando estés listo.');
       onComplete?.();
     } catch (err) {
-      console.error('[CampaignCreateWizard] Submit error:', err);
+      // Submit error — toast shown below
       toast.error('Error al crear campaña');
     } finally {
       setSubmitting(false);

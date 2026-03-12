@@ -89,7 +89,7 @@ export function ShopifyDiscountDialog({
       setUsageLimit('');
       setEndsAt('');
     } catch (error: unknown) {
-      console.error('Error creating discount:', error);
+      // Error handled by toast below
       const message = error instanceof Error ? error.message : 'Error al crear el descuento';
       toast.error(message);
     } finally {

@@ -117,7 +117,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             .order('days_running', { ascending: false, nullsFirst: false });
 
           if (adsError) {
-            console.error('[CompetitorAdsPanel] Error fetching ads:', adsError);
+            // Error handled by toast
           }
           if (Array.isArray(adsData)) {
             setAds(adsData as CompetitorAd[]);
@@ -189,7 +189,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       await fetchData();
     } catch (err: any) {
-      console.error('Sync error:', err);
       toast.error(err.message || 'Error al sincronizar');
     } finally {
       setSyncing(false);
@@ -292,8 +291,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         recomendaciones,
         ganadores_insight: ganadorInsights,
       });
-    } catch (err) {
-      console.error('Analysis error:', err);
+    } catch {
       toast.error('Error al analizar competidores');
     } finally {
       setAnalyzing(false);

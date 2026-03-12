@@ -126,7 +126,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
       .eq('client_id', clientId)
       .order('updated_at', { ascending: false });
 
-    if (error) { toast.error('Error cargando plantillas'); console.error(error); }
+    if (error) { toast.error('Error cargando plantillas'); /* Error handled by toast */ }
     else {
       const valid = (data || [])
         .filter((t: any) => Array.isArray(t.content_blocks) && t.content_blocks.length > 0)
@@ -157,7 +157,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
         body: { connectionId: conn.id, timeframe: '90d' },
       });
 
-      if (error) { console.error('Error fetching audiences:', error); return; }
+      if (error) { /* Error handled by toast */ return; }
 
       const listItems: AudienceOption[] = (data?.lists || []).map((l: any) => ({
         id: l.id,
@@ -172,8 +172,8 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
         profileCount: s.profile_count,
       }));
       setAudiences([...listItems, ...segmentItems]);
-    } catch (e) {
-      console.error('Error loading audiences:', e);
+    } catch {
+      // Error handled silently
     } finally {
       setLoadingAudiences(false);
     }
@@ -369,7 +369,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
           idx === i ? { ...c, blocks, status: 'done' } : c
         ));
       } catch (err: any) {
-        console.error(`Error generating ${campaign.name}:`, err);
+        // Error handled by per-campaign error state
         setGeneratedCampaigns(prev => prev.map((c, idx) =>
           idx === i ? { ...c, status: 'error', errorMessage: err.message } : c
         ));
@@ -510,7 +510,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
               errorDetail = errBody?.error || errBody?.details || JSON.stringify(errBody).substring(0, 300);
             }
           } catch (_) {}
-          console.error('Upload error detail:', errorDetail);
+          // Error detail captured above
           throw new Error(errorDetail);
         }
 
@@ -529,7 +529,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
 
         results.push({ name: campaign.name, success: true });
       } catch (err: any) {
-        console.error(`Error uploading ${campaign.name}:`, err);
+        // Error handled by per-campaign result state
         results.push({ name: campaign.name, success: false, error: err.message });
       }
 

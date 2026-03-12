@@ -106,8 +106,8 @@ export function OnboardingWizard({ clientId, initialStep, onComplete }: Onboardi
       } else {
         setStep(nextStep);
       }
-    } catch (e) {
-      console.error('Error saving step:', e);
+    } catch {
+      // silently ignore
     } finally {
       setSaving(false);
     }
@@ -162,7 +162,7 @@ export function OnboardingWizard({ clientId, initialStep, onComplete }: Onboardi
       if (error) throw error;
       await saveStep(2);
     } catch (e) {
-      console.error('Error saving step 1:', e);
+      // Error handled by toast below
       toast.error('Error al guardar');
     } finally {
       setSaving(false);

@@ -32,8 +32,8 @@ export function FloatingDiscountButton({ clientId }: FloatingDiscountButtonProps
       if (!error && data) {
         setHasShopify(true);
       }
-    } catch (error) {
-      console.error('Error checking Shopify connection:', error);
+    } catch {
+      // silently ignore
     } finally {
       setLoading(false);
     }

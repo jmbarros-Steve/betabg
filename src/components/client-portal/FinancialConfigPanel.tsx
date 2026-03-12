@@ -120,8 +120,8 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
           product_margins: (data.product_margins as Record<string, number>) || {},
         });
       }
-    } catch (error) {
-      console.error('Error fetching config:', error);
+    } catch {
+      // Error handled silently
     } finally {
       setLoading(false);
     }
@@ -174,8 +174,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
       toast.success('Configuración guardada correctamente');
       // Notify other views to refresh
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
-    } catch (error) {
-      console.error('Error saving config:', error);
+    } catch {
       toast.error('Error al guardar configuración');
     } finally {
       setSaving(false);

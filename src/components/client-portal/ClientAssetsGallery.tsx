@@ -61,8 +61,8 @@ export function ClientAssetsGallery({ clientId, compact = false, onAssetsLoaded 
       if (error) throw error;
       setAssets(data || []);
       onAssetsLoaded?.(data || []);
-    } catch (err) {
-      console.error('Error fetching assets:', err);
+    } catch {
+      // Error handled by toast
     } finally {
       setLoading(false);
     }
@@ -122,8 +122,7 @@ export function ClientAssetsGallery({ clientId, compact = false, onAssetsLoaded 
         setAssets(prev => [asset, ...prev]);
         onAssetsLoaded?.([asset, ...assets]);
         uploaded++;
-      } catch (err) {
-        console.error('Upload error:', err);
+      } catch {
         toast.error(`Error subiendo ${file.name}`);
       }
     }
@@ -153,8 +152,7 @@ export function ClientAssetsGallery({ clientId, compact = false, onAssetsLoaded 
       onAssetsLoaded?.(updated);
       setSelectedAsset(null);
       toast.success('Imagen eliminada');
-    } catch (err) {
-      console.error('Delete error:', err);
+    } catch {
       toast.error('Error al eliminar');
     }
   };

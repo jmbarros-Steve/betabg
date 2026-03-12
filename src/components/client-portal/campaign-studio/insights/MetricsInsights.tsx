@@ -376,7 +376,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
       );
 
       if (fnError) {
-        console.error('Error fetching Klaviyo metrics:', fnError);
+        // Error handled by state/toast below
         setError(fnError || 'Error al cargar métricas');
         toast.error('Error al cargar métricas de Klaviyo');
         return;
@@ -403,7 +403,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
       if (data.flows) setFlows(data.flows);
       if (data.campaigns) setCampaigns(data.campaigns);
     } catch (err: any) {
-      console.error('Error generating insights:', err);
+      // Error handled by state/toast below
       setError(err.message || 'Error inesperado');
       toast.error('Error al generar insights');
     } finally {

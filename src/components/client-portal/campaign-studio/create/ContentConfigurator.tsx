@@ -118,7 +118,7 @@ export function ContentConfigurator({
 
       onUpdate({ products: mapped });
     } catch (err: any) {
-      console.error('Error loading products:', err);
+      // Error handled by toast below
       toast.error('Error al cargar productos de Shopify');
     } finally {
       setLoadingProducts(false);
@@ -135,7 +135,7 @@ export function ContentConfigurator({
       if (error) throw new Error(error);
       setCollections(data?.collections || []);
     } catch (err: any) {
-      console.error('Error loading collections:', err);
+      // Error handled by toast below
       toast.error('Error al cargar colecciones de Shopify');
     } finally {
       setLoadingCollections(false);
@@ -168,7 +168,7 @@ export function ContentConfigurator({
 
       onUpdate({ products: mapped });
     } catch (err: any) {
-      console.error('Error loading collection products:', err);
+      // Error handled by toast below
       toast.error('Error al cargar productos de la colección');
     } finally {
       setLoadingProducts(false);
@@ -202,7 +202,7 @@ export function ContentConfigurator({
         onUpdate({ previewText: data.previewTexts[0] });
       }
     } catch (err: any) {
-      console.error('Error generating subjects:', err);
+      // Error handled by toast below
       toast.error('Error al generar subjects con Steve');
     } finally {
       setAiLoading(null);
@@ -225,7 +225,7 @@ export function ContentConfigurator({
       if (error) throw error;
       setAiFeedback(data?.feedback || []);
     } catch (err: any) {
-      console.error('Error analyzing:', err);
+      // Error handled by toast below
       toast.error('Error al analizar contenido');
     } finally {
       setAiLoading(null);

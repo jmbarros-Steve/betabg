@@ -154,8 +154,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
       }));
       
       setPlans(parsedPlans);
-    } catch (error) {
-      console.error('Error fetching plans:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al cargar los planes');
     } finally {
       setLoading(false);
@@ -217,8 +217,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
       setShowFeedback(true);
       
       toast.success('Plan creado correctamente');
-    } catch (error) {
-      console.error('Error creating plan:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al crear el plan');
     } finally {
       setSaving(false);
@@ -246,8 +246,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
         p.id === planId ? { ...p, ...updates } : p
       ));
       toast.success('Plan actualizado');
-    } catch (error) {
-      console.error('Error updating plan:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al actualizar');
     } finally {
       setSaving(false);
@@ -265,8 +265,8 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
 
       setPlans(prev => prev.filter(p => p.id !== planId));
       toast.success('Plan eliminado');
-    } catch (error) {
-      console.error('Error deleting plan:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al eliminar');
     }
   }
@@ -684,7 +684,6 @@ function PlanCard({
       );
       setShowEmailEditor(true);
     } catch (err: any) {
-      console.error('Preview error:', err);
       // Fallback: open editor with raw content
       const emails: EditorEmail[] = plan.emails.map((e) => ({
         subject: e.subject,
@@ -1008,8 +1007,8 @@ function PushToKlaviyoDialog({
       if (error) throw error;
       setLists(data.lists || []);
       if (data.lists?.length > 0) setSelectedList(data.lists[0].id);
-    } catch (err) {
-      console.error('Error fetching lists:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al obtener las listas de Klaviyo');
     } finally {
       setLoadingLists(false);
@@ -1040,7 +1039,7 @@ function PushToKlaviyoDialog({
       toast.success(`${data.campaigns?.length || emailCount} campañas creadas${draftLabel} en Klaviyo 🚀`);
       onComplete();
     } catch (err: any) {
-      console.error('Push error:', err);
+      // Error handled by toast
       toast.error(`Error: ${err.message || 'No se pudieron crear las campañas'}`);
     } finally {
       setPushing(false);
@@ -1364,7 +1363,7 @@ function BulkImportDialog({ clientId, onComplete, onClose }: BulkImportDialogPro
 
       onComplete([newPlan]);
     } catch (err: any) {
-      console.error('Bulk import error:', err);
+      // Error handled by toast
       toast.error('Error al importar: ' + err.message);
     } finally {
       setImporting(false);
@@ -1492,7 +1491,7 @@ function EmailStepCard({ email, index, isFirst, flowType, onUpdate, onRemove }: 
       setShowPreview(true);
       toast.success(`IA detectó ${data.features_detected?.length || 0} features de Klaviyo`);
     } catch (err: any) {
-      console.error('Smart format error:', err);
+      // Error handled by toast
       toast.error('Error al formatear: ' + (err.message || 'Intenta de nuevo'));
     } finally {
       setSmartFormatting(false);

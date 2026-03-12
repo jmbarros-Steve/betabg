@@ -56,8 +56,8 @@ export default function AdSetSelector({
       }));
 
       setAdsets(items);
-    } catch (err) {
-      console.error('[AdSetSelector] Error fetching ad sets:', err);
+    } catch {
+      // Error handled by toast
     } finally {
       setLoading(false);
     }

@@ -604,8 +604,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
       const total = result?.total || combinations.length;
       toast.success(`Campaña "${name}" creada: ${created}/${total} ads publicados en Meta (Paused).`);
       onComplete?.();
-    } catch (err) {
-      console.error('[TestingWizard322] Publish error:', err);
+    } catch {
       toast.error('Error al crear campaña 3:2:2');
     } finally {
       setPublishing(false);

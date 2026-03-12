@@ -56,7 +56,7 @@ export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatPr
         setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
       }
     } catch (error: any) {
-      console.error('Strategy chat error:', error);
+      // Error handled by toast below
       if (error?.status === 429) {
         toast.error('Demasiadas solicitudes. Espera un momento.');
       } else {

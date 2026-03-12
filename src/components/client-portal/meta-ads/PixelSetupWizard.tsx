@@ -114,7 +114,6 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
         setSelectedPixel(contextMatch || pixelList[0]);
       }
     } catch (err: any) {
-      console.error('[PixelSetupWizard] Detection error:', err);
       toast.error(err?.message || 'Error detectando pixels');
     } finally {
       setLoading(false);
@@ -133,8 +132,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
 
       if (error) throw error;
       setEvents(data?.events || []);
-    } catch (err: any) {
-      console.error('[PixelSetupWizard] Stats error:', err);
+    } catch {
       // Stats may fail if pixel hasn't fired - not critical
       setEvents([]);
     } finally {

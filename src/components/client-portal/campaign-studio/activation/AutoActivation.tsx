@@ -177,8 +177,8 @@ export function AutoActivation({
       setTimeout(() => {
         setStep(2);
       }, 2000);
-    } catch (err) {
-      console.error('Error loading brand info:', err);
+    } catch {
+      // Fall back to default brand info
       setBrandInfo({
         name: 'Tu Marca',
         tone: 'Profesional',
@@ -229,8 +229,7 @@ export function AutoActivation({
               clientId,
             },
           });
-        } catch (flowErr) {
-          console.error(`Error creating flow plan for ${flow.name}:`, flowErr);
+        } catch {
           // Continue with the other flows even if one fails
         }
       }
@@ -255,8 +254,8 @@ export function AutoActivation({
               ctaText: 'Ver mas',
             },
           });
-        } catch (campErr) {
-          console.error('Error creating draft campaign:', campErr);
+        } catch {
+          // silently ignore
         }
       }
 
@@ -270,7 +269,7 @@ export function AutoActivation({
 
       toast.success('Activacion completada');
     } catch (err: any) {
-      console.error('Error during activation:', err);
+      // Error handled by toast below
       toast.error('Error durante la activacion. Algunos elementos pueden no haberse creado.');
       setStep(3);
     } finally {

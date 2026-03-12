@@ -51,8 +51,8 @@ export function SteveFeedbackPanel({ clientId }: SteveFeedbackPanelProps) {
       setSelectedSection(null);
       setRating(null);
       setFeedback('');
-    } catch (error) {
-      console.error('Feedback error:', error);
+    } catch {
+      // Error handled by toast below
       toast.error('Error al enviar feedback');
     } finally {
       setSubmitting(false);

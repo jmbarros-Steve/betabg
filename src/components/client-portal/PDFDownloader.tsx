@@ -91,8 +91,8 @@ export function PDFDownloader({ type, title, content, variant = 'outline', size 
         const logoBase64 = await loadImageAsBase64(logo);
         doc.addImage(logoBase64, 'JPEG', margin, yPosition, 40, 15);
         yPosition += 25;
-      } catch (e) {
-        console.warn('Could not load logo:', e);
+      } catch {
+        // Logo load failed — skip, continue without it
         yPosition += 10;
       }
 
@@ -266,8 +266,7 @@ export function PDFDownloader({ type, title, content, variant = 'outline', size 
 
       doc.save(filename);
       toast.success('PDF descargado correctamente');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
+    } catch {
       toast.error('Error al generar el PDF');
     } finally {
       setIsGenerating(false);

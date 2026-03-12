@@ -258,7 +258,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
       );
 
       if (fnError) {
-        console.error('Error fetching send time heatmap:', fnError);
+        // Error handled by state/toast below
         setError(fnError || 'Error al cargar analisis de horarios');
         toast.error('Error al cargar analisis de horarios');
         return;
@@ -277,7 +277,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
 
       setData(result as HeatmapData);
     } catch (err: any) {
-      console.error('Error in send time analysis:', err);
+      // Error handled by state/toast below
       setError(err.message || 'Error inesperado');
       toast.error('Error al analizar horarios de envio');
     } finally {

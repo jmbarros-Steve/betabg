@@ -98,7 +98,6 @@ async function sendToSteveAndPersist(
         'Lo siento, no pude procesar tu mensaje. Intenta de nuevo.';
     }
   } catch (err: any) {
-    console.error('Error sending message to Steve:', err);
     // On error, clean up inflight and re-throw so caller can handle
     inflightMap.delete(conversationId);
     throw err;
@@ -111,8 +110,8 @@ async function sendToSteveAndPersist(
       role: 'assistant',
       content: assistantContent,
     });
-  } catch (err) {
-    console.error('Error saving assistant message:', err);
+  } catch {
+    // silently ignore
   }
 
   // Clean up inflight entry
@@ -220,8 +219,8 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
             toast.error('No se pudo crear la conversación');
           }
         }
-      } catch (err) {
-        console.error('Error loading conversation:', err);
+      } catch {
+        // Error handled by toast below
         toast.error('Error al cargar el historial de conversación');
       } finally {
         setLoadingHistory(false);
@@ -247,8 +246,8 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
           }))
         );
       }
-    } catch (err) {
-      console.error('Error reloading messages:', err);
+    } catch {
+      // silently ignore
     }
   }, []);
 
@@ -281,8 +280,8 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
       if (data) {
         setConnectionId(data.id);
       }
-    } catch (err) {
-      console.error('Error loading Klaviyo connection:', err);
+    } catch {
+      // silently ignore
     } finally {
       setInitializing(false);
     }
@@ -304,8 +303,8 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
         setMessages([]);
         toast.success('Nueva conversación iniciada');
       }
-    } catch (err) {
-      console.error('Error creating new conversation:', err);
+    } catch {
+      // Error handled by toast below
       toast.error('Error al crear nueva conversación');
     }
   };
@@ -326,8 +325,8 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
         role: 'user',
         content: trimmed,
       });
-    } catch (err) {
-      console.error('Error saving user message:', err);
+    } catch {
+      // silently ignore
     }
 
     // Build history for context (last 10 messages)
@@ -384,8 +383,8 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
               .delete()
               .eq('id', lastMsg.id);
           }
-        } catch (deleteErr) {
-          console.error('Error removing failed user message from DB:', deleteErr);
+        } catch {
+          // silently ignore
         }
       }
     } finally {

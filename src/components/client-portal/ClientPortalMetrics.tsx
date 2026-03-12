@@ -333,8 +333,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               items.sort((a, b) => b.revenue - a.revenue);
               setProductBreakdown(items);
             }
-          } catch (e) {
-            console.warn('[Metrics] Could not fetch products for P&L breakdown:', e);
+          } catch {
+            // P&L product breakdown unavailable — non-critical
           }
 
           // Fetch real SKU sales, abandoned checkouts, customer metrics, and cohorts
@@ -378,15 +378,15 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                 );
               }
             }
-          } catch (e) {
-            console.warn('[Metrics] Could not fetch analytics:', e);
+          } catch {
+            // Analytics fetch unavailable — non-critical
           }
         }
 
         // Set rawMetrics with DB data + any injected Shopify API data
         setRawMetrics([...dbMetricRows, ...currentCampaignMetrics, ...additionalMetrics]);
-      } catch (error) {
-        console.error('Error fetching metrics:', error);
+      } catch {
+        // Error handled by toast
       } finally {
         setLoading(false);
       }

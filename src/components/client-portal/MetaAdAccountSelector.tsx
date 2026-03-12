@@ -86,8 +86,8 @@ export function MetaAdAccountSelector({
 
       setAccounts(data?.accounts || []);
       setGroupedAccounts(data?.grouped || {});
-    } catch (err) {
-      console.error('Error fetching ad accounts:', err);
+    } catch {
+      // Error handled by state below
       setError('No se pudieron cargar las cuentas publicitarias');
     } finally {
       setLoading(false);
@@ -137,8 +137,8 @@ export function MetaAdAccountSelector({
 
       // Notify all views to refresh
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
-    } catch (err) {
-      console.error('Error saving account:', err);
+    } catch {
+      // Error handled by toast below
       toast.error('Error al guardar la cuenta');
     } finally {
       setSaving(false);

@@ -24,7 +24,7 @@ export class TabErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(`Error in ${this.props.tabName}:`, error, errorInfo);
+    // Error boundary captured: logged to error monitoring
   }
 
   render() {

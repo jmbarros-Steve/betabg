@@ -118,7 +118,7 @@ export default function ImportKlaviyoDialog({
         setFetchError('No se encontraron plantillas en Klaviyo.');
       }
     } catch (err: any) {
-      console.error('Error fetching Klaviyo templates:', err);
+      // Error handled by state below
       setFetchError(err.message || 'Error al conectar con Klaviyo');
     } finally {
       setLoading(false);
@@ -231,8 +231,7 @@ export default function ImportKlaviyoDialog({
 
         if (error) throw error;
         successCount++;
-      } catch (err: any) {
-        console.error(`Error importing template "${template.name}":`, err);
+      } catch {
         failCount++;
       }
     }

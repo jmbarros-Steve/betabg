@@ -124,7 +124,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
       toast.success(`Deep Dive completado para @${competitor.ig_handle}`);
       await fetchCompetitors();
     } catch (err: any) {
-      console.error('Deep dive error:', err);
+      // Error handled by toast below
       toast.error(err.message || 'Error en el análisis');
     } finally {
       setScrapingId(null);

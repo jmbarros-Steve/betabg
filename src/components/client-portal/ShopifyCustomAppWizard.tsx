@@ -179,7 +179,7 @@ export function ShopifyCustomAppWizard({
         setStep(3);
       }
     } catch (err: any) {
-      console.error('Error storing Shopify credentials:', err);
+      // Error handled by state below
       setError(err.message || 'Error al guardar credenciales');
       setDirection(-1);
       setStep(3);

@@ -99,8 +99,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
       }
 
       setFlowStatuses(statusMap);
-    } catch (err: any) {
-      console.error('Error loading flows:', err);
+    } catch {
       // Don't show error toast for initial load failures, just set default statuses
       const defaultMap: FlowStatusMap = {};
       for (const template of FLOW_TEMPLATES) {

@@ -56,7 +56,7 @@ export function SteveFeedbackDialog({ clientId, contentType, contentId, onComple
       setIsVisible(false);
       setTimeout(onComplete, 300);
     } catch (error) {
-      console.error('Error submitting feedback:', error);
+      // Error handled by toast below
       toast.error('Error al enviar feedback');
     } finally {
       setIsSubmitting(false);

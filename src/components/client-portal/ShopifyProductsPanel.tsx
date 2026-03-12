@@ -67,7 +67,7 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
       });
 
       if (error) {
-        console.error('[ShopifyProducts] Error:', error);
+        // Error handled by toast below
         toast.error('Error al cargar productos: ' + error);
         return;
       }

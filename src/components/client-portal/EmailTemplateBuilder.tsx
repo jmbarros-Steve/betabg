@@ -106,7 +106,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       .select('*')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
-    if (error) { toast.error('Error cargando templates'); console.error(error); }
+    if (error) { toast.error('Error cargando templates'); }
     else setTemplates((data || []) as unknown as EmailTemplate[]);
     setLoading(false);
   };
@@ -151,7 +151,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       const { data, error } = await callApi('parse-email-html', {
         body: { html: form.base_html },
       });
-      if (error) { toast.error('Error al convertir plantilla'); console.error(error); return; }
+      if (error) { toast.error('Error al convertir plantilla'); return; }
       const parsed = data?.blocks || [];
       if (parsed.length === 0) { toast.error('No se pudieron extraer bloques'); return; }
       
@@ -257,7 +257,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
       ({ error } = await supabase.from('email_templates').insert(payload as any));
     }
 
-    if (error) { toast.error('Error guardando template'); console.error(error); }
+    if (error) { toast.error('Error guardando template'); }
     else {
       toast.success(editing ? 'Template actualizado' : 'Template creado');
       setIsNew(false);

@@ -208,8 +208,8 @@ ${bodyHtml}
 </body>
 </html>`;
         }
-      } catch (err) {
-        console.error('Error parsing template blocks:', err);
+      } catch {
+        // silently ignore
       }
     }
   }
@@ -626,9 +626,9 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
           .insert(insertPayload as any);
 
         if (!error) successCount++;
-        else console.error('Error inserting campaign:', error);
-      } catch (err) {
-        console.error('Error creating draft:', err);
+        // error tracked via successCount
+      } catch {
+        // silently ignore
       }
 
       setCreationProgress(Math.round(((i + 1) / toCreate.length) * 100));

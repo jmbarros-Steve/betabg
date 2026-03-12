@@ -432,7 +432,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
       setCampaigns(Array.from(campaignMap.values()));
     } catch (err: any) {
-      console.error('[MetaCampaignManager] Error fetching campaigns:', err);
+      // Error handled by toast
       setError(err?.message || 'Error al cargar campañas');
       toast.error('Error al cargar campañas');
     } finally {
@@ -584,8 +584,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           ? `Campaña "${campaign.campaign_name}" reanudada`
           : `Campaña "${campaign.campaign_name}" pausada`,
       );
-    } catch (err: any) {
-      console.error('[MetaCampaignManager] Toggle status error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al cambiar estado de la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
@@ -608,8 +608,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
       toast.success(`Campaña duplicada: "${campaign.campaign_name} (Copia)"`);
       await fetchCampaigns();
-    } catch (err: any) {
-      console.error('[MetaCampaignManager] Duplicate error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al duplicar la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
@@ -637,8 +637,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         ),
       );
       toast.success(`Campaña "${campaign.campaign_name}" archivada`);
-    } catch (err: any) {
-      console.error('[MetaCampaignManager] Archive error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al archivar la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
@@ -691,8 +691,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setCreateDialogOpen(false);
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
-    } catch (err: any) {
-      console.error('[MetaCampaignManager] Create error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al crear la campaña');
     } finally {
       setFormSubmitting(false);
@@ -731,8 +731,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setSelectedCampaign(null);
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
-    } catch (err: any) {
-      console.error('[MetaCampaignManager] Edit error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al actualizar la campaña');
     } finally {
       setFormSubmitting(false);
@@ -777,8 +777,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         `Presupuesto actualizado a ${formatCLP(newBudget)}/día`,
       );
       setBudgetDialogOpen(false);
-    } catch (err: any) {
-      console.error('[MetaCampaignManager] Budget adjust error:', err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al ajustar presupuesto');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));

@@ -162,8 +162,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           c.platform === 'meta' || c.platform === 'google'
       );
       setConnections(filteredData);
-    } catch (error) {
-      console.error('Error fetching connections:', error);
+    } catch {
+      // Error handled silently
     } finally {
       setLoading(false);
     }
@@ -184,8 +184,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
       if (error) throw error;
       setMetrics(data || []);
-    } catch (error) {
-      console.error('Error fetching metrics:', error);
+    } catch {
+      // Error handled silently
     }
   }
 
@@ -209,8 +209,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         priority: r.priority as 'low' | 'medium' | 'high' | 'critical'
       }));
       setRecommendations(typedData);
-    } catch (error) {
-      console.error('Error fetching recommendations:', error);
+    } catch {
+      // Error handled silently
     }
   }
 
@@ -227,7 +227,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         });
 
         if (error) {
-          console.error(`Sync error for ${conn.platform}:`, error);
+          // Error handled by toast
           toast.error(`Error sincronizando ${conn.platform}`);
         }
       }
@@ -316,8 +316,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         ...prev,
         [campaignId]: data.ad_sets || []
       }));
-    } catch (error) {
-      console.error('Error fetching ad sets:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al cargar Ad Sets');
     } finally {
       setLoadingAdSets(prev => {

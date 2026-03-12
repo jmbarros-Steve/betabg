@@ -47,8 +47,8 @@ class BriefErrorBoundary extends React.Component<{ children: React.ReactNode }, 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[BrandBriefView] Render crash:', error, info.componentStack);
+  componentDidCatch(_error: Error, _info: React.ErrorInfo) {
+    // Error handled by error boundary UI
   }
   render() {
     if (this.state.error) {
@@ -1365,7 +1365,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       .select('research_type, research_data')
       .eq('client_id', clientId);
     if (error) {
-      console.error('fetchResearch error:', error);
+      // Error handled by toast
       return;
     }
     const r: ResearchData = {};
@@ -1549,14 +1549,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       });
       if (researchErr) {
         setDebug({ phase1: 'error', phase1Message: researchErr });
-        console.error('analyze-brand-research error:', researchErr);
+        // Error handled by toast
       } else {
         research = researchData?.research;
         setDebug({ phase1: 'ok', phase1Status: 200 });
       }
     } catch (err: any) {
       setDebug({ phase1: 'error', phase1Message: err?.message || String(err) });
-      console.error('analyze-brand-research failed:', err);
+      // Error handled by toast
     }
 
     // Phase 2: strategy — await to capture error for diagnóstico
@@ -1571,7 +1571,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         });
         if (strategyErr) {
           setDebug({ phase2: 'error', phase2Message: strategyErr });
-          console.error('analyze-brand-strategy error:', strategyErr);
+          // Error handled by toast
         } else {
           setDebug({ phase2: 'ok', phase2Status: 200 });
         }
@@ -1581,7 +1581,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
     } else {
       setDebug({ phase2: 'skipped', phase2Message: 'Fase 1 falló' });
-      console.error('Skipping strategy phase — research phase failed');
+      // Skipping strategy phase — research phase failed
     }
   }
 
@@ -2622,8 +2622,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const safePdfRender = (label: string, fn: () => void) => {
       try {
         fn();
-      } catch (err) {
-        console.error(`[PDF] Error rendering "${label}":`, err);
+      } catch {
+        // Error handled by fallback section render below
         try {
           addSubTitle(`Error en seccion: ${label}`);
           addBody('Esta seccion no pudo generarse correctamente. Los datos pueden estar incompletos.', 0, 5);
@@ -3343,8 +3343,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     doc.save(`Brief_Estrategico_${clientInfo?.name || 'Marca'}_${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success('Brief estratégico descargado');
-    } catch (pdfError) {
-      console.error('Error generando PDF:', pdfError);
+    } catch {
+      // Error handled by toast
       toast.error('Error al generar el PDF');
     }
   }

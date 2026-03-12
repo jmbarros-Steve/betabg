@@ -556,8 +556,8 @@ function ShopifyProductPicker({ clientId, onSelect }: { clientId?: string; onSel
         setAllProducts(data.products);
         setLoaded(true);
       }
-    } catch (err) {
-      console.error('Error loading products:', err);
+    } catch {
+      // silently ignore
     }
     setLoading(false);
   }, [clientId, loaded, loading, callEdgeFunction]);

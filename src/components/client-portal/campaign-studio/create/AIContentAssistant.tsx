@@ -105,8 +105,8 @@ export function AIContentAssistant({
       if (data) {
         setConnectionId(data.id);
       }
-    } catch (err) {
-      console.error('Error loading connection for AI assistant:', err);
+    } catch {
+      // silently ignore
     }
   };
 
@@ -142,7 +142,7 @@ export function AIContentAssistant({
 
       toast.success('Subject lines generados');
     } catch (err: any) {
-      console.error('Error generating subjects:', err);
+      // Error handled by toast below
       toast.error('Error al generar subject lines');
     } finally {
       setLoadingSubjects(false);
@@ -192,7 +192,7 @@ export function AIContentAssistant({
       setAnalysisOpen(true);
       toast.success('Análisis completado');
     } catch (err: any) {
-      console.error('Error analyzing content:', err);
+      // Error handled by toast below
       toast.error('Error al analizar contenido');
     } finally {
       setLoadingAnalysis(false);
@@ -236,7 +236,7 @@ export function AIContentAssistant({
       setVariantsOpen(true);
       toast.success('Variantes A/B generadas');
     } catch (err: any) {
-      console.error('Error generating A/B variants:', err);
+      // Error handled by toast below
       toast.error('Error al generar variantes A/B');
     } finally {
       setLoadingVariants(false);

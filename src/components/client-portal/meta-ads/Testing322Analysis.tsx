@@ -144,8 +144,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
       if (unique.length > 0 && !selectedCampaignId) {
         setSelectedCampaignId(unique[0].campaign_id);
       }
-    } catch (err: any) {
-      console.error('Error fetching campaigns:', err);
+    } catch {
       toast.error('Error al cargar campañas');
     }
   }, [ctxConnectionId, selectedCampaignId]);
@@ -170,8 +169,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
 
       if (error) throw error;
       setAdsetRows(data || []);
-    } catch (err: any) {
-      console.error('Error fetching adset metrics:', err);
+    } catch {
       toast.error('Error al cargar métricas de ad sets');
     } finally {
       setLoading(false);

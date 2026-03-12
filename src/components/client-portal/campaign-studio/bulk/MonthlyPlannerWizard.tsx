@@ -160,8 +160,8 @@ export function MonthlyPlannerWizard({ clientId, brand, open, onClose, onCreated
             setKlaviyoSegments([...listItems, ...segmentItems]);
           }
         }
-      } catch (e) {
-        console.error('Error loading Klaviyo segments:', e);
+      } catch {
+        // silently ignore
       }
 
       if (!cancelled) setLoadingData(false);
@@ -264,8 +264,8 @@ ${bodyHtml}
 </body>
 </html>`;
           }
-        } catch (err) {
-          console.error('Error loading template blocks for', c.name, err);
+        } catch {
+          // silently ignore
         }
       }
 
@@ -337,7 +337,7 @@ ${bodyHtml}
           .insert(insertPayload as any);
 
         results.push({ name: campaign.name, success: !error });
-        if (error) console.error('Error saving campaign:', error);
+        // error tracked via results array
       } catch (err) {
         results.push({ name: campaign.name, success: false });
       }

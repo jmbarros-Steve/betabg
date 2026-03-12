@@ -184,8 +184,8 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
 
       if (error) throw error;
       setTemplates((data as TemplateRow[]) || []);
-    } catch (err: any) {
-      console.error('Error fetching templates:', err);
+    } catch {
+      // Error handled by toast below
       toast.error('Error al cargar plantillas');
     } finally {
       setLoading(false);
@@ -257,8 +257,8 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
       setEditorOpen(false);
       setEditingTemplate(null);
       fetchTemplates();
-    } catch (err: any) {
-      console.error('Error saving template:', err);
+    } catch {
+      // Error handled by toast below
       toast.error('Error al guardar la plantilla');
     } finally {
       setSaving(false);
@@ -289,8 +289,8 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
         if (error) throw error;
         toast.success('Plantilla duplicada');
         fetchTemplates();
-      } catch (err: any) {
-        console.error('Error duplicating template:', err);
+      } catch {
+        // Error handled by toast below
         toast.error('Error al duplicar la plantilla');
       }
     },
@@ -313,8 +313,8 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
         toast.success('Plantilla eliminada');
         setDeleteConfirm(null);
         fetchTemplates();
-      } catch (err: any) {
-        console.error('Error deleting template:', err);
+      } catch {
+        // Error handled by toast below
         toast.error('Error al eliminar la plantilla');
       }
     },
@@ -345,8 +345,8 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
         if (setError) throw setError;
         toast.success('Plantilla marcada como principal');
         fetchTemplates();
-      } catch (err: any) {
-        console.error('Error setting principal:', err);
+      } catch {
+        // Error handled by toast below
         toast.error('Error al marcar como principal');
       }
     },

@@ -184,8 +184,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         await fetchCredits();
       }
       toast.success('Copies generados');
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // Error handled by toast
       toast.error('Error al generar copies');
     } finally {
       setIsGenerating(false);
@@ -213,8 +213,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         if (matchedAsset) setSelectedFotoUrl(matchedAsset.url);
         else if (assets.length > 0) setSelectedFotoUrl(assets[0].url);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // Error handled by toast
       toast.error('Error generando el brief visual');
     } finally {
       setGeneratingBrief(false);
@@ -261,8 +261,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         await fetchCredits();
         toast.success('Imagen generada');
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // Error handled by toast
       toast.error('Error generando imagen');
     } finally {
       setGeneratingImage(false);
@@ -290,8 +290,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         await fetchCredits();
         startVideoPolling(data.prediction_id);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // Error handled by toast
       toast.error('Error iniciando generación de video');
       setGeneratingVideo(false);
     }

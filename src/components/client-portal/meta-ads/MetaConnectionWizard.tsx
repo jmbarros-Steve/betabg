@@ -116,7 +116,6 @@ export default function MetaConnectionWizard({
         setStep(2);
       }
     } catch (err: any) {
-      console.error('[MetaConnectionWizard] Hierarchy error:', err);
       setError(err?.message || 'Error cargando Business Managers');
     } finally {
       setLoading(false);
@@ -155,8 +154,7 @@ export default function MetaConnectionWizard({
 
       toast.success(`Conectado: ${selectedPortfolio.name}`);
       onComplete(selectedPortfolio);
-    } catch (err: any) {
-      console.error('[MetaConnectionWizard] Connect error:', err);
+    } catch {
       toast.error('Error al conectar activos');
     } finally {
       setConnecting(false);

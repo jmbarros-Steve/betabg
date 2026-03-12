@@ -139,8 +139,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
         created_at: item.created_at,
       }));
       setSavedCopies(mappedData);
-    } catch (error) {
-      console.error('Error fetching saved copies:', error);
+    } catch {
       toast.error('Error al cargar el historial');
     } finally {
       setLoadingHistory(false);
@@ -193,8 +192,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
 
       if (error) throw error;
       return data?.id || null;
-    } catch (error) {
-      console.error('Error saving copy:', error);
+    } catch {
       return null;
     }
   };
@@ -227,8 +225,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
       }
       
       toast.success('Copies de Google Ads generados');
-    } catch (error) {
-      console.error('Error generating copy:', error);
+    } catch {
       toast.error('Error al generar copies');
     } finally {
       setIsGenerating(false);
@@ -246,8 +243,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
       
       setSavedCopies(prev => prev.filter(c => c.id !== copyId));
       toast.success('Copy eliminado');
-    } catch (error) {
-      console.error('Error deleting copy:', error);
+    } catch {
       toast.error('Error al eliminar');
     }
   };

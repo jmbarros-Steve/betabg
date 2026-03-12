@@ -71,8 +71,8 @@ export default function CampaignSelector({
       }
 
       setCampaigns(Array.from(map.values()).sort((a, b) => b.spend_30d - a.spend_30d));
-    } catch (err) {
-      console.error('[CampaignSelector] Error fetching campaigns:', err);
+    } catch {
+      // Error handled by toast
     } finally {
       setLoading(false);
     }

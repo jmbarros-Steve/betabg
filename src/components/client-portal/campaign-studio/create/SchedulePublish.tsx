@@ -78,7 +78,7 @@ export function SchedulePublish({
         setSelectedList(fetchedLists[0].id);
       }
     } catch (err: any) {
-      console.error('Error loading Klaviyo lists:', err);
+      // Error handled by toast below
       toast.error('Error al cargar listas de Klaviyo');
     } finally {
       setLoadingLists(false);
@@ -185,7 +185,7 @@ export function SchedulePublish({
       toast.success(`Campaña creada ${strategyLabel} en Klaviyo`);
       onPublish(pushData);
     } catch (err: any) {
-      console.error('Push error:', err);
+      // Error handled by toast below
       toast.error(`Error: ${err.message || 'No se pudo crear la campaña en Klaviyo'}`);
     } finally {
       setPushing(false);

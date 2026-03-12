@@ -309,13 +309,11 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
   // ─── Main launch function (mutex-protected) ─────────────────────
   async function launchAnalysis(url: string, compUrls: string[]) {
     if (!url.trim()) {
-      console.warn('[launchAnalysis] No URL provided, aborting');
       return;
     }
 
     // MUTEX: prevent double execution from auto-trigger + manual click
     if (isLaunchingRef.current) {
-      console.warn('[launchAnalysis] Already launching — ignoring duplicate call');
       return;
     }
 
@@ -384,7 +382,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       });
       if (researchErr) {
         setDebug({ phase1: 'error', phase1Message: researchErr });
-        console.error('[launchAnalysis] Phase 1 error:', researchErr);
+        // Error handled by toast
       } else {
         research = researchData?.research;
         setDebug({ phase1: 'ok', phase1Status: 200 });
@@ -393,7 +391,7 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
     } catch (err: any) {
       const msg = err?.message || String(err);
       setDebug({ phase1: 'error', phase1Message: msg });
-      console.error('[launchAnalysis] Phase 1 failed:', err);
+      // Error handled by toast
     }
 
     // Phase 2: await to capture error for diagnóstico
@@ -406,18 +404,18 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         });
         if (strategyErr) {
           setDebug({ phase2: 'error', phase2Message: strategyErr });
-          console.error('[launchAnalysis] Phase 2 error:', strategyErr);
+          // Error handled by toast
         } else {
           setDebug({ phase2: 'ok', phase2Status: 200 });
         }
       } catch (err: any) {
         const msg = err?.message || String(err);
         setDebug({ phase2: 'error', phase2Message: msg });
-        console.error('[launchAnalysis] Phase 2 failed:', err);
+        // Error handled by toast
       }
     } else {
       setDebug({ phase2: 'skipped', phase2Message: 'Fase 1 falló' });
-      console.error('[launchAnalysis] Skipping Phase 2 — research failed');
+      // Skipping Phase 2 — research failed
     }
   }
 
@@ -541,8 +539,8 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
         await supabase.from('clients').update({ logo_url: newUrls[newUrls.length - 1] }).eq('id', clientId);
       }
       toast.success(`${files.length} archivo(s) subido(s)`);
-    } catch (error) {
-      console.error('Upload error:', error);
+    } catch {
+      // Error handled by toast
       toast.error('Error al subir archivo');
     } finally {
       setUploading(null);
@@ -556,8 +554,8 @@ export function BrandAssetUploader({ clientId, onResearchComplete }: BrandAssetU
       if (pathMatch) await supabase.storage.from('client-assets').remove([pathMatch[1]]);
       setAssets(prev => ({ ...prev, [category]: prev[category].filter(u => u !== url) }));
       toast.success('Archivo eliminado');
-    } catch (error) {
-      console.error('Delete error:', error);
+    } catch {
+      // Error handled silently
     }
   }
 

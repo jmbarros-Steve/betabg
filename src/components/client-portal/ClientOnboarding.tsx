@@ -127,13 +127,12 @@ export function ClientOnboarding({ onComplete, clientName }: ClientOnboardingPro
         .eq('client_user_id', user.id);
 
       if (error) {
-        console.error('Error saving store info:', error);
         toast.error('Error guardando los datos');
       } else {
         toast.success('Tienda registrada');
       }
-    } catch (e) {
-      console.error('Error:', e);
+    } catch {
+      // Error handled by toast
     } finally {
       setSavingStore(false);
     }

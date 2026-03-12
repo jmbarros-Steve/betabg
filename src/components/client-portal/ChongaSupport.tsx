@@ -105,7 +105,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error: unknown) {
-      console.error('Chonga error:', error);
+      // Error handled by toast/state below
       
       const errorObj = error as { status?: number };
       if (errorObj?.status === 429) {
