@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, CheckCircle, AlertTriangle, Image, Type, FileText, ChevronDown } from 'lucide-react';
@@ -10,6 +9,7 @@ import { AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianG
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
+import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 
 interface ShopifyDashboardProps {
   clientId: string;
@@ -54,6 +54,14 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [seoProducts, setSeoProducts] = useState<any[]>([]);
   const [dailyBreakdown, setDailyBreakdown] = useState<{ date: string; revenue: number; orders: number }[]>([]);
   const [daysBack, setDaysBack] = useState(30);
+
+  // Responsive: detect mobile for chart adjustments
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const resizeHandler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", resizeHandler);
+    return () => window.removeEventListener("resize", resizeHandler);
+  }, []);
 
   useEffect(() => {
     checkConnection();
@@ -113,7 +121,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       if (!date) return;
       if (!byDate[date]) byDate[date] = { count: 0, value: 0 };
       byDate[date].count += 1;
-      byDate[date].value += cart.totalPrice || 0;
+      byDate[date].value += cart.totalValue || 0;
     });
     return Object.entries(byDate)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -134,7 +142,16 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   if (loading) {
     return (
       <div className="space-y-6">
-        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <TableSkeleton rows={5} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TableSkeleton rows={5} />
+          <TableSkeleton rows={5} />
+        </div>
+        <TableSkeleton rows={4} />
       </div>
     );
   }
@@ -187,9 +204,8 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={dailyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 350}>
+                  <ComposedChart data={dailyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
                     <defs>
                       <linearGradient id="shopifyRevGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -197,9 +213,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(val) => val.slice(5)} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={formatCurrency} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <XAxis dataKey="date" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={(val: string) => val.slice(5)} interval={isMobile ? 'preserveStartEnd' : 0} angle={isMobile ? -45 : 0} textAnchor={isMobile ? 'end' : 'middle'} height={isMobile ? 60 : 30} />
+                    <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={formatCurrency} width={isMobile ? 45 : 60} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" width={isMobile ? 35 : 50} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                       formatter={(value: number, name: string) => [
@@ -211,9 +227,8 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                     <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#shopifyRevGrad)" name="revenue" />
                     <Bar yAxisId="right" dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.4} name="orders" />
                   </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex items-center justify-center gap-6 mt-4 text-xs">
+              </ResponsiveContainer>
+              <div className={`flex items-center justify-center gap-${isMobile ? '4' : '6'} mt-4 text-xs`}>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-primary" />
                   <span className="text-muted-foreground">Ingresos</span>
@@ -236,13 +251,12 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
             </CardHeader>
             <CardContent>
               {abandonedCartsByDay.length > 0 ? (
-                <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={abandonedCartsByDay} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ResponsiveContainer width="100%" height={isMobile ? 250 : 350}>
+                    <ComposedChart data={abandonedCartsByDay} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(val) => val.slice(5)} />
-                      <YAxis yAxisId="left" tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={formatCurrency} />
+                      <XAxis dataKey="date" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={(val: string) => val.slice(5)} interval={isMobile ? 'preserveStartEnd' : 0} angle={isMobile ? -45 : 0} textAnchor={isMobile ? 'end' : 'middle'} height={isMobile ? 60 : 30} />
+                      <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" width={isMobile ? 35 : 50} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={formatCurrency} width={isMobile ? 45 : 60} />
                       <Tooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                         formatter={(value: number, name: string) => [
@@ -254,8 +268,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                       <Bar yAxisId="left" dataKey="count" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} opacity={0.7} name="count" />
                       <Line yAxisId="right" type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} name="value" />
                     </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
+                </ResponsiveContainer>
               ) : (
                 <p className="text-muted-foreground text-sm text-center py-6">No hay carritos abandonados en este período</p>
               )}

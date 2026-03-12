@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Target, Users, Percent, BarChart3 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Target, Users, Percent, BarChart3, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProfitMetric {
@@ -8,6 +9,7 @@ interface ProfitMetric {
   previousValue?: string;
   changePercent?: number;
   description: string;
+  tooltip: string;
   icon: React.ElementType;
 }
 
@@ -72,6 +74,7 @@ export function ProfitMetricsPanel({
       previousValue: previousPoas ? `${previousPoas.toFixed(2)}x` : undefined,
       changePercent: poasChange,
       description: 'Profit on Ad Spend (Beneficio real por $ invertido)',
+      tooltip: 'Profit Over Ad Spend — ganancia neta por cada $1 en publicidad. Sobre 1x significa que estás ganando dinero',
       icon: DollarSign,
     },
     {
@@ -80,6 +83,7 @@ export function ProfitMetricsPanel({
       previousValue: previousCac ? `$${previousCac.toLocaleString('es-CL')}` : undefined,
       changePercent: cacChange ? -cacChange : undefined, // Invert because lower CAC is better
       description: 'Costo de Adquisición por Cliente',
+      tooltip: 'Costo de Adquisición de Cliente — cuánto cuesta conseguir un nuevo cliente. Mientras más bajo, mejor',
       icon: Users,
     },
     {
@@ -88,12 +92,14 @@ export function ProfitMetricsPanel({
       previousValue: previousMer ? `${previousMer.toFixed(2)}x` : undefined,
       changePercent: merChange,
       description: 'Ratio de Eficiencia de Marketing (Ingresos / Inversión Total)',
+      tooltip: 'Marketing Efficiency Ratio — ingresos totales dividido por gasto total en marketing. Sobre 3x es saludable',
       icon: BarChart3,
     },
     {
       label: 'Break-even ROAS',
       value: `${breakEvenRoas.toFixed(2)}x`,
       description: 'ROAS mínimo para no perder dinero',
+      tooltip: 'ROAS mínimo necesario para no perder dinero, considerando tus costos y márgenes',
       icon: Target,
     },
   ];
@@ -113,8 +119,18 @@ export function ProfitMetricsPanel({
           <Card key={metric.label} className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-slate-700">
+                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                   {metric.label}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p>{metric.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </CardTitle>
                 <metric.icon className="w-4 h-4 text-muted-foreground" />
               </div>

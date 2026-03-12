@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users } from 'lucide-react';
+import { EmptyState } from '@/components/client-portal/EmptyState';
 import { cn } from '@/lib/utils';
 
 interface CohortData {
@@ -37,6 +38,14 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {cohorts.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Sin datos de cohortes"
+            description="Se necesitan al menos 2 meses de datos para el análisis de cohortes"
+          />
+        ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -136,6 +145,8 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
         <p className="text-xs text-muted-foreground mt-4">
           M0 = clientes nuevos del mes | M1-M5 = % que volvieron a comprar en meses siguientes
         </p>
+        </>
+        )}
       </CardContent>
     </Card>
   );

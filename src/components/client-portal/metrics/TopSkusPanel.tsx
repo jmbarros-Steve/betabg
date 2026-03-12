@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package } from 'lucide-react';
+import { Package, ShoppingBag } from 'lucide-react';
+import { EmptyState } from '@/components/client-portal/EmptyState';
 
 export interface SkuData {
   sku: string;
@@ -27,9 +28,11 @@ export function TopSkusPanel({ skus, currency = 'CLP' }: TopSkusPanelProps) {
       </CardHeader>
       <CardContent>
         {skus.length === 0 ? (
-          <p className="text-muted-foreground text-sm text-center py-6">
-            No hay datos de SKU disponibles
-          </p>
+          <EmptyState
+            icon={ShoppingBag}
+            title="Sin datos de productos"
+            description="Conecta tu Shopify para ver tus productos más vendidos"
+          />
         ) : (
           <div className="space-y-4">
             {skus.slice(0, 10).map((sku, index) => (

@@ -22,13 +22,19 @@ import { CampaignStudio } from '@/components/client-portal/campaign-studio/Campa
 import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfigPanel';
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
+import { OnboardingWizard } from '@/components/client-portal/OnboardingWizard';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
 import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import MetaAdsManager from '@/components/client-portal/meta-ads/MetaAdsManager';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
+import { TabErrorBoundary } from '@/components/client-portal/TabErrorBoundary';
 import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
 import { EmailMarketing } from '@/components/client-portal/email/EmailMarketing';
+import { CommandPalette } from '@/components/client-portal/CommandPalette';
+import { BottomNav } from '@/components/client-portal/BottomNav';
+import { OfflineBanner } from '@/components/client-portal/OfflineBanner';
+import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
@@ -54,6 +60,8 @@ export default function ClientPortal() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
   const [defaultTabResolved, setDefaultTabResolved] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   // Track visited tabs so they stay mounted (preserves state like in-flight API calls)
   useEffect(() => {
@@ -211,19 +219,23 @@ export default function ClientPortal() {
     resolveDefaultTab();
   }, [defaultTabResolved, roleLoading, authLoading, isAdminView, urlClientId, clientData?.id]);
 
-  // Fetch client logo
+  // Fetch client logo and onboarding step
   useEffect(() => {
     const id = isAdminView ? urlClientId : clientData?.id;
     if (!id) return;
     supabase
       .from('clients')
-      .select('logo_url')
+      .select('logo_url, onboarding_step')
       .eq('id', id)
       .single()
-      .then(({ data }) => { if (data?.logo_url) setClientLogoUrl(data.logo_url); });
+      .then(({ data }) => {
+        if (data?.logo_url) setClientLogoUrl(data.logo_url);
+        setOnboardingStep((data as any)?.onboarding_step ?? null);
+        setOnboardingChecked(true);
+      });
   }, [clientData?.id, urlClientId, isAdminView]);
 
-  if (authLoading || roleLoading || loadingClient) {
+  if (authLoading || roleLoading || loadingClient || !onboardingChecked) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -233,6 +245,17 @@ export default function ClientPortal() {
 
   if (!user || (!displayClient && !isAdminView)) {
     return null;
+  }
+
+  // Show onboarding wizard for clients who haven't completed it
+  if (onboardingStep !== null && !isAdminView && effectiveClientId) {
+    return (
+      <OnboardingWizard
+        clientId={effectiveClientId}
+        initialStep={onboardingStep}
+        onComplete={() => setOnboardingStep(null)}
+      />
+    );
   }
 
   const primaryTabs = [
@@ -259,6 +282,7 @@ export default function ClientPortal() {
 
   return (
     <div className="min-h-screen bg-background">
+      <OfflineBanner />
       {/* Header */}
       <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
         <div className="container px-6 h-16 flex items-center justify-between">
@@ -301,9 +325,9 @@ export default function ClientPortal() {
         </div>
       </header>
 
-      <div className="container px-6 py-8">
-        {/* Tabs */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
+      <div className="container px-6 py-8 pb-20 md:pb-8">
+        {/* Tabs — hidden on mobile where BottomNav is used */}
+        <div className="hidden md:flex gap-2 mb-8 overflow-x-auto pb-2">
           {primaryTabs.map((tab) => (
             <button
               key={tab.id}
@@ -346,89 +370,122 @@ export default function ClientPortal() {
           </DropdownMenu>
         </div>
 
+        {/* Setup Progress Tracker */}
+        {effectiveClientId && (
+          <SetupProgressTracker clientId={effectiveClientId} onNavigate={(tab) => setActiveTab(tab as TabType)} />
+        )}
+
         {/* Content — tabs stay mounted once visited so in-flight requests complete */}
         <div>
           {visitedTabs.has('metrics') && effectiveClientId && (
             <div className={activeTab !== 'metrics' ? 'hidden' : ''}>
-              <ClientPortalMetrics clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Métricas">
+                <ClientPortalMetrics clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('campaigns') && effectiveClientId && (
             <div className={activeTab !== 'campaigns' ? 'hidden' : ''}>
-              <CampaignAnalyticsPanel clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Campañas">
+                <CampaignAnalyticsPanel clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('shopify') && effectiveClientId && (
             <div className={activeTab !== 'shopify' ? 'hidden' : ''}>
-              <ShopifyDashboard clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Shopify">
+                <ShopifyDashboard clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('connections') && effectiveClientId && (
             <div className={activeTab !== 'connections' ? 'hidden' : ''}>
-              <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
+              <TabErrorBoundary tabName="Conexiones">
+                <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('brief') && effectiveClientId && (
             <div className={activeTab !== 'brief' ? 'hidden' : ''}>
-              <BrandBriefView
-                clientId={effectiveClientId}
-                onEditBrief={() => setActiveTab('steve')}
-              />
+              <TabErrorBoundary tabName="Brief">
+                <BrandBriefView
+                  clientId={effectiveClientId}
+                  onEditBrief={() => setActiveTab('steve')}
+                />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('competitors') && effectiveClientId && (
             <div className={activeTab !== 'competitors' ? 'hidden' : ''}>
-              <CompetitorAdsPanel clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Competencia">
+                <CompetitorAdsPanel clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('deepdive') && effectiveClientId && (
             <div className={activeTab !== 'deepdive' ? 'hidden' : ''}>
-              <CompetitorDeepDivePanel clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Deep Dive">
+                <CompetitorDeepDivePanel clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('steve') && effectiveClientId && (
             <div className={activeTab !== 'steve' ? 'hidden' : ''}>
-              <div className="max-w-2xl mx-auto">
-                <SteveChat clientId={effectiveClientId} />
-              </div>
+              <TabErrorBoundary tabName="Steve">
+                <div className="max-w-2xl mx-auto">
+                  <SteveChat clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('estrategia') && effectiveClientId && (
             <div className={activeTab !== 'estrategia' ? 'hidden' : ''}>
-              <div className="max-w-2xl mx-auto">
-                <SteveEstrategia clientId={effectiveClientId} />
-              </div>
+              <TabErrorBoundary tabName="Estrategia">
+                <div className="max-w-2xl mx-auto">
+                  <SteveEstrategia clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('copies') && effectiveClientId && (
             <div className={activeTab !== 'copies' ? 'hidden' : ''}>
-              <MetaAdsManager clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Meta Ads">
+                <MetaAdsManager clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('google') && effectiveClientId && (
             <div className={activeTab !== 'google' ? 'hidden' : ''}>
-              <div className="max-w-4xl mx-auto">
-                <GoogleAdsGenerator clientId={effectiveClientId} />
-              </div>
+              <TabErrorBoundary tabName="Google Ads">
+                <div className="max-w-4xl mx-auto">
+                  <GoogleAdsGenerator clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('klaviyo') && effectiveClientId && (
             <div className={activeTab !== 'klaviyo' ? 'hidden' : ''}>
-              <div className="max-w-4xl mx-auto">
-                <CampaignStudio clientId={effectiveClientId} />
-              </div>
+              <TabErrorBoundary tabName="Klaviyo">
+                <div className="max-w-4xl mx-auto">
+                  <CampaignStudio clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('email') && effectiveClientId && (
             <div className={activeTab !== 'email' ? 'hidden' : ''}>
-              <div className="max-w-5xl mx-auto">
-                <EmailMarketing clientId={effectiveClientId} />
-              </div>
+              <TabErrorBoundary tabName="Steve Mail">
+                <div className="max-w-5xl mx-auto">
+                  <EmailMarketing clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('config') && effectiveClientId && (
             <div className={activeTab !== 'config' ? 'hidden' : ''}>
-              <FinancialConfigPanel clientId={effectiveClientId} />
+              <TabErrorBoundary tabName="Configuración">
+                <FinancialConfigPanel clientId={effectiveClientId} />
+              </TabErrorBoundary>
             </div>
           )}
         </div>
@@ -451,6 +508,23 @@ export default function ClientPortal() {
           clientName={displayClient?.name}
         />
       )}
+
+      {/* Cmd+K Command Palette */}
+      <CommandPalette onNavigate={(tab) => setActiveTab(tab as TabType)} />
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav
+        activeTab={activeTab}
+        onNavigate={(tab) => setActiveTab(tab as TabType)}
+        secondaryTabs={[
+          { id: 'brief', label: 'Brief', icon: <FileText className="w-5 h-5" /> },
+          ...secondaryTabs.map((t) => ({
+            id: t.id,
+            label: t.label,
+            icon: <t.icon className="w-5 h-5" />,
+          })),
+        ]}
+      />
     </div>
   );
 }

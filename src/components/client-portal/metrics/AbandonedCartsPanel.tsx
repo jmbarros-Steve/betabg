@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Check, X, Mail, Phone, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { EmptyState } from '@/components/client-portal/EmptyState';
 import { toast } from 'sonner';
 
 export interface CartLineItem {
@@ -149,9 +150,11 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
         </div>
 
         {filteredCarts.length === 0 ? (
-          <p className="text-muted-foreground text-sm text-center py-6">
-            No hay carritos abandonados en este filtro
-          </p>
+          <EmptyState
+            icon={ShoppingCart}
+            title="Sin carritos abandonados"
+            description="¡Buenas noticias! No hay carritos abandonados en este periodo"
+          />
         ) : (
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
             {filteredCarts.map((cart) => {

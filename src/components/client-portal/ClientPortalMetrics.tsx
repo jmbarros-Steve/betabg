@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
-import { TrendingUp, DollarSign, ShoppingCart, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Target, HelpCircle, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AnimatedNumber } from './metrics/AnimatedNumber';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MetricsCharts } from './metrics/MetricsCharts';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
@@ -11,7 +13,8 @@ import { ConversionLtvPanel } from './metrics/ConversionLtvPanel';
 import { ProfitMetricsPanel } from './metrics/ProfitMetricsPanel';
 import { ProfitLossPanel, ProductMarginItem } from './metrics/ProfitLossPanel';
 import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
-import { MetricsDateFilter, DateRange } from './metrics/MetricsDateFilter';
+import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
+import { KPIGridSkeleton, ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 
 interface ClientPortalMetricsProps {
   clientId: string;
@@ -52,7 +55,7 @@ const defaultFinancialConfig: FinancialConfig = {
   fixed_cost_items: [],
 };
 
-function getProrationFactor(dateRange: DateRange): number {
+function getProrationFactor(dateRange: DateRange, customRange?: CustomDateRange): number {
   const now = new Date();
   switch (dateRange) {
     case 'mtd': {
@@ -68,11 +71,19 @@ function getProrationFactor(dateRange: DateRange): number {
       const daysDiff = Math.ceil((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
       return daysDiff / 30;
     }
+    case 'custom': {
+      if (!customRange) return 1;
+      const days = Math.ceil((customRange.to.getTime() - customRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      return days / 30;
+    }
     default: return 1;
   }
 }
 
-function getDateRangeStart(range: DateRange): Date {
+function getDateRangeStart(range: DateRange, customRange?: CustomDateRange): Date {
+  if (range === 'custom' && customRange) {
+    return customRange.from;
+  }
   const now = new Date();
   switch (range) {
     case '7d':
@@ -90,9 +101,16 @@ function getDateRangeStart(range: DateRange): Date {
   }
 }
 
-function getPreviousPeriodDates(range: DateRange): { start: Date; end: Date } {
-  const now = new Date();
-  const currentStart = getDateRangeStart(range);
+function getDateRangeEnd(range: DateRange, customRange?: CustomDateRange): Date {
+  if (range === 'custom' && customRange) {
+    return customRange.to;
+  }
+  return new Date();
+}
+
+function getPreviousPeriodDates(range: DateRange, customRange?: CustomDateRange): { start: Date; end: Date } {
+  const now = range === 'custom' && customRange ? customRange.to : new Date();
+  const currentStart = getDateRangeStart(range, customRange);
   const daysDiff = Math.ceil((now.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24));
 
   const prevEnd = new Date(currentStart);
@@ -107,6 +125,7 @@ function getPreviousPeriodDates(range: DateRange): { start: Date; end: Date } {
 export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange | undefined>(undefined);
   const [rawMetrics, setRawMetrics] = useState<MetricRow[]>([]);
   const [previousMetrics, setPreviousMetrics] = useState<MetricRow[]>([]);
   const [financialConfig, setFinancialConfig] = useState<FinancialConfig>(defaultFinancialConfig);
@@ -148,8 +167,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         ).map(c => c.id);
         setConnectionIds(connIds);
 
-        const startDate = getDateRangeStart(dateRange);
-        const { start: prevStart, end: prevEnd } = getPreviousPeriodDates(dateRange);
+        const startDate = getDateRangeStart(dateRange, customDateRange);
+        const endDate = getDateRangeEnd(dateRange, customDateRange);
+        const { start: prevStart, end: prevEnd } = getPreviousPeriodDates(dateRange, customDateRange);
 
         // Fetch current and previous metrics in parallel
         // IMPORTANT: Only fetch revenue/orders from Shopify connections to avoid double attribution
@@ -159,14 +179,18 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         // Map connection_id → platform for ad spend breakdown
         const connPlatformMap = new Map(connections.map(c => [c.id, c.platform]));
 
+        const endDateStr = endDate.toISOString().split('T')[0];
         const [currentRes, prevRes, configRes, adSpendCurrentRes, adSpendPrevRes] = await Promise.all([
           // Only Shopify metrics for revenue/orders (no Meta purchase_value!)
-          supabase
-            .from('platform_metrics')
-            .select('metric_type, metric_value, metric_date')
-            .in('connection_id', shopifyQueryIds)
-            .gte('metric_date', startDate.toISOString().split('T')[0])
-            .order('metric_date', { ascending: true }),
+          (() => {
+            let q = supabase
+              .from('platform_metrics')
+              .select('metric_type, metric_value, metric_date')
+              .in('connection_id', shopifyQueryIds)
+              .gte('metric_date', startDate.toISOString().split('T')[0]);
+            if (dateRange === 'custom') q = q.lte('metric_date', endDateStr);
+            return q.order('metric_date', { ascending: true });
+          })(),
           supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date')
@@ -179,12 +203,16 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             .eq('client_id', clientId)
             .maybeSingle(),
           // Get ad spend from platform_metrics (where sync-meta-metrics writes)
-          supabase
-            .from('platform_metrics')
-            .select('metric_type, metric_value, metric_date, connection_id')
-            .in('connection_id', adQueryIds)
-            .eq('metric_type', 'ad_spend')
-            .gte('metric_date', startDate.toISOString().split('T')[0]),
+          (() => {
+            let q = supabase
+              .from('platform_metrics')
+              .select('metric_type, metric_value, metric_date, connection_id')
+              .in('connection_id', adQueryIds)
+              .eq('metric_type', 'ad_spend')
+              .gte('metric_date', startDate.toISOString().split('T')[0]);
+            if (dateRange === 'custom') q = q.lte('metric_date', endDateStr);
+            return q;
+          })(),
           supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date, connection_id')
@@ -311,7 +339,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             const now = new Date();
             const mtdDays = now.getDate() - 1; // March 9: 8 days back = March 1
             const ytdDays = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
-            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': mtdDays, 'ytd': ytdDays };
+            const customDays = customDateRange
+              ? Math.ceil((customDateRange.to.getTime() - customDateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1
+              : 30;
+            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': mtdDays, 'ytd': ytdDays, 'custom': customDays };
             const { data: analyticsData } = await callApi('fetch-shopify-analytics', {
               body: { connectionId: shopifyConnIds[0], daysBack: daysMap[dateRange] || 30 },
             });
@@ -368,10 +399,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     return () => {
       window.removeEventListener('bg:sync-complete', handler);
     };
-  }, [clientId, dateRange]);
+  }, [clientId, dateRange, customDateRange]);
 
-  // Compute aggregated metrics
-  const computeAggregates = (metrics: MetricRow[]) => {
+  // Compute aggregated metrics — memoized to avoid recreation on each render
+  const computeAggregates = useCallback((metrics: MetricRow[]) => {
     let totalRevenue = 0;
     let totalSpend = 0;
     let totalOrders = 0;
@@ -421,10 +452,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           : 0;
 
     return { totalRevenue, totalSpend, totalOrders, avgRoas, metaSpend, googleSpend };
-  };
+  }, []);
 
-  const current = useMemo(() => computeAggregates(rawMetrics), [rawMetrics]);
-  const previous = useMemo(() => computeAggregates(previousMetrics), [previousMetrics]);
+  const current = useMemo(() => computeAggregates(rawMetrics), [rawMetrics, computeAggregates]);
+  const previous = useMemo(() => computeAggregates(previousMetrics), [previousMetrics, computeAggregates]);
 
   // Chart data grouped by date - now includes ad spend
   // Falls back to Shopify daily breakdown if platform_metrics has no daily revenue data
@@ -481,7 +512,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const prevGrossProfit = prevNetRevenue * marginRate;
 
     // Include manual Google spend (prorated) in total ad spend for MER/POAS/CAC
-    const prorationFactor = getProrationFactor(dateRange);
+    const prorationFactor = getProrationFactor(dateRange, customDateRange);
     const manualGoogleSpend = Math.round(financialConfig.manual_google_spend * prorationFactor);
     const totalAdSpend = current.totalSpend + manualGoogleSpend;
     const prevTotalAdSpend = previous.totalSpend + manualGoogleSpend;
@@ -518,7 +549,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       costOfGoods,
       gatewayFees: current.totalRevenue * gatewayRate,
     };
-  }, [current, previous, financialConfig, dateRange]);
+  }, [current, previous, financialConfig, dateRange, customDateRange]);
 
   // P&L data
   const profitLossData = useMemo(() => {
@@ -526,7 +557,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const netRevenue = current.totalRevenue / (1 + taxRate);
 
     // Prorate monthly costs based on date range
-    const prorationFactor = getProrationFactor(dateRange);
+    const prorationFactor = getProrationFactor(dateRange, customDateRange);
 
     // Dynamic fixed costs — prorated
     const fixedCostItems = financialConfig.fixed_cost_items.map(item => ({
@@ -568,49 +599,72 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       netProfit,
       netProfitMargin: current.totalRevenue > 0 ? (netProfit / current.totalRevenue) * 100 : 0,
     };
-  }, [current, profitMetrics, financialConfig, dateRange]);
+  }, [current, profitMetrics, financialConfig, dateRange, customDateRange]);
+
+  // Memoized derived KPI values
+  const totalAdSpendWithGoogle = profitLossData.totalAdSpend;
+
+  const effectiveRoas = useMemo(() => totalAdSpendWithGoogle > 0
+    ? current.totalRevenue / totalAdSpendWithGoogle
+    : 0, [current.totalRevenue, totalAdSpendWithGoogle]);
+
+  const currencyFormatter = useCallback((n: number) => "$" + Math.round(n).toLocaleString("es-CL") + " CLP", []);
+  const roasFormatter = useCallback((n: number) => n.toFixed(2) + "x", []);
+
+  const statCards = useMemo(() => [
+    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600', tooltip: 'Ingresos totales de Shopify en el periodo seleccionado', formatter: currencyFormatter },
+    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el periodo', formatter: currencyFormatter },
+    { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600', tooltip: 'Número total de pedidos completados en Shopify', formatter: undefined },
+    { title: 'ROAS Promedio', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600', tooltip: 'Return On Ad Spend — ingresos generados por cada $1 invertido en publicidad. Sobre 3x es bueno, sobre 5x es excelente', formatter: roasFormatter },
+  ], [current, previous, totalAdSpendWithGoogle, effectiveRoas, currencyFormatter, roasFormatter]);
+
+  const hasData = useMemo(() => current.totalRevenue > 0 || totalAdSpendWithGoogle > 0 || current.totalOrders > 0, [current.totalRevenue, totalAdSpendWithGoogle, current.totalOrders]);
+
+  const exportToCSV = useCallback(() => {
+    const rows = [
+      ['Métrica', 'Valor', 'Periodo anterior', 'Cambio %'],
+      ['Ingresos Totales (CLP)', String(Math.round(current.totalRevenue)), String(Math.round(previous.totalRevenue)), previous.totalRevenue > 0 ? (((current.totalRevenue - previous.totalRevenue) / previous.totalRevenue) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Inversión Publicitaria (CLP)', String(Math.round(totalAdSpendWithGoogle)), String(Math.round(previous.totalSpend)), previous.totalSpend > 0 ? (((totalAdSpendWithGoogle - previous.totalSpend) / previous.totalSpend) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Pedidos', String(current.totalOrders), String(previous.totalOrders), previous.totalOrders > 0 ? (((current.totalOrders - previous.totalOrders) / previous.totalOrders) * 100).toFixed(1) + '%' : 'N/A'],
+      ['ROAS', effectiveRoas.toFixed(2), previous.avgRoas.toFixed(2), previous.avgRoas > 0 ? (((effectiveRoas - previous.avgRoas) / previous.avgRoas) * 100).toFixed(1) + '%' : 'N/A'],
+      ['POAS', profitMetrics.poas.toFixed(2), profitMetrics.previousPoas?.toFixed(2) ?? 'N/A', ''],
+      ['CAC (CLP)', String(Math.round(profitMetrics.cac)), profitMetrics.previousCac ? String(Math.round(profitMetrics.previousCac)) : 'N/A', ''],
+      ['MER', profitMetrics.mer.toFixed(2), profitMetrics.previousMer?.toFixed(2) ?? 'N/A', ''],
+      ['Ganancia Bruta (CLP)', String(Math.round(profitMetrics.grossProfit)), '', ''],
+      ['Ganancia Neta (CLP)', String(Math.round(profitLossData.netProfit)), '', ''],
+      ['Margen Neto', profitLossData.netProfitMargin.toFixed(1) + '%', '', ''],
+    ];
+    const csvContent = rows.map(r => r.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `metricas-steve-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [current, previous, totalAdSpendWithGoogle, effectiveRoas, profitMetrics, profitLossData]);
+
+  const getChangePercent = useCallback((curr: number, prev: number) => {
+    if (prev === 0) return undefined;
+    return ((curr - prev) / prev) * 100;
+  }, []);
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-32" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <KPIGridSkeleton />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-[350px]" />
-          <Skeleton className="h-[350px]" />
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <KPIGridSkeleton />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TableSkeleton rows={5} />
+          <TableSkeleton rows={5} />
         </div>
       </div>
     );
   }
-
-  const totalAdSpendWithGoogle = profitLossData.totalAdSpend;
-  // ROAS uses total ad spend (including manual Google) for consistency with KPI card
-  const effectiveRoas = totalAdSpendWithGoogle > 0
-    ? current.totalRevenue / totalAdSpendWithGoogle
-    : 0;
-  const statCards = [
-    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600' },
-    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600' },
-    { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600' },
-    { title: 'ROAS Promedio', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600' },
-  ];
-
-  const hasData = current.totalRevenue > 0 || totalAdSpendWithGoogle > 0 || current.totalOrders > 0;
-
-  const getChangePercent = (curr: number, prev: number) => {
-    if (prev === 0) return undefined;
-    return ((curr - prev) / prev) * 100;
-  };
 
   return (
     <div className="space-y-6">
@@ -620,7 +674,17 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           <h2 className="text-2xl font-semibold mb-1">Resumen de Rendimiento</h2>
           <p className="text-muted-foreground text-sm">Dashboard integrado de métricas</p>
         </div>
-        <MetricsDateFilter value={dateRange} onChange={setDateRange} />
+        <div className="flex items-center gap-2">
+          <MetricsDateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            customRange={customDateRange}
+            onCustomRangeChange={setCustomDateRange}
+          />
+          <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar métricas a CSV">
+            <Download className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards with comparison */}
@@ -633,21 +697,45 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           return (
             <Card key={stat.title} className="bg-white border border-slate-200 rounded-xl card-hover">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-700">
+                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                   {stat.title}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p>{stat.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </CardTitle>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                {stat.prevValue !== undefined && stat.prevValue > 0 && (
-                  <p className={`text-xs mt-1 ${change && change >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                    {change !== undefined && (
-                      <>
-                        {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}% vs período anterior
-                      </>
-                    )}
-                  </p>
+                <div className="text-2xl font-bold">
+                  <AnimatedNumber value={stat.currentNum} formatter={stat.formatter} />
+                </div>
+                {stat.prevValue !== undefined && stat.prevValue > 0 && change !== undefined && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        change > 0
+                          ? 'bg-green-100 text-green-700'
+                          : change < 0
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {change > 0 ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : change < 0 ? (
+                        <TrendingDown className="w-3 h-3" />
+                      ) : null}
+                      {Math.abs(change).toFixed(1)}%
+                    </span>
+                    <span className="text-xs text-muted-foreground">vs período anterior</span>
+                  </div>
                 )}
               </CardContent>
             </Card>

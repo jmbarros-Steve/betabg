@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Settings, Percent, DollarSign, CreditCard, Package, Save, RefreshCw, Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { KPICardSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 
 interface FinancialConfigPanelProps {
   clientId: string;
@@ -218,10 +218,15 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPICardSkeleton />
+          <KPICardSkeleton />
+          <KPICardSkeleton />
+          <KPICardSkeleton />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-[300px]" />
-          <Skeleton className="h-[300px]" />
+          <TableSkeleton rows={4} />
+          <TableSkeleton rows={4} />
         </div>
       </div>
     );
