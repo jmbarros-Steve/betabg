@@ -39,14 +39,13 @@ export default function Dashboard() {
     // SECURITY: Shopify users should NEVER access dashboard
     // Even if they somehow have admin role
     if (isShopifyUser) {
-      console.warn('SECURITY: Shopify user attempted to access admin dashboard, redirecting to portal');
+      // SECURITY: Shopify users must not access admin dashboard
       navigate('/portal');
       return;
     }
 
     // Only super admins or real admins can access dashboard
     if (!isSuperAdmin && !isAdmin) {
-      console.warn('SECURITY: Non-admin user attempted to access dashboard');
       navigate('/portal');
     }
   }, [user, authLoading, roleLoading, isSuperAdmin, isAdmin, isShopifyUser, navigate]);

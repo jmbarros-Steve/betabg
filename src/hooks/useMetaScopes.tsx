@@ -91,12 +91,10 @@ export function useMetaScopes(clientId: string) {
           body: { connection_id: conns[0].id },
         });
         if (result.error) {
-          console.warn('[useMetaScopes] Edge function error:', result.error);
           return; // scopeDataLoaded stays false → panel hidden
         }
         data = result.data;
-      } catch (invokeErr) {
-        console.warn('[useMetaScopes] Edge function unreachable:', invokeErr);
+      } catch {
         return; // scopeDataLoaded stays false → panel hidden
       }
 
@@ -117,7 +115,6 @@ export function useMetaScopes(clientId: string) {
 
       // Only trust the response if the edge function explicitly reported success
       if (data?.success !== true || !Array.isArray(data?.granted)) {
-        console.warn('[useMetaScopes] Unexpected response shape:', data);
         return; // scopeDataLoaded stays false → panel hidden
       }
 
@@ -126,7 +123,6 @@ export function useMetaScopes(clientId: string) {
       setGranted(data.granted);
       setDeclined(data.declined || []);
     } catch (err: any) {
-      console.warn('[useMetaScopes] Scope check failed:', err?.message);
       setError(err?.message || 'Error checking scopes');
       // scopeDataLoaded stays false → panel hidden
     } finally {

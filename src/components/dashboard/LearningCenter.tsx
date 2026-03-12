@@ -164,8 +164,8 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
       void callApi('process-queue-item', {
         body: { queueId: data.queueId },
-      }).catch((invokeErr) => {
-        console.error('process-queue-item invoke error:', invokeErr);
+      }).catch(() => {
+        // Fire-and-forget — errors silently ignored
       });
 
       setRules([]);
@@ -173,7 +173,6 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
       setPhaseMessage('✅ Fuente en procesamiento. Revisa el estado en la cola/historial.');
       toast.success('Fuente enviada a procesamiento en background');
     } catch (err) {
-      console.error('Learning error:', err);
       setPhase('error');
       setPhaseMessage(err instanceof Error ? err.message : 'Error desconocido');
       toast.error('Error al procesar la fuente');
@@ -286,8 +285,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
       setCurrentQueueId(null);
       setPhase('idle');
       onSaved();
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error('Error al guardar reglas');
     } finally {
       setSavingAll(false);

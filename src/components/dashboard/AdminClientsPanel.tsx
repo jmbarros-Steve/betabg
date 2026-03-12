@@ -122,9 +122,8 @@ function ClientDetail({ client, onClose, onRefresh }: {
 
       toast.success('Cliente actualizado');
       onRefresh();
-    } catch (err) {
+    } catch {
       toast.error('Error al guardar');
-      console.error(err);
     } finally {
       setSaving(false);
     }
@@ -391,8 +390,7 @@ export function AdminClientsPanel() {
       }));
 
       setClients(enriched);
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error('Error cargando clientes');
     } finally {
       setLoading(false);

@@ -46,7 +46,7 @@ export async function callApi<T = any>(
     const data = await response.json();
     return { data, error: null };
   } catch (err: any) {
-    console.error(`[callApi] Error for ${functionName}:`, err);
+    // Network or unexpected error — surface message to caller
     return { data: null, error: err.message };
   }
 }

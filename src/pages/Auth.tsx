@@ -63,7 +63,6 @@ export default function Auth() {
           refresh_token: refreshToken
         }).then(({ data, error }) => {
           if (error) {
-            console.error('[Auth] setSession error:', error);
             setOauthError(`Error setSession: ${error.message}`);
           } else if (data.user) {
             // If this is a password reset flow, show the reset form
@@ -85,7 +84,6 @@ export default function Auth() {
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
         if (error) {
-          console.error('[Auth] exchangeCodeForSession error:', error);
           setOauthError(`Error exchange: ${error.message}`);
         } else if (data.user) {
           // If this is a password reset flow, show the reset form

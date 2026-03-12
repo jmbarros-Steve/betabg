@@ -30,7 +30,6 @@ export default function OAuthShopifyCallback() {
       const isNewUser = searchParams.get('new_user') === 'true';
       const tempPass = searchParams.get('temp_pass');
 
-      console.log('OAuth callback params:', { success, error, store, email, isNewUser });
 
       if (error) {
         const errorMessages: Record<string, string> = {
@@ -62,17 +61,14 @@ export default function OAuthShopifyCallback() {
             });
 
             if (signInError) {
-              console.error('Auto-login failed:', signInError);
               setCredentials({ email, password: tempPass });
               setStatus('new_user');
               return;
             }
 
-            console.log('[OAuthCallback] Auto-login succeeded for user:', email);
             // Show onboarding tour for new users
             setStatus('tour');
           } catch (e: any) {
-            console.error('Auto-login error:', e);
             setCredentials({ email, password: tempPass });
             setStatus('new_user');
           }

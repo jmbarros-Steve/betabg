@@ -64,7 +64,7 @@ export default function OAuthMetaCallback() {
         toast.success('¡Meta conectado exitosamente!');
         setTimeout(() => navigate('/portal?tab=connections'), 1500);
       } catch (err) {
-        console.error('OAuth callback error:', err);
+        // Error handled by UI status
         setStatus('error');
         setErrorMessage(err instanceof Error ? err.message : 'Error al conectar con Meta');
       }

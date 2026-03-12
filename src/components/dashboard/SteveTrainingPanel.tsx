@@ -126,8 +126,7 @@ export function SteveTrainingPanel() {
         })));
       }
       if (recsRes.data) setPendingRecs(recsRes.data);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch {
       toast.error('Error cargando datos');
     } finally {
       setLoading(false);
@@ -163,8 +162,7 @@ export function SteveTrainingPanel() {
       setSelectedRec(null);
       setFeedbackForm({ rating: 'positive', notes: '', improved: '' });
       fetchData();
-    } catch (error) {
-      console.error('Error saving feedback:', error);
+    } catch {
       toast.error('Error guardando feedback');
     }
   }
@@ -208,8 +206,7 @@ export function SteveTrainingPanel() {
         tags: '',
       });
       fetchData();
-    } catch (error) {
-      console.error('Error saving example:', error);
+    } catch {
       toast.error('Error guardando ejemplo');
     }
   }

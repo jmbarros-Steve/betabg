@@ -180,7 +180,6 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
         .upload(filePath, blob, { contentType: item.mediaType });
 
       if (uploadErr) {
-        console.error('Upload error:', uploadErr);
         toast.error(`Error subiendo ${item.file.name}: ${uploadErr.message}`);
         return;
       }
@@ -220,11 +219,9 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
       });
 
       if (insertErr) {
-        console.error('Insert error:', insertErr);
         toast.error(`Error guardando referencia ${item.file.name}: ${insertErr.message}`);
       }
     } catch (err) {
-      console.error('Error saving reference:', err);
       toast.error(`Error inesperado guardando referencia: ${err instanceof Error ? err.message : 'desconocido'}`);
     }
   }
@@ -268,7 +265,6 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
         // Always save as visual reference
         await saveReference(item, analysis);
       } catch (err) {
-        console.error('Error analyzing:', item.file.name, err);
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: err instanceof Error ? err.message : 'Error' } : q));
       }
 
@@ -299,8 +295,7 @@ function AdImageAnalyzer({ onSaved }: { onSaved: () => void }) {
       ));
       toast.success(`${unsaved.length} análisis guardados en Knowledge Base`);
       onSaved();
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error('Error al guardar');
     } finally {
       setSaving(false);

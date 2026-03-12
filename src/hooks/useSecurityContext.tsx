@@ -55,8 +55,8 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
         setIsSuperAdmin(superAdminCheck.data ?? false);
         setShopDomain(shopDomainResult.data ?? null);
 
-      } catch (error) {
-        console.error('Error in security context:', error);
+      } catch {
+        // Error handled by toast
       } finally {
         setLoading(false);
       }

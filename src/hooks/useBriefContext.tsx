@@ -86,8 +86,8 @@ export function useBriefContext(clientId: string) {
       const unique = foundChips.filter((c, i, arr) => arr.findIndex(x => x.key === c.key) === i);
       setChips(unique);
       setActiveChips(defaults);
-    } catch (e) {
-      console.error('Error loading brief context:', e);
+    } catch {
+      // Error handled by toast
     } finally {
       setLoaded(true);
     }

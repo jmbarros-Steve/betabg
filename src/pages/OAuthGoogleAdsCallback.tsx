@@ -65,7 +65,7 @@ export default function OAuthGoogleAdsCallback() {
           navigate('/portal');
         }, 2000);
       } catch (err) {
-        console.error('OAuth callback error:', err);
+        // Error handled by UI status
         setStatus('error');
         setErrorMessage(err instanceof Error ? err.message : 'Error al conectar con Google Ads');
       }

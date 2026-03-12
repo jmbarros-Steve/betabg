@@ -131,8 +131,7 @@ export default function ClientPortal() {
 
         if (error) throw error;
         setAdminViewClient(data);
-      } catch (error) {
-        console.error('Error fetching client:', error);
+      } catch {
         navigate('/dashboard');
       } finally {
         setLoadingClient(false);
@@ -150,7 +149,7 @@ export default function ClientPortal() {
 
     // SECURITY: If user is a Shopify user trying to access admin URLs, redirect to portal
     if (isShopifyUser && urlClientId) {
-      console.warn('SECURITY: Shopify user attempted to access admin client view');
+      // SECURITY: Shopify users must not access admin client views
       navigate('/portal');
       return;
     }

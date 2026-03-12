@@ -59,7 +59,7 @@ export function useShopifyAuthFetch() {
       const data = await response.json();
       return { data, error: null };
     } catch (err: any) {
-      console.error(`[AuthFetch] Error calling ${functionName}:`, err);
+      // Error handled by caller via returned error string
       return { data: null, error: err.message };
     }
   }, []);

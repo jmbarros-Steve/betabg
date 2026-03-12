@@ -54,9 +54,6 @@ export function useUserRole(): UseUserRoleReturn {
         ]);
 
         // Silently handle RPC errors — functions may not exist for all users
-        if (adminErr || clientErr) {
-          console.warn('[useUserRole] Role check unavailable');
-        }
 
         setIsSuperAdmin(superAdminCheck ?? false);
         // Super admins should NOT be flagged as Shopify users even if linked to a shop
@@ -97,16 +94,14 @@ export function useUserRole(): UseUserRoleReturn {
             ? clients.find(c => c.shop_domain) || clients[0]
             : null;
 
-          if (clientError) {
-            console.error('Error fetching client data:', clientError);
-          }
+          // clientError silently ignored — clientData stays null
 
           setClientData(client);
         } else {
           setClientData(null);
         }
-      } catch (error) {
-        console.error('Error in fetchRole:', error);
+      } catch {
+        // Error in fetchRole — role remains null
       } finally {
         setLoading(false);
       }

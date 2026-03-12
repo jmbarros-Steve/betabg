@@ -44,7 +44,6 @@ export function useShopifyPreviewProducts(clientId?: string, count = 6) {
 
         if (!conn || cancelled) {
           if (!cancelled) {
-            console.log('[Preview] No Shopify connection, using fallback products');
             setProducts(FALLBACK_PRODUCTS.slice(0, count));
             setIsRealData(false);
           }
@@ -58,7 +57,6 @@ export function useShopifyPreviewProducts(clientId?: string, count = 6) {
 
         if (cancelled) return;
         if (error || !data?.products) {
-          console.log('[Preview] Edge function failed, using fallback products');
           setProducts(FALLBACK_PRODUCTS.slice(0, count));
           setIsRealData(false);
           setLoading(false);

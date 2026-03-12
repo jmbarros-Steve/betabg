@@ -188,8 +188,8 @@ export function LearningQueue() {
         // Fire-and-forget
         void callApi('process-queue-item', {
           body: { queueId: data.queueId },
-        }).catch((invokeErr) => {
-          console.error('process-queue-item invoke error:', invokeErr);
+        }).catch(() => {
+          // Fire-and-forget — errors silently ignored
         });
 
         // Polling cada 5s hasta completar/error — with max timeout (10 min)
@@ -220,7 +220,6 @@ export function LearningQueue() {
         }
       } catch (err) {
         // Mark as error but DON'T retry — advance to next item
-        console.error('Queue processing error:', err);
         await supabase
           .from('learning_queue')
           .update({
