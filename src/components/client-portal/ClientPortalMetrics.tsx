@@ -497,6 +497,28 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     return dbChartEntries;
   }, [rawMetrics, shopifyDailyData]);
 
+  // Previous period chart data (daily breakdown from previousMetrics)
+  const previousChartData = useMemo(() => {
+    const byDate: Record<string, { revenue: number; orders: number; spend: number }> = {};
+    previousMetrics.forEach((m) => {
+      if (!byDate[m.metric_date]) {
+        byDate[m.metric_date] = { revenue: 0, orders: 0, spend: 0 };
+      }
+      if (['revenue', 'gross_revenue', 'purchase_value'].includes(m.metric_type)) {
+        byDate[m.metric_date].revenue += m.metric_value;
+      }
+      if (['orders', 'orders_count', 'purchases'].includes(m.metric_type)) {
+        byDate[m.metric_date].orders += m.metric_value;
+      }
+      if (m.metric_type === 'ad_spend') {
+        byDate[m.metric_date].spend += m.metric_value;
+      }
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({ date, ...data }));
+  }, [previousMetrics]);
+
   // Calculate profit metrics
   // IMPORTANT: margin and COGS are based on NET revenue (excl. IVA)
   const profitMetrics = useMemo(() => {
@@ -671,7 +693,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold mb-1">Resumen de Rendimiento</h2>
+          <h2 className="text-xl font-bold tracking-tight mb-1">Resumen de Rendimiento</h2>
           <p className="text-muted-foreground text-sm">Dashboard integrado de métricas</p>
         </div>
         <div className="flex items-center gap-2">
@@ -697,7 +719,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           return (
             <Card key={stat.title} className="bg-white border border-slate-200 rounded-xl card-hover">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                   {stat.title}
                   <TooltipProvider>
                     <Tooltip>
@@ -713,7 +735,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-3xl font-bold tabular-nums tracking-tight">
                   <AnimatedNumber value={stat.currentNum} formatter={stat.formatter} />
                 </div>
                 {stat.prevValue !== undefined && stat.prevValue > 0 && change !== undefined && (
@@ -734,7 +756,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                       ) : null}
                       {Math.abs(change).toFixed(1)}%
                     </span>
-                    <span className="text-xs text-muted-foreground">vs período anterior</span>
+                    <span className="text-xs text-muted-foreground">vs periodo anterior</span>
                   </div>
                 )}
               </CardContent>
@@ -746,7 +768,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       {hasData ? (
         <>
           {/* Charts */}
-          <MetricsCharts revenueData={chartData} currency="CLP" />
+          <MetricsCharts revenueData={chartData} previousRevenueData={previousChartData.length > 0 ? previousChartData : undefined} currency="CLP" />
 
           {/* Profit Metrics (POAS, CAC, MER, Break-even) */}
           <ProfitMetricsPanel

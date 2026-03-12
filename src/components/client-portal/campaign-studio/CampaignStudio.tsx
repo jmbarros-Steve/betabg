@@ -10,6 +10,13 @@ import {
   PlusCircle, CalendarDays, BarChart3, Palette, Zap, MessageCircle,
   ArrowRight, LayoutTemplate, Upload,
 } from 'lucide-react';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { CAMPAIGN_TEMPLATES, CAMPAIGN_TYPE_LIST, type CampaignType } from './templates/TemplatePresets';
 import type { BrandIdentity } from './templates/BrandHtmlGenerator';
 import { CampaignCreationWizard } from './create/CampaignCreationWizard';
@@ -21,6 +28,7 @@ import { MetricsInsights } from './insights/MetricsInsights';
 import { SteveKlaviyoChat } from './chat/SteveKlaviyoChat';
 import { AutoActivation } from './activation/AutoActivation';
 import TemplatesPanel from './templates/TemplatesPanel';
+import { Coachmark } from '@/components/client-portal/Coachmark';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   TrendingUp,
@@ -119,6 +127,7 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
 
   return (
     <div className="space-y-6">
+      <Coachmark id="klaviyo_intro" message="Crea campañas de email, diseña plantillas y configura flujos automáticos para tu tienda. Empieza en Plantillas para diseñar tu primer email." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -196,6 +205,21 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
             Steve
           </TabsTrigger>
         </TabsList>
+
+        {/* Breadcrumb */}
+        <Breadcrumb className="mt-4 mb-2 px-1">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-medium">Klaviyo</BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>
+                {{ plantillas: 'Plantillas', campanas: 'Campañas', flujos: 'Flujos', calendario: 'Calendario', metricas: 'Métricas', steve: 'Steve' }[activeTab] ?? activeTab}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {/* TAB: Plantillas — Editor drag & drop, CRUD de templates */}
         <TabsContent value="plantillas" className="mt-6">

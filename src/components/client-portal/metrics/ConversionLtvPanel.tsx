@@ -62,7 +62,7 @@ export function ConversionLtvPanel({
         <Card key={metric.title} className="bg-white border border-slate-200 rounded-xl card-hover">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 {metric.title}
                 <TooltipProvider>
                   <Tooltip>
@@ -81,7 +81,7 @@ export function ConversionLtvPanel({
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{metric.value}</p>
+            <p className="text-lg font-semibold tabular-nums">{metric.value}</p>
             <p className="text-xs text-muted-foreground mt-1">{metric.description}</p>
           </CardContent>
         </Card>

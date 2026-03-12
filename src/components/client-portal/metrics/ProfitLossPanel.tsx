@@ -74,8 +74,8 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
   return (
     <Card className="bg-white border border-slate-200 rounded-xl card-hover">
       <CardHeader>
-        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <FileText className="w-4 h-4" />
+        <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
+          <FileText className="w-5 h-5" />
           Estado de Resultados
           <span className="ml-auto text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded">CLP</span>
         </CardTitle>
@@ -86,18 +86,18 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Ingresos Brutos</span>
-            <span className="font-semibold">
+            <span className="font-semibold tabular-nums">
               {formatCurrency(data.grossRevenue, currency)}
               <ChangeIndicator current={data.grossRevenue} previous={previousData?.grossRevenue} />
             </span>
           </div>
           <div className="flex justify-between items-center text-muted-foreground">
             <span className="text-sm pl-4">(-) IVA / Impuestos</span>
-            <span className="text-sm">{formatCurrency(data.grossRevenue - data.netRevenue, currency)}</span>
+            <span className="text-sm tabular-nums">{formatCurrency(data.grossRevenue - data.netRevenue, currency)}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Ingresos Netos</span>
-            <span className="font-semibold">{formatCurrency(data.netRevenue, currency)}</span>
+            <span className="font-semibold tabular-nums">{formatCurrency(data.netRevenue, currency)}</span>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         <div className="space-y-2">
           <div className="flex justify-between items-center text-muted-foreground">
             <span className="text-sm">(-) Costo de Productos</span>
-            <span className="text-sm text-destructive">-{formatCurrency(data.costOfGoods, currency)}</span>
+            <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.costOfGoods, currency)}</span>
           </div>
           
           <Collapsible open={showProductDetail} onOpenChange={setShowProductDetail}>
@@ -127,7 +127,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
                   )}
                 </button>
               </CollapsibleTrigger>
-              <span className="font-semibold text-primary">{formatCurrency(data.grossProfit, currency)}</span>
+              <span className="font-semibold tabular-nums text-primary">{formatCurrency(data.grossProfit, currency)}</span>
             </div>
 
             <CollapsibleContent>
@@ -182,28 +182,28 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
 
         {/* Marketing Expenses */}
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-slate-700">Inversión en Marketing</p>
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Inversión en Marketing</p>
           {data.metaSpend > 0 && (
             <div className="flex justify-between items-center text-muted-foreground">
               <span className="text-sm pl-4">Meta Ads</span>
-              <span className="text-sm text-destructive">-{formatCurrency(data.metaSpend, currency)}</span>
+              <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.metaSpend, currency)}</span>
             </div>
           )}
           {data.googleSpend > 0 && (
             <div className="flex justify-between items-center text-muted-foreground">
               <span className="text-sm pl-4">Google Ads</span>
-              <span className="text-sm text-destructive">-{formatCurrency(data.googleSpend, currency)}</span>
+              <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.googleSpend, currency)}</span>
             </div>
           )}
           {data.manualGoogleSpend > 0 && (
             <div className="flex justify-between items-center text-muted-foreground">
               <span className="text-sm pl-4">Google Ads (manual)</span>
-              <span className="text-sm text-destructive">-{formatCurrency(data.manualGoogleSpend, currency)}</span>
+              <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.manualGoogleSpend, currency)}</span>
             </div>
           )}
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Total Marketing</span>
-            <span className="font-medium text-destructive">-{formatCurrency(data.totalAdSpend, currency)}</span>
+            <span className="font-semibold tabular-nums text-destructive">-{formatCurrency(data.totalAdSpend, currency)}</span>
           </div>
         </div>
 
@@ -211,19 +211,19 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
 
         {/* Fixed Costs - Dynamic */}
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-slate-700">Costos Fijos (prorrateados)</p>
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Costos Fijos (prorrateados)</p>
           {data.fixedCostItems.map((item, idx) => (
             item.amount > 0 && (
               <div key={idx} className="flex justify-between items-center text-muted-foreground">
                 <span className="text-sm pl-4">{item.name || 'Sin nombre'}</span>
-                <span className="text-sm text-destructive">-{formatCurrency(item.amount, currency)}</span>
+                <span className="text-sm tabular-nums text-destructive">-{formatCurrency(item.amount, currency)}</span>
               </div>
             )
           ))}
           {data.totalFixedCosts > 0 && (
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Total Costos Fijos</span>
-              <span className="font-medium text-destructive">-{formatCurrency(data.totalFixedCosts, currency)}</span>
+              <span className="font-semibold tabular-nums text-destructive">-{formatCurrency(data.totalFixedCosts, currency)}</span>
             </div>
           )}
         </div>
@@ -233,17 +233,17 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         {/* Operational Costs */}
         {(data.shippingCosts > 0 || data.shopifyCommission > 0) && (
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-700">Costos Operacionales</p>
+            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Costos Operacionales</p>
             {data.shippingCosts > 0 && (
               <div className="flex justify-between items-center text-muted-foreground">
                 <span className="text-sm pl-4">Despachos</span>
-                <span className="text-sm text-destructive">-{formatCurrency(data.shippingCosts, currency)}</span>
+                <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.shippingCosts, currency)}</span>
               </div>
             )}
             {data.shopifyCommission > 0 && (
               <div className="flex justify-between items-center text-muted-foreground">
                 <span className="text-sm pl-4">Comisión Shopify</span>
-                <span className="text-sm text-destructive">-{formatCurrency(data.shopifyCommission, currency)}</span>
+                <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.shopifyCommission, currency)}</span>
               </div>
             )}
           </div>
@@ -254,7 +254,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
         {/* Payment Gateway */}
         <div className="flex justify-between items-center text-muted-foreground">
           <span className="text-sm">(-) Comisiones Pasarela</span>
-          <span className="text-sm text-destructive">-{formatCurrency(data.paymentGatewayFees, currency)}</span>
+          <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.paymentGatewayFees, currency)}</span>
         </div>
 
         <Separator className="border-2" />
@@ -270,14 +270,14 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
               )}
               Utilidad Neta
             </span>
-            <span className={cn('text-xl font-bold', isNetProfitPositive ? 'text-primary' : 'text-destructive')}>
+            <span className={cn('text-xl font-bold tabular-nums', isNetProfitPositive ? 'text-primary' : 'text-destructive')}>
               {isNetProfitPositive ? '' : '-'}
               {formatCurrency(Math.abs(data.netProfit), currency)}
             </span>
           </div>
           <div className="flex justify-between items-center text-muted-foreground">
             <span className="text-sm">Margen Neto</span>
-            <span className={cn('text-sm font-medium', isNetProfitPositive ? 'text-primary' : 'text-destructive')}>
+            <span className={cn('text-sm font-medium tabular-nums', isNetProfitPositive ? 'text-primary' : 'text-destructive')}>
               {data.netProfitMargin.toFixed(1)}%
             </span>
           </div>

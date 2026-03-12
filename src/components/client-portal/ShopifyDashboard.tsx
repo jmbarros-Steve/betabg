@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +11,7 @@ import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
 import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
+import { Coachmark } from '@/components/client-portal/Coachmark';
 
 interface ShopifyDashboardProps {
   clientId: string;
@@ -166,6 +168,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   return (
     <div className="space-y-6">
+      <Coachmark id="shopify_intro" message="Aquí ves ventas diarias, carritos abandonados, canales de venta y un análisis SEO rápido de tus productos." />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -348,32 +351,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
               No se encontraron UTMs en los pedidos. Asegúrate de usar parámetros utm_source, utm_medium y utm_campaign en tus links.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Fuente</th>
-                    <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Medio</th>
-                    <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Campaña</th>
-                    <th className="text-right py-2 pr-4 text-muted-foreground font-medium">Pedidos</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium">Ingresos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {utmPerformance.map((utm, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                      <td className="py-2 pr-4">
-                        <Badge variant="outline" className="text-xs">{utm.source || '—'}</Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">{utm.medium || '—'}</td>
-                      <td className="py-2 pr-4 font-medium truncate max-w-[200px]">{utm.campaign || '—'}</td>
-                      <td className="py-2 pr-4 text-right">{utm.orders}</td>
-                      <td className="py-2 text-right font-semibold">${utm.revenue.toLocaleString('es-CL')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <UtmTable utmPerformance={utmPerformance} />
           )}
         </CardContent>
       </Card>
@@ -383,6 +361,96 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
       {/* Productos de Shopify */}
       <ShopifyProductsPanel clientId={clientId} />
+    </div>
+  );
+}
+
+function UtmTable({ utmPerformance }: { utmPerformance: UtmData[] }) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const useVirtual = utmPerformance.length > 20;
+
+  const virtualizer = useVirtualizer({
+    count: utmPerformance.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 41, // approximate row height in px
+    overscan: 5,
+    enabled: useVirtual,
+  });
+
+  const headerRow = (
+    <tr className="border-b">
+      <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Fuente</th>
+      <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Medio</th>
+      <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Campaña</th>
+      <th className="text-right py-2 pr-4 text-muted-foreground font-medium">Pedidos</th>
+      <th className="text-right py-2 text-muted-foreground font-medium">Ingresos</th>
+    </tr>
+  );
+
+  const renderRow = (utm: UtmData, i: number) => (
+    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+      <td className="py-2 pr-4">
+        <Badge variant="outline" className="text-xs">{utm.source || '—'}</Badge>
+      </td>
+      <td className="py-2 pr-4 text-muted-foreground">{utm.medium || '—'}</td>
+      <td className="py-2 pr-4 font-medium truncate max-w-[200px]">{utm.campaign || '—'}</td>
+      <td className="py-2 pr-4 text-right">{utm.orders}</td>
+      <td className="py-2 text-right font-semibold">${utm.revenue.toLocaleString('es-CL')}</td>
+    </tr>
+  );
+
+  if (!useVirtual) {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {utmPerformance.map((utm, i) => renderRow(utm, i))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>{headerRow}</thead>
+      </table>
+      <div ref={parentRef} className="overflow-auto max-h-[400px]">
+        <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+          <table className="w-full text-sm">
+            <tbody>
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const utm = utmPerformance[virtualRow.index];
+                return (
+                  <tr
+                    key={virtualRow.key}
+                    className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                      display: 'table-row',
+                    }}
+                  >
+                    <td className="py-2 pr-4">
+                      <Badge variant="outline" className="text-xs">{utm.source || '—'}</Badge>
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">{utm.medium || '—'}</td>
+                    <td className="py-2 pr-4 font-medium truncate max-w-[200px]">{utm.campaign || '—'}</td>
+                    <td className="py-2 pr-4 text-right">{utm.orders}</td>
+                    <td className="py-2 text-right font-semibold">${utm.revenue.toLocaleString('es-CL')}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

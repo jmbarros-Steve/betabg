@@ -35,6 +35,7 @@ import { CommandPalette } from '@/components/client-portal/CommandPalette';
 import { BottomNav } from '@/components/client-portal/BottomNav';
 import { OfflineBanner } from '@/components/client-portal/OfflineBanner';
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
+import { ProductTour } from '@/components/client-portal/ProductTour';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
@@ -511,6 +512,11 @@ export default function ClientPortal() {
 
       {/* Cmd+K Command Palette */}
       <CommandPalette onNavigate={(tab) => setActiveTab(tab as TabType)} />
+
+      {/* Product Tour — only for non-onboarding users */}
+      {onboardingStep === null && user && (
+        <ProductTour userId={user.id} onNavigate={(tab) => setActiveTab(tab as TabType)} />
+      )}
 
       {/* Mobile Bottom Navigation */}
       <BottomNav

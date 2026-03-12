@@ -107,7 +107,7 @@ export function ProfitMetricsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
+        <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
           <Percent className="w-5 h-5" />
           Métricas de Rentabilidad
         </h3>
@@ -119,7 +119,7 @@ export function ProfitMetricsPanel({
           <Card key={metric.label} className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                   {metric.label}
                   <TooltipProvider>
                     <Tooltip>
@@ -136,7 +136,7 @@ export function ProfitMetricsPanel({
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{metric.value}</p>
+              <p className="text-lg font-semibold tabular-nums">{metric.value}</p>
               <div className="flex items-center justify-between mt-1">
                 <p className="text-xs text-muted-foreground line-clamp-1">{metric.description}</p>
               </div>
@@ -170,7 +170,7 @@ export function ProfitMetricsPanel({
               </div>
             </div>
             <div className="text-right">
-              <p className={cn('text-2xl font-bold', isRoasAboveBreakeven ? 'text-primary' : 'text-destructive')}>
+              <p className={cn('text-2xl font-bold tabular-nums', isRoasAboveBreakeven ? 'text-primary' : 'text-destructive')}>
                 {isRoasAboveBreakeven ? '+' : ''}
                 {((currentRoas - breakEvenRoas) / breakEvenRoas * 100).toFixed(0)}%
               </p>

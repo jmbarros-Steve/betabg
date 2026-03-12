@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShopifyCustomAppWizard } from './ShopifyCustomAppWizard';
+import { useRetrySync } from './useRetrySync';
 
 const GOOGLE_CLIENT_ID = '850416724643-52bpu0tvsd9juc2v5b636ajfk4sogt24.apps.googleusercontent.com';
 const META_APP_ID = '1994525824461583';
@@ -75,9 +76,13 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [klaviyoApiKey, setKlaviyoApiKey] = useState('');
   const [connectingKlaviyo, setConnectingKlaviyo] = useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null);
 
   // Use Shopify auth fetch for embedded mode with Session Tokens
   const { callEdgeFunction, isEmbedded } = useShopifyAuthFetch();
+
+  // Retry sync with exponential backoff (3 attempts: initial + 2 retries, 2s/4s delays)
+  const { execute: retrySync, retrying: isSyncRetrying } = useRetrySync({ maxRetries: 2, baseDelay: 2000 });
 
   useEffect(() => {
     fetchConnections();
@@ -152,36 +157,39 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       toast.info('Klaviyo no requiere sincronización de métricas');
       return;
     }
-    
+
+    let functionName = 'sync-shopify-metrics';
+    let bodyKey = 'connectionId';
+
+    if (connection.platform === 'meta') {
+      functionName = 'sync-meta-metrics';
+      bodyKey = 'connection_id';
+    } else if (connection.platform === 'google') {
+      functionName = 'sync-google-ads-metrics';
+      bodyKey = 'connection_id';
+    }
+
+    const platformLabel = platformConfig[connection.platform].name;
+    setSyncingConnectionId(connection.id);
+    toast.loading('Sincronizando...', { id: 'sync' });
+
     try {
-      toast.loading('Sincronizando...', { id: 'sync' });
-
-      let functionName = 'sync-shopify-metrics';
-      let bodyKey = 'connectionId';
-      
-      if (connection.platform === 'meta') {
-        functionName = 'sync-meta-metrics';
-        bodyKey = 'connection_id';
-      } else if (connection.platform === 'google') {
-        functionName = 'sync-google-ads-metrics';
-        bodyKey = 'connection_id';
-      }
-
-      // Use callEdgeFunction which includes Session Token when embedded
-      if (isEmbedded) {
-        console.log(`[Sync] Using Session Token auth for ${functionName}`);
-        const { data, error } = await callEdgeFunction(functionName, {
-          body: { [bodyKey]: connection.id },
-        });
-
-        if (error) throw new Error(error);
-      } else {
-        const { error } = await callApi(functionName, {
-          body: { [bodyKey]: connection.id },
-        });
-
-        if (error) throw new Error(error);
-      }
+      await retrySync(async () => {
+        // Use callEdgeFunction which includes Session Token when embedded
+        if (isEmbedded) {
+          console.log(`[Sync] Using Session Token auth for ${functionName}`);
+          const { data, error } = await callEdgeFunction(functionName, {
+            body: { [bodyKey]: connection.id },
+          });
+          if (error) throw new Error(error);
+          return data;
+        } else {
+          const { error } = await callApi(functionName, {
+            body: { [bodyKey]: connection.id },
+          });
+          if (error) throw new Error(error);
+        }
+      }, platformLabel);
 
       toast.success('Sincronización completada', { id: 'sync' });
       fetchConnections();
@@ -189,7 +197,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error: any) {
       console.error('Error syncing:', error);
-      toast.error(error.message || 'Error al sincronizar', { id: 'sync' });
+      toast.error(error.message || `Error al sincronizar ${platformLabel} después de reintentar`, { id: 'sync' });
+    } finally {
+      setSyncingConnectionId(null);
     }
   };
 
@@ -321,10 +331,14 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                           variant="outline"
                           size="sm"
                           onClick={() => handleSyncConnection(connection)}
-                          disabled={isMeta && !connection.account_id}
+                          disabled={(isMeta && !connection.account_id) || syncingConnectionId === connection.id}
                         >
-                          <RefreshCw className="w-4 h-4 mr-1" />
-                          Sincronizar
+                          <RefreshCw className={`w-4 h-4 mr-1 ${syncingConnectionId === connection.id ? 'animate-spin' : ''}`} />
+                          {syncingConnectionId === connection.id && isSyncRetrying
+                            ? 'Reintentando...'
+                            : syncingConnectionId === connection.id
+                              ? 'Sincronizando...'
+                              : 'Sincronizar'}
                         </Button>
                       )}
                       <Button

@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Line } from 'recharts';
+import { Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Line } from 'recharts';
 
 interface MetricsChartsProps {
   revenueData: { date: string; revenue: number; orders: number; spend?: number }[];
+  previousRevenueData?: { date: string; revenue: number; orders: number; spend?: number }[];
   currency?: string;
 }
 
-export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsProps) {
+export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CLP' }: MetricsChartsProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -35,6 +36,16 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
   };
 
   const hasSpendData = revenueData.some(d => (d.spend ?? 0) > 0);
+  const hasPreviousData = previousRevenueData && previousRevenueData.length > 0;
+
+  // Merge previous period revenue into current data by index (aligned by position, not date)
+  const mergedData = useMemo(() => {
+    if (!previousRevenueData || previousRevenueData.length === 0) return revenueData;
+    return revenueData.map((item, i) => ({
+      ...item,
+      prevRevenue: previousRevenueData[i]?.revenue ?? null,
+    }));
+  }, [revenueData, previousRevenueData]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -48,7 +59,7 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
         <CardContent>
           <ResponsiveContainer width="100%" height={chartHeight}>
             {hasSpendData ? (
-              <ComposedChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
+              <ComposedChart data={mergedData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -83,8 +94,8 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
                     borderRadius: '8px',
                   }}
                   formatter={(value: number, name: string) => [
-                    `$${value.toLocaleString('es-CL')} ${name === 'revenue' ? 'CLP' : 'USD'}`,
-                    name === 'revenue' ? 'Ingresos' : 'Inversión'
+                    `$${value.toLocaleString('es-CL')} ${name === 'spend' ? 'USD' : 'CLP'}`,
+                    name === 'prevRevenue' ? 'Periodo anterior' : name === 'revenue' ? 'Ingresos' : 'Inversión'
                   ]}
                   labelFormatter={(label) => `Fecha: ${label}`}
                 />
@@ -108,9 +119,22 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
                   dot={false}
                   name="spend"
                 />
+                {hasPreviousData && (
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="prevRevenue"
+                    stroke="#94a3b8"
+                    strokeDasharray="5 5"
+                    strokeWidth={1.5}
+                    dot={false}
+                    name="prevRevenue"
+                    connectNulls={false}
+                  />
+                )}
               </ComposedChart>
             ) : (
-              <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
+              <ComposedChart data={mergedData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
                 <defs>
                   <linearGradient id="colorRevenueSingle" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -131,7 +155,10 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px',
                   }}
-                  formatter={(value: number) => [`$${value.toLocaleString('es-CL')} ${currency}`, 'Ingresos']}
+                  formatter={(value: number, name: string) => [
+                    `$${value.toLocaleString('es-CL')} ${currency}`,
+                    name === 'prevRevenue' ? 'Periodo anterior' : 'Ingresos'
+                  ]}
                   labelFormatter={(label) => `Fecha: ${label}`}
                 />
                 <Area
@@ -142,19 +169,39 @@ export function MetricsCharts({ revenueData, currency = 'CLP' }: MetricsChartsPr
                   fillOpacity={1}
                   fill="url(#colorRevenueSingle)"
                 />
-              </AreaChart>
+                {hasPreviousData && (
+                  <Line
+                    type="monotone"
+                    dataKey="prevRevenue"
+                    stroke="#94a3b8"
+                    strokeDasharray="5 5"
+                    strokeWidth={1.5}
+                    dot={false}
+                    name="prevRevenue"
+                    connectNulls={false}
+                  />
+                )}
+              </ComposedChart>
             )}
           </ResponsiveContainer>
-          {hasSpendData && (
-            <div className={`flex items-center justify-center gap-${isMobile ? '4' : '6'} mt-4 text-xs`}>
+          {(hasSpendData || hasPreviousData) && (
+            <div className={`flex items-center justify-center gap-${isMobile ? '4' : '6'} mt-4 text-xs flex-wrap`}>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-primary" />
                 <span className="text-muted-foreground">Ingresos</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-destructive" style={{ borderStyle: 'dashed' }} />
-                <span className="text-muted-foreground">Inversión Publicitaria</span>
-              </div>
+              {hasSpendData && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-0.5 bg-destructive" style={{ borderStyle: 'dashed' }} />
+                  <span className="text-muted-foreground">Inversión Publicitaria</span>
+                </div>
+              )}
+              {hasPreviousData && (
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-0.5" style={{ borderTop: '2px dashed #94a3b8' }} />
+                  <span className="text-muted-foreground">Periodo anterior</span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

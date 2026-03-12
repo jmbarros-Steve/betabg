@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 // Select UI components no longer needed for portfolio picker (handled by MetaConnectionWizard)
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
@@ -38,6 +46,7 @@ import {
 } from 'lucide-react';
 
 // Existing components
+import { Coachmark } from '@/components/client-portal/Coachmark';
 import { MetaAdCreator } from '@/components/client-portal/MetaAdCreator';
 import { AdCreativesLibrary } from '@/components/client-portal/AdCreativesLibrary';
 import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
@@ -346,6 +355,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-6">
+      <Coachmark id="meta_ads_intro" message="Desde aquí puedes crear campañas, gestionar audiencias y ver métricas de Meta Ads. Empieza por el Dashboard para una vista general." />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Meta Ads Dashboard</h2>
@@ -1068,6 +1078,28 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* Breadcrumb */}
+          {selectedAssets.adAccountId && !portfolioSwitching && (
+            <Breadcrumb className="mb-4 px-1">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    className="cursor-pointer"
+                    onClick={() => handleNavClick('dashboard')}
+                  >
+                    Meta Ads
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>
+                    {NAV_ITEMS.find((item) => item.key === activeSection)?.label ?? 'Dashboard'}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
           )}
 
           {/* Sections */}
