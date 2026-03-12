@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Platform — Auditoría de Código</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --border: #475569;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --critical: #ef4444;
+    --high: #f97316;
+    --medium: #eab308;
+    --low: #3b82f6;
+    --good: #22c55e;
+    --accent: #8b5cf6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* Header */
+  .header { text-align: center; padding: 3rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+  .header h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #8b5cf6, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .date { color: var(--text2); margin-top: .5rem; font-size: .9rem; }
+  .header .subtitle { color: var(--text2); margin-top: .25rem; font-size: 1rem; }
+
+  /* Stats Grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 2rem 0; }
+  .stat-card { background: var(--surface); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border); text-align: center; }
+  .stat-card .number { font-size: 2rem; font-weight: 800; }
+  .stat-card .label { color: var(--text2); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+  .stat-card.critical .number { color: var(--critical); }
+  .stat-card.high .number { color: var(--high); }
+  .stat-card.medium .number { color: var(--medium); }
+  .stat-card.low .number { color: var(--low); }
+  .stat-card.good .number { color: var(--good); }
+
+  /* Score */
+  .score-section { text-align: center; margin: 2.5rem 0; }
+  .score-ring { width: 180px; height: 180px; margin: 0 auto; position: relative; }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring .score-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; font-weight: 800; }
+  .score-label { color: var(--text2); margin-top: .5rem; }
+
+  /* Sections */
+  .section { margin: 2.5rem 0; }
+  .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; cursor: pointer; user-select: none; }
+  .section-title .icon { font-size: 1.2rem; }
+  .section-title .count { background: var(--surface2); color: var(--text2); font-size: .75rem; padding: 2px 8px; border-radius: 999px; }
+
+  /* Issues */
+  .issue-list { display: flex; flex-direction: column; gap: .75rem; }
+  .issue { background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; transition: border-color .2s; }
+  .issue:hover { border-color: var(--accent); }
+  .issue-header { padding: 1rem 1.25rem; cursor: pointer; display: flex; align-items: center; gap: .75rem; }
+  .issue-header .severity { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+  .severity.critical { background: rgba(239,68,68,.15); color: var(--critical); border: 1px solid rgba(239,68,68,.3); }
+  .severity.high { background: rgba(249,115,22,.15); color: var(--high); border: 1px solid rgba(249,115,22,.3); }
+  .severity.medium { background: rgba(234,179,8,.15); color: var(--medium); border: 1px solid rgba(234,179,8,.3); }
+  .severity.low { background: rgba(59,130,246,.15); color: var(--low); border: 1px solid rgba(59,130,246,.3); }
+  .issue-header .title { flex: 1; font-weight: 600; font-size: .95rem; }
+  .issue-header .category { color: var(--text2); font-size: .75rem; background: var(--surface2); padding: 2px 8px; border-radius: 4px; }
+  .issue-header .toggle { color: var(--text2); transition: transform .2s; }
+  .issue.open .toggle { transform: rotate(180deg); }
+  .issue-body { padding: 0 1.25rem 1.25rem; display: none; }
+  .issue.open .issue-body { display: block; }
+  .issue-body .file { color: var(--accent); font-size: .85rem; font-family: monospace; margin-bottom: .5rem; word-break: break-all; }
+  .issue-body .desc { color: var(--text2); font-size: .9rem; margin-bottom: .75rem; }
+  .issue-body .fix { background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2); border-radius: 8px; padding: .75rem 1rem; font-size: .85rem; }
+  .issue-body .fix strong { color: var(--good); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .tab { padding: .5rem 1rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); cursor: pointer; font-size: .85rem; color: var(--text2); transition: all .2s; }
+  .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .tab:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Priority Table */
+  .priority-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  .priority-table th { text-align: left; padding: .75rem 1rem; background: var(--surface2); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text2); }
+  .priority-table td { padding: .75rem 1rem; border-bottom: 1px solid var(--border); font-size: .9rem; }
+  .priority-table tr:hover td { background: rgba(139,92,246,.05); }
+
+  /* Gauge bar */
+  .gauge { height: 8px; background: var(--surface2); border-radius: 99px; overflow: hidden; margin: .5rem 0; }
+  .gauge-fill { height: 100%; border-radius: 99px; transition: width .5s ease; }
+
+  /* Summary cards */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .summary-card { background: var(--surface); border-radius: 10px; padding: 1.25rem; border: 1px solid var(--border); }
+  .summary-card h3 { font-size: 1rem; margin-bottom: .75rem; }
+  .summary-card .metric { display: flex; justify-content: space-between; margin-bottom: .5rem; font-size: .85rem; }
+  .summary-card .metric .val { font-weight: 600; }
+
+  footer { text-align: center; padding: 2rem 0; color: var(--text2); font-size: .8rem; border-top: 1px solid var(--border); margin-top: 3rem; }
+
+  @media (max-width: 640px) {
+    .header h1 { font-size: 1.5rem; }
+    .container { padding: 1rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Steve Platform — Auditoría de Código</h1>
+  <div class="subtitle">Análisis completo de calidad, seguridad y rendimiento</div>
+  <div class="date">Generado el 12 de Marzo, 2026</div>
+</div>
+
+<!-- Score -->
+<div class="score-section">
+  <div class="score-ring">
+    <svg width="180" height="180" viewBox="0 0 180 180">
+      <circle cx="90" cy="90" r="80" fill="none" stroke="#334155" stroke-width="12"/>
+      <circle cx="90" cy="90" r="80" fill="none" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"
+        stroke-dasharray="502" stroke-dashoffset="191"/>
+      <defs><linearGradient id="grad"><stop offset="0%" stop-color="#f97316"/><stop offset="100%" stop-color="#eab308"/></linearGradient></defs>
+    </svg>
+    <div class="score-text" style="color:#f97316">62</div>
+  </div>
+  <div class="score-label">Puntaje General de Calidad (de 100)</div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card"><div class="number" style="color:#8b5cf6">120K</div><div class="label">Líneas de Código</div></div>
+  <div class="stat-card"><div class="number" style="color:#06b6d4">217</div><div class="label">Componentes React</div></div>
+  <div class="stat-card"><div class="number" style="color:#06b6d4">96</div><div class="label">Archivos Backend</div></div>
+  <div class="stat-card"><div class="number" style="color:#06b6d4">70</div><div class="label">Migraciones SQL</div></div>
+  <div class="stat-card critical"><div class="number">4</div><div class="label">Issues Críticos</div></div>
+  <div class="stat-card high"><div class="number">16</div><div class="label">Issues Altos</div></div>
+  <div class="stat-card medium"><div class="number">21</div><div class="label">Issues Medios</div></div>
+  <div class="stat-card low"><div class="number">10</div><div class="label">Issues Bajos</div></div>
+</div>
+
+<!-- Category Gauges -->
+<div class="summary-grid">
+  <div class="summary-card">
+    <h3>Seguridad</h3>
+    <div class="metric"><span>Score</span><span class="val" style="color:var(--critical)">45/100</span></div>
+    <div class="gauge"><div class="gauge-fill" style="width:45%;background:var(--critical)"></div></div>
+    <div class="metric"><span>CORS abierto, secreto hardcodeado, open redirect, sin rate limiting</span></div>
+  </div>
+  <div class="summary-card">
+    <h3>TypeScript / Tipado</h3>
+    <div class="metric"><span>Score</span><span class="val" style="color:var(--high)">50/100</span></div>
+    <div class="gauge"><div class="gauge-fill" style="width:50%;background:var(--high)"></div></div>
+    <div class="metric"><span>1,257 usos de "any", strict desactivado en frontend</span></div>
+  </div>
+  <div class="summary-card">
+    <h3>Rendimiento</h3>
+    <div class="metric"><span>Score</span><span class="val" style="color:var(--medium)">65/100</span></div>
+    <div class="gauge"><div class="gauge-fill" style="width:65%;background:var(--medium)"></div></div>
+    <div class="metric"><span>Re-renders innecesarios, N+1 queries, sin lazy loading</span></div>
+  </div>
+  <div class="summary-card">
+    <h3>Mantenibilidad</h3>
+    <div class="metric"><span>Score</span><span class="val" style="color:var(--high)">55/100</span></div>
+    <div class="gauge"><div class="gauge-fill" style="width:55%;background:var(--high)"></div></div>
+    <div class="metric"><span>Archivo de 5,382 líneas, código duplicado, 206 console.logs</span></div>
+  </div>
+  <div class="summary-card">
+    <h3>Manejo de Errores</h3>
+    <div class="metric"><span>Score</span><span class="val" style="color:var(--medium)">60/100</span></div>
+    <div class="gauge"><div class="gauge-fill" style="width:60%;background:var(--medium)"></div></div>
+    <div class="metric"><span>Promesas sin catch, catches silenciosos, sin error boundaries</span></div>
+  </div>
+  <div class="summary-card">
+    <h3>Arquitectura</h3>
+    <div class="metric"><span>Score</span><span class="val" style="color:var(--good)">75/100</span></div>
+    <div class="gauge"><div class="gauge-fill" style="width:75%;background:var(--good)"></div></div>
+    <div class="metric"><span>Buena organización de carpetas, separación front/back clara</span></div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('security')">Seguridad</div>
+  <div class="tab" onclick="switchTab('typescript')">TypeScript</div>
+  <div class="tab" onclick="switchTab('react')">React</div>
+  <div class="tab" onclick="switchTab('backend')">Backend</div>
+  <div class="tab" onclick="switchTab('performance')">Rendimiento</div>
+  <div class="tab" onclick="switchTab('maintenance')">Mantenibilidad</div>
+</div>
+
+<!-- SECURITY TAB -->
+<div id="tab-security" class="tab-content active">
+<div class="section">
+  <div class="section-title">Problemas de Seguridad <span class="count">13</span></div>
+  <div class="issue-list">
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity critical">CRÍTICO</span>
+        <span class="title">Secreto de admin hardcodeado en código fuente</span>
+        <span class="category">Secrets</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/auth/admin-create-client.ts:18</div>
+        <div class="desc">El endpoint valida contra un secreto hardcodeado <code>'setup-jardin-eva-2026'</code>. Este secreto es visible en el código fuente y quedará en el historial de git.</div>
+        <div class="fix"><strong>Fix:</strong> Usar variable de entorno <code>ADMIN_SETUP_SECRET</code>. Considerar protección adicional como IP whitelist.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity critical">CRÍTICO</span>
+        <span class="title">CORS permite todos los orígenes (origin: '*')</span>
+        <span class="category">CORS</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/middleware/cors.ts:3-4</div>
+        <div class="desc">CORS configurado con <code>origin: '*'</code>. Esto habilita ataques CSRF y fuga de credenciales si se usan cookies o headers de autenticación.</div>
+        <div class="fix"><strong>Fix:</strong> Restringir a dominios específicos: <code>origin: ['https://tudominio.com', 'https://app.tudominio.com']</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity critical">CRÍTICO</span>
+        <span class="title">Archivo .env rastreado en historial de git</span>
+        <span class="category">Secrets</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">.env (raíz del proyecto)</div>
+        <div class="desc">El archivo <code>.env</code> aparece como modificado en git status, lo que indica que fue commiteado previamente. Contiene claves de Supabase y URLs de API.</div>
+        <div class="fix"><strong>Fix:</strong> Revisar historial git con <code>git log --all -- .env</code>. Usar BFG Repo Cleaner para eliminar del historial. Rotar claves expuestas.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity critical">CRÍTICO</span>
+        <span class="title">Sin rate limiting en endpoints públicos</span>
+        <span class="category">DoS/Brute Force</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/auth/self-signup.ts, track-events.ts, email-unsubscribe</div>
+        <div class="desc">Endpoints públicos como signup, tracking de emails y unsubscribe no tienen rate limiting. Permite ataques de fuerza bruta, enumeración de emails y DoS.</div>
+        <div class="fix"><strong>Fix:</strong> Implementar middleware de rate limiting con sliding window. Usar Redis o in-memory store con límites por IP.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">Open Redirect en tracking de clicks de email</span>
+        <span class="category">Redirect</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/email/track-events.ts:63-108</div>
+        <div class="desc">El endpoint de track click usa <code>decodeURIComponent(targetUrl)</code> y redirige sin validación. Un atacante puede crear links que redirijan a dominios maliciosos.</div>
+        <div class="fix"><strong>Fix:</strong> Validar que la URL destino pertenece a dominios permitidos usando <code>new URL(decodedUrl).hostname</code> contra whitelist.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">JWT de Shopify sin verificación de firma</span>
+        <span class="category">Auth</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/shopify/sync-shopify-metrics.ts:54-60</div>
+        <div class="desc">Los session tokens de Shopify se decodifican con <code>JSON.parse(atob(...))</code> sin verificar la firma JWT. Un atacante podría forjar tokens válidos.</div>
+        <div class="fix"><strong>Fix:</strong> Usar <code>jsonwebtoken.verify()</code> con la clave pública de Shopify para verificar la firma.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">dangerouslySetInnerHTML sin sanitización</span>
+        <span class="category">XSS</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">src/components/client-portal/email/ (7 ocurrencias en EmailTemplateBuilder, EmailBlockEditor, TemplatesPanel)</div>
+        <div class="desc">Se renderiza HTML de bloques de email usando <code>dangerouslySetInnerHTML</code> sin sanitizar el contenido. Si el HTML viene de fuentes no confiables, hay riesgo de XSS.</div>
+        <div class="fix"><strong>Fix:</strong> Usar DOMPurify para sanitizar todo HTML antes de renderizarlo: <code>dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(html)}}</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">OAuth state sin validación de timestamp</span>
+        <span class="category">CSRF</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts:62-80</div>
+        <div class="desc">El nonce del estado OAuth se valida contra la DB pero sin verificación de timestamp. Permite ataques de replay con nonces antiguos.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar validación de expiración: rechazar nonces con más de 10 minutos de antigüedad.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">Procesador HTML custom sin librería de sanitización</span>
+        <span class="category">XSS</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/lib/email-html-processor.ts</div>
+        <div class="desc">Implementación custom de parsing HTML con regex y operaciones de string (287+ operaciones). El parsing con regex es propenso a errores y puede no cubrir todos los vectores de ataque.</div>
+        <div class="fix"><strong>Fix:</strong> Reemplazar con librería probada como <code>sanitize-html</code> o <code>DOMPurify</code>.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">SSRF potencial en scraping de competidores</span>
+        <span class="category">SSRF</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/ai/analyze-brand-research.ts:236-242</div>
+        <div class="desc">URLs de competidores no se validan antes del scraping. Un atacante podría inyectar URLs internas (127.0.0.1, 10.*, 172.16.*) para atacar servicios internos.</div>
+        <div class="fix"><strong>Fix:</strong> Validar que los hostnames sean DNS públicos, rechazar IPs privadas y localhost.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Errores internos expuestos al cliente</span>
+        <span class="category">Info Disclosure</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/oauth/meta-oauth-callback.ts:171</div>
+        <div class="desc">Las respuestas de error incluyen <code>details: errorMessage</code> que puede filtrar stack traces e información interna al cliente.</div>
+        <div class="fix"><strong>Fix:</strong> Solo retornar detalles en modo development: <code>details: process.env.NODE_ENV === 'development' ? msg : undefined</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">localStorage usado para datos sensibles sin encriptación</span>
+        <span class="category">Storage</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Múltiples componentes frontend (35 instancias)</div>
+        <div class="desc">Datos de usuario almacenados en localStorage/sessionStorage sin cifrado. Si hay XSS, toda la información es accesible.</div>
+        <div class="fix"><strong>Fix:</strong> Revisar qué datos se almacenan. Usar cookies HTTP-only para tokens. Considerar cifrado para datos sensibles.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Variables de entorno no validadas al inicio</span>
+        <span class="category">Config</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/index.ts, middleware/auth.ts</div>
+        <div class="desc">Se usa <code>process.env.KEY!</code> con non-null assertion sin validar al arrancar el server. Si falta una variable, falla en runtime.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar función de validación al inicio que verifique todas las env vars requeridas.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- TYPESCRIPT TAB -->
+<div id="tab-typescript" class="tab-content">
+<div class="section">
+  <div class="section-title">Problemas de TypeScript <span class="count">6</span></div>
+  <div class="issue-list">
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">1,257 usos de "any" en el codebase</span>
+        <span class="category">Type Safety</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Frontend: 137 "as any" en 31 archivos. Backend: extenso uso en routes.</div>
+        <div class="desc">El tipo <code>any</code> anula completamente el type-checking de TypeScript. Los archivos más afectados son BrandBriefView.tsx (68 ocurrencias), BlockConfigPanel.tsx (20), y múltiples archivos del backend.</div>
+        <div class="fix"><strong>Fix:</strong> Reemplazar <code>any</code> con tipos específicos o <code>unknown</code> con type guards. Crear interfaces para todas las respuestas de API.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">TypeScript strict desactivado en frontend</span>
+        <span class="category">Config</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">tsconfig.app.json</div>
+        <div class="desc">Frontend tiene <code>strict: false</code>, <code>noImplicitAny: false</code>, <code>strictNullChecks: false</code>. El backend sí tiene <code>strict: true</code>. Inconsistencia que permite bugs silenciosos en frontend.</div>
+        <div class="fix"><strong>Fix:</strong> Habilitar gradualmente: primero <code>noImplicitAny</code>, luego <code>strictNullChecks</code>, finalmente <code>strict: true</code>.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Record&lt;string, any&gt; en 17 ubicaciones</span>
+        <span class="category">Type Safety</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">CampaignCreateWizard.tsx, BrandBriefView.tsx, EmailTemplateGallery.tsx, BlockConfigPanel.tsx</div>
+        <div class="desc">Uso de <code>Record&lt;string, any&gt;</code> es un tipo demasiado permisivo que no ofrece autocompletado ni validación.</div>
+        <div class="fix"><strong>Fix:</strong> Definir interfaces específicas para cada caso de uso.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Parámetros de función sin tipo (50+ ocurrencias)</span>
+        <span class="category">Type Safety</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">BrandAssetUploader.tsx:177, ClientPortalConnections.tsx:40, EmailBlockEditor.tsx:87, y más</div>
+        <div class="desc">Funciones con parámetros tipados como <code>(p: any)</code> o sin tipo explícito. Elimina las ventajas de TypeScript.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar tipos explícitos a todos los parámetros de función.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">useState sin tipo genérico (any[])</span>
+        <span class="category">Type Safety</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">29 ocurrencias: BrandBriefView, ShopifyDashboard, EmailTemplateBuilder, MetaAdCreator, MassCampaignsWizard</div>
+        <div class="desc">Hooks <code>useState&lt;any[]&gt;([])</code> pierden toda la información de tipo del estado.</div>
+        <div class="fix"><strong>Fix:</strong> Crear interfaces para el estado: <code>useState&lt;Template[]&gt;([])</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Magic strings sin enums ni constantes</span>
+        <span class="category">Type Safety</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Backend: manage-meta-campaign.ts, flow-engine.ts, y otros</div>
+        <div class="desc">Strings como <code>'create'</code>, <code>'pause'</code>, <code>'draft'</code>, <code>'subscribed'</code> usados directamente sin constantes. Propenso a typos.</div>
+        <div class="fix"><strong>Fix:</strong> Definir enums: <code>enum CampaignStatus { DRAFT = 'draft', ACTIVE = 'active' }</code></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- REACT TAB -->
+<div id="tab-react" class="tab-content">
+<div class="section">
+  <div class="section-title">Anti-patrones React <span class="count">7</span></div>
+  <div class="issue-list">
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">73+ inline function props causando re-renders</span>
+        <span class="category">Performance</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">MetaAdCreator.tsx, CampaignCreateWizard.tsx, GoogleAdsGenerator.tsx, FinancialConfigPanel.tsx, MetaAudienceManager.tsx</div>
+        <div class="desc">Funciones inline en props <code>onClick={() =&gt; {...}}</code> crean nuevas referencias en cada render, causando re-renders innecesarios en componentes hijos.</div>
+        <div class="fix"><strong>Fix:</strong> Usar <code>useCallback</code> para handlers que se pasan como props a componentes hijos.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">Dependencias faltantes en useEffect (115+ archivos)</span>
+        <span class="category">Hooks</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">BrandAssetUploader.tsx:281, MetaAdCreator.tsx, OnboardingWizard.tsx:81-94, ClientPortalConnections.tsx:87</div>
+        <div class="desc">Múltiples <code>useEffect</code> con arrays de dependencias incompletos. Puede causar bugs sutiles donde los efectos no se re-ejecutan cuando deberían.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar todas las dependencias necesarias al array. Usar el plugin de ESLint <code>react-hooks/exhaustive-deps</code>.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">Doble fuente de verdad para estado (ref + state)</span>
+        <span class="category">State Management</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">BrandAssetUploader.tsx:129-131</div>
+        <div class="desc">Usa <code>analyzingRef</code> y <code>analyzing</code> state simultáneamente para el mismo dato. Crea inconsistencias cuando uno se actualiza sin el otro.</div>
+        <div class="fix"><strong>Fix:</strong> Elegir una sola fuente de verdad. Usar ref si no necesita trigger de re-render, state si sí.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Exceso de useState en componentes (10+ states)</span>
+        <span class="category">State Management</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">ClientPortalMetrics.tsx, BrandBriefView.tsx, MetaAdCreator.tsx</div>
+        <div class="desc">Componentes con 10+ llamadas a <code>useState</code>. Dificulta el mantenimiento y puede causar renders en cascada.</div>
+        <div class="fix"><strong>Fix:</strong> Agrupar estados relacionados con <code>useReducer</code> o un objeto de estado.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Props drilling a través de 4+ niveles</span>
+        <span class="category">Architecture</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">CopyGenerator.tsx (clientId), CampaignStudio.tsx (estado)</div>
+        <div class="desc"><code>clientId</code> y otras props pasan por múltiples niveles de componentes sin necesidad.</div>
+        <div class="fix"><strong>Fix:</strong> Usar React Context para datos que necesitan muchos componentes, o composición de componentes.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Sin Error Boundaries en árboles complejos</span>
+        <span class="category">Error Handling</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">ClientPortalMetrics.tsx, CampaignStudio.tsx, y otros</div>
+        <div class="desc">Solo BrandBriefView.tsx tiene ErrorBoundary. Si un componente hijo falla en render, toda la app se cae.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar Error Boundaries en los límites de cada feature principal del portal.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity low">BAJO</span>
+        <span class="title">Componentes de función creados dentro del render</span>
+        <span class="category">Performance</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">CopyGenerator.tsx:37-82 (renderBriefField)</div>
+        <div class="desc"><code>renderBriefField</code> es un componente funcional creado dentro del render. Se recrea en cada render perdiendo estado interno.</div>
+        <div class="fix"><strong>Fix:</strong> Extraer como componente separado fuera de la función padre.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- BACKEND TAB -->
+<div id="tab-backend" class="tab-content">
+<div class="section">
+  <div class="section-title">Problemas de Backend <span class="count">8</span></div>
+  <div class="issue-list">
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">Un endpoint maneja 6+ acciones diferentes</span>
+        <span class="category">API Design</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/auth/admin-create-client.ts:10-261</div>
+        <div class="desc">POST <code>/api/admin-create-client</code> maneja setup_patricio, cleanup_patricio, fix_patricio, diagnostic, set_shop_domain, reset_password — todo en un solo endpoint de 261 líneas.</div>
+        <div class="fix"><strong>Fix:</strong> Separar en endpoints individuales: <code>POST /api/admin/setup</code>, <code>POST /api/admin/cleanup</code>, etc.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">Sin validación de esquema en request bodies</span>
+        <span class="category">Validation</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Todas las rutas del backend</div>
+        <div class="desc">No hay validación de esquema en los bodies de las peticiones. Los campos requeridos no se verifican antes de usar, lo que puede causar errores en runtime.</div>
+        <div class="fix"><strong>Fix:</strong> Implementar validación con <code>zod</code>: <code>const schema = z.object({ email: z.string().email() }); schema.parse(body);</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Formato de respuesta de error inconsistente</span>
+        <span class="category">API Design</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Todo el backend</div>
+        <div class="desc">Algunas rutas retornan <code>{ error: string }</code>, otras <code>{ error: { message } }</code>, y algunas incluyen <code>details</code>. Dificulta el manejo de errores en el frontend.</div>
+        <div class="fix"><strong>Fix:</strong> Estandarizar: <code>{ success: boolean, data?: T, error?: { code: string, message: string } }</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Lógica de HMAC duplicada en 3 archivos</span>
+        <span class="category">Duplicación</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">middleware/shopify-hmac.ts, routes/email/flow-webhooks.ts, routes/shopify/shopify-oauth-callback.ts</div>
+        <div class="desc">La verificación de HMAC de Shopify está implementada en 3 lugares diferentes con lógica similar.</div>
+        <div class="fix"><strong>Fix:</strong> Extraer a una función utilitaria compartida: <code>verifyShopifyHmac(rawBody, hmacHeader, secret)</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">HTTP status codes genéricos (mayormente 500)</span>
+        <span class="category">API Design</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Todo el backend</div>
+        <div class="desc">La mayoría de errores retornan 500. Faltan códigos apropiados: 409 (conflicto), 422 (validación), 429 (rate limit), 404 (no encontrado).</div>
+        <div class="fix"><strong>Fix:</strong> Usar status codes HTTP estándar consistentemente según el tipo de error.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Sin versionamiento de API</span>
+        <span class="category">API Design</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/</div>
+        <div class="desc">Los endpoints no tienen prefijo de versión (ej: <code>/v1/</code>). Cambios breaking en el futuro serán difíciles de manejar.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar versionamiento: <code>/api/v1/...</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">391 console.log en producción (backend)</span>
+        <span class="category">Logging</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Múltiples archivos del backend</div>
+        <div class="desc">Console.log/warn/error usados para logging en producción. No son estructurados, no tienen niveles, y dificultan el monitoreo.</div>
+        <div class="fix"><strong>Fix:</strong> Reemplazar con librería de logging estructurado (pino, winston) integrada con Google Cloud Logging.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity low">BAJO</span>
+        <span class="title">Promesas fire-and-forget sin catch</span>
+        <span class="category">Error Handling</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/email/track-events.ts:17-43</div>
+        <div class="desc">Operaciones async fire-and-forget dentro de IIFE sin manejo de errores. Si la promesa rechaza, el error se pierde silenciosamente.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar <code>.catch(err => console.error(...))</code> a todas las promesas fire-and-forget.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- PERFORMANCE TAB -->
+<div id="tab-performance" class="tab-content">
+<div class="section">
+  <div class="section-title">Problemas de Rendimiento <span class="count">7</span></div>
+  <div class="issue-list">
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">N+1 queries en procesamiento de bounces</span>
+        <span class="category">Database</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/email/track-events.ts:143-170</div>
+        <div class="desc">Para cada email rebotado, se ejecuta una query individual para buscar el suscriptor. Con 100+ bounces en un webhook, esto genera N+1 queries.</div>
+        <div class="fix"><strong>Fix:</strong> Batch query: <code>select('id').in('email', recipientEmails)</code> y luego procesar en loop.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">PDF imports sin lazy loading</span>
+        <span class="category">Bundle Size</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">src/components/client-portal/BrandBriefView.tsx:15-21</div>
+        <div class="desc">Librerías de PDF (jsPDF, registerPdfFont) importadas globalmente. Aumentan el bundle size para todos los usuarios aunque no generen PDFs.</div>
+        <div class="fix"><strong>Fix:</strong> Usar <code>React.lazy()</code> o <code>import()</code> dinámico para cargar las librerías de PDF solo cuando se necesiten.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Cálculos de bloques normalizados en cada render</span>
+        <span class="category">Memoization</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">src/components/client-portal/email/EmailBlockEditor.tsx:87-93</div>
+        <div class="desc">La normalización de bloques se calcula en cada render sin <code>useMemo</code>. Con muchos bloques, esto es costoso.</div>
+        <div class="fix"><strong>Fix:</strong> Envolver en <code>useMemo(() => normalizeBlocks(blocks), [blocks])</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Scraping de competidores bloquea el endpoint</span>
+        <span class="category">Async</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/ai/analyze-brand-research.ts:233-260</div>
+        <div class="desc">El scraping de 6+ competidores espera a que todos terminen antes de responder. Con 10+ segundos por scrape, el endpoint puede hacer timeout.</div>
+        <div class="fix"><strong>Fix:</strong> Usar Cloud Tasks para procesamiento async. Retornar un job ID y que el cliente haga polling.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Inserciones de eventos email una por una</span>
+        <span class="category">Database</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/email/track-events.ts:143-226</div>
+        <div class="desc">Cuando un webhook SES trae 100+ bounces, se insertan registros uno por uno en loop.</div>
+        <div class="fix"><strong>Fix:</strong> Usar batch insert: <code>supabase.from('email_events').insert([...records])</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Cache in-memory no compartido entre instancias</span>
+        <span class="category">Cache</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/email/product-recommendations.ts:84-99</div>
+        <div class="desc">Catálogo de productos cacheado en memoria. En deploy multi-instancia de Cloud Run, cada instancia tiene su propio cache.</div>
+        <div class="fix"><strong>Fix:</strong> Usar Supabase o Redis para cache compartido con TTL.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity low">BAJO</span>
+        <span class="title">Cache de exchange rates sin invalidación</span>
+        <span class="category">Cache</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">cloud-run-api/src/routes/shopify/sync-shopify-metrics.ts:26-40</div>
+        <div class="desc">Variable global <code>cachedRates</code> no tiene TTL. Puede servir tasas de cambio desactualizadas indefinidamente.</div>
+        <div class="fix"><strong>Fix:</strong> Agregar TTL: <code>if (Date.now() - cachedRates.fetchedAt > 3600000) refresh()</code></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- MAINTENANCE TAB -->
+<div id="tab-maintenance" class="tab-content">
+<div class="section">
+  <div class="section-title">Mantenibilidad y Código Muerto <span class="count">9</span></div>
+  <div class="issue-list">
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">BrandBriefView.tsx tiene 5,382 líneas</span>
+        <span class="category">File Size</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">src/components/client-portal/BrandBriefView.tsx (288 KB)</div>
+        <div class="desc">Archivo masivo con lógica de brief, generación de PDF, fetching de datos y múltiples secciones de UI. Es imposible de mantener, testear o code-review efectivamente.</div>
+        <div class="fix"><strong>Fix:</strong> Dividir en 5-8 componentes: BrandBriefHeader, BrandBriefSections, BrandBriefPDF, BrandBriefMetrics, etc.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity high">ALTO</span>
+        <span class="title">8 archivos con más de 1,000 líneas</span>
+        <span class="category">File Size</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">CampaignCreateWizard (2,184), MetaCampaignManager (1,993), KlaviyoPlanner (1,853), MetaAudienceManager (1,811), BulkUploadWizard (1,588), MetaAutomatedRules (1,462), EmailTemplateGallery (1,381)</div>
+        <div class="desc">Archivos demasiado grandes que mezclan múltiples responsabilidades. Dificultan la navegación, el mantenimiento y el testing.</div>
+        <div class="fix"><strong>Fix:</strong> Aplicar el principio de responsabilidad única. Extraer lógica a hooks custom y subcomponentes.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">206 console.log en 64 archivos del frontend</span>
+        <span class="category">Dead Code</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">BrandBriefView.tsx (17), BrandAssetUploader.tsx (9), KlaviyoPlanner.tsx (9), GoogleAdsGenerator.tsx (4), y 60 archivos más</div>
+        <div class="desc">Console.logs de debug dejados en producción. Ensucian la consola del browser y pueden exponer info interna.</div>
+        <div class="fix"><strong>Fix:</strong> Eliminar todos los console.log de debug. Agregar regla de ESLint <code>no-console</code>.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Código duplicado: formatters de moneda en 3+ archivos</span>
+        <span class="category">Duplicación</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">ClientPortalMetrics.tsx, FinancialConfigPanel.tsx, ShopifyDashboard.tsx</div>
+        <div class="desc">Funciones de formato de moneda recreadas en múltiples componentes con lógica similar.</div>
+        <div class="fix"><strong>Fix:</strong> Crear un utility <code>src/lib/formatters.ts</code> con funciones compartidas.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Definiciones de ángulos/estrategias duplicadas</span>
+        <span class="category">Duplicación</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">MetaAdCreator.tsx y CopyGenerator.tsx</div>
+        <div class="desc"><code>ANGLES_BY_PHASE</code>, <code>ALL_ANGLES</code>, <code>ANGLE_EXPLANATIONS</code> definidos en dos archivos diferentes.</div>
+        <div class="fix"><strong>Fix:</strong> Extraer a un archivo de constantes compartido: <code>src/lib/marketing-angles.ts</code></div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">ESLint deshabilitado para unused vars</span>
+        <span class="category">Config</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">eslint.config.js</div>
+        <div class="desc">La regla <code>@typescript-eslint/no-unused-vars</code> está desactivada. Permite acumulación de código muerto.</div>
+        <div class="fix"><strong>Fix:</strong> Habilitar la regla y corregir las violaciones existentes.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity medium">MEDIO</span>
+        <span class="title">Lock files duplicados (bun.lockb + package-lock.json)</span>
+        <span class="category">Dependencies</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">bun.lockb (240 KB) + package-lock.json (360 KB)</div>
+        <div class="desc">Dos package managers (bun y npm) con lock files diferentes. Causa ambigüedad sobre cuál es la fuente de verdad.</div>
+        <div class="fix"><strong>Fix:</strong> Estandarizar en un solo package manager y eliminar el lock file redundante.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity low">BAJO</span>
+        <span class="title">15 TODO/FIXME sin ticket asociado</span>
+        <span class="category">Technical Debt</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">Varios archivos frontend y backend</div>
+        <div class="desc">Comentarios TODO/FIXME dispersos sin tracking. Ejemplo: "TODO: implement your async job queue here" en shopify-fulfillment-webhooks.ts.</div>
+        <div class="fix"><strong>Fix:</strong> Crear tickets para cada TODO. Resolver o documentar por qué son aceptables.</div>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-header" onclick="toggleIssue(this)">
+        <span class="severity low">BAJO</span>
+        <span class="title">Archivos SQL y MD en dist/</span>
+        <span class="category">Build</span>
+        <span class="toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="file">dist/database-export.sql, dist/TECHNICAL_STACK.md, dist/steve-ads-schema.sql</div>
+        <div class="desc">Archivos no relacionados con el build están en la carpeta dist/. Inusual para una app React.</div>
+        <div class="fix"><strong>Fix:</strong> Mover a src/assets/ o docs/. Ajustar vite config para excluirlos del output.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- PRIORITY TABLE -->
+<div class="section" style="margin-top:3rem">
+  <div class="section-title">Plan de Acción Priorizado</div>
+  <table class="priority-table">
+    <thead>
+      <tr><th>Prioridad</th><th>Acción</th><th>Impacto</th><th>Esfuerzo</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="severity critical">INMEDIATO</span></td><td>Mover secreto hardcodeado a env var</td><td style="color:var(--critical)">Crítico</td><td>30 min</td></tr>
+      <tr><td><span class="severity critical">INMEDIATO</span></td><td>Restringir CORS a dominios específicos</td><td style="color:var(--critical)">Crítico</td><td>30 min</td></tr>
+      <tr><td><span class="severity critical">INMEDIATO</span></td><td>Verificar y limpiar .env del historial git</td><td style="color:var(--critical)">Crítico</td><td>1 hora</td></tr>
+      <tr><td><span class="severity critical">INMEDIATO</span></td><td>Agregar rate limiting a endpoints públicos</td><td style="color:var(--critical)">Crítico</td><td>2 horas</td></tr>
+      <tr><td><span class="severity high">ESTA SEMANA</span></td><td>Corregir open redirect en tracking de emails</td><td style="color:var(--high)">Alto</td><td>1 hora</td></tr>
+      <tr><td><span class="severity high">ESTA SEMANA</span></td><td>Verificar firma JWT de Shopify</td><td style="color:var(--high)">Alto</td><td>2 horas</td></tr>
+      <tr><td><span class="severity high">ESTA SEMANA</span></td><td>Agregar DOMPurify a renders de HTML</td><td style="color:var(--high)">Alto</td><td>2 horas</td></tr>
+      <tr><td><span class="severity high">ESTA SEMANA</span></td><td>Implementar validación con zod en backend</td><td style="color:var(--high)">Alto</td><td>1 día</td></tr>
+      <tr><td><span class="severity medium">2 SEMANAS</span></td><td>Dividir BrandBriefView.tsx (5,382 líneas)</td><td style="color:var(--medium)">Alto</td><td>1 día</td></tr>
+      <tr><td><span class="severity medium">2 SEMANAS</span></td><td>Habilitar TypeScript strict en frontend</td><td style="color:var(--medium)">Alto</td><td>2 días</td></tr>
+      <tr><td><span class="severity medium">2 SEMANAS</span></td><td>Reemplazar console.logs con logging estructurado</td><td style="color:var(--medium)">Medio</td><td>1 día</td></tr>
+      <tr><td><span class="severity medium">2 SEMANAS</span></td><td>Corregir N+1 queries y batch inserts</td><td style="color:var(--medium)">Medio</td><td>4 horas</td></tr>
+      <tr><td><span class="severity low">1 MES</span></td><td>Estandarizar formato de errores API</td><td style="color:var(--low)">Medio</td><td>1 día</td></tr>
+      <tr><td><span class="severity low">1 MES</span></td><td>Extraer código duplicado a utilities</td><td style="color:var(--low)">Bajo</td><td>4 horas</td></tr>
+      <tr><td><span class="severity low">1 MES</span></td><td>Agregar Error Boundaries por feature</td><td style="color:var(--low)">Bajo</td><td>2 horas</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div>
+
+<footer>
+  Steve Platform — Auditoría de Código generada por Claude Code &bull; 12 de Marzo, 2026
+</footer>
+
+<script>
+function toggleIssue(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Auto-open first issue in each section
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab-content.active .issue:first-child').forEach(i => i.classList.add('open'));
+});
+</script>
+</body>
+</html>
