@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 async function getShopifyCredentials(supabase: any, clientId: string) {
   const { data, error } = await supabase
     .from('platform_connections')
-    .select('connection_data')
+    .select('shop_domain, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
@@ -16,17 +16,17 @@ async function getShopifyCredentials(supabase: any, clientId: string) {
 
   if (error || !data) return null;
 
-  const connData = data.connection_data;
-  const shopDomain = connData.shop_domain || connData.shop;
+  const shopDomain = data.shop_domain;
+  let accessToken = '';
 
-  // Decrypt access token
-  let accessToken = connData.access_token;
-  if (connData.encrypted_access_token) {
-    const { data: decrypted } = await supabase.rpc('decrypt_token', {
-      encrypted_token: connData.encrypted_access_token,
+  if (data.access_token_encrypted) {
+    const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
+      encrypted_token: data.access_token_encrypted,
     });
     if (decrypted) accessToken = decrypted;
   }
+
+  if (!shopDomain || !accessToken) return null;
 
   return { shopDomain, accessToken };
 }

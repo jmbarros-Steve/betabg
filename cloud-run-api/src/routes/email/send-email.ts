@@ -232,7 +232,7 @@ export async function sendEmailHandler(c: Context) {
         to,
         subject,
         htmlContent: html_content,
-        fromEmail: from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'mail.steveads.com'}`,
+        fromEmail: from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`,
         fromName: from_name || 'Steve',
         subscriberId,
         clientId: client_id,

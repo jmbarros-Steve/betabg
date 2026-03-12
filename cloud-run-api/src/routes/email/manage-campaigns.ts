@@ -191,7 +191,7 @@ export async function manageEmailCampaigns(c: Context) {
         .eq('id', campaign_id);
 
       // Determine from email
-      const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'mail.steveads.com'}`;
+      const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;
       const fromName = campaign.from_name || 'Steve';
 
       // Replace product recommendations in HTML (pre-fetch catalog once)

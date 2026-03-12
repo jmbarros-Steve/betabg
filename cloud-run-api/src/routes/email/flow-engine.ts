@@ -204,7 +204,7 @@ export async function emailFlowExecute(c: Context) {
     .limit(1)
     .single();
 
-  const fromDomain = domain?.domain || process.env.DEFAULT_FROM_DOMAIN || 'mail.steveads.com';
+  const fromDomain = domain?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
   const fromEmail = currentStep.from_email || `noreply@${fromDomain}`;
   const fromName = currentStep.from_name || 'Steve';
 

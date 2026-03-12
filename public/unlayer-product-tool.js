@@ -8,6 +8,7 @@
  * Tools registered:
  *  - steve_products: Drag-and-drop product grid block
  *  - steve_discount: Discount/coupon code block
+ *  - steve_countdown: Countdown timer block
  */
 
 (function () {
@@ -136,6 +137,67 @@
     },
   });
 
+  // ===== Countdown Timer Tool =====
+  unlayer.registerTool({
+    name: 'steve_countdown',
+    label: 'Cuenta Regresiva',
+    icon: 'fa-clock-o',
+    supportedDisplayModes: ['email'],
+    values: {},
+    options: {
+      countdown: {
+        title: 'Cuenta Regresiva',
+        position: 1,
+        options: {
+          endDate: {
+            label: 'Fecha de término',
+            defaultValue: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+            widget: 'text',
+          },
+          labelText: {
+            label: 'Texto superior',
+            defaultValue: 'La oferta termina en',
+            widget: 'text',
+          },
+          expiredText: {
+            label: 'Texto expirado',
+            defaultValue: 'Esta oferta ha expirado',
+            widget: 'text',
+          },
+        },
+      },
+      style: {
+        title: 'Estilo',
+        position: 2,
+        options: {
+          bgColor: {
+            label: 'Color de fondo',
+            defaultValue: '#18181b',
+            widget: 'color_picker',
+          },
+          textColor: {
+            label: 'Color de texto',
+            defaultValue: '#ffffff',
+            widget: 'color_picker',
+          },
+        },
+      },
+    },
+    transformer: function (values, source) { return values; },
+    renderer: {
+      Viewer: unlayer.createViewer({
+        render: function (values) {
+          return generateCountdownHTML(values);
+        },
+      }),
+      exporters: {
+        email: function (values) {
+          return generateCountdownHTML(values);
+        },
+      },
+    },
+  });
+
   // ===== HTML Generators =====
 
   function generateProductGridHTML(values) {
@@ -192,6 +254,77 @@
         '<p style="margin:0 0 16px;font-size:28px;font-weight:700;color:' + textColor + ';letter-spacing:3px;">' + code + '</p>' +
         cta +
       '</div>' +
+    '</div>';
+  }
+  function generateCountdownHTML(values) {
+    var endDate = values.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+    var labelText = values.labelText || 'La oferta termina en';
+    var expiredText = values.expiredText || 'Esta oferta ha expirado';
+    var bgColor = values.bgColor || '#18181b';
+    var textColor = values.textColor || '#ffffff';
+
+    // Unique ID so multiple countdowns on the same page don't clash
+    var uid = 'cd_' + Math.random().toString(36).substr(2, 9);
+
+    var digitBoxStyle = 'display:inline-block;min-width:56px;padding:10px 8px;margin:0 4px;' +
+      'background:rgba(255,255,255,0.08);border-radius:8px;text-align:center;';
+    var digitStyle = 'display:block;font-size:28px;font-weight:700;line-height:1.2;color:' + textColor + ';';
+    var unitStyle = 'display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;' +
+      'color:' + textColor + ';opacity:0.6;margin-top:4px;';
+
+    return '<div data-steve-countdown="true" data-end-date="' + endDate + '" ' +
+      'style="text-align:center;padding:28px 16px;background:' + bgColor + ';border-radius:12px;">' +
+        '<p style="margin:0 0 16px;font-size:13px;font-weight:600;letter-spacing:1px;' +
+          'text-transform:uppercase;color:' + textColor + ';opacity:0.75;">' + labelText + '</p>' +
+        '<div id="' + uid + '" style="display:inline-block;">' +
+          '<span style="' + digitBoxStyle + '">' +
+            '<span class="cd-val" data-unit="days" style="' + digitStyle + '">00</span>' +
+            '<span style="' + unitStyle + '">Días</span>' +
+          '</span>' +
+          '<span style="' + digitBoxStyle + '">' +
+            '<span class="cd-val" data-unit="hours" style="' + digitStyle + '">00</span>' +
+            '<span style="' + unitStyle + '">Horas</span>' +
+          '</span>' +
+          '<span style="' + digitBoxStyle + '">' +
+            '<span class="cd-val" data-unit="minutes" style="' + digitStyle + '">00</span>' +
+            '<span style="' + unitStyle + '">Min</span>' +
+          '</span>' +
+          '<span style="' + digitBoxStyle + '">' +
+            '<span class="cd-val" data-unit="seconds" style="' + digitStyle + '">00</span>' +
+            '<span style="' + unitStyle + '">Seg</span>' +
+          '</span>' +
+        '</div>' +
+        '<p id="' + uid + '_expired" style="display:none;margin:8px 0 0;font-size:16px;font-weight:600;color:' + textColor + ';">' + expiredText + '</p>' +
+        '<script>' +
+          '(function(){' +
+            'var end=new Date("' + endDate + '").getTime();' +
+            'var wrap=document.getElementById("' + uid + '");' +
+            'var expEl=document.getElementById("' + uid + '_expired");' +
+            'if(!wrap)return;' +
+            'function pad(n){return n<10?"0"+n:String(n);}' +
+            'function tick(){' +
+              'var diff=end-Date.now();' +
+              'if(diff<=0){' +
+                'wrap.style.display="none";' +
+                'expEl.style.display="block";' +
+                'return;' +
+              '}' +
+              'var d=Math.floor(diff/86400000);' +
+              'var h=Math.floor((diff%86400000)/3600000);' +
+              'var m=Math.floor((diff%3600000)/60000);' +
+              'var s=Math.floor((diff%60000)/1000);' +
+              'var vals=wrap.querySelectorAll(".cd-val");' +
+              'for(var i=0;i<vals.length;i++){' +
+                'var u=vals[i].getAttribute("data-unit");' +
+                'if(u==="days")vals[i].textContent=pad(d);' +
+                'if(u==="hours")vals[i].textContent=pad(h);' +
+                'if(u==="minutes")vals[i].textContent=pad(m);' +
+                'if(u==="seconds")vals[i].textContent=pad(s);' +
+              '}' +
+            '}' +
+            'tick();setInterval(tick,1000);' +
+          '})();' +
+        '<\/script>' +
     '</div>';
   }
 })();

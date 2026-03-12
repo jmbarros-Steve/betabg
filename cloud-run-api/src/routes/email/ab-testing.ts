@@ -282,7 +282,7 @@ export async function executeAbTestWinner(c: Context) {
   );
 
   // Send winning variant to remaining subscribers in batches of 10
-  const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'mail.steveads.com'}`;
+  const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;
   const fromName = campaign.from_name || 'Steve';
   const batchSize = 10;
 

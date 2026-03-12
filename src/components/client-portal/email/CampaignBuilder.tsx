@@ -13,13 +13,14 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Play, Loader2, Eye, X, Save,
-  Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag,
+  Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck, Filter,
 } from 'lucide-react';
 import { getSteveMailEditorOptions, registerSteveMailTools } from './steveMailEditorConfig';
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
+import { ConditionalBlockPanel, type BlockCondition } from './ConditionalBlockPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -56,6 +57,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState(0);
 
   // Editor state
@@ -95,6 +97,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
   const [showImageEditor, setShowImageEditor] = useState(false);
+  const [showConditionalPanel, setShowConditionalPanel] = useState(false);
+  const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
 
   // Schedule
@@ -144,6 +148,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       setShowTemplateGallery(false);
       setShowUniversalBlocks(false);
       setShowImageEditor(false);
+      setShowConditionalPanel(false);
     }
   }, [showEditor]);
 
@@ -288,6 +293,31 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   };
 
+  const handleSendTest = async () => {
+    if (!editingCampaign?.html_content) { toast.error('Diseña el email primero'); return; }
+    setSendingTest(true);
+    try {
+      await handleSaveCampaign();
+      const { data, error } = await callApi<any>('send-email', {
+        body: {
+          action: 'send-test',
+          to: editingCampaign?.from_email || 'noreply@steve.cl',
+          subject: `[TEST] ${editingCampaign?.subject || 'Sin asunto'}`,
+          html_content: editingCampaign.html_content,
+          from_email: editingCampaign?.from_email || 'noreply@steve.cl',
+          from_name: editingCampaign?.from_name || 'Steve',
+          client_id: clientId,
+        },
+      });
+      if (error) { toast.error(error); return; }
+      toast.success('Email de prueba enviado a ' + (editingCampaign?.from_email || 'noreply@steve.cl'));
+    } catch {
+      toast.error('Error enviando test');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   const handleSchedule = async () => {
     if (!scheduleDate) { toast.error('Fecha es requerida'); return; }
     const { error } = await callApi('manage-email-campaigns', {
@@ -349,11 +379,42 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   };
 
+  const replaceMergeTagsForPreview = (html: string): string => {
+    const sampleData: Record<string, string> = {
+      '{{ first_name }}': 'María',
+      '{{ last_name }}': 'González',
+      '{{ full_name }}': 'María González',
+      '{{ email }}': 'maria@ejemplo.com',
+      '{{ brand_name }}': brandInfo.name || 'Tu Marca',
+      '{{ shop_url }}': brandInfo.shop_url || 'https://tutienda.com',
+      '{{ brand_color }}': brandInfo.brand_color || '#18181b',
+      '{{ total_orders }}': '5',
+      '{{ total_spent }}': '$125.990',
+      '{{ last_order_date }}': '10 Mar 2026',
+      '{{ days_since_last_order }}': '2',
+      '{{ cart_url }}': '#',
+      '{{ cart_total }}': '$49.990',
+      '{{ cart_items_count }}': '3',
+      '{{ discount_code }}': 'STEVE20',
+      '{{ product_name }}': 'Producto Ejemplo',
+      '{{ product_price }}': '$29.990',
+      '{{ product_url }}': '#',
+      '{{ unsubscribe_url }}': '#',
+      '{{ subscriber_tags }}': 'vip, frecuente',
+      '{{ subscribed_date }}': '1 Ene 2026',
+    };
+    let result = html;
+    for (const [tag, value] of Object.entries(sampleData)) {
+      result = result.replaceAll(tag, value);
+    }
+    return result;
+  };
+
   const goToReviewStep = async () => {
     const { html, design } = await exportEditorHtml();
     setEditingCampaign(prev => ({ ...prev, html_content: html }));
     setDesignJson(design);
-    setPreviewHtml(html);
+    setPreviewHtml(replaceMergeTagsForPreview(html));
     setEditorStep('review');
   };
 
@@ -675,6 +736,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <Button variant="outline" size="sm" onClick={() => setShowImageEditor(true)}>
                 Editar Imagen
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowConditionalPanel(!showConditionalPanel)}>
+                <Filter className="w-4 h-4 mr-1" /> Condiciones
+              </Button>
               <Button size="sm" onClick={goToReviewStep}>
                 Revisar y Enviar
               </Button>
@@ -725,6 +789,26 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               brandColor={brandInfo.brand_color}
               brandSecondaryColor={brandInfo.brand_secondary_color}
             />
+
+            {/* Conditional Block Panel */}
+            {showConditionalPanel && (
+              <div className="fixed right-0 top-[88px] bottom-0 w-80 bg-background border-l shadow-lg z-50 overflow-y-auto p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-sm">Contenido Condicional</h3>
+                  <Button variant="ghost" size="sm" onClick={() => setShowConditionalPanel(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Define condiciones para mostrar/ocultar bloques según datos del suscriptor.
+                  Selecciona un bloque en el editor y aplica condiciones.
+                </p>
+                <ConditionalBlockPanel
+                  conditions={blockConditions}
+                  onChange={setBlockConditions}
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -753,7 +837,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Remitente</p>
-                      <p className="text-sm">{editingCampaign?.from_name || 'Default'} &lt;{editingCampaign?.from_email || 'noreply@mail.steveads.com'}&gt;</p>
+                      <p className="text-sm">{editingCampaign?.from_name || 'Default'} &lt;{editingCampaign?.from_email || 'noreply@steve.cl'}&gt;</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Audiencia</p>
@@ -803,6 +887,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   Volver al Editor
                 </Button>
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleSendTest}
+                    disabled={sendingTest || !editingCampaign?.html_content}
+                  >
+                    {sendingTest ? (
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    ) : (
+                      <MailCheck className="w-4 h-4 mr-1.5" />
+                    )}
+                    Enviar Test
+                  </Button>
                   <Button
                     variant="outline"
                     onClick={async () => {
