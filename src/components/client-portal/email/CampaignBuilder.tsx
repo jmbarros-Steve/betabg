@@ -21,6 +21,7 @@ import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, type BlockCondition } from './ConditionalBlockPanel';
+import { ProductBlockPanel } from './ProductBlockPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -98,6 +99,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [showConditionalPanel, setShowConditionalPanel] = useState(false);
+  const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
 
@@ -149,6 +151,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       setShowUniversalBlocks(false);
       setShowImageEditor(false);
       setShowConditionalPanel(false);
+      setShowProductPanel(false);
     }
   }, [showEditor]);
 
@@ -744,6 +747,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                 Bloques
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowProductPanel(true)}>
+                <ShoppingBag className="w-4 h-4 mr-1" /> Productos
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setShowImageEditor(true)}>
                 Editar Imagen
               </Button>
@@ -840,6 +846,50 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               }}
               brandColor={brandInfo.brand_color}
               brandSecondaryColor={brandInfo.brand_secondary_color}
+            />
+
+            {/* Product Block Panel */}
+            <ProductBlockPanel
+              clientId={clientId}
+              isOpen={showProductPanel}
+              onClose={() => setShowProductPanel(false)}
+              onInsert={(html) => {
+                const editor = emailEditorRef.current?.editor;
+                if (!editor) return;
+                editor.saveDesign((design: any) => {
+                  const ts = Date.now();
+                  const newRow = {
+                    id: `prod_row_${ts}`,
+                    cells: [1],
+                    columns: [{
+                      id: `prod_col_${ts}`,
+                      contents: [{
+                        type: 'html',
+                        values: {
+                          containerPadding: '0px',
+                          anchor: '',
+                          html,
+                          hideDesktop: false,
+                          displayCondition: null,
+                          _meta: { htmlID: `u_prod_html_${ts}`, htmlClassNames: 'u_content_html' },
+                          selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
+                        },
+                      }],
+                      values: { _meta: { htmlID: `u_prod_col_${ts}`, htmlClassNames: 'u_column' } },
+                    }],
+                    values: {
+                      displayCondition: null, columns: false, backgroundColor: '', columnsBackgroundColor: '',
+                      backgroundImage: { url: '', fullWidth: true, repeat: 'no-repeat', size: 'custom', position: 'center' },
+                      padding: '0px', anchor: '', hideDesktop: false,
+                      _meta: { htmlID: `u_prod_row_${ts}`, htmlClassNames: 'u_row' },
+                      selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
+                    },
+                  };
+                  design.body.rows.push(newRow);
+                  design.counters.u_row = (design.counters.u_row || 1) + 1;
+                  editor.loadDesign(design);
+                });
+              }}
             />
 
             {/* Conditional Block Panel */}

@@ -19,6 +19,24 @@ export async function productRecommendations(c: Context) {
   const supabase = getSupabaseAdmin();
 
   switch (action) {
+    case 'list_products': {
+      // Return full product catalog for the editor product picker
+      const products = await getProductCatalog(supabase, client_id);
+      return c.json({ products });
+    }
+
+    case 'search_products': {
+      // Search products by name
+      const { query } = body;
+      const products = await getProductCatalog(supabase, client_id);
+      if (!query) return c.json({ products });
+      const q = (query as string).toLowerCase();
+      const filtered = products.filter((p: any) =>
+        p.title.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q) || (p.product_type || '').toLowerCase().includes(q)
+      );
+      return c.json({ products: filtered });
+    }
+
     case 'generate': {
       const { subscriber_id, recommendation_type, count } = body;
       const products = await getProductCatalog(supabase, client_id);
