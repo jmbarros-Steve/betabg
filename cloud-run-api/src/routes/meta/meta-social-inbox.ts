@@ -395,7 +395,21 @@ async function handleReplyMessage(token: string, body: RequestBody): Promise<{ b
 
   if (!result.ok) {
     console.error(`[social-inbox] Reply failed:`, result.error);
-    return { body: { success: false, error: result.error }, status: 502 };
+
+    // Meta error #10: 24-hour messaging window expired
+    const errorStr = result.error || '';
+    if (errorStr.includes('(#10)') || errorStr.includes('período permitido') || errorStr.includes('outside the allowed window')) {
+      return {
+        body: {
+          success: false,
+          error: 'Han pasado más de 24 horas desde el último mensaje del usuario. Meta solo permite responder dentro de las 24h.',
+          error_code: 'WINDOW_EXPIRED',
+        },
+        status: 200,
+      };
+    }
+
+    return { body: { success: false, error: errorStr }, status: 502 };
   }
 
   return { body: { success: true, message_id: result.data?.message_id || result.data?.id }, status: 200 };

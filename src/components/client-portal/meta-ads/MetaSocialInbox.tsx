@@ -324,7 +324,11 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       });
 
       if (error || !data?.success) {
-        toast.error(data?.error || 'Error al enviar respuesta');
+        if (data?.error_code === 'WINDOW_EXPIRED') {
+          toast.error('Han pasado más de 24h desde el último mensaje. Meta no permite responder fuera de esa ventana.');
+        } else {
+          toast.error(data?.error || 'Error al enviar respuesta');
+        }
         return;
       }
 
