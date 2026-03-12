@@ -682,13 +682,56 @@ function AdFormMultiSlot({
   };
 
   const handleGenerateImage = async () => {
-    if (!aiPrompt.trim()) { toast.error('Describe la imagen'); return; }
     setGeneratingImage(true);
     try {
       const formatMap: Record<AspectRatio, string> = { '1:1': 'square', '9:16': 'story', '16:9': 'feed' };
-      const anglePrompt = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
+      const formato = formatMap[aspectRatio];
+
+      // If user wrote a custom prompt, use it directly
+      if (aiPrompt.trim()) {
+        const anglePrompt = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
+        const { data, error } = await callApi('generate-image', {
+          body: { clientId, promptGeneracion: aiPrompt + anglePrompt, engine: imageEngine, formato },
+        });
+        if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
+        if (error) throw error;
+        if (data?.asset_url) { setImageAtSlot(data.asset_url); toast.success(`Imagen ${activeImageSlot + 1} generada`); }
+        return;
+      }
+
+      // No custom prompt: use brief-visual pipeline with current copy + angle
+      const variacionElegida = {
+        titulo: headlines.find(Boolean) || 'Anuncio',
+        texto_principal: primaryTexts.find(Boolean) || '',
+        descripcion: descriptions.find(Boolean) || '',
+        cta: cta || 'SHOP_NOW',
+      };
+      const angleValue = selectedAngle || 'beneficios';
+      const productAssets = focusType === 'product' && selectedProduct?.images?.[0]
+        ? [selectedProduct.images[0]] : [];
+
+      const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
+        body: {
+          clientId,
+          formato: 'static',
+          angulo: angleValue,
+          variacionElegida,
+          assetUrls: productAssets,
+          productData: selectedProduct ? {
+            title: selectedProduct.title,
+            product_type: selectedProduct.product_type,
+            body_html: selectedProduct.description || '',
+          } : undefined,
+        },
+      });
+
+      if (briefErr) throw new Error(briefErr);
+
+      const promptGeneracion = briefData?.prompt_generacion;
+      if (!promptGeneracion) throw new Error('No se generó prompt visual');
+
       const { data, error } = await callApi('generate-image', {
-        body: { clientId, promptGeneracion: aiPrompt + anglePrompt, engine: imageEngine, formato: formatMap[aspectRatio] },
+        body: { clientId, promptGeneracion, engine: imageEngine, formato },
       });
       if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
       if (error) throw error;
@@ -1093,8 +1136,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // ---- AI Copy Generation ----
 
   const generatingRef = useRef(false);
-  const handleGenerateCopy = useCallback(async () => {
-    if (generatingRef.current) return;
+  const handleGenerateCopy = useCallback(async (): Promise<{ texts: string[]; headlines: string[]; descriptions: string[] } | null> => {
+    if (generatingRef.current) return null;
     generatingRef.current = true;
     setGeneratingCopy(true);
     try {
@@ -1131,30 +1174,37 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (!raw) {
         console.warn('[Wizard] Empty copy response');
         toast.error('Steve no devolvió copy — intenta de nuevo');
-        return;
+        return null;
       }
       try {
         const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}');
         console.log('[Wizard] Parsed copy:', parsed);
+        const result = { texts: [] as string[], headlines: [] as string[], descriptions: [] as string[] };
         if (isMulti) {
-          if (parsed.texts?.length) setPrimaryTexts(parsed.texts.slice(0, 2));
-          if (parsed.headlines?.length) setHeadlines(parsed.headlines.slice(0, 2));
-          if (parsed.descriptions?.length) setDescriptions(parsed.descriptions.slice(0, 2));
-          else if (parsed.description) setDescriptions([parsed.description, '']);
+          if (parsed.texts?.length) { setPrimaryTexts(parsed.texts.slice(0, 2)); result.texts = parsed.texts.slice(0, 2); }
+          if (parsed.headlines?.length) { setHeadlines(parsed.headlines.slice(0, 2)); result.headlines = parsed.headlines.slice(0, 2); }
+          if (parsed.descriptions?.length) { setDescriptions(parsed.descriptions.slice(0, 2)); result.descriptions = parsed.descriptions.slice(0, 2); }
+          else if (parsed.description) { setDescriptions([parsed.description, '']); result.descriptions = [parsed.description]; }
         } else {
-          if (parsed.primary_text || parsed.texts?.[0]) setPrimaryTexts([parsed.primary_text || parsed.texts[0]]);
-          if (parsed.headline || parsed.headlines?.[0]) setHeadlines([parsed.headline || parsed.headlines[0]]);
-          if (parsed.description || parsed.descriptions?.[0]) setDescriptions([parsed.description || parsed.descriptions[0]]);
+          const t = parsed.primary_text || parsed.texts?.[0] || '';
+          const h = parsed.headline || parsed.headlines?.[0] || '';
+          const d = parsed.description || parsed.descriptions?.[0] || '';
+          if (t) { setPrimaryTexts([t]); result.texts = [t]; }
+          if (h) { setHeadlines([h]); result.headlines = [h]; }
+          if (d) { setDescriptions([d]); result.descriptions = [d]; }
         }
         toast.success('Steve generó el copy automáticamente');
+        return result;
       } catch {
         // AI didn't return valid JSON — use raw text as primary text
         console.warn('[Wizard] Could not parse JSON, using raw text');
         setPrimaryTexts([raw.slice(0, 500)]);
+        return { texts: [raw.slice(0, 500)], headlines: [], descriptions: [] };
       }
     } catch (err: any) {
       console.error('[Wizard] Copy generation error:', err);
       toast.error(err?.message || 'Error generando copy');
+      return null;
     } finally {
       generatingRef.current = false;
       setGeneratingCopy(false);
@@ -1171,42 +1221,80 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     if (autoGenRef.current) return;
     autoGenRef.current = true;
 
-    // Auto-generate copy
+    // Auto-generate copy first, then use it to generate a proper image via brief-visual
     console.log('[Wizard] Auto-generating copy on ad-creative step entry');
-    handleGenerateCopy();
+    (async () => {
+      // Step 1: Generate copy and get the result directly (don't rely on React state)
+      const copyResult = await handleGenerateCopy();
+      if (!copyResult) return;
 
-    // Auto-generate AI image
-    {
-      let imgPrompt = '';
-      if (focusType === 'product' && selectedProduct) {
-        const angleLabel = selectedAngle || 'general';
-        imgPrompt = `Imagen publicitaria profesional para Meta Ads. Producto: ${selectedProduct.title}. Ángulo creativo: ${angleLabel}. Estilo: anuncio de alto rendimiento para redes sociales, colores vibrantes, composición llamativa.`;
-        console.log('[Wizard] Auto-generating AI image for product:', selectedProduct.title);
-      } else {
-        // Broad focus: generate image based on angle + objective + audience context
-        const angleLabel = selectedAngle || 'general';
-        imgPrompt = `Imagen publicitaria profesional para Meta Ads. Ángulo creativo: ${angleLabel}. Objetivo: ${objective}. Audiencia: ${audienceDesc || 'general'}. Estilo: anuncio de alto rendimiento para redes sociales, colores vibrantes, composición llamativa.`;
-        console.log('[Wizard] Auto-generating AI image for broad focus:', angleLabel);
+      // Step 2: Generate image using brief-visual pipeline with the copy we just got
+      try {
+        const variacionElegida = {
+          titulo: copyResult.headlines[0] || 'Anuncio',
+          texto_principal: copyResult.texts[0] || '',
+          descripcion: copyResult.descriptions[0] || '',
+          cta: cta || 'SHOP_NOW',
+        };
+
+        const angleValue = selectedAngle || 'beneficios';
+        const productAssets = focusType === 'product' && selectedProduct?.images?.[0]
+          ? [selectedProduct.images[0]] : [];
+
+        console.log('[Wizard] Generating brief-visual with copy + angle:', { angleValue, variacionElegida });
+
+        // Step 2a: Get proper prompt from generate-brief-visual (uses ad_references + angle rules)
+        const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
+          body: {
+            clientId,
+            formato: 'static',
+            angulo: angleValue,
+            variacionElegida,
+            assetUrls: productAssets,
+            productData: selectedProduct ? {
+              title: selectedProduct.title,
+              product_type: selectedProduct.product_type,
+              body_html: selectedProduct.description || '',
+            } : undefined,
+          },
+        });
+
+        if (briefErr) {
+          console.error('[Wizard] Brief-visual error:', briefErr);
+          return;
+        }
+
+        const promptGeneracion = briefData?.prompt_generacion;
+        if (!promptGeneracion) {
+          console.warn('[Wizard] No prompt_generacion in brief-visual response');
+          return;
+        }
+
+        console.log('[Wizard] Got prompt_generacion from brief-visual, generating image...');
+
+        // Step 2b: Generate image with the proper prompt
+        const { data: imgData, error: imgErr } = await callApi('generate-image', {
+          body: { clientId, promptGeneracion, engine: 'imagen', formato: 'square' },
+        });
+
+        if (imgErr) {
+          console.error('[Wizard] AI image error:', imgErr);
+          if (imgErr !== 'NO_CREDITS') toast.error('Error generando imagen: ' + imgErr);
+          return;
+        }
+
+        if (imgData?.asset_url) {
+          setImages((prev) => {
+            const next = [...prev];
+            next[0] = imgData.asset_url;
+            return next;
+          });
+          toast.success('Steve generó imagen automáticamente');
+        }
+      } catch (err) {
+        console.error('[Wizard] AI image generation failed:', err);
       }
-      if (imgPrompt) {
-        (async () => {
-          try {
-            const { data, error } = await callApi('generate-image', {
-              body: { clientId, promptGeneracion: imgPrompt, engine: 'imagen', formato: 'square' },
-            });
-            if (error) { console.error('[Wizard] AI image error:', error); toast.error('Error generando imagen: ' + error); return; }
-            if (data?.asset_url) {
-              setImages((prev) => {
-                const next = [...prev];
-                next[0] = data.asset_url;
-                return next;
-              });
-              toast.success('Steve generó imagen automáticamente');
-            }
-          } catch (err) { console.error('[Wizard] AI image generation failed:', err); }
-        })();
-      }
-    }
+    })();
   }, [currentStep, handleGenerateCopy, focusType, selectedProduct, selectedAngle, clientId]);
 
   // ---- Save Draft ----
