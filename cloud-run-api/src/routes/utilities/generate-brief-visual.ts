@@ -7,13 +7,17 @@ export async function generateBriefVisual(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
-  const [briefRes, personaRes] = await Promise.all([
+  const [briefRes, personaRes, shopifyProductsRes, clientRes] = await Promise.all([
     supabase.from('brand_research').select('research_data').eq('client_id', clientId).eq('research_type', 'brand_brief').maybeSingle(),
     supabase.from('buyer_personas').select('persona_data').eq('client_id', clientId).eq('is_complete', true).maybeSingle(),
+    supabase.from('shopify_products').select('title, product_type, image_url, price').eq('client_id', clientId).limit(10),
+    supabase.from('clients').select('shop_domain, name, company').eq('id', clientId).maybeSingle(),
   ]);
 
   const brief = (briefRes.data?.research_data as Record<string, unknown>) || {};
   const persona = (personaRes.data?.persona_data as Record<string, unknown>) || {};
+  const shopifyProducts = shopifyProductsRes.data || [];
+  const clientInfo = clientRes.data || {};
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -50,6 +54,25 @@ ${refEntries}
 Tu prompt_generacion DEBE seguir los patrones de composición, iluminación, estilo fotográfico y paleta de colores de estas referencias reales. No inventes un estilo nuevo — replica el estilo que ya funcionó.\n`;
   }
 
+  // Build Shopify store context for prompt enrichment
+  let shopifyContext = '';
+  if (shopifyProducts.length > 0 || (clientInfo as any).shop_domain) {
+    const storeDomain = (clientInfo as any).shop_domain || '';
+    const storeName = (clientInfo as any).name || (clientInfo as any).company || '';
+    const productTypes = [...new Set(shopifyProducts.map((p: any) => p.product_type).filter(Boolean))];
+    const priceRange = shopifyProducts.length > 0
+      ? { min: Math.min(...shopifyProducts.map((p: any) => parseFloat(p.price) || 0)), max: Math.max(...shopifyProducts.map((p: any) => parseFloat(p.price) || 0)) }
+      : null;
+    const productSamples = shopifyProducts.slice(0, 5).map((p: any) => `${p.title} ($${p.price})`).join(', ');
+
+    shopifyContext = `\nCONTEXTO DE TIENDA SHOPIFY:
+Tienda: ${storeName}${storeDomain ? ` (${storeDomain})` : ''}
+Categorías de productos: ${productTypes.join(', ') || 'No disponible'}
+${priceRange ? `Rango de precios: $${priceRange.min} - $${priceRange.max}` : ''}
+Productos destacados: ${productSamples || 'No disponible'}
+`;
+  }
+
   const photosList = (assetUrls as string[] || []).slice(0, 5).join(', ');
   const copyText = `Título: ${variacionElegida?.titulo}\nTexto: ${variacionElegida?.texto_principal}\nDescripción: ${variacionElegida?.descripcion}\nCTA: ${variacionElegida?.cta}`;
 
@@ -74,6 +97,7 @@ ${productDesc ? `Producto: ${productDesc}` : ''}
 Colores de marca: ${brief.brand_colors || brief.colores || 'A definir'}
 Estilo visual: ${brief.visual_style || brief.estilo || 'moderno y limpio'}
 Fotos disponibles del producto: ${photosList || 'No hay fotos'}
+${shopifyContext}
 
 ${formato === 'video' ? `Responde en JSON para VIDEO:
 {
@@ -104,6 +128,7 @@ ${formato === 'video' ? `Responde en JSON para VIDEO:
 IMPORTANTE para prompt_generacion (seguir OBLIGATORIAMENTE):
 ${productDesc ? `- Describe el producto EXACTO en el prompt: "${productDesc}". The product must appear prominently and realistically — same shape, colors, packaging.` : ''}
 - ${personaPhotoDesc}
+- ESTILO DE LA TIENDA: El estilo fotográfico debe ser COHERENTE con la estética de la tienda y su catálogo de productos. Si la tienda vende productos premium, la foto debe verse premium. Si es una tienda casual/juvenil, la foto debe reflejar esa energía. Usa los colores de marca, el rango de precios y el tipo de productos como guía para definir el nivel de producción, ambientación y estilo de la imagen. La foto generada debe parecer parte natural del feed de la tienda o su catálogo.
 - CLAVE PARA REALISMO: El prompt debe especificar detalles físicos reales: textura de piel con poros e imperfecciones naturales, ropa con arrugas y pliegues reales, superficies con reflejos naturales, profundidad de campo con bokeh sutil, iluminación con sombras suaves y direccionales.
 - Mencionar un entorno REAL y específico (ej: "en una cocina moderna con mesón de mármol" NO "en un fondo limpio").
 - NUNCA usar palabras como "digital art", "illustration", "3D render", "graphic design" — todo debe ser "photograph".
@@ -113,19 +138,58 @@ Responde SOLO el JSON sin markdown ni backticks.`;
 
   const ANGLE_PHOTO_RULES = `
 Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al generar prompt_generacion):
-- Call Out: Close-up portrait, direct eye contact, clean minimal background, subject addressing viewer directly
-- Bold Statement: High contrast, dramatic lighting, product hero shot, wide angle, impactful composition
-- Us vs Them: Split composition or before/after layout, clear visual comparison
-- Reviews/Testimonios: Lifestyle setting, person using product naturally, warm tones, authentic feel
-- Ugly Ads: Raw phone screenshot aesthetic, no production value, looks like organic social media content
-- Beneficios: Product in use, person experiencing the benefit, aspirational lifestyle
-- Resultados: Clean background with space for number overlays, product secondary
-- Antes y Después: Two-panel composition showing transformation
-- Descuentos/Ofertas: Bold product shot, clean background, space for price/discount overlay
-- Paquetes: Multiple products arranged together, lifestyle bundle composition
+- Call Out: Close-up portrait, direct eye contact, clean minimal background, subject addressing viewer directly. TONE: provocative, confrontational, "Hey you!"
+- Bold Statement: High contrast, dramatic lighting, product hero shot, wide angle, impactful composition. TONE: confident, authoritative, disruptive
+- Us vs Them: Split composition or before/after layout, clear visual comparison. TONE: competitive, us-first, showing the gap
+- Reviews/Testimonios: Lifestyle setting, person using product naturally, warm tones, authentic feel. TONE: trusted, genuine, word-of-mouth
+- Ugly Ads: Raw phone screenshot aesthetic, no production value, looks like organic social media content. TONE: raw, unfiltered, anti-ad
+- Beneficios: Product in use, person experiencing the benefit, aspirational lifestyle. TONE: transformative, "imagine yourself", solution-focused
+- Beneficios Principales: Macro detail on the KEY benefit with visual proof. TONE: specific, evidence-based, "this is what matters"
+- Resultados: Clean background with space for number overlays, product secondary. TONE: data-driven, impressive, metrics-focused
+- Antes y Después: Two-panel composition showing transformation. TONE: dramatic change, journey, night-and-day difference
+- Descuentos/Ofertas: Bold product shot, clean background, space for price/discount overlay. TONE: urgency, value, limited-time
+- Paquetes: Multiple products arranged together, lifestyle bundle composition. TONE: value stacking, completeness, "everything you need"
+- Pantalla Dividida: Split-screen dual narrative showing two moments/perspectives. TONE: contrast, comparison, storytelling
+- Nueva Colección: Editorial fashion/product shoot, fresh colors, seasonal. TONE: excitement, novelty, "just dropped"
+- Detalles de Producto: Extreme macro, texture focus, craftsmanship visible. TONE: quality, precision, premium
+- Ingredientes/Material: Raw materials/ingredients beautifully arranged around product. TONE: transparency, natural, "what's inside"
+- Memes: Trending meme format adapted to brand, relatable humor. TONE: funny, shareable, culturally relevant
+- Mensajes y Comentarios: Screenshot-style showing real DMs/comments praising product. TONE: social proof, viral, community
+
+REGLA CRÍTICA DE VARIACIÓN: Cada prompt_generacion debe ser ÚNICO y CREATIVO. NO repitas los mismos escenarios, metáforas o situaciones entre imágenes. Si el producto es X, piensa en 10 formas distintas de mostrarlo y elige la más inesperada y atractiva para este ángulo específico. Sorprende al espectador.
 `;
 
   const systemPrompt = `${bugSection}${knowledgeSection}${referencesSection}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Cuando generes prompt_generacion, SIEMPRE sigue las reglas de estilo fotográfico del ángulo creativo indicado.${adReferences && adReferences.length > 0 ? ' PRIORIZA replicar los patrones de las referencias visuales reales proporcionadas.' : ''}`;
+
+  // Build multimodal message with reference images and product photos
+  const messageContent: any[] = [];
+
+  // Add ad reference images (visual examples from knowledge library)
+  const refImages = (adReferences || []).filter((ref: any) => ref.image_url).slice(0, 3);
+  if (refImages.length > 0) {
+    messageContent.push({ type: 'text', text: `IMÁGENES DE REFERENCIA DE ANUNCIOS EXITOSOS (replica este estilo visual):` });
+    for (const ref of refImages) {
+      messageContent.push({
+        type: 'image',
+        source: { type: 'url', url: (ref as any).image_url },
+      });
+    }
+  }
+
+  // Add Shopify product images (store aesthetic reference)
+  const productImages = shopifyProducts.filter((p: any) => p.image_url).slice(0, 3);
+  if (productImages.length > 0) {
+    messageContent.push({ type: 'text', text: `FOTOS DEL CATÁLOGO SHOPIFY (la imagen generada debe ser coherente con esta estética de tienda):` });
+    for (const p of productImages) {
+      messageContent.push({
+        type: 'image',
+        source: { type: 'url', url: (p as any).image_url },
+      });
+    }
+  }
+
+  // Add the main text prompt
+  messageContent.push({ type: 'text', text: userPrompt });
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -138,7 +202,7 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+      messages: [{ role: 'user', content: messageContent }],
     }),
   });
 

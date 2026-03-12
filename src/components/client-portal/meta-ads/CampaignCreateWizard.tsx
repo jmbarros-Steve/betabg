@@ -87,11 +87,32 @@ const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
 const CTA_OPTIONS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'DOWNLOAD', 'CONTACT_US', 'GET_OFFER', 'BOOK_NOW'];
 
 // Different visual compositions for DCT 3:2:2 (3 images with different approaches)
-const IMAGE_COMPOSITIONS = [
-  'Product hero shot: the product is the main subject on a real surface (marble countertop, wooden table, textured fabric). Dramatic side lighting with soft shadows. Shot from a slight angle to show depth and dimension. Background softly blurred with natural bokeh.',
-  'Lifestyle shot: a real person actively using or enjoying the product in a specific real environment (modern kitchen, cozy living room, outdoor café). The person has natural skin texture, genuine expression, real clothing with wrinkles. The product is clearly visible in their hands or in use. Warm natural lighting from a window or golden hour.',
-  'Close-up detail shot: extreme macro close-up highlighting the product texture, material quality, label text, or a key feature. Shallow depth of field at f/2.8. Real surface reflections and micro-textures visible. The background is a soft, out-of-focus real environment.',
+// Each array has multiple options — one is picked randomly per generation to avoid repetition
+const IMAGE_COMPOSITIONS_POOL = [
+  // Slot 0: Product-centric shots
+  [
+    'Product hero shot: the product is the star, placed on a textured surface (marble countertop, raw wood, linen fabric). Dramatic side lighting, slight overhead angle. Background softly blurred with natural bokeh.',
+    'Flat lay composition: the product arranged with complementary props (lifestyle accessories, natural elements) on a clean surface, shot from directly above. Soft even lighting, editorial magazine feel.',
+    'Product in motion: the product captured mid-action (being poured, opened, applied, unboxed). Dynamic composition with slight motion blur on secondary elements. Crisp focus on the product itself.',
+  ],
+  // Slot 1: Human-centric / lifestyle shots
+  [
+    'Lifestyle candid: a real person genuinely enjoying the product in a specific environment (sunlit apartment, bustling street market, cozy café). Natural expression, imperfect and authentic. Product clearly visible but not forced.',
+    'First-person POV: shot from the user perspective — hands holding/using the product with the environment visible ahead. Creates intimacy and "I could be there" feeling. Natural daylight.',
+    'Social proof moment: person mid-reaction — smiling at the product, showing it to a friend, taking a selfie with it. Warm tones, authentic social media aesthetic but with professional quality.',
+  ],
+  // Slot 2: Creative/editorial shots
+  [
+    'Dramatic contrast: the product isolated against a bold, unexpected colored background or environment. High contrast lighting, fashion editorial style. Makes the product pop and demand attention.',
+    'Before/after narrative: split or sequential composition showing the transformation or benefit. Left side shows the problem, right side shows the solution with the product. Clean dividing line or natural transition.',
+    'Environmental storytelling: wide angle shot of a beautiful, aspirational space where the product is naturally integrated — not the focus but part of a desirable lifestyle scene. The viewer discovers the product within the environment.',
+  ],
 ];
+
+function pickComposition(slot: number): string {
+  const pool = IMAGE_COMPOSITIONS_POOL[slot] || IMAGE_COMPOSITIONS_POOL[0];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 // ---------------------------------------------------------------------------
 // Step definitions per flow
@@ -1195,6 +1216,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [submitting, setSubmitting] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const [autoGenProgress, setAutoGenProgress] = useState('');
 
   // Leave confirmation
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -1336,11 +1359,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     // Auto-generate copy first, then use it to generate a proper image via brief-visual
     console.log('[Wizard] Auto-generating copy on ad-creative step entry');
     (async () => {
+      setAutoGenerating(true);
+      setAutoGenProgress('Generando copies...');
       // Step 1: Generate copy and get the result directly (don't rely on React state)
       const copyResult = await handleGenerateCopy();
-      if (!copyResult) return;
+      if (!copyResult) { setAutoGenerating(false); setAutoGenProgress(''); return; }
 
       // Step 2: Generate images using brief-visual pipeline with the copy we just got
+      setAutoGenProgress('Preparando brief visual...');
       try {
         const angleValue = selectedAngle || 'beneficios';
         const productPhoto = focusType === 'product' && selectedProduct?.image
@@ -1356,7 +1382,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         const imageCount = adSetFormat === 'flexible' ? 3 : 1;
 
         for (let slot = 0; slot < imageCount; slot++) {
-          const composition = IMAGE_COMPOSITIONS[slot] || IMAGE_COMPOSITIONS[0];
+          const composition = pickComposition(slot);
           const variacionElegida = {
             titulo: copyResult.headlines[0] || 'Anuncio',
             texto_principal: copyResult.texts[0] || '',
@@ -1364,6 +1390,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             cta: cta || 'SHOP_NOW',
           };
 
+          setAutoGenProgress(`Generando imagen ${slot + 1} de ${imageCount}...`);
           console.log(`[Wizard] Generating brief-visual for image ${slot + 1}/${imageCount}:`, { angleValue, composition: composition.slice(0, 40) });
 
           const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
@@ -1398,6 +1425,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         }
       } catch (err) {
         console.error('[Wizard] AI image generation failed:', err);
+      } finally {
+        setAutoGenerating(false);
+        setAutoGenProgress('');
       }
     })();
   }, [currentStep, handleGenerateCopy, focusType, selectedProduct, selectedAngle, clientId]);
@@ -1779,6 +1809,21 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
               {/* AD CREATIVE step */}
               {currentStep === 'ad-creative' && (
+                <div className="relative">
+                  {/* Auto-generation overlay */}
+                  {autoGenerating && (
+                    <div className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center gap-4 pointer-events-auto">
+                      <div className="relative">
+                        <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                        <Sparkles className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-semibold text-foreground">Steve esta creando tu anuncio</p>
+                        <p className="text-xs text-muted-foreground animate-pulse">{autoGenProgress}</p>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground max-w-xs text-center">Esto puede tomar unos segundos. No cierres esta ventana.</p>
+                    </div>
+                  )}
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
                   <AdFormMultiSlot
                     clientId={clientId}
@@ -1807,6 +1852,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                       destinationUrl={destinationUrl}
                     />
                   )}
+                </div>
                 </div>
               )}
 
@@ -1872,8 +1918,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   )}
                 </Button>
               ) : (
-                <Button onClick={goNext} disabled={!canProceed()}>
-                  Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+                <Button onClick={goNext} disabled={!canProceed() || autoGenerating}>
+                  {autoGenerating ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Generando...</>
+                  ) : (
+                    <>Siguiente <ChevronRight className="w-4 h-4 ml-1" /></>
+                  )}
                 </Button>
               )}
             </div>
