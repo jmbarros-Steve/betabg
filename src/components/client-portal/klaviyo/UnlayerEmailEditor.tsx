@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import EmailEditor, { EditorRef } from 'react-email-editor';
 import { X, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,12 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
   );
   const [editorReady, setEditorReady] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Memoize Unlayer options to prevent editor re-creation on every render
+  const editorOptions = useMemo(
+    () => getSteveMailEditorOptions({ mergeTagsOverride: unlayerMergeTagsConfig.mergeTags }),
+    []
+  );
 
   const currentEmail = emails[activeIndex];
 
@@ -205,7 +211,7 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
             onReady={() => {
               setEditorReady(true);
             }}
-            options={getSteveMailEditorOptions({ mergeTagsOverride: unlayerMergeTagsConfig.mergeTags })}
+            options={editorOptions}
             style={{ height: '100%' }}
           />
         </div>

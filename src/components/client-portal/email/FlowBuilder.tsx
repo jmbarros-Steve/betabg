@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import EmailEditor, { EditorRef } from 'react-email-editor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -150,6 +150,9 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const emailEditorRef = useRef<EditorRef>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [editorReady, setEditorReady] = useState(false);
+
+  // Memoize Unlayer options to prevent editor re-creation on every render
+  const editorOptions = useMemo(() => getSteveMailEditorOptions(), []);
 
   // AI generation
   const [generating, setGenerating] = useState(false);
@@ -451,7 +454,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                   emailEditorRef.current?.editor?.loadDesign(design as any);
                 }
               }}
-              options={getSteveMailEditorOptions()}
+              options={editorOptions}
               style={{ height: '100%' }}
             />
           </div>

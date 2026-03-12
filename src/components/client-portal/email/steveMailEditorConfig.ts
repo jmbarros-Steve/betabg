@@ -473,11 +473,7 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
       images: { enabled: true },
     },
     customCSS: [],
-    customJS: [
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/unlayer-product-tool.js?v=${Date.now()}`
-        : '/unlayer-product-tool.js',
-    ],
+    customJS: ['/unlayer-product-tool.js'],
     blocks: customBlocks,
     ...(opts?.mergeTagsOverride
       ? { mergeTags: opts.mergeTagsOverride }
@@ -487,9 +483,7 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
 };
 
 /**
- * Custom tools are registered exclusively via customJS (public/unlayer-product-tool.js).
- * Unlayer requires registerTool/createViewer to run inside its iframe context.
- * This function is kept for backwards compatibility but is a no-op.
+ * No-op. Custom tools registered via customJS (public/unlayer-product-tool.js).
  */
 export function registerSteveMailTools(_editor: any) {
   // Tools registered via customJS — see public/unlayer-product-tool.js

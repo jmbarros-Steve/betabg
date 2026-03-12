@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import EmailEditor, { EditorRef } from 'react-email-editor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,6 +102,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
+
+  // Memoize Unlayer options to prevent editor re-creation on every render
+  const editorOptions = useMemo(
+    () => getSteveMailEditorOptions({
+      designTags: Object.keys(brandInfo).length > 0 ? brandInfo : undefined,
+    }),
+    [brandInfo]
+  );
 
   // Schedule
   const [showSchedule, setShowSchedule] = useState(false);
@@ -769,9 +777,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   onReady={() => {
                     setEditorReady(true);
                   }}
-                  options={getSteveMailEditorOptions({
-                    designTags: Object.keys(brandInfo).length > 0 ? brandInfo : undefined,
-                  })}
+                  options={editorOptions}
                   style={{ height: '100%' }}
                 />
               </div>
