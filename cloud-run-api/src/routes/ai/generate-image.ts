@@ -48,13 +48,43 @@ export async function generateImage(c: Context) {
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
+    // Build parts: text prompt + optional reference photo
+    const parts: Array<Record<string, any>> = [];
+
+    // If a base photo URL is provided, download it and send as visual reference
+    if (fotoBaseUrl) {
+      try {
+        console.log('[generate-image] Downloading reference photo for Gemini:', fotoBaseUrl);
+        const refResponse = await fetch(fotoBaseUrl);
+        if (refResponse.ok) {
+          const refBuffer = await refResponse.arrayBuffer();
+          const refBase64 = Buffer.from(refBuffer).toString('base64');
+          const mimeType = refResponse.headers.get('content-type') || 'image/jpeg';
+          parts.push({
+            inlineData: { mimeType, data: refBase64 },
+          });
+          parts.push({
+            text: `Use this product photo as the main visual reference. The product in the generated image MUST look exactly like this real product. Do not invent a different product. Incorporate this product into the following advertising scene:\n\n${promptFinal}`,
+          });
+        } else {
+          console.warn('[generate-image] Could not download reference photo:', refResponse.status);
+          parts.push({ text: promptFinal });
+        }
+      } catch (refErr) {
+        console.warn('[generate-image] Reference photo download error:', refErr);
+        parts.push({ text: promptFinal });
+      }
+    } else {
+      parts.push({ text: promptFinal });
+    }
+
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptFinal }] }],
+          contents: [{ parts }],
           generationConfig: {
             responseModalities: ['IMAGE'],
           },

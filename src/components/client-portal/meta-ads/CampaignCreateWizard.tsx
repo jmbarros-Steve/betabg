@@ -730,8 +730,13 @@ function AdFormMultiSlot({
       const promptGeneracion = briefData?.prompt_generacion;
       if (!promptGeneracion) throw new Error('No se generó prompt visual');
 
+      // Use product image as visual reference for the AI
+      const fotoBase = (focusType === 'product' && selectedProduct?.images?.[0])
+        || briefData?.foto_recomendada
+        || undefined;
+
       const { data, error } = await callApi('generate-image', {
-        body: { clientId, promptGeneracion, engine: imageEngine, formato },
+        body: { clientId, promptGeneracion, fotoBaseUrl: fotoBase, engine: imageEngine, formato },
       });
       if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
       if (error) throw error;
@@ -1270,11 +1275,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           return;
         }
 
-        console.log('[Wizard] Got prompt_generacion from brief-visual, generating image...');
+        // Use product image or brief-recommended photo as visual reference for Gemini
+        const fotoBase = productAssets[0]
+          || briefData?.foto_recomendada
+          || undefined;
 
-        // Step 2b: Generate image with the proper prompt
+        console.log('[Wizard] Got prompt_generacion from brief-visual, generating image...', { fotoBase: fotoBase ? 'yes' : 'none' });
+
+        // Step 2b: Generate image with the proper prompt + product photo reference
         const { data: imgData, error: imgErr } = await callApi('generate-image', {
-          body: { clientId, promptGeneracion, engine: 'imagen', formato: 'square' },
+          body: { clientId, promptGeneracion, fotoBaseUrl: fotoBase, engine: 'imagen', formato: 'square' },
         });
 
         if (imgErr) {
