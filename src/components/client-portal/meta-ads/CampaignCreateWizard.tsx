@@ -38,7 +38,10 @@ import {
   Plus,
   Palette,
   ShoppingBag,
+  Maximize2,
 } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { useMetaBusiness } from './MetaBusinessContext';
 import AdPreviewMockup from './AdPreviewMockup';
 import StepIndicator, { type StepDef } from './wizard/StepIndicator';
@@ -82,6 +85,13 @@ const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
 ];
 
 const CTA_OPTIONS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'DOWNLOAD', 'CONTACT_US', 'GET_OFFER', 'BOOK_NOW'];
+
+// Different visual compositions for DCT 3:2:2 (3 images with different approaches)
+const IMAGE_COMPOSITIONS = [
+  'Product hero shot: the product is the main subject, centered, clean background, dramatic lighting. Show the product prominently from its best angle.',
+  'Lifestyle shot: a real person actively using or enjoying the product in a natural everyday setting. The product must be clearly visible. The scene tells a story of transformation or satisfaction.',
+  'Close-up detail shot: extreme close-up highlighting the product texture, material quality, packaging or a key feature. Macro photography style, shallow depth of field.',
+];
 
 // ---------------------------------------------------------------------------
 // Step definitions per flow
@@ -615,6 +625,8 @@ function AdFormMultiSlot({
   generating,
   onGenerateCopy,
   productContext,
+  focusType,
+  selectedProduct,
 }: {
   clientId: string;
   adSetFormat: AdSetFormat;
@@ -628,6 +640,8 @@ function AdFormMultiSlot({
   generating: boolean;
   onGenerateCopy: () => void;
   productContext?: string;
+  focusType: 'product' | 'broad';
+  selectedProduct: ShopifyProduct | null;
 }) {
   const [activeImageSlot, setActiveImageSlot] = useState(0);
   const [mediaTab, setMediaTab] = useState<MediaTab>(productContext ? 'ai-image' : 'upload');
@@ -638,6 +652,7 @@ function AdFormMultiSlot({
   const [imageEngine, setImageEngine] = useState<'imagen' | 'gpt4o' | 'flux'>('imagen');
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadGallery = useCallback(async () => {
@@ -707,8 +722,9 @@ function AdFormMultiSlot({
         cta: cta || 'SHOP_NOW',
       };
       const angleValue = selectedAngle || 'beneficios';
-      const productAssets = focusType === 'product' && selectedProduct?.images?.[0]
-        ? [selectedProduct.images[0]] : [];
+      const productPhoto = focusType === 'product' && selectedProduct?.image
+        ? selectedProduct.image : undefined;
+      const productAssets = productPhoto ? [productPhoto] : [];
 
       const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
         body: {
@@ -720,7 +736,7 @@ function AdFormMultiSlot({
           productData: selectedProduct ? {
             title: selectedProduct.title,
             product_type: selectedProduct.product_type,
-            body_html: selectedProduct.description || '',
+            body_html: '',
           } : undefined,
         },
       });
@@ -731,7 +747,7 @@ function AdFormMultiSlot({
       if (!promptGeneracion) throw new Error('No se generó prompt visual');
 
       // Use product image as visual reference for the AI
-      const fotoBase = (focusType === 'product' && selectedProduct?.images?.[0])
+      const fotoBase = productPhoto
         || briefData?.foto_recomendada
         || undefined;
 
@@ -798,7 +814,7 @@ function AdFormMultiSlot({
             <button
               key={i}
               onClick={() => setActiveImageSlot(i)}
-              className={`relative w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
+              className={`group relative w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
                 activeImageSlot === i ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
@@ -810,6 +826,15 @@ function AdFormMultiSlot({
                 </div>
               )}
               <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center">{i + 1}</span>
+              {img && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setLightboxUrl(img); }}
+                  className="absolute top-0 left-0 bg-black/60 text-white rounded-br p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Ver en grande"
+                >
+                  <Maximize2 className="w-2.5 h-2.5" />
+                </button>
+              )}
               {img && images.length > 1 && (
                 <button
                   onClick={(e) => { e.stopPropagation(); const next = images.filter((_, j) => j !== i); setImages(next); if (activeImageSlot >= next.length) setActiveImageSlot(Math.max(0, next.length - 1)); }}
@@ -861,8 +886,8 @@ function AdFormMultiSlot({
                   <SelectItem value="flux">Flux Pro (2 cred)</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleGenerateImage} disabled={generatingImage || !aiPrompt.trim()} className="flex-1">
-                {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando...</> : <><Sparkles className="w-3 h-3 mr-1" />Generar</>}
+              <Button onClick={handleGenerateImage} disabled={generatingImage} className="flex-1">
+                {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando...</> : <><Sparkles className="w-3 h-3 mr-1" />{aiPrompt.trim() ? 'Generar' : 'Auto-generar'}</>}
               </Button>
             </div>
           </div>
@@ -964,6 +989,75 @@ function AdFormMultiSlot({
           <Label>URL de destino</Label>
           <Input value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://tu-tienda.com" className="mt-1" />
         </div>
+      </div>
+
+      {/* Lightbox for viewing images in full size */}
+      <Dialog open={!!lightboxUrl} onOpenChange={() => setLightboxUrl(null)}>
+        <DialogContent className="max-w-3xl p-2">
+          {lightboxUrl && <img src={lightboxUrl} alt="Preview" className="w-full h-auto rounded" />}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Preview Panel with image cycling
+// ---------------------------------------------------------------------------
+
+function PreviewPanel({
+  images, primaryTexts, headlines, descriptions, cta, pageName, destinationUrl,
+}: {
+  images: string[];
+  primaryTexts: string[];
+  headlines: string[];
+  descriptions: string[];
+  cta: string;
+  pageName: string;
+  destinationUrl: string;
+}) {
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const filledImages = images.filter(Boolean);
+
+  return (
+    <div className="hidden lg:block">
+      <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
+      <div className="sticky top-4 space-y-2">
+        <AdPreviewMockup
+          imageUrl={images[previewIdx] || ''}
+          primaryText={primaryTexts[previewIdx] || primaryTexts[0] || ''}
+          headline={headlines[previewIdx] || headlines[0] || ''}
+          description={descriptions[previewIdx] || descriptions[0] || ''}
+          cta={cta}
+          pageName={pageName}
+          destinationUrl={destinationUrl}
+        />
+        {filledImages.length > 1 && (
+          <div className="flex gap-1.5 justify-center">
+            {images.map((img, i) => (
+              <button
+                key={i}
+                onClick={() => setPreviewIdx(i)}
+                className={`w-10 h-10 rounded border-2 overflow-hidden transition-all ${
+                  previewIdx === i ? 'border-primary ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                {img ? (
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <ImageIcon className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {filledImages.length > 1 && (
+          <p className="text-[10px] text-muted-foreground text-center">
+            Variación {previewIdx + 1} de {images.length}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1102,7 +1196,20 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
+  // Leave confirmation
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+
   // ---- Navigation ----
+
+  const hasUnsavedWork = images.some(Boolean) || primaryTexts.some((t) => t.trim()) || headlines.some((h) => h.trim());
+
+  const handleLeaveAttempt = () => {
+    if (hasUnsavedWork) {
+      setShowLeaveDialog(true);
+    } else {
+      onBack();
+    }
+  };
 
   const goNext = () => {
     if (stepIndex < steps.length - 1) setStepIndex(stepIndex + 1);
@@ -1233,73 +1340,61 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const copyResult = await handleGenerateCopy();
       if (!copyResult) return;
 
-      // Step 2: Generate image using brief-visual pipeline with the copy we just got
+      // Step 2: Generate images using brief-visual pipeline with the copy we just got
       try {
-        const variacionElegida = {
-          titulo: copyResult.headlines[0] || 'Anuncio',
-          texto_principal: copyResult.texts[0] || '',
-          descripcion: copyResult.descriptions[0] || '',
-          cta: cta || 'SHOP_NOW',
-        };
-
         const angleValue = selectedAngle || 'beneficios';
-        const productAssets = focusType === 'product' && selectedProduct?.images?.[0]
-          ? [selectedProduct.images[0]] : [];
+        const productPhoto = focusType === 'product' && selectedProduct?.image
+          ? selectedProduct.image : undefined;
+        const productAssets = productPhoto ? [productPhoto] : [];
+        const productData = selectedProduct ? {
+          title: selectedProduct.title,
+          product_type: selectedProduct.product_type,
+          body_html: '',
+        } : undefined;
 
-        console.log('[Wizard] Generating brief-visual with copy + angle:', { angleValue, variacionElegida });
+        // How many images to generate (3 for DCT flexible, 1 for others)
+        const imageCount = adSetFormat === 'flexible' ? 3 : 1;
 
-        // Step 2a: Get proper prompt from generate-brief-visual (uses ad_references + angle rules)
-        const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
-          body: {
-            clientId,
-            formato: 'static',
-            angulo: angleValue,
-            variacionElegida,
-            assetUrls: productAssets,
-            productData: selectedProduct ? {
-              title: selectedProduct.title,
-              product_type: selectedProduct.product_type,
-              body_html: selectedProduct.description || '',
-            } : undefined,
-          },
-        });
+        for (let slot = 0; slot < imageCount; slot++) {
+          const composition = IMAGE_COMPOSITIONS[slot] || IMAGE_COMPOSITIONS[0];
+          const variacionElegida = {
+            titulo: copyResult.headlines[0] || 'Anuncio',
+            texto_principal: copyResult.texts[0] || '',
+            descripcion: `${copyResult.descriptions[0] || ''}. VISUAL COMPOSITION: ${composition}`,
+            cta: cta || 'SHOP_NOW',
+          };
 
-        if (briefErr) {
-          console.error('[Wizard] Brief-visual error:', briefErr);
-          return;
-        }
+          console.log(`[Wizard] Generating brief-visual for image ${slot + 1}/${imageCount}:`, { angleValue, composition: composition.slice(0, 40) });
 
-        const promptGeneracion = briefData?.prompt_generacion;
-        if (!promptGeneracion) {
-          console.warn('[Wizard] No prompt_generacion in brief-visual response');
-          return;
-        }
-
-        // Use product image or brief-recommended photo as visual reference for Gemini
-        const fotoBase = productAssets[0]
-          || briefData?.foto_recomendada
-          || undefined;
-
-        console.log('[Wizard] Got prompt_generacion from brief-visual, generating image...', { fotoBase: fotoBase ? 'yes' : 'none' });
-
-        // Step 2b: Generate image with the proper prompt + product photo reference
-        const { data: imgData, error: imgErr } = await callApi('generate-image', {
-          body: { clientId, promptGeneracion, fotoBaseUrl: fotoBase, engine: 'imagen', formato: 'square' },
-        });
-
-        if (imgErr) {
-          console.error('[Wizard] AI image error:', imgErr);
-          if (imgErr !== 'NO_CREDITS') toast.error('Error generando imagen: ' + imgErr);
-          return;
-        }
-
-        if (imgData?.asset_url) {
-          setImages((prev) => {
-            const next = [...prev];
-            next[0] = imgData.asset_url;
-            return next;
+          const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
+            body: { clientId, formato: 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData },
           });
-          toast.success('Steve generó imagen automáticamente');
+
+          if (briefErr || !briefData?.prompt_generacion) {
+            console.error(`[Wizard] Brief-visual error for image ${slot + 1}:`, briefErr);
+            continue;
+          }
+
+          const fotoBase = productPhoto || briefData?.foto_recomendada || undefined;
+
+          const { data: imgData, error: imgErr } = await callApi('generate-image', {
+            body: { clientId, promptGeneracion: briefData.prompt_generacion, fotoBaseUrl: fotoBase, engine: 'imagen', formato: 'square' },
+          });
+
+          if (imgErr) {
+            console.error(`[Wizard] Image ${slot + 1} error:`, imgErr);
+            if (imgErr === 'NO_CREDITS') { toast.error('Sin créditos para generar más imágenes'); break; }
+            continue;
+          }
+
+          if (imgData?.asset_url) {
+            setImages((prev) => {
+              const next = [...prev];
+              next[slot] = imgData.asset_url;
+              return next;
+            });
+            toast.success(`Imagen ${slot + 1} generada`);
+          }
         }
       } catch (err) {
         console.error('[Wizard] AI image generation failed:', err);
@@ -1524,7 +1619,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={wizardStarted ? () => { if (stepIndex === 0) { setWizardStarted(false); } else { goPrev(); } } : onBack} className="h-8 w-8">
+        <Button variant="ghost" size="icon" onClick={wizardStarted ? () => { if (stepIndex === 0) { setWizardStarted(false); } else { goPrev(); } } : handleLeaveAttempt} className="h-8 w-8">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
@@ -1698,22 +1793,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     generating={generatingCopy}
                     onGenerateCopy={handleGenerateCopy}
                     productContext={focusType === 'product' && selectedProduct ? `Anuncio para producto "${selectedProduct.title}" (${selectedProduct.product_type || 'general'}). Ángulo: ${selectedAngle || 'general'}. Genera una imagen publicitaria profesional para Meta Ads.` : undefined}
+                    focusType={focusType}
+                    selectedProduct={selectedProduct}
                   />
                   {(primaryTexts[0] || headlines[0] || images[0]) && (
-                    <div className="hidden lg:block">
-                      <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
-                      <div className="sticky top-4">
-                        <AdPreviewMockup
-                          imageUrl={images[0] || ''}
-                          primaryText={primaryTexts[0] || ''}
-                          headline={headlines[0] || ''}
-                          description={descriptions[0] || ''}
-                          cta={cta}
-                          pageName={pageName || 'Tu Marca'}
-                          destinationUrl={destinationUrl}
-                        />
-                      </div>
-                    </div>
+                    <PreviewPanel
+                      images={images}
+                      primaryTexts={primaryTexts}
+                      headlines={headlines}
+                      descriptions={descriptions}
+                      cta={cta}
+                      pageName={pageName || 'Tu Marca'}
+                      destinationUrl={destinationUrl}
+                    />
                   )}
                 </div>
               )}
@@ -1788,6 +1880,27 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           </div>
         </>
       )}
+
+      {/* Leave confirmation dialog */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tienes trabajo sin guardar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si sales ahora perderás el anuncio en progreso. ¿Quieres guardar un borrador antes de salir?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={() => { setShowLeaveDialog(false); onBack(); }}>
+              Descartar y salir
+            </Button>
+            <Button onClick={async () => { await handleSaveDraft(); setShowLeaveDialog(false); onBack(); }}>
+              <Save className="w-4 h-4 mr-1" />Guardar borrador y salir
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
