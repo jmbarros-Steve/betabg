@@ -40,7 +40,7 @@ async function metaGet(endpoint: string, token: string, params?: Record<string, 
   return { ok: true as const, error: null, data };
 }
 
-async function metaPost(endpoint: string, token: string, body: Record<string, string>) {
+async function metaPost(endpoint: string, token: string, body: Record<string, any>) {
   const url = new URL(`${META_API}/${endpoint}`);
   url.searchParams.set('access_token', token);
   const res = await fetch(url.toString(), {
@@ -48,7 +48,14 @@ async function metaPost(endpoint: string, token: string, body: Record<string, st
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data: any = await res.json();
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.error(`Meta POST /${endpoint} non-JSON response:`, text.slice(0, 200));
+    return { ok: false as const, error: 'Non-JSON response from Meta API', data: null };
+  }
   if (!res.ok) {
     console.error(`Meta POST /${endpoint} error:`, data);
     return { ok: false as const, error: data?.error?.message || 'Meta API error', data: null };
@@ -135,6 +142,7 @@ async function handleListConversations(
   // Fetch Instagram conversations if available
   if (igAccountId) {
     const igParams: Record<string, string> = {
+      platform: 'instagram',
       fields: 'id,participants{username,id,name},updated_time,message_count',
       limit: '25',
     };
@@ -156,6 +164,8 @@ async function handleListConversations(
           message_count: conv.message_count || 0,
         });
       }
+    } else if (!igResult.ok) {
+      console.warn(`[social-inbox] IG conversations error for ${igAccountId}:`, igResult.error);
     }
   }
 
@@ -334,40 +344,58 @@ async function handleReplyMessage(token: string, body: RequestBody): Promise<{ b
     return { body: { success: false, error: 'page_id, conversation_id, and message required' }, status: 400 };
   }
 
-  // Get page access token
-  const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
+  // Get page access token + IG account
+  const pageTokenResult = await metaGet(page_id, token, {
+    fields: 'access_token,instagram_business_account{id}',
+  });
   const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  const igAccountId = pageTokenResult.data?.instagram_business_account?.id;
 
-  // Try sending via conversation thread (works for both Messenger and Instagram)
-  const result = await metaPost(`${conversation_id}/messages`, pageToken, { message });
+  // Get the conversation participants to find the recipient
+  const convResult = await metaGet(conversation_id, pageToken, {
+    fields: 'participants{id,name,username}',
+  });
+
+  if (!convResult.ok) {
+    console.error(`[social-inbox] Failed to get conversation participants:`, convResult.error);
+    return { body: { success: false, error: convResult.error }, status: 502 };
+  }
+
+  // Find the non-page participant (the user we want to reply to)
+  const participants = convResult.data?.participants?.data || [];
+  const recipient = participants.find(
+    (p: any) => p.id !== page_id && p.id !== igAccountId,
+  );
+
+  if (!recipient?.id) {
+    return { body: { success: false, error: 'Could not find recipient in conversation' }, status: 400 };
+  }
+
+  // Determine if this is an Instagram or Messenger conversation
+  const isInstagram = recipient.username || (igAccountId && participants.some((p: any) => p.id === igAccountId));
+
+  let result;
+
+  if (isInstagram && igAccountId) {
+    // Instagram: POST /{ig-user-id}/messages
+    result = await metaPost(`${igAccountId}/messages`, pageToken, {
+      recipient: { id: recipient.id },
+      message: { text: message },
+    });
+  } else {
+    // Messenger: POST /{page_id}/messages
+    result = await metaPost(`${page_id}/messages`, pageToken, {
+      recipient: { id: recipient.id },
+      message: { text: message },
+    });
+  }
 
   if (!result.ok) {
-    console.error(`[social-inbox] Reply failed for conversation ${conversation_id}:`, result.error);
-
-    // Fallback: For Instagram, try getting the participant and sending via user ID
-    // Instagram conversations sometimes require sending to the participant directly
-    try {
-      const convResult = await metaGet(conversation_id, pageToken, { fields: 'participants{id}' });
-      if (convResult.ok && convResult.data?.participants?.data) {
-        const igAccountResult = await metaGet(page_id, token, { fields: 'instagram_business_account{id}' });
-        const igId = igAccountResult.data?.instagram_business_account?.id;
-        const recipient = convResult.data.participants.data.find((p: any) => p.id !== page_id && p.id !== igId);
-        if (recipient?.id && igId) {
-          const igReply = await metaPost(`${igId}/messages`, pageToken, {
-            recipient: JSON.stringify({ id: recipient.id }),
-            message: JSON.stringify({ text: message }),
-          });
-          if (igReply.ok) return { body: { success: true, message_id: igReply.data?.id }, status: 200 };
-        }
-      }
-    } catch (fallbackErr) {
-      console.error(`[social-inbox] IG fallback reply also failed:`, fallbackErr);
-    }
-
+    console.error(`[social-inbox] Reply failed:`, result.error);
     return { body: { success: false, error: result.error }, status: 502 };
   }
 
-  return { body: { success: true, message_id: result.data?.id }, status: 200 };
+  return { body: { success: true, message_id: result.data?.message_id || result.data?.id }, status: 200 };
 }
 
 /** Reply to a comment */
