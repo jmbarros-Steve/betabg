@@ -23,19 +23,19 @@ const INITIAL_MESSAGE: ChatMessage = {
   role: 'assistant',
   content:
     'Hola! Soy Steve, tu experto en email marketing. Puedo ayudarte con:\n\n' +
-    '- Estrategia de email y frecuencia de envio\n' +
-    '- Mejores practicas de Klaviyo\n' +
-    '- Ideas para campanas y flujos\n' +
-    '- Optimizacion de open rate y conversiones\n' +
-    '- Segmentacion de audiencia\n\n' +
-    'En que puedo ayudarte?',
+    '- Estrategia de email y frecuencia de envío\n' +
+    '- Mejores prácticas de Klaviyo\n' +
+    '- Ideas para campañas y flujos\n' +
+    '- Optimización de open rate y conversiones\n' +
+    '- Segmentación de audiencia\n\n' +
+    '¿En qué puedo ayudarte?',
 };
 
 const QUICK_SUGGESTIONS = [
-  'Cada cuanto enviar emails?',
-  'Que flujos necesito?',
-  'Como mejoro mi open rate?',
-  'Ideas para mi proxima campana',
+  '¿Cada cuánto enviar emails?',
+  '¿Qué flujos necesito?',
+  '¿Cómo mejoro mi open rate?',
+  'Ideas para mi próxima campaña',
 ];
 
 // ---------------------------------------------------------------------------
@@ -448,7 +448,7 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
             </CardTitle>
             <p className="text-xs text-muted-foreground">
               Preguntale a Steve sobre email marketing, Klaviyo, estrategia y
-              mejores practicas
+              mejores prácticas
             </p>
           </div>
           <Button

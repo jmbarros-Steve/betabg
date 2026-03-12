@@ -370,7 +370,7 @@ export default function MetaConnectionWizard({
                   <Facebook className="w-4 h-4 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground">Pagina de Facebook</p>
+                  <p className="text-xs text-muted-foreground">Página de Facebook</p>
                   <p className="text-sm font-medium">
                     {selectedPortfolio.pageName || 'No detectada'}
                   </p>
@@ -423,7 +423,7 @@ export default function MetaConnectionWizard({
                   <p className="text-sm font-medium">
                     {selectedPortfolio.pixelId
                       ? `Pixel ${selectedPortfolio.pixelId}`
-                      : 'Sin pixel — puedes crear uno despues'}
+                      : 'Sin pixel — puedes crear uno después'}
                   </p>
                 </div>
                 {selectedPortfolio.pixelId ? (

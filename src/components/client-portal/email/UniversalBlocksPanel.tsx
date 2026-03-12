@@ -54,9 +54,9 @@ interface UniversalBlocksPanelProps {
 const BLOCK_CATEGORIES = [
   { value: 'all', label: 'Todas' },
   { value: 'header', label: 'Encabezado' },
-  { value: 'footer', label: 'Pie de pagina' },
+  { value: 'footer', label: 'Pie de página' },
   { value: 'product', label: 'Producto' },
-  { value: 'cta', label: 'Llamada a la accion' },
+  { value: 'cta', label: 'Llamada a la acción' },
   { value: 'testimonial', label: 'Testimonio' },
   { value: 'social', label: 'Redes sociales' },
   { value: 'content', label: 'Contenido' },
@@ -114,7 +114,7 @@ export function UniversalBlocksPanel({
       return;
     }
     if (!editor) {
-      toast.error('El editor no esta disponible');
+      toast.error('El editor no está disponible');
       return;
     }
 
@@ -125,7 +125,7 @@ export function UniversalBlocksPanel({
           if (data?.design) {
             resolve(data.design);
           } else {
-            reject(new Error('No se pudo obtener el diseno del editor'));
+            reject(new Error('No se pudo obtener el diseño del editor'));
           }
         });
       });
@@ -159,7 +159,7 @@ export function UniversalBlocksPanel({
 
   const handleInsertBlock = async (block: UniversalBlock) => {
     if (!editor) {
-      toast.error('El editor no esta disponible');
+      toast.error('El editor no está disponible');
       return;
     }
 
@@ -280,7 +280,7 @@ export function UniversalBlocksPanel({
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger>
-              <SelectValue placeholder="Filtrar por categoria" />
+              <SelectValue placeholder="Filtrar por categoría" />
             </SelectTrigger>
             <SelectContent>
               {BLOCK_CATEGORIES.map((cat) => (
@@ -363,7 +363,7 @@ export function UniversalBlocksPanel({
           <DialogHeader>
             <DialogTitle>Guardar bloque</DialogTitle>
             <DialogDescription>
-              Guarda el diseno actual del editor como un bloque reutilizable.
+              Guarda el diseño actual del editor como un bloque reutilizable.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -376,7 +376,7 @@ export function UniversalBlocksPanel({
               />
             </div>
             <div className="space-y-2">
-              <Label>Categoria</Label>
+              <Label>Categoría</Label>
               <Select value={saveCategory} onValueChange={setSaveCategory}>
                 <SelectTrigger>
                   <SelectValue />

@@ -29,7 +29,7 @@ const CONDITION_FIELDS = [
   { value: 'person.tags', label: 'Tags del contacto', type: 'text' },
   {
     value: 'person.last_order_at',
-    label: 'Fecha ultimo pedido',
+    label: 'Fecha último pedido',
     type: 'text',
   },
   {
@@ -70,7 +70,7 @@ function getOperatorLabel(operatorValue: string): string {
 
 function buildPreviewText(conditions: BlockCondition[]): string {
   if (conditions.length === 0) {
-    return 'Este bloque se mostrara siempre';
+    return 'Este bloque se mostrará siempre';
   }
 
   const parts = conditions.map((c) => {
@@ -83,7 +83,7 @@ function buildPreviewText(conditions: BlockCondition[]): string {
     return `${fieldLabel} ${opLabel} '${c.value}'`;
   });
 
-  return `Este bloque se mostrara si: ${parts.join(' Y ')}`;
+  return `Este bloque se mostrará si: ${parts.join(' Y ')}`;
 }
 
 /**
@@ -245,7 +245,7 @@ export function ConditionalBlockPanel({
         onClick={handleAddCondition}
       >
         <Plus className="h-4 w-4 mr-2" />
-        Agregar condicion
+        Agregar condición
       </Button>
 
       {/* Preview text */}
