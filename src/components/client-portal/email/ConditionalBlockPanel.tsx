@@ -86,6 +86,15 @@ function buildPreviewText(conditions: BlockCondition[]): string {
   return `Este bloque se mostrara si: ${parts.join(' Y ')}`;
 }
 
+/**
+ * Serialize conditions to a data-attribute string for embedding in HTML.
+ * Used by CampaignBuilder to inject conditions into editor blocks.
+ */
+export function serializeConditionsToAttr(conditions: BlockCondition[]): string {
+  if (conditions.length === 0) return '';
+  return `data-steve-condition='${JSON.stringify(conditions)}'`;
+}
+
 export function ConditionalBlockPanel({
   conditions,
   onChange,

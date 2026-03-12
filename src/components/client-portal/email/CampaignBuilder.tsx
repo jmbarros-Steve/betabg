@@ -20,7 +20,7 @@ import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
-import { ConditionalBlockPanel, type BlockCondition } from './ConditionalBlockPanel';
+import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
 
 interface CampaignBuilderProps {
@@ -231,7 +231,20 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       }
       editor.saveDesign((design: any) => {
         editor.exportHtml(({ html }: { html: string }) => {
-          resolve({ html, design });
+          // Embed conditional block conditions into the HTML body
+          let finalHtml = html;
+          if (blockConditions.length > 0) {
+            const condAttr = serializeConditionsToAttr(blockConditions);
+            // Wrap the <body> content in a conditional div
+            finalHtml = finalHtml.replace(
+              /(<body[^>]*>)/i,
+              `$1<div ${condAttr}>`
+            ).replace(
+              /(<\/body>)/i,
+              '</div>$1'
+            );
+          }
+          resolve({ html: finalHtml, design });
         });
       });
     });

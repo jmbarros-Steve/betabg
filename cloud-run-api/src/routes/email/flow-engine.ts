@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
+import { processEmailHtml } from '../../lib/email-html-processor.js';
 
 /**
  * Flow engine: executes flow steps when triggered by Cloud Tasks.
@@ -213,6 +214,37 @@ export async function emailFlowExecute(c: Context) {
 
   htmlContent = replaceMergeTags(htmlContent, subscriber, enrollment.metadata);
   subject = replaceMergeTags(subject, subscriber, enrollment.metadata);
+
+  // Process custom blocks (products, discounts, conditionals) per subscriber
+  const hasCustomBlocks = htmlContent.includes('data-steve-') || htmlContent.includes('product_recommendations');
+  if (hasCustomBlocks) {
+    const templateCtx = buildTemplateContext(
+      {
+        first_name: subscriber.first_name,
+        last_name: subscriber.last_name,
+        email: subscriber.email,
+        tags: subscriber.tags || [],
+        total_orders: subscriber.total_orders || 0,
+        total_spent: subscriber.total_spent || 0,
+        last_order_at: subscriber.last_order_at,
+        custom_fields: subscriber.custom_fields || {},
+      },
+      {
+        cart_url: enrollment.metadata?.abandoned_checkout_url || enrollment.metadata?.cart_url,
+        cart_total: enrollment.metadata?.total_price,
+        discount_code: enrollment.metadata?.discount_code,
+      },
+      enrollment.metadata?.brand || {},
+      enrollment.metadata?.products || []
+    );
+
+    htmlContent = await processEmailHtml(htmlContent, {
+      clientId: enrollment.client_id,
+      subscriberId: subscriber.id,
+      enrollmentMetadata: enrollment.metadata,
+      templateContext: templateCtx,
+    });
+  }
 
   const result = await sendSingleEmail({
     to: subscriber.email,

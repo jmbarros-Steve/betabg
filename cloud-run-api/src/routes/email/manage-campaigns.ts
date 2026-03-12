@@ -1,8 +1,8 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
-import { replaceProductRecommendations } from './product-recommendations.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
+import { processEmailHtml } from '../../lib/email-html-processor.js';
 
 /**
  * Campaign management: CRUD + send + schedule.
@@ -194,12 +194,9 @@ export async function manageEmailCampaigns(c: Context) {
       const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;
       const fromName = campaign.from_name || 'Steve';
 
-      // Replace product recommendations in HTML (pre-fetch catalog once)
+      // Product recommendations are now processed per-subscriber in processEmailHtml
       const recConfig = campaign.recommendation_config || null;
       let baseHtml = campaign.html_content;
-      if (baseHtml.includes('product_recommendations')) {
-        baseHtml = await replaceProductRecommendations(baseHtml, client_id, null, recConfig);
-      }
 
       // Load brand info for nunjucks template rendering
       const { data: brandClient } = await supabase
@@ -235,12 +232,9 @@ export async function manageEmailCampaigns(c: Context) {
         const groupB = shuffled.slice(halfTest, testSize);
         const remainder = shuffled.slice(testSize);
 
-        // Variant B content
+        // Variant B content (product recommendations processed per-subscriber)
         const variantBSubject = abTest.variant_b_subject || campaign.subject;
-        let variantBHtml = abTest.variant_b_html_content || baseHtml;
-        if (variantBHtml.includes('product_recommendations')) {
-          variantBHtml = await replaceProductRecommendations(variantBHtml, client_id, null, recConfig);
-        }
+        const variantBHtml = abTest.variant_b_html_content || baseHtml;
 
         // Update A/B test status
         await supabase
@@ -308,19 +302,28 @@ export async function manageEmailCampaigns(c: Context) {
       for (let i = 0; i < subscribers.length; i += batchSize) {
         const batch = subscribers.slice(i, i + batchSize);
 
-        const promises = batch.map((sub) => {
-          // Render per-subscriber template if nunjucks syntax is used
-          let personalizedHtml = baseHtml;
-          let personalizedSubject = campaign.subject;
-          if (usesNunjucks) {
-            const ctx = buildTemplateContext(
-              { first_name: sub.first_name ?? undefined, email: sub.email },
-              { discount_code: campaign.recommendation_config?.discount_code },
-              brandInfo,
-              []
-            );
-            personalizedHtml = renderEmailTemplate(baseHtml, ctx);
-            personalizedSubject = renderEmailTemplate(campaign.subject, ctx);
+        const promises = batch.map(async (sub) => {
+          // Build per-subscriber template context
+          const ctx = buildTemplateContext(
+            { first_name: sub.first_name ?? undefined, email: sub.email },
+            { discount_code: campaign.recommendation_config?.discount_code },
+            brandInfo,
+            []
+          );
+
+          // Render per-subscriber template (nunjucks)
+          let personalizedHtml = usesNunjucks ? renderEmailTemplate(baseHtml, ctx) : baseHtml;
+          let personalizedSubject = usesNunjucks ? renderEmailTemplate(campaign.subject, ctx) : campaign.subject;
+
+          // Process custom blocks (products, discounts, conditionals) per subscriber
+          const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+          if (hasCustomBlocks) {
+            personalizedHtml = await processEmailHtml(personalizedHtml, {
+              clientId: client_id,
+              subscriberId: sub.id,
+              templateContext: ctx,
+              recommendationConfig: recConfig,
+            });
           }
 
           return sendSingleEmail({

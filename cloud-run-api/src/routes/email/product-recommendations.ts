@@ -6,6 +6,9 @@ import { getPersonalizedRecommendations } from './product-recommendation-engine.
 const productCache = new Map<string, { products: any[]; cachedAt: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+// In-memory best sellers cache per client (TTL: 1 hour)
+const bestSellersCache = new Map<string, { productIds: string[]; cachedAt: number }>();
+
 /**
  * Product recommendations for Steve Mail emails.
  * POST /api/email-product-recommendations
@@ -149,7 +152,7 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
 /**
  * Generate a personalized product recommendation HTML block.
  */
-async function generateRecommendationBlock(
+export async function generateRecommendationBlock(
   supabase: any,
   allProducts: any[],
   subscriber: any | null,
@@ -162,29 +165,47 @@ async function generateRecommendationBlock(
 
   switch (config.type) {
     case 'best_sellers': {
-      // Get top products from conversion events
-      const { data: events } = await supabase
-        .from('email_events')
-        .select('metadata')
-        .eq('client_id', clientId)
-        .eq('event_type', 'converted')
-        .limit(100);
+      // Get real best sellers from Shopify orders (cached 1hr)
+      const bestSellerIds = await getBestSellerProductIds(supabase, clientId);
 
-      const productCounts = new Map<string, number>();
-      for (const event of events || []) {
-        const productId = event.metadata?.product_id;
-        if (productId) {
-          productCounts.set(productId, (productCounts.get(productId) || 0) + 1);
+      if (bestSellerIds.length > 0) {
+        // Order products by their best-seller ranking
+        const idRank = new Map(bestSellerIds.map((id, i) => [id, i]));
+        recommended = allProducts
+          .filter(p => idRank.has(p.id))
+          .sort((a, b) => (idRank.get(a.id) ?? 999) - (idRank.get(b.id) ?? 999))
+          .slice(0, config.count);
+      }
+
+      // Fallback to conversion events
+      if (recommended.length < config.count) {
+        const { data: events } = await supabase
+          .from('email_events')
+          .select('metadata')
+          .eq('client_id', clientId)
+          .eq('event_type', 'converted')
+          .limit(100);
+
+        const productCounts = new Map<string, number>();
+        for (const event of events || []) {
+          const productId = event.metadata?.product_id;
+          if (productId) {
+            productCounts.set(productId, (productCounts.get(productId) || 0) + 1);
+          }
+        }
+
+        if (productCounts.size > 0) {
+          const existing = new Set(recommended.map(p => p.id));
+          const additional = allProducts
+            .filter(p => !existing.has(p.id))
+            .sort((a, b) => (productCounts.get(b.id) || 0) - (productCounts.get(a.id) || 0))
+            .slice(0, config.count - recommended.length);
+          recommended = [...recommended, ...additional];
         }
       }
 
-      // Sort products by conversion count, fallback to all products by price
-      if (productCounts.size > 0) {
-        recommended = allProducts
-          .sort((a, b) => (productCounts.get(b.id) || 0) - (productCounts.get(a.id) || 0))
-          .slice(0, config.count);
-      } else {
-        // Fallback: highest priced products (often most popular)
+      // Final fallback: highest priced
+      if (recommended.length === 0) {
         recommended = [...allProducts]
           .sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
           .slice(0, config.count);
@@ -312,6 +333,81 @@ async function generateRecommendationBlock(
 
   const shopUrl = allProducts[0]?.url?.split('/products/')[0] || '#';
   return renderProductGrid(recommended, config.count, shopUrl);
+}
+
+/**
+ * Get real best-seller product IDs from Shopify orders (last 90 days).
+ * Aggregates line_items by product_id and sorts by quantity sold.
+ * Results are cached in-memory for 1 hour.
+ */
+async function getBestSellerProductIds(supabase: any, clientId: string): Promise<string[]> {
+  // Check cache
+  const cached = bestSellersCache.get(clientId);
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.productIds;
+  }
+
+  // Get Shopify credentials
+  const { data: connection } = await supabase
+    .from('platform_connections')
+    .select('shop_domain, access_token, encrypted_access_token')
+    .eq('client_id', clientId)
+    .eq('platform', 'shopify')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!connection?.shop_domain) return [];
+
+  let accessToken = connection.access_token;
+  if (connection.encrypted_access_token) {
+    const { data: decrypted } = await supabase.rpc('decrypt_token', {
+      encrypted_token: connection.encrypted_access_token,
+    });
+    if (decrypted) accessToken = decrypted;
+  }
+
+  if (!accessToken) return [];
+
+  try {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString();
+    const response = await fetch(
+      `https://${connection.shop_domain}/admin/api/2024-10/orders.json?status=any&created_at_min=${ninetyDaysAgo}&limit=250&fields=line_items`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) return [];
+
+    const data: any = await response.json();
+    const orders = data.orders || [];
+
+    // Aggregate quantities by product_id
+    const salesCount = new Map<string, number>();
+    for (const order of orders) {
+      for (const item of order.line_items || []) {
+        const pid = String(item.product_id || '');
+        if (pid) {
+          salesCount.set(pid, (salesCount.get(pid) || 0) + (item.quantity || 1));
+        }
+      }
+    }
+
+    // Sort by quantity descending
+    const sorted = [...salesCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => id);
+
+    // Cache result
+    bestSellersCache.set(clientId, { productIds: sorted, cachedAt: Date.now() });
+    return sorted;
+  } catch (err) {
+    console.error('Failed to fetch Shopify orders for best sellers:', err);
+    return [];
+  }
 }
 
 /**

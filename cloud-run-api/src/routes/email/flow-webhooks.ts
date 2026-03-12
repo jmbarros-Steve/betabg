@@ -148,6 +148,8 @@ async function handleCheckoutCreated(supabase: any, clientId: string, payload: a
             image: item.image_url || item.featured_image?.url,
             price: item.price,
             quantity: item.quantity,
+            product_id: item.product_id ? String(item.product_id) : null,
+            variant_id: item.variant_id ? String(item.variant_id) : null,
           })),
         },
       })
@@ -372,6 +374,8 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
               title: item.title,
               price: item.price,
               quantity: item.quantity,
+              product_id: item.product_id ? String(item.product_id) : null,
+              variant_id: item.variant_id ? String(item.variant_id) : null,
             })),
           },
         })

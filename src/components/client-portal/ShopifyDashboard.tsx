@@ -172,20 +172,20 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold mb-1">Dashboard Shopify</h2>
+          <h2 className="text-xl font-bold tracking-tight mb-1">Dashboard Shopify</h2>
           <p className="text-muted-foreground text-sm">Análisis completo de tu tienda</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1">
+          <div className="flex gap-1 bg-muted p-1 rounded-lg">
             {[7, 30, 90].map((d) => (
               <Button
                 key={d}
                 variant={daysBack === d ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setDaysBack(d)}
-                className="text-xs"
+                className="text-xs h-7 px-3"
               >
-                {d}d
+                {d} días
               </Button>
             ))}
           </div>
@@ -201,7 +201,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
                 Ventas por Día
               </CardTitle>
@@ -231,7 +231,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                     <Bar yAxisId="right" dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.4} name="orders" />
                   </ComposedChart>
               </ResponsiveContainer>
-              <div className={`flex items-center justify-center gap-${isMobile ? '4' : '6'} mt-4 text-xs`}>
+              <div className={`flex items-center justify-center ${isMobile ? 'gap-4' : 'gap-6'} mt-4 text-xs`}>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-primary" />
                   <span className="text-muted-foreground">Ingresos</span>
@@ -247,7 +247,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
           {/* Abandoned Carts by Day */}
           <Card className="bg-white border border-slate-200 rounded-xl card-hover">
             <CardHeader>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
                 Carritos Abandonados por Día
               </CardTitle>
@@ -295,14 +295,18 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* Ventas por Canal */}
       <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <Globe className="w-4 h-4" />
             Ventas por Canal
           </CardTitle>
         </CardHeader>
         <CardContent>
           {salesByChannel.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-6">No hay datos de canales</p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Globe className="w-8 h-8 text-muted-foreground/50 mb-2" />
+              <p className="text-sm font-medium text-muted-foreground">Sin datos de canales</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Los datos aparecerán cuando haya pedidos en el período</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {salesByChannel.map((ch) => {
@@ -339,7 +343,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* UTMs con más ventas */}
       <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <Link2 className="w-4 h-4" />
             UTMs con Más Ventas
           </CardTitle>
@@ -347,9 +351,11 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
         </CardHeader>
         <CardContent>
           {utmPerformance.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-6">
-              No se encontraron UTMs en los pedidos. Asegúrate de usar parámetros utm_source, utm_medium y utm_campaign en tus links.
-            </p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Link2 className="w-8 h-8 text-muted-foreground/50 mb-2" />
+              <p className="text-sm font-medium text-muted-foreground">Sin UTMs detectados</p>
+              <p className="text-xs text-muted-foreground/70 mt-1 max-w-md">Asegúrate de usar parámetros utm_source, utm_medium y utm_campaign en tus links de marketing</p>
+            </div>
           ) : (
             <UtmTable utmPerformance={utmPerformance} />
           )}
@@ -462,7 +468,7 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
     return (
       <Card className="bg-white border border-slate-200 rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <Search className="w-4 h-4" />
             Análisis SEO Rápido
           </CardTitle>
@@ -553,7 +559,7 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
               <Search className="w-4 h-4" />
               Análisis SEO Rápido
             </CardTitle>
