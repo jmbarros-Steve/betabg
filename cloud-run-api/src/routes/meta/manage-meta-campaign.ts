@@ -246,7 +246,16 @@ async function handleCreate(
     }
 
     if (targeting) {
-      adsetPayload.targeting = typeof targeting === 'string' ? targeting : JSON.stringify(targeting);
+      // Meta now requires targeting_automation.advantage_audience to be set
+      const targetingObj = typeof targeting === 'string' ? JSON.parse(targeting) : { ...targeting };
+      if (!targetingObj.targeting_automation) {
+        targetingObj.targeting_automation = { advantage_audience: 1 };
+      }
+      // With Advantage+ audience, age_max cannot be below 65
+      if (targetingObj.targeting_automation?.advantage_audience === 1 && targetingObj.age_max && targetingObj.age_max < 65) {
+        targetingObj.age_max = 65;
+      }
+      adsetPayload.targeting = JSON.stringify(targetingObj);
     }
 
     // For conversion-optimized ad sets, Meta requires a promoted_object with pixel_id
@@ -309,13 +318,34 @@ async function handleCreate(
   if (pageId) {
     try {
       const igResult = await metaApiRequest(pageId, accessToken, 'GET', {
-        fields: 'instagram_business_account{id}',
+        fields: 'instagram_business_account{id,username}',
       });
       if (igResult.ok && igResult.data?.instagram_business_account?.id) {
         igActorId = igResult.data.instagram_business_account.id;
-        console.log(`[manage-meta-campaign] Resolved instagram_actor_id: ${igActorId}`);
+        console.log(`[manage-meta-campaign] Resolved instagram_actor_id: ${igActorId} (${igResult.data.instagram_business_account.username || 'no username'})`);
       }
     } catch (_) { /* no IG account linked */ }
+  }
+
+  // Helper: create ad creative with retry (drops instagram_actor_id on failure)
+  async function createCreativeWithRetry(
+    creativePayload: Record<string, any>,
+    storySpecKey: string = 'object_story_spec'
+  ): Promise<{ ok: boolean; data?: any; error?: string }> {
+    const result = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
+    if (!result.ok && result.error?.includes('instagram_actor_id') && igActorId) {
+      console.warn(`[manage-meta-campaign] Creative failed with instagram_actor_id, retrying without it`);
+      igActorId = null;
+      // Remove instagram_actor_id from story spec and retry
+      const specStr = creativePayload[storySpecKey];
+      if (specStr) {
+        const spec = JSON.parse(specStr);
+        delete spec.instagram_actor_id;
+        creativePayload[storySpecKey] = JSON.stringify(spec);
+      }
+      return metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
+    }
+    return result;
   }
 
   // Step 3: Create ad creative + ad if creative data is provided
@@ -401,12 +431,7 @@ async function handleCreate(
         object_story_spec: JSON.stringify(dctStorySpec),
       };
 
-      const creativeResult = await metaApiRequest(
-        `act_${accountId}/adcreatives`,
-        accessToken,
-        'POST',
-        creativePayload
-      );
+      const creativeResult = await createCreativeWithRetry(creativePayload);
 
       if (!creativeResult.ok) {
         console.error(`[manage-meta-campaign] Dynamic Creative creation failed: ${creativeResult.error}`);
@@ -478,12 +503,7 @@ async function handleCreate(
         object_story_spec: JSON.stringify(carouselStorySpec),
       };
 
-      const creativeResult = await metaApiRequest(
-        `act_${accountId}/adcreatives`,
-        accessToken,
-        'POST',
-        creativePayload
-      );
+      const creativeResult = await createCreativeWithRetry(creativePayload);
 
       if (!creativeResult.ok) {
         console.error(`[manage-meta-campaign] Carousel creative creation failed: ${creativeResult.error}`);
@@ -507,11 +527,27 @@ async function handleCreate(
     } else {
       const singleImage = allImages[0] || image_url;
       if (singleImage) {
+        // Upload image to get image_hash (Meta no longer accepts image_url in link_data)
+        const upload = await uploadImageFromUrl(accountId, accessToken, singleImage);
+        if (!upload.ok || !upload.hash) {
+          console.error(`[manage-meta-campaign] Single image upload failed: ${upload.error}`);
+          return {
+            body: {
+              success: true,
+              partial: true,
+              campaign_id: campaignId,
+              adset_id: adSetId,
+              creative_error: `Image upload failed: ${upload.error}`,
+            },
+            status: 207,
+          };
+        }
+
         const linkData: Record<string, any> = {
           link: destUrl,
           message: allTexts[0] || primary_text || '',
           name: allHeadlines[0] || headline || '',
-          image_url: singleImage,
+          image_hash: upload.hash,
           call_to_action: { type: cta, value: { link: destUrl } },
         };
 
@@ -532,12 +568,7 @@ async function handleCreate(
 
         console.log(`[manage-meta-campaign] Creating single-image ad creative for campaign ${campaignId}`);
 
-        const creativeResult = await metaApiRequest(
-          `act_${accountId}/adcreatives`,
-          accessToken,
-          'POST',
-          creativePayload
-        );
+        const creativeResult = await createCreativeWithRetry(creativePayload);
 
         if (!creativeResult.ok) {
           console.error(`[manage-meta-campaign] Ad creative creation failed: ${creativeResult.error}`);
