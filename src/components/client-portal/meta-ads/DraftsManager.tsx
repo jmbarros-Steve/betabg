@@ -147,6 +147,41 @@ function SafeImage({ src, className }: { src: string; className?: string }) {
 // Main Component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Objective & optimization mappings
+// ---------------------------------------------------------------------------
+
+const OBJECTIVE_MAP: Record<string, string> = {
+  CONVERSIONS: 'OUTCOME_SALES',
+  TRAFFIC: 'OUTCOME_TRAFFIC',
+  AWARENESS: 'OUTCOME_AWARENESS',
+  ENGAGEMENT: 'OUTCOME_ENGAGEMENT',
+  CATALOG: 'OUTCOME_SALES',
+};
+
+const OPTIMIZATION_MAP: Record<string, string> = {
+  CONVERSIONS: 'OFFSITE_CONVERSIONS',
+  TRAFFIC: 'LINK_CLICKS',
+  AWARENESS: 'REACH',
+  ENGAGEMENT: 'POST_ENGAGEMENT',
+  CATALOG: 'OFFSITE_CONVERSIONS',
+};
+
+// ---------------------------------------------------------------------------
+// Relative time helper
+// ---------------------------------------------------------------------------
+
+function relativeTime(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return 'hace unos segundos';
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days}d`;
+}
+
 export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerProps) {
   const { connectionId: ctxConnectionId } = useMetaBusiness();
 
@@ -156,6 +191,8 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
   const [deleteTarget, setDeleteTarget] = useState<DraftItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
+  const [publishTarget, setPublishTarget] = useState<DraftItem | null>(null);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
   // ── Fetch ──
   const fetchDrafts = useCallback(async () => {
@@ -169,6 +206,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         .order('created_at', { ascending: false });
       if (error) throw error;
       setDrafts((data as DraftItem[]) || []);
+      setLastFetched(new Date());
     } catch (err) {
       console.error('[DraftsManager] Error:', err);
       toast.error('Error cargando borradores');
@@ -198,25 +236,33 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
 
   // ── Publish ──
   const handlePublish = async (draft: DraftItem) => {
+    setPublishTarget(null);
     setPublishing(draft.id);
     try {
       if (!ctxConnectionId) {
         toast.error('No hay conexión Meta Ads activa. Conecta Meta desde Conexiones.');
         return;
       }
-      const name = draft.brief_visual?.campaign_name || draft.titulo || `Campaña - ${new Date().toISOString().split('T')[0]}`;
+      const bv = draft.brief_visual;
+      const rawObjective = bv?.objective || 'CONVERSIONS';
+      const objective = OBJECTIVE_MAP[rawObjective] || 'OUTCOME_SALES';
+      const optimization_goal = OPTIMIZATION_MAP[rawObjective] || 'OFFSITE_CONVERSIONS';
+      const dailyBudgetCLP = Number(
+        bv?.plan_accion?.presupuesto_diario || bv?.adset_budget || bv?.campaign_budget || '10000'
+      );
+      const name = bv?.campaign_name || draft.titulo || `Campaña - ${new Date().toISOString().split('T')[0]}`;
       const { error } = await callApi('manage-meta-campaign', {
         body: {
           action: 'create',
           connection_id: ctxConnectionId,
           data: {
             name,
-            objective: 'OUTCOME_SALES',
+            objective,
             status: 'PAUSED',
-            daily_budget: 100 * 100,
+            daily_budget: dailyBudgetCLP * 100,
             billing_event: 'IMPRESSIONS',
-            optimization_goal: 'OFFSITE_CONVERSIONS',
-            adset_name: draft.brief_visual?.adset_name || `${name} - Ad Set 1`,
+            optimization_goal,
+            adset_name: bv?.adset_name || `${name} - Ad Set 1`,
           },
         },
       });
@@ -229,17 +275,6 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       toast.error(err?.message || 'Error al publicar');
     } finally {
       setPublishing(null);
-    }
-  };
-
-  // ── Approve ──
-  const handleApprove = async (draft: DraftItem) => {
-    try {
-      await supabase.from('ad_creatives').update({ estado: 'aprobado' }).eq('id', draft.id);
-      setDrafts((prev) => prev.map((d) => d.id === draft.id ? { ...d, estado: 'aprobado' as DraftStatus } : d));
-      toast.success('Borrador aprobado. Listo para publicar.');
-    } catch {
-      toast.error('Error al aprobar');
     }
   };
 
@@ -299,8 +334,11 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Borradores</h2>
           <p className="text-muted-foreground text-sm">
-            {drafts.length} borrador{drafts.length !== 1 ? 'es' : ''} &middot; Revisa estrategia, aprueba y publica
+            {drafts.length} borrador{drafts.length !== 1 ? 'es' : ''} &middot; Revisa estrategia y publica
           </p>
+          {lastFetched && (
+            <p className="text-muted-foreground text-xs mt-0.5">Actualizado: {relativeTime(lastFetched)}</p>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={fetchDrafts}>
           <RefreshCw className="w-4 h-4 mr-2" />
@@ -322,6 +360,19 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
           </button>
         ))}
       </div>
+
+      {/* Pending drafts banner */}
+      {(() => {
+        const pendingCount = drafts.filter((d) => d.estado === 'borrador').length;
+        return pendingCount > 0 ? (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <p className="text-sm font-medium text-amber-700">
+              Tienes {pendingCount} borrador{pendingCount !== 1 ? 'es' : ''} pendiente{pendingCount !== 1 ? 's' : ''} de revisión. Publícalos para comenzar a vender.
+            </p>
+          </div>
+        ) : null;
+      })()}
 
       {/* Empty state */}
       {filtered.length === 0 ? (
@@ -574,19 +625,14 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {draft.estado === 'borrador' && (
-                        <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleApprove(draft)}>
-                          <CheckCircle className="w-3.5 h-3.5 mr-1" /> Aprobar
-                        </Button>
-                      )}
                       {(draft.estado === 'borrador' || draft.estado === 'aprobado') && (
-                        <Button variant="default" size="sm" className="h-8 text-xs" onClick={() => handlePublish(draft)} disabled={publishing === draft.id}>
-                          {publishing === draft.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1" />}
-                          Publicar
+                        <Button variant="default" size="sm" className="h-8 text-xs" onClick={() => setPublishTarget(draft)} disabled={publishing === draft.id}>
+                          {publishing === draft.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
+                          Publicar en Meta
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(draft)}>
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -597,6 +643,29 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
           })}
         </div>
       )}
+
+      {/* Publish Confirmation Dialog */}
+      <Dialog open={!!publishTarget} onOpenChange={() => setPublishTarget(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Publicar en Meta</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+            <Send className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Tu campaña se publicará en Meta como PAUSADA.</p>
+              <p className="text-xs text-muted-foreground mt-1">Podrás activarla cuando estés listo.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishTarget(null)}>Cancelar</Button>
+            <Button onClick={() => publishTarget && handlePublish(publishTarget)}>
+              <Send className="w-4 h-4 mr-2" />
+              Publicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>

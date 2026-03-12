@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -103,6 +103,29 @@ const fmtNum = (v: number) => new Intl.NumberFormat('es-CL').format(Math.round(v
 const fmtPct = (v: number) => `${v.toFixed(2)}%`;
 
 const fmtRoas = (v: number) => `${v.toFixed(2)}x`;
+
+/** Convert a timestamp (ms) to a relative time string in Spanish */
+function timeAgo(ts: number | null): string {
+  if (!ts) return 'Sin sincronizar';
+  const diff = Date.now() - ts;
+  if (diff < 0) return 'hace un momento';
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'hace un momento';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours} hora${hours > 1 ? 's' : ''}`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} día${days > 1 ? 's' : ''}`;
+}
+
+const objectiveLabels: Record<string, string> = {
+  OUTCOME_SALES: 'Ventas',
+  OUTCOME_TRAFFIC: 'Tráfico',
+  OUTCOME_AWARENESS: 'Alcance',
+  OUTCOME_ENGAGEMENT: 'Interacción',
+  CONVERSIONS: 'Conversiones',
+};
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
@@ -246,6 +269,11 @@ function CampaignRow({
         <span className="font-semibold text-sm truncate max-w-[260px]">{campaign.campaign_name}</span>
         <StatusBadge status={campaign.status} />
         <BudgetTypeBadge type={campaign.budget_type} />
+        {campaign.objective && objectiveLabels[campaign.objective] && (
+          <Badge variant="outline" className="text-[10px] font-medium bg-indigo-500/10 text-indigo-700 border-indigo-500/25">
+            {objectiveLabels[campaign.objective]}
+          </Badge>
+        )}
 
         <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground shrink-0">
           <span className="flex items-center gap-1" title="Gasto 30d"><DollarSign className="w-3 h-3" />{fmtCLP(campaign.spend_30d)}</span>
@@ -401,7 +429,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
             status: (m.campaign_status as CampaignNode['status']) || 'ACTIVE',
             budget_type: m.campaign_name?.includes('CBO') || m.campaign_name?.includes('Ganador') ? 'CBO' : 'ABO',
             daily_budget: 0,
-            objective: 'CONVERSIONS',
+            objective: m.objective || 'CONVERSIONS',
             spend_30d: Number(m.spend) || 0,
             roas: 0,
             cpa: 0,
@@ -444,6 +472,18 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
     window.addEventListener('bg:sync-complete', handler);
     return () => window.removeEventListener('bg:sync-complete', handler);
   }, [fetchCampaigns]);
+
+  // Auto-sync on mount if lastSyncAt is null or older than 30 min
+  const autoSyncTriggered = useRef(false);
+  useEffect(() => {
+    if (autoSyncTriggered.current) return;
+    if (connectionIds.length === 0) return;
+    const thirtyMinMs = 30 * 60 * 1000;
+    if (!lastSyncAt || Date.now() - lastSyncAt > thirtyMinMs) {
+      autoSyncTriggered.current = true;
+      handleSync();
+    }
+  }, [connectionIds, lastSyncAt]);
 
   // ---------- Fetch ad sets for a campaign ----------
   const fetchAdSets = useCallback(async (campaignId: string) => {
@@ -552,6 +592,9 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
           <p className="text-muted-foreground text-sm">Jerarquía: Campaña &gt; Ad Set &gt; Anuncio</p>
         </div>
         <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            {lastSyncAt ? `Última sync: ${timeAgo(lastSyncAt)}` : 'Sin sincronizar'}
+          </span>
           <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
@@ -700,12 +743,12 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
                   <Select value={adEditData.cta || 'SHOP_NOW'} onValueChange={(v) => setAdEditData({ ...adEditData, cta: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="SHOP_NOW">Shop Now</SelectItem>
-                      <SelectItem value="LEARN_MORE">Learn More</SelectItem>
-                      <SelectItem value="SIGN_UP">Sign Up</SelectItem>
-                      <SelectItem value="SUBSCRIBE">Subscribe</SelectItem>
-                      <SelectItem value="CONTACT_US">Contact Us</SelectItem>
-                      <SelectItem value="GET_OFFER">Get Offer</SelectItem>
+                      <SelectItem value="SHOP_NOW">Comprar ahora</SelectItem>
+                      <SelectItem value="LEARN_MORE">Saber más</SelectItem>
+                      <SelectItem value="SIGN_UP">Registrarse</SelectItem>
+                      <SelectItem value="SUBSCRIBE">Suscribirse</SelectItem>
+                      <SelectItem value="CONTACT_US">Contactar</SelectItem>
+                      <SelectItem value="GET_OFFER">Ver oferta</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

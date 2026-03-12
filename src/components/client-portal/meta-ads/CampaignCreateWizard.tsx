@@ -43,6 +43,7 @@ import {
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { useMetaBusiness } from './MetaBusinessContext';
+import { useBriefContext } from '@/hooks/useBriefContext';
 import AdPreviewMockup from './AdPreviewMockup';
 import StepIndicator, { type StepDef } from './wizard/StepIndicator';
 import DynamicSteveTip from './wizard/DynamicSteveTip';
@@ -84,7 +85,15 @@ const OBJECTIVES: { value: Objective; label: string; desc: string }[] = [
   { value: 'CATALOG', label: 'Catálogo', desc: 'Dynamic Product Ads desde Shopify' },
 ];
 
-const CTA_OPTIONS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'DOWNLOAD', 'CONTACT_US', 'GET_OFFER', 'BOOK_NOW'];
+const CTA_OPTIONS: { value: string; label: string }[] = [
+  { value: 'SHOP_NOW', label: 'Comprar ahora' },
+  { value: 'LEARN_MORE', label: 'Saber más' },
+  { value: 'SIGN_UP', label: 'Registrarse' },
+  { value: 'DOWNLOAD', label: 'Descargar' },
+  { value: 'CONTACT_US', label: 'Contactar' },
+  { value: 'GET_OFFER', label: 'Ver oferta' },
+  { value: 'BOOK_NOW', label: 'Reservar' },
+];
 
 // Different visual compositions for DCT 3:2:2 (3 images with different approaches)
 // Each array has multiple options — one is picked randomly per generation to avoid repetition
@@ -337,6 +346,17 @@ function CampaignForm({
       <div>
         <Label>Fecha de inicio</Label>
         <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
+        <div className="flex gap-2 mt-1.5">
+          {[
+            { label: 'Hoy', date: new Date().toISOString().split('T')[0] },
+            { label: 'Mañana', date: new Date(Date.now() + 86400000).toISOString().split('T')[0] },
+            { label: 'Próximo lunes', date: (() => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return d.toISOString().split('T')[0]; })() },
+          ].map((opt) => (
+            <button key={opt.label} type="button" onClick={() => setStartDate(opt.date)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${startDate === opt.date ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'}`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1099,7 +1119,7 @@ function AdFormMultiSlot({
           <Label>Botón CTA</Label>
           <Select value={cta} onValueChange={(v) => setCta(v)}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-            <SelectContent>{CTA_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
+            <SelectContent>{CTA_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
@@ -1186,6 +1206,7 @@ function PreviewPanel({
 
 export default function CampaignCreateWizard({ clientId, onBack, onComplete, startFrom = 'campaign' }: CampaignCreateWizardProps) {
   const { connectionId: ctxConnectionId, pageId: ctxPageId, pageName } = useMetaBusiness();
+  const briefChips = useBriefContext(clientId);
 
   // Wizard navigation
   const [level, setLevel] = useState<StartLevel>(startFrom);
@@ -1203,11 +1224,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [createNewAdset, setCreateNewAdset] = useState(false);
 
   // Campaign fields
-  const [campName, setCampName] = useState(`Mi Campaña - ${new Date().toISOString().split('T')[0]}`);
+  const [campName, setCampName] = useState('');
   const [budgetType, setBudgetType] = useState<BudgetType>('ABO');
   const [objective, setObjective] = useState<Objective>('CONVERSIONS');
   const [campBudget, setCampBudget] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(tomorrow);
 
   // Ad Set fields
   const [adsetName, setAdsetName] = useState('');
@@ -1271,6 +1293,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       return next;
     });
   }, [adSetFormat]);
+
+  // Auto-generate campaign name from objective/funnel/angle
+  useEffect(() => {
+    if (campName && campName !== '') return; // Don't overwrite user edits
+    const parts: string[] = [];
+    const objLabel = OBJECTIVES.find(o => o.value === objective)?.label || '';
+    if (objLabel) parts.push(objLabel);
+    if (funnelStage) parts.push(funnelStage.toUpperCase());
+    if (selectedAngle) parts.push(selectedAngle);
+    const today = new Date().toISOString().split('T')[0];
+    parts.push(today);
+    setCampName(parts.join(' — '));
+  }, [objective, funnelStage, selectedAngle]);
 
   // Auto-load CPA from brief (buyer_personas)
   useEffect(() => {
@@ -1398,6 +1433,29 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   // ---- AI Copy Generation ----
 
+  const ANGLE_DESCRIPTIONS: Record<string, string> = {
+    'Beneficios': 'Resalta los beneficios principales del producto de forma directa',
+    'Bold Statement': 'Abre con una declaración atrevida y provocadora que interrumpa el scroll',
+    'Us vs Them': 'Compara tu producto vs la competencia o vs no usarlo',
+    'Call Out': 'Llama directamente a tu audiencia específica: "Si eres X, esto es para ti"',
+    'Antes y Después': 'Muestra la transformación: el antes (dolor) vs el después (solución)',
+    'Reviews': 'Usa testimonios y reseñas reales de clientes',
+    'Detalles de Producto': 'Enfócate en specs, materiales, ingredientes, calidad',
+    'Ugly Ads': 'Estilo informal, casero, sin pulir — se ve como contenido orgánico real',
+    'Memes': 'Humor y cultura popular adaptada al producto',
+    'Descuentos/Ofertas': 'Promoción directa con urgencia y escasez',
+    'Resultados': 'Datos, números y resultados concretos obtenidos por clientes',
+    'Paquetes': 'Bundles, combos y ofertas de valor',
+    'Mensajes y Comentarios': 'Capturas de DMs y comentarios positivos como prueba social',
+    'Credenciales en Medios': 'Apariciones en prensa, certificaciones, premios',
+    'Reviews + Beneficios': 'Combina testimonios con beneficios del producto',
+    'Pantalla Dividida': 'Compara visualmente dos opciones lado a lado',
+    'Nueva Colección': 'Lanzamiento de productos nuevos con expectativa',
+    'Cyber/Fechas Especiales': 'Aprovecha temporalidad: Cyber Monday, Black Friday, etc.',
+    'Ingredientes/Material': 'Enfócate en la calidad de materiales o ingredientes',
+    'Beneficios Principales': 'Lista los top 3-5 beneficios de forma clara',
+  };
+
   const generatingRef = useRef(false);
   const handleGenerateCopy = useCallback(async (): Promise<{ texts: string[]; headlines: string[]; descriptions: string[] } | null> => {
     if (generatingRef.current) return null;
@@ -1405,7 +1463,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     setGeneratingCopy(true);
     try {
       const isMulti = adSetFormat === 'flexible';
-      const angleHint = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
+      const angleDesc = ANGLE_DESCRIPTIONS[selectedAngle] || '';
+      const angleHint = selectedAngle ? ` Ángulo creativo: ${selectedAngle}. ${angleDesc}` : '';
       const productHint = focusType === 'product' && selectedProduct
         ? ` Producto: ${selectedProduct.title}. Precio: $${selectedProduct.price.toLocaleString('es-CL')}. Tipo: ${selectedProduct.product_type || 'general'}.`
         : '';
@@ -1935,7 +1994,21 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
               {/* FUNNEL STAGE step */}
               {currentStep === 'funnel-stage' && (
-                <FunnelStageSelector funnelStage={funnelStage} setFunnelStage={setFunnelStage} />
+                <>
+                  <FunnelStageSelector funnelStage={funnelStage} setFunnelStage={setFunnelStage} />
+                  {briefChips.chips.length > 0 && (
+                    <div className="mt-4 p-3 rounded-lg bg-muted/30 border">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Steve conoce tu marca:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {briefChips.chips.map((chip) => (
+                          <span key={chip.key} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/5 text-[11px] text-foreground border border-primary/10">
+                            <span>{chip.emoji}</span> <span className="font-medium">{chip.label}:</span> <span className="text-muted-foreground">{chip.value}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* ANGLE SELECT step */}
@@ -2030,6 +2103,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   cta={cta}
                   destinationUrl={destinationUrl}
                   pageName={pageName || 'Tu Marca'}
+                  images={images.filter(Boolean)}
+                  headlines={headlines}
+                  primaryTexts={primaryTexts}
+                  descriptions={descriptions}
+                  adSetFormat={adSetFormat}
+                  selectedAngle={selectedAngle}
                 />
               )}
             </CardContent>
