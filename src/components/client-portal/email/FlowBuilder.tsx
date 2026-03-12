@@ -440,9 +440,11 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           <div ref={editorContainerRef} className="absolute inset-0">
             <EmailEditor
               ref={emailEditorRef}
+              onLoad={(unlayer) => {
+                registerSteveMailTools(unlayer);
+              }}
               onReady={() => {
                 setEditorReady(true);
-                registerSteveMailTools(emailEditorRef.current?.editor);
                 // Load existing design
                 const step = editingFlow?.steps?.[editingStepIndex];
                 if (step?.design_json) {

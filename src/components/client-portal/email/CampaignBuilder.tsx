@@ -766,9 +766,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <div ref={editorContainerRef} className="absolute inset-0">
                 <EmailEditor
                   ref={emailEditorRef}
+                  onLoad={(unlayer) => {
+                    registerSteveMailTools(unlayer);
+                  }}
                   onReady={() => {
                     setEditorReady(true);
-                    registerSteveMailTools(emailEditorRef.current?.editor);
                   }}
                   options={getSteveMailEditorOptions({
                     designTags: Object.keys(brandInfo).length > 0 ? brandInfo : undefined,

@@ -473,12 +473,7 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
       images: { enabled: true },
     },
     customCSS: [],
-    customJS: [
-      // Fallback: also load tools via customJS in case editor.registerTool() isn't available
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/unlayer-product-tool.js`
-        : '/unlayer-product-tool.js',
-    ],
+    customJS: [],
     blocks: customBlocks,
     ...(opts?.mergeTagsOverride
       ? { mergeTags: opts.mergeTagsOverride }

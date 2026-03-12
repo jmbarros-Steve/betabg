@@ -202,9 +202,11 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
         <div ref={editorContainerRef} className="absolute inset-0">
           <EmailEditor
             ref={emailEditorRef}
+            onLoad={(unlayer) => {
+              registerSteveMailTools(unlayer);
+            }}
             onReady={() => {
               setEditorReady(true);
-              registerSteveMailTools(emailEditorRef.current?.editor);
             }}
             options={getSteveMailEditorOptions({ mergeTagsOverride: unlayerMergeTagsConfig.mergeTags })}
             style={{ height: '100%' }}
