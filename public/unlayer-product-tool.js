@@ -17,10 +17,6 @@
   // Guard: only run inside Unlayer context
   if (typeof unlayer === 'undefined') return;
 
-  // Guard: don't double-register if already registered via editor API
-  if (window.__steveMailToolsRegistered) return;
-  window.__steveMailToolsRegistered = true;
-
   // ===== Product Grid Tool =====
   unlayer.registerTool({
     name: 'steve_products',

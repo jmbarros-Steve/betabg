@@ -440,9 +440,6 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           <div ref={editorContainerRef} className="absolute inset-0">
             <EmailEditor
               ref={emailEditorRef}
-              onLoad={(unlayer) => {
-                registerSteveMailTools(unlayer);
-              }}
               onReady={() => {
                 setEditorReady(true);
                 // Load existing design

@@ -202,9 +202,6 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
         <div ref={editorContainerRef} className="absolute inset-0">
           <EmailEditor
             ref={emailEditorRef}
-            onLoad={(unlayer) => {
-              registerSteveMailTools(unlayer);
-            }}
             onReady={() => {
               setEditorReady(true);
             }}
