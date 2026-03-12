@@ -140,18 +140,21 @@ async function handleListConversations(
   }
 
   // Fetch Instagram conversations if available
+  // Per Meta docs: use /{page_id}/conversations?platform=instagram (NOT /{ig_id}/conversations)
   if (igAccountId) {
     const igParams: Record<string, string> = {
       platform: 'instagram',
-      fields: 'id,participants{username,id,name},updated_time,message_count',
-      limit: '25',
+      fields: 'id,participants{username,id},updated_time',
+      limit: '10',
     };
 
-    const igResult = await metaGet(`${igAccountId}/conversations`, pageToken, igParams);
+    const igResult = await metaGet(`${page_id}/conversations`, pageToken, igParams);
 
     if (igResult.ok && igResult.data?.data) {
       for (const conv of igResult.data.data) {
-        const participant = conv.participants?.data?.find((p: any) => p.id !== igAccountId) || {};
+        const participant = conv.participants?.data?.find(
+          (p: any) => p.id !== page_id && p.id !== igAccountId,
+        ) || {};
         conversations.push({
           id: conv.id,
           platform: 'instagram',
@@ -165,7 +168,7 @@ async function handleListConversations(
         });
       }
     } else if (!igResult.ok) {
-      console.warn(`[social-inbox] IG conversations error for ${igAccountId}:`, igResult.error);
+      console.warn(`[social-inbox] IG conversations error for page ${page_id}:`, igResult.error);
     }
   }
 
