@@ -302,6 +302,10 @@ function AdSetForm({
   isABO,
   adSetFormat, setAdSetFormat,
   cpaTarget, setCpaTarget,
+  targetCountries, setTargetCountries,
+  targetAgeMin, setTargetAgeMin,
+  targetAgeMax, setTargetAgeMax,
+  targetGender, setTargetGender,
 }: {
   name: string; setName: (v: string) => void;
   audienceDesc: string; setAudienceDesc: (v: string) => void;
@@ -309,6 +313,10 @@ function AdSetForm({
   isABO: boolean;
   adSetFormat: AdSetFormat; setAdSetFormat: (v: AdSetFormat) => void;
   cpaTarget: string; setCpaTarget: (v: string) => void;
+  targetCountries: string[]; setTargetCountries: (v: string[]) => void;
+  targetAgeMin: number; setTargetAgeMin: (v: number) => void;
+  targetAgeMax: number; setTargetAgeMax: (v: number) => void;
+  targetGender: 0 | 1 | 2; setTargetGender: (v: 0 | 1 | 2) => void;
 }) {
   const cpa = Number(cpaTarget) || 0;
   const recommendedBudget = cpa > 0 ? Math.round((cpa * 10) / 7) : 0;
@@ -362,8 +370,48 @@ function AdSetForm({
 
       <div>
         <Label>Audiencia / Segmento</Label>
-        <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Describe la audiencia: demographics, intereses, comportamiento..." rows={3} className="mt-1" />
-        <p className="text-xs text-muted-foreground mt-1">Puedes crear audiencias detalladas en la sección Audiencias.</p>
+        <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Describe la audiencia: demographics, intereses, comportamiento..." rows={2} className="mt-1" />
+      </div>
+
+      {/* Targeting controls */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Pais</Label>
+          <Select value={targetCountries[0] || 'CL'} onValueChange={(v) => setTargetCountries([v])}>
+            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="CL">Chile</SelectItem>
+              <SelectItem value="MX">Mexico</SelectItem>
+              <SelectItem value="CO">Colombia</SelectItem>
+              <SelectItem value="AR">Argentina</SelectItem>
+              <SelectItem value="PE">Peru</SelectItem>
+              <SelectItem value="US">Estados Unidos</SelectItem>
+              <SelectItem value="ES">Espana</SelectItem>
+              <SelectItem value="BR">Brasil</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Genero</Label>
+          <Select value={String(targetGender)} onValueChange={(v) => setTargetGender(Number(v) as 0 | 1 | 2)}>
+            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Todos</SelectItem>
+              <SelectItem value="1">Hombres</SelectItem>
+              <SelectItem value="2">Mujeres</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Edad minima</Label>
+          <Input type="number" min={18} max={65} value={targetAgeMin} onChange={(e) => setTargetAgeMin(Math.max(18, Number(e.target.value)))} className="mt-1" />
+        </div>
+        <div>
+          <Label className="text-xs">Edad maxima</Label>
+          <Input type="number" min={18} max={65} value={targetAgeMax} onChange={(e) => setTargetAgeMax(Math.min(65, Number(e.target.value)))} className="mt-1" />
+        </div>
       </div>
 
       {/* CPA + Budget */}
@@ -1118,6 +1166,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [audienceDesc, setAudienceDesc] = useState('');
   const [adsetBudget, setAdsetBudget] = useState('');
 
+  // Targeting fields
+  const [targetCountries, setTargetCountries] = useState<string[]>(['CL']);
+  const [targetAgeMin, setTargetAgeMin] = useState(18);
+  const [targetAgeMax, setTargetAgeMax] = useState(65);
+  const [targetGender, setTargetGender] = useState<0 | 1 | 2>(0); // 0=all, 1=male, 2=female
+
   // Funnel stage
   const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
 
@@ -1207,6 +1261,32 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             setCpaTarget(String(cpaMax));
             console.log(`[Wizard] CPA auto-loaded from brief: $${cpaMax} (price=${price}, cost=${cost}, shipping=${shipping})`);
           }
+        }
+
+        // Auto-fill targeting from persona
+        const gender = pd.genero || pd.gender || '';
+        if (gender) {
+          const g = gender.toLowerCase();
+          if (g.includes('mujer') || g.includes('female') || g.includes('femenin')) setTargetGender(2);
+          else if (g.includes('hombre') || g.includes('male') || g.includes('masculin')) setTargetGender(1);
+        }
+        const age = pd.edad || pd.age || '';
+        if (age) {
+          const ageStr = String(age);
+          const rangeMatch = ageStr.match(/(\d+)\s*[-–a]\s*(\d+)/);
+          if (rangeMatch) {
+            setTargetAgeMin(Math.max(18, Number(rangeMatch[1])));
+            setTargetAgeMax(Math.min(65, Number(rangeMatch[2])));
+          }
+        }
+        const country = pd.pais || pd.country || '';
+        if (country) {
+          const c = country.toLowerCase();
+          if (c.includes('chile') || c.includes('cl')) setTargetCountries(['CL']);
+          else if (c.includes('mexico') || c.includes('mx')) setTargetCountries(['MX']);
+          else if (c.includes('colombia') || c.includes('co')) setTargetCountries(['CO']);
+          else if (c.includes('argentin') || c.includes('ar')) setTargetCountries(['AR']);
+          else if (c.includes('peru') || c.includes('pe')) setTargetCountries(['PE']);
         }
       } catch { /* brief not found */ }
     })();
@@ -1569,12 +1649,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           : Number(adsetBudget);
         submitData.daily_budget = budget || 10000;
 
-        // Meta requires at least geo_locations in targeting spec
-        submitData.targeting = {
-          geo_locations: { countries: ['CL'] },
-          age_min: 18,
-          age_max: 65,
+        // Build targeting from wizard fields
+        const targetingSpec: Record<string, any> = {
+          geo_locations: { countries: targetCountries.length > 0 ? targetCountries : ['CL'] },
+          age_min: targetAgeMin || 18,
+          age_max: targetAgeMax || 65,
         };
+        if (targetGender > 0) {
+          targetingSpec.genders = [targetGender];
+        }
+        submitData.targeting = targetingSpec;
       }
 
       if (!existingCampaignId && startDate) {
@@ -1752,6 +1836,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           isABO={budgetType === 'ABO'}
                           adSetFormat={adSetFormat} setAdSetFormat={setAdSetFormat}
                           cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
+                          targetCountries={targetCountries} setTargetCountries={setTargetCountries}
+                          targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
+                          targetAgeMax={targetAgeMax} setTargetAgeMax={setTargetAgeMax}
+                          targetGender={targetGender} setTargetGender={setTargetGender}
                         />
                       </CardContent>
                     </Card>
@@ -1779,6 +1867,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   isABO={budgetType === 'ABO'}
                   adSetFormat={adSetFormat} setAdSetFormat={setAdSetFormat}
                   cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
+                  targetCountries={targetCountries} setTargetCountries={setTargetCountries}
+                  targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
+                  targetAgeMax={targetAgeMax} setTargetAgeMax={setTargetAgeMax}
+                  targetGender={targetGender} setTargetGender={setTargetGender}
                 />
               )}
 

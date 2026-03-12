@@ -208,6 +208,22 @@ async function handleCreate(
   const isFlexible = ad_set_format === 'flexible';
   const isCarousel = ad_set_format === 'carousel';
 
+  // Check if existing campaign uses CBO (Campaign Budget Optimization)
+  let isCboCampaign = false;
+  if (existingCampaignId) {
+    try {
+      const campCheck = await metaApiRequest(existingCampaignId, accessToken, 'GET', {
+        fields: 'is_campaign_budget_optimization',
+      });
+      if (campCheck.ok && campCheck.data?.is_campaign_budget_optimization) {
+        isCboCampaign = true;
+        console.log(`[manage-meta-campaign] Existing campaign ${existingCampaignId} uses CBO — skipping adset budget`);
+      }
+    } catch (e) {
+      console.warn(`[manage-meta-campaign] Could not check CBO status for campaign ${existingCampaignId}`);
+    }
+  }
+
   if (!adSetId && (daily_budget || targeting)) {
     const adsetPayload: Record<string, any> = {
       campaign_id: campaignId,
@@ -223,8 +239,9 @@ async function handleCreate(
       adsetPayload.is_dynamic_creative = true;
     }
 
-    if (daily_budget) {
+    if (daily_budget && !isCboCampaign) {
       // Frontend already sends budget in cents (smallest currency unit)
+      // Skip budget for CBO campaigns — budget is managed at campaign level
       adsetPayload.daily_budget = Math.round(Number(daily_budget));
     }
 
@@ -285,6 +302,20 @@ async function handleCreate(
     console.log(`[manage-meta-campaign] Ad set created: ${adSetId}`);
   } else if (adSetId) {
     console.log(`[manage-meta-campaign] Using existing ad set: ${adSetId}`);
+  }
+
+  // Resolve instagram_actor_id for Instagram placements
+  let igActorId: string | null = null;
+  if (pageId) {
+    try {
+      const igResult = await metaApiRequest(pageId, accessToken, 'GET', {
+        fields: 'instagram_business_account{id}',
+      });
+      if (igResult.ok && igResult.data?.instagram_business_account?.id) {
+        igActorId = igResult.data.instagram_business_account.id;
+        console.log(`[manage-meta-campaign] Resolved instagram_actor_id: ${igActorId}`);
+      }
+    } catch (_) { /* no IG account linked */ }
   }
 
   // Step 3: Create ad creative + ad if creative data is provided
@@ -360,13 +391,14 @@ async function handleCreate(
 
       console.log(`[manage-meta-campaign] DCT asset_feed_spec:`, JSON.stringify(assetFeedSpec));
 
-      // For DCT: object_story_spec only needs page_id — link_data comes from asset_feed_spec
+      // For DCT: object_story_spec only needs page_id + instagram_actor_id
+      const dctStorySpec: Record<string, any> = { page_id: pageId };
+      if (igActorId) dctStorySpec.instagram_actor_id = igActorId;
+
       const creativePayload: Record<string, any> = {
         name: `${name} - DCT Creative`,
         asset_feed_spec: JSON.stringify(assetFeedSpec),
-        object_story_spec: JSON.stringify({
-          page_id: pageId,
-        }),
+        object_story_spec: JSON.stringify(dctStorySpec),
       };
 
       const creativeResult = await metaApiRequest(
@@ -430,17 +462,20 @@ async function handleCreate(
         description: allDescriptions[0] || '',
       }));
 
+      const carouselStorySpec: Record<string, any> = {
+        page_id: pageId,
+        link_data: {
+          link: destUrl,
+          message: allTexts[0] || '',
+          child_attachments: childAttachments,
+          call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
+        },
+      };
+      if (igActorId) carouselStorySpec.instagram_actor_id = igActorId;
+
       const creativePayload = {
         name: `${name} - Carousel Creative`,
-        object_story_spec: JSON.stringify({
-          page_id: pageId,
-          link_data: {
-            link: destUrl,
-            message: allTexts[0] || '',
-            child_attachments: childAttachments,
-            call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
-          },
-        }),
+        object_story_spec: JSON.stringify(carouselStorySpec),
       };
 
       const creativeResult = await metaApiRequest(
@@ -484,12 +519,15 @@ async function handleCreate(
           linkData.description = allDescriptions[0] || description;
         }
 
+        const singleStorySpec: Record<string, any> = {
+          page_id: pageId,
+          link_data: linkData,
+        };
+        if (igActorId) singleStorySpec.instagram_actor_id = igActorId;
+
         const creativePayload = {
           name: `${name} - Creative`,
-          object_story_spec: JSON.stringify({
-            page_id: pageId,
-            link_data: linkData,
-          }),
+          object_story_spec: JSON.stringify(singleStorySpec),
         };
 
         console.log(`[manage-meta-campaign] Creating single-image ad creative for campaign ${campaignId}`);
