@@ -147,7 +147,7 @@ export function PlatformConnectionsPanel() {
       resetForm();
       fetchConnections();
     } catch (error: any) {
-      console.error('Error creating connection:', error);
+      // Error creating platform connection
       toast.error(error.message || 'Error al crear conexión');
     } finally {
       setSubmitting(false);
@@ -199,7 +199,7 @@ export function PlatformConnectionsPanel() {
       // Notify other views to refresh instantly
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
     } catch (error: any) {
-      console.error('Sync error:', error);
+      // Error syncing metrics
       toast.error('Error al sincronizar métricas');
     } finally {
       setSyncing(null);

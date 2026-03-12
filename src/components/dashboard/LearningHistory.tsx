@@ -145,8 +145,6 @@ export function LearningHistory() {
       .select('id, titulo, contenido, categoria')
       .eq('source_id', item.id);
 
-    console.log('[LearningHistory] Rules query for source_id:', item.id, '→', data?.length, 'rules, error:', queryErr);
-
     if (data && data.length > 0) {
       setExpandedRules(data as KnowledgeRule[]);
     } else if (item.processed_at || item.created_at) {

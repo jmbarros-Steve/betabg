@@ -174,7 +174,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
       const summary = buildSummaryMessage(result);
       setMessages(prev => [...prev, { role: 'assistant', text: summary, result }]);
     } catch (err) {
-      console.error('train-steve error:', err);
+      // Error during train-steve API call
       const errMsg = err instanceof Error ? err.message : 'Error desconocido';
       setMessages(prev => [
         ...prev,
@@ -244,7 +244,7 @@ export function SteveTrainingChat({ onSaved }: { onSaved?: () => void }) {
         },
       ]);
     } catch (err) {
-      console.error(err);
+      // Error saving knowledge entries
       toast.error('Error al guardar en la base de conocimientos');
     } finally {
       setSaving(false);

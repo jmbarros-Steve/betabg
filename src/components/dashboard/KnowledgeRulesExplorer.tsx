@@ -107,7 +107,6 @@ export function KnowledgeRulesExplorer() {
       })));
       setTotal(data.length);
     }
-    if (error) console.error('[KnowledgeRulesExplorer] Error:', error);
     setLoading(false);
   }, [categoryFilter, selectedDate, searchQuery]);
 

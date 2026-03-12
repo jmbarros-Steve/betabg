@@ -192,7 +192,7 @@ export function ClientsPanel({ userId }: Props) {
       setGeneratedPassword(accessForm.password);
       fetchClients();
     } catch (err) {
-      console.error('Error creating access:', err);
+      // Error creating access for client
       toast.error(err instanceof Error ? err.message : 'Error al crear acceso');
     } finally {
       setCreatingAccess(false);
