@@ -307,7 +307,7 @@ export default function ClientPortal() {
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-slate-900 leading-tight">{displayClient?.name}</p>
                 {isAdminView && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
                     Vista Admin
                   </span>
                 )}
@@ -340,8 +340,8 @@ export default function ClientPortal() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  ? 'bg-primary text-white shadow-md'
+                  : 'bg-card text-slate-600 hover:bg-slate-100 border border-border'
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -353,12 +353,12 @@ export default function ClientPortal() {
               <button
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                   secondaryTabs.some(t => t.id === activeTab)
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'bg-card text-slate-600 hover:bg-slate-100 border border-border'
                 }`}
               >
                 {secondaryTabs.find(t => t.id === activeTab)?.label || 'Más'}
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-4 h-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -366,7 +366,7 @@ export default function ClientPortal() {
                 <DropdownMenuItem
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 text-sm ${activeTab === tab.id ? 'bg-blue-50 text-blue-700' : ''}`}
+                  className={`flex items-center gap-2 text-sm ${activeTab === tab.id ? 'bg-primary/10 text-primary' : ''}`}
                 >
                   <tab.icon className="w-4 h-4" />
                   {tab.label}

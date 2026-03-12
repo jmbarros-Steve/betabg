@@ -999,7 +999,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       if (data?.success && Array.isArray(data.audiences)) {
         // Edge function returned 200 with valid data (possibly empty list) — proceed normally
       } else if (error) {
-        console.error('[MetaAudienceManager] Sync from Meta error:', error);
+        // Sync from Meta error handled via toast
         if (showErrors) {
           const errMsg = (data as any)?.error || (error as any)?.message || '';
           if (errMsg.includes('Unauthorized') || errMsg.includes('403')) {
@@ -1018,7 +1018,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         }
         return [];
       } else if (!data?.success || !Array.isArray(data.audiences)) {
-        console.warn('[MetaAudienceManager] No audiences returned from Meta', data);
+        // No audiences returned from Meta
         if (showErrors && data?.error) {
           toast.error(`Meta API: ${data.error}${data.details ? ` - ${data.details}` : ''}`);
         }
@@ -1055,7 +1055,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         } as AudienceRow;
       });
     } catch (err) {
-      console.error('[MetaAudienceManager] Sync from Meta exception:', err);
+      // Sync exception handled via toast
       return [];
     }
   }, []);
@@ -1121,7 +1121,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
       setAudiences(metaAudiences);
     } catch (err) {
-      console.error('[MetaAudienceManager] Error fetching audiences:', err);
+      // Fetch audiences error handled via toast
       toast.error('Error al cargar audiencias');
     } finally {
       setLoading(false);
@@ -1263,7 +1263,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       setCreateCustomOpen(false);
       setCustomForm({ ...EMPTY_CUSTOM_FORM });
     } catch (err) {
-      console.error('[MetaAudienceManager] Create custom error:', err);
+      // Create custom audience error handled via toast
       toast.error('Error al crear audiencia personalizada');
     } finally {
       setFormSubmitting(false);
@@ -1331,7 +1331,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       setLookalikeForm({ ...EMPTY_LOOKALIKE_FORM });
       setActiveTab('lookalike');
     } catch (err) {
-      console.error('[MetaAudienceManager] Create lookalike error:', err);
+      // Create lookalike error handled via toast
       toast.error('Error al crear audiencia similar');
     } finally {
       setFormSubmitting(false);
@@ -1371,7 +1371,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       toast.success(`Audiencia "${deleteTarget.name}" eliminada`);
       setDeleteTarget(null);
     } catch (err) {
-      console.error('[MetaAudienceManager] Delete error:', err);
+      // Delete error handled via toast
       toast.error('Error al eliminar audiencia');
     } finally {
       setDeleting(false);
@@ -1650,10 +1650,17 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                         className="h-8 w-8"
                         title="Editar"
                         onClick={() => {
+                          const sourceMap: Record<string, CustomAudienceSource> = {
+                            'Sitio Web (Pixel)': 'WEBSITE',
+                            'Lista de Clientes': 'CUSTOMER_LIST',
+                            'Interacción': 'ENGAGEMENT',
+                            'Actividad en App': 'APP_ACTIVITY',
+                          };
+                          const resolvedSource = sourceMap[audience.source] || (audience.source as CustomAudienceSource) || 'WEBSITE';
                           setCustomForm({
                             name: audience.name,
                             description: audience.description || '',
-                            source: 'WEBSITE',
+                            source: resolvedSource,
                             url_rule: '',
                             url_match_type: 'CONTAINS',
                             retention_days: audience.retention_days || 30,

@@ -275,7 +275,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       setMetrics((currentData as CampaignMetricRow[]) || []);
       setPrevMetrics((prevData as CampaignMetricRow[]) || []);
     } catch (err) {
-      console.error('Error fetching analytics:', err);
+      // Analytics fetch error handled via toast
       toast.error('Error al cargar datos de analytics');
     } finally {
       setLoading(false);

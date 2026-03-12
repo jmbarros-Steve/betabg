@@ -15,6 +15,9 @@ import { ProfitLossPanel, ProductMarginItem } from './metrics/ProfitLossPanel';
 import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
 import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
 import { KPIGridSkeleton, ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
+import { SmartInsightsPanel } from './metrics/SmartInsightsPanel';
+import { BusinessHealthScore } from './metrics/BusinessHealthScore';
+import { DayOfWeekChart } from './metrics/DayOfWeekChart';
 
 interface ClientPortalMetricsProps {
   clientId: string;
@@ -310,10 +313,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                 ? Number(configRes.data.default_margin_percentage) / 100
                 : 0.3;
               const items: ProductMarginItem[] = prodData.products.map((p: any) => {
-                const totalRevenue = (p.variants || []).reduce((sum: number, v: any) => sum + (v.price || 0), 0);
-                const hasCost = (p.variants || []).some((v: any) => v.cost !== null);
+                const totalRevenue = (p.variants || []).reduce((sum: number, v: any) => sum + (v.price ?? 0), 0);
+                const hasCost = (p.variants || []).some((v: any) => v.cost != null);
                 const totalCost = hasCost
-                  ? (p.variants || []).reduce((sum: number, v: any) => sum + (v.cost || 0), 0)
+                  ? (p.variants || []).reduce((sum: number, v: any) => sum + (v.cost ?? 0), 0)
                   : totalRevenue * (1 - marginConfig);
                 const margin = totalRevenue - totalCost;
                 const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
@@ -630,15 +633,24 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     ? current.totalRevenue / totalAdSpendWithGoogle
     : 0, [current.totalRevenue, totalAdSpendWithGoogle]);
 
-  const currencyFormatter = useCallback((n: number) => "$" + Math.round(n).toLocaleString("es-CL") + " CLP", []);
+  const aov = useMemo(() => current.totalOrders > 0
+    ? current.totalRevenue / current.totalOrders
+    : 0, [current.totalRevenue, current.totalOrders]);
+
+  const previousAov = useMemo(() => previous.totalOrders > 0
+    ? previous.totalRevenue / previous.totalOrders
+    : 0, [previous.totalRevenue, previous.totalOrders]);
+
+  const currencyFormatter = useCallback((n: number) => "$" + Math.round(n).toLocaleString("es-CL"), []);
   const roasFormatter = useCallback((n: number) => n.toFixed(2) + "x", []);
 
   const statCards = useMemo(() => [
-    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')} CLP`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600', tooltip: 'Ingresos totales de Shopify en el período seleccionado', formatter: currencyFormatter },
-    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')} CLP`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el período', formatter: currencyFormatter },
+    { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')}`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600', tooltip: 'Ingresos totales de Shopify en el período seleccionado', formatter: currencyFormatter },
+    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')}`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el período', formatter: currencyFormatter },
     { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600', tooltip: 'Número total de pedidos completados en Shopify', formatter: undefined },
-    { title: 'ROAS Promedio', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600', tooltip: 'Return On Ad Spend — ingresos generados por cada $1 invertido en publicidad. Sobre 3x es bueno, sobre 5x es excelente', formatter: roasFormatter },
-  ], [current, previous, totalAdSpendWithGoogle, effectiveRoas, currencyFormatter, roasFormatter]);
+    { title: 'Ticket Promedio', value: `$${Math.round(aov).toLocaleString('es-CL')}`, currentNum: aov, prevValue: previousAov, icon: ShoppingCart, color: 'text-amber-600', tooltip: 'Valor promedio de cada pedido. Subirlo es la forma más rápida de aumentar ingresos sin necesitar más clientes', formatter: currencyFormatter },
+    { title: 'ROAS', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600', tooltip: 'Return On Ad Spend — ingresos generados por cada $1 invertido en publicidad. Sobre 3x es bueno, sobre 5x es excelente', formatter: roasFormatter },
+  ], [current, previous, totalAdSpendWithGoogle, effectiveRoas, aov, previousAov, currencyFormatter, roasFormatter]);
 
   const hasData = useMemo(() => current.totalRevenue > 0 || totalAdSpendWithGoogle > 0 || current.totalOrders > 0, [current.totalRevenue, totalAdSpendWithGoogle, current.totalOrders]);
 
@@ -703,21 +715,21 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             customRange={customDateRange}
             onCustomRangeChange={setCustomDateRange}
           />
-          <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar métricas a CSV">
+          <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar métricas a CSV" aria-label="Exportar métricas a CSV">
             <Download className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       {/* KPI Cards with comparison */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => {
           const change = getChangePercent(
             stat.currentNum,
             stat.prevValue || 0
           );
           return (
-            <Card key={stat.title} className="bg-white border border-slate-200 rounded-xl card-hover">
+            <Card key={stat.title} className="bg-card border border-border rounded-xl card-hover">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                   {stat.title}
@@ -767,6 +779,35 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
       {hasData ? (
         <>
+          {/* Business Health Score */}
+          <BusinessHealthScore
+            roas={effectiveRoas}
+            breakEvenRoas={profitMetrics.breakEvenRoas}
+            netProfitMargin={profitLossData.netProfitMargin}
+            conversionRate={customerMetrics?.conversionRate}
+            repeatCustomerRate={customerMetrics?.repeatCustomerRate}
+            aov={aov}
+          />
+
+          {/* Smart Insights */}
+          <SmartInsightsPanel data={{
+            totalRevenue: current.totalRevenue,
+            totalOrders: current.totalOrders,
+            totalSpend: totalAdSpendWithGoogle,
+            roas: effectiveRoas,
+            breakEvenRoas: profitMetrics.breakEvenRoas,
+            netProfit: profitLossData.netProfit,
+            netProfitMargin: profitLossData.netProfitMargin,
+            aov,
+            conversionRate: customerMetrics?.conversionRate,
+            repeatCustomerRate: customerMetrics?.repeatCustomerRate,
+            abandonedCartsCount: abandonedCarts.length,
+            abandonedCartsValue: abandonedCarts.reduce((s, c) => s + c.totalValue, 0),
+            previousRevenue: previous.totalRevenue,
+            previousOrders: previous.totalOrders,
+            previousSpend: previous.totalSpend,
+          }} />
+
           {/* Charts */}
           <MetricsCharts revenueData={chartData} previousRevenueData={previousChartData.length > 0 ? previousChartData : undefined} currency="CLP" />
 
@@ -782,6 +823,11 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             currentRoas={profitMetrics.currentRoas}
             currency="CLP"
           />
+
+          {/* Day of Week Analysis */}
+          {chartData.length >= 7 && (
+            <DayOfWeekChart dailyData={chartData} />
+          )}
 
           {/* Conversion & LTV */}
           {customerMetrics ? (
@@ -821,7 +867,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           {/* Removed: SKUs & Abandoned Carts moved to Shopify tab */}
         </>
       ) : (
-        <Card className="bg-white border border-slate-200 rounded-xl">
+        <Card className="bg-card border border-border rounded-xl">
           <CardContent className="py-16 text-center">
             <Target className="w-10 h-10 mx-auto text-muted-foreground/40 mb-4" />
             <p className="font-medium text-muted-foreground mb-1">Sin métricas disponibles</p>

@@ -139,7 +139,7 @@ function generateInsights(
     insights.push({
       type: 'success',
       title: 'Excelente Open Rate',
-      message: `Excelente open rate (${openRatePct}%). Tu audiencia esta engaged.`,
+      message: `Excelente open rate (${openRatePct}%). Tu audiencia está engaged.`,
       icon: 'check_circle',
     });
   } else {
@@ -157,14 +157,14 @@ function generateInsights(
     insights.push({
       type: 'warning',
       title: 'Click Rate Bajo',
-      message: `Click rate bajo (${clickRatePct}%). Revisa tus CTAs y asegurate de tener uno solo y claro.`,
+      message: `Click rate bajo (${clickRatePct}%). Revisa tus CTAs y asegúrate de tener uno solo y claro.`,
       icon: 'alert_triangle',
     });
   } else if (globalStats.avgClickRate > 0.04) {
     insights.push({
       type: 'success',
       title: 'Gran Click Rate',
-      message: `Gran click rate (${clickRatePct}%). Tus CTAs estan funcionando.`,
+      message: `Gran click rate (${clickRatePct}%). Tus CTAs están funcionando.`,
       icon: 'trending_up',
     });
   }
@@ -181,7 +181,7 @@ function generateInsights(
     insights.push({
       type: 'warning',
       title: 'Sin Ingresos por Email',
-      message: 'Sin ingresos por email aun. Activa flujos de abandoned cart y post-purchase.',
+      message: 'Sin ingresos por email aún. Activa flujos de abandoned cart y post-purchase.',
       icon: 'alert_triangle',
     });
   }
@@ -191,14 +191,14 @@ function generateInsights(
     insights.push({
       type: 'critical',
       title: 'Sin Flujos Activos',
-      message: 'No tienes flujos activos. Los flujos generan 30-50% del revenue por email. Activalos ya.',
+      message: 'No tienes flujos activos. Los flujos generan 30-50% del revenue por email. Actívalos ya.',
       icon: 'x_circle',
     });
   } else if (globalStats.activeFlows < 3) {
     insights.push({
       type: 'warning',
       title: 'Pocos Flujos Activos',
-      message: `Solo ${globalStats.activeFlows} flujos activos. Recomendamos minimo 5 flujos core.`,
+      message: `Solo ${globalStats.activeFlows} flujos activos. Recomendamos mínimo 5 flujos core.`,
       icon: 'zap',
     });
   } else if (globalStats.activeFlows >= 5) {
@@ -243,8 +243,8 @@ function generateInsights(
   if (recentCampaigns.length < 2) {
     insights.push({
       type: 'warning',
-      title: 'Frecuencia de Envio',
-      message: `Solo ${recentCampaigns.length} campanas enviadas este mes. Manten 2-3 por semana para engaged subscribers.`,
+      title: 'Frecuencia de Envío',
+      message: `Solo ${recentCampaigns.length} campañas enviadas este mes. Mantén 2-3 por semana para engaged subscribers.`,
       icon: 'mail',
     });
   }
@@ -377,8 +377,8 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
 
       if (fnError) {
         console.error('Error fetching Klaviyo metrics:', fnError);
-        setError(fnError || 'Error al cargar metricas');
-        toast.error('Error al cargar metricas de Klaviyo');
+        setError(fnError || 'Error al cargar métricas');
+        toast.error('Error al cargar métricas de Klaviyo');
         return;
       }
 
@@ -397,7 +397,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
         );
         setInsights(generated);
       } else {
-        setError('Respuesta sin metricas globales');
+        setError('Respuesta sin métricas globales');
       }
 
       if (data.flows) setFlows(data.flows);
@@ -427,7 +427,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
         <CardContent className="py-8 text-center">
           <Mail className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-muted-foreground text-sm">
-            Conecta Klaviyo en la pestana "Conexiones" para ver tus metricas de email
+            Conecta Klaviyo en la pestaña "Conexiones" para ver tus métricas de email
           </p>
         </CardContent>
       </Card>
@@ -444,7 +444,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
               <Skeleton key={i} className="h-14 w-full rounded-lg" />
             ))}
             <p className="text-xs text-muted-foreground text-center">
-              Verificando conexion...
+              Verificando conexión...
             </p>
           </div>
         </CardContent>
@@ -453,7 +453,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
   }
 
   const timeframeLabel =
-    TIMEFRAME_OPTIONS.find((o) => o.value === timeframe)?.label || '30 dias';
+    TIMEFRAME_OPTIONS.find((o) => o.value === timeframe)?.label || '30 días';
 
   return (
     <div className="space-y-6">
@@ -464,7 +464,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
-                Metricas de Klaviyo
+                Métricas de Klaviyo
               </CardTitle>
               <CardDescription>
                 Rendimiento de los últimos {timeframeLabel}
@@ -507,7 +507,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="w-4 h-4 text-primary animate-pulse" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Steve esta analizando tus metricas...
+                  Steve está analizando tus métricas...
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -576,7 +576,7 @@ export function MetricsInsights({ clientId }: MetricsInsightsProps) {
                   icon={Zap}
                 />
                 <StatCard
-                  label="Campanas Enviadas"
+                  label="Campañas Enviadas"
                   value={`${globalStats.sentCampaigns}`}
                   subtitle={`de ${globalStats.totalCampaigns} totales`}
                   icon={Megaphone}

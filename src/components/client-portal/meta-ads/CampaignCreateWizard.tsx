@@ -1342,7 +1342,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           const cpaMax = Math.round(margin * 0.30);
           if (cpaMax > 0 && !cpaTarget) {
             setCpaTarget(String(cpaMax));
-            console.log(`[Wizard] CPA auto-loaded from brief: $${cpaMax} (price=${price}, cost=${cost}, shipping=${shipping})`);
+            // CPA auto-loaded from brief data
           }
         }
 
@@ -1483,24 +1483,20 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             'Responde SOLO con JSON: {"texts":["texto"],"headlines":["headline"],"descriptions":["descripción"]}',
           ].join('\n');
 
-      console.log('[Wizard] Generating copy with instruction mode...', { clientId, isMulti, selectedAngle, funnelStage });
       const { data, error } = await callApi('generate-meta-copy', {
         body: {
           client_id: clientId,
           instruction,
         },
       });
-      console.log('[Wizard] Copy API response:', { data: data ? 'received' : 'null', error });
       if (error) throw new Error(error);
       const raw = data?.copy || data?.text || '';
       if (!raw) {
-        console.warn('[Wizard] Empty copy response');
         toast.error('Steve no devolvió copy — intenta de nuevo');
         return null;
       }
       try {
         const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}');
-        console.log('[Wizard] Parsed copy:', parsed);
         const result = { texts: [] as string[], headlines: [] as string[], descriptions: [] as string[] };
         if (isMulti) {
           if (parsed.texts?.length) { setPrimaryTexts(parsed.texts.slice(0, 2)); result.texts = parsed.texts.slice(0, 2); }
@@ -1519,12 +1515,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         return result;
       } catch {
         // AI didn't return valid JSON — use raw text as primary text
-        console.warn('[Wizard] Could not parse JSON, using raw text');
         setPrimaryTexts([raw.slice(0, 500)]);
         return { texts: [raw.slice(0, 500)], headlines: [], descriptions: [] };
       }
     } catch (err: any) {
-      console.error('[Wizard] Copy generation error:', err);
       toast.error(err?.message || 'Error generando copy');
       return null;
     } finally {
@@ -1544,7 +1538,6 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     autoGenRef.current = true;
 
     // Auto-generate copy first, then use it to generate a proper image via brief-visual
-    console.log('[Wizard] Auto-generating copy on ad-creative step entry');
     (async () => {
       setAutoGenerating(true);
       setAutoGenProgress('Generando copies...');
@@ -1578,14 +1571,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           };
 
           setAutoGenProgress(`Generando imagen ${slot + 1} de ${imageCount}...`);
-          console.log(`[Wizard] Generating brief-visual for image ${slot + 1}/${imageCount}:`, { angleValue, composition: composition.slice(0, 40) });
+          // Generate brief-visual for image
 
           const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
             body: { clientId, formato: 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData },
           });
 
           if (briefErr || !briefData?.prompt_generacion) {
-            console.error(`[Wizard] Brief-visual error for image ${slot + 1}:`, briefErr);
+            // Brief-visual error, skip to next image
             continue;
           }
 
@@ -1596,7 +1589,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           });
 
           if (imgErr) {
-            console.error(`[Wizard] Image ${slot + 1} error:`, imgErr);
+            // Image generation error, skip to next
             if (imgErr === 'NO_CREDITS') { toast.error('Sin créditos para generar más imágenes'); break; }
             continue;
           }

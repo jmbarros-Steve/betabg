@@ -841,7 +841,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       await fetchResearch();
       setAnalysisStatus('complete');
       setProgressStep(null);
-      toast.success('Análisis aplicado automáticamente — revisa las pestañas SEO, Keywords y Competencia.');
+      toast.success('Análisis aplicado correctamente');
     }
 
     (async () => {
@@ -852,7 +852,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         return;
       }
       console.log('[BrandBriefView] A los 120s — aún no hay datos, esperando resultados del backend…');
-      toast.info('El análisis está tardando. Se aplicará automáticamente cuando haya resultados.');
+      toast.info('Análisis en progreso, se aplicará automáticamente');
       dataCheckIntervalRef.current = setInterval(async () => {
         if (await hasResearchData()) {
           console.log('[BrandBriefView] Datos de análisis detectados — aplicando en las pestañas');
@@ -874,7 +874,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     await fetchResearch();
     setAnalysisStatus('complete');
     setProgressStep(null);
-    toast.success('Análisis cargado — mostrando datos disponibles.');
+    toast.success('Análisis cargado');
   }
 
   // Re-fetch research data whenever analysisStatus transitions to 'complete'
@@ -925,7 +925,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         await fetchResearch();
         setAnalysisStatus('complete');
         setProgressStep(null);
-        toast.success('¡Análisis SEO y Keywords completado! Ya puedes descargar el informe completo.');
+        toast.success('Análisis SEO y Keywords completado');
       } else if (status === 'error') {
         setAnalysisStatus('error');
         setProgressStep(null);
@@ -1506,7 +1506,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   async function handleReanalyze() {
     const websiteUrl = clientInfo?.website_url || '';
     if (!websiteUrl) {
-      toast.error('No hay URL de sitio web. Completa el brief primero.');
+      toast.error('No hay URL de sitio web, completa el brief primero');
       return;
     }
     setProgressStep(null);
@@ -1527,7 +1527,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     // Update UI state immediately so banner shows right away
     setAnalysisStatus('pending');
     setProgressStep({ step: 'inicio', detail: 'Iniciando análisis de marca...', pct: 2 });
-    toast.info('Iniciando análisis — Steve está investigando tus competidores...');
+    toast.info('Iniciando análisis de competidores');
 
     // Two-phase analysis: research (data analysis) → strategy (AI strategy)
     // Each phase fits within the 150s edge function timeout
@@ -3342,10 +3342,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     }
 
     doc.save(`Brief_Estrategico_${clientInfo?.name || 'Marca'}_${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('Brief estratégico descargado con éxito');
+    toast.success('Brief estratégico descargado');
     } catch (pdfError) {
       console.error('Error generando PDF:', pdfError);
-      toast.error('Error al generar el PDF. Intenta nuevamente.');
+      toast.error('Error al generar el PDF');
     }
   }
 

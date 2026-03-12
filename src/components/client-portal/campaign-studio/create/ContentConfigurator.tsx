@@ -169,7 +169,7 @@ export function ContentConfigurator({
       onUpdate({ products: mapped });
     } catch (err: any) {
       console.error('Error loading collection products:', err);
-      toast.error('Error al cargar productos de la coleccion');
+      toast.error('Error al cargar productos de la colección');
     } finally {
       setLoadingProducts(false);
     }
@@ -239,7 +239,7 @@ export function ContentConfigurator({
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold text-base">Contenido de la Campana</h3>
+        <h3 className="font-semibold text-base">Contenido de la Campaña</h3>
         <p className="text-sm text-muted-foreground mt-1">
           Configura el asunto, textos y productos. Steve te ayuda a optimizar todo.
         </p>
@@ -318,7 +318,7 @@ export function ContentConfigurator({
           {!campaignData.previewText && campaignData.subject && (
             <p className="text-[10px] text-yellow-600 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
-              No dejes el preview text vacio — mejora tu open rate
+              No dejes el preview text vacío — mejora tu open rate
             </p>
           )}
         </div>
@@ -327,12 +327,12 @@ export function ContentConfigurator({
       {/* Title and Intro */}
       <div className="grid grid-cols-1 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="title">Titulo del email</Label>
+          <Label htmlFor="title">Título del email</Label>
           <Input
             id="title"
             value={campaignData.title}
             onChange={(e) => onUpdate({ title: e.target.value })}
-            placeholder="Titulo principal del email"
+            placeholder="Título principal del email"
           />
         </div>
 
@@ -372,7 +372,7 @@ export function ContentConfigurator({
       {/* Collection selector */}
       {campaignType === 'collection' && (
         <div className="space-y-2">
-          <Label>Coleccion de Shopify</Label>
+          <Label>Colección de Shopify</Label>
           {loadingCollections ? (
             <Skeleton className="h-10 w-full" />
           ) : collections.length === 0 ? (
@@ -391,7 +391,7 @@ export function ContentConfigurator({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona una coleccion" />
+                <SelectValue placeholder="Selecciona una colección" />
               </SelectTrigger>
               <SelectContent>
                 {collections.map((col) => (
@@ -409,12 +409,12 @@ export function ContentConfigurator({
       {campaignType === 'promotional' && (
         <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
           <h4 className="font-medium text-sm flex items-center gap-2">
-            <Badge variant="secondary">Cupon</Badge>
-            Configuracion del descuento
+            <Badge variant="secondary">Cupón</Badge>
+            Configuración del descuento
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="couponCode">Codigo del cupon</Label>
+              <Label htmlFor="couponCode">Código del cupón</Label>
               <Input
                 id="couponCode"
                 value={campaignData.couponCode}
@@ -424,7 +424,7 @@ export function ContentConfigurator({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="couponExpiry">Fecha de expiracion</Label>
+              <Label htmlFor="couponExpiry">Fecha de expiración</Label>
               <Input
                 id="couponExpiry"
                 type="date"
@@ -434,7 +434,7 @@ export function ContentConfigurator({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="couponDescription">Descripcion del descuento</Label>
+            <Label htmlFor="couponDescription">Descripción del descuento</Label>
             <Input
               id="couponDescription"
               value={campaignData.couponDescription}
@@ -492,7 +492,7 @@ export function ContentConfigurator({
             <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg border-dashed">
               {shopifyConnectionId
                 ? 'Haz clic en "Cargar productos" para importar desde Shopify'
-                : 'Conecta Shopify para cargar productos automaticamente'}
+                : 'Conecta Shopify para cargar productos automáticamente'}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -531,7 +531,7 @@ export function ContentConfigurator({
       {/* CTA */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="ctaText">Texto del boton CTA</Label>
+          <Label htmlFor="ctaText">Texto del botón CTA</Label>
           <Input
             id="ctaText"
             value={campaignData.ctaText}
@@ -540,7 +540,7 @@ export function ContentConfigurator({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="ctaUrl">URL del boton CTA</Label>
+          <Label htmlFor="ctaUrl">URL del botón CTA</Label>
           <Input
             id="ctaUrl"
             value={campaignData.ctaUrl}
@@ -588,7 +588,7 @@ export function ContentConfigurator({
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Haz clic en "Analizar" para que Steve revise tu contenido y te de recomendaciones.
+              Haz clic en "Analizar" para que Steve revise tu contenido y te dé recomendaciones.
             </p>
           )}
         </div>

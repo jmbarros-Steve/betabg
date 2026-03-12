@@ -190,7 +190,7 @@ export function CampaignCreationWizard({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-lg font-semibold">
-            {editCampaign ? 'Editar Campana' : 'Crear Campana'}
+            {editCampaign ? 'Editar Campaña' : 'Crear Campaña'}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             {CAMPAIGN_TEMPLATES[campaignData.type].label} — Paso {step + 1} de 4
@@ -284,7 +284,7 @@ export function CampaignCreationWizard({
             ) : (
               <>
                 <ArrowLeft className="w-4 h-4 mr-1" />
-                Atras
+                Atrás
               </>
             )}
           </Button>

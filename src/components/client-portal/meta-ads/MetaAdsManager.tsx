@@ -786,7 +786,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         !campaignsRes.value.error;
 
       if (ok) {
-        toast.success(`Negocio seleccionado: ${portfolio.name}`, { id: 'portfolio-switch' });
+        toast.success('Negocio seleccionado correctamente', { id: 'portfolio-switch' });
       } else {
         toast.warning('Negocio seleccionado, sincronización parcial', { id: 'portfolio-switch' });
       }
@@ -905,7 +905,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         )}
         {key === 'social-inbox' && <MetaSocialInbox clientId={clientId} />}
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
-        {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={(id) => { console.log('Edit draft:', id); handleNavClick('create-wizard'); }} />}
+        {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={() => { handleNavClick('create-wizard'); }} />}
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
         {key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
       </div>

@@ -31,8 +31,8 @@ const COMMON_ENDING: EmailSection[] = [
 export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
   best_sellers: {
     type: 'best_sellers',
-    label: 'Mas Vendidos',
-    description: 'Los productos mas vendidos del periodo. Ideal para generar confianza y urgencia con social proof.',
+    label: 'Más Vendidos',
+    description: 'Los productos más vendidos del periodo. Ideal para generar confianza y urgencia con social proof.',
     icon: 'TrendingUp',
     sections: [
       { type: 'header' },
@@ -54,8 +54,8 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
 
   most_viewed: {
     type: 'most_viewed',
-    label: 'Mas Vistos',
-    description: 'Los productos que mas estan mirando. Perfecto para campanas semanales dinamicas con datos reales.',
+    label: 'Más Vistos',
+    description: 'Los productos que más están mirando. Perfecto para campañas semanales dinámicas con datos reales.',
     icon: 'Eye',
     sections: [
       { type: 'header' },
@@ -77,8 +77,8 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
 
   collection: {
     type: 'collection',
-    label: 'Coleccion',
-    description: 'Destaca una coleccion de Shopify con hero image y productos seleccionados.',
+    label: 'Colección',
+    description: 'Destaca una colección de Shopify con hero image y productos seleccionados.',
     icon: 'Layers',
     sections: [
       { type: 'header' },
@@ -102,7 +102,7 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
   new_arrivals: {
     type: 'new_arrivals',
     label: 'Novedades',
-    description: 'Los productos mas nuevos de la tienda. Genera expectativa y novedad con tu audiencia.',
+    description: 'Los productos más nuevos de la tienda. Genera expectativa y novedad con tu audiencia.',
     icon: 'Sparkles',
     sections: [
       { type: 'header' },
@@ -125,7 +125,7 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
   promotional: {
     type: 'promotional',
     label: 'Promocional',
-    description: 'Campana con descuento o cupon. Ideal para cierres de mes, fechas especiales o flash sales.',
+    description: 'Campaña con descuento o cupón. Ideal para cierres de mes, fechas especiales o flash sales.',
     icon: 'Megaphone',
     sections: [
       { type: 'header' },
@@ -149,7 +149,7 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignType, CampaignTemplate> = {
   custom: {
     type: 'custom',
     label: 'Personalizado',
-    description: 'Disena tu email desde cero con bloques libres, tu identidad de marca y ayuda de Steve.',
+    description: 'Diseña tu email desde cero con bloques libres, tu identidad de marca y ayuda de Steve.',
     icon: 'Paintbrush',
     sections: [
       { type: 'header' },

@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
-import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, CheckCircle, AlertTriangle, Image, Type, FileText, ChevronDown } from 'lucide-react';
-import { AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
+import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, CheckCircle, AlertTriangle, Image, Type, FileText, ChevronDown, DollarSign, Package, Percent, HelpCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
+import { DayOfWeekChart } from './metrics/DayOfWeekChart';
+import { AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Line } from 'recharts';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
@@ -55,7 +58,25 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [utmPerformance, setUtmPerformance] = useState<UtmData[]>([]);
   const [seoProducts, setSeoProducts] = useState<any[]>([]);
   const [dailyBreakdown, setDailyBreakdown] = useState<{ date: string; revenue: number; orders: number }[]>([]);
-  const [daysBack, setDaysBack] = useState(30);
+  const [dateRange, setDateRange] = useState<DateRange>('30d');
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange | undefined>(undefined);
+
+  // Convert dateRange to daysBack for the API
+  const daysBack = useMemo(() => {
+    const now = new Date();
+    switch (dateRange) {
+      case '7d': return 7;
+      case '30d': return 30;
+      case '90d': return 90;
+      case 'mtd': return Math.max(now.getDate() - 1, 1);
+      case 'ytd': return Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
+      case 'custom': {
+        if (!customDateRange) return 30;
+        return Math.ceil((customDateRange.to.getTime() - customDateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      }
+      default: return 30;
+    }
+  }, [dateRange, customDateRange]);
 
   // Responsive: detect mobile for chart adjustments
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -109,7 +130,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
         setSeoProducts(productsRes.data.products);
       }
     } catch (e: any) {
-      console.warn('[ShopifyDashboard] Error:', e);
+      // Dashboard error handled silently
     } finally {
       setLoading(false);
     }
@@ -132,7 +153,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   if (!hasConnection) {
     return (
-      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+      <Card className="bg-card border border-border rounded-xl card-hover">
         <CardContent className="py-12 text-center">
           <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">Conecta Shopify en la pestaña "Conexiones" para ver tu dashboard</p>
@@ -160,6 +181,19 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   const totalChannelRevenue = salesByChannel.reduce((s, c) => s + c.revenue, 0);
 
+  // Summary KPIs
+  const shopifyTotalRevenue = dailyBreakdown.reduce((s, d) => s + d.revenue, 0);
+  const shopifyTotalOrders = dailyBreakdown.reduce((s, d) => s + d.orders, 0);
+  const shopifyAov = shopifyTotalOrders > 0 ? shopifyTotalRevenue / shopifyTotalOrders : 0;
+  const abandonedValue = abandonedCarts.reduce((s, c) => s + c.totalValue, 0);
+
+  const shopifyKpis = [
+    { title: 'Ingresos del Período', value: `$${Math.round(shopifyTotalRevenue).toLocaleString('es-CL')}`, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-100', tooltip: 'Ingresos totales de tu tienda Shopify en el período seleccionado' },
+    { title: 'Pedidos', value: shopifyTotalOrders.toLocaleString('es-CL'), icon: Package, color: 'text-blue-600', bgColor: 'bg-blue-100', tooltip: 'Cantidad de pedidos completados en el período' },
+    { title: 'Ticket Promedio', value: shopifyTotalOrders > 0 ? `$${Math.round(shopifyAov).toLocaleString('es-CL')}` : '—', icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-100', tooltip: 'Valor promedio de cada pedido. Aumentarlo es clave para crecer sin necesitar más clientes' },
+    { title: 'Dinero en Carritos', value: `$${Math.round(abandonedValue).toLocaleString('es-CL')}`, subtitle: `${abandonedCarts.length} carritos abandonados`, icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', tooltip: 'Valor total de carritos abandonados. Contacta a estos clientes por WhatsApp o email para recuperar ventas' },
+  ] as const;
+
   const formatCurrency = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
@@ -172,36 +206,61 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight mb-1">Dashboard Shopify</h2>
+          <h2 className="text-xl font-bold tracking-tight mb-1">Panel Shopify</h2>
           <p className="text-muted-foreground text-sm">Análisis completo de tu tienda</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1 bg-muted p-1 rounded-lg">
-            {[7, 30, 90].map((d) => (
-              <Button
-                key={d}
-                variant={daysBack === d ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setDaysBack(d)}
-                className="text-xs h-7 px-3"
-              >
-                {d} días
-              </Button>
-            ))}
-          </div>
-          <Button variant="outline" size="sm" onClick={fetchAnalytics}>
+          <MetricsDateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            customRange={customDateRange}
+            onCustomRangeChange={setCustomDateRange}
+          />
+          <Button variant="outline" size="sm" onClick={fetchAnalytics} aria-label="Actualizar datos">
             <RefreshCw className="w-4 h-4 mr-1" />
             Actualizar
           </Button>
         </div>
       </div>
 
+      {/* KPI Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {shopifyKpis.map((kpi) => (
+          <Card key={kpi.title} className="bg-card border border-border rounded-xl card-hover">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  {kpi.title}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p>{kpi.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </span>
+                <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
+                  <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold tabular-nums tracking-tight">{kpi.value}</p>
+              {'subtitle' in kpi && kpi.subtitle && (
+                <p className="text-xs text-muted-foreground mt-1">{kpi.subtitle}</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       {/* Daily Sales Chart */}
       {dailyBreakdown.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+          <Card className="bg-card border border-border rounded-xl card-hover">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
                 Ventas por Día
               </CardTitle>
@@ -219,13 +278,16 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                     <XAxis dataKey="date" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={(val: string) => val.slice(5)} interval={isMobile ? 'preserveStartEnd' : 0} angle={isMobile ? -45 : 0} textAnchor={isMobile ? 'end' : 'middle'} height={isMobile ? 60 : 30} />
                     <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={formatCurrency} width={isMobile ? 45 : 60} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" width={isMobile ? 35 : 50} />
-                    <Tooltip
+                    <RechartsTooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                       formatter={(value: number, name: string) => [
                         name === 'revenue' ? `$${value.toLocaleString('es-CL')} CLP` : value.toLocaleString('es-CL'),
                         name === 'revenue' ? 'Ingresos' : 'Pedidos'
                       ]}
-                      labelFormatter={(label) => `Fecha: ${label}`}
+                      labelFormatter={(label: string) => {
+                        const d = new Date(label + 'T12:00:00');
+                        return isNaN(d.getTime()) ? label : d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+                      }}
                     />
                     <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#shopifyRevGrad)" name="revenue" />
                     <Bar yAxisId="right" dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.4} name="orders" />
@@ -245,9 +307,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
           </Card>
 
           {/* Abandoned Carts by Day */}
-          <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+          <Card className="bg-card border border-border rounded-xl card-hover">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
                 Carritos Abandonados por Día
               </CardTitle>
@@ -260,20 +322,23 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
                       <XAxis dataKey="date" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={(val: string) => val.slice(5)} interval={isMobile ? 'preserveStartEnd' : 0} angle={isMobile ? -45 : 0} textAnchor={isMobile ? 'end' : 'middle'} height={isMobile ? 60 : 30} />
                       <YAxis yAxisId="left" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" width={isMobile ? 35 : 50} />
                       <YAxis yAxisId="right" orientation="right" tick={{ fontSize: isMobile ? 10 : 12 }} className="text-muted-foreground" tickFormatter={formatCurrency} width={isMobile ? 45 : 60} />
-                      <Tooltip
+                      <RechartsTooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                         formatter={(value: number, name: string) => [
                           name === 'value' ? `$${value.toLocaleString('es-CL')} CLP` : value.toLocaleString('es-CL'),
-                          name === 'value' ? 'Valor Perdido' : 'Carritos'
+                          name === 'value' ? 'Valor en Carritos' : 'Carritos'
                         ]}
-                        labelFormatter={(label) => `Fecha: ${label}`}
+                        labelFormatter={(label: string) => {
+                          const d = new Date(label + 'T12:00:00');
+                          return isNaN(d.getTime()) ? label : d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+                        }}
                       />
                       <Bar yAxisId="left" dataKey="count" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} opacity={0.7} name="count" />
                       <Line yAxisId="right" type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} name="value" />
                     </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-muted-foreground text-sm text-center py-6">No hay carritos abandonados en este período</p>
+                <p className="text-muted-foreground text-sm text-center py-6">Sin carritos abandonados en este período</p>
               )}
               {abandonedCartsByDay.length > 0 && (
                 <div className="flex items-center justify-center gap-6 mt-4 text-xs">
@@ -292,10 +357,15 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
         </div>
       )}
 
+      {/* Day of Week Analysis */}
+      {dailyBreakdown.length >= 7 && (
+        <DayOfWeekChart dailyData={dailyBreakdown} />
+      )}
+
       {/* Ventas por Canal */}
-      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+      <Card className="bg-card border border-border rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Globe className="w-4 h-4" />
             Ventas por Canal
           </CardTitle>
@@ -341,9 +411,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       </div>
 
       {/* UTMs con más ventas */}
-      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+      <Card className="bg-card border border-border rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Link2 className="w-4 h-4" />
             UTMs con Más Ventas
           </CardTitle>
@@ -466,9 +536,9 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
 
   if (products.length === 0) {
     return (
-      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+      <Card className="bg-card border border-border rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Search className="w-4 h-4" />
             Análisis SEO Rápido
           </CardTitle>
@@ -555,11 +625,11 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
   };
 
   return (
-    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Search className="w-4 h-4" />
               Análisis SEO Rápido
             </CardTitle>

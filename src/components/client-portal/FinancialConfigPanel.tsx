@@ -130,7 +130,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
   const handleSave = async () => {
     // Validate values are in CLP range
     if (hasLowValues) {
-      toast.error('Los valores parecen estar en USD. Por favor, ingresa los montos en Pesos Chilenos (CLP).', {
+      toast.error('Valores parecen estar en USD, ingresa en CLP', {
         description: 'Ejemplo: $29.000 CLP en vez de $29 USD',
         duration: 5000,
       });
@@ -263,7 +263,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Margin Settings */}
-        <Card className="bg-white border border-slate-200 rounded-xl p-6">
+        <Card className="bg-card border border-border rounded-xl p-6">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Percent className="w-4 h-4" />
@@ -273,7 +273,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
               Define cómo calcular la rentabilidad de tus productos
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="default_margin">Margen promedio global (%)</Label>
               <div className="flex items-center gap-2">
@@ -366,7 +366,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
         </Card>
 
         {/* Fixed Costs & Operational Costs */}
-        <Card className="bg-white border border-slate-200 rounded-xl p-6">
+        <Card className="bg-card border border-border rounded-xl p-6">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <DollarSign className="w-4 h-4" />

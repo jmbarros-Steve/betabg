@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Target, Users, Percent, BarChart3, HelpCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Target, Users, Percent, BarChart3, HelpCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ProfitMetric {
@@ -61,9 +61,9 @@ export function ProfitMetricsPanel({
   currentRoas,
   currency = 'CLP',
 }: ProfitMetricsPanelProps) {
-  const poasChange = previousPoas ? ((poas - previousPoas) / previousPoas) * 100 : undefined;
-  const cacChange = previousCac ? ((cac - previousCac) / previousCac) * 100 : undefined;
-  const merChange = previousMer ? ((mer - previousMer) / previousMer) * 100 : undefined;
+  const poasChange = previousPoas && previousPoas !== 0 ? ((poas - previousPoas) / Math.abs(previousPoas)) * 100 : undefined;
+  const cacChange = previousCac && previousCac !== 0 ? ((cac - previousCac) / Math.abs(previousCac)) * 100 : undefined;
+  const merChange = previousMer && previousMer !== 0 ? ((mer - previousMer) / Math.abs(previousMer)) * 100 : undefined;
 
   const isRoasAboveBreakeven = currentRoas >= breakEvenRoas;
 
@@ -81,9 +81,9 @@ export function ProfitMetricsPanel({
       label: 'CAC',
       value: `$${Math.round(cac).toLocaleString('es-CL')}`,
       previousValue: previousCac ? `$${Math.round(previousCac).toLocaleString('es-CL')}` : undefined,
-      changePercent: cacChange ? -cacChange : undefined, // Invert because lower CAC is better
-      description: 'Costo de Adquisición por Cliente',
-      tooltip: 'Costo de Adquisición de Cliente — cuánto cuesta conseguir un nuevo cliente. Mientras más bajo, mejor',
+      changePercent: cacChange !== undefined ? -cacChange : undefined, // Invert because lower CAC is better
+      description: 'Costo por cada nuevo cliente',
+      tooltip: 'Cuánto cuesta conseguir un nuevo cliente a través de publicidad. Mientras más bajo, mejor. El cambio % se muestra invertido: verde significa que bajó (bueno)',
       icon: Users,
     },
     {
@@ -116,7 +116,7 @@ export function ProfitMetricsPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
-          <Card key={metric.label} className="bg-white border border-slate-200 rounded-xl card-hover">
+          <Card key={metric.label} className="bg-card border border-border rounded-xl card-hover">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -161,8 +161,10 @@ export function ProfitMetricsPanel({
                 <TrendingDown className="w-6 h-6 text-destructive" />
               )}
               <div>
-                <p className="font-semibold">
-                  {isRoasAboveBreakeven ? '✅ Operación rentable' : '⚠️ Por debajo del break-even'}
+                <p className="font-semibold flex items-center gap-1.5">
+                  {isRoasAboveBreakeven
+                    ? <><CheckCircle className="w-4 h-4 text-green-600 inline" /> Operación rentable</>
+                    : <><AlertTriangle className="w-4 h-4 text-amber-600 inline" /> Por debajo del break-even</>}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   ROAS actual: {currentRoas.toFixed(2)}x | Break-even: {breakEvenRoas.toFixed(2)}x

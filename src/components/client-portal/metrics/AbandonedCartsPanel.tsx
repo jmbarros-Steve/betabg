@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Check, X, Mail, Phone, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Check, X, Mail, Phone, MessageCircle, ChevronDown, ChevronUp, AlertTriangle, Send, Copy } from 'lucide-react';
 import { EmptyState } from '@/components/client-portal/EmptyState';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 
 export interface CartLineItem {
@@ -31,10 +32,126 @@ interface AbandonedCartsPanelProps {
   onUpdateContactStatus?: (cartId: string, contacted: boolean) => void;
 }
 
+/**
+ * Formats a phone number for wa.me link.
+ * Handles Chilean numbers (+56), numbers with leading 0, etc.
+ */
+function formatPhoneForWhatsApp(phone: string): string {
+  // Remove everything except digits and leading +
+  let clean = phone.replace(/[^0-9+]/g, '');
+  // If it starts with +, keep it
+  if (clean.startsWith('+')) {
+    clean = clean.slice(1); // wa.me doesn't use +
+  }
+  // Chilean numbers: if starts with 9 and is 9 digits, prepend 56
+  if (/^9\d{8}$/.test(clean)) {
+    clean = '56' + clean;
+  }
+  // If starts with 0, remove leading 0 (common in some formats)
+  if (clean.startsWith('0')) {
+    clean = clean.slice(1);
+  }
+  return clean;
+}
+
+/**
+ * Generates a friendly WhatsApp message including the products in the cart.
+ */
+function generateWhatsAppMessage(cart: AbandonedCart): string {
+  const firstName = (cart.customerName || '').split(' ')[0] || 'cliente';
+  const products = (cart.lineItems || [])
+    .slice(0, 5)
+    .map(item => {
+      const name = item.title || 'Producto';
+      const variant = item.variantTitle?.trim() ? ` (${item.variantTitle})` : '';
+      return `  - ${name}${variant}`;
+    })
+    .join('\n');
+
+  const hasMoreProducts = (cart.lineItems?.length ?? 0) > 5;
+  const moreText = hasMoreProducts ? `\n  ...y ${(cart.lineItems?.length ?? 0) - 5} más` : '';
+
+  const total = `$${Math.round(cart.totalValue).toLocaleString('es-CL')}`;
+
+  if (products) {
+    return `Hola ${firstName}! 👋
+
+Vi que dejaste estos productos en tu carrito:
+${products}${moreText}
+
+Total: ${total}
+
+¿Puedo ayudarte a completar tu compra? Si tienes alguna duda sobre tallas, envío o formas de pago, estoy aquí para ayudarte.`;
+  }
+
+  return `Hola ${firstName}! 👋
+
+Vi que dejaste productos por ${total} en tu carrito. ¿Puedo ayudarte a completar tu compra? Si tienes alguna duda, estoy aquí para ayudarte.`;
+}
+
+// WhatsApp message preview popover
+function WhatsAppPreview({ cart, onSend }: { cart: AbandonedCart; onSend: () => void }) {
+  const defaultMessage = generateWhatsAppMessage(cart);
+  const [message, setMessage] = useState(defaultMessage);
+  const phone = formatPhoneForWhatsApp(cart.phone || '');
+
+  const handleSend = () => {
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
+    onSend();
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message);
+    toast.success('Mensaje copiado');
+  };
+
+  return (
+    <div className="w-80 space-y-3">
+      <div className="flex items-center gap-2">
+        <MessageCircle className="w-4 h-4 text-green-600" />
+        <p className="font-semibold text-sm">Enviar WhatsApp</p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">Para: {cart.customerName}</p>
+        <p className="text-xs text-muted-foreground font-mono">+{phone}</p>
+      </div>
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        className="w-full h-40 text-xs p-3 rounded-lg border border-border bg-muted/30 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"
+        placeholder="Edita el mensaje o escribe el tuyo..."
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+          onClick={handleSend}
+        >
+          <Send className="w-3.5 h-3.5 mr-1.5" />
+          Abrir WhatsApp
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleCopy}
+          title="Copiar mensaje"
+        >
+          <Copy className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground text-center">
+        Se abrirá WhatsApp Web en una nueva pestaña
+      </p>
+    </div>
+  );
+}
+
 export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactStatus }: AbandonedCartsPanelProps) {
   const [localCarts, setLocalCarts] = useState(carts);
   const [filter, setFilter] = useState<'all' | 'contacted' | 'not_contacted'>('all');
   const [expandedCarts, setExpandedCarts] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'recent' | 'value'>('recent');
 
   // Sync localCarts when prop changes (e.g. date range switch)
   useEffect(() => {
@@ -49,11 +166,18 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
     toast.success(contacted ? 'Marcado como contactado' : 'Marcado como no contactado');
   };
 
-  const filteredCarts = localCarts.filter((cart) => {
-    if (filter === 'contacted') return cart.contacted;
-    if (filter === 'not_contacted') return !cart.contacted;
-    return true;
-  });
+  const filteredAndSortedCarts = useMemo(() => {
+    let result = localCarts.filter((cart) => {
+      if (filter === 'contacted') return cart.contacted;
+      if (filter === 'not_contacted') return !cart.contacted;
+      return true;
+    });
+    if (sortBy === 'value') {
+      result = [...result].sort((a, b) => b.totalValue - a.totalValue);
+    }
+    // 'recent' is already the default sort from the API
+    return result;
+  }, [localCarts, filter, sortBy]);
 
   const toggleExpanded = (cartId: string) => {
     setExpandedCarts(prev => {
@@ -64,26 +188,28 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
     });
   };
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: localCarts.length,
     contacted: localCarts.filter((c) => c.contacted).length,
     notContacted: localCarts.filter((c) => !c.contacted).length,
-    totalValue: localCarts.reduce((acc, c) => acc + c.totalValue, 0),
-  };
+    totalValue: localCarts.reduce((acc, c) => acc + (c.totalValue ?? 0), 0),
+  }), [localCarts]);
 
   // "Dinero sobre la mesa" — value of uncontacted carts with recovery estimate
-  const uncontactedValue = localCarts.filter(c => !c.contacted).reduce((acc, c) => acc + c.totalValue, 0);
+  const uncontactedValue = useMemo(() =>
+    localCarts.filter(c => !c.contacted).reduce((acc, c) => acc + (c.totalValue ?? 0), 0),
+  [localCarts]);
   const estimatedRecovery = Math.round(uncontactedValue * 0.12); // ~12% avg e-commerce recovery rate
 
   return (
-    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <ShoppingCart className="w-4 h-4" />
             Carritos Abandonados
           </CardTitle>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             <Button
               variant={filter === 'all' ? 'default' : 'ghost'}
               size="sm"
@@ -135,7 +261,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
         )}
 
         {/* Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
           <div>
             <p className="text-xs text-muted-foreground">Total carritos</p>
             <p className="text-xl font-bold">{stats.total}</p>
@@ -154,7 +280,30 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
           </div>
         </div>
 
-        {filteredCarts.length === 0 ? (
+        {/* Sort */}
+        {localCarts.length > 1 && (
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-muted-foreground">Ordenar:</span>
+            <Button
+              variant={sortBy === 'recent' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSortBy('recent')}
+              className="text-xs h-6 px-2"
+            >
+              Más recientes
+            </Button>
+            <Button
+              variant={sortBy === 'value' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSortBy('value')}
+              className="text-xs h-6 px-2"
+            >
+              Mayor valor
+            </Button>
+          </div>
+        )}
+
+        {filteredAndSortedCarts.length === 0 ? (
           <EmptyState
             icon={ShoppingCart}
             title="Sin carritos abandonados"
@@ -162,12 +311,19 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
           />
         ) : (
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-            {filteredCarts.map((cart) => {
+            {filteredAndSortedCarts.map((cart) => {
               const isExpanded = expandedCarts.has(cart.id);
+              const hoursSinceAbandonment = Math.round(
+                (Date.now() - new Date(cart.abandonedAt).getTime()) / (1000 * 60 * 60)
+              );
+              const isRecent = hoursSinceAbandonment <= 24;
+
               return (
                 <div
                   key={cart.id}
-                  className="border border-border rounded-lg hover:bg-muted/30 transition-colors"
+                  className={`border rounded-lg hover:bg-muted/30 transition-colors ${
+                    isRecent && !cart.contacted ? 'border-orange-300 bg-orange-50/30' : 'border-border'
+                  }`}
                 >
                   <div className="flex items-center justify-between p-3">
                     <div className="flex items-center gap-3">
@@ -183,18 +339,27 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
                         )}
                       </button>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-sm">{cart.customerName}</p>
                           <Badge variant={cart.contacted ? 'default' : 'secondary'} className="text-xs">
                             {cart.contacted ? 'Contactado' : 'Pendiente'}
                           </Badge>
+                          {isRecent && !cart.contacted && (
+                            <Badge variant="outline" className="text-xs border-orange-400 text-orange-600">
+                              Reciente
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground">{cart.customerEmail}</p>
                         {cart.phone && (
                           <p className="text-xs text-muted-foreground">{cart.phone}</p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          {cart.itemCount} items • Abandonado {new Date(cart.abandonedAt).toLocaleDateString('es-CL')}
+                          {cart.itemCount} items • {
+                            hoursSinceAbandonment < 1 ? 'Hace menos de 1 hora' :
+                            hoursSinceAbandonment < 24 ? `Hace ${hoursSinceAbandonment}h` :
+                            `Abandonado ${new Date(cart.abandonedAt).toLocaleDateString('es-CL')}`
+                          }
                         </p>
                       </div>
                     </div>
@@ -204,15 +369,41 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
                         <p className="text-xs text-muted-foreground">{currency}</p>
                       </div>
                       <div className="flex gap-1">
+                        {/* WhatsApp — primary action */}
+                        {cart.phone && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                title="Enviar WhatsApp"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent side="left" align="start" className="p-4">
+                              <WhatsAppPreview
+                                cart={cart}
+                                onSend={() => handleToggleContacted(cart.id, true)}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        )}
                         {cart.phone && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => {
-                              window.open(`tel:${cart.phone}`, '_blank');
+                              if (/Mobi|Android/i.test(navigator.userAgent)) {
+                                window.open(`tel:${cart.phone}`, '_blank');
+                              } else {
+                                navigator.clipboard.writeText(cart.phone!);
+                                toast.success('Teléfono copiado');
+                              }
                             }}
-                            title="Llamar"
+                            title="Llamar (móvil) / Copiar número (desktop)"
                           >
                             <Phone className="w-4 h-4" />
                           </Button>
@@ -249,7 +440,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
                           <div key={idx} className="flex items-center justify-between text-xs py-1">
                             <div className="flex-1">
                               <span className="font-medium">{item.title}</span>
-                              {item.variantTitle && (
+                              {item.variantTitle?.trim() && (
                                 <span className="text-muted-foreground ml-1">({item.variantTitle})</span>
                               )}
                             </div>

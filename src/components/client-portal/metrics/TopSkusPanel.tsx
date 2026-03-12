@@ -16,14 +16,14 @@ interface TopSkusPanelProps {
 }
 
 export function TopSkusPanel({ skus, currency = 'CLP' }: TopSkusPanelProps) {
-  const maxQuantity = Math.max(...skus.map((s) => s.quantity), 1);
+  const maxQuantity = skus.length > 0 ? Math.max(...skus.map((s) => s.quantity), 1) : 1;
 
   return (
-    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
         <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <Package className="w-4 h-4" />
-          Top SKUs Vendidos
+          Top 10 Productos Vendidos
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -43,7 +43,7 @@ export function TopSkusPanel({ skus, currency = 'CLP' }: TopSkusPanelProps) {
                       {index + 1}
                     </Badge>
                     <div>
-                      <p className="font-medium text-sm line-clamp-1">{sku.name}</p>
+                      <p className="font-medium text-sm line-clamp-1" title={sku.name}>{sku.name}</p>
                       <p className="text-xs text-muted-foreground font-mono">{sku.sku}</p>
                     </div>
                   </div>

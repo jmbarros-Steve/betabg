@@ -154,7 +154,7 @@ export default function ConnectShopify() {
           {/* CTA */}
           <Button
             onClick={handleConnect}
-            className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 rounded-lg"
+            className="w-full h-12 text-base bg-primary hover:bg-primary/90 rounded-lg"
             disabled={isRedirecting || !shopDomain.trim()}
           >
             {isRedirecting ? (

@@ -175,13 +175,13 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       if (permissionErrors.length > 0) {
         setAdLibraryPermissionError(true);
-        toast.error('La aplicación no tiene acceso a Meta Ad Library. Contacta al administrador.');
+        toast.error('Sin acceso a Meta Ad Library, contacta al administrador');
       } else if (tokenErrors.length > 0) {
-        toast.error('El token de Meta expiró. Reconecta Meta Ads en la pestaña Conexiones.');
+        toast.error('Token de Meta expirado, reconecta en Conexiones');
       } else if (allErrors.length > 0 && allErrors.length === results.length) {
-        toast.error('No se pudieron sincronizar los competidores. Verifica los handles.');
+        toast.error('Error al sincronizar competidores');
       } else if (allErrors.length > 0) {
-        toast.warning(`${totalAds} anuncios encontrados. ${allErrors.length} handles con errores.`);
+        toast.warning(`${totalAds} anuncios encontrados, ${allErrors.length} handles con errores`);
       } else {
         setAdLibraryPermissionError(false);
         toast.success(`${totalAds} anuncios sincronizados de ${results.length} competidores`);
@@ -236,7 +236,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       if (hasQuestions > winnerTexts.length * 0.3) patrones.push('Usan preguntas en el copy para generar curiosidad');
       if (hasEmojis > winnerTexts.length * 0.4) patrones.push('Uso frecuente de emojis para llamar la atención');
       if (hasNumbers > winnerTexts.length * 0.2) patrones.push('Incluyen números y estadísticas en sus ads ganadores');
-      if (winners.length > 3) patrones.push(`${winners.length} ads llevan mas de 30 días - están escalando agresivamente`);
+      if (winners.length > 3) patrones.push(`${winners.length} ads llevan más de 30 días - están escalando agresivamente`);
       if (patrones.length === 0) patrones.push('Patrón mixto - necesitan más data para identificar tendencias claras');
 
       // Analyze copy angles from winner ads
@@ -244,7 +244,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       for (const w of winnerTexts) {
         const lower = w.toLowerCase();
         if (lower.includes('descuento') || lower.includes('%') || lower.includes('off')) angulos.push('Descuentos/Ofertas');
-        else if (lower.includes('antes') || lower.includes('resultado')) angulos.push('Antes y Despues');
+        else if (lower.includes('antes') || lower.includes('resultado')) angulos.push('Antes y Después');
         else if (lower.includes('mejor') || lower.includes('unico') || lower.includes('solo')) angulos.push('Bold Statement');
         else if (lower.includes('?') || lower.includes('cansad') || lower.includes('busc')) angulos.push('Call Out');
         else if (lower.includes('testimonio') || lower.includes('opinion') || lower.includes('review')) angulos.push('Reviews');
@@ -276,12 +276,12 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         recomendaciones.push(`CTA más popular: ${topCtas[0]}. Considera usar el mismo para competir.`);
       }
       if (uniqueAngulos[0]) {
-        recomendaciones.push(`Ángulo dominante: ${uniqueAngulos[0]}. Prueba un angulo diferente para diferenciarte.`);
+        recomendaciones.push(`Ángulo dominante: ${uniqueAngulos[0]}. Prueba un ángulo diferente para diferenciarte.`);
       }
       if (activeAds.length > 10) {
         recomendaciones.push(`Competidores tienen ${activeAds.length} ads activos. Necesitas al menos ${Math.ceil(activeAds.length * 0.5)} para competir.`);
       }
-      recomendaciones.push('Usa la metodologia 3:2:2 para testear variaciones inspiradas en los ganadores.');
+      recomendaciones.push('Usa la metodología 3:2:2 para testear variaciones inspiradas en los ganadores.');
 
       setAnalysis({
         patrones,

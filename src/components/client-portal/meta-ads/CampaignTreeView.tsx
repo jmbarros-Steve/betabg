@@ -348,7 +348,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
       if (error) throw new Error(typeof error === 'string' ? error : 'Error fetching ad details');
       setAdEditData(data?.ad || null);
     } catch (err) {
-      console.error('Failed to fetch ad details:', err);
+      // Ad details fetch error handled via toast
       toast.error('Error al cargar detalles del anuncio');
       setEditingAdId(null);
     } finally {
@@ -381,7 +381,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
       setEditingAdId(null);
       setAdEditData(null);
     } catch (err) {
-      console.error('Failed to update ad:', err);
+      // Ad update error handled via toast
       toast.error('Error al actualizar anuncio');
     } finally {
       setSavingAdEdit(false);
@@ -457,7 +457,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
 
       setCampaigns(Array.from(map.values()).sort((a, b) => b.spend_30d - a.spend_30d));
     } catch (err) {
-      console.error('[CampaignTreeView] Error:', err);
+      // Campaign fetch error handled via toast
       toast.error('Error cargando campañas');
     } finally {
       setLoading(false);
@@ -516,7 +516,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
           : c,
       ));
     } catch (err) {
-      console.error('[CampaignTreeView] Error fetching ad sets:', err);
+      // Ad sets fetch error handled silently
       setCampaigns((prev) => prev.map((c) => c.campaign_id === campaignId ? { ...c, adsets_loading: false, adsets_loaded: true } : c));
     }
   }, [connectionIds]);
@@ -589,7 +589,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Campañas</h2>
-          <p className="text-muted-foreground text-sm">Jerarquía: Campaña &gt; Ad Set &gt; Anuncio</p>
+          <p className="text-muted-foreground text-sm">Jerarquía: Campaña → Ad Set → Anuncio</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -711,7 +711,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
                   />
                 </div>
                 <div>
-                  <Label>Headline</Label>
+                  <Label>Título</Label>
                   <Input
                     value={adEditData.headline || ''}
                     onChange={(e) => setAdEditData({ ...adEditData, headline: e.target.value })}

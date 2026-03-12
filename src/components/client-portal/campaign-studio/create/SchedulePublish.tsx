@@ -60,7 +60,7 @@ export function SchedulePublish({
         .maybeSingle();
 
       if (!conn) {
-        toast.error('No hay conexion activa de Klaviyo. Conecta Klaviyo primero.');
+        toast.error('No hay conexión activa de Klaviyo. Conecta Klaviyo primero.');
         setLoadingLists(false);
         return;
       }
@@ -94,7 +94,7 @@ export function SchedulePublish({
     setPushing(true);
     try {
       // Step 1: Save campaign to email_campaigns table
-      const campaignName = `${campaignData.subject || 'Campana sin asunto'}`;
+      const campaignName = `${campaignData.subject || 'Campaña sin asunto'}`;
       const { data: savedCampaign, error: saveError } = await supabase
         .from('email_campaigns')
         .insert({
@@ -178,15 +178,15 @@ export function SchedulePublish({
       const strategyLabel = sendStrategy === 'draft'
         ? 'como borrador'
         : sendStrategy === 'immediate'
-        ? 'para envio inmediato'
+        ? 'para envío inmediato'
         : sendStrategy === 'smart_send'
         ? 'con Smart Send'
         : 'programada';
-      toast.success(`Campana creada ${strategyLabel} en Klaviyo`);
+      toast.success(`Campaña creada ${strategyLabel} en Klaviyo`);
       onPublish(pushData);
     } catch (err: any) {
       console.error('Push error:', err);
-      toast.error(`Error: ${err.message || 'No se pudo crear la campana en Klaviyo'}`);
+      toast.error(`Error: ${err.message || 'No se pudo crear la campaña en Klaviyo'}`);
     } finally {
       setPushing(false);
     }
@@ -200,13 +200,13 @@ export function SchedulePublish({
         <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
           <Check className="w-8 h-8 text-green-600" />
         </div>
-        <h3 className="font-semibold text-lg">Campana creada en Klaviyo</h3>
+        <h3 className="font-semibold text-lg">Campaña creada en Klaviyo</h3>
         <p className="text-sm text-muted-foreground text-center max-w-md">
-          Tu campana "{campaignData.subject}" ha sido creada exitosamente en Klaviyo.
+          Tu campaña "{campaignData.subject}" ha sido creada exitosamente en Klaviyo.
           {sendStrategy === 'draft' && ' Puedes editarla directamente en tu cuenta de Klaviyo.'}
           {sendStrategy === 'scheduled' && ` Programada para ${scheduledAt}.`}
-          {sendStrategy === 'immediate' && ' El envio ha sido iniciado.'}
-          {sendStrategy === 'smart_send' && ' Klaviyo elegira el mejor horario de envio.'}
+          {sendStrategy === 'immediate' && ' El envío ha sido iniciado.'}
+          {sendStrategy === 'smart_send' && ' Klaviyo elegirá el mejor horario de envío.'}
         </p>
         {campaignId && (
           <Button variant="outline" size="sm" asChild>
@@ -230,7 +230,7 @@ export function SchedulePublish({
       <div>
         <h3 className="font-semibold text-base">Programar y Publicar</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Configura como y cuando se enviara tu campana a traves de Klaviyo.
+          Configura cómo y cuándo se enviará tu campaña a través de Klaviyo.
         </p>
       </div>
 
@@ -246,7 +246,7 @@ export function SchedulePublish({
               No se encontraron listas en Klaviyo.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {connectionId ? 'Crea una lista en Klaviyo primero.' : 'Conecta Klaviyo en la seccion de Conexiones.'}
+              {connectionId ? 'Crea una lista en Klaviyo primero.' : 'Conecta Klaviyo en la sección de Conexiones.'}
             </p>
           </div>
         ) : (
@@ -267,7 +267,7 @@ export function SchedulePublish({
 
       {/* Send strategy */}
       <div className="space-y-3">
-        <Label>Estrategia de envio</Label>
+        <Label>Estrategia de envío</Label>
         <RadioGroup
           value={sendStrategy}
           onValueChange={(v) => setSendStrategy(v as typeof sendStrategy)}
@@ -284,7 +284,7 @@ export function SchedulePublish({
             <RadioGroupItem value="scheduled" id="strategy-scheduled" />
             <Label htmlFor="strategy-scheduled" className="font-normal cursor-pointer">
               <span className="font-medium">Programado</span>
-              <span className="text-muted-foreground"> — Elegir fecha y hora de envio</span>
+              <span className="text-muted-foreground"> — Elegir fecha y hora de envío</span>
             </Label>
           </div>
           <div className="flex items-center space-x-2">
@@ -307,7 +307,7 @@ export function SchedulePublish({
       {/* Date/Time picker for scheduled sends */}
       {sendStrategy === 'scheduled' && (
         <div className="space-y-2">
-          <Label htmlFor="scheduledAt">Fecha y hora de envio</Label>
+          <Label htmlFor="scheduledAt">Fecha y hora de envío</Label>
           <Input
             id="scheduledAt"
             type="datetime-local"
@@ -315,7 +315,7 @@ export function SchedulePublish({
             onChange={(e) => setScheduledAt(e.target.value)}
           />
           <p className="text-xs text-muted-foreground">
-            Se usara la zona horaria configurada en tu cuenta de Klaviyo.
+            Se usará la zona horaria configurada en tu cuenta de Klaviyo.
           </p>
         </div>
       )}
@@ -331,7 +331,7 @@ export function SchedulePublish({
           {pushing ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creando campana en Klaviyo...
+              Creando campaña en Klaviyo...
             </>
           ) : (
             <>
@@ -342,7 +342,7 @@ export function SchedulePublish({
         </Button>
         {sendStrategy === 'immediate' && (
           <p className="text-xs text-center text-amber-600 mt-2">
-            La campana se enviara inmediatamente a todos los contactos de la lista seleccionada.
+            La campaña se enviará inmediatamente a todos los contactos de la lista seleccionada.
           </p>
         )}
       </div>

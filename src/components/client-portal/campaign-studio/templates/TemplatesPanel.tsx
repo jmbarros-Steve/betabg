@@ -465,7 +465,7 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
         {templates.length === 0 && (
           <Card className="p-12 text-center">
             <LayoutTemplate className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-            <h3 className="text-lg font-medium mb-2">No tienes plantillas aun</h3>
+            <h3 className="text-lg font-medium mb-2">No tienes plantillas aún</h3>
             <p className="text-sm text-muted-foreground mb-6">
               Crea tu primera plantilla para empezar.
             </p>
@@ -638,7 +638,7 @@ export default function TemplatesPanel({ clientId, brand }: TemplatesPanelProps)
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar plantilla</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. La plantilla sera eliminada permanentemente.
+              Esta acción no se puede deshacer. La plantilla será eliminada permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -221,7 +221,7 @@ export function ProductAlerts({ clientId }: ProductAlertsProps) {
               <div>
                 <h4 className="text-sm font-semibold">Widget de alertas para Shopify</h4>
                 <p className="text-xs text-muted-foreground">
-                  Agrega este script en tu theme de Shopify para mostrar botones de "Avisarme cuando vuelva" y "Alerta de baja de precio" en las paginas de producto.
+                  Agrega este script en tu theme de Shopify para mostrar botones de "Avisarme cuando vuelva" y "Alerta de baja de precio" en las páginas de producto.
                 </p>
               </div>
               <div className="flex items-center gap-2">

@@ -62,10 +62,10 @@ const STANDARD_EVENTS = [
 ];
 
 const PRIORITY_BADGE: Record<string, { label: string; color: string }> = {
-  critico: { label: 'Crítico', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
-  basico: { label: 'Básico', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
-  importante: { label: 'Importante', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
-  opcional: { label: 'Opcional', color: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },
+  critico: { label: 'Crítico', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+  basico: { label: 'Básico', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+  importante: { label: 'Importante', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' },
+  opcional: { label: 'Opcional', color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' },
 };
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
         </CardHeader>
         <CardContent>
           {pixels.length === 0 ? (
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
               <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-yellow-700">No se detectó ningún pixel</p>
@@ -235,7 +235,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                   className="mt-3"
                   onClick={() => window.open('https://business.facebook.com/events_manager2/list/pixel/', '_blank')}
                 >
-                  <ExternalLink className="w-3.5 h-3.5 mr-2" />
+                  <ExternalLink className="w-4 h-4 mr-2" />
                   Ir a Events Manager
                 </Button>
               </div>
@@ -251,7 +251,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                     key={pixel.id}
                     onClick={() => setSelectedPixel(pixel)}
                     className={`flex items-center gap-4 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+                      isSelected ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/50'
                     }`}
                   >
                     {/* Status icon */}
@@ -279,7 +279,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
 
                     {/* Copy ID */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); copyToClipboard(pixel.id); }}>
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="w-4 h-4" />
                     </Button>
                   </div>
                 );
@@ -315,7 +315,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                     <div
                       key={evt.name}
                       className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                        isActive ? 'border-green-500/30 bg-green-500/5' : 'border-border bg-muted/20'
+                        isActive ? 'border-green-500/20 bg-green-500/10' : 'border-border bg-muted/20'
                       }`}
                     >
                       <div className={`p-1.5 rounded-md ${isActive ? 'bg-green-500/10' : 'bg-muted'}`}>
@@ -432,7 +432,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium">Código del Pixel (base code)</h4>
                 <Button variant="ghost" size="sm" onClick={() => copyToClipboard(selectedPixel.code!)}>
-                  <Copy className="w-3.5 h-3.5 mr-2" />
+                  <Copy className="w-4 h-4 mr-2" />
                   Copiar
                 </Button>
               </div>

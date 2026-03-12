@@ -57,8 +57,8 @@ interface FormTriggers {
 const FORM_TYPES: { value: SignupForm['form_type']; label: string; description: string }[] = [
   { value: 'popup', label: 'Popup', description: 'Ventana centrada en pantalla' },
   { value: 'slide_in', label: 'Slide-in', description: 'Aparece desde una esquina' },
-  { value: 'inline', label: 'Inline', description: 'Embebido en la pagina' },
-  { value: 'full_page', label: 'Pagina completa', description: 'Cubre toda la pantalla' },
+  { value: 'inline', label: 'Inline', description: 'Embebido en la página' },
+  { value: 'full_page', label: 'Página completa', description: 'Cubre toda la pantalla' },
 ];
 
 const FORM_TYPE_LABELS: Record<string, string> = {
@@ -76,18 +76,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 const FREQUENCY_OPTIONS = [
   { value: 'once', label: 'Una sola vez' },
-  { value: 'session', label: 'Una vez por sesion' },
+  { value: 'session', label: 'Una vez por sesión' },
   { value: 'always', label: 'Siempre' },
 ];
 
 const INCENTIVE_TYPES = [
   { value: 'none', label: 'Sin incentivo' },
-  { value: 'discount_code', label: 'Codigo de descuento' },
-  { value: 'free_shipping', label: 'Envio gratis' },
+  { value: 'discount_code', label: 'Código de descuento' },
+  { value: 'free_shipping', label: 'Envío gratis' },
 ];
 
 const DEFAULT_DESIGN: FormDesign = {
-  headline: 'Suscribete a nuestro newsletter',
+  headline: 'Suscríbete a nuestro newsletter',
   description: 'Recibe ofertas exclusivas y novedades directo en tu email.',
   button_text: 'Suscribirme',
   button_color: '#7c3aed',
@@ -386,7 +386,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
             <Tabs defaultValue="design" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="design" className="text-xs">
-                  <Palette className="w-3.5 h-3.5 mr-1.5" /> Diseno
+                  <Palette className="w-3.5 h-3.5 mr-1.5" /> Diseño
                 </TabsTrigger>
                 <TabsTrigger value="triggers" className="text-xs">
                   <MousePointerClick className="w-3.5 h-3.5 mr-1.5" /> Triggers
@@ -399,18 +399,18 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Tab: Diseno */}
+              {/* Tab: Diseño */}
               <TabsContent value="design" className="space-y-4 mt-4">
                 <div>
                   <Label>Titular</Label>
                   <Input
                     value={editingForm?.design?.headline || ''}
                     onChange={(e) => updateDesign({ headline: e.target.value })}
-                    placeholder="Suscribete a nuestro newsletter"
+                    placeholder="Suscríbete a nuestro newsletter"
                   />
                 </div>
                 <div>
-                  <Label>Descripcion</Label>
+                  <Label>Descripción</Label>
                   <Input
                     value={editingForm?.design?.description || ''}
                     onChange={(e) => updateDesign({ description: e.target.value })}
@@ -418,7 +418,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <Label>Texto del boton</Label>
+                  <Label>Texto del botón</Label>
                   <Input
                     value={editingForm?.design?.button_text || ''}
                     onChange={(e) => updateDesign({ button_text: e.target.value })}
@@ -427,7 +427,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <Label className="text-xs">Color del boton</Label>
+                    <Label className="text-xs">Color del botón</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
@@ -479,7 +479,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label className="text-sm">Mostrar campo de nombre</Label>
-                      <p className="text-xs text-muted-foreground">Pedir nombre ademas del email</p>
+                      <p className="text-xs text-muted-foreground">Pedir nombre además del email</p>
                     </div>
                     <Switch
                       checked={editingForm?.design?.show_name_field ?? false}
@@ -488,8 +488,8 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm">Mostrar campo de telefono</Label>
-                      <p className="text-xs text-muted-foreground">Pedir telefono para SMS marketing</p>
+                      <Label className="text-sm">Mostrar campo de teléfono</Label>
+                      <p className="text-xs text-muted-foreground">Pedir teléfono para SMS marketing</p>
                     </div>
                     <Switch
                       checked={editingForm?.design?.show_phone_field ?? false}
@@ -513,7 +513,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                         {editingForm?.design?.headline || 'Titular'}
                       </h4>
                       <p className="text-sm mb-4 opacity-80">
-                        {editingForm?.design?.description || 'Descripcion'}
+                        {editingForm?.design?.description || 'Descripción'}
                       </p>
                       {editingForm?.design?.show_name_field && (
                         <div className="mb-2 rounded border px-3 py-2 text-left text-xs text-gray-400 bg-white">
@@ -525,7 +525,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                       </div>
                       {editingForm?.design?.show_phone_field && (
                         <div className="mb-2 rounded border px-3 py-2 text-left text-xs text-gray-400 bg-white">
-                          Telefono
+                          Teléfono
                         </div>
                       )}
                       <button
@@ -546,7 +546,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm">Exit Intent</Label>
-                    <p className="text-xs text-muted-foreground">Mostrar cuando el usuario intenta salir de la pagina</p>
+                    <p className="text-xs text-muted-foreground">Mostrar cuando el usuario intenta salir de la página</p>
                   </div>
                   <Switch
                     checked={editingForm?.trigger_rules?.exit_intent ?? true}
@@ -573,10 +573,10 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
 
                 <div>
                   <Label className="text-sm flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" /> Tiempo en pagina (segundos)
+                    <Clock className="w-3.5 h-3.5" /> Tiempo en página (segundos)
                   </Label>
                   <p className="text-xs text-muted-foreground mb-1.5">
-                    Mostrar despues de este tiempo en la pagina. 0 = inmediato.
+                    Mostrar después de este tiempo en la página. 0 = inmediato.
                   </p>
                   <Input
                     type="number"
@@ -588,9 +588,9 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 </div>
 
                 <div>
-                  <Label className="text-sm">Filtro de URL de pagina</Label>
+                  <Label className="text-sm">Filtro de URL de página</Label>
                   <p className="text-xs text-muted-foreground mb-1.5">
-                    Solo mostrar en paginas que contengan esta URL. Vacio = todas las paginas.
+                    Solo mostrar en páginas que contengan esta URL. Vacío = todas las páginas.
                   </p>
                   <Input
                     value={editingForm?.trigger_rules?.page_url_filter || ''}
@@ -602,7 +602,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 <div>
                   <Label className="text-sm">Frecuencia de muestra</Label>
                   <p className="text-xs text-muted-foreground mb-1.5">
-                    Con que frecuencia mostrar el formulario al mismo visitante.
+                    Con qué frecuencia mostrar el formulario al mismo visitante.
                   </p>
                   <Select
                     value={editingForm?.trigger_rules?.show_frequency || 'once'}
@@ -623,7 +623,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 <div>
                   <Label className="text-sm">Tipo de incentivo</Label>
                   <p className="text-xs text-muted-foreground mb-1.5">
-                    Ofrece algo a cambio del registro para aumentar la conversion.
+                    Ofrece algo a cambio del registro para aumentar la conversión.
                   </p>
                   <Select
                     value={editingForm?.incentive_type || 'none'}
@@ -641,12 +641,12 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 {editingForm?.incentive_type && editingForm.incentive_type !== 'none' && (
                   <div>
                     <Label className="text-sm">
-                      {editingForm.incentive_type === 'discount_code' ? 'Codigo de descuento' : 'Mensaje de envio gratis'}
+                      {editingForm.incentive_type === 'discount_code' ? 'Código de descuento' : 'Mensaje de envío gratis'}
                     </Label>
                     <p className="text-xs text-muted-foreground mb-1.5">
                       {editingForm.incentive_type === 'discount_code'
-                        ? 'El codigo que recibira el suscriptor (ej: BIENVENIDO10)'
-                        : 'El texto que se mostrara (ej: Envio gratis en tu primera compra)'
+                        ? 'El código que recibirá el suscriptor (ej: BIENVENIDO10)'
+                        : 'El texto que se mostrará (ej: Envío gratis en tu primera compra)'
                       }
                     </p>
                     <Input
@@ -655,7 +655,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                       placeholder={
                         editingForm.incentive_type === 'discount_code'
                           ? 'BIENVENIDO10'
-                          : 'Envio gratis en tu primera compra'
+                          : 'Envío gratis en tu primera compra'
                       }
                     />
                   </div>
@@ -666,7 +666,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                     <CardContent className="py-4 text-center">
                       <Gift className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground">
-                        Los formularios con incentivo tienen hasta 3x mas conversion.
+                        Los formularios con incentivo tienen hasta 3x más conversión.
                       </p>
                     </CardContent>
                   </Card>
@@ -678,7 +678,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                 <div>
                   <Label className="text-sm">Tags a aplicar al suscribirse</Label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Estos tags se asignaran automaticamente a cada nuevo suscriptor de este formulario.
+                    Estos tags se asignarán automáticamente a cada nuevo suscriptor de este formulario.
                   </p>
                   <div className="flex items-center gap-2">
                     <Input

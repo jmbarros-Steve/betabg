@@ -18,15 +18,15 @@ export default function DataDeletion() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Shield className="w-6 h-6 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold">Solicitud de Eliminacion de Datos</h1>
+            <h1 className="text-3xl font-bold">Solicitud de Eliminación de Datos</h1>
           </div>
           <p className="text-muted-foreground mb-8">
-            Steve Ads — Plataforma de Marketing AI por Consultoria BG
+            Steve Ads — Plataforma de Marketing AI por Consultoría BG
           </p>
 
           <div className="space-y-6 text-muted-foreground">
             <p className="text-sm text-muted-foreground">
-              Ultima actualizacion: 28 de febrero de 2026
+              Última actualización: 28 de febrero de 2026
             </p>
 
             {/* Card de solicitud destacada */}
@@ -37,17 +37,17 @@ export default function DataDeletion() {
                     <Mail className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-foreground mb-2">Como solicitar la eliminacion de tus datos</h2>
+                    <h2 className="text-lg font-semibold text-foreground mb-2">Cómo solicitar la eliminación de tus datos</h2>
                     <p className="mb-3">
-                      Envia un correo electronico a{' '}
+                      Envía un correo electrónico a{' '}
                       <a href="mailto:jmbarros@bgconsult.cl" className="text-primary font-medium hover:underline">
                         jmbarros@bgconsult.cl
                       </a>{' '}
-                      con el asunto <strong className="text-foreground">"Solicitud de Eliminacion de Datos"</strong>.
+                      con el asunto <strong className="text-foreground">"Solicitud de Eliminación de Datos"</strong>.
                     </p>
                     <p className="text-sm">
                       Incluye en tu correo: tu nombre completo, el email asociado a tu cuenta en Steve Ads,
-                      y si deseas eliminacion total o parcial de tus datos.
+                      y si deseas eliminación total o parcial de tus datos.
                     </p>
                   </div>
                 </div>
@@ -62,10 +62,10 @@ export default function DataDeletion() {
                     <Clock className="w-5 h-5 text-yellow-600" />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-foreground mb-1">Plazo de respuesta: 30 dias</h3>
+                    <h3 className="text-base font-semibold text-foreground mb-1">Plazo de respuesta: 30 días</h3>
                     <p className="text-sm">
-                      Procesaremos tu solicitud dentro de un maximo de 30 dias habiles desde la recepcion.
-                      Recibiras una confirmacion por email cuando la eliminacion se haya completado.
+                      Procesaremos tu solicitud dentro de un máximo de 30 días hábiles desde la recepción.
+                      Recibirás una confirmación por email cuando la eliminación se haya completado.
                     </p>
                   </div>
                 </div>
@@ -76,45 +76,45 @@ export default function DataDeletion() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4 flex items-center gap-2">
                 <Trash2 className="w-5 h-5" />
-                Datos que se eliminaran
+                Datos que se eliminarán
               </h2>
               <p className="mb-4">
-                Al solicitar la eliminacion, se borran permanentemente todos los datos asociados a tu cuenta:
+                Al solicitar la eliminación, se borran permanentemente todos los datos asociados a tu cuenta:
               </p>
               <ul className="list-disc pl-6 space-y-2">
-                <li>Informacion de tu cuenta (nombre, email, contrasena)</li>
-                <li>Datos de clientes y campanas publicitarias</li>
+                <li>Información de tu cuenta (nombre, email, contraseña)</li>
+                <li>Datos de clientes y campañas publicitarias</li>
                 <li>Conexiones a plataformas (Meta Ads, Google Ads, Shopify, Klaviyo)</li>
                 <li>Tokens de acceso y credenciales encriptadas</li>
-                <li>Metricas, reportes e historiales de rendimiento</li>
+                <li>Métricas, reportes e historiales de rendimiento</li>
                 <li>Creativos publicitarios, borradores y assets generados</li>
                 <li>Conversaciones con el asistente Steve AI</li>
-                <li>Analisis de competencia y audiencias guardadas</li>
+                <li>Análisis de competencia y audiencias guardadas</li>
                 <li>Cualquier otro dato personal vinculado a tu cuenta</li>
               </ul>
             </section>
 
             {/* Datos de Meta/Facebook */}
             <section>
-              <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">Eliminacion de datos de Facebook / Meta</h2>
+              <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">Eliminación de datos de Facebook / Meta</h2>
               <p className="mb-4">
-                Si conectaste tu cuenta de Facebook o Meta Ads a Steve Ads, al solicitar la eliminacion:
+                Si conectaste tu cuenta de Facebook o Meta Ads a Steve Ads, al solicitar la eliminación:
               </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Eliminaremos todos los tokens de acceso de Meta almacenados (encriptados con AES-256)</li>
-                <li>Borraremos las metricas publicitarias obtenidas de tu cuenta de Meta Ads</li>
-                <li>Eliminaremos audiencias, creativos y configuraciones de campanas</li>
-                <li>Revocaremos los permisos de nuestra aplicacion en tu cuenta de Meta</li>
+                <li>Borraremos las métricas publicitarias obtenidas de tu cuenta de Meta Ads</li>
+                <li>Eliminaremos audiencias, creativos y configuraciones de campañas</li>
+                <li>Revocaremos los permisos de nuestra aplicación en tu cuenta de Meta</li>
               </ul>
               <p className="mt-4">
-                Tambien puedes revocar el acceso directamente desde la{' '}
+                También puedes revocar el acceso directamente desde la{' '}
                 <a
                   href="https://www.facebook.com/settings?tab=applications"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary hover:underline"
                 >
-                  configuracion de aplicaciones de Facebook
+                  configuración de aplicaciones de Facebook
                 </a>.
               </p>
             </section>
@@ -129,24 +129,24 @@ export default function DataDeletion() {
                 Por obligaciones legales o regulatorias, algunos datos pueden ser retenidos temporalmente:
               </p>
               <ul className="list-disc pl-6 space-y-2">
-                <li>Registros de facturacion (requeridos por ley fiscal chilena — SII)</li>
-                <li>Logs de seguridad para prevencion de fraude (maximo 90 dias)</li>
-                <li>Datos anonimizados para analisis estadistico agregado</li>
+                <li>Registros de facturación (requeridos por ley fiscal chilena — SII)</li>
+                <li>Logs de seguridad para prevención de fraude (máximo 90 días)</li>
+                <li>Datos anonimizados para análisis estadístico agregado</li>
               </ul>
               <p className="mt-4">
-                Estos datos seran eliminados automaticamente una vez expire el periodo de retencion legal aplicable.
+                Estos datos serán eliminados automáticamente una vez expire el período de retención legal aplicable.
               </p>
             </section>
 
             {/* Proceso */}
             <section>
-              <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">Proceso de eliminacion</h2>
+              <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">Proceso de eliminación</h2>
               <ol className="list-decimal pl-6 space-y-2">
-                <li>Envias tu solicitud por email a <a href="mailto:jmbarros@bgconsult.cl" className="text-primary hover:underline">jmbarros@bgconsult.cl</a></li>
+                <li>Envías tu solicitud por email a <a href="mailto:jmbarros@bgconsult.cl" className="text-primary hover:underline">jmbarros@bgconsult.cl</a></li>
                 <li>Verificamos tu identidad para proteger tus datos</li>
-                <li>Procesamos la eliminacion dentro de 30 dias habiles</li>
-                <li>Revocamos automaticamente los accesos a plataformas de terceros</li>
-                <li>Te enviamos confirmacion por email cuando este completo</li>
+                <li>Procesamos la eliminación dentro de 30 días hábiles</li>
+                <li>Revocamos automáticamente los accesos a plataformas de terceros</li>
+                <li>Te enviamos confirmación por email cuando esté completo</li>
               </ol>
             </section>
 
@@ -154,7 +154,7 @@ export default function DataDeletion() {
             <section className="pb-8">
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">Contacto</h2>
               <p>
-                Si tienes preguntas sobre la eliminacion de tus datos o sobre nuestra politica de privacidad:
+                Si tienes preguntas sobre la eliminación de tus datos o sobre nuestra política de privacidad:
               </p>
               <ul className="list-disc pl-6 space-y-2 mt-4">
                 <li>
@@ -164,15 +164,15 @@ export default function DataDeletion() {
                   </a>
                 </li>
                 <li>
-                  Politica de Privacidad:{' '}
+                  Política de Privacidad:{' '}
                   <Link to="/privacidad" className="text-primary hover:underline">
-                    Ver politica completa
+                    Ver política completa
                   </Link>
                 </li>
                 <li>
-                  Terminos de Servicio:{' '}
+                  Términos de Servicio:{' '}
                   <Link to="/terminos" className="text-primary hover:underline">
-                    Ver terminos
+                    Ver términos
                   </Link>
                 </li>
               </ul>

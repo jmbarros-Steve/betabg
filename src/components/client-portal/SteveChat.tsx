@@ -279,10 +279,10 @@ export function SteveChat({ clientId }: SteveChatProps) {
       if (category === 'logo' && newUrls.length > 0) {
         await supabase.from('clients').update({ logo_url: newUrls[newUrls.length - 1] }).eq('id', clientId);
       }
-      toast.success(`${files.length} archivo(s) subido(s)`);
+      toast.success(`${files.length} archivos subidos`);
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Error al subir archivo. Verifica que el archivo sea menor a 5MB.');
+      // Upload error handled via toast
+      toast.error('Error al subir archivo');
     } finally {
       setUploadingAssets(null);
     }
@@ -298,7 +298,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       setUploadedAssets(prev => ({ ...prev, [category]: prev[category].filter(u => u !== url) }));
       toast.success('Archivo eliminado');
     } catch (error) {
-      console.error('Delete error:', error);
+      // Delete error handled silently
     }
   }
 
@@ -377,8 +377,8 @@ export function SteveChat({ clientId }: SteveChatProps) {
         await startNewConversation();
       }
     } catch (error) {
-      console.error('Error initializing conversation:', error);
-      toast.error('No pudimos cargar tu conversación. Recarga la página para intentar de nuevo.');
+      // Conversation init error handled via toast
+      toast.error('Error al cargar conversación');
     } finally {
       setIsInitializing(false);
     }
@@ -411,13 +411,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
         setFieldValidation(data.field_validation);
       }
     } catch (error) {
-      console.error('Error starting conversation:', error);
+      // Start conversation error handled via toast
       toast.error('Error al iniciar conversación con Steve');
     }
   }
 
   async function sendMessage(messageText: string) {
     if (!messageText.trim() || isLoading || !conversationId) return;
+    if (messageText.trim().length > 5000) { toast.error('El mensaje es muy largo, máximo 5.000 caracteres'); return; }
     const userMessage = messageText.trim();
     setInput('');
     setExamples([]);
@@ -457,7 +458,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
             m.id === tempUserMsg.id ? { ...m, rejected: true } : m
           ));
           setShowInteraction(true);
-          toast.info('Steve no aceptó la respuesta. Puedes volver a intentar con la misma pregunta abajo.');
+          toast.info('Steve no aceptó la respuesta, intenta de nuevo');
         } else {
           // Track accepted response only when the counter actually advances
           const prevAnswered = progress.answered;
@@ -484,20 +485,20 @@ export function SteveChat({ clientId }: SteveChatProps) {
         setFieldValidation(data.field_validation);
       if (data.is_complete) {
           setIsComplete(true);
-          toast.success('¡Brief de Marca completado! 🎉');
+          toast.success('Brief de marca completado');
           // Trigger analysis chain from frontend since edge function fire-and-forget
           // gets killed by Deno after returning the response.
           triggerAnalysisChain(clientId);
         }
       }
     } catch (error: any) {
-      console.error('Error sending message:', error);
+      // Message send error handled via toast
       if (error?.status === 429) {
-        toast.error('Demasiadas solicitudes. Espera un momento.');
+        toast.error('Demasiadas solicitudes, espera un momento');
       } else if (error?.status === 402) {
-        toast.error('Steve no está disponible en este momento. Intenta de nuevo en unos minutos.');
+        toast.error('Steve no disponible, intenta en unos minutos');
       } else {
-        toast.error('No se pudo enviar tu mensaje. Verifica tu conexión e intenta de nuevo.');
+        toast.error('Error al enviar mensaje');
       }
       setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
     } finally {
@@ -537,14 +538,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
         body: { client_id: cId, website_url: clientData?.website_url, competitor_urls: competitorUrls },
       });
       if (researchErr || !researchData?.research) {
-        console.error('[triggerAnalysis] Research failed:', researchErr || researchData);
+        // Research failed, will report via toast
         await supabase.from('brand_research').upsert({
           client_id: cId, research_type: 'analysis_status',
           research_data: { status: 'error', error: researchErr?.message || 'Research failed' },
         }, { onConflict: 'client_id,research_type' });
         setIsAnalyzing(false);
         setAnalysisPhase(null);
-        toast.error('Error en el análisis. Intenta de nuevo desde la pestaña Brief.');
+        toast.error('Error en el análisis');
         return;
       }
 
@@ -554,14 +555,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
         body: { client_id: cId, research: researchData.research },
       });
       if (strategyErr) {
-        console.error('[triggerAnalysis] Strategy failed:', strategyErr);
+        // Strategy failed, will report via toast
         await supabase.from('brand_research').upsert({
           client_id: cId, research_type: 'analysis_status',
           research_data: { status: 'error', error: strategyErr?.message || 'Strategy failed' },
         }, { onConflict: 'client_id,research_type' });
         setIsAnalyzing(false);
         setAnalysisPhase(null);
-        toast.error('Error en la estrategia. Intenta de nuevo desde la pestaña Brief.');
+        toast.error('Error en la estrategia');
         return;
       }
 
@@ -572,17 +573,17 @@ export function SteveChat({ clientId }: SteveChatProps) {
       }, { onConflict: 'client_id,research_type' });
 
       setAnalysisPhase('done');
-      toast.success('¡Análisis completo! Revisa las pestañas Brief, Competencia y SEO.');
+      toast.success('Análisis completado');
       // Keep the "done" phase visible for a few seconds, then hide
       setTimeout(() => {
         setIsAnalyzing(false);
         setAnalysisPhase(null);
       }, 5000);
     } catch (err) {
-      console.error('[triggerAnalysis] Error:', err);
+      // Analysis chain error handled via toast
       setIsAnalyzing(false);
       setAnalysisPhase(null);
-      toast.error('Ocurrió un error durante el análisis. Puedes reintentarlo desde la pestaña Brief.');
+      toast.error('Error durante el análisis');
     }
   }
 
@@ -968,7 +969,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
               disabled={isLoading}
               className="flex-1"
             />
-            <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-blue-600 rounded-full">
+            <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-blue-600 rounded-full" aria-label="Enviar mensaje">
               <Send className="h-4 w-4" />
             </Button>
           </form>

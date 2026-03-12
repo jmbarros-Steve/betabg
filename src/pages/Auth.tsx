@@ -231,7 +231,7 @@ export default function Auth() {
         className="relative z-10 w-full max-w-md mx-4"
       >
         <div className="mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-primary transition-colors">
             <ArrowLeft className="w-4 h-4" />
             Volver
           </Link>
@@ -308,7 +308,7 @@ export default function Auth() {
                   </p>
                 </div>
 
-                <Button type="submit" size="lg" className="w-full bg-blue-600 text-white rounded-lg py-3 font-semibold hover:bg-blue-700" disabled={loading}>
+                <Button type="submit" size="lg" className="w-full bg-primary text-white rounded-lg py-3 font-semibold hover:bg-primary/90" disabled={loading}>
                   {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
                 </Button>
               </form>
@@ -352,7 +352,7 @@ export default function Auth() {
                   </div>
                 </div>
 
-                <Button type="submit" size="lg" className="w-full bg-blue-600 text-white rounded-lg py-3 font-semibold hover:bg-blue-700" disabled={loading}>
+                <Button type="submit" size="lg" className="w-full bg-primary text-white rounded-lg py-3 font-semibold hover:bg-primary/90" disabled={loading}>
                   {loading ? 'Enviando...' : 'Enviar Link de Recuperación'}
                 </Button>
 
@@ -420,7 +420,7 @@ export default function Auth() {
                   </div>
                 )}
 
-                <Button type="submit" size="lg" className="w-full bg-blue-600 text-white rounded-lg py-3 font-semibold hover:bg-blue-700" disabled={loading}>
+                <Button type="submit" size="lg" className="w-full bg-primary text-white rounded-lg py-3 font-semibold hover:bg-primary/90" disabled={loading}>
                   {loading ? 'Cargando...' : mode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
                 </Button>
               </form>

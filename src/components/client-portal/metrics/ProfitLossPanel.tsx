@@ -72,12 +72,12 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
   const [showProductDetail, setShowProductDetail] = useState(false);
 
   return (
-    <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
         <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
           <FileText className="w-5 h-5" />
           Estado de Resultados
-          <span className="ml-auto text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded">CLP</span>
+          <span className="ml-auto text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded">{currency}</span>
         </CardTitle>
         <p className="text-xs text-muted-foreground">{periodLabel}</p>
       </CardHeader>
@@ -162,7 +162,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
                       </span>
                       <span className={cn(
                         'text-right w-16 font-mono font-medium',
-                        product.marginPercent >= 30 ? 'text-primary' : product.marginPercent >= 15 ? 'text-yellow-600' : 'text-destructive'
+                        product.marginPercent >= 30 ? 'text-primary' : product.marginPercent >= 15 ? 'text-amber-500' : 'text-destructive'
                       )}>
                         {product.marginPercent.toFixed(1)}%
                       </span>
@@ -257,7 +257,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
           <span className="text-sm tabular-nums text-destructive">-{formatCurrency(data.paymentGatewayFees, currency)}</span>
         </div>
 
-        <Separator className="border-2" />
+        <Separator />
 
         {/* Net Profit */}
         <div className="space-y-2 pt-2">

@@ -48,7 +48,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
         .maybeSingle();
 
       if (!conn) {
-        setError('No hay conexion activa de Klaviyo. Conecta Klaviyo en la seccion de Conexiones para usar flujos automaticos.');
+        setError('No hay conexión activa de Klaviyo. Conecta Klaviyo en la sección de Conexiones para usar flujos automáticos.');
         setLoading(false);
         return;
       }
@@ -135,7 +135,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
         <div className="flex items-center gap-3">
           <Zap className="w-6 h-6 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold">Flujos Automaticos</h2>
+            <h2 className="text-xl font-semibold">Flujos Automáticos</h2>
             <p className="text-sm text-muted-foreground">Cargando flujos...</p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
         <div className="flex items-center gap-3">
           <Zap className="w-6 h-6 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold">Flujos Automaticos</h2>
+            <h2 className="text-xl font-semibold">Flujos Automáticos</h2>
             <p className="text-sm text-muted-foreground">
               Steve propone los flujos más efectivos para tu marca
             </p>
@@ -172,7 +172,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
       <div className="flex items-center gap-3">
         <Zap className="w-6 h-6 text-primary" />
         <div>
-          <h2 className="text-xl font-semibold">Flujos Automaticos</h2>
+          <h2 className="text-xl font-semibold">Flujos Automáticos</h2>
           <p className="text-sm text-muted-foreground">
             Steve propone los flujos más efectivos para tu marca
           </p>
@@ -185,7 +185,7 @@ export function FlowsPanel({ clientId }: FlowsPanelProps) {
           Prioritarios
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Estos flujos tienen el mayor impacto en ingresos y retencion. Recomendamos activarlos primero.
+          Estos flujos tienen el mayor impacto en ingresos y retención. Recomendamos activarlos primero.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {priorityFlows.map((template) => {

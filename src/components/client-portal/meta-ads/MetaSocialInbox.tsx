@@ -178,7 +178,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           }
         }
       } catch (err) {
-        console.error('[MetaSocialInbox] Init error:', err);
+        // Init error logged silently
         toast.error('Error cargando Social Inbox');
       } finally {
         setLoadingPages(false);
@@ -236,7 +236,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
 
       setConversations(allItems);
     } catch (err) {
-      console.error('[SocialInbox] Fetch error:', err);
+      // Fetch error logged silently
       toast.error('Error cargando inbox');
     } finally {
       setLoadingConversations(false);
@@ -269,7 +269,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           });
 
           if (error || !data?.success) {
-            console.error('[SocialInbox] get_messages error:', error, data);
+            // get_messages error handled via empty state
             setMessages([]);
           } else {
             setMessages(data.messages || []);
@@ -434,7 +434,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Social Inbox</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Bandeja Social</h2>
           <p className="text-muted-foreground text-sm">
             Gestiona mensajes, comentarios y menciones en tiempo real
           </p>
@@ -697,12 +697,12 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                               {conv.type === 'messages'
                                 ? 'DM'
                                 : conv.type === 'ad_comments'
-                                  ? 'Ad'
+                                  ? 'Anuncio'
                                   : 'Post'}
                             </Badge>
                             {(conv.like_count || 0) > 0 && (
                               <span className="text-[10px] text-muted-foreground">
-                                {conv.like_count} likes
+                                {conv.like_count} me gusta
                               </span>
                             )}
                           </div>
@@ -796,7 +796,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                         }`}
                       >
                         {!msg.is_page && (
-                          <Avatar className="h-7 w-7 shrink-0">
+                          <Avatar className="h-8 w-8 shrink-0">
                             <AvatarFallback className="text-[10px] font-medium bg-muted">
                               {getInitials(msg.from_name)}
                             </AvatarFallback>
@@ -824,7 +824,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                           </p>
                         </div>
                         {msg.is_page && (
-                          <Avatar className="h-7 w-7 shrink-0">
+                          <Avatar className="h-8 w-8 shrink-0">
                             <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary">
                               TM
                             </AvatarFallback>

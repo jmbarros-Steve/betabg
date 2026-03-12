@@ -50,9 +50,9 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Revenue vs Spend Chart */}
-      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+      <Card className="bg-card border border-border rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold text-slate-700">
+          <CardTitle className="text-sm font-semibold text-foreground">
             {hasSpendData ? 'Ingresos vs Inversión por Día' : 'Ingresos por Día'}
           </CardTitle>
         </CardHeader>
@@ -94,7 +94,7 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                     borderRadius: '8px',
                   }}
                   formatter={(value: number, name: string) => [
-                    `$${value.toLocaleString('es-CL')} CLP`,
+                    `$${value.toLocaleString('es-CL')} ${currency}`,
                     name === 'prevRevenue' ? 'Período anterior' : name === 'revenue' ? 'Ingresos' : 'Inversión'
                   ]}
                   labelFormatter={(label) => `Fecha: ${label}`}
@@ -208,9 +208,9 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
       </Card>
 
       {/* Orders Chart */}
-      <Card className="bg-white border border-slate-200 rounded-xl card-hover">
+      <Card className="bg-card border border-border rounded-xl card-hover">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold text-slate-700">
+          <CardTitle className="text-sm font-semibold text-foreground">
             Órdenes por Día
           </CardTitle>
         </CardHeader>

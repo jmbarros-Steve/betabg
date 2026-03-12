@@ -226,10 +226,10 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
         setTimeout(() => setShowFeedback(true), 1500);
       }
       
-      toast.success('¡Copies de Google Ads generados!');
+      toast.success('Copies de Google Ads generados');
     } catch (error) {
       console.error('Error generating copy:', error);
-      toast.error('Error al generar copies. Intenta de nuevo.');
+      toast.error('Error al generar copies');
     } finally {
       setIsGenerating(false);
     }

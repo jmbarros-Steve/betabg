@@ -120,7 +120,7 @@ export function ProductTour({ userId, onNavigate }: ProductTourProps) {
                 </Button>
               )}
               <Button size="sm" onClick={next}>
-                {step === TOUR_STEPS.length - 1 ? "!Listo!" : "Siguiente"}
+                {step === TOUR_STEPS.length - 1 ? "¡Listo!" : "Siguiente"}
                 {step < TOUR_STEPS.length - 1 && <ChevronRight className="h-4 w-4 ml-1" />}
               </Button>
             </div>

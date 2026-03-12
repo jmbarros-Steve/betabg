@@ -31,7 +31,7 @@ export function TemplateSelector({ selectedType, onSelect }: TemplateSelectorPro
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-semibold text-base">Tipo de Campana</h3>
+        <h3 className="font-semibold text-base">Tipo de Campaña</h3>
         <p className="text-sm text-muted-foreground mt-1">
           Selecciona el tipo de email que quieres crear. Cada tipo tiene secciones y fuentes de datos optimizadas.
         </p>

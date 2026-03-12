@@ -208,7 +208,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       setDrafts((data as DraftItem[]) || []);
       setLastFetched(new Date());
     } catch (err) {
-      console.error('[DraftsManager] Error:', err);
+      // Drafts fetch error handled via toast
       toast.error('Error cargando borradores');
     } finally {
       setLoading(false);
@@ -271,7 +271,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
       toast.success(`"${draft.titulo}" publicado en Meta como pausado. Activa cuando estés listo.`);
     } catch (err: any) {
-      console.error('[DraftsManager] Publish error:', err);
+      // Publish error handled via toast
       toast.error(err?.message || 'Error al publicar');
     } finally {
       setPublishing(null);
@@ -559,19 +559,19 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5" />
-                        Headlines — Títulos ({headlines.length}/2)
+                        Títulos ({headlines.length}/2)
                       </p>
                       <div className="space-y-2">
                         {[0, 1].map((i) => (
                           <div key={i} className={`rounded-lg border p-3 ${headlines[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
                             {headlines[i] ? (
                               <>
-                                <span className="text-sm font-medium text-emerald-600">Headline {i + 1} ✓</span>
+                                <span className="text-sm font-medium text-emerald-600">Título {i + 1} ✓</span>
                                 <p className="mt-1 text-sm font-semibold">{headlines[i]}</p>
                               </>
                             ) : (
                               <span className="text-xs text-muted-foreground/50">
-                                Headline {i + 1} — Pendiente. Crea otra variación desde "Crear".
+                                Título {i + 1} — Pendiente. Crea otra variación desde "Crear".
                               </span>
                             )}
                           </div>
@@ -598,7 +598,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     <div className="text-xs leading-relaxed">
                       <span className="font-semibold">Metodología DCT 3:2:2 (Charles Tichener):</span>{' '}
                       Cada Ad Set tiene 1 solo anuncio para aislar variables. No tocar por 7 días.
-                      Día 7, Steve clasifica en ganadores, potenciales y perdedores según Hook Rate (&gt;25%), Hold Rate (&gt;15%) y CTR (&gt;1.5%).
+                      Día 7, Steve clasifica en ganadores, potenciales y perdedores según Hook Rate ({'>'}25%), Hold Rate ({'>'}15%) y CTR ({'>'}1.5%).
                       {bv?.plan_accion?.regla_kill && (
                         <span className="block mt-1 text-muted-foreground">
                           Kill rule: {bv.plan_accion.regla_kill}

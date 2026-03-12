@@ -131,7 +131,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
 
   const fetchCredits = async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any).from('client_credits').select('creditos_disponibles, creditos_usados, plan').eq('client_id', clientId).maybeSingle();
+    const { data, error } = await (supabase as any).from('client_credits').select('creditos_disponibles, creditos_usados, plan').eq('client_id', clientId).maybeSingle();
+    if (error) { toast.error('Error al cargar créditos'); return; }
     if (data) setCredits(data);
     else setCredits({ creditos_disponibles: 99999, creditos_usados: 0, plan: 'free_beta' });
   };
@@ -181,10 +182,10 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         setStep('variaciones');
         await fetchCredits();
       }
-      toast.success('✨ Copies generados');
+      toast.success('Copies generados');
     } catch (err) {
       console.error(err);
-      toast.error('Error al generar. Intenta de nuevo.');
+      toast.error('Error al generar copies');
     } finally {
       setIsGenerating(false);
       setRegeneratingIdx(null);
@@ -232,12 +233,13 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       }).select('id').single();
       if (error) throw error;
       setSavedCreativeId(data?.id || null);
-      toast.success('✅ Creativo guardado en la Biblioteca');
+      toast.success('Creativo guardado en la Biblioteca');
     } catch { toast.error('Error al guardar'); }
   };
 
   const handleGenerateImage = async () => {
     if (!savedCreativeId || !briefVisual) return;
+    if (!briefVisual.prompt_generacion) { toast.error('Error al generar brief visual'); return; }
     setGeneratingImage(true);
     setGeneratedAssetUrl(null);
     try {
@@ -254,7 +256,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       if (data?.asset_url) {
         setGeneratedAssetUrl(data.asset_url);
         await fetchCredits();
-        toast.success('🖼 Imagen generada exitosamente');
+        toast.success('Imagen generada');
       }
     } catch (err) {
       console.error(err);
@@ -266,6 +268,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
 
   const handleGenerateVideo = async () => {
     if (!savedCreativeId || !briefVisual) return;
+    if (!briefVisual.prompt_generacion) { toast.error('Error al generar brief visual'); return; }
     setGeneratingVideo(true);
     setVideoProgress('Iniciando generación...');
     setGeneratedAssetUrl(null);
@@ -307,7 +310,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
           setGeneratedAssetUrl(data.asset_url);
           setGeneratingVideo(false);
           setVideoPollingId(null);
-          toast.success('🎬 Video generado exitosamente');
+          toast.success('Video generado');
         } else if (data.status === 'failed') {
           clearInterval(interval);
           setGeneratingVideo(false);
@@ -540,8 +543,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                       <CardContent className="p-4 flex flex-col flex-1 space-y-3">
                         <div className="flex items-center justify-between">
                           <Badge className="bg-primary/10 text-primary border-primary/20">{v.badge}</Badge>
-                          <button onClick={() => generateVariaciones(idx)} disabled={regeneratingIdx === idx}
-                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                          <button onClick={() => generateVariaciones(idx)} disabled={regeneratingIdx !== null || isGenerating}
+                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground">
                             {regeneratingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsDown className="w-3 h-3" />}
                             👎 Regenerar
                           </button>

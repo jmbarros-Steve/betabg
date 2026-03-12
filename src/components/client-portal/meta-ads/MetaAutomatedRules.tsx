@@ -476,7 +476,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
       }));
       setLogEntries(dbLogs);
     } catch (err) {
-      console.error('[MetaAutomatedRules] Fetch error:', err);
+      // Fetch error handled silently
     } finally {
       setLoading(false);
     }
@@ -548,7 +548,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
       return;
     }
     if (!ctxConnectionId) {
-      toast.error('No hay conexion Meta Ads activa');
+      toast.error('No hay conexión Meta Ads activa');
       return;
     }
     const numericValue = parseFloat(form.value);
@@ -643,7 +643,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
       setEditingRule(null);
       await fetchRules();
     } catch (err) {
-      console.error('[MetaAutomatedRules] Save error:', err);
+      // Save error handled via toast
       toast.error('Error al guardar regla');
     } finally {
       setSaving(false);
@@ -704,7 +704,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
       }
       await fetchRules();
     } catch (err) {
-      console.error('[MetaAutomatedRules] Execute error:', err);
+      // Execute error handled via toast
       toast.error('Error al evaluar reglas');
     } finally {
       setExecuting(false);
@@ -782,13 +782,13 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     {/* Condition & Action summary */}
                     <div className="space-y-1.5 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <span className="font-medium text-foreground bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded text-xs">
+                        <span className="font-medium text-foreground bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full text-xs">
                           SI
                         </span>
                         {formatConditionSummary(rule.condition)}
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <span className="font-medium text-foreground bg-green-500/10 text-green-600 px-2 py-0.5 rounded text-xs">
+                        <span className="font-medium text-foreground bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full text-xs">
                           ENTONCES
                         </span>
                         {formatActionLabel(rule.action)}
@@ -809,7 +809,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                       )}
                       <span className="flex items-center gap-1">
                         <Zap className="h-3 w-3" />
-                        {rule.triggerCount} ejecucion{rule.triggerCount !== 1 ? 'es' : ''}
+                        {rule.triggerCount} ejecución{rule.triggerCount !== 1 ? 'es' : ''}
                       </span>
                     </div>
                   </div>
@@ -985,7 +985,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             <Card className="border-blue-200 bg-blue-50/30 dark:border-blue-900 dark:bg-blue-950/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-bold">
+                  <span className="bg-blue-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
                     SI
                   </span>
                   Condición de activación
@@ -1099,7 +1099,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             <Card className="border-green-200 bg-green-50/30 dark:border-green-900 dark:bg-green-950/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold">
+                  <span className="bg-green-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
                     ENTONCES
                   </span>
                   Acción a ejecutar
@@ -1258,7 +1258,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     <span className="font-semibold">{form.name}</span>
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    <span className="bg-blue-500/10 text-blue-600 px-1.5 py-0.5 rounded text-xs font-medium mr-1">
+                    <span className="bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full text-xs font-medium mr-1">
                       SI
                     </span>
                     {formatConditionSummary({
@@ -1269,7 +1269,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                       timeWindow: form.timeWindow,
                     })}
                     <span className="mx-2">→</span>
-                    <span className="bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded text-xs font-medium mr-1">
+                    <span className="bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full text-xs font-medium mr-1">
                       ENTONCES
                     </span>
                     {formatActionLabel({
