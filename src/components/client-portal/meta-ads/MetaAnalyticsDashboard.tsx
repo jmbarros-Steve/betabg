@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -150,7 +151,7 @@ function KpiCard({
   icon: Icon,
   prefix,
 }: {
-  title: string;
+  title: React.ReactNode;
   value: string;
   change: number | null;
   icon: React.ElementType;
@@ -507,7 +508,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     });
   }
 
-  const SortHeader = ({ field, label, className }: { field: SortField; label: string; className?: string }) => (
+  const SortHeader = ({ field, label, className }: { field: SortField; label: React.ReactNode; className?: string }) => (
     <th
       className={`px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none whitespace-nowrap ${className || ''}`}
       onClick={() => handleSort(field)}
@@ -619,7 +620,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           icon={MousePointerClick}
         />
         <KpiCard
-          title="CTR"
+          title={<JargonTooltip term="CTR" />}
           value={formatPercent(totals.ctr)}
           change={pctChange(totals.ctr, prevTotals.ctr)}
           icon={Target}
@@ -631,7 +632,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           icon={ShoppingCart}
         />
         <KpiCard
-          title="ROAS"
+          title={<JargonTooltip term="ROAS" />}
           value={formatRoas(totals.roas)}
           change={pctChange(totals.roas, prevTotals.roas)}
           icon={TrendingUp}
@@ -738,13 +739,13 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <SortHeader field="spend" label="Gasto" />
                     <SortHeader field="impressions" label="Impresiones" />
                     <SortHeader field="clicks" label="Clicks" />
-                    <SortHeader field="ctr" label="CTR" />
-                    <SortHeader field="cpc" label="CPC" />
-                    <SortHeader field="cpm" label="CPM" />
+                    <SortHeader field="ctr" label={<JargonTooltip term="CTR" />} />
+                    <SortHeader field="cpc" label={<JargonTooltip term="CPC" />} />
+                    <SortHeader field="cpm" label={<JargonTooltip term="CPM" />} />
                     <SortHeader field="conversions" label="Conv." />
                     <SortHeader field="revenue" label="Ingresos" />
-                    <SortHeader field="roas" label="ROAS" />
-                    <SortHeader field="cpa" label="CPA" />
+                    <SortHeader field="roas" label={<JargonTooltip term="ROAS" />} />
+                    <SortHeader field="cpa" label={<JargonTooltip term="CPA" />} />
                   </tr>
                 </thead>
                 <tbody>
@@ -1007,11 +1008,11 @@ function CampaignRow({
                     <th className="px-3 py-1.5 text-left">Gasto</th>
                     <th className="px-3 py-1.5 text-left">Impresiones</th>
                     <th className="px-3 py-1.5 text-left">Clicks</th>
-                    <th className="px-3 py-1.5 text-left">CTR</th>
-                    <th className="px-3 py-1.5 text-left">CPC</th>
+                    <th className="px-3 py-1.5 text-left"><JargonTooltip term="CTR" /></th>
+                    <th className="px-3 py-1.5 text-left"><JargonTooltip term="CPC" /></th>
                     <th className="px-3 py-1.5 text-left">Conv.</th>
                     <th className="px-3 py-1.5 text-left">Ingresos</th>
-                    <th className="px-3 py-1.5 text-left">ROAS</th>
+                    <th className="px-3 py-1.5 text-left"><JargonTooltip term="ROAS" /></th>
                   </tr>
                 </thead>
                 <tbody>

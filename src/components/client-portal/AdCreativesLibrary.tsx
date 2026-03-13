@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { motion } from 'framer-motion';
 import { Loader2, Trash2, Download, ChevronDown, ChevronUp, ImageIcon, Video, Play, Rocket, X, CheckCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -154,7 +155,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
             descriptions: publishModal.dct_descripciones || undefined,
             cta: publishModal.cta || 'SHOP_NOW',
             ad_set_format: 'flexible',
-            daily_budget: cpaMaximo ? cpaMaximo * 2 * 100 : 1000000,
+            daily_budget: cpaMaximo ? cpaMaximo * 2 : 10000,
           },
         },
       });
@@ -265,7 +266,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         <Badge variant="outline" className="text-[10px]">{FUNNEL_LABELS[creative.funnel] || creative.funnel}</Badge>
                         <Badge variant="outline" className="text-[10px]">{isVideo ? '🎬 Video' : '📸 Imagen'}</Badge>
                         <Badge variant="outline" className="text-[10px]">{creative.angulo}</Badge>
-                        {isDct && <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">DCT 3-2-2</Badge>}
+                        {isDct && <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20"><JargonTooltip term="DCT" label="DCT 3-2-2" /></Badge>}
                       </div>
                       <p className="font-semibold text-sm leading-tight truncate">{creative.titulo || 'Sin título'}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(creative.created_at), "d MMM yyyy", { locale: es })}</p>
@@ -288,7 +289,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         {/* DCT Images grid */}
                         {hasDctImages && (
                           <div>
-                            <p className="text-sm font-medium text-muted-foreground mb-2">Imágenes DCT</p>
+                            <p className="text-sm font-medium text-muted-foreground mb-2">Imágenes <JargonTooltip term="DCT" /></p>
                             <div className="grid grid-cols-3 gap-2">
                               {creative.dct_imagenes!.map((url, i) => (
                                 <div key={i} className="rounded-lg overflow-hidden border">
@@ -334,7 +335,7 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         {/* Plan de Acción DCT */}
                         {isDct && hasDctImages && (
                           <div className="rounded-lg border-l-[3px] border-l-blue-500 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-2">
-                            <p className="text-[13px] font-bold text-blue-900 dark:text-blue-300">📊 Plan de Acción DCT — Método Charlie</p>
+                            <p className="text-[13px] font-bold text-blue-900 dark:text-blue-300">Plan de Accion <JargonTooltip term="DCT" /> — Metodo Charlie</p>
                             <div className="space-y-1.5 text-[13px] text-blue-800 dark:text-blue-200">
                               <p>• <strong>Tipo de campaña:</strong> Testing DCT — Advantage+ Shopping</p>
                               <p>• <strong>Presupuesto diario sugerido:</strong> {cpaMaximo ? `$${(cpaMaximo * 2).toLocaleString('es-CL')} CLP` : <span className="text-amber-600">Completar brief para calcular</span>}</p>

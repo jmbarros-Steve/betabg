@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -549,7 +550,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <TrendingUp className="w-3 h-3" />
-              ROAS
+              <JargonTooltip term="ROAS" />
             </div>
             <p className={`text-lg font-bold ${overallRoas >= 3 ? 'text-green-500' : overallRoas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
               {overallRoas.toFixed(2)}x
@@ -580,7 +581,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <MousePointerClick className="w-3 h-3" />
-              CPC
+              <JargonTooltip term="CPC" />
             </div>
             <p className="text-lg font-bold">
               {totals.clicks > 0 ? `$${(totals.spend / totals.clicks).toFixed(2)}` : '-'}
@@ -591,7 +592,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Eye className="w-3 h-3" />
-              CPM
+              <JargonTooltip term="CPM" />
             </div>
             <p className="text-lg font-bold">
               {totals.impressions > 0 ? `$${((totals.spend / totals.impressions) * 1000).toFixed(2)}` : '-'}
@@ -602,7 +603,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <MousePointerClick className="w-3 h-3" />
-              CTR
+              <JargonTooltip term="CTR" />
             </div>
             <p className="text-lg font-bold">{formatPercent(overallCtr)}</p>
           </CardContent>
@@ -720,7 +721,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                               <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">ROAS</p>
+                              <p className="text-muted-foreground text-xs"><JargonTooltip term="ROAS" /></p>
                               <p className={`font-medium ${campaign.avg_roas >= 3 ? 'text-green-500' : campaign.avg_roas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
                                 {campaign.avg_roas.toFixed(2)}x
                               </p>
@@ -732,15 +733,15 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                               </p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">CPC</p>
+                              <p className="text-muted-foreground text-xs"><JargonTooltip term="CPC" /></p>
                               <p className="font-medium">${campaign.avg_cpc.toFixed(2)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">CPM</p>
+                              <p className="text-muted-foreground text-xs"><JargonTooltip term="CPM" /></p>
                               <p className="font-medium">${campaign.avg_cpm.toFixed(2)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">CTR</p>
+                              <p className="text-muted-foreground text-xs"><JargonTooltip term="CTR" /></p>
                               <p className="font-medium">{formatPercent(campaign.avg_ctr)}</p>
                             </div>
                             <div>
@@ -816,17 +817,17 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                           <p className="font-medium">{adSet.conversions || 0}</p>
                                         </div>
                                         <div>
-                                          <p className="text-muted-foreground">ROAS</p>
+                                          <p className="text-muted-foreground"><JargonTooltip term="ROAS" /></p>
                                           <p className={`font-medium ${adSet.roas >= 3 ? 'text-green-600' : adSet.roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
                                             {adSet.roas > 0 ? `${adSet.roas.toFixed(2)}x` : '—'}
                                           </p>
                                         </div>
                                         <div>
-                                          <p className="text-muted-foreground">CTR</p>
+                                          <p className="text-muted-foreground"><JargonTooltip term="CTR" /></p>
                                           <p className="font-medium">{parseFloat(adSet.ctr).toFixed(2)}%</p>
                                         </div>
                                         <div>
-                                          <p className="text-muted-foreground">CPM CLP</p>
+                                          <p className="text-muted-foreground"><JargonTooltip term="CPM" label="CPM CLP" /></p>
                                           <p className="font-medium">${(parseFloat(adSet.cpm) * CLP_RATE).toLocaleString('es-CL', {maximumFractionDigits: 0})}</p>
                                         </div>
                                       </div>

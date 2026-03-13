@@ -154,7 +154,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
                 <AvatarFallback>🐕</AvatarFallback>
               </Avatar>
             </Button>
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-background animate-pulse" />
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-background animate-pulse" aria-label="Disponible" role="status" />
           </motion.div>
         )}
       </AnimatePresence>

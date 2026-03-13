@@ -10,6 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Send, User, Sparkles, RefreshCw, Upload, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
@@ -196,6 +200,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [currentQuestionLabel, setCurrentQuestionLabel] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   const [acceptedResponses, setAcceptedResponses] = useState<Array<{label: string; content: string}>>([]);
+  const [showRestartDialog, setShowRestartDialog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -587,9 +592,12 @@ export function SteveChat({ clientId }: SteveChatProps) {
     }
   }
 
-  async function handleRestart() {
-    if (!confirm('¿Estás seguro de que quieres reiniciar la conversación?')) return;
+  function handleRestart() {
+    setShowRestartDialog(true);
+  }
 
+  async function confirmRestart() {
+    setShowRestartDialog(false);
     const oldConversationId = conversationId;
 
     // Reset ALL local state
@@ -652,7 +660,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 <AvatarImage src={avatarSteve} alt="Steve" />
                 <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
-              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" aria-label="En línea" role="status" />
             </div>
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -975,6 +983,21 @@ export function SteveChat({ clientId }: SteveChatProps) {
           </form>
         )}
       </div>
+
+      <AlertDialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se reiniciará la conversación y se perderá todo el progreso. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRestart}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

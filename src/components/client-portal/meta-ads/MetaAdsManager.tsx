@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -392,7 +393,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-muted-foreground">ROAS</span>
+              <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
               <div className="p-1.5 rounded-md bg-green-500/10"><TrendingUp className="w-4 h-4 text-green-500" /></div>
             </div>
             <p className={`text-2xl font-bold ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
@@ -406,7 +407,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-muted-foreground">CPA</span>
+              <JargonTooltip term="CPA" className="text-sm font-medium text-muted-foreground" />
               <div className="p-1.5 rounded-md bg-blue-500/10"><Target className="w-4 h-4 text-blue-500" /></div>
             </div>
             <p className="text-2xl font-bold">{totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}</p>
@@ -420,7 +421,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
         <Card className="relative overflow-hidden">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-muted-foreground">CTR</span>
+              <JargonTooltip term="CTR" className="text-sm font-medium text-muted-foreground" />
               <div className="p-1.5 rounded-md bg-purple-500/10"><MousePointerClick className="w-4 h-4 text-purple-500" /></div>
             </div>
             <p className="text-2xl font-bold">{formatPercent(overallCtr)}</p>
@@ -450,9 +451,9 @@ function DashboardSection({ clientId }: { clientId: string }) {
                     <tr className="border-b border-border/50">
                       <th className="text-left py-2 pr-4 text-sm font-medium text-muted-foreground">Campaña</th>
                       <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Gasto</th>
-                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">ROAS</th>
+                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground"><JargonTooltip term="ROAS" /></th>
                       <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Conv.</th>
-                      <th className="text-right py-2 pl-3 text-sm font-medium text-muted-foreground">CTR</th>
+                      <th className="text-right py-2 pl-3 text-sm font-medium text-muted-foreground"><JargonTooltip term="CTR" /></th>
                     </tr>
                   </thead>
                   <tbody>

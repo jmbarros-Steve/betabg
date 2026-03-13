@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Send, User, Sparkles, Trash2, FileText } from 'lucide-react';
@@ -25,6 +29,7 @@ export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatPr
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showClearDialog, setShowClearDialog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -78,8 +83,12 @@ export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatPr
 
   function handleClear() {
     if (messages.length === 0) return;
-    if (!confirm('¿Limpiar la conversación?')) return;
+    setShowClearDialog(true);
+  }
+
+  function confirmClear() {
     setMessages([]);
+    setShowClearDialog(false);
   }
 
   const suggestions = [
@@ -99,7 +108,7 @@ export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatPr
                 <AvatarImage src={avatarSteve} alt="Steve" />
                 <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
               </Avatar>
-              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" aria-label="En línea" role="status" />
             </div>
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -217,6 +226,20 @@ export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatPr
           </Button>
         </form>
       </div>
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se limpiará toda la conversación. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClear}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

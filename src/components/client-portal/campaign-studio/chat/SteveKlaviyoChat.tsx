@@ -440,7 +440,7 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
             <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
               <Bot className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" aria-label="En línea" role="status" />
           </div>
           <div className="flex-1">
             <CardTitle className="text-base">

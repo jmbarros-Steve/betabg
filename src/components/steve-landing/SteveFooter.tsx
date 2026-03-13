@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import logoSteve from '@/assets/logo-steve.png';
 
 const columns = [
@@ -22,18 +23,17 @@ const columns = [
   {
     title: 'Recursos',
     links: [
-      { label: 'Blog', href: '#' },
-      { label: 'Guias', href: '#' },
-      { label: 'Soporte', href: '#' },
-      { label: 'API Docs', href: '#' },
+      { label: 'Blog', href: '/blog' },
+      { label: 'Preguntas Frecuentes', href: '/faq' },
+      { label: 'Soporte', href: 'mailto:jmbarros@bgconsult.cl' },
     ],
   },
   {
     title: 'Legal',
     links: [
-      { label: 'Privacidad', href: '#' },
-      { label: 'Terminos', href: '#' },
-      { label: 'Cookies', href: '#' },
+      { label: 'Política de Privacidad', href: '/privacidad' },
+      { label: 'Términos de Servicio', href: '/terminos' },
+      { label: 'Eliminación de Datos', href: '/eliminacion-datos' },
     ],
   },
 ];
@@ -60,12 +60,21 @@ export function SteveFooter() {
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      {link.label}
-                    </a>
+                    {link.href.startsWith('/') ? (
+                      <Link
+                        to={link.href}
+                        className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        {link.label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={link.href}
+                        className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        {link.label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

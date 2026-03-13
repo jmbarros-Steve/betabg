@@ -661,7 +661,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                             </AvatarFallback>
                           </Avatar>
                           {isUnread && (
-                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-background" />
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-background" aria-label="No leído" role="status" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -736,6 +736,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 lg:hidden shrink-0"
+                    aria-label="Volver a conversaciones"
                     onClick={() => {
                       setMobileShowThread(false);
                       setSelectedConversation(null);

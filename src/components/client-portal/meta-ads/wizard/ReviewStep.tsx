@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { Megaphone, FolderOpen, FileImage, Target, DollarSign, Info, AlertTriangle, Calendar, Layers } from 'lucide-react';
 import AdPreviewMockup from '../AdPreviewMockup';
 
@@ -153,7 +154,7 @@ export default function ReviewStep(props: ReviewStepProps) {
                 <span className="text-muted-foreground">Objetivo:</span>
                 <span className="font-medium">{OBJECTIVE_LABELS[objective] || objective}</span>
                 <span className="text-muted-foreground">Tipo:</span>
-                <Badge className={`text-[10px] w-fit ${budgetType === 'CBO' ? 'bg-purple-500/15 text-purple-700' : 'bg-blue-500/15 text-blue-700'}`}>{budgetType}</Badge>
+                <Badge className={`text-[10px] w-fit ${budgetType === 'CBO' ? 'bg-purple-500/15 text-purple-700' : 'bg-blue-500/15 text-blue-700'}`}><JargonTooltip term={budgetType} /></Badge>
               </>
             )}
           </div>
@@ -208,7 +209,7 @@ export default function ReviewStep(props: ReviewStepProps) {
             <span className="text-sm font-semibold">Creatividades del Anuncio</span>
             {hasMultipleCreatives && (
               <Badge variant="outline" className="text-[9px] border-purple-400 text-purple-700">
-                DCT {allImages.filter(Boolean).length}:{allPrimaryTexts.filter(Boolean).length}:{allHeadlines.filter(Boolean).length}
+                <JargonTooltip term="DCT" /> {allImages.filter(Boolean).length}:{allPrimaryTexts.filter(Boolean).length}:{allHeadlines.filter(Boolean).length}
               </Badge>
             )}
           </div>

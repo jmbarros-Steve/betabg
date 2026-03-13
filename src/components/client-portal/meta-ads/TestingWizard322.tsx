@@ -636,7 +636,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8">
+        <Button variant="ghost" size="icon" aria-label="Volver" onClick={onBack} className="h-8 w-8">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>

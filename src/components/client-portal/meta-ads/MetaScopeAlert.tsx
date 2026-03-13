@@ -51,10 +51,10 @@ export function MetaScopeStatusPanel({ clientId }: { clientId: string }) {
 
   if (!needsReconnect) {
     return (
-      <Card className="border-green-500/30 bg-green-500/5">
+      <Card className="border-green-500/30 bg-green-500/5" role="status">
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-green-500/10">
+            <div className="p-2 rounded-full bg-green-500/10" aria-hidden="true">
               <Shield className="w-5 h-5 text-green-600" />
             </div>
             <div className="flex-1">
@@ -63,7 +63,7 @@ export function MetaScopeStatusPanel({ clientId }: { clientId: string }) {
                 Tu conexion Meta Ads tiene todos los permisos necesarios.
               </p>
             </div>
-            <Button variant="ghost" size="sm" onClick={refresh}>
+            <Button variant="ghost" size="sm" aria-label="Actualizar estado de permisos" onClick={refresh}>
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
           </div>
@@ -73,10 +73,10 @@ export function MetaScopeStatusPanel({ clientId }: { clientId: string }) {
   }
 
   return (
-    <Card className="border-yellow-500/30 bg-yellow-500/5">
+    <Card className="border-yellow-500/30 bg-yellow-500/5" role="alert">
       <CardContent className="py-4">
         <div className="flex items-start gap-3 mb-4">
-          <div className="p-2 rounded-full bg-yellow-500/10 shrink-0">
+          <div className="p-2 rounded-full bg-yellow-500/10 shrink-0" aria-hidden="true">
             <AlertTriangle className="w-5 h-5 text-yellow-600" />
           </div>
           <div className="flex-1">
@@ -180,10 +180,10 @@ export default function MetaScopeAlert({ clientId, requiredFeature, compact }: M
   }
 
   return (
-    <Card className="border-yellow-500/30 bg-yellow-500/5 mb-4">
+    <Card className="border-yellow-500/30 bg-yellow-500/5 mb-4" role="alert">
       <CardContent className="py-4">
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded-full bg-yellow-500/10 shrink-0">
+          <div className="p-2 rounded-full bg-yellow-500/10 shrink-0" aria-hidden="true">
             <AlertTriangle className="w-5 h-5 text-yellow-600" />
           </div>
           <div className="flex-1">

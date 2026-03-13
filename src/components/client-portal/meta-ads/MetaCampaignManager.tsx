@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -273,6 +274,7 @@ function BudgetAllocationChart({
           <div key={c.campaign_id} className="flex items-center gap-1.5 text-xs">
             <span
               className={`w-2.5 h-2.5 rounded-full shrink-0 ${COLORS[i % COLORS.length]}`}
+              aria-hidden="true"
             />
             <span className="text-muted-foreground truncate max-w-[140px]">
               {c.campaign_name}
@@ -673,7 +675,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
             name: formData.campaign_name.trim(),
             objective: `OUTCOME_${formData.objective}`,
             status: 'PAUSED',
-            daily_budget: Number(formData.daily_budget) * 100,
+            daily_budget: Number(formData.daily_budget),
             billing_event: 'IMPRESSIONS',
             optimization_goal: formData.optimization_goal === 'PURCHASES' ? 'OFFSITE_CONVERSIONS'
               : formData.optimization_goal === 'ADD_TO_CART' ? 'OFFSITE_CONVERSIONS'
@@ -719,7 +721,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           connection_id: connectionIds[0],
           data: {
             name: formData.campaign_name.trim(),
-            daily_budget: Number(formData.daily_budget) * 100,
+            daily_budget: Number(formData.daily_budget),
           },
         },
       });
@@ -1181,7 +1183,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('roas')}
                       >
-                        ROAS
+                        <JargonTooltip term="ROAS" />
                         <SortIcon
                           field="roas"
                           currentField={sortField}
@@ -1196,7 +1198,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('cpa')}
                       >
-                        CPA
+                        <JargonTooltip term="CPA" />
                         <SortIcon
                           field="cpa"
                           currentField={sortField}
@@ -1211,7 +1213,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('ctr')}
                       >
-                        CTR
+                        <JargonTooltip term="CTR" />
                         <SortIcon
                           field="ctr"
                           currentField={sortField}
@@ -1332,6 +1334,11 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleToggleStatus(campaign)}
+                                  aria-label={
+                                    campaign.status === 'ACTIVE'
+                                      ? 'Pausar campaña'
+                                      : 'Reanudar campaña'
+                                  }
                                   title={
                                     campaign.status === 'ACTIVE'
                                       ? 'Pausar'
@@ -1355,6 +1362,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => openEditDialog(campaign)}
+                              aria-label="Editar campaña"
                               title="Editar"
                               disabled={isLoading}
                             >
@@ -1367,6 +1375,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => openBudgetDialog(campaign)}
+                              aria-label="Ajustar presupuesto"
                               title="Ajustar presupuesto"
                               disabled={isLoading}
                             >
@@ -1379,6 +1388,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => handleDuplicate(campaign)}
+                              aria-label="Duplicar campaña"
                               title="Duplicar"
                               disabled={isLoading}
                             >
@@ -1391,6 +1401,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => openAnalyticsDialog(campaign)}
+                              aria-label="Ver analítica"
                               title="Ver analítica"
                               disabled={isLoading}
                             >
@@ -1404,6 +1415,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                                 size="icon"
                                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                 onClick={() => handleArchive(campaign)}
+                                aria-label="Archivar campaña"
                                 title="Archivar"
                                 disabled={isLoading}
                               >
@@ -1645,7 +1657,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-sm font-medium text-muted-foreground mb-1">
-                    ROAS
+                    <JargonTooltip term="ROAS" />
                   </p>
                   <p
                     className={`text-lg font-bold ${
@@ -1663,7 +1675,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-sm font-medium text-muted-foreground mb-1">
-                    CPA
+                    <JargonTooltip term="CPA" />
                   </p>
                   <p className="text-lg font-bold">
                     {selectedCampaign.cpa > 0
@@ -1673,7 +1685,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-sm font-medium text-muted-foreground mb-1">
-                    CTR
+                    <JargonTooltip term="CTR" />
                   </p>
                   <p className="text-lg font-bold">
                     {selectedCampaign.ctr > 0
@@ -1722,7 +1734,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">CPC Prom.</span>
+                    <JargonTooltip term="CPC" label="CPC Prom." className="text-muted-foreground" />
                     <span className="font-medium">
                       {selectedCampaign.clicks > 0
                         ? formatCLP(
@@ -1735,7 +1747,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">CPM</span>
+                    <JargonTooltip term="CPM" className="text-muted-foreground" />
                     <span className="font-medium">
                       {selectedCampaign.impressions > 0
                         ? formatCLP(

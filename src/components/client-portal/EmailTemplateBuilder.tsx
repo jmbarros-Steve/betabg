@@ -13,6 +13,10 @@ import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Plus, Trash2, Copy, Upload, ArrowLeft, Save, Palette, Type, Image, Code, Eye, LayoutGrid, Download, Loader2, Wand2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import EmailBlockEditor from './email-blocks/EmailBlockEditor';
 import type { EmailBlock } from './email-blocks/blockTypes';
 import { renderBlockToHtml } from './email-blocks/blockRenderer';
@@ -77,6 +81,8 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetsInputRef = useRef<HTMLInputElement>(null);
   const [converting, setConverting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -267,11 +273,18 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     setSaving(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este template?')) return;
-    const { error } = await supabase.from('email_templates').delete().eq('id', id);
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    const { error } = await supabase.from('email_templates').delete().eq('id', pendingDeleteId);
     if (error) toast.error('Error eliminando');
     else { toast.success('Template eliminado'); loadTemplates(); }
+    setDeleteDialogOpen(false);
+    setPendingDeleteId(null);
   };
 
   const handleDuplicate = async (t: EmailTemplate) => {
@@ -549,6 +562,21 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
             </TableBody>
           </Table>
         )}
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se eliminará este template. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }

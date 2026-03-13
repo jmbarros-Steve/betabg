@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { useMetaBusiness } from './MetaBusinessContext';
@@ -431,7 +432,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5" />
-              Mejor ROAS
+              Mejor <JargonTooltip term="ROAS" />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -443,7 +444,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <BarChart3 className="h-3.5 w-3.5" />
-              Mejor CPA
+              Mejor <JargonTooltip term="CPA" />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -458,7 +459,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
       {chartData.length > 0 && topAdsetNames.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">ROAS Diario — Top 4 Conjuntos</CardTitle>
+            <CardTitle className="text-sm font-medium"><JargonTooltip term="ROAS" /> Diario — Top 4 Conjuntos</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -512,9 +513,9 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
                   <TableHead>Conjunto</TableHead>
                   <TableHead className="text-right">Gasto</TableHead>
                   <TableHead className="text-right">Conv.</TableHead>
-                  <TableHead className="text-right">CPA</TableHead>
-                  <TableHead className="text-right">ROAS</TableHead>
-                  <TableHead className="text-right">CTR</TableHead>
+                  <TableHead className="text-right"><JargonTooltip term="CPA" /></TableHead>
+                  <TableHead className="text-right"><JargonTooltip term="ROAS" /></TableHead>
+                  <TableHead className="text-right"><JargonTooltip term="CTR" /></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

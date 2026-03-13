@@ -150,6 +150,12 @@ export async function sendSingleEmail(params: {
 
   const eventId = event.id;
 
+  // Guard against undefined/empty HTML content
+  if (!params.htmlContent) {
+    console.error('sendSingleEmail called with empty htmlContent for subscriber:', params.subscriberId);
+    return { success: false, error: 'Empty HTML content' };
+  }
+
   // Process HTML: add unsubscribe footer → wrap links → inject pixel
   let processedHtml = addUnsubscribeFooter(params.htmlContent, params.subscriberId, params.clientId);
   processedHtml = wrapLinksForTracking(processedHtml, eventId, params.campaignId || null, params.flowId || null);

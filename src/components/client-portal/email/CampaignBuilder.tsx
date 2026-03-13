@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -110,6 +114,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }),
     [brandInfo]
   );
+
+  // Send confirmation
+  const [showSendDialog, setShowSendDialog] = useState(false);
+  const [pendingSendId, setPendingSendId] = useState<string | null>(null);
 
   // Schedule
   const [showSchedule, setShowSchedule] = useState(false);
@@ -292,11 +300,16 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     loadCampaigns();
   };
 
-  const handleSend = async (campaignId: string) => {
-    const confirmed = window.confirm(
-      `¿Estás seguro de enviar esta campaña a ${subscriberCount} suscriptores?\n\nEsta acción no se puede deshacer.`
-    );
-    if (!confirmed) return;
+  const handleSend = (campaignId: string) => {
+    setPendingSendId(campaignId);
+    setShowSendDialog(true);
+  };
+
+  const confirmSend = async () => {
+    if (!pendingSendId) return;
+    setShowSendDialog(false);
+    const campaignId = pendingSendId;
+    setPendingSendId(null);
 
     setSending(true);
     try {
@@ -1220,6 +1233,21 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se enviará esta campaña a {subscriberCount} suscriptores. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSend}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

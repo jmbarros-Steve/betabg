@@ -491,7 +491,7 @@ async function replaceDiscountBlocks(
 
       if (discountMode === 'shopify_create') {
         try {
-          const subscriberShort = options.subscriberId.substring(0, 6).toUpperCase();
+          const subscriberShort = (options.subscriberId || 'UNKNOWN').substring(0, 6).toUpperCase();
           const random = Math.random().toString(36).substring(2, 6).toUpperCase();
           const uniqueCode = `STEVE-${subscriberShort}-${random}`;
 

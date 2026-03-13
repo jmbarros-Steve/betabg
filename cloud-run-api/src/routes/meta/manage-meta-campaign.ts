@@ -240,7 +240,7 @@ async function handleCreate(
     }
 
     if (daily_budget && !isCboCampaign) {
-      // Frontend already sends budget in cents (smallest currency unit)
+      // CLP has no cents — smallest currency unit is 1 CLP
       // Skip budget for CBO campaigns — budget is managed at campaign level
       adsetPayload.daily_budget = Math.round(Number(daily_budget));
     }
@@ -700,7 +700,8 @@ async function handleUpdate(
     const adsetUpdates: Record<string, any> = {};
 
     if (daily_budget) {
-      adsetUpdates.daily_budget = Math.round(Number(daily_budget) * 100);
+      // CLP has no cents — pass value directly as smallest currency unit
+      adsetUpdates.daily_budget = Math.round(Number(daily_budget));
     }
     if (start_time) adsetUpdates.start_time = start_time;
     if (end_time) adsetUpdates.end_time = end_time;
@@ -738,8 +739,9 @@ async function handleUpdateBudget(
   if (adset_id) {
     console.log(`[manage-meta-campaign] Updating budget for ad set ${adset_id}`);
 
+    // CLP has no cents — pass value directly as smallest currency unit
     const result = await metaApiRequest(adset_id, accessToken, 'POST', {
-      daily_budget: Math.round(Number(daily_budget) * 100),
+      daily_budget: Math.round(Number(daily_budget)),
     });
 
     if (!result.ok) {
@@ -768,8 +770,9 @@ async function handleUpdateBudget(
   const failedAdsets: Array<{ id: string; error: string }> = [];
 
   for (const adset of adsets) {
+    // CLP has no cents — pass value directly as smallest currency unit
     const updateResult = await metaApiRequest(adset.id, accessToken, 'POST', {
-      daily_budget: Math.round(Number(daily_budget) * 100),
+      daily_budget: Math.round(Number(daily_budget)),
     });
 
     if (updateResult.ok) {

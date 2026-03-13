@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -274,6 +278,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
   const [creating, setCreating] = useState(false);
   const [creationProgress, setCreationProgress] = useState(0);
   const [creationDone, setCreationDone] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   // Optimal send times
   const [optimalSlots, setOptimalSlots] = useState<Array<{day: number; hour: number; score: number}>>([]);
@@ -363,11 +368,16 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
   // ---- Close handler with confirmation ----
   const handleClose = useCallback(() => {
     if (hasContent && !creationDone) {
-      const confirmed = window.confirm('Tienes contenido sin guardar. ¿Seguro que quieres salir?');
-      if (!confirmed) return;
+      setShowCloseDialog(true);
+      return;
     }
     onClose();
   }, [hasContent, creationDone, onClose]);
+
+  const confirmClose = useCallback(() => {
+    setShowCloseDialog(false);
+    onClose();
+  }, [onClose]);
 
   // ---- Can advance logic ----
   const canAdvance = useMemo(() => {
@@ -784,6 +794,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
   /*  Render                                                          */
   /* ================================================================ */
   return (
+    <>
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
         <DialogHeader className="p-6 pb-0">
@@ -1584,5 +1595,21 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
         )}
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tienes contenido sin guardar. Si sales ahora, se perderán los cambios.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmClose}>Confirmar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

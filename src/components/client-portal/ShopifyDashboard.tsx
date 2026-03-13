@@ -296,11 +296,11 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
               </ResponsiveContainer>
               <div className={`flex items-center justify-center ${isMobile ? 'gap-4' : 'gap-6'} mt-4 text-xs`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-primary" />
+                  <div className="w-3 h-3 rounded-full bg-primary" aria-hidden="true" />
                   <span className="text-muted-foreground">Ingresos</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-primary opacity-40" />
+                  <div className="w-3 h-3 rounded-full bg-primary opacity-40" aria-hidden="true" />
                   <span className="text-muted-foreground">Pedidos</span>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
               {abandonedCartsByDay.length > 0 && (
                 <div className="flex items-center justify-center gap-6 mt-4 text-xs">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-destructive opacity-70" />
+                    <div className="w-3 h-3 rounded-full bg-destructive opacity-70" aria-hidden="true" />
                     <span className="text-muted-foreground">Carritos</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -673,7 +673,7 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
                       </Badge>
                     </div>
                     {/* Progress bar */}
-                    <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(passedPct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${check.title}: ${Math.round(passedPct)}% completado`}>
                       <div
                         className={`h-full rounded-full transition-all ${isOk ? 'bg-green-500' : 'bg-orange-500'}`}
                         style={{ width: `${passedPct}%` }}

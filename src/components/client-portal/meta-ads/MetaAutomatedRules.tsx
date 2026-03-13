@@ -821,13 +821,14 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                       onCheckedChange={() => toggleRule(rule.id)}
                       aria-label={`Toggle rule ${rule.name}`}
                     />
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(rule)}>
+                    <Button variant="ghost" size="icon" aria-label="Editar regla" onClick={() => openEdit(rule)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="text-destructive hover:text-destructive"
+                      aria-label="Eliminar regla"
                       onClick={() => setDeleteConfirmId(rule.id)}
                     >
                       <Trash2 className="h-4 w-4" />

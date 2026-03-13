@@ -73,7 +73,7 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
           <span className="text-xs text-muted-foreground">
             {completedCount}/{steps.length}
           </span>
-          <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+          <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={completedCount} aria-valuemin={0} aria-valuemax={steps.length} aria-label={`Setup del portal: ${completedCount} de ${steps.length} pasos completados`}>
             <div
               className="h-full bg-primary rounded-full transition-all"
               style={{ width: `${(completedCount / steps.length) * 100}%` }}
@@ -81,10 +81,10 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setCollapsed(!collapsed)} className="p-1 hover:bg-muted rounded">
+          <button onClick={() => setCollapsed(!collapsed)} className="p-1 hover:bg-muted rounded" aria-label={collapsed ? 'Expandir pasos' : 'Colapsar pasos'}>
             {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </button>
-          <button onClick={() => setDismissed(true)} className="p-1 hover:bg-muted rounded">
+          <button onClick={() => setDismissed(true)} className="p-1 hover:bg-muted rounded" aria-label="Cerrar progreso de setup">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -101,11 +101,12 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
               disabled={step.done}
             >
               {step.done ? (
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
               ) : (
-                <Circle className="h-4 w-4 text-muted-foreground" />
+                <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               )}
               <span className={step.done ? "line-through" : ""}>{step.label}</span>
+              <span className="sr-only">{step.done ? '(completado)' : '(pendiente)'}</span>
             </button>
           ))}
         </div>

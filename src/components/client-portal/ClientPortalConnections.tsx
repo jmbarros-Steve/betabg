@@ -20,6 +20,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShopifyCustomAppWizard } from './ShopifyCustomAppWizard';
@@ -77,6 +81,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [connectingKlaviyo, setConnectingKlaviyo] = useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [pendingDisconnect, setPendingDisconnect] = useState<Connection | null>(null);
 
   // Use Shopify auth fetch for embedded mode with Session Tokens
   const { callEdgeFunction, isEmbedded } = useShopifyAuthFetch();
@@ -203,8 +209,16 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     }
   };
 
-  const handleDisconnect = async (connection: Connection) => {
-    if (!confirm(`¿Desconectar ${platformConfig[connection.platform].name}? Podrás reconectar en cualquier momento.`)) return;
+  const handleDisconnect = (connection: Connection) => {
+    setPendingDisconnect(connection);
+    setDisconnectDialogOpen(true);
+  };
+
+  const confirmDisconnect = async () => {
+    if (!pendingDisconnect) return;
+    setDisconnectDialogOpen(false);
+    const connection = pendingDisconnect;
+    setPendingDisconnect(null);
     setDisconnecting(connection.id);
     try {
       const { error } = await supabase
@@ -560,6 +574,23 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
           setShowShopifyWizard(false);
         }}
       />
+
+      <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDisconnect
+                ? `¿Desconectar ${platformConfig[pendingDisconnect.platform].name}? Podrás reconectar en cualquier momento.`
+                : 'Esta acción no se puede deshacer.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDisconnect}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

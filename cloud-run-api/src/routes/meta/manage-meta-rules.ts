@@ -188,7 +188,7 @@ async function executeRuleAction(
       let updated2 = 0;
       for (const adset of adsetsResult2.data?.data || []) {
         const updateResult = await metaApiRequest(adset.id, accessToken, 'POST', {
-          daily_budget: String(Math.round(targetAmount * 100)), // cents
+          daily_budget: String(Math.round(targetAmount)), // CLP has no cents — smallest unit is 1 CLP
         });
         if (updateResult.ok) updated2++;
       }

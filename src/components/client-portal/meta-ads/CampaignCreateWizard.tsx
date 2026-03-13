@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -310,7 +311,7 @@ function CampaignForm({
                 budgetType === t.key ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
-              <Badge className={`text-xs font-bold ${t.key === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}>{t.label}</Badge>
+              <Badge className={`text-xs font-bold ${t.key === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}><JargonTooltip term={t.key} /></Badge>
               <span className={`text-xs font-semibold ${budgetType === t.key ? 'text-foreground' : 'text-muted-foreground'}`}>{t.name}</span>
               <span className="text-[10px] text-muted-foreground text-center">{t.desc}</span>
             </button>
@@ -399,8 +400,8 @@ function AdSetForm({
     }
   }, [recommendedBudget]);
 
-  const formats: { key: AdSetFormat; label: string; desc: string; icon: React.ElementType; recommended?: boolean }[] = [
-    { key: 'flexible', label: 'Flexible (DCT)', desc: 'Metodología 3:2:2 — 3 imágenes, 2 textos, 2 títulos. Meta optimiza combinaciones ganadoras.', icon: Layers, recommended: isABO },
+  const formats: { key: AdSetFormat; label: React.ReactNode; desc: string; icon: React.ElementType; recommended?: boolean }[] = [
+    { key: 'flexible', label: <>Flexible (<JargonTooltip term="DCT" />)</>, desc: 'Metodología 3:2:2 — 3 imágenes, 2 textos, 2 títulos. Meta optimiza combinaciones ganadoras.', icon: Layers, recommended: isABO },
     { key: 'carousel', label: 'Carrusel', desc: 'Múltiples imágenes en swipe. 3+ fotos.', icon: ImageIcon },
     { key: 'single', label: 'Imagen Única', desc: 'Un solo creativo. 1 foto, 1 texto, 1 headline.', icon: FileImage },
   ];
@@ -489,7 +490,7 @@ function AdSetForm({
       {isABO && (
         <>
           <div>
-            <Label>CPA Objetivo (CLP)</Label>
+            <Label><JargonTooltip term="CPA" label="CPA Objetivo" /> (CLP)</Label>
             <Input type="number" value={cpaTarget} onChange={(e) => setCpaTarget(e.target.value)} placeholder="15000" className="mt-1" />
             {recommendedBudget > 0 && (
               <p className="text-xs text-primary mt-1 font-medium">
@@ -1847,7 +1848,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={wizardStarted ? () => { if (stepIndex === 0) { setWizardStarted(false); } else { goPrev(); } } : handleLeaveAttempt} className="h-8 w-8">
+        <Button variant="ghost" size="icon" aria-label="Volver" onClick={wizardStarted ? () => { if (stepIndex === 0) { setWizardStarted(false); } else { goPrev(); } } : handleLeaveAttempt} className="h-8 w-8">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>

@@ -253,7 +253,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                     }`}
                   >
                     {/* Status icon */}
-                    <div className={`p-2 rounded-full ${isActive ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                    <div className={`p-2 rounded-full ${isActive ? 'bg-green-500/10' : 'bg-red-500/10'}`} aria-hidden="true">
                       {isActive ? (
                         <CheckCircle className="w-5 h-5 text-green-600" />
                       ) : (
@@ -276,7 +276,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                     </div>
 
                     {/* Copy ID */}
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); copyToClipboard(pixel.id); }}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Copiar ID del píxel" onClick={(e) => { e.stopPropagation(); copyToClipboard(pixel.id); }}>
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>

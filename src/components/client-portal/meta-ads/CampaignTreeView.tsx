@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -141,7 +142,7 @@ function StatusBadge({ status }: { status: string }) {
 function BudgetTypeBadge({ type }: { type: 'ABO' | 'CBO' }) {
   return (
     <Badge variant="outline" className={`text-[10px] font-bold ${type === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}>
-      {type}
+      <JargonTooltip term={type} />
     </Badge>
   );
 }
@@ -625,7 +626,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
         </Card>
         <Card className="relative overflow-hidden">
           <CardContent className="py-3 px-4">
-            <p className="text-sm font-medium text-muted-foreground">ROAS Promedio</p>
+            <p className="text-sm font-medium text-muted-foreground"><JargonTooltip term="ROAS" /> Promedio</p>
             <p className={`text-xl font-bold mt-0.5 ${stats.avgRoas >= 3 ? 'text-green-600' : stats.avgRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>{fmtRoas(stats.avgRoas)}</p>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-green-500/40 to-green-500/10" />
           </CardContent>

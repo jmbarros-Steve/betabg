@@ -176,7 +176,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
               <AvatarImage src={avatarSteve} alt="Steve" />
               <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
             </Avatar>
-            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" aria-label="En línea" role="status" />
           </div>
           <div>
             <CardTitle className="text-lg flex items-center gap-2">

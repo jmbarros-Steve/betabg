@@ -26,7 +26,7 @@ export default function DataDeletion() {
 
           <div className="space-y-6 text-muted-foreground">
             <p className="text-sm text-muted-foreground">
-              Última actualización: 28 de febrero de 2026
+              Última actualización: 13 de marzo de 2026
             </p>
 
             {/* Card de solicitud destacada */}

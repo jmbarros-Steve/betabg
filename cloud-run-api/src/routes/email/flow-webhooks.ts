@@ -372,6 +372,7 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
             total_price: payload.total_price,
             line_items: (payload.line_items || []).slice(0, 5).map((item: any) => ({
               title: item.title,
+              image: item.image_url || item.featured_image?.url || null,
               price: item.price,
               quantity: item.quantity,
               product_id: item.product_id ? String(item.product_id) : null,

@@ -1648,6 +1648,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        aria-label="Editar audiencia"
                         title="Editar"
                         onClick={() => {
                           const sourceMap: Record<string, CustomAudienceSource> = {
@@ -1683,6 +1684,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        aria-label="Crear Audiencia Similar"
                         title="Crear Audiencia Similar"
                         onClick={() => handleCreateLookalikeFrom(audience)}
                       >
@@ -1695,6 +1697,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      aria-label="Eliminar audiencia"
                       title="Eliminar"
                       onClick={() => setDeleteTarget(audience)}
                     >

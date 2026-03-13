@@ -104,7 +104,7 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
   // Decrypt access token if needed
   let accessToken = connection.access_token;
   if (connection.encrypted_access_token) {
-    const { data: decrypted } = await supabase.rpc('decrypt_token', {
+    const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
       encrypted_token: connection.encrypted_access_token,
     });
     if (decrypted) accessToken = decrypted;
@@ -363,7 +363,7 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
 
   let accessToken = connection.access_token;
   if (connection.encrypted_access_token) {
-    const { data: decrypted } = await supabase.rpc('decrypt_token', {
+    const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
       encrypted_token: connection.encrypted_access_token,
     });
     if (decrypted) accessToken = decrypted;
@@ -459,24 +459,28 @@ function renderProductCell(product: any): string {
     minimumFractionDigits: 0,
   });
 
+  const safeTitle = (product.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const safeUrl = (product.url || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const safeImageUrl = (product.image_url || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
   return `
     <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;overflow:hidden;">
       ${product.image_url ? `
         <tr>
           <td style="padding:0;">
-            <a href="${product.url}" style="text-decoration:none;">
-              <img src="${product.image_url}" alt="${product.title}" width="100%" style="display:block;max-width:280px;height:auto;" />
+            <a href="${safeUrl}" style="text-decoration:none;">
+              <img src="${safeImageUrl}" alt="${safeTitle}" width="100%" style="display:block;max-width:280px;height:auto;" />
             </a>
           </td>
         </tr>
       ` : ''}
       <tr>
         <td style="padding:12px;">
-          <a href="${product.url}" style="text-decoration:none;color:#1a1a1a;font-size:14px;font-weight:600;display:block;margin-bottom:4px;">
-            ${product.title}
+          <a href="${safeUrl}" style="text-decoration:none;color:#1a1a1a;font-size:14px;font-weight:600;display:block;margin-bottom:4px;">
+            ${safeTitle}
           </a>
           <span style="font-size:14px;color:#666;display:block;margin-bottom:10px;">${price}</span>
-          <a href="${product.url}" style="display:inline-block;background:#1a1a1a;color:#fff;font-size:13px;padding:8px 20px;border-radius:20px;text-decoration:none;font-weight:500;">
+          <a href="${safeUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;font-size:13px;padding:8px 20px;border-radius:20px;text-decoration:none;font-weight:500;">
             Ver producto
           </a>
         </td>

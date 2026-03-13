@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -259,7 +260,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
             name,
             objective,
             status: 'PAUSED',
-            daily_budget: dailyBudgetCLP * 100,
+            daily_budget: dailyBudgetCLP,
             billing_event: 'IMPRESSIONS',
             optimization_goal,
             adset_name: bv?.adset_name || `${name} - Ad Set 1`,
@@ -499,7 +500,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     <div>
                       <h4 className="text-sm font-bold flex items-center gap-2">
                         <Zap className="w-4 h-4 text-violet-500" />
-                        DCT 3:2:2 — Matriz de Variaciones
+                        <JargonTooltip term="DCT" label="DCT 3:2:2" /> — Matriz de Variaciones
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         3 imágenes × 2 copies × 2 headlines = 12 combinaciones de anuncios para testear
@@ -631,7 +632,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                           Publicar en Meta
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(draft)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Eliminar borrador" onClick={() => setDeleteTarget(draft)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>

@@ -1,6 +1,8 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
+import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
+import { processEmailHtml } from '../../lib/email-html-processor.js';
 
 /**
  * Calculate stats for a specific A/B variant.
@@ -269,39 +271,87 @@ export async function executeAbTestWinner(c: Context) {
 
   const alreadySentIds = new Set((alreadySentEvents || []).map((e: any) => e.subscriber_id));
 
-  // Get all subscribed subscribers for this client
-  const { data: allSubscribers } = await supabase
+  // Get all subscribed subscribers for this client (full data for template rendering)
+  let subQuery = supabase
     .from('email_subscribers')
-    .select('id, email, first_name')
+    .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
     .eq('client_id', client_id)
     .eq('status', 'subscribed');
+
+  // Apply campaign audience filter if present
+  const filter = campaign.audience_filter;
+  if (filter) {
+    if (filter.source) subQuery = subQuery.eq('source', filter.source);
+    if (filter.tags && filter.tags.length > 0) subQuery = subQuery.overlaps('tags', filter.tags);
+    if (filter.min_orders) subQuery = subQuery.gte('total_orders', filter.min_orders);
+    if (filter.min_spent) subQuery = subQuery.gte('total_spent', filter.min_spent);
+    if (filter.last_order_after) subQuery = subQuery.gte('last_order_at', filter.last_order_after);
+    if (filter.last_order_before) subQuery = subQuery.lte('last_order_at', filter.last_order_before);
+    if (filter.subscribed_after) subQuery = subQuery.gte('subscribed_at', filter.subscribed_after);
+  }
+
+  const { data: allSubscribers } = await subQuery;
 
   // Filter to remaining subscribers not already sent
   const remainingSubscribers = (allSubscribers || []).filter(
     (sub: any) => !alreadySentIds.has(sub.id)
   );
 
-  // Send winning variant to remaining subscribers in batches of 10
+  // Fetch brand info for template rendering
+  const { data: brandInfo } = await supabase
+    .from('clients')
+    .select('brand_name, website_url, logo_url')
+    .eq('id', client_id)
+    .single();
+
+  // Send winning variant with full per-subscriber processing pipeline
   const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;
   const fromName = campaign.from_name || 'Steve';
+  const usesNunjucks = winningHtml.includes('{{');
+  const recConfig = campaign.recommendation_config || null;
   const batchSize = 10;
 
   for (let i = 0; i < remainingSubscribers.length; i += batchSize) {
     const batch = remainingSubscribers.slice(i, i + batchSize);
 
-    const promises = batch.map((sub: any) =>
-      sendSingleEmail({
-        to: sub.email,
-        subject: winningSubject,
-        htmlContent: winningHtml,
-        fromEmail,
-        fromName,
-        replyTo: campaign.reply_to || undefined,
-        subscriberId: sub.id,
-        clientId: client_id,
-        campaignId: test.campaign_id,
-      })
-    );
+    const promises = batch.map(async (sub: any) => {
+      try {
+        // Build per-subscriber template context
+        const ctx = buildTemplateContext(
+          { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at, custom_fields: sub.custom_fields },
+          { discount_code: recConfig?.discount_code },
+          brandInfo ?? undefined,
+          []
+        );
+
+        // Render Nunjucks template per subscriber
+        let personalizedHtml = usesNunjucks ? renderEmailTemplate(winningHtml, ctx) : winningHtml;
+        let personalizedSubject = usesNunjucks ? renderEmailTemplate(winningSubject, ctx) : winningSubject;
+
+        // Process custom blocks (products, discounts, conditionals) per subscriber
+        const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+        if (hasCustomBlocks) {
+          personalizedHtml = await processEmailHtml(personalizedHtml, {
+            clientId: client_id, subscriberId: sub.id, templateContext: ctx, recommendationConfig: recConfig,
+          });
+        }
+
+        return sendSingleEmail({
+          to: sub.email,
+          subject: personalizedSubject,
+          htmlContent: personalizedHtml,
+          fromEmail,
+          fromName,
+          replyTo: campaign.reply_to || undefined,
+          subscriberId: sub.id,
+          clientId: client_id,
+          campaignId: test.campaign_id,
+        });
+      } catch (err) {
+        console.error(`[ab-test] Failed to process/send to ${sub.email}:`, err);
+        return { success: false, error: (err as Error).message };
+      }
+    });
 
     await Promise.all(promises);
   }
