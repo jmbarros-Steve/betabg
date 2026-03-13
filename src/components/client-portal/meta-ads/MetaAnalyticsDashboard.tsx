@@ -134,12 +134,12 @@ const roasBadgeVariant = (roas: number): string => {
 // ---------------------------------------------------------------------------
 
 function ChangeIndicator({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-xs text-muted-foreground">--</span>;
+  if (value === null) return <span className="text-xs text-muted-foreground">Sin datos previos</span>;
   const isPositive = value >= 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-      {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-      {Math.abs(value).toFixed(1)}%
+    <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
+      {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+      {Math.abs(value).toFixed(1)}% vs periodo anterior
     </span>
   );
 }
@@ -150,27 +150,44 @@ function KpiCard({
   change,
   icon: Icon,
   prefix,
+  accent = 'blue',
 }: {
   title: React.ReactNode;
   value: string;
   change: number | null;
   icon: React.ElementType;
   prefix?: string;
+  accent?: string;
 }) {
+  const accentMap: Record<string, string> = {
+    blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
+    green: 'from-green-500/10 to-green-500/5 border-green-500/20',
+    purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
+    red: 'from-red-500/10 to-red-500/5 border-red-500/20',
+    amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
+    cyan: 'from-cyan-500/10 to-cyan-500/5 border-cyan-500/20',
+  };
+  const iconColorMap: Record<string, string> = {
+    blue: 'text-blue-500 bg-blue-500/10',
+    green: 'text-green-500 bg-green-500/10',
+    purple: 'text-purple-500 bg-purple-500/10',
+    red: 'text-red-500 bg-red-500/10',
+    amber: 'text-amber-500 bg-amber-500/10',
+    cyan: 'text-cyan-500 bg-cyan-500/10',
+  };
   return (
-    <Card>
-      <CardContent className="pt-4 pb-3">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-          <Icon className="w-3.5 h-3.5" />
-          {title}
+    <Card className={`relative overflow-hidden border bg-gradient-to-br ${accentMap[accent] || accentMap.blue}`}>
+      <CardContent className="pt-5 pb-5 px-5">
+        <div className="flex items-start justify-between mb-3">
+          <span className="text-sm font-medium text-muted-foreground leading-tight">{title}</span>
+          <div className={`p-2 rounded-lg ${iconColorMap[accent] || iconColorMap.blue}`}>
+            <Icon className="w-4 h-4" />
+          </div>
         </div>
-        <div className="flex items-end justify-between">
-          <p className="text-lg font-bold">
-            {prefix}
-            {value}
-          </p>
-          <ChangeIndicator value={change} />
-        </div>
+        <p className="text-3xl font-bold tracking-tight leading-none mb-2">
+          {prefix}{value}
+        </p>
+        <ChangeIndicator value={change} />
       </CardContent>
     </Card>
   );
@@ -510,7 +527,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
 
   const SortHeader = ({ field, label, className }: { field: SortField; label: React.ReactNode; className?: string }) => (
     <th
-      className={`px-3 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none whitespace-nowrap ${className || ''}`}
+      className={`px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground select-none whitespace-nowrap ${className || ''}`}
       onClick={() => handleSort(field)}
     >
       <span className="inline-flex items-center gap-1">
@@ -528,7 +545,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-full max-w-xl" />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Skeleton key={i} className="h-24" />
           ))}
@@ -600,42 +617,48 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       {/* ------------------------------------------------------------------ */}
       {/* 2. Overview KPI Row                                                */}
       {/* ------------------------------------------------------------------ */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard
           title="Gasto Total"
           value={formatCLP(totals.spend)}
           change={pctChange(totals.spend, prevTotals.spend)}
           icon={DollarSign}
+          accent="red"
         />
         <KpiCard
           title="Impresiones"
           value={formatNumber(totals.impressions)}
           change={pctChange(totals.impressions, prevTotals.impressions)}
           icon={Eye}
+          accent="blue"
         />
         <KpiCard
           title="Clicks"
           value={formatNumber(totals.clicks)}
           change={pctChange(totals.clicks, prevTotals.clicks)}
           icon={MousePointerClick}
+          accent="purple"
         />
         <KpiCard
           title={<JargonTooltip term="CTR" />}
           value={formatPercent(totals.ctr)}
           change={pctChange(totals.ctr, prevTotals.ctr)}
           icon={Target}
+          accent="amber"
         />
         <KpiCard
           title="Conversiones"
           value={formatNumber(totals.conversions)}
           change={pctChange(totals.conversions, prevTotals.conversions)}
           icon={ShoppingCart}
+          accent="green"
         />
         <KpiCard
           title={<JargonTooltip term="ROAS" />}
           value={formatRoas(totals.roas)}
           change={pctChange(totals.roas, prevTotals.roas)}
           icon={TrendingUp}
+          accent="cyan"
         />
       </div>
 
@@ -727,24 +750,16 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/50">
+                <thead className="border-b-2 border-border bg-muted/40">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-8" />
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground min-w-[180px]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-8" />
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[200px]">
                       Campaña
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
-                      Estado
-                    </th>
                     <SortHeader field="spend" label="Gasto" />
-                    <SortHeader field="impressions" label="Impresiones" />
-                    <SortHeader field="clicks" label="Clicks" />
-                    <SortHeader field="ctr" label={<JargonTooltip term="CTR" />} />
-                    <SortHeader field="cpc" label={<JargonTooltip term="CPC" />} />
-                    <SortHeader field="cpm" label={<JargonTooltip term="CPM" />} />
                     <SortHeader field="conversions" label="Conv." />
-                    <SortHeader field="revenue" label="Ingresos" />
                     <SortHeader field="roas" label={<JargonTooltip term="ROAS" />} />
+                    <SortHeader field="ctr" label={<JargonTooltip term="CTR" />} />
                     <SortHeader field="cpa" label={<JargonTooltip term="CPA" />} />
                   </tr>
                 </thead>
@@ -762,25 +777,15 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   })}
                 </tbody>
                 {/* Table footer with totals */}
-                <tfoot className="border-t bg-muted/30 font-medium text-xs">
-                  <tr>
-                    <td className="px-3 py-2" />
-                    <td className="px-3 py-2">Total</td>
-                    <td className="px-3 py-2" />
-                    <td className="px-3 py-2">{formatCLP(totals.spend)}</td>
-                    <td className="px-3 py-2">{formatNumber(totals.impressions)}</td>
-                    <td className="px-3 py-2">{formatNumber(totals.clicks)}</td>
-                    <td className="px-3 py-2">{formatPercent(totals.ctr)}</td>
-                    <td className="px-3 py-2">
-                      {totals.clicks > 0 ? formatCLP(totals.spend / totals.clicks) : '--'}
-                    </td>
-                    <td className="px-3 py-2">
-                      {totals.impressions > 0 ? formatCLP((totals.spend / totals.impressions) * 1000) : '--'}
-                    </td>
-                    <td className="px-3 py-2">{formatNumber(totals.conversions)}</td>
-                    <td className="px-3 py-2">{formatCLP(totals.revenue)}</td>
-                    <td className={`px-3 py-2 ${roasColor(totals.roas)}`}>{formatRoas(totals.roas)}</td>
-                    <td className="px-3 py-2">
+                <tfoot className="border-t-2 border-border bg-muted/40">
+                  <tr className="font-semibold text-sm">
+                    <td className="px-4 py-3" />
+                    <td className="px-4 py-3">Total ({sortedCampaigns.length})</td>
+                    <td className="px-4 py-3 text-right">{formatCLP(totals.spend)}</td>
+                    <td className="px-4 py-3 text-right">{formatNumber(totals.conversions)}</td>
+                    <td className={`px-4 py-3 text-right ${roasColor(totals.roas)}`}>{formatRoas(totals.roas)}</td>
+                    <td className="px-4 py-3 text-right">{formatPercent(totals.ctr)}</td>
+                    <td className="px-4 py-3 text-right">
                       {totals.conversions > 0 ? formatCLP(totals.spend / totals.conversions) : '--'}
                     </td>
                   </tr>
@@ -951,47 +956,31 @@ function CampaignRow({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const statusBadge: Record<string, string> = {
-    Activa: 'bg-green-500/10 text-green-600 border-green-500/20',
-    Pausada: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-    Inactiva: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
-  };
-
   return (
     <>
       <tr
         className="border-b hover:bg-muted/40 transition-colors cursor-pointer"
         onClick={onToggle}
       >
-        <td className="px-3 py-2.5">
+        <td className="px-4 py-3">
           {c.dailyBreakdown.length > 0 && (
             isExpanded
               ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
               : <ChevronRight className="w-4 h-4 text-muted-foreground" />
           )}
         </td>
-        <td className="px-3 py-2.5 font-medium max-w-[220px] truncate" title={c.campaign_name}>
+        <td className="px-4 py-3 font-medium max-w-[240px] truncate" title={c.campaign_name}>
           {c.campaign_name}
         </td>
-        <td className="px-3 py-2.5">
-          <Badge variant="outline" className={`text-[10px] ${statusBadge[c.status] || ''}`}>
-            {c.status}
-          </Badge>
-        </td>
-        <td className="px-3 py-2.5 tabular-nums">{formatCLP(c.spend)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatNumber(c.impressions)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatNumber(c.clicks)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatPercent(c.ctr)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatCLP(c.cpc)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatCLP(c.cpm)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatNumber(c.conversions)}</td>
-        <td className="px-3 py-2.5 tabular-nums">{formatCLP(c.revenue)}</td>
-        <td className="px-3 py-2.5 tabular-nums">
+        <td className="px-4 py-3 text-right tabular-nums">{formatCLP(c.spend)}</td>
+        <td className="px-4 py-3 text-right tabular-nums">{formatNumber(c.conversions)}</td>
+        <td className="px-4 py-3 text-right tabular-nums">
           <Badge variant="outline" className={`text-xs ${roasBadgeVariant(c.roas)}`}>
             {formatRoas(c.roas)}
           </Badge>
         </td>
-        <td className="px-3 py-2.5 tabular-nums">
+        <td className="px-4 py-3 text-right tabular-nums">{formatPercent(c.ctr)}</td>
+        <td className="px-4 py-3 text-right tabular-nums">
           {c.conversions > 0 ? formatCLP(c.cpa) : '--'}
         </td>
       </tr>
@@ -999,40 +988,36 @@ function CampaignRow({
       {/* Expanded daily breakdown */}
       {isExpanded && c.dailyBreakdown.length > 0 && (
         <tr>
-          <td colSpan={13} className="p-0">
+          <td colSpan={7} className="p-0">
             <div className="bg-muted/20 border-b">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-muted-foreground">
-                    <th className="px-3 py-1.5 text-left pl-12">Fecha</th>
-                    <th className="px-3 py-1.5 text-left">Gasto</th>
-                    <th className="px-3 py-1.5 text-left">Impresiones</th>
-                    <th className="px-3 py-1.5 text-left">Clicks</th>
-                    <th className="px-3 py-1.5 text-left"><JargonTooltip term="CTR" /></th>
-                    <th className="px-3 py-1.5 text-left"><JargonTooltip term="CPC" /></th>
-                    <th className="px-3 py-1.5 text-left">Conv.</th>
-                    <th className="px-3 py-1.5 text-left">Ingresos</th>
-                    <th className="px-3 py-1.5 text-left"><JargonTooltip term="ROAS" /></th>
+                    <th className="px-4 py-1.5 text-left pl-12">Fecha</th>
+                    <th className="px-4 py-1.5 text-right">Gasto</th>
+                    <th className="px-4 py-1.5 text-right">Conv.</th>
+                    <th className="px-4 py-1.5 text-right"><JargonTooltip term="ROAS" /></th>
+                    <th className="px-4 py-1.5 text-right"><JargonTooltip term="CTR" /></th>
+                    <th className="px-4 py-1.5 text-right"><JargonTooltip term="CPA" /></th>
                   </tr>
                 </thead>
                 <tbody>
                   {c.dailyBreakdown.map((d) => (
                     <tr key={d.date} className="border-t border-border/30 hover:bg-muted/30">
-                      <td className="px-3 py-1.5 pl-12 tabular-nums">
+                      <td className="px-4 py-1.5 pl-12 tabular-nums">
                         {new Date(d.date + 'T12:00:00').toLocaleDateString('es-CL', {
                           day: '2-digit',
                           month: 'short',
                         })}
                       </td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatCLP(d.spend)}</td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatNumber(d.impressions)}</td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatNumber(d.clicks)}</td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatPercent(d.ctr)}</td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatCLP(d.cpc)}</td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatNumber(d.conversions)}</td>
-                      <td className="px-3 py-1.5 tabular-nums">{formatCLP(d.revenue)}</td>
-                      <td className={`px-3 py-1.5 tabular-nums font-medium ${roasColor(d.roas)}`}>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{formatCLP(d.spend)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{formatNumber(d.conversions)}</td>
+                      <td className={`px-4 py-1.5 text-right tabular-nums font-medium ${roasColor(d.roas)}`}>
                         {formatRoas(d.roas)}
+                      </td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{formatPercent(d.ctr)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">
+                        {d.conversions > 0 ? formatCLP(d.spend / d.conversions) : '--'}
                       </td>
                     </tr>
                   ))}

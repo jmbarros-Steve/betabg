@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
-  RefreshCw, TrendingUp, TrendingDown, DollarSign, MousePointerClick,
+  RefreshCw, TrendingUp, TrendingDown, DollarSign,
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
   BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
   Clock, CheckCircle, PauseCircle, Calendar
@@ -525,87 +525,90 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <DollarSign className="w-3 h-3" />
-              Gasto Total
+      {/* Primary KPIs - large cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Gasto Total</span>
+              <div className="p-2.5 rounded-xl bg-red-500/10">
+                <DollarSign className="w-5 h-5 text-red-500" />
+              </div>
             </div>
-            <p className="text-lg font-bold">{formatCurrency(totals.spend)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend)}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <ShoppingCart className="w-3 h-3" />
-              Revenue (Atribuido)
+
+        <Card className="border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Ingresos</span>
+              <div className="p-2.5 rounded-xl bg-green-500/10">
+                <ShoppingCart className="w-5 h-5 text-green-500" />
+              </div>
             </div>
-            <p className="text-lg font-bold">{formatCurrency(totals.revenue)}</p>
-            <p className="text-[10px] text-muted-foreground">Reportado por plataforma</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Atribuido por plataforma</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <TrendingUp className="w-3 h-3" />
-              <JargonTooltip term="ROAS" />
+
+        <Card className="border bg-gradient-to-br from-cyan-500/8 to-transparent border-cyan-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
+              <div className="p-2.5 rounded-xl bg-cyan-500/10">
+                <TrendingUp className="w-5 h-5 text-cyan-500" />
+              </div>
             </div>
-            <p className={`text-lg font-bold ${overallRoas >= 3 ? 'text-green-500' : overallRoas >= 2 ? 'text-yellow-500' : 'text-red-500'}`}>
+            <p className={`text-3xl font-bold tracking-tight ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
               {overallRoas.toFixed(2)}x
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Eye className="w-3 h-3" />
-              Conversiones
+
+        <Card className="border bg-gradient-to-br from-amber-500/8 to-transparent border-amber-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Conversiones</span>
+              <div className="p-2.5 rounded-xl bg-amber-500/10">
+                <Eye className="w-5 h-5 text-amber-500" />
+              </div>
             </div>
-            <p className="text-lg font-bold">{formatNumber(totals.conversions)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatNumber(totals.conversions)}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Target className="w-3 h-3" />
-              Costo/Conv
-            </div>
-            <p className="text-lg font-bold">
+      </div>
+
+      {/* Secondary KPIs - compact row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="bg-muted/30">
+          <CardContent className="py-4 px-5">
+            <span className="text-xs font-medium text-muted-foreground">Costo/Conv</span>
+            <p className="text-xl font-bold mt-1">
               {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions) : '-'}
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <MousePointerClick className="w-3 h-3" />
-              <JargonTooltip term="CPC" />
-            </div>
-            <p className="text-lg font-bold">
-              {totals.clicks > 0 ? `$${(totals.spend / totals.clicks).toFixed(2)}` : '-'}
+        <Card className="bg-muted/30">
+          <CardContent className="py-4 px-5">
+            <JargonTooltip term="CPC" className="text-xs font-medium text-muted-foreground" />
+            <p className="text-xl font-bold mt-1">
+              {totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks) : '-'}
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Eye className="w-3 h-3" />
-              <JargonTooltip term="CPM" />
-            </div>
-            <p className="text-lg font-bold">
-              {totals.impressions > 0 ? `$${((totals.spend / totals.impressions) * 1000).toFixed(2)}` : '-'}
+        <Card className="bg-muted/30">
+          <CardContent className="py-4 px-5">
+            <JargonTooltip term="CPM" className="text-xs font-medium text-muted-foreground" />
+            <p className="text-xl font-bold mt-1">
+              {totals.impressions > 0 ? formatCurrency((totals.spend / totals.impressions) * 1000) : '-'}
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <MousePointerClick className="w-3 h-3" />
-              <JargonTooltip term="CTR" />
-            </div>
-            <p className="text-lg font-bold">{formatPercent(overallCtr)}</p>
+        <Card className="bg-muted/30">
+          <CardContent className="py-4 px-5">
+            <JargonTooltip term="CTR" className="text-xs font-medium text-muted-foreground" />
+            <p className="text-xl font-bold mt-1">{formatPercent(overallCtr)}</p>
           </CardContent>
         </Card>
       </div>

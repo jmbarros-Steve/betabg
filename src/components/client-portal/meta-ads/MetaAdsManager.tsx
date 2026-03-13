@@ -375,61 +375,69 @@ function DashboardSection({ clientId }: { clientId: string }) {
 
       <MetaScopeStatusPanel clientId={clientId} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">Gasto Total</span>
-              <div className="p-1.5 rounded-md bg-red-500/10"><DollarSign className="w-4 h-4 text-red-500" /></div>
+              <div className="p-2.5 rounded-xl bg-red-500/10">
+                <DollarSign className="w-5 h-5 text-red-500" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(totals.spend)}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {aggregated.length} campaña{aggregated.length !== 1 ? 's' : ''} (30d)
+            <p className="text-3xl font-bold tracking-tight mb-1">{formatCurrency(totals.spend)}</p>
+            <p className="text-sm text-muted-foreground">
+              {aggregated.length} campaña{aggregated.length !== 1 ? 's' : ''} · 30 días
             </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/40 to-red-500/10" />
         </Card>
 
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
-              <div className="p-1.5 rounded-md bg-green-500/10"><TrendingUp className="w-4 h-4 text-green-500" /></div>
+              <div className="p-2.5 rounded-xl bg-green-500/10">
+                <TrendingUp className="w-5 h-5 text-green-500" />
+              </div>
             </div>
-            <p className={`text-2xl font-bold ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
+            <p className={`text-3xl font-bold tracking-tight mb-1 ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
               {overallRoas.toFixed(2)}x
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Revenue: {formatCurrency(totals.revenue)}</p>
+            <p className="text-sm text-muted-foreground">
+              Ingresos: {formatCurrency(totals.revenue)}
+            </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500/40 to-green-500/10" />
         </Card>
 
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-blue-500/8 to-transparent border-blue-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <JargonTooltip term="CPA" className="text-sm font-medium text-muted-foreground" />
-              <div className="p-1.5 rounded-md bg-blue-500/10"><Target className="w-4 h-4 text-blue-500" /></div>
+              <div className="p-2.5 rounded-xl bg-blue-500/10">
+                <Target className="w-5 h-5 text-blue-500" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}</p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-3xl font-bold tracking-tight mb-1">
+              {totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}
+            </p>
+            <p className="text-sm text-muted-foreground">
               {formatNumber(totals.conversions)} conversión{totals.conversions !== 1 ? 'es' : ''}
             </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
         </Card>
 
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-purple-500/8 to-transparent border-purple-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <JargonTooltip term="CTR" className="text-sm font-medium text-muted-foreground" />
-              <div className="p-1.5 rounded-md bg-purple-500/10"><MousePointerClick className="w-4 h-4 text-purple-500" /></div>
+              <div className="p-2.5 rounded-xl bg-purple-500/10">
+                <MousePointerClick className="w-5 h-5 text-purple-500" />
+              </div>
             </div>
-            <p className="text-2xl font-bold">{formatPercent(overallCtr)}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {formatNumber(totals.clicks)} clicks / {formatNumber(totals.impressions)} impresiones
+            <p className="text-3xl font-bold tracking-tight mb-1">{formatPercent(overallCtr)}</p>
+            <p className="text-sm text-muted-foreground">
+              {formatNumber(totals.clicks)} clics · {formatNumber(totals.impressions)} impr.
             </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500/40 to-purple-500/10" />
         </Card>
       </div>
 
@@ -445,31 +453,36 @@ function DashboardSection({ clientId }: { clientId: string }) {
                 No hay campañas con datos. Sincroniza para cargar métricas.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="text-left py-2 pr-4 text-sm font-medium text-muted-foreground">Campaña</th>
-                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Gasto</th>
-                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground"><JargonTooltip term="ROAS" /></th>
-                      <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Conv.</th>
-                      <th className="text-right py-2 pl-3 text-sm font-medium text-muted-foreground"><JargonTooltip term="CTR" /></th>
+                    <tr className="border-b-2 border-border">
+                      <th className="text-left py-3 pr-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Campaña</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Gasto</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"><JargonTooltip term="ROAS" /></th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Conv.</th>
+                      <th className="text-right py-3 pl-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"><JargonTooltip term="CTR" /></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {topCampaigns.map((c) => (
-                      <tr key={c.campaign_id} className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors">
-                        <td className="py-2.5 pr-4">
-                          <span className="font-medium text-sm truncate block max-w-[260px]">{c.campaign_name}</span>
+                    {topCampaigns.map((c, i) => (
+                      <tr key={c.campaign_id} className="border-b border-border/30 last:border-0 hover:bg-muted/40 transition-colors">
+                        <td className="py-3.5 pr-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                              {i + 1}
+                            </div>
+                            <span className="font-medium text-sm truncate max-w-[220px]">{c.campaign_name}</span>
+                          </div>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(c.total_spend)}</td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className={`font-medium ${c.avg_roas >= 3 ? 'text-green-600' : c.avg_roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
+                        <td className="py-3.5 px-4 text-right font-semibold text-sm">{formatCurrency(c.total_spend)}</td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span className={`font-semibold text-sm ${c.avg_roas >= 3 ? 'text-green-600' : c.avg_roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
                             {c.avg_roas.toFixed(2)}x
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right">{formatNumber(c.total_conversions)}</td>
-                        <td className="py-2.5 pl-3 text-right">{formatPercent(c.avg_ctr)}</td>
+                        <td className="py-3.5 px-4 text-right font-medium text-sm">{formatNumber(c.total_conversions)}</td>
+                        <td className="py-3.5 pl-4 text-right text-sm">{formatPercent(c.avg_ctr)}</td>
                       </tr>
                     ))}
                   </tbody>

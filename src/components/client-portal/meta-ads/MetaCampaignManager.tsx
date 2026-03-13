@@ -910,67 +910,62 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       {/* ----------------------------------------------------------------- */}
       {/* Budget Summary Cards */}
       {/* ----------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <Card className="border bg-gradient-to-br from-blue-500/8 to-transparent border-blue-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">
                 Presupuesto Diario Total
               </span>
-              <div className="p-1.5 rounded-md bg-blue-500/10">
-                <DollarSign className="w-4 h-4 text-blue-500" />
+              <div className="p-2.5 rounded-xl bg-blue-500/10">
+                <DollarSign className="w-5 h-5 text-blue-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">
+            <p className="text-3xl font-bold tracking-tight mb-1">
               {formatCLP(budgetSummary.totalDaily)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {budgetSummary.activeCount} campaña
-              {budgetSummary.activeCount !== 1 ? 's' : ''} activa
-              {budgetSummary.activeCount !== 1 ? 's' : ''}
+            <p className="text-sm text-muted-foreground">
+              {budgetSummary.activeCount} campaña{budgetSummary.activeCount !== 1 ? 's' : ''} activa{budgetSummary.activeCount !== 1 ? 's' : ''}
             </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
         </Card>
 
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+        <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">
                 Gasto 30 Días
               </span>
-              <div className="p-1.5 rounded-md bg-red-500/10">
-                <TrendingUp className="w-4 h-4 text-red-500" />
+              <div className="p-2.5 rounded-xl bg-red-500/10">
+                <TrendingUp className="w-5 h-5 text-red-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">
+            <p className="text-3xl font-bold tracking-tight mb-1">
               {formatCLP(budgetSummary.totalSpend30d)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">
               Campañas activas
             </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/40 to-red-500/10" />
         </Card>
 
-        <Card className="relative overflow-hidden">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
+        <Card className="border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">
                 Presupuesto Mensual Est.
               </span>
-              <div className="p-1.5 rounded-md bg-green-500/10">
-                <CalendarDays className="w-4 h-4 text-green-500" />
+              <div className="p-2.5 rounded-xl bg-green-500/10">
+                <CalendarDays className="w-5 h-5 text-green-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">
+            <p className="text-3xl font-bold tracking-tight mb-1">
               {formatCLP(budgetSummary.totalDaily * 30)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">
               Proyección a 30 días
             </p>
           </CardContent>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500/40 to-green-500/10" />
         </Card>
       </div>
 
@@ -1115,12 +1110,12 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
-                  <tr className="border-b border-border">
+                <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-sm">
+                  <tr className="border-b-2 border-border">
                     {/* Campaign Name */}
                     <th className="text-left py-3 px-4">
                       <button
-                        className="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors"
                         onClick={() => handleSort('campaign_name')}
                       >
                         Campaña
@@ -1135,7 +1130,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Status */}
                     <th className="text-center py-3 px-3">
                       <button
-                        className="flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-center text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('status')}
                       >
                         Estado
@@ -1150,7 +1145,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Daily Budget */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('daily_budget')}
                       >
                         Presupuesto/Día
@@ -1165,7 +1160,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Spend 30d */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('spend')}
                       >
                         Gasto (30d)
@@ -1180,7 +1175,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* ROAS */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('roas')}
                       >
                         <JargonTooltip term="ROAS" />
@@ -1195,7 +1190,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* CPA */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('cpa')}
                       >
                         <JargonTooltip term="CPA" />
@@ -1210,7 +1205,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* CTR */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('ctr')}
                       >
                         <JargonTooltip term="CTR" />
@@ -1225,7 +1220,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Conversions */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('conversions')}
                       >
                         Conv.
@@ -1239,7 +1234,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
                     {/* Actions */}
                     <th className="text-center py-3 px-4">
-                      <span className="text-sm font-medium text-muted-foreground">
+                      <span className="text-xs uppercase tracking-wider font-medium text-muted-foreground">
                         Acciones
                       </span>
                     </th>
@@ -1254,14 +1249,14 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className={`
                           border-b border-border/30 last:border-0
                           hover:bg-muted/50 transition-colors
-                          ${idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/20'}
+                          ${idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/15'}
                           ${isLoading ? 'opacity-60 pointer-events-none' : ''}
                         `}
                       >
                         {/* Campaign Name */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-4">
                           <div className="flex flex-col">
-                            <span className="font-medium text-sm truncate max-w-[240px]">
+                            <span className="font-medium text-sm truncate max-w-[280px]">
                               {campaign.campaign_name}
                             </span>
                             <span className="text-xs text-muted-foreground">
@@ -1271,24 +1266,24 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-4 px-3 text-center">
                           <StatusBadge status={campaign.status} />
                         </td>
 
                         {/* Daily Budget */}
-                        <td className="py-3 px-3 text-right font-medium">
+                        <td className="py-4 px-3 text-right font-medium">
                           {formatCLP(campaign.daily_budget)}
                         </td>
 
                         {/* Spend 30d */}
-                        <td className="py-3 px-3 text-right font-medium">
+                        <td className="py-4 px-3 text-right font-medium">
                           {formatCLP(campaign.spend_30d)}
                         </td>
 
                         {/* ROAS */}
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-4 px-3 text-right">
                           <span
-                            className={`font-medium ${
+                            className={`text-base font-medium ${
                               campaign.roas >= 3
                                 ? 'text-green-600'
                                 : campaign.roas >= 2
@@ -1305,27 +1300,27 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         </td>
 
                         {/* CPA */}
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-4 px-3 text-right">
                           {campaign.cpa > 0
                             ? formatCLP(campaign.cpa)
                             : '--'}
                         </td>
 
                         {/* CTR */}
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-4 px-3 text-right">
                           {campaign.ctr > 0
                             ? formatPercent(campaign.ctr)
                             : '--'}
                         </td>
 
                         {/* Conversions */}
-                        <td className="py-3 px-3 text-right font-medium">
+                        <td className="py-4 px-3 text-right font-medium">
                           {formatNumber(campaign.conversions)}
                         </td>
 
                         {/* Actions */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-center gap-1.5">
                             {/* Pause/Resume */}
                             {campaign.status !== 'ARCHIVED' &&
                               campaign.status !== 'COMPLETED' && (
