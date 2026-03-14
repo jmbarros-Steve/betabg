@@ -18,6 +18,7 @@ import {
   Clock, CheckCircle, PauseCircle, Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
 
@@ -101,7 +102,7 @@ const priorityConfig = {
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CL', { 
     style: 'currency', 
-    currency: 'USD',
+    currency: 'CLP',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0 
   }).format(value);
@@ -136,6 +137,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     currentBudget?: number;
   } | null>(null);
   const [charlieActionLoading, setCharlieActionLoading] = useState(false);
+  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
+
+  const daysFromRange = (range: string): number => {
+    const map: Record<string, number> = { '7d': 7, '14d': 14, '30d': 30, '60d': 60, '90d': 90 };
+    return map[range] || 30;
+  };
+
   useEffect(() => {
     fetchConnections();
   }, [clientId]);
@@ -145,7 +153,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       fetchMetrics();
       fetchRecommendations();
     }
-  }, [connections, selectedConnection]);
+  }, [connections, selectedConnection, dateRange]);
 
   async function fetchConnections() {
     try {
@@ -180,7 +188,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         .from('campaign_metrics')
         .select('*')
         .in('connection_id', connectionIds)
-        .gte('metric_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .gte('metric_date', new Date(Date.now() - daysFromRange(dateRange) * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('metric_date', { ascending: false });
 
       if (error) throw error;
@@ -488,7 +496,22 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Analytics por Campaña</h2>
-          <p className="text-muted-foreground text-sm">Últimos 30 días</p>
+          <p className="text-muted-foreground text-sm">
+            Últimos {daysFromRange(dateRange)} días
+          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {(['7d', '14d', '30d', '60d', '90d'] as const).map((range) => (
+              <Button
+                key={range}
+                variant={dateRange === range ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDateRange(range)}
+                className="text-xs"
+              >
+                {range === '7d' ? '7 días' : range === '14d' ? '14 días' : range === '30d' ? '30 días' : range === '60d' ? '60 días' : '90 días'}
+              </Button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -613,6 +636,80 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         </Card>
       </div>
 
+      {/* Spend vs Revenue Chart */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Gasto vs Ingresos por Día</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            // Build daily data from metrics
+            const dailyMap = new Map<string, { date: string; spend: number; revenue: number; conversions: number }>();
+            const filteredMetrics = selectedConnection === 'all'
+              ? metrics
+              : metrics.filter(m => {
+                  const conn = connections.find(c => c.id === selectedConnection);
+                  return conn && m.platform === conn.platform;
+                });
+            filteredMetrics.forEach(m => {
+              const existing = dailyMap.get(m.metric_date) || { date: m.metric_date, spend: 0, revenue: 0, conversions: 0 };
+              existing.spend += m.spend || 0;
+              existing.revenue += m.conversion_value || 0;
+              existing.conversions += m.conversions || 0;
+              dailyMap.set(m.metric_date, existing);
+            });
+            const chartData = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+            if (chartData.length === 0) {
+              return (
+                <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+                  Sin datos para el periodo seleccionado
+                </div>
+              );
+            }
+
+            return (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v: string) => {
+                      const d = new Date(v + 'T12:00:00');
+                      return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+                    }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v: number) => formatCurrency(v)}
+                  />
+                  <RechartsTooltip
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name === 'revenue' ? 'Ingresos' : name === 'spend' ? 'Gasto' : 'Conversiones',
+                    ]}
+                    labelFormatter={(label: string) => {
+                      const d = new Date(label + 'T12:00:00');
+                      return d.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+                    }}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend formatter={(value: string) => (value === 'revenue' ? 'Ingresos' : 'Gasto')} />
+                  <Bar dataKey="spend" fill="#EF4444" name="spend" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" fill="#22C55E" name="revenue" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <div className="flex items-center justify-between">
@@ -704,6 +801,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                     <span className="text-muted-foreground/60">• Click para ver Ad Sets</span>
                                   )}
                                 </p>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {(() => {
+                                    const campaignMetrics = metrics.filter(m => m.campaign_id === campaign.campaign_id);
+                                    if (campaignMetrics.length === 0) return '';
+                                    const dates = campaignMetrics.map(m => m.metric_date).sort();
+                                    const first = new Date(dates[0] + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+                                    const last = new Date(dates[dates.length - 1] + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+                                    return `${first} — ${last}`;
+                                  })()}
+                                </span>
                               </div>
                             </div>
                             
