@@ -34,6 +34,7 @@ interface CampaignMetricRow {
   platform: string;
   campaign_id: string;
   campaign_name: string;
+  campaign_status?: string;
   metric_date: string;
   impressions: number | null;
   clicks: number | null;
@@ -409,12 +410,13 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
         }))
         .sort((a, b) => b.date.localeCompare(a.date));
 
-      // Determine campaign status based on recency
-      const mostRecentDate = rows.reduce((max, r) => (r.metric_date > max ? r.metric_date : max), '');
-      const daysSinceLast = Math.ceil(
-        (Date.now() - new Date(mostRecentDate).getTime()) / 86400000
-      );
-      const status = daysSinceLast <= 2 ? 'Activa' : daysSinceLast <= 7 ? 'Pausada' : 'Inactiva';
+      // Use real campaign status from Meta API (most recent row has latest status)
+      const sortedByDate = [...rows].sort((a, b) => b.metric_date.localeCompare(a.metric_date));
+      const realStatus = sortedByDate[0]?.campaign_status || '';
+      const status = realStatus.toUpperCase() === 'ACTIVE' ? 'ACTIVE'
+        : realStatus.toUpperCase() === 'PAUSED' ? 'PAUSED'
+        : realStatus.toUpperCase() === 'ARCHIVED' ? 'ARCHIVED'
+        : 'ACTIVE'; // fallback for old rows without campaign_status
 
       result.push({
         campaign_id: id, campaign_name: name, status,
@@ -907,8 +909,8 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     {insights.worstCampaign.roas < 1
                       ? `Esta campaña gasta más de lo que genera (ROAS ${formatRoas(insights.worstCampaign.roas)}). Considera pausarla y reasignar presupuesto a "${insights.bestCampaign.campaign_name}".`
                       : insights.worstCampaign.roas < 2
-                        ? `ROAS bajo (${formatRoas(insights.worstCampaign.roas)}). Prueba nuevos creativos o audiencias antes de escalar.`
-                        : `Es la de menor rendimiento activa. Revisa segmentación y creativos.`
+                        ? `ROAS bajo (${formatRoas(insights.worstCampaign.roas)}). Prueba nuevos creativos o audiencias antes de aumentar inversión.`
+                        : `Es la de menor rendimiento activa. Revisa a quién le muestras los anuncios y prueba nuevas imágenes/videos.`
                     }
                   </p>
                 </div>

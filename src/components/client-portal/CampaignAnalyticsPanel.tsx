@@ -953,7 +953,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                             📈 Aprobar escalado 20%
                                           </Button>
                                         )}
-                                        {semKey === 'danger' && (
+                                        {semKey === 'danger' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                                           <Button size="sm" variant="outline" className="text-xs text-red-700 border-red-300 hover:bg-red-50"
                                             onClick={() => setCharlieModal({
                                               type: 'pause', adSetName: adSet.name, adSetId: adSet.id,
@@ -962,8 +962,14 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                             ⏸ Aprobar pausa de Ad Set
                                           </Button>
                                         )}
-                                        {semKey === 'learning' && (
-                                          <span className="text-xs text-yellow-600">⏳ En aprendizaje — revisión pendiente</span>
+                                        {semKey === 'danger' && adSet.status?.toUpperCase() === 'PAUSED' && (
+                                          <span className="text-xs text-muted-foreground">Ya está pausado</span>
+                                        )}
+                                        {semKey === 'learning' && adSet.status?.toUpperCase() !== 'PAUSED' && (
+                                          <span className="text-xs text-yellow-600">⏳ En aprendizaje — no tocar por 7 días para que Meta optimice</span>
+                                        )}
+                                        {semKey === 'learning' && adSet.status?.toUpperCase() === 'PAUSED' && (
+                                          <span className="text-xs text-muted-foreground">Pausado — reactívalo si quieres retomar el test</span>
                                         )}
                                         {semKey === 'nodata' && (
                                           <span className="text-xs text-muted-foreground">🔄 Sin datos — activa o elimina este Ad Set</span>
@@ -1089,13 +1095,21 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                               📈 Aprobar escalado 20%
                             </Button>
                           )}
-                          {semaphore === 'danger' && (
+                          {semaphore === 'danger' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                             <Button size="sm" variant="destructive" className="text-xs"
                               onClick={() => setCharlieModal({ type: 'pause', adSetName: adSet.name, adSetId: adSet.id, spend: parseFloat(adSet.spend) || 0, daysActive: 3 })}>
                               ⏸ Aprobar pausa Ad Set
                             </Button>
                           )}
-                          {semaphore === 'learning' && <span className="text-xs text-yellow-600">⏳ Esperar 7 días</span>}
+                          {semaphore === 'danger' && adSet.status?.toUpperCase() === 'PAUSED' && (
+                            <span className="text-xs text-muted-foreground">Ya está pausado</span>
+                          )}
+                          {semaphore === 'learning' && adSet.status?.toUpperCase() !== 'PAUSED' && (
+                            <span className="text-xs text-yellow-600">⏳ En aprendizaje — no tocar por 7 días</span>
+                          )}
+                          {semaphore === 'learning' && adSet.status?.toUpperCase() === 'PAUSED' && (
+                            <span className="text-xs text-muted-foreground">Pausado</span>
+                          )}
                           {semaphore === 'nodata' && <span className="text-xs text-muted-foreground">🔄 Revisar</span>}
                         </div>
                       </div>
@@ -1139,6 +1153,10 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <div className="space-y-2 pt-2 text-sm">
                 <p>¿Seguro que quieres pausar el Ad Set <strong>"{charlieModal?.adSetName}"</strong>?</p>
                 <p>Lleva <strong>{charlieModal?.daysActive} días activo</strong> con <strong>${((charlieModal?.spend || 0) * CLP_RATE).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP</strong> gastados.</p>
+                <div className="bg-destructive/10 rounded-lg p-3 text-xs space-y-1 mt-2">
+                  <p className="font-semibold text-destructive">¿Por qué pausar?</p>
+                  <p>Este Ad Set tiene un costo por adquisición (CPA) demasiado alto — está gastando más de lo que debería para conseguir cada venta. Pausarlo redirige el presupuesto a los Ad Sets que sí están funcionando.</p>
+                </div>
                 <div className="bg-muted rounded-lg p-3 text-xs space-y-1 mt-2">
                   <p>✅ Pausas el <strong>Ad Set</strong>, no la campaña.</p>
                   <p>✅ La campaña principal sigue activa con los demás Ad Sets.</p>
