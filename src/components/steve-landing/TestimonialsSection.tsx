@@ -13,8 +13,8 @@ const testimonials = [
     name: 'Carlos Mendez',
     role: 'CMO, FitWear Chile',
     avatar: 'CM',
-    quote: 'El analisis de competencia es brutal. Descubrimos gaps en el mercado que nos dieron ventaja competitiva real.',
-    metric: '3x mas rapido en research',
+    quote: 'El análisis de competencia es brutal. Descubrimos gaps en el mercado que nos dieron ventaja competitiva real.',
+    metric: '3x más rápido en research',
     color: 'bg-purple-100 text-purple-700',
   },
   {

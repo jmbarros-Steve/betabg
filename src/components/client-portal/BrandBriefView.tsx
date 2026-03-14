@@ -715,7 +715,7 @@ function AnalysisProgressBanner({ progressStep, elapsedSeconds }: { progressStep
 
         {/* Footer tip */}
         <p className="text-[10px] text-center text-muted-foreground/70 mt-3">
-          Puedes navegar a otras pestanas mientras Steve trabaja. Te avisaremos cuando termine.
+          Puedes navegar a otras pestañas mientras Steve trabaja. Te avisaremos cuando termine.
         </p>
       </CardContent>
     </Card>
@@ -3042,7 +3042,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           }
         }
       } else {
-        addInsightBox('El presupuesto detallado se define en funcion del CPA maximo viable y los objetivos de ROAS. Consulte con su estratega para una propuesta personalizada basada en los datos de este brief.');
+        addInsightBox('El presupuesto detallado se define en función del CPA máximo viable y los objetivos de ROAS. Consulte con su estratega para una propuesta personalizada basada en los datos de este brief.');
       }
       y += 8;
     }
@@ -3186,7 +3186,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
     doc.setFontSize(14);
     doc.setTextColor(accentR + 40, accentG + 40, accentB + 20);
-    doc.text('Tu Brief esta listo. Es hora de activar la maquina.', pageWidth / 2, pageHeight * 0.2 + 30, { align: 'center' });
+    doc.text('Tu Brief está listo. Es hora de activar la máquina.', pageWidth / 2, pageHeight * 0.2 + 30, { align: 'center' });
 
     doc.setFont('NotoSans', 'normal');
     doc.setFontSize(9);
@@ -3218,7 +3218,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFont('NotoSans', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text(`Tu CPA maximo viable es ${cpaMaxCLP || 'N/D'}. Steve Ads esta calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
+    doc.text(`Tu CPA máximo viable es ${cpaMaxCLP || 'N/D'}. Steve Ads está calibrado para nunca superarlo.`, pageWidth / 2, steveY + 12, { align: 'center', maxWidth: maxWidth - 36 });
     steveY += 26;
 
     // CTA

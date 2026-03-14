@@ -22,7 +22,7 @@ export function FinalCTA({ onOpenAuth }: FinalCTAProps) {
           <span className="text-gradient">inteligente</span>
         </h2>
         <p className="text-slate-400 max-w-lg mx-auto mb-8">
-          Unete a los equipos de e-commerce que ya usan Steve para crecer mas rapido.
+          Únete a los equipos de e-commerce que ya usan Steve para crecer más rápido.
         </p>
 
         <button

@@ -447,7 +447,7 @@ export function SteveKlaviyoChat({ clientId }: SteveKlaviyoChatProps) {
               Steve — Email Marketing
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Preguntale a Steve sobre email marketing, Klaviyo, estrategia y
+              Pregúntale a Steve sobre email marketing, Klaviyo, estrategia y
               mejores prácticas
             </p>
           </div>

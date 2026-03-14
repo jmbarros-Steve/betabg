@@ -5,7 +5,7 @@ const features = [
   {
     icon: MessageSquare,
     title: 'Chat con Steve AI',
-    description: 'Tu consultor de marketing 24/7. Pregunta sobre estrategia, analisis y optimizacion.',
+    description: 'Tu consultor de marketing 24/7. Pregunta sobre estrategia, análisis y optimización.',
     color: 'bg-blue-50 text-blue-600',
     span: false,
   },
@@ -39,7 +39,7 @@ const features = [
   },
   {
     icon: Search,
-    title: 'Analisis de Competencia',
+    title: 'Análisis de Competencia',
     description: 'Escanea anuncios, estrategias y posicionamiento de tus competidores con web scraping AI. Identifica oportunidades y gaps en el mercado.',
     color: 'bg-red-50 text-red-600',
     span: true,
