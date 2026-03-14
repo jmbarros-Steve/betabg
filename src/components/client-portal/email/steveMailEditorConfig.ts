@@ -2,11 +2,12 @@
  * Shared Unlayer editor configuration for Steve Mail.
  * Used by CampaignBuilder, FlowBuilder, and UnlayerEmailEditor.
  *
- * Custom tools are registered via customJS (public/unlayer-product-tool.js)
- * which runs inside the Unlayer iframe. The URL must be absolute
- * (window.location.origin) since the iframe is on editor.unlayer.com.
+ * Custom tools are loaded via customJS from the Cloud Run API server.
+ * This avoids Vercel SPA rewrite issues — the API server serves the
+ * JS file directly at /api/static/unlayer-custom-tools.js.
  */
 import { steveMailMergeTagsConfig } from './steveMailMergeTags';
+
 
 export interface SteveMailEditorOptions {
   designTags?: Record<string, string>;
@@ -483,7 +484,7 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
       images: { enabled: true },
     },
     customCSS: [],
-    customJS: [`${window.location.origin}/unlayer-product-tool.js`],
+    customJS: [`${import.meta.env.VITE_API_URL}/api/static/unlayer-custom-tools.js`],
     blocks: customBlocks,
     ...(opts?.mergeTagsOverride
       ? { mergeTags: opts.mergeTagsOverride }
