@@ -569,7 +569,7 @@ export function TemplateBuilder({ clientId, onBrandUpdate }: TemplateBuilderProp
                   </AccordionTrigger>
                   <AccordionContent className="pb-5 space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Texto del boton</Label>
+                      <Label className="text-xs text-muted-foreground">Texto del botón</Label>
                       <Input
                         value={sampleCtaText}
                         onChange={(e) => setSampleCtaText(e.target.value)}
@@ -578,7 +578,7 @@ export function TemplateBuilder({ clientId, onBrandUpdate }: TemplateBuilderProp
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">URL del boton</Label>
+                      <Label className="text-xs text-muted-foreground">URL del botón</Label>
                       <Input
                         value={sampleCtaUrl}
                         onChange={(e) => setSampleCtaUrl(e.target.value)}

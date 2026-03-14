@@ -31,7 +31,7 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
   return (
     <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
-        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Users className="w-4 h-4" />
           Retención de Clientes
           <TooltipProvider>

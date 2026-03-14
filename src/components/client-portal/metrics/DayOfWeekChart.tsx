@@ -44,7 +44,7 @@ export function DayOfWeekChart({ dailyData }: DayOfWeekChartProps) {
   return (
     <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <CalendarDays className="w-4 h-4" />
           Rendimiento por Día de la Semana
         </CardTitle>

@@ -354,7 +354,7 @@ export function ShopifyCustomAppWizard({
             <Loader2 className="w-12 h-12 mx-auto animate-spin text-green-600" />
             <h3 className="text-lg font-semibold">Conectando con Shopify...</h3>
             <p className="text-sm text-muted-foreground">
-              Te redirigiremos a Shopify para autorizar la conexion.
+              Te redirigiremos a Shopify para autorizar la conexión.
             </p>
           </div>
         );

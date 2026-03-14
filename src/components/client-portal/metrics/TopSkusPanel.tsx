@@ -21,7 +21,7 @@ export function TopSkusPanel({ skus, currency = 'CLP' }: TopSkusPanelProps) {
   return (
     <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
-        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Package className="w-4 h-4" />
           Top 10 Productos Vendidos
         </CardTitle>

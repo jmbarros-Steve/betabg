@@ -205,7 +205,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
     <Card className="bg-card border border-border rounded-xl card-hover">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <ShoppingCart className="w-4 h-4" />
             Carritos Abandonados
           </CardTitle>

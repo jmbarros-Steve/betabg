@@ -259,13 +259,13 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
 
       if (fnError) {
         // Error handled by state/toast below
-        setError(fnError || 'Error al cargar analisis de horarios');
-        toast.error('Error al cargar analisis de horarios');
+        setError(fnError || 'Error al cargar análisis de horarios');
+        toast.error('Error al cargar análisis de horarios');
         return;
       }
 
       if (!result) {
-        setError('No se recibieron datos del analisis');
+        setError('No se recibieron datos del análisis');
         return;
       }
 
@@ -341,7 +341,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
             {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-14 w-full rounded-lg" />
             ))}
-            <p className="text-xs text-muted-foreground text-center">Verificando conexion...</p>
+            <p className="text-xs text-muted-foreground text-center">Verificando conexión...</p>
           </div>
         </CardContent>
       </Card>
