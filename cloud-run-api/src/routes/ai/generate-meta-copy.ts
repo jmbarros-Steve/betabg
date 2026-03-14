@@ -467,12 +467,21 @@ PASOS DE SABRI (10-17):
   },
 };
 
-function buildSystemPrompt(briefData: any, adType: string, funnelStage: keyof typeof FUNNEL_CONTEXT, customPrompt?: string) {
+function buildSystemPrompt(briefData: any, adType: string, funnelStage: keyof typeof FUNNEL_CONTEXT, customPrompt?: string, productContext?: string, brandContext?: string) {
   const funnel = FUNNEL_CONTEXT[funnelStage];
 
   return `Eres un copywriter EXPERTO en Meta Ads entrenado en las metodologías combinadas de:
 - Sabri Suby (Sell Like Crazy / 1PMP)
 - Russell Brunson (DotCom Secrets / Expert Secrets / Traffic Secrets)
+
+███████████████████████████████████████████████████████████████████████████████
+█  REGLA #0 — ANTI-ALUCINACIÓN (MÁXIMA PRIORIDAD)                           █
+███████████████████████████████████████████████████████████████████████████████
+- NUNCA inventes productos, marcas, industrias o temas que NO aparezcan en el contexto de este prompt.
+- NUNCA hables de plantas, macetas, jardines, mascotas, comida u otros temas genéricos a menos que sean los productos REALES del cliente.
+- Si no hay suficientes datos del cliente, usa SOLO lo que sí tienes (productos de Shopify, propuesta de valor, nombre de marca).
+- Todo el copy DEBE referirse a los productos y la marca REALES del cliente que aparecen abajo.
+- Si generas copy sobre un tema que NO está en los datos del cliente, estás fallando.
 
 ${COMBINED_METHODOLOGY}
 
@@ -480,6 +489,10 @@ ${COMBINED_METHODOLOGY}
 BRIEF DE MARCA DEL CLIENTE
 ═══════════════════════════════════════════════════════════════════════════════
 ${JSON.stringify(briefData, null, 2)}
+
+${brandContext || ''}
+
+${productContext || ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
 INSTRUCCIONES ESPECÍFICAS PARA ESTA GENERACIÓN
@@ -539,7 +552,8 @@ IMPORTANTE:
 - APLICA Hook-Historia-Oferta en todo
 - SIGUE las fórmulas de headlines según temperatura
 - Para ${funnelStage.toUpperCase()}: ${funnel.goal}
-- Responde SOLO con JSON, sin texto adicional`;
+- Responde SOLO con JSON, sin texto adicional
+- REGLA ANTI-ALUCINACIÓN: Todo el copy DEBE referirse EXCLUSIVAMENTE a los productos y marca del cliente listados arriba. Si no hay productos listados, usa la propuesta de valor y el nombre de la marca. NUNCA inventes productos, industrias ni temas genéricos. PROHIBIDO hablar de plantas, macetas, jardines, mascotas, comida u otros temas que no estén en los datos del cliente.`;
 }
 
 export async function generateMetaCopy(c: Context) {
@@ -613,6 +627,7 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
+        system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes.',
         messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
       }),
     });
@@ -690,6 +705,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
+        system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. PROHIBIDO hablar de plantas, mascotas, comida u otros temas genéricos que no correspondan al negocio real del cliente.',
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -720,18 +736,22 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
     const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-    const { data: shopifyProductsBV } = await supabase
-      .from('shopify_products')
-      .select('title, product_type, price, image_url')
-      .eq('client_id', clientId)
-      .limit(10);
+    const [{ data: shopifyProductsBV }, { data: brandResearchBV }, { data: clientInfoBV }] = await Promise.all([
+      supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
+      supabase.from('brand_research').select('brand_name, industry, value_proposition, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).single(),
+      supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
+    ]);
 
     const shopifyContextBV = shopifyProductsBV && shopifyProductsBV.length > 0
       ? `\nProductos reales de la tienda:\n${shopifyProductsBV.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP)${p.image_url ? ` [foto: ${p.image_url}]` : ''}`).join('\n')}\n`
       : '';
 
+    const brandContextBV = brandResearchBV ? `\nMarca: ${brandResearchBV.brand_name || 'N/A'}\nIndustria: ${brandResearchBV.industry || 'N/A'}\nProductos: ${JSON.stringify(brandResearchBV.product_details || 'N/A')}\n` : '';
+    const clientNameBV = clientInfoBV?.name || clientInfoBV?.company || '';
+
     const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
-${shopifyContextBV}
+Cliente: ${clientNameBV}
+${brandContextBV}${shopifyContextBV}
 Copy aprobado: ${JSON.stringify(variacionElegida)}
 Formato: ${adType}
 Ángulo: ${angulo}
@@ -751,6 +771,7 @@ ${adType === 'static'
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
+        system: 'Eres un director creativo experto en producción visual para Meta Ads. REGLA ABSOLUTA: Basa el brief visual SOLO en los productos y marca REALES del cliente. NUNCA inventes productos ni temas genéricos.',
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -925,14 +946,41 @@ las preferencias específicas de cada cliente cuando las conozco.
     },
   };
 
-  const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }] = await Promise.all([
+  const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }, { data: brandResearchLegacy }, { data: shopifyProductsLegacy }, { data: clientInfoLegacy }] = await Promise.all([
     supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
     supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
+    supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).single(),
+    supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
+    supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
   ]);
   const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
   const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nREGLAS APRENDIDAS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto.\n${kbKnowledgeLegacy.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
+  const brandContextLegacy = brandResearchLegacy ? `
+═══════════════════════════════════════════════════════════════════════════════
+DATOS DE LA MARCA (brand_research)
+═══════════════════════════════════════════════════════════════════════════════
+- Marca: ${brandResearchLegacy.brand_name || 'N/A'}
+- Industria: ${brandResearchLegacy.industry || 'N/A'}
+- Audiencia objetivo: ${JSON.stringify(brandResearchLegacy.target_audience || 'N/A')}
+- Propuesta de valor: ${JSON.stringify(brandResearchLegacy.value_proposition || 'N/A')}
+- Voz de marca: ${JSON.stringify(brandResearchLegacy.brand_voice || 'N/A')}
+- Detalles del producto: ${JSON.stringify(brandResearchLegacy.product_details || 'N/A')}
+- Análisis competencia: ${JSON.stringify(brandResearchLegacy.competitor_analysis || 'N/A')}` : '';
+
+  const shopifyContextLegacy = shopifyProductsLegacy && shopifyProductsLegacy.length > 0
+    ? `
+═══════════════════════════════════════════════════════════════════════════════
+PRODUCTOS REALES DE LA TIENDA (Shopify) — USA ESTOS PRODUCTOS EN EL COPY
+═══════════════════════════════════════════════════════════════════════════════
+${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}`
+    : '';
+
+  const clientNameLegacy = clientInfoLegacy?.name || clientInfoLegacy?.company || '';
+  const shopDomainLegacy = clientInfoLegacy?.shop_domain || '';
+  const clientHeaderLegacy = clientNameLegacy ? `\nCLIENTE: ${clientNameLegacy}${shopDomainLegacy ? ` (${shopDomainLegacy})` : ''}` : '';
+
+  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + clientHeaderLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
 
   console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 
@@ -952,6 +1000,7 @@ las preferencias específicas de cada cliente cuando las conozco.
           role: 'user',
           content: `Genera copies profesionales para un anuncio ${adType === 'static' ? 'estático' : 'de video'} de Meta Ads para la etapa ${funnelStage.toUpperCase()} del funnel.
 
+CLIENTE: ${clientNameLegacy || 'N/A'}${shopDomainLegacy ? ` (${shopDomainLegacy})` : ''}
 CONTEXTO DEL BUYER PERSONA: "${briefContext.buyerPersona.nombre || 'Cliente ideal'}"
 
 REQUISITOS OBLIGATORIOS:
@@ -960,6 +1009,8 @@ REQUISITOS OBLIGATORIOS:
 3. Usa las fórmulas de headlines según temperatura del tráfico
 4. Incorpora las PALABRAS EXACTAS del buyer persona
 5. Para ${funnelStage.toUpperCase()}: ${FUNNEL_CONTEXT[funnelStage].goal}
+6. SOLO habla de los productos y la marca REALES del cliente — NUNCA inventes productos ni temas genéricos
+7. Si hay productos de Shopify en el contexto, MENCIONA al menos uno por nombre en el copy
 
 ELEMENTOS CLAVE DEL BRIEF A USAR:
 - Dolor de las 3 AM: ${briefContext.personaProfunda.dolorDeLas3AM || 'No especificado'}
@@ -969,6 +1020,8 @@ ELEMENTOS CLAVE DEL BRIEF A USAR:
 - Transformación soñada: ${briefContext.personaProfunda.transformacionSonada || 'No especificado'}
 
 ${learningContext}
+
+RECORDATORIO FINAL: El copy DEBE ser 100% sobre los productos y marca del cliente. PROHIBIDO inventar productos o usar temas genéricos como plantas, mascotas, comida, etc. Si no corresponden al negocio real.
 
 Genera copies que VENDAN siguiendo las metodologías combinadas y las preferencias aprendidas del cliente.`
         },
