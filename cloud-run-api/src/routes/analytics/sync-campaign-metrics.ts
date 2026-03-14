@@ -149,6 +149,7 @@ export async function syncCampaignMetrics(c: Context) {
       platform: string;
       metric_date: string;
       impressions: number;
+      reach?: number;
       clicks: number;
       spend: number;
       conversions: number;
@@ -356,7 +357,7 @@ async function syncMetaCampaigns(
   for (const campaign of campaigns) {
     const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign.id}/insights`);
     insightsUrl.searchParams.set('access_token', accessToken);
-    insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
+    insightsUrl.searchParams.set('fields', 'spend,impressions,reach,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
     insightsUrl.searchParams.set('time_range', JSON.stringify({
       since: formatDate(startDate),
       until: formatDate(endDate)
@@ -394,6 +395,7 @@ async function syncMetaCampaigns(
           platform: 'meta',
           metric_date: day.date_start,
           impressions: parseFloat(day.impressions || '0'),
+          reach: parseFloat(day.reach || '0'),
           clicks: parseFloat(day.clicks || '0'),
           spend: Math.round(spendCLP),
           conversions: parseFloat(purchases?.value || '0'),

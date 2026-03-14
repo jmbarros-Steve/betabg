@@ -1061,7 +1061,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {formatFrequencyLabel(rule.checkFrequency)}
+                        Ejecucion manual
                       </span>
                       {rule.lastTriggered && (
                         <span className="flex items-center gap-1">
@@ -1483,29 +1483,15 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                   </Select>
                 </div>
 
-                {/* Check frequency */}
+                {/* Execution note */}
                 <div className="space-y-2">
-                  <Label className="text-xs">Frecuencia de verificación</Label>
-                  <Select
-                    value={form.checkFrequency}
-                    onValueChange={(val) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        checkFrequency: val as CheckFrequency,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FREQUENCY_OPTIONS.map((f) => (
-                        <SelectItem key={f.value} value={f.value}>
-                          {f.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs">Modo de ejecucion</Label>
+                  <div className="flex items-start gap-2 p-3 rounded-lg border bg-amber-50/50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900">
+                    <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Las reglas se evaluan manualmente al presionar "Evaluar reglas". La ejecucion automatica periodica estara disponible proximamente.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1616,7 +1602,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             Reglas Automatizadas
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Automatiza la gestión de tus campañas con reglas inteligentes basadas en métricas.
+            Define reglas para gestionar campañas. Presiona "Evaluar reglas" para ejecutarlas con los datos actuales.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">

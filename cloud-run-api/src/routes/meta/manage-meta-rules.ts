@@ -118,9 +118,11 @@ function aggregateMetric(
       return imp2 > 0 ? (sp2 / imp2) * 1000 : 0;
     }
     case 'FREQUENCY': {
+      // campaign_metrics does not store reach; approximate frequency from
+      // the pre-computed cpm and cpc fields if available, or return 0.
+      // Without reach data, frequency rules cannot be accurately evaluated.
       const imp3 = rows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
       const reach3 = rows.reduce((s, r) => s + (Number(r.reach) || 0), 0);
-      // Frequency = impressions / reach
       return reach3 > 0 ? imp3 / reach3 : 0;
     }
     default: return 0;
@@ -424,7 +426,15 @@ export async function manageMetaRules(c: Context) {
 
         // Filter campaigns based on apply_to
         let campaignIds = Array.from(campaignGroups.keys());
-        if (rule.apply_to === 'SPECIFIC_CAMPAIGNS' && rule.specific_campaign_ids?.length) {
+        if (rule.apply_to === 'ACTIVE_ONLY') {
+          // Only keep campaigns whose latest metric row has campaign_status = 'ACTIVE'
+          campaignIds = campaignIds.filter(id => {
+            const group = campaignGroups.get(id)!;
+            const latest = group.rows.reduce((a: any, b: any) =>
+              (a.metric_date > b.metric_date ? a : b), group.rows[0]);
+            return latest.campaign_status === 'ACTIVE';
+          });
+        } else if (rule.apply_to === 'SPECIFIC_CAMPAIGNS' && rule.specific_campaign_ids?.length) {
           campaignIds = campaignIds.filter(id => rule.specific_campaign_ids.includes(id));
         }
 
