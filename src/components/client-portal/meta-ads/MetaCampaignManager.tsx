@@ -550,7 +550,10 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     const active = campaigns.filter((c) => c.status === 'ACTIVE');
     const totalDaily = active.reduce((sum, c) => sum + c.daily_budget, 0);
     const totalSpend30d = active.reduce((sum, c) => sum + c.spend_30d, 0);
-    return { totalDaily, totalSpend30d, activeCount: active.length };
+    const totalConversions = campaigns.reduce((sum, c) => sum + c.conversions, 0);
+    const totalSpendAll = campaigns.reduce((sum, c) => sum + c.spend_30d, 0);
+    const avgCpa = totalConversions > 0 ? totalSpendAll / totalConversions : 0;
+    return { totalDaily, totalSpend30d, activeCount: active.length, totalConversions, avgCpa };
   }, [campaigns]);
 
   // ----- Handlers -----
@@ -847,8 +850,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
@@ -917,7 +920,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       {/* ----------------------------------------------------------------- */}
       {/* Budget Summary Cards */}
       {/* ----------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <Card className="border bg-gradient-to-br from-blue-500/8 to-transparent border-blue-500/15">
           <CardContent className="pt-6 pb-5 px-6">
             <div className="flex items-start justify-between mb-3">
@@ -971,6 +974,49 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
             </p>
             <p className="text-sm text-muted-foreground">
               Proyección a 30 días
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border bg-gradient-to-br from-purple-500/8 to-transparent border-purple-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">
+                Ventas (30 días)
+              </span>
+              <div className="p-2.5 rounded-xl bg-purple-500/10">
+                <Megaphone className="w-5 h-5 text-purple-500" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight mb-1">
+              {formatNumber(budgetSummary.totalConversions)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Total de todas las campañas
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border bg-gradient-to-br from-orange-500/8 to-transparent border-orange-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <span className="text-sm font-medium text-muted-foreground block">
+                  Costo por Venta
+                </span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  Lo que pagas por cada venta
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-orange-500/10">
+                <TrendingDown className="w-5 h-5 text-orange-500" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight mb-1">
+              {budgetSummary.avgCpa > 0 ? formatCLP(budgetSummary.avgCpa) : '$0'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Promedio general
             </p>
           </CardContent>
         </Card>
@@ -1117,12 +1163,12 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-sm">
+                <thead className="sticky top-0 z-10 bg-muted backdrop-blur-sm">
                   <tr className="border-b-2 border-border">
                     {/* Campaign Name */}
                     <th className="text-left py-3 px-4">
                       <button
-                        className="flex items-center text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors"
                         onClick={() => handleSort('campaign_name')}
                       >
                         Campaña
@@ -1137,7 +1183,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Status */}
                     <th className="text-center py-3 px-3">
                       <button
-                        className="flex items-center justify-center text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-center text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('status')}
                       >
                         Estado
@@ -1152,7 +1198,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Daily Budget */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('daily_budget')}
                       >
                         Presupuesto/Día
@@ -1167,7 +1213,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Spend 30d */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('spend')}
                       >
                         Gasto 30d
@@ -1182,7 +1228,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* ROAS */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('roas')}
                       >
                         <JargonTooltip term="ROAS" />
@@ -1197,7 +1243,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* CPA */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('cpa')}
                       >
                         Costo/Venta
@@ -1212,7 +1258,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* CTR */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('ctr')}
                       >
                         Tasa Clics
@@ -1227,7 +1273,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                     {/* Conversions */}
                     <th className="text-right py-3 px-3">
                       <button
-                        className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('conversions')}
                       >
                         Ventas
@@ -1241,7 +1287,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
                     {/* Actions */}
                     <th className="text-center py-3 px-4">
-                      <span className="text-xs uppercase tracking-wider font-medium text-muted-foreground">
+                      <span className="text-xs uppercase tracking-wider font-bold text-foreground">
                         Acciones
                       </span>
                     </th>
@@ -1679,12 +1725,15 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-sm font-medium text-muted-foreground mb-1">
-                    <JargonTooltip term="CPA" />
+                    Costo/Venta
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/70 -mt-0.5 mb-1">
+                    Lo que pagas por cada venta
                   </p>
                   <p className="text-lg font-bold">
                     {selectedCampaign.cpa > 0
                       ? formatCLP(selectedCampaign.cpa)
-                      : '--'}
+                      : '$0'}
                   </p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
