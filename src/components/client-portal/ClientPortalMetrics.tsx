@@ -192,8 +192,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               .from('platform_metrics')
               .select('metric_type, metric_value, metric_date')
               .in('connection_id', shopifyQueryIds)
-              .gte('metric_date', startDate.toISOString().split('T')[0]);
-            if (dateRange === 'custom') q = q.lte('metric_date', endDateStr);
+              .gte('metric_date', startDate.toISOString().split('T')[0])
+              .lte('metric_date', endDateStr);
             return q.order('metric_date', { ascending: true });
           })(),
           supabase
@@ -214,8 +214,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               .select('metric_type, metric_value, metric_date, connection_id')
               .in('connection_id', adQueryIds)
               .eq('metric_type', 'ad_spend')
-              .gte('metric_date', startDate.toISOString().split('T')[0]);
-            if (dateRange === 'custom') q = q.lte('metric_date', endDateStr);
+              .gte('metric_date', startDate.toISOString().split('T')[0])
+              .lte('metric_date', endDateStr);
             return q;
           })(),
           supabase
@@ -855,13 +855,13 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             </Card>
           )}
 
-          {/* Conversion Funnel */}
-          {funnelData && (
+          {/* Conversion Funnel — always show when we have order data */}
+          {(funnelData || current.totalOrders > 0) && (
             <ConversionFunnelPanel
-              sessions={funnelData.sessions}
-              addToCarts={funnelData.addToCarts}
-              checkoutsInitiated={funnelData.checkoutsInitiated}
-              purchases={funnelData.purchases}
+              sessions={funnelData?.sessions ?? null}
+              addToCarts={funnelData?.addToCarts ?? null}
+              checkoutsInitiated={funnelData?.checkoutsInitiated ?? current.totalOrders + abandonedCarts.length}
+              purchases={funnelData?.purchases ?? current.totalOrders}
             />
           )}
 

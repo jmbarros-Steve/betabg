@@ -72,6 +72,16 @@ export default function ClientPortal() {
     });
   }, [activeTab]);
 
+  // Listen for cross-component tab navigation events (e.g. from SmartInsightsPanel)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail?.tab;
+      if (tab) setActiveTab(tab as TabType);
+    };
+    window.addEventListener('steve:navigate-tab', handler);
+    return () => window.removeEventListener('steve:navigate-tab', handler);
+  }, []);
+
   // SECURITY: Only super admins can view other clients' portals
   // Shopify users with admin role should NOT have this access
   const isAdminView = isSuperAdmin && urlClientId;

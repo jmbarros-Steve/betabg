@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lightbulb, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ArrowRight, ShoppingCart, DollarSign, Target, Users, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Lightbulb, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ArrowRight, ShoppingCart, DollarSign, Target, Users, Zap, Mail, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface InsightData {
@@ -27,12 +28,18 @@ interface SmartInsightsPanelProps {
 
 type InsightType = 'success' | 'warning' | 'danger' | 'tip';
 
+interface InsightAction {
+  label: string;
+  tab: string; // tab ID to navigate to (dispatches 'steve:navigate-tab' event)
+}
+
 interface Insight {
   type: InsightType;
   icon: React.ElementType;
   title: string;
   message: string;
   action?: string;
+  actionButton?: InsightAction;
   priority: number; // lower = more important
 }
 
@@ -45,6 +52,10 @@ const typeStyles: Record<InsightType, { bg: string; border: string; iconColor: s
 
 function fmt(n: number): string {
   return `$${Math.round(n).toLocaleString('es-CL')}`;
+}
+
+function navigateToTab(tab: string) {
+  window.dispatchEvent(new CustomEvent('steve:navigate-tab', { detail: { tab } }));
 }
 
 export function SmartInsightsPanel({ data }: SmartInsightsPanelProps) {
@@ -83,8 +94,9 @@ export function SmartInsightsPanel({ data }: SmartInsightsPanelProps) {
           type: data.abandonedCartsCount > 10 ? 'warning' : 'tip',
           icon: ShoppingCart,
           title: `${data.abandonedCartsCount} carritos abandonados`,
-          message: `Hay ${fmt(data.abandonedCartsValue)} en carritos sin recuperar. Con una tasa de recuperación del 12%, podrías rescatar aproximadamente ${fmt(recoverable)}.`,
-          action: 'Contacta a estos clientes por WhatsApp o email. Los primeros 30 minutos son clave.',
+          message: `Hay ${fmt(data.abandonedCartsValue)} en carritos sin recuperar. Con una tasa de recuperacion del 12%, podrias rescatar aproximadamente ${fmt(recoverable)}.`,
+          action: 'Contacta a estos clientes por WhatsApp o email. Los primeros 30 minutos son clave. Configura un flow automatico en Klaviyo o Steve Mail para recuperar carritos sin esfuerzo manual.',
+          actionButton: { label: 'Ver carritos abandonados', tab: 'shopify' },
           priority: 2,
         });
       }
@@ -234,6 +246,17 @@ export function SmartInsightsPanel({ data }: SmartInsightsPanelProps) {
                           {insight.action}
                         </p>
                       </div>
+                    )}
+                    {insight.actionButton && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 h-7 text-xs gap-1.5"
+                        onClick={() => navigateToTab(insight.actionButton!.tab)}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        {insight.actionButton.label}
+                      </Button>
                     )}
                   </div>
                 </div>

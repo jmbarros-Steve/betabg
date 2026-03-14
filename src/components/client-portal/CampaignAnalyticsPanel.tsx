@@ -137,6 +137,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     currentBudget?: number;
   } | null>(null);
   const [charlieActionLoading, setCharlieActionLoading] = useState(false);
+  const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
 
   const daysFromRange = (range: string): number => {
@@ -408,12 +409,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
     const cpa = conversions > 0 ? spend / conversions : null;
-    const spendClp = spend * CLP_RATE;
     const maxCpa = maxCpaUsd || 50; // fallback $50 USD
-    
+    const isPaused = adSet.status?.toUpperCase() === 'PAUSED';
+
+    // If no data at all, show nodata regardless of status
     if (spend === 0 && conversions === 0) return 'nodata';
+    // Evaluate performance based on actual metrics (even if paused, we show the performance state)
     if (cpa !== null && cpa > maxCpa * 2) return 'danger';
     if (cpa !== null && cpa <= maxCpa) return 'good';
+    // Only show "learning" if the adset is actually active — PAUSED adsets aren't learning
+    if (isPaused) return 'nodata';
     return 'learning'; // no CPA data or < 7 days
   };
 
@@ -423,6 +428,79 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     danger: { emoji: '🔴', label: 'Revisar', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/20', action: 'pause' as const },
     nodata: { emoji: '⚫', label: 'Sin datos', color: 'text-muted-foreground', bg: 'bg-muted/30 border-border', action: 'review' as const },
   };
+
+  // Build human-readable explanation for each semaphore state
+  const getAdSetExplanation = (adSet: AdSet, semKey: keyof typeof semaphoreConfig, maxCpaUsd = 50): string => {
+    const spend = parseFloat(adSet.spend) || 0;
+    const conversions = adSet.conversions || 0;
+    const cpa = conversions > 0 ? spend : null;
+    const cpaPerConv = conversions > 0 ? spend / conversions : null;
+    const spendClp = spend * CLP_RATE;
+    const cpaClp = cpaPerConv !== null ? cpaPerConv * CLP_RATE : null;
+    const maxCpaClp = maxCpaUsd * CLP_RATE;
+    const isPaused = adSet.status?.toUpperCase() === 'PAUSED';
+
+    if (isPaused) {
+      return `Este Ad Set está pausado en Meta. No está gastando presupuesto actualmente.`;
+    }
+
+    switch (semKey) {
+      case 'danger':
+        return `Este Ad Set gasta ${formatCurrency(cpaClp || spendClp)} por venta, muy por encima de tu máximo de ${formatCurrency(maxCpaClp)}. Pausarlo ahorra presupuesto para los Ad Sets que sí funcionan.`;
+      case 'learning':
+        return `Meta está optimizando este Ad Set. Espera al menos 7 días antes de tomar decisiones — pausar antes destruye el aprendizaje del algoritmo.`;
+      case 'good':
+        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp) : '—'} por venta (dentro de tu objetivo). Se puede escalar.`;
+      case 'nodata':
+        return `Sin datos suficientes para evaluar. Verifica que esté activo en Meta Ads Manager y que tenga presupuesto asignado.`;
+      default:
+        return '';
+    }
+  };
+
+  // Actually pause an adset via the API
+  async function executeCharlieAction(type: 'pause' | 'scale', adSetId: string, adSetName: string) {
+    setCharlieActionLoading(true);
+    setCharlieActionSuccess(null);
+    try {
+      const connection = connections.find(c => c.platform === 'meta');
+      if (!connection) {
+        toast.error('No se encontró conexión Meta activa');
+        return;
+      }
+
+      if (type === 'pause') {
+        const { error } = await callApi('meta-adset-action', {
+          body: { connection_id: connection.id, adset_id: adSetId, action: 'pause' }
+        });
+        if (error) throw new Error(error);
+        toast.success(`Ad Set "${adSetName}" pausado exitosamente en Meta`);
+        setCharlieActionSuccess(`Ad Set "${adSetName}" pausado en Meta.`);
+        // Update local state to reflect the pause
+        setAdSetsByCampaign(prev => {
+          const updated = { ...prev };
+          for (const [campaignId, adSets] of Object.entries(updated)) {
+            updated[campaignId] = adSets.map(as =>
+              as.id === adSetId ? { ...as, status: 'PAUSED' } : as
+            );
+          }
+          return updated;
+        });
+      } else {
+        // Scale: increase budget by 20%
+        const { error } = await callApi('meta-adset-action', {
+          body: { connection_id: connection.id, adset_id: adSetId, action: 'scale', scale_percent: 20 }
+        });
+        if (error) throw new Error(error);
+        toast.success(`Ad Set "${adSetName}" escalado +20% en Meta`);
+        setCharlieActionSuccess(`Presupuesto de "${adSetName}" aumentado 20% en Meta.`);
+      }
+    } catch (err: any) {
+      toast.error(`Error al ejecutar acción: ${err?.message || 'Error desconocido'}`);
+    } finally {
+      setCharlieActionLoading(false);
+    }
+  }
 
   // Collect all ad sets across campaigns for Charlie review tab
   const allAdSetsForCharlie = useMemo(() => {
@@ -944,9 +1022,14 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                         </div>
                                       </div>
 
+                                      {/* Explanation text */}
+                                      <div className="mt-2 px-2 py-1.5 rounded bg-muted/40 text-xs text-muted-foreground leading-relaxed">
+                                        {getAdSetExplanation(adSet, semKey)}
+                                      </div>
+
                                       {/* Charlie action button */}
                                       <div className="pt-2 border-t border-border/30">
-                                        {semKey === 'good' && (
+                                        {semKey === 'good' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                                           <Button size="sm" variant="outline" className="text-xs text-green-700 border-green-300 hover:bg-green-50"
                                             onClick={() => setCharlieModal({
                                               type: 'scale', adSetName: adSet.name, adSetId: adSet.id,
@@ -954,6 +1037,9 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                             })}>
                                             📈 Aprobar escalado 20%
                                           </Button>
+                                        )}
+                                        {semKey === 'good' && adSet.status?.toUpperCase() === 'PAUSED' && (
+                                          <span className="text-xs text-muted-foreground">Pausado — reactívalo en Meta para poder escalar</span>
                                         )}
                                         {semKey === 'danger' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                                           <Button size="sm" variant="outline" className="text-xs text-red-700 border-red-300 hover:bg-red-50"
@@ -1091,11 +1177,14 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                           </div>
                         </div>
                         <div className="shrink-0">
-                          {semaphore === 'good' && (
+                          {semaphore === 'good' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                             <Button size="sm" className="text-xs"
                               onClick={() => setCharlieModal({ type: 'scale', adSetName: adSet.name, adSetId: adSet.id, spend: parseFloat(adSet.spend) || 0, daysActive: 8 })}>
                               📈 Aprobar escalado 20%
                             </Button>
+                          )}
+                          {semaphore === 'good' && adSet.status?.toUpperCase() === 'PAUSED' && (
+                            <span className="text-xs text-muted-foreground">Pausado — reactívalo para escalar</span>
                           )}
                           {semaphore === 'danger' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                             <Button size="sm" variant="destructive" className="text-xs"
@@ -1115,6 +1204,10 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                           {semaphore === 'nodata' && <span className="text-xs text-muted-foreground">🔄 Revisar</span>}
                         </div>
                       </div>
+                      {/* Explanation text */}
+                      <div className="mt-2 px-2 py-1.5 rounded bg-muted/40 text-xs text-muted-foreground leading-relaxed">
+                        {getAdSetExplanation(adSet, semaphore)}
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -1125,32 +1218,56 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       </Tabs>
 
       {/* Charlie Scale Dialog */}
-      <Dialog open={charlieModal?.type === 'scale'} onOpenChange={() => setCharlieModal(null)}>
+      <Dialog open={charlieModal?.type === 'scale'} onOpenChange={() => { setCharlieModal(null); setCharlieActionSuccess(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>📈 ESCALAR AD SET — MÉTODO CHARLIE</DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-2 pt-2 text-sm">
                 <p><strong>Ad Set:</strong> {charlieModal?.adSetName}</p>
-                <p><strong>Presupuesto actual:</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
+                <p><strong>Presupuesto actual estimado:</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
                 <p><strong>Nuevo presupuesto (+20%):</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30 * 1.2).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
+                <div className="bg-green-500/10 rounded-lg p-3 text-xs space-y-1 mt-2">
+                  <p className="font-semibold text-green-700">¿Qué va a pasar?</p>
+                  <p>Se enviará una solicitud a Meta para aumentar el presupuesto diario de este Ad Set en un 20%. El cambio se aplica inmediatamente en Meta Ads.</p>
+                </div>
+                {charlieActionSuccess && (
+                  <div className="bg-green-500/10 rounded-lg p-3 text-xs mt-2">
+                    <p className="font-semibold text-green-700">{charlieActionSuccess}</p>
+                  </div>
+                )}
               </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCharlieModal(null)}>❌ Cancelar</Button>
-            <Button onClick={() => { toast.success(`✅ Escala el presupuesto del Ad Set "${charlieModal?.adSetName}" +20% en Meta`); setCharlieModal(null); }}>
-              ✅ Confirmar escalado
+            <Button variant="outline" onClick={() => { setCharlieModal(null); setCharlieActionSuccess(null); }}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={charlieActionLoading || !!charlieActionSuccess}
+              onClick={() => {
+                if (charlieModal) {
+                  executeCharlieAction('scale', charlieModal.adSetId, charlieModal.adSetName);
+                }
+              }}
+            >
+              {charlieActionLoading ? (
+                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Escalando...</>
+              ) : charlieActionSuccess ? (
+                <><CheckCircle className="w-4 h-4 mr-2" /> Listo</>
+              ) : (
+                'Confirmar escalado +20%'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Charlie Pause Dialog */}
-      <Dialog open={charlieModal?.type === 'pause'} onOpenChange={() => setCharlieModal(null)}>
+      <Dialog open={charlieModal?.type === 'pause'} onOpenChange={() => { setCharlieModal(null); setCharlieActionSuccess(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-destructive">⚠️ ADVERTENCIA — MÉTODO CHARLIE</DialogTitle>
+            <DialogTitle className="text-destructive">PAUSAR AD SET — MÉTODO CHARLIE</DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-2 pt-2 text-sm">
                 <p>¿Seguro que quieres pausar el Ad Set <strong>"{charlieModal?.adSetName}"</strong>?</p>
@@ -1160,17 +1277,38 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                   <p>Este Ad Set tiene un costo por adquisición (CPA) demasiado alto — está gastando más de lo que debería para conseguir cada venta. Pausarlo redirige el presupuesto a los Ad Sets que sí están funcionando.</p>
                 </div>
                 <div className="bg-muted rounded-lg p-3 text-xs space-y-1 mt-2">
-                  <p>✅ Pausas el <strong>Ad Set</strong>, no la campaña.</p>
-                  <p>✅ La campaña principal sigue activa con los demás Ad Sets.</p>
-                  <p className="text-destructive font-medium">⚠️ Pausar antes de 7 días destruye el aprendizaje del algoritmo.</p>
+                  <p>Se pausará el <strong>Ad Set</strong> directamente en Meta, no la campaña.</p>
+                  <p>La campaña principal sigue activa con los demás Ad Sets.</p>
+                  <p className="text-destructive font-medium">Pausar antes de 7 días puede destruir el aprendizaje del algoritmo.</p>
                 </div>
+                {charlieActionSuccess && (
+                  <div className="bg-green-500/10 rounded-lg p-3 text-xs mt-2">
+                    <p className="font-semibold text-green-700">{charlieActionSuccess}</p>
+                  </div>
+                )}
               </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setCharlieModal(null)}>❌ No pausar — seguir el método</Button>
-            <Button variant="destructive" onClick={() => { toast.warning(`⏸ Ad Set "${charlieModal?.adSetName}" marcado para pausa`); setCharlieModal(null); }}>
-              ⏸ Pausar Ad Set de todas formas
+            <Button variant="outline" onClick={() => { setCharlieModal(null); setCharlieActionSuccess(null); }}>
+              No pausar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={charlieActionLoading || !!charlieActionSuccess}
+              onClick={() => {
+                if (charlieModal) {
+                  executeCharlieAction('pause', charlieModal.adSetId, charlieModal.adSetName);
+                }
+              }}
+            >
+              {charlieActionLoading ? (
+                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Pausando en Meta...</>
+              ) : charlieActionSuccess ? (
+                <><CheckCircle className="w-4 h-4 mr-2" /> Pausado</>
+              ) : (
+                'Pausar Ad Set en Meta'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

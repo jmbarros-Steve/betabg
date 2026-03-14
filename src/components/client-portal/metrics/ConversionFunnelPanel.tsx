@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { HelpCircle, Eye, ShoppingCart, CreditCard, CheckCircle, TrendingDown } from 'lucide-react';
+import { HelpCircle, Eye, ShoppingCart, CreditCard, CheckCircle, TrendingDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FunnelStage {
@@ -29,6 +29,7 @@ function getBenchmarkStatus(actual: number, benchmark: { low: number; avg: numbe
 export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated, purchases }: ConversionFunnelPanelProps) {
   // Build funnel stages with conversion rates
   const stages: FunnelStage[] = [];
+  const missingAnalytics = sessions === null && addToCarts === null;
 
   if (sessions !== null && sessions > 0) {
     stages.push({
@@ -38,7 +39,7 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
       benchmark: { low: 0, avg: 0, high: 0, unit: '' },
-      tooltip: 'Sesiones totales en tu tienda online durante el período',
+      tooltip: 'Sesiones totales en tu tienda online durante el periodo',
     });
   }
 
@@ -54,6 +55,7 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
     });
   }
 
+  // Always show checkout stage if we have any data
   if (checkoutsInitiated > 0 || purchases > 0) {
     stages.push({
       label: 'Checkout Iniciado',
@@ -64,18 +66,19 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       benchmark: { low: 25, avg: 45, high: 65, unit: '% de carritos' },
       tooltip: 'Personas que iniciaron el proceso de pago. Benchmark ecommerce: 30-60% de quienes agregan al carrito',
     });
+
+    stages.push({
+      label: 'Compra Completada',
+      value: purchases,
+      icon: CheckCircle,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      benchmark: { low: 35, avg: 50, high: 70, unit: '% de checkouts' },
+      tooltip: 'Pedidos pagados exitosamente. Benchmark ecommerce: 40-65% de quienes inician checkout',
+    });
   }
 
-  stages.push({
-    label: 'Compra Completada',
-    value: purchases,
-    icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-    benchmark: { low: 35, avg: 50, high: 70, unit: '% de checkouts' },
-    tooltip: 'Pedidos pagados exitosamente. Benchmark ecommerce: 40-65% de quienes inician checkout',
-  });
-
+  // Need at least 2 stages to render a funnel
   if (stages.length < 2) return null;
 
   // Calculate conversion rates between stages
@@ -261,23 +264,33 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
                 const status = getBenchmarkStatus(step.rate, step.benchmark);
                 if (status === 'bad') {
                   if (step.to === 'Agregar al Carrito') {
-                    return <li key={step.to}>- Tus visitas no agregan productos al carrito. Revisa tus páginas de producto: fotos, precio visible, botón de compra claro.</li>;
+                    return <li key={step.to}>- Tus visitas no agregan productos al carrito. Revisa tus paginas de producto: fotos, precio visible, boton de compra claro.</li>;
                   }
                   if (step.to === 'Checkout Iniciado') {
-                    return <li key={step.to}>- Muchos agregan al carrito pero no inician el pago. Revisa costos de envío, opciones de pago y proceso de checkout.</li>;
+                    return <li key={step.to}>- Muchos agregan al carrito pero no inician el pago. Revisa costos de envio, opciones de pago y proceso de checkout.</li>;
                   }
                   if (step.to === 'Compra Completada') {
-                    return <li key={step.to}>- Pierdes ventas en el checkout. Simplifica formularios, ofrece más medios de pago y muestra seguridad.</li>;
+                    return <li key={step.to}>- Pierdes ventas en el checkout. Simplifica formularios, ofrece mas medios de pago y muestra seguridad.</li>;
                   }
                 }
                 if (status === 'good') {
                   if (step.to === 'Compra Completada') {
-                    return <li key={step.to}>- Tu tasa de cierre es excelente. Enfoca esfuerzos en atraer más tráfico calificado.</li>;
+                    return <li key={step.to}>- Tu tasa de cierre es excelente. Enfoca esfuerzos en atraer mas trafico calificado.</li>;
                   }
                 }
                 return null;
               })}
             </ul>
+          </div>
+        )}
+
+        {/* Note when session/cart data is missing */}
+        {missingAnalytics && (
+          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 flex items-start gap-2">
+            <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-blue-700">
+              Las etapas de Visitas y Carrito requieren acceso a Shopify Analytics (ShopifyQL). Actualmente mostramos Checkout y Compras basados en datos de pedidos y checkouts abandonados.
+            </p>
           </div>
         )}
       </CardContent>
