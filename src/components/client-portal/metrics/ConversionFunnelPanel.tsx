@@ -61,8 +61,8 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       icon: CreditCard,
       color: 'text-amber-600',
       bgColor: 'bg-amber-100',
-      benchmark: { low: 2, avg: 4, high: 8, unit: '% de visitas' },
-      tooltip: 'Personas que iniciaron el proceso de pago. Benchmark ecommerce: 2-8%',
+      benchmark: { low: 25, avg: 45, high: 65, unit: '% de carritos' },
+      tooltip: 'Personas que iniciaron el proceso de pago. Benchmark ecommerce: 30-60% de quienes agregan al carrito',
     });
   }
 
@@ -72,8 +72,8 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
     icon: CheckCircle,
     color: 'text-green-600',
     bgColor: 'bg-green-100',
-    benchmark: { low: 1, avg: 2.5, high: 4, unit: '% de visitas' },
-    tooltip: 'Pedidos pagados exitosamente. Benchmark ecommerce: 1-4%',
+    benchmark: { low: 35, avg: 50, high: 70, unit: '% de checkouts' },
+    tooltip: 'Pedidos pagados exitosamente. Benchmark ecommerce: 40-65% de quienes inician checkout',
   });
 
   if (stages.length < 2) return null;

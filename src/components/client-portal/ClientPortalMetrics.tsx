@@ -341,15 +341,11 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
           // Fetch real SKU sales, abandoned checkouts, customer metrics, and cohorts
           try {
-            const now = new Date();
-            const mtdDays = Math.max(now.getDate() - 1, 1);
-            const ytdDays = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
-            const customDays = customDateRange
-              ? Math.ceil((customDateRange.to.getTime() - customDateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1
-              : 30;
-            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, 'mtd': mtdDays, 'ytd': ytdDays, 'custom': customDays };
+            // Send explicit startDate/endDate for accurate date filtering
+            const analyticsStartDate = startDate.toISOString().split('T')[0];
+            const analyticsEndDate = endDate.toISOString().split('T')[0];
             const { data: analyticsData } = await callApi('fetch-shopify-analytics', {
-              body: { connectionId: shopifyConnIds[0], daysBack: daysMap[dateRange] || 30 },
+              body: { connectionId: shopifyConnIds[0], startDate: analyticsStartDate, endDate: analyticsEndDate },
             });
             if (analyticsData?.topSkus) {
               setSkuData(analyticsData.topSkus);
@@ -371,11 +367,17 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             }
             if (analyticsData?.summary) {
               setShopifySummary(analyticsData.summary);
-              // Inject Shopify API revenue/orders if platform_metrics has no revenue data
-              const hasDbRevenue = dbMetricRows.some(m =>
-                ['revenue', 'gross_revenue', 'purchase_value'].includes(m.metric_type) && m.metric_value > 0
-              );
-              if (!hasDbRevenue && analyticsData.summary.totalRevenue > 0) {
+              // Always prefer real-time Shopify API revenue/orders over potentially stale DB data
+              if (analyticsData.summary.totalRevenue > 0) {
+                // Remove stale DB revenue/orders so API data is authoritative
+                const revenueTypes = ['revenue', 'gross_revenue', 'purchase_value'];
+                const orderTypes = ['orders', 'orders_count', 'purchases'];
+                const staleTypes = [...revenueTypes, ...orderTypes];
+                for (let i = dbMetricRows.length - 1; i >= 0; i--) {
+                  if (staleTypes.includes(dbMetricRows[i].metric_type)) {
+                    dbMetricRows.splice(i, 1);
+                  }
+                }
                 const today = new Date().toISOString().split('T')[0];
                 additionalMetrics.push(
                   { metric_type: 'revenue', metric_value: analyticsData.summary.totalRevenue, metric_date: today },

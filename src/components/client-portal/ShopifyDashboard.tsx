@@ -61,21 +61,29 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange | undefined>(undefined);
 
-  // Convert dateRange to daysBack for the API
-  const daysBack = useMemo(() => {
+  // Compute explicit start/end dates for the API
+  const analyticsDates = useMemo(() => {
     const now = new Date();
+    let start: Date;
+    let end: Date = now;
     switch (dateRange) {
-      case '7d': return 7;
-      case '30d': return 30;
-      case '90d': return 90;
-      case 'mtd': return Math.max(now.getDate() - 1, 1);
-      case 'ytd': return Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24));
+      case '7d': start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7); break;
+      case '30d': start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30); break;
+      case '90d': start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90); break;
+      case 'mtd': start = new Date(now.getFullYear(), now.getMonth(), 1); break;
+      case 'ytd': start = new Date(now.getFullYear(), 0, 1); break;
       case 'custom': {
-        if (!customDateRange) return 30;
-        return Math.ceil((customDateRange.to.getTime() - customDateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (!customDateRange) { start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30); break; }
+        start = customDateRange.from;
+        end = customDateRange.to;
+        break;
       }
-      default: return 30;
+      default: start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
     }
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
   }, [dateRange, customDateRange]);
 
   // Responsive: detect mobile for chart adjustments
@@ -92,7 +100,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   useEffect(() => {
     if (connectionId) fetchAnalytics();
-  }, [connectionId, daysBack]);
+  }, [connectionId, analyticsDates]);
 
   const checkConnection = async () => {
     const { data } = await supabase
@@ -117,7 +125,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
     setLoading(true);
     try {
       const [analyticsRes, productsRes] = await Promise.all([
-        callApi('fetch-shopify-analytics', { body: { connectionId, daysBack } }),
+        callApi('fetch-shopify-analytics', { body: { connectionId, startDate: analyticsDates.startDate, endDate: analyticsDates.endDate } }),
         callApi('fetch-shopify-products', { body: { connectionId } }),
       ]);
       if (analyticsRes.error) throw new Error(analyticsRes.error);

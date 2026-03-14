@@ -33,7 +33,7 @@ export async function fetchShopifyAnalytics(c: Context) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const { connectionId, daysBack = 30 } = await c.req.json();
+    const { connectionId, daysBack = 30, startDate: startDateParam, endDate: endDateParam } = await c.req.json();
     if (!connectionId) {
       return c.json({ error: 'connectionId required' }, 400);
     }
@@ -84,8 +84,18 @@ export async function fetchShopifyAnalytics(c: Context) {
       'Content-Type': 'application/json',
     };
 
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - daysBack);
+    // Use explicit startDate/endDate if provided, otherwise fall back to daysBack from today
+    const sinceDate = startDateParam ? new Date(startDateParam) : new Date();
+    if (!startDateParam) sinceDate.setDate(sinceDate.getDate() - daysBack);
+
+    const untilDate = endDateParam ? new Date(endDateParam) : null;
+    // For Shopify API created_at_max, set to end of day
+    const untilDateISO = untilDate ? new Date(untilDate.getFullYear(), untilDate.getMonth(), untilDate.getDate(), 23, 59, 59).toISOString() : null;
+
+    // Calculate effective daysBack for GraphQL SINCE queries
+    const effectiveDaysBack = startDateParam
+      ? Math.ceil((new Date().getTime() - sinceDate.getTime()) / (1000 * 60 * 60 * 24))
+      : daysBack;
 
     const SHOPIFY_API_VERSION = '2025-01';
 
@@ -110,8 +120,9 @@ export async function fetchShopifyAnalytics(c: Context) {
       return results;
     }
 
-    const ordersUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${sinceDate.toISOString()}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
-    const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}`;
+    const maxDateParam = untilDateISO ? `&created_at_max=${untilDateISO}` : '';
+    const ordersUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${sinceDate.toISOString()}${maxDateParam}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
+    const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}${maxDateParam}`;
 
     console.log('[fetch-shopify-analytics] Fetching orders and checkouts from:', cleanStoreUrl);
 
@@ -344,8 +355,10 @@ export async function fetchShopifyAnalytics(c: Context) {
       const graphqlUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
 
       // Query online store sessions
-      const sessionsQuery = `{ shopifyqlQuery(query: "FROM visits SHOW sum(totalSessions) AS sessions SINCE -${daysBack}d UNTIL today") { __typename ... on TableResponse { tableData { rowData } } } }`;
-      const addToCartQuery = `{ shopifyqlQuery(query: "FROM products SHOW sum(cartAdditionCount) AS addToCarts SINCE -${daysBack}d UNTIL today") { __typename ... on TableResponse { tableData { rowData } } } }`;
+      const untilClause = endDateParam ? `UNTIL '${endDateParam}'` : 'UNTIL today';
+      const sinceClause = startDateParam ? `SINCE '${startDateParam}'` : `SINCE -${daysBack}d`;
+      const sessionsQuery = `{ shopifyqlQuery(query: "FROM visits SHOW sum(totalSessions) AS sessions ${sinceClause} ${untilClause}") { __typename ... on TableResponse { tableData { rowData } } } }`;
+      const addToCartQuery = `{ shopifyqlQuery(query: "FROM products SHOW sum(cartAdditionCount) AS addToCarts ${sinceClause} ${untilClause}") { __typename ... on TableResponse { tableData { rowData } } } }`;
 
       const [sessionsRes, cartRes] = await Promise.all([
         fetch(graphqlUrl, {

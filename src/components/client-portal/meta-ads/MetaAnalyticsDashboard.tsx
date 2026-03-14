@@ -472,14 +472,15 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     // Best performing campaign
     const bestCampaign = [...campaigns].sort((a, b) => b.roas - a.roas)[0];
 
-    // Worst performing campaign
+    // Worst performing ACTIVE campaign (don't recommend pausing already-paused campaigns)
     const worstCampaign = [...campaigns]
-      .filter((c) => c.spend > 0)
+      .filter((c) => c.spend > 0 && c.status === 'ACTIVE')
       .sort((a, b) => a.roas - b.roas)[0];
 
-    // Budget recommendation
-    const highRoasCampaigns = campaigns.filter((c) => c.roas >= 3 && c.spend > 0);
-    const lowRoasCampaigns = campaigns.filter((c) => c.roas < 2 && c.roas > 0 && c.spend > 0);
+    // Budget recommendation — only consider active campaigns
+    const activeCampaigns = campaigns.filter((c) => c.status === 'ACTIVE');
+    const highRoasCampaigns = activeCampaigns.filter((c) => c.roas >= 3 && c.spend > 0);
+    const lowRoasCampaigns = activeCampaigns.filter((c) => c.roas < 2 && c.roas > 0 && c.spend > 0);
     let budgetRec: string | null = null;
     if (highRoasCampaigns.length > 0 && lowRoasCampaigns.length > 0) {
       const shiftAmount = lowRoasCampaigns.reduce((s, c) => s + c.spend * 0.3, 0);
@@ -887,7 +888,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                 </p>
               </div>
 
-              {/* Worst performing */}
+              {/* Worst performing — only show for active campaigns */}
               {insights.worstCampaign && insights.worstCampaign.campaign_id !== insights.bestCampaign.campaign_id && (
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -900,9 +901,15 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   <p className="text-xs text-muted-foreground mt-1">
                     ROAS: <span className="text-red-500 font-semibold">{formatRoas(insights.worstCampaign.roas)}</span>
                     {' | '}Gasto: {formatCLP(insights.worstCampaign.spend)}
+                    {insights.worstCampaign.conversions > 0 && <>{' | '}CPA: {formatCLP(insights.worstCampaign.cpa)}</>}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Considerar pausar o reestructurar creativos y audiencias.
+                  <p className="text-xs mt-2 text-red-600/80">
+                    {insights.worstCampaign.roas < 1
+                      ? `Esta campaña gasta más de lo que genera (ROAS ${formatRoas(insights.worstCampaign.roas)}). Considera pausarla y reasignar presupuesto a "${insights.bestCampaign.campaign_name}".`
+                      : insights.worstCampaign.roas < 2
+                        ? `ROAS bajo (${formatRoas(insights.worstCampaign.roas)}). Prueba nuevos creativos o audiencias antes de escalar.`
+                        : `Es la de menor rendimiento activa. Revisa segmentación y creativos.`
+                    }
                   </p>
                 </div>
               )}
