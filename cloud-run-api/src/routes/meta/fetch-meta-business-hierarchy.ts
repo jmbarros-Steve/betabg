@@ -151,11 +151,19 @@ function buildPortfolios(
       bestPage = null;
     }
 
-    // Try to find a matching pixel by name
-    const bestPixel = pixels.find(p => {
-      const pixelNameLower = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return pixelNameLower.includes(accNameLower) || accNameLower.includes(pixelNameLower);
-    });
+    // Try to find a matching pixel by name.
+    // If there's only one pixel in the business, assign it to all portfolios (most common case).
+    let bestPixel: PixelInfo | undefined;
+    if (pixels.length === 1) {
+      bestPixel = pixels[0];
+    } else if (pixels.length > 1) {
+      bestPixel = pixels.find(p => {
+        const pixelNameLower = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return pixelNameLower.includes(accNameLower) || accNameLower.includes(pixelNameLower);
+      });
+      // Fallback: if no name match, use the first pixel
+      if (!bestPixel) bestPixel = pixels[0];
+    }
 
     return {
       name: acc.name,
@@ -236,20 +244,33 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
 
     if (businesses.length === 0) {
       // Fallback: user might have ad accounts without a BM
-      const directAccounts = await metaGetAll('/me/adaccounts', token, {
-        fields: 'id,account_id,name,account_status,currency,timezone_name',
-      });
-
-      const directPages = await metaGetAll('/me/accounts', token, {
-        fields: 'id,name,category,instagram_business_account{id,name,username}',
-      });
+      const [directAccounts, directPages, directPixels] = await Promise.all([
+        metaGetAll('/me/adaccounts', token, {
+          fields: 'id,account_id,name,account_status,currency,timezone_name',
+        }),
+        metaGetAll('/me/accounts', token, {
+          fields: 'id,name,category,instagram_business_account{id,name,username}',
+        }),
+        // Also fetch pixels for each ad account
+        (async () => {
+          const accs = await metaGetAll('/me/adaccounts', token, { fields: 'id' });
+          const allPixels: PixelInfo[] = [];
+          for (const acc of accs.slice(0, 5)) {
+            const px = await metaGetAll(`/${acc.id}/adspixels`, token, { fields: 'id,name' }).catch(() => []);
+            allPixels.push(...px);
+          }
+          // Deduplicate by id
+          const seen = new Set<string>();
+          return allPixels.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+        })(),
+      ]);
 
       const personalPortfolios = buildPortfolios(
         'personal',
         'Cuenta Personal',
         directAccounts,
         directPages,
-        [],
+        directPixels,
       );
 
       return c.json({

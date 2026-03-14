@@ -44,6 +44,7 @@ import {
   Building2,
   Instagram,
   Facebook,
+  ShoppingBag,
 } from 'lucide-react';
 
 // Existing components
@@ -375,7 +376,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
 
       <MetaScopeStatusPanel clientId={clientId} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <Card className="relative overflow-hidden border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
           <CardContent className="pt-6 pb-5 px-6">
             <div className="flex items-start justify-between mb-3">
@@ -387,6 +388,21 @@ function DashboardSection({ clientId }: { clientId: string }) {
             <p className="text-3xl font-bold tracking-tight mb-1">{formatCurrency(totals.spend)}</p>
             <p className="text-sm text-muted-foreground">
               {aggregated.length} campaña{aggregated.length !== 1 ? 's' : ''} · 30 días
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-orange-500/8 to-transparent border-orange-500/15">
+          <CardContent className="pt-6 pb-5 px-6">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">Ventas</span>
+              <div className="p-2.5 rounded-xl bg-orange-500/10">
+                <ShoppingBag className="w-5 h-5 text-orange-500" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight mb-1">{formatNumber(totals.conversions)}</p>
+            <p className="text-sm text-muted-foreground">
+              Ingresos: {formatCurrency(totals.revenue)}
             </p>
           </CardContent>
         </Card>
@@ -403,7 +419,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
               {overallRoas.toFixed(2)}x
             </p>
             <p className="text-sm text-muted-foreground">
-              Ingresos: {formatCurrency(totals.revenue)}
+              Retorno por cada $1 invertido
             </p>
           </CardContent>
         </Card>
@@ -420,7 +436,7 @@ function DashboardSection({ clientId }: { clientId: string }) {
               {totals.conversions > 0 ? formatCurrency(overallCpa) : '--'}
             </p>
             <p className="text-sm text-muted-foreground">
-              {formatNumber(totals.conversions)} conversión{totals.conversions !== 1 ? 'es' : ''}
+              Costo por venta
             </p>
           </CardContent>
         </Card>

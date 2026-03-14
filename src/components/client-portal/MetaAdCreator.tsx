@@ -370,37 +370,35 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
     setGeneratingImage(true);
     setGeneratedAssetUrls([]);
     try {
-      const results = await Promise.allSettled(
-        selectedBriefs.map(async (briefIdx) => {
-          const brief = briefsVisuales[briefIdx];
+      // Generate images sequentially to avoid credit race conditions and API rate limits
+      const urls: string[] = [];
+      const failures: string[] = [];
+      for (const briefIdx of selectedBriefs) {
+        const brief = briefsVisuales[briefIdx];
+        try {
           const { data, error } = await callApi('generate-image', {
             body: { clientId, creativeId: savedCreativeId, promptGeneracion: brief.prompt_generacion as string, engine: imageEngine },
           });
           if (error) {
             const errMsg = (error as any)?.message || 'Error desconocido';
-            throw new Error(`Imagen: ${errMsg}`);
+            failures.push(errMsg);
+            continue;
           }
-          if (data?.error === 'NO_CREDITS') throw new Error('Sin creditos. Se necesitan 2 creditos por imagen.');
-          if (data?.error) throw new Error(data.error);
-          return data?.asset_url as string;
-        })
-      );
-      const urls = results
-        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
-        .map(r => r.value);
-      const imgFailures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
-      if (imgFailures.length > 0) {
-        // Image generation partial failures logged
+          if (data?.error === 'NO_CREDITS') { failures.push('Sin creditos. Se necesitan 2 creditos por imagen.'); continue; }
+          if (data?.error) { failures.push(data.error); continue; }
+          if (data?.asset_url) urls.push(data.asset_url as string);
+        } catch (singleErr: any) {
+          failures.push(singleErr?.message || 'Error desconocido');
+        }
       }
       if (urls.length === 0) {
-        const firstImgErr = imgFailures[0]?.reason?.message || 'Error generando imagenes';
-        throw new Error(firstImgErr);
+        throw new Error(failures[0] || 'Error generando imagenes');
       }
       setGeneratedAssetUrls(urls);
       // Update dct_imagenes in DB
       await (supabase as any).from('ad_creatives').update({ dct_imagenes: urls }).eq('id', savedCreativeId);
       toast.success(`${urls.length} imagen${urls.length !== 1 ? 'es' : ''} generada${urls.length !== 1 ? 's' : ''}`);
-      if (imgFailures.length > 0) toast.warning(`${imgFailures.length} imagen${imgFailures.length !== 1 ? 'es' : ''} fallaron`);
+      if (failures.length > 0) toast.warning(`${failures.length} imagen${failures.length !== 1 ? 'es' : ''} fallaron`);
     } catch (imgErr: any) { toast.error(imgErr?.message || 'Error generando imagenes'); }
     finally { setGeneratingImage(false); }
   };

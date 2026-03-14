@@ -299,11 +299,18 @@ export async function generateImage(c: Context) {
     tipo: 'imagen',
   });
 
-  // Deduct credits
+  // Deduct credits — re-read current balance to avoid stale values from concurrent requests
   const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
+  const { data: freshCredits } = await supabase
+    .from('client_credits')
+    .select('creditos_disponibles, creditos_usados')
+    .eq('client_id', clientId)
+    .maybeSingle();
+  const currentAvailable = freshCredits?.creditos_disponibles ?? credits.creditos_disponibles;
+  const currentUsed = freshCredits?.creditos_usados ?? credits.creditos_usados ?? 0;
   await supabase.from('client_credits').update({
-    creditos_disponibles: credits.creditos_disponibles - 2,
-    creditos_usados: (credits.creditos_usados || 0) + 2,
+    creditos_disponibles: currentAvailable - 2,
+    creditos_usados: currentUsed + 2,
   }).eq('client_id', clientId);
 
   await supabase.from('credit_transactions').insert({

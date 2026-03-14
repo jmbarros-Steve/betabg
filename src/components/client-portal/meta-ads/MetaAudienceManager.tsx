@@ -987,13 +987,16 @@ function CreateLookalikeDialog({
 // ---------------------------------------------------------------------------
 
 export default function MetaAudienceManager({ clientId }: MetaAudienceManagerProps) {
-  const { connectionId: ctxConnectionId, lastSyncAt, pixelId } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, lastSyncAt, pixelId: ctxPixelId } = useMetaBusiness();
 
   // State
   const [audiences, setAudiences] = useState<AudienceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AudienceTab>('custom');
   const [searchQuery, setSearchQuery] = useState('');
+  // Fallback pixel ID from DB if context doesn't have it
+  const [dbPixelId, setDbPixelId] = useState<string | null>(null);
+  const pixelId = ctxPixelId || dbPixelId;
 
   // Connection info
   const [hasMetaConnection, setHasMetaConnection] = useState(false);
@@ -1123,7 +1126,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     try {
       // Use connectionId from MetaBusinessContext for Meta
       // Still check Shopify/Klaviyo connections from DB
-      const [{ data: otherConns }, { data: clientData }] = await Promise.all([
+      const [{ data: otherConns }, { data: clientData }, { data: metaConn }] = await Promise.all([
         supabase
           .from('platform_connections')
           .select('id, platform, is_active')
@@ -1135,7 +1138,23 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           .select('shop_domain')
           .eq('id', clientId)
           .single(),
+        // Fallback: fetch pixel_id from DB if context doesn't have it
+        !ctxPixelId
+          ? supabase
+              .from('platform_connections')
+              .select('pixel_id')
+              .eq('client_id', clientId)
+              .eq('platform', 'meta')
+              .eq('is_active', true)
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
+
+      // Set DB pixel fallback
+      if (!ctxPixelId && metaConn?.pixel_id) {
+        setDbPixelId(metaConn.pixel_id);
+      }
 
       const shopifyConns = (otherConns || []).filter((c) => c.platform === 'shopify');
       const klaviyoConns = (otherConns || []).filter((c) => c.platform === 'klaviyo');

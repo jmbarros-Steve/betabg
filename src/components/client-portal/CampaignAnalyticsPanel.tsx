@@ -565,13 +565,15 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         <Card className="border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
           <CardContent className="pt-6 pb-5 px-6">
             <div className="flex items-start justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Ingresos</span>
+              <span className="text-sm font-medium text-muted-foreground">Ingresos Totales</span>
               <div className="p-2.5 rounded-xl bg-green-500/10">
-                <ShoppingCart className="w-5 h-5 text-green-500" />
+                <DollarSign className="w-5 h-5 text-green-500" />
               </div>
             </div>
             <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Atribuido por plataforma</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totals.revenue > 0 ? `ROAS: ${overallRoas.toFixed(2)}x` : 'Sin datos de conversión'}
+            </p>
           </CardContent>
         </Card>
 

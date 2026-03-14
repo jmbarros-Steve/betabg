@@ -358,7 +358,7 @@ async function handleCreate(
   const allHeadlines: string[] = (headlines && headlines.length > 0) ? headlines : (headline ? [headline] : []);
   const allDescriptions: string[] = (descriptions && descriptions.length > 0) ? descriptions : (description ? [description] : []);
   if (!destination_url) {
-    return c.json({ error: 'Missing required field: destination_url. A destination URL is required for conversion campaigns.' }, 400);
+    return { body: { error: 'Missing required field: destination_url. A destination URL is required for conversion campaigns.' }, status: 400 };
   }
   const destUrl = destination_url;
 

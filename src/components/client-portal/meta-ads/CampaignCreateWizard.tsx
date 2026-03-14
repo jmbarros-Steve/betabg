@@ -367,6 +367,13 @@ function CampaignForm({
 // Ad Set Form
 // ---------------------------------------------------------------------------
 
+interface MetaAudienceOption {
+  id: string;
+  name: string;
+  type: 'custom' | 'lookalike' | 'saved';
+  approximate_count?: number;
+}
+
 function AdSetForm({
   name, setName,
   audienceDesc, setAudienceDesc,
@@ -378,6 +385,8 @@ function AdSetForm({
   targetAgeMin, setTargetAgeMin,
   targetAgeMax, setTargetAgeMax,
   targetGender, setTargetGender,
+  connectionId,
+  selectedAudienceIds, setSelectedAudienceIds,
 }: {
   name: string; setName: (v: string) => void;
   audienceDesc: string; setAudienceDesc: (v: string) => void;
@@ -389,7 +398,47 @@ function AdSetForm({
   targetAgeMin: number; setTargetAgeMin: (v: number) => void;
   targetAgeMax: number; setTargetAgeMax: (v: number) => void;
   targetGender: 0 | 1 | 2; setTargetGender: (v: 0 | 1 | 2) => void;
+  connectionId?: string;
+  selectedAudienceIds: string[]; setSelectedAudienceIds: (v: string[]) => void;
 }) {
+  // Fetch available audiences from Meta
+  const [metaAudiences, setMetaAudiences] = useState<MetaAudienceOption[]>([]);
+  const [audiencesLoading, setAudiencesLoading] = useState(false);
+  const [audiencesFetched, setAudiencesFetched] = useState(false);
+
+  useEffect(() => {
+    if (!connectionId || audiencesFetched) return;
+    let cancelled = false;
+    (async () => {
+      setAudiencesLoading(true);
+      try {
+        const { data } = await callApi('manage-meta-audiences', {
+          body: { action: 'list', connection_id: connectionId },
+        });
+        if (!cancelled && data?.success && Array.isArray(data.audiences)) {
+          const mapped: MetaAudienceOption[] = data.audiences.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            type: a.subtype === 'LOOKALIKE' ? 'lookalike' as const
+              : a.subtype === 'CUSTOM' || a.subtype === 'WEBSITE' || a.subtype === 'ENGAGEMENT'
+                ? 'custom' as const
+                : 'saved' as const,
+            approximate_count: a.approximate_count_lower_bound || a.approximate_count || 0,
+          }));
+          setMetaAudiences(mapped);
+        }
+      } catch {
+        // Silently fail — user can still set targeting manually
+      } finally {
+        if (!cancelled) {
+          setAudiencesLoading(false);
+          setAudiencesFetched(true);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [connectionId, audiencesFetched]);
+
   const cpa = Number(cpaTarget) || 0;
   const recommendedBudget = cpa > 0 ? Math.round((cpa * 10) / 7) : 0;
 
@@ -440,9 +489,81 @@ function AdSetForm({
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="[Audiencia] - [Variable test]" className="mt-1" />
       </div>
 
+      {/* Audience selector — show real Meta audiences */}
       <div>
-        <Label>Audiencia / Segmento</Label>
-        <Textarea value={audienceDesc} onChange={(e) => setAudienceDesc(e.target.value)} placeholder="Describe la audiencia: edad, género, intereses, comportamiento..." rows={2} className="mt-1" />
+        <Label>Audiencia de Meta</Label>
+        {audiencesLoading ? (
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> Cargando audiencias de Meta...
+          </div>
+        ) : metaAudiences.length > 0 ? (
+          <div className="space-y-2 mt-2">
+            <div className="max-h-48 overflow-y-auto space-y-1 rounded-lg border p-2 bg-muted/20">
+              {metaAudiences.map((aud) => {
+                const isSelected = selectedAudienceIds.includes(aud.id);
+                const typeLabel = aud.type === 'custom' ? 'Personalizada'
+                  : aud.type === 'lookalike' ? 'Similar'
+                  : 'Guardada';
+                const typeBg = aud.type === 'custom' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30'
+                  : aud.type === 'lookalike' ? 'bg-blue-500/15 text-blue-700 border-blue-500/30'
+                  : 'bg-gray-500/15 text-gray-600 border-gray-500/30';
+                return (
+                  <button
+                    key={aud.id}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedAudienceIds(selectedAudienceIds.filter(id => id !== aud.id));
+                      } else {
+                        setSelectedAudienceIds([...selectedAudienceIds, aud.id]);
+                      }
+                      // Also update audienceDesc for display/AI context
+                      const newSelected = isSelected
+                        ? selectedAudienceIds.filter(id => id !== aud.id)
+                        : [...selectedAudienceIds, aud.id];
+                      const names = metaAudiences
+                        .filter(a => newSelected.includes(a.id))
+                        .map(a => a.name);
+                      setAudienceDesc(names.join(', '));
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 p-2 rounded-md text-left text-sm transition-all ${
+                      isSelected
+                        ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20'
+                        : 'hover:bg-muted/50 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Target className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <span className="truncate">{aud.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {aud.approximate_count ? (
+                        <span className="text-[10px] text-muted-foreground">{new Intl.NumberFormat('es-CL').format(aud.approximate_count)}</span>
+                      ) : null}
+                      <Badge variant="outline" className={`text-[9px] ${typeBg}`}>{typeLabel}</Badge>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedAudienceIds.length > 0 && (
+              <p className="text-xs text-muted-foreground">{selectedAudienceIds.length} audiencia(s) seleccionada(s)</p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border/60 text-sm text-muted-foreground">
+            <p>No tienes audiencias guardadas en Meta Ads.</p>
+            <p className="mt-1 text-xs">Ve a la pestaña <strong>Audiencias</strong> para crear audiencias personalizadas, similares o guardadas. También puedes continuar sin audiencia (targeting abierto).</p>
+          </div>
+        )}
+        {/* Fallback: optional free text for extra targeting notes */}
+        <Input
+          value={selectedAudienceIds.length > 0 ? '' : audienceDesc}
+          onChange={(e) => setAudienceDesc(e.target.value)}
+          placeholder={selectedAudienceIds.length > 0 ? 'Audiencia seleccionada arriba' : 'O describe manualmente: intereses, comportamiento...'}
+          className="mt-2"
+          disabled={selectedAudienceIds.length > 0}
+        />
       </div>
 
       {/* Targeting controls */}
@@ -1247,6 +1368,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [targetAgeMin, setTargetAgeMin] = useState(18);
   const [targetAgeMax, setTargetAgeMax] = useState(65);
   const [targetGender, setTargetGender] = useState<0 | 1 | 2>(0); // 0=all, 1=male, 2=female
+  const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
 
   // Funnel stage
   const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
@@ -1409,15 +1531,28 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     // Validate BEFORE transitioning to review step
     const nextStep = steps[stepIndex + 1]?.key;
     if (nextStep === 'review') {
-      const issues: string[] = [];
-      if (!images.some(Boolean)) issues.push('Agrega al menos 1 imagen para el anuncio');
-      if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) issues.push('Genera o escribe el copy (texto + título)');
-      if (!destinationUrl.trim()) issues.push('Agrega la URL de destino');
+      // Check for issues that require going back to a previous step
       const hasBudget = budgetType === 'CBO' ? !!campBudget : !!adsetBudget;
-      if (!hasBudget && !existingAdsetId) issues.push('Define el presupuesto diario');
-      if (!audienceDesc.trim() && !existingAdsetId) issues.push('Describe la audiencia / segmento');
-      if (issues.length > 0) {
-        issues.forEach((msg) => toast.error(msg));
+      const hasAudience = audienceDesc.trim() || selectedAudienceIds.length > 0;
+      if ((!hasBudget || !hasAudience) && !existingAdsetId) {
+        // Find the adset-config step index and navigate there
+        const adsetStepIdx = steps.findIndex((s) => s.key === 'adset-config');
+        if (adsetStepIdx >= 0) {
+          const missing: string[] = [];
+          if (!hasBudget) missing.push('presupuesto diario');
+          if (!hasAudience) missing.push('audiencia');
+          toast.error(`Completa: ${missing.join(' y ')}. Te llevamos al paso correcto.`);
+          setStepIndex(adsetStepIdx);
+          return;
+        }
+      }
+      // Check for creative issues (stay on current ad-creative step)
+      const creativeIssues: string[] = [];
+      if (!images.some(Boolean)) creativeIssues.push('Agrega al menos 1 imagen para el anuncio');
+      if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) creativeIssues.push('Genera o escribe el copy (texto + título)');
+      if (!destinationUrl.trim()) creativeIssues.push('Agrega la URL de destino');
+      if (creativeIssues.length > 0) {
+        creativeIssues.forEach((msg) => toast.error(msg));
         return;
       }
     }
@@ -1794,6 +1929,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         if (targetGender > 0) {
           targetingSpec.genders = [targetGender];
         }
+        // Include selected Meta audiences (custom/lookalike/saved) in targeting
+        if (selectedAudienceIds.length > 0) {
+          targetingSpec.custom_audiences = selectedAudienceIds.map(id => ({ id }));
+        }
         submitData.targeting = targetingSpec;
       }
 
@@ -1987,6 +2126,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
                           targetAgeMax={targetAgeMax} setTargetAgeMax={setTargetAgeMax}
                           targetGender={targetGender} setTargetGender={setTargetGender}
+                          connectionId={ctxConnectionId}
+                          selectedAudienceIds={selectedAudienceIds} setSelectedAudienceIds={setSelectedAudienceIds}
                         />
                       </CardContent>
                     </Card>
@@ -2018,6 +2159,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
                   targetAgeMax={targetAgeMax} setTargetAgeMax={setTargetAgeMax}
                   targetGender={targetGender} setTargetGender={setTargetGender}
+                  connectionId={ctxConnectionId}
+                  selectedAudienceIds={selectedAudienceIds} setSelectedAudienceIds={setSelectedAudienceIds}
                 />
               )}
 

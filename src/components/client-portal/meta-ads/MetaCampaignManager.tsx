@@ -263,7 +263,7 @@ function BudgetAllocationChart({
               key={c.campaign_id}
               className={`${COLORS[i % COLORS.length]} transition-all duration-300`}
               style={{ width: `${pct}%` }}
-              title={`${c.campaign_name}: ${formatCLP(c.daily_budget)} (${pct.toFixed(1)}%)`}
+              title={`${c.campaign_name} — Presupuesto: ${formatCLP(c.daily_budget)}/día (${pct.toFixed(1)}%)`}
             />
           );
         })}
@@ -280,7 +280,7 @@ function BudgetAllocationChart({
             <span className="text-muted-foreground truncate max-w-[140px]">
               {c.campaign_name}
             </span>
-            <span className="font-medium">{formatCLP(c.daily_budget)}</span>
+            <span className="font-medium">{formatCLP(c.daily_budget)}/día</span>
           </div>
         ))}
       </div>

@@ -152,7 +152,7 @@ export async function syncCompetitorAds(c: Context) {
 
         // Step 2: Search Ad Library with multi-strategy approach
         const AD_LIBRARY_FIELDS = 'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages';
-        const AD_LIBRARY_COUNTRIES = 'CL,MX,CO,AR,PE,US';
+        const AD_LIBRARY_COUNTRIES = '["CL","MX","CO","AR","PE","US"]';
 
         // Helper: fetch Ad Library with given params
         async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
