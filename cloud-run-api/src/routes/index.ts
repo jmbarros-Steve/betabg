@@ -75,6 +75,7 @@ import { metaSocialInbox } from './meta/meta-social-inbox.js';
 import { metaDataDeletion } from './meta/meta-data-deletion.js';
 import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
 import { manageMetaRules } from './meta/manage-meta-rules.js';
+import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 
 // Phase 4: Auth
 import { selfSignup } from './auth/self-signup.js';
@@ -183,6 +184,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/meta-data-deletion', metaDataDeletion); // No JWT - called by Meta directly
   app.post('/api/sync-meta-metrics', authMiddleware, syncMetaMetrics);
   app.post('/api/manage-meta-rules', authMiddleware, manageMetaRules);
+  app.post('/api/meta-targeting-search', authMiddleware, metaTargetingSearch);
 
   // ============================================================
   // Phase 3: Platform Integrations (Shopify)

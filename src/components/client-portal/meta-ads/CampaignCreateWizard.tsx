@@ -40,6 +40,13 @@ import {
   Palette,
   ShoppingBag,
   Maximize2,
+  Search,
+  MapPin,
+  Globe,
+  Users,
+  Minus,
+  Trash2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
@@ -367,6 +374,283 @@ function CampaignForm({
 // Ad Set Form
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Interest Search (queries Meta targeting search API)
+// ---------------------------------------------------------------------------
+
+function InterestSearch({
+  connectionId,
+  selectedInterests,
+  onAdd,
+  onRemove,
+  placeholder = 'Buscar intereses...',
+  isExclusion = false,
+}: {
+  connectionId?: string;
+  selectedInterests: Array<{ id: string; name: string }>;
+  onAdd: (interest: { id: string; name: string }) => void;
+  onRemove: (id: string) => void;
+  placeholder?: string;
+  isExclusion?: boolean;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Array<{ id: string; name: string; audience_size_lower_bound: number; audience_size_upper_bound: number; path: string[] }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const doSearch = useCallback(async (q: string) => {
+    if (!connectionId || q.length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const { data } = await callApi('meta-targeting-search', {
+        body: { connection_id: connectionId, search_type: 'interests', query: q },
+      });
+      if (data?.success && Array.isArray(data.results)) {
+        setResults(data.results.filter((r: any) => !selectedInterests.find(s => s.id === r.id)));
+      }
+    } catch { /* ignore */ }
+    setSearching(false);
+  }, [connectionId, selectedInterests]);
+
+  const handleInputChange = (value: string) => {
+    setQuery(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (value.length >= 2) {
+      searchTimeout.current = setTimeout(() => doSearch(value), 400);
+      setShowResults(true);
+    } else {
+      setResults([]);
+      setShowResults(false);
+    }
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const borderColor = isExclusion ? 'border-red-500/30' : 'border-border';
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className={`flex items-center gap-2 border rounded-lg px-2.5 py-1.5 mt-1 ${borderColor} bg-background`}>
+        <Search className={`w-3.5 h-3.5 shrink-0 ${isExclusion ? 'text-red-400' : 'text-muted-foreground'}`} />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={() => { if (results.length > 0) setShowResults(true); }}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+        />
+        {searching && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+      </div>
+
+      {/* Search results dropdown */}
+      {showResults && results.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border bg-background shadow-lg">
+          {results.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => {
+                onAdd({ id: r.id, name: r.name });
+                setQuery('');
+                setResults([]);
+                setShowResults(false);
+              }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors border-b border-border/30 last:border-0"
+            >
+              <div className="min-w-0">
+                <span className="font-medium truncate block">{r.name}</span>
+                {r.path && r.path.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground truncate block">{r.path.join(' > ')}</span>
+                )}
+              </div>
+              {(r.audience_size_lower_bound > 0 || r.audience_size_upper_bound > 0) && (
+                <span className="text-[10px] text-muted-foreground shrink-0">
+                  {new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(r.audience_size_lower_bound)}
+                  {r.audience_size_upper_bound > r.audience_size_lower_bound && ` - ${new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(r.audience_size_upper_bound)}`}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Selected interests as chips */}
+      {selectedInterests.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {selectedInterests.map((interest) => (
+            <span
+              key={interest.id}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                isExclusion
+                  ? 'bg-red-500/10 text-red-700 border-red-500/30'
+                  : 'bg-primary/10 text-primary border-primary/30'
+              }`}
+            >
+              {interest.name}
+              <button
+                type="button"
+                onClick={() => onRemove(interest.id)}
+                className="ml-0.5 hover:text-foreground"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {!connectionId && (
+        <p className="text-[10px] text-muted-foreground mt-1">Conecta tu cuenta de Meta para buscar intereses.</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Location Search (queries Meta geo location API)
+// ---------------------------------------------------------------------------
+
+function LocationSearch({
+  connectionId,
+  selectedLocations,
+  onAdd,
+  onRemove,
+}: {
+  connectionId?: string;
+  selectedLocations: Array<{ key: string; name: string; type: string; country_name: string }>;
+  onAdd: (loc: { key: string; name: string; type: string; country_name: string }) => void;
+  onRemove: (key: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Array<{ key: string; name: string; type: string; country_name: string; region: string }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const doSearch = useCallback(async (q: string) => {
+    if (!connectionId || q.length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const { data } = await callApi('meta-targeting-search', {
+        body: { connection_id: connectionId, search_type: 'locations', query: q },
+      });
+      if (data?.success && Array.isArray(data.results)) {
+        setResults(data.results.filter((r: any) => !selectedLocations.find(s => s.key === r.key)));
+      }
+    } catch { /* ignore */ }
+    setSearching(false);
+  }, [connectionId, selectedLocations]);
+
+  const handleInputChange = (value: string) => {
+    setQuery(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (value.length >= 2) {
+      searchTimeout.current = setTimeout(() => doSearch(value), 400);
+      setShowResults(true);
+    } else {
+      setResults([]);
+      setShowResults(false);
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case 'country': return 'País';
+      case 'region': return 'Región';
+      case 'city': return 'Ciudad';
+      case 'zip': return 'Código Postal';
+      default: return type;
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative mt-2">
+      <div className="flex items-center gap-2 border rounded-lg px-2.5 py-1.5 bg-background">
+        <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={() => { if (results.length > 0) setShowResults(true); }}
+          placeholder="Buscar ciudades o regiones: Santiago, CDMX, Bogotá..."
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+        />
+        {searching && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+      </div>
+
+      {showResults && results.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border bg-background shadow-lg">
+          {results.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => {
+                onAdd({ key: r.key, name: r.name, type: r.type, country_name: r.country_name });
+                setQuery('');
+                setResults([]);
+                setShowResults(false);
+              }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors border-b border-border/30 last:border-0"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="w-3 h-3 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <span className="font-medium truncate block">{r.name}</span>
+                  {r.region && <span className="text-[10px] text-muted-foreground">{r.region}, {r.country_name}</span>}
+                  {!r.region && r.country_name && <span className="text-[10px] text-muted-foreground">{r.country_name}</span>}
+                </div>
+              </div>
+              <Badge variant="outline" className="text-[9px] shrink-0">{typeLabel(r.type)}</Badge>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedLocations.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {selectedLocations.map((loc) => (
+            <span
+              key={loc.key}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/30"
+            >
+              <MapPin className="w-2.5 h-2.5" />
+              {loc.name}{loc.country_name ? `, ${loc.country_name}` : ''}
+              <button type="button" onClick={() => onRemove(loc.key)} className="ml-0.5 hover:text-foreground">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 interface MetaAudienceOption {
   id: string;
   name: string;
@@ -387,6 +671,9 @@ function AdSetForm({
   targetGender, setTargetGender,
   connectionId,
   selectedAudienceIds, setSelectedAudienceIds,
+  targetInterests, setTargetInterests,
+  targetExcludeInterests, setTargetExcludeInterests,
+  targetLocations, setTargetLocations,
 }: {
   name: string; setName: (v: string) => void;
   audienceDesc: string; setAudienceDesc: (v: string) => void;
@@ -400,6 +687,9 @@ function AdSetForm({
   targetGender: 0 | 1 | 2; setTargetGender: (v: 0 | 1 | 2) => void;
   connectionId?: string;
   selectedAudienceIds: string[]; setSelectedAudienceIds: (v: string[]) => void;
+  targetInterests: Array<{ id: string; name: string }>; setTargetInterests: (v: Array<{ id: string; name: string }>) => void;
+  targetExcludeInterests: Array<{ id: string; name: string }>; setTargetExcludeInterests: (v: Array<{ id: string; name: string }>) => void;
+  targetLocations: Array<{ key: string; name: string; type: string; country_name: string }>; setTargetLocations: (v: Array<{ key: string; name: string; type: string; country_name: string }>) => void;
 }) {
   // Fetch available audiences from Meta
   const [metaAudiences, setMetaAudiences] = useState<MetaAudienceOption[]>([]);
@@ -566,45 +856,174 @@ function AdSetForm({
         />
       </div>
 
-      {/* Targeting controls */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs">País</Label>
-          <Select value={targetCountries[0] || 'CL'} onValueChange={(v) => setTargetCountries([v])}>
-            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CL">Chile</SelectItem>
-              <SelectItem value="MX">México</SelectItem>
-              <SelectItem value="CO">Colombia</SelectItem>
-              <SelectItem value="AR">Argentina</SelectItem>
-              <SelectItem value="PE">Perú</SelectItem>
-              <SelectItem value="US">Estados Unidos</SelectItem>
-              <SelectItem value="ES">España</SelectItem>
-              <SelectItem value="BR">Brasil</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* ═══════════ TARGETING SECTION ═══════════ */}
+      <div className="space-y-4 p-4 rounded-lg border border-border/60 bg-muted/10">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-primary" />
+          <Label className="text-sm font-semibold">Segmentación detallada</Label>
         </div>
+
+        {/* ── Gender ── */}
         <div>
-          <Label className="text-xs">Género</Label>
-          <Select value={String(targetGender)} onValueChange={(v) => setTargetGender(Number(v) as 0 | 1 | 2)}>
-            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">Todos</SelectItem>
-              <SelectItem value="1">Hombres</SelectItem>
-              <SelectItem value="2">Mujeres</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label className="text-xs font-medium text-muted-foreground">Género</Label>
+          <div className="flex gap-2 mt-1.5">
+            {([
+              { val: 0 as const, label: 'Todos', icon: Users },
+              { val: 1 as const, label: 'Hombres', icon: Users },
+              { val: 2 as const, label: 'Mujeres', icon: Users },
+            ]).map((g) => (
+              <button
+                key={g.val}
+                type="button"
+                onClick={() => setTargetGender(g.val)}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                  targetGender === g.val
+                    ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
+                    : 'border-border text-muted-foreground hover:border-primary/30'
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
+
+        {/* ── Age Range ── */}
         <div>
-          <Label className="text-xs">Edad mínima</Label>
-          <Input type="number" min={18} max={65} value={targetAgeMin} onChange={(e) => { const v = Math.max(18, Math.min(65, Number(e.target.value))); setTargetAgeMin(v); if (v > targetAgeMax) setTargetAgeMax(v); }} className="mt-1" />
+          <Label className="text-xs font-medium text-muted-foreground">Rango de edad</Label>
+          <div className="flex items-center gap-3 mt-1.5">
+            <div className="flex-1">
+              <Select value={String(targetAgeMin)} onValueChange={(v) => { const n = Number(v); setTargetAgeMin(n); if (n > targetAgeMax) setTargetAgeMax(n); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 48 }, (_, i) => 18 + i).map((age) => (
+                    <SelectItem key={age} value={String(age)}>{age} {age === 18 ? '(min)' : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Minus className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              <Select value={String(targetAgeMax)} onValueChange={(v) => { const n = Number(v); setTargetAgeMax(n); if (n < targetAgeMin) setTargetAgeMin(n); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 48 }, (_, i) => 18 + i).map((age) => (
+                    <SelectItem key={age} value={String(age)}>{age}{age === 65 ? '+' : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary/40 rounded-full transition-all"
+              style={{
+                marginLeft: `${((targetAgeMin - 18) / 47) * 100}%`,
+                width: `${((targetAgeMax - targetAgeMin) / 47) * 100}%`,
+              }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {targetAgeMin === 18 && targetAgeMax === 65 ? 'Todas las edades (18-65+)' : `${targetAgeMin} - ${targetAgeMax}${targetAgeMax === 65 ? '+' : ''} años`}
+          </p>
         </div>
+
+        {/* ── Locations ── */}
         <div>
-          <Label className="text-xs">Edad máxima</Label>
-          <Input type="number" min={18} max={65} value={targetAgeMax} onChange={(e) => { const v = Math.max(18, Math.min(65, Number(e.target.value))); setTargetAgeMax(v); if (v < targetAgeMin) setTargetAgeMin(v); }} className="mt-1" />
+          <Label className="text-xs font-medium text-muted-foreground">Ubicaciones</Label>
+          {/* Quick country buttons */}
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {([
+              { code: 'CL', flag: 'CL', label: 'Chile' },
+              { code: 'MX', flag: 'MX', label: 'México' },
+              { code: 'CO', flag: 'CO', label: 'Colombia' },
+              { code: 'AR', flag: 'AR', label: 'Argentina' },
+              { code: 'PE', flag: 'PE', label: 'Perú' },
+              { code: 'US', flag: 'US', label: 'EE.UU.' },
+              { code: 'ES', flag: 'ES', label: 'España' },
+              { code: 'BR', flag: 'BR', label: 'Brasil' },
+              { code: 'EC', flag: 'EC', label: 'Ecuador' },
+              { code: 'UY', flag: 'UY', label: 'Uruguay' },
+              { code: 'BO', flag: 'BO', label: 'Bolivia' },
+              { code: 'PA', flag: 'PA', label: 'Panamá' },
+            ]).map((c) => {
+              const isSelected = targetCountries.includes(c.code);
+              return (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      const next = targetCountries.filter(cc => cc !== c.code);
+                      setTargetCountries(next.length > 0 ? next : ['CL']);
+                    } else {
+                      setTargetCountries([...targetCountries, c.code]);
+                    }
+                  }}
+                  className={`px-2 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                    isSelected
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-muted-foreground hover:border-primary/30'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+          {targetCountries.length > 1 && (
+            <p className="text-[10px] text-primary mt-1 font-medium">{targetCountries.length} países seleccionados</p>
+          )}
+
+          {/* Location search (cities/regions via Meta API) */}
+          <LocationSearch
+            connectionId={connectionId}
+            selectedLocations={targetLocations}
+            onAdd={(loc) => {
+              if (!targetLocations.find(l => l.key === loc.key)) {
+                setTargetLocations([...targetLocations, loc]);
+              }
+            }}
+            onRemove={(key) => setTargetLocations(targetLocations.filter(l => l.key !== key))}
+          />
         </div>
+
+        {/* ── Interests (Detailed Targeting) ── */}
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">Intereses y comportamientos</Label>
+          <p className="text-[10px] text-muted-foreground mb-1.5">Busca intereses de Meta para segmentar tu audiencia con precisión.</p>
+          <InterestSearch
+            connectionId={connectionId}
+            selectedInterests={targetInterests}
+            onAdd={(interest) => {
+              if (!targetInterests.find(i => i.id === interest.id)) {
+                setTargetInterests([...targetInterests, interest]);
+              }
+            }}
+            onRemove={(id) => setTargetInterests(targetInterests.filter(i => i.id !== id))}
+            placeholder="Buscar: fitness, moda, tecnología, cocina..."
+          />
+        </div>
+
+        {/* ── Exclusion Interests ── */}
+        {targetInterests.length > 0 && (
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground">Excluir intereses</Label>
+            <p className="text-[10px] text-muted-foreground mb-1.5">Personas con estos intereses NO verán tu anuncio.</p>
+            <InterestSearch
+              connectionId={connectionId}
+              selectedInterests={targetExcludeInterests}
+              onAdd={(interest) => {
+                if (!targetExcludeInterests.find(i => i.id === interest.id)) {
+                  setTargetExcludeInterests([...targetExcludeInterests, interest]);
+                }
+              }}
+              onRemove={(id) => setTargetExcludeInterests(targetExcludeInterests.filter(i => i.id !== id))}
+              placeholder="Excluir: competidores, temas no relevantes..."
+              isExclusion
+            />
+          </div>
+        )}
       </div>
 
       {/* CPA + Budget */}
@@ -1369,6 +1788,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [targetAgeMax, setTargetAgeMax] = useState(65);
   const [targetGender, setTargetGender] = useState<0 | 1 | 2>(0); // 0=all, 1=male, 2=female
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
+  const [targetInterests, setTargetInterests] = useState<Array<{ id: string; name: string }>>([]);
+  const [targetExcludeInterests, setTargetExcludeInterests] = useState<Array<{ id: string; name: string }>>([]);
+  const [targetLocations, setTargetLocations] = useState<Array<{ key: string; name: string; type: string; country_name: string }>>([]);
 
   // Funnel stage
   const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
@@ -1921,8 +2343,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         submitData.daily_budget = budget || 10000;
 
         // Build targeting from wizard fields
+        const geoLocations: Record<string, any> = {
+          countries: targetCountries.length > 0 ? targetCountries : ['CL'],
+        };
+        // Add specific cities/regions from location search
+        if (targetLocations.length > 0) {
+          const cities = targetLocations.filter(l => l.type === 'city').map(l => ({ key: l.key }));
+          const regions = targetLocations.filter(l => l.type === 'region').map(l => ({ key: l.key }));
+          if (cities.length > 0) geoLocations.cities = cities;
+          if (regions.length > 0) geoLocations.regions = regions;
+        }
+
         const targetingSpec: Record<string, any> = {
-          geo_locations: { countries: targetCountries.length > 0 ? targetCountries : ['CL'] },
+          geo_locations: geoLocations,
           age_min: targetAgeMin || 18,
           age_max: targetAgeMax || 65,
         };
@@ -1932,6 +2365,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         // Include selected Meta audiences (custom/lookalike/saved) in targeting
         if (selectedAudienceIds.length > 0) {
           targetingSpec.custom_audiences = selectedAudienceIds.map(id => ({ id }));
+        }
+        // Include interests (detailed targeting)
+        if (targetInterests.length > 0) {
+          targetingSpec.flexible_spec = [{
+            interests: targetInterests.map(i => ({ id: i.id, name: i.name })),
+          }];
+        }
+        // Exclude interests
+        if (targetExcludeInterests.length > 0) {
+          targetingSpec.exclusions = {
+            interests: targetExcludeInterests.map(i => ({ id: i.id, name: i.name })),
+          };
         }
         submitData.targeting = targetingSpec;
       }
@@ -2128,6 +2573,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           targetGender={targetGender} setTargetGender={setTargetGender}
                           connectionId={ctxConnectionId}
                           selectedAudienceIds={selectedAudienceIds} setSelectedAudienceIds={setSelectedAudienceIds}
+                          targetInterests={targetInterests} setTargetInterests={setTargetInterests}
+                          targetExcludeInterests={targetExcludeInterests} setTargetExcludeInterests={setTargetExcludeInterests}
+                          targetLocations={targetLocations} setTargetLocations={setTargetLocations}
                         />
                       </CardContent>
                     </Card>
@@ -2161,6 +2609,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   targetGender={targetGender} setTargetGender={setTargetGender}
                   connectionId={ctxConnectionId}
                   selectedAudienceIds={selectedAudienceIds} setSelectedAudienceIds={setSelectedAudienceIds}
+                  targetInterests={targetInterests} setTargetInterests={setTargetInterests}
+                  targetExcludeInterests={targetExcludeInterests} setTargetExcludeInterests={setTargetExcludeInterests}
+                  targetLocations={targetLocations} setTargetLocations={setTargetLocations}
                 />
               )}
 
