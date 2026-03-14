@@ -143,6 +143,10 @@ export async function fetchShopifyAnalytics(c: Context) {
     console.log(`[fetch-shopify-analytics] Fetched ${orders.length} orders (paginated)`);
 
     for (const order of orders) {
+      // Skip cancelled/refunded/voided orders from revenue calculation
+      const fs = order.financial_status || '';
+      if (fs === 'refunded' || fs === 'voided' || fs === 'cancelled') continue;
+
       const orderRevenue = parseFloat(order.total_price || '0');
       totalRevenue += orderRevenue;
 
