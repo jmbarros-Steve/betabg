@@ -75,7 +75,7 @@ export async function fetchCampaignAdsets(c: Context) {
 
   if (platform === 'meta') {
     // Fetch ad sets for this campaign with insights
-    const adsetsUrl = new URL(`https://graph.facebook.com/v18.0/${campaign_id}/adsets`);
+    const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign_id}/adsets`);
     adsetsUrl.searchParams.set('access_token', decryptedToken);
     adsetsUrl.searchParams.set('fields', 'id,name,status');
     adsetsUrl.searchParams.set('limit', '100');
@@ -94,7 +94,7 @@ export async function fetchCampaignAdsets(c: Context) {
 
     // Fetch insights for each adset
     for (const adset of rawAdsets) {
-      const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adset.id}/insights`);
+      const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);
       insightsUrl.searchParams.set('access_token', decryptedToken);
       insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
       insightsUrl.searchParams.set('time_range', JSON.stringify({

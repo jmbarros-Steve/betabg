@@ -322,7 +322,7 @@ async function syncMetaCampaigns(
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
   // Get account currency first
-  const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency&access_token=${accessToken}`;
+  const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency&access_token=${accessToken}`;
   let accountCurrency = 'USD';
   try {
     const accountRes = await fetch(accountInfoUrl);
@@ -336,7 +336,7 @@ async function syncMetaCampaigns(
   console.log(`Meta account currency: ${accountCurrency}`);
 
   // Fetch campaigns with insights
-  const campaignsUrl = new URL(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns`);
+  const campaignsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/campaigns`);
   campaignsUrl.searchParams.set('access_token', accessToken);
   campaignsUrl.searchParams.set('fields', 'id,name,status');
   campaignsUrl.searchParams.set('limit', '100');
@@ -354,7 +354,7 @@ async function syncMetaCampaigns(
 
   // Fetch insights for each campaign
   for (const campaign of campaigns) {
-    const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${campaign.id}/insights`);
+    const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign.id}/insights`);
     insightsUrl.searchParams.set('access_token', accessToken);
     insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
     insightsUrl.searchParams.set('time_range', JSON.stringify({
@@ -548,7 +548,7 @@ async function syncMetaAdsetMetrics(
   let accountCurrency = 'USD';
   try {
     const accountRes = await fetch(
-      `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency&access_token=${accessToken}`
+      `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency&access_token=${accessToken}`
     );
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
@@ -566,7 +566,7 @@ async function syncMetaAdsetMetrics(
     const campaignName = campaignMetrics.find(m => m.campaign_id === campaignId)?.campaign_name || '';
 
     // Fetch adsets for this campaign
-    const adsetsUrl = new URL(`https://graph.facebook.com/v18.0/${campaignId}/adsets`);
+    const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaignId}/adsets`);
     adsetsUrl.searchParams.set('access_token', accessToken);
     adsetsUrl.searchParams.set('fields', 'id,name');
     adsetsUrl.searchParams.set('limit', '100');
@@ -578,7 +578,7 @@ async function syncMetaAdsetMetrics(
       const adsets = adsetsData.data || [];
 
       for (const adset of adsets) {
-        const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adset.id}/insights`);
+        const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);
         insightsUrl.searchParams.set('access_token', accessToken);
         insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
         insightsUrl.searchParams.set('time_range', JSON.stringify({

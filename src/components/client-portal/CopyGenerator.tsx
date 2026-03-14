@@ -134,8 +134,12 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).from('client_credits').select('creditos_disponibles, creditos_usados, plan').eq('client_id', clientId).maybeSingle();
     if (error) { toast.error('Error al cargar créditos'); return; }
-    if (data) setCredits(data);
-    else setCredits({ creditos_disponibles: 99999, creditos_usados: 0, plan: 'free_beta' });
+    if (!data) {
+      setCredits({ creditos_disponibles: 0, creditos_usados: 0, plan: 'free_beta' });
+      toast.error('No se encontraron créditos. Contacta al administrador.');
+      return;
+    }
+    setCredits(data);
   };
 
   const resetWizard = () => {
@@ -153,7 +157,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const generateVariaciones = async (regenerateIdx?: number) => {
     if (!funnel || !formato || !efectiveAngulo) return;
 
-    if ((credits?.creditos_disponibles ?? 99999) < 1 && regenerateIdx === undefined) {
+    if ((credits?.creditos_disponibles ?? 0) < 1 && regenerateIdx === undefined) {
       toast.error('Sin créditos disponibles');
       return;
     }

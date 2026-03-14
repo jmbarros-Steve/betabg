@@ -32,10 +32,13 @@ export async function generateCopy(c: Context) {
   }
 
   if (!credits) {
-    await supabase.from('client_credits').insert({ client_id: clientId, creditos_disponibles: 99999, creditos_usados: 0, plan: 'free_beta' });
+    return c.json(
+      { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
+      402
+    );
   }
 
-  const available = credits?.creditos_disponibles ?? 99999;
+  const available = credits.creditos_disponibles ?? 0;
   if (available < 1) {
     return c.json({ error: 'NO_CREDITS', message: 'Sin créditos disponibles' }, 402);
   }
@@ -164,12 +167,10 @@ Responde SOLO en JSON válido sin markdown ni backticks:
   }
 
   // Deduct 1 credit
-  if (credits) {
-    await supabase.from('client_credits').update({
-      creditos_disponibles: (credits.creditos_disponibles || 99999) - 1,
-      creditos_usados: (credits.creditos_usados || 0) + 1,
-    }).eq('client_id', clientId);
-  }
+  await supabase.from('client_credits').update({
+    creditos_disponibles: credits.creditos_disponibles - 1,
+    creditos_usados: (credits.creditos_usados || 0) + 1,
+  }).eq('client_id', clientId);
 
   // Record transaction
   await supabase.from('credit_transactions').insert({

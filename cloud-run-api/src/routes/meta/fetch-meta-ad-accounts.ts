@@ -100,7 +100,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     // First, check token permissions
     console.log('Checking token permissions...');
-    const permissionsUrl = new URL('https://graph.facebook.com/v18.0/me/permissions');
+    const permissionsUrl = new URL('https://graph.facebook.com/v21.0/me/permissions');
     permissionsUrl.searchParams.set('access_token', decryptedToken);
 
     const permissionsResponse = await fetch(permissionsUrl.toString());
@@ -127,7 +127,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     // Fetch ad accounts from Meta Graph API with business info
     // Include business field to group by Business Manager
-    const accountsUrl = new URL('https://graph.facebook.com/v18.0/me/adaccounts');
+    const accountsUrl = new URL('https://graph.facebook.com/v21.0/me/adaccounts');
     accountsUrl.searchParams.set('access_token', decryptedToken);
     accountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name,business{id,name}');
     accountsUrl.searchParams.set('limit', '200');
@@ -150,7 +150,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     // Also fetch accounts from Business Managers directly
     // First get user's businesses
-    const businessesUrl = new URL('https://graph.facebook.com/v18.0/me/businesses');
+    const businessesUrl = new URL('https://graph.facebook.com/v21.0/me/businesses');
     businessesUrl.searchParams.set('access_token', decryptedToken);
     businessesUrl.searchParams.set('fields', 'id,name');
     businessesUrl.searchParams.set('limit', '50');
@@ -164,7 +164,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
       // Fetch ad accounts for each business
       for (const business of businessesData.data || []) {
-        const businessAdAccountsUrl = new URL(`https://graph.facebook.com/v18.0/${business.id}/owned_ad_accounts`);
+        const businessAdAccountsUrl = new URL(`https://graph.facebook.com/v21.0/${business.id}/owned_ad_accounts`);
         businessAdAccountsUrl.searchParams.set('access_token', decryptedToken);
         businessAdAccountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
         businessAdAccountsUrl.searchParams.set('limit', '100');

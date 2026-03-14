@@ -199,7 +199,7 @@ export async function syncMetaMetrics(c: Context) {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
+    const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
     const accountInfoResponse = await fetch(accountInfoUrl);
     let accountCurrency = 'USD'; // Default to USD
 
@@ -227,7 +227,7 @@ export async function syncMetaMetrics(c: Context) {
       'purchase_roas'
     ].join(',');
 
-    const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adAccountId}/insights`);
+    const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/insights`);
     insightsUrl.searchParams.set('access_token', decryptedToken);
     insightsUrl.searchParams.set('fields', fields);
     insightsUrl.searchParams.set('time_range', JSON.stringify({

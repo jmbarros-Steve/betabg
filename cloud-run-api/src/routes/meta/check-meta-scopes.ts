@@ -61,7 +61,7 @@ export async function checkMetaScopes(c: Context) {
     }
 
     // Check permissions via Meta Graph API
-    const permUrl = `https://graph.facebook.com/v18.0/me/permissions?access_token=${encodeURIComponent(decryptedToken)}`;
+    const permUrl = `https://graph.facebook.com/v21.0/me/permissions?access_token=${encodeURIComponent(decryptedToken)}`;
     const permResponse = await fetch(permUrl);
     const permData: any = await permResponse.json();
 

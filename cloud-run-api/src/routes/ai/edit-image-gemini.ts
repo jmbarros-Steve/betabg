@@ -45,7 +45,14 @@ export async function editImageGemini(c: Context) {
       .eq('client_id', clientId)
       .maybeSingle();
 
-    const available = credits?.creditos_disponibles ?? 99999;
+    if (!credits) {
+      return c.json(
+        { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
+        402
+      );
+    }
+
+    const available = credits.creditos_disponibles ?? 0;
     if (available < creditCost) {
       return c.json({ error: 'NO_CREDITS', message: `Se necesitan ${creditCost} créditos` }, 402);
     }
@@ -274,8 +281,8 @@ export async function editImageGemini(c: Context) {
 
     // Deduct credits
     await supabase.from('client_credits').update({
-      creditos_disponibles: (credits?.creditos_disponibles || 99999) - creditCost,
-      creditos_usados: (credits?.creditos_usados || 0) + creditCost,
+      creditos_disponibles: credits.creditos_disponibles - creditCost,
+      creditos_usados: (credits.creditos_usados || 0) + creditCost,
     }).eq('client_id', clientId);
 
     await supabase.from('credit_transactions').insert({

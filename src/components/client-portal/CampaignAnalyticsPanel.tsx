@@ -938,7 +938,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground"><JargonTooltip term="CPM" label="CPM CLP" /></p>
-                                          <p className="font-medium">${(parseFloat(adSet.cpm) * CLP_RATE).toLocaleString('es-CL', {maximumFractionDigits: 0})}</p>
+                                          <p className="font-medium">{formatCurrency(parseFloat(adSet.cpm) * CLP_RATE)}</p>
                                         </div>
                                       </div>
 

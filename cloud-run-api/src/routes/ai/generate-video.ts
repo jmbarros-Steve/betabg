@@ -20,7 +20,14 @@ export async function generateVideo(c: Context) {
       .eq('client_id', clientId)
       .maybeSingle();
 
-    const available = credits?.creditos_disponibles ?? 99999;
+    if (!credits) {
+      return c.json(
+        { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
+        402
+      );
+    }
+
+    const available = credits.creditos_disponibles ?? 0;
     if (available < 10) {
       return c.json(
         { error: 'NO_CREDITS', message: 'Se necesitan 10 créditos para generar un video' },
@@ -75,8 +82,8 @@ export async function generateVideo(c: Context) {
 
     // Deduct credits immediately
     await supabase.from('client_credits').update({
-      creditos_disponibles: (credits?.creditos_disponibles || 99999) - 10,
-      creditos_usados: (credits?.creditos_usados || 0) + 10,
+      creditos_disponibles: credits.creditos_disponibles - 10,
+      creditos_usados: (credits.creditos_usados || 0) + 10,
     }).eq('client_id', clientId);
 
     await supabase.from('credit_transactions').insert({

@@ -48,7 +48,7 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Meta configuration error' }, 500);
     }
 
-    const tokenUrl = `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirect_uri)}&client_secret=${metaAppSecret}&code=${code}`;
+    const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirect_uri)}&client_secret=${metaAppSecret}&code=${code}`;
 
     console.log('Exchanging code for token...');
     const tokenResponse = await fetch(tokenUrl);
@@ -63,7 +63,7 @@ export async function metaOauthCallback(c: Context) {
     console.log('Access token obtained');
 
     // Get long-lived access token
-    const longLivedUrl = `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaAppId}&client_secret=${metaAppSecret}&fb_exchange_token=${accessToken}`;
+    const longLivedUrl = `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaAppId}&client_secret=${metaAppSecret}&fb_exchange_token=${accessToken}`;
 
     const longLivedResponse = await fetch(longLivedUrl);
     const longLivedData = await longLivedResponse.json() as any;
@@ -74,8 +74,8 @@ export async function metaOauthCallback(c: Context) {
     // Fetch businesses and ad accounts to verify access
     // We do NOT auto-select an account — the user will choose from the portfolio selector
     const [accountsResponse, businessesResponse] = await Promise.all([
-      fetch(`https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`),
-      fetch(`https://graph.facebook.com/v18.0/me/businesses?access_token=${finalToken}&fields=id,name`),
+      fetch(`https://graph.facebook.com/v21.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`),
+      fetch(`https://graph.facebook.com/v21.0/me/businesses?access_token=${finalToken}&fields=id,name`),
     ]);
 
     const accountsData = await accountsResponse.json() as any;
