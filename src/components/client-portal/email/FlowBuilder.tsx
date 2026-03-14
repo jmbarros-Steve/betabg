@@ -14,7 +14,7 @@ import {
   GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowDown,
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Eye, Bell, TrendingDown, Split,
 } from 'lucide-react';
-import { getSteveMailEditorOptions, registerSteveMailTools } from './steveMailEditorConfig';
+import { getSteveMailEditorOptions, registerSteveMailTools, type ShopifyProduct } from './steveMailEditorConfig';
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
@@ -150,6 +150,19 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const emailEditorRef = useRef<EditorRef>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [editorReady, setEditorReady] = useState(false);
+  const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
+
+  // Load Shopify products for custom tool previews
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await callApi<any>('email-product-recommendations', {
+          body: { action: 'list_products', client_id: clientId },
+        });
+        if (data?.products) setShopifyProducts(data.products);
+      } catch { /* optional */ }
+    })();
+  }, [clientId]);
 
   // Memoize Unlayer options to prevent editor re-creation on every render
   const editorOptions = useMemo(() => getSteveMailEditorOptions(), []);
@@ -445,6 +458,11 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               ref={emailEditorRef}
               onReady={() => {
                 setEditorReady(true);
+                // Register Steve custom tools
+                const editor = emailEditorRef.current?.editor;
+                if (editor) {
+                  registerSteveMailTools(editor, shopifyProducts);
+                }
                 // Load existing design
                 const step = editingFlow?.steps?.[editingStepIndex];
                 if (step?.design_json) {

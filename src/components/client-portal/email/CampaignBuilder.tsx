@@ -19,7 +19,7 @@ import {
   Send, Plus, Edit, Trash2, Clock, Play, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck, Filter,
 } from 'lucide-react';
-import { getSteveMailEditorOptions, registerSteveMailTools } from './steveMailEditorConfig';
+import { getSteveMailEditorOptions, registerSteveMailTools, type ShopifyProduct } from './steveMailEditorConfig';
 import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
@@ -106,6 +106,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
+  const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
 
   // Memoize Unlayer options to prevent editor re-creation on every render
   const editorOptions = useMemo(
@@ -157,6 +158,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         });
         if (data) setBrandInfo(data);
       } catch { /* Brand info is optional */ }
+    })();
+  }, [clientId]);
+
+  // Load Shopify products for custom tool previews
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await callApi<any>('email-product-recommendations', {
+          body: { action: 'list_products', client_id: clientId },
+        });
+        if (data?.products) setShopifyProducts(data.products);
+      } catch { /* Products are optional for editor preview */ }
     })();
   }, [clientId]);
 
@@ -807,6 +820,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   ref={emailEditorRef}
                   onReady={() => {
                     setEditorReady(true);
+                    // Register Steve custom tools (Productos, Descuento, Countdown, Boton)
+                    const editor = emailEditorRef.current?.editor;
+                    if (editor) {
+                      registerSteveMailTools(editor, shopifyProducts);
+                    }
                   }}
                   options={editorOptions}
                   style={{ height: '100%' }}
