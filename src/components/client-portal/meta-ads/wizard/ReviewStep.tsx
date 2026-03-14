@@ -1,7 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
-import { Megaphone, FolderOpen, FileImage, Target, DollarSign, Info, AlertTriangle, Calendar, Layers } from 'lucide-react';
+import { Megaphone, FolderOpen, FileImage, Target, DollarSign, Info, AlertTriangle, Calendar, Layers, CheckCircle2, XCircle, Rocket, Save, Loader2 } from 'lucide-react';
 import AdPreviewMockup from '../AdPreviewMockup';
 
 interface ReviewStepProps {
@@ -36,6 +37,11 @@ interface ReviewStepProps {
   descriptions?: string[];
   adSetFormat?: string;
   selectedAngle?: string;
+  // Actions
+  onPublish?: () => void;
+  onSaveDraft?: () => void;
+  submitting?: boolean;
+  savingDraft?: boolean;
 }
 
 const OBJECTIVE_LABELS: Record<string, string> = {
@@ -65,6 +71,7 @@ export default function ReviewStep(props: ReviewStepProps) {
     funnelStage,
     headline, primaryText, description, imageUrl, cta, destinationUrl, pageName,
     images, headlines, primaryTexts, descriptions, adSetFormat, selectedAngle,
+    onPublish, onSaveDraft, submitting, savingDraft,
   } = props;
 
   const campaignLabel = existingCampaignId ? existingCampaignName : campName;
@@ -86,15 +93,79 @@ export default function ReviewStep(props: ReviewStepProps) {
     } catch { return d; }
   };
 
+  // --- Validation checklist ---
+  const checks: Array<{ label: string; ok: boolean; step?: string }> = [
+    { label: 'Al menos 1 imagen', ok: allImages.some(Boolean), step: 'Anuncio' },
+    { label: 'Texto principal', ok: allPrimaryTexts.some((t) => t.trim()), step: 'Anuncio' },
+    { label: 'Titulo / headline', ok: allHeadlines.some((h) => h.trim()), step: 'Anuncio' },
+    { label: 'URL de destino', ok: !!destinationUrl.trim(), step: 'Anuncio' },
+    { label: 'Presupuesto definido', ok: !!budget || !!existingAdsetId, step: 'Ad Set' },
+    { label: 'Audiencia definida', ok: !!audienceDesc.trim() || !!existingAdsetId, step: 'Ad Set' },
+    { label: 'Nombre de campana', ok: !!campaignLabel?.trim(), step: 'Campana' },
+  ];
+  const allPassed = checks.every((c) => c.ok);
+  const failedChecks = checks.filter((c) => !c.ok);
+
   return (
     <div className="space-y-4">
+      {/* Readiness banner */}
+      {allPassed ? (
+        <Card className="border-green-400 bg-green-50">
+          <CardContent className="py-4 flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-green-800">Todo listo para publicar</p>
+              <p className="text-xs text-green-700">Tu campana se creara en PAUSA. No se gastara dinero hasta que la actives en Meta.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-red-300 bg-red-50">
+          <CardContent className="py-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <p className="text-sm font-bold text-red-800">Faltan datos para publicar</p>
+            </div>
+            <ul className="space-y-1 ml-7">
+              {failedChecks.map((c, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs text-red-700">
+                  <XCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{c.label}</span>
+                  {c.step && <Badge variant="outline" className="text-[9px] ml-1 border-red-300 text-red-600">{c.step}</Badge>}
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-red-600 ml-7">Vuelve al paso correspondiente para completar los datos faltantes.</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* PAUSA notice */}
       <Card className="border-blue-300 bg-blue-50">
         <CardContent className="py-3 flex items-start gap-3">
           <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
           <div className="text-sm text-blue-800">
-            <span className="font-semibold">Tu campaña se creará en PAUSA en Meta.</span>{' '}
-            Esto te permite revisarla antes de activarla. No se gastará dinero hasta que la actives manualmente.
+            <span className="font-semibold">Tu campana se creara en PAUSA en Meta.</span>{' '}
+            Esto te permite revisarla antes de activarla. No se gastara dinero hasta que la actives manualmente.
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Validation checklist */}
+      <Card>
+        <CardContent className="py-3 space-y-2">
+          <span className="text-xs font-semibold text-muted-foreground">Checklist</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+            {checks.map((c, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs py-0.5">
+                {c.ok ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                )}
+                <span className={c.ok ? 'text-muted-foreground' : 'text-red-700 font-medium'}>{c.label}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -113,7 +184,7 @@ export default function ReviewStep(props: ReviewStepProps) {
             <>
               <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0" />
               <span className="text-sm text-yellow-800">
-                Sin fecha de inicio definida — la campaña comenzará al activarla
+                Sin fecha de inicio definida — la campana comenzara al activarla
               </span>
             </>
           )}
@@ -131,7 +202,7 @@ export default function ReviewStep(props: ReviewStepProps) {
           )}
           {selectedAngle && (
             <Badge variant="outline" className="text-xs gap-1 border-indigo-400 text-indigo-700 bg-indigo-50">
-              Ángulo: {selectedAngle}
+              Angulo: {selectedAngle}
             </Badge>
           )}
         </div>
@@ -142,7 +213,7 @@ export default function ReviewStep(props: ReviewStepProps) {
         <CardContent className="py-3 space-y-2">
           <div className="flex items-center gap-2">
             <Megaphone className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold">Campaña</span>
+            <span className="text-sm font-semibold">Campana</span>
             {existingCampaignId && <Badge variant="outline" className="text-[9px]">Existente</Badge>}
             {!existingCampaignId && <Badge variant="outline" className="text-[9px] border-green-500/30 text-green-700">Nueva</Badge>}
           </div>
@@ -195,7 +266,7 @@ export default function ReviewStep(props: ReviewStepProps) {
           <CardContent className="py-3 flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-green-500" />
             <span className="text-xs font-medium">
-              {budget ? `$${Number(budget).toLocaleString('es-CL')}/día` : 'Sin definir'}
+              {budget ? `$${Number(budget).toLocaleString('es-CL')}/dia` : 'Sin definir'}
             </span>
           </CardContent>
         </Card>
@@ -217,7 +288,7 @@ export default function ReviewStep(props: ReviewStepProps) {
           {/* Images grid */}
           {allImages.filter(Boolean).length > 1 ? (
             <div className="space-y-3 mb-4">
-              <span className="text-xs font-medium text-muted-foreground">Imágenes ({allImages.filter(Boolean).length})</span>
+              <span className="text-xs font-medium text-muted-foreground">Imagenes ({allImages.filter(Boolean).length})</span>
               <div className="grid grid-cols-3 gap-2">
                 {allImages.filter(Boolean).map((img, i) => (
                   <div key={i} className="space-y-1">
@@ -247,10 +318,10 @@ export default function ReviewStep(props: ReviewStepProps) {
           {/* Headlines list */}
           {allHeadlines.filter(Boolean).length > 1 && (
             <div className="space-y-2 mb-4">
-              <span className="text-xs font-medium text-muted-foreground">Títulos ({allHeadlines.filter(Boolean).length})</span>
+              <span className="text-xs font-medium text-muted-foreground">Titulos ({allHeadlines.filter(Boolean).length})</span>
               {allHeadlines.filter(Boolean).map((h, i) => (
                 <div key={i} className="bg-muted/50 rounded-md p-2 text-xs">
-                  <span className="text-muted-foreground font-medium">Título {i + 1}:</span> {h}
+                  <span className="text-muted-foreground font-medium">Titulo {i + 1}:</span> {h}
                 </div>
               ))}
             </div>
@@ -280,6 +351,44 @@ export default function ReviewStep(props: ReviewStepProps) {
               destinationUrl={destinationUrl}
             />
           </div>
+        </div>
+      )}
+
+      {/* Publish / Draft action buttons */}
+      {(onPublish || onSaveDraft) && (
+        <div className="pt-2 space-y-3">
+          <div className="border-t pt-4" />
+          {onPublish && (
+            <Button
+              onClick={onPublish}
+              disabled={!allPassed || submitting}
+              size="lg"
+              className="w-full bg-green-600 hover:bg-green-700 text-white text-base font-bold py-6 disabled:opacity-50"
+            >
+              {submitting ? (
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Creando campana en Meta...</>
+              ) : !allPassed ? (
+                <>Completa los datos faltantes para publicar</>
+              ) : (
+                <><Rocket className="w-5 h-5 mr-2" />Publicar Campana en Meta</>
+              )}
+            </Button>
+          )}
+          {onSaveDraft && (
+            <Button
+              variant="outline"
+              onClick={onSaveDraft}
+              disabled={savingDraft}
+              size="lg"
+              className="w-full"
+            >
+              {savingDraft ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando borrador...</>
+              ) : (
+                <><Save className="w-4 h-4 mr-2" />Guardar como Borrador</>
+              )}
+            </Button>
+          )}
         </div>
       )}
     </div>

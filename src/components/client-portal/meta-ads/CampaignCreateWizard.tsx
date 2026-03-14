@@ -1404,7 +1404,25 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   };
 
   const goNext = () => {
-    if (stepIndex < steps.length - 1) setStepIndex(stepIndex + 1);
+    if (stepIndex >= steps.length - 1) return;
+
+    // Validate BEFORE transitioning to review step
+    const nextStep = steps[stepIndex + 1]?.key;
+    if (nextStep === 'review') {
+      const issues: string[] = [];
+      if (!images.some(Boolean)) issues.push('Agrega al menos 1 imagen para el anuncio');
+      if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) issues.push('Genera o escribe el copy (texto + título)');
+      if (!destinationUrl.trim()) issues.push('Agrega la URL de destino');
+      const hasBudget = budgetType === 'CBO' ? !!campBudget : !!adsetBudget;
+      if (!hasBudget && !existingAdsetId) issues.push('Define el presupuesto diario');
+      if (!audienceDesc.trim() && !existingAdsetId) issues.push('Describe la audiencia / segmento');
+      if (issues.length > 0) {
+        issues.forEach((msg) => toast.error(msg));
+        return;
+      }
+    }
+
+    setStepIndex(stepIndex + 1);
   };
   const goPrev = () => {
     if (stepIndex > 0) setStepIndex(stepIndex - 1);
@@ -1536,11 +1554,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Auto-generate copy + AI image when entering ad-creative step
   const autoGenRef = useRef(false);
   useEffect(() => {
-    if (currentStep !== 'ad-creative') {
-      autoGenRef.current = false;
-      return;
-    }
+    if (currentStep !== 'ad-creative') return; // Don't reset autoGenRef on leave — preserve generated content
     if (autoGenRef.current) return;
+    // Skip auto-generation if content already exists (user went back and returned)
+    const hasExistingContent = primaryTexts.some((t) => t.trim()) || headlines.some((h) => h.trim()) || images.some(Boolean);
+    if (hasExistingContent) { autoGenRef.current = true; return; }
     autoGenRef.current = true;
 
     // Auto-generate copy first, then use it to generate a proper image via brief-visual
@@ -2120,6 +2138,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   descriptions={descriptions}
                   adSetFormat={adSetFormat}
                   selectedAngle={selectedAngle}
+                  onPublish={handleSubmit}
+                  onSaveDraft={handleSaveDraft}
+                  submitting={submitting}
+                  savingDraft={savingDraft}
                 />
               )}
             </CardContent>

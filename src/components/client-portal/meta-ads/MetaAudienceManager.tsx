@@ -437,6 +437,8 @@ function CreateCustomAudienceDialog({
   setFormData,
   onSubmit,
   submitting,
+  pixelId,
+  shopDomain,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -444,6 +446,8 @@ function CreateCustomAudienceDialog({
   setFormData: React.Dispatch<React.SetStateAction<CustomAudienceFormData>>;
   onSubmit: () => void;
   submitting: boolean;
+  pixelId: string | null;
+  shopDomain: string | null;
 }) {
   const SourceIcon = SOURCE_ICONS[formData.source];
 
@@ -539,59 +543,82 @@ function CreateCustomAudienceDialog({
             {/* WEBSITE (Pixel) */}
             {formData.source === 'WEBSITE' && (
               <>
-                <div>
-                  <Label>Regla de URL</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Select
-                      value={formData.url_match_type}
-                      onValueChange={(v) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          url_match_type: v as 'CONTAINS' | 'EQUALS' | 'STARTS_WITH',
-                        }))
-                      }
-                    >
-                      <SelectTrigger className="w-[160px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CONTAINS">Contiene</SelectItem>
-                        <SelectItem value="EQUALS">Es igual a</SelectItem>
-                        <SelectItem value="STARTS_WITH">Empieza con</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={formData.url_rule}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, url_rule: e.target.value }))
-                      }
-                      placeholder="Ej: /productos, /checkout/success"
-                      className="flex-1"
-                    />
+                {!pixelId ? (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                    <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-700">Conecta tu Pixel primero</p>
+                      <p className="text-xs text-yellow-600 mt-1">
+                        Para crear audiencias basadas en tráfico web necesitas tener un Meta Pixel conectado.
+                        Ve a la sección de Pixel para configurarlo.
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <Label>Días de retención (1-180)</Label>
-                  <div className="flex items-center gap-4 mt-2">
-                    <Slider
-                      value={[formData.retention_days]}
-                      onValueChange={([val]) =>
-                        setFormData((prev) => ({ ...prev, retention_days: val }))
-                      }
-                      min={1}
-                      max={180}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="text-sm font-medium w-16 text-right">
-                      {formData.retention_days} días
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Incluir visitantes de los últimos {formData.retention_days} día
-                    {formData.retention_days !== 1 ? 's' : ''}.
-                  </p>
-                </div>
+                ) : (
+                  <>
+                    {shopDomain && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <Info className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                        <p className="text-xs text-green-700">
+                          Pixel conectado con tu tienda <strong>{shopDomain}</strong>. El dominio se usará automáticamente.
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <Label>Filtro de URL <span className="text-muted-foreground font-normal">(opcional — deja vacío para todo el sitio)</span></Label>
+                      <div className="flex gap-2 mt-1">
+                        <Select
+                          value={formData.url_match_type}
+                          onValueChange={(v) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              url_match_type: v as 'CONTAINS' | 'EQUALS' | 'STARTS_WITH',
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CONTAINS">Contiene</SelectItem>
+                            <SelectItem value="EQUALS">Es igual a</SelectItem>
+                            <SelectItem value="STARTS_WITH">Empieza con</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={formData.url_rule}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, url_rule: e.target.value }))
+                          }
+                          placeholder="Ej: /productos, /checkout (vacío = todo el sitio)"
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Días de retención (1-180)</Label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <Slider
+                          value={[formData.retention_days]}
+                          onValueChange={([val]) =>
+                            setFormData((prev) => ({ ...prev, retention_days: val }))
+                          }
+                          min={1}
+                          max={180}
+                          step={1}
+                          className="flex-1"
+                        />
+                        <span className="text-sm font-medium w-16 text-right">
+                          {formData.retention_days} días
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Incluir visitantes de los últimos {formData.retention_days} día
+                        {formData.retention_days !== 1 ? 's' : ''}.
+                      </p>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -774,7 +801,7 @@ function CreateCustomAudienceDialog({
           >
             Cancelar
           </Button>
-          <Button onClick={onSubmit} disabled={submitting}>
+          <Button onClick={onSubmit} disabled={submitting || (formData.source === 'WEBSITE' && !pixelId)}>
             {submitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -960,7 +987,7 @@ function CreateLookalikeDialog({
 // ---------------------------------------------------------------------------
 
 export default function MetaAudienceManager({ clientId }: MetaAudienceManagerProps) {
-  const { connectionId: ctxConnectionId, lastSyncAt } = useMetaBusiness();
+  const { connectionId: ctxConnectionId, lastSyncAt, pixelId } = useMetaBusiness();
 
   // State
   const [audiences, setAudiences] = useState<AudienceRow[]>([]);
@@ -973,6 +1000,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   const [metaConnectionId, setMetaConnectionId] = useState<string | null>(null);
   const [hasShopify, setHasShopify] = useState(false);
   const [hasKlaviyo, setHasKlaviyo] = useState(false);
+  const [shopDomain, setShopDomain] = useState<string | null>(null);
 
   // Dialogs
   const [createCustomOpen, setCreateCustomOpen] = useState(false);
@@ -1095,12 +1123,19 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     try {
       // Use connectionId from MetaBusinessContext for Meta
       // Still check Shopify/Klaviyo connections from DB
-      const { data: otherConns } = await supabase
-        .from('platform_connections')
-        .select('id, platform, is_active')
-        .eq('client_id', clientId)
-        .eq('is_active', true)
-        .in('platform', ['shopify', 'klaviyo']);
+      const [{ data: otherConns }, { data: clientData }] = await Promise.all([
+        supabase
+          .from('platform_connections')
+          .select('id, platform, is_active')
+          .eq('client_id', clientId)
+          .eq('is_active', true)
+          .in('platform', ['shopify', 'klaviyo']),
+        supabase
+          .from('clients')
+          .select('shop_domain')
+          .eq('id', clientId)
+          .single(),
+      ]);
 
       const shopifyConns = (otherConns || []).filter((c) => c.platform === 'shopify');
       const klaviyoConns = (otherConns || []).filter((c) => c.platform === 'klaviyo');
@@ -1109,6 +1144,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       setMetaConnectionId(ctxConnectionId);
       setHasShopify(shopifyConns.length > 0);
       setHasKlaviyo(klaviyoConns.length > 0);
+      setShopDomain(clientData?.shop_domain || null);
 
       if (!ctxConnectionId) {
         setAudiences([]);
@@ -1181,8 +1217,8 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       return;
     }
 
-    if (customForm.source === 'WEBSITE' && !customForm.url_rule.trim()) {
-      toast.error('Ingresa una regla de URL para el pixel');
+    if (customForm.source === 'WEBSITE' && !pixelId) {
+      toast.error('Necesitas un Meta Pixel conectado para crear audiencias de sitio web');
       return;
     }
 
@@ -1201,20 +1237,25 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       };
 
       if (customForm.source === 'WEBSITE') {
+        // If url_rule is empty, use the shopDomain (whole site) or fallback to '/'
+        const urlValue = customForm.url_rule.trim() || shopDomain || '/';
+        const urlOperator = customForm.url_rule.trim()
+          ? (customForm.url_match_type === 'CONTAINS' ? 'i_contains'
+            : customForm.url_match_type === 'STARTS_WITH' ? 'i_starts_with'
+            : 'eq')
+          : 'i_contains';
         data.rule = {
           inclusions: {
             operator: 'or',
             rules: [{
-              event_sources: [{ type: 'pixel' }],
+              event_sources: [{ type: 'pixel', id: pixelId }],
               retention_seconds: customForm.retention_days * 86400,
               filter: {
                 operator: 'and',
                 filters: [{
                   field: 'url',
-                  operator: customForm.url_match_type === 'CONTAINS' ? 'i_contains'
-                    : customForm.url_match_type === 'STARTS_WITH' ? 'i_starts_with'
-                    : 'eq',
-                  value: customForm.url_rule,
+                  operator: urlOperator,
+                  value: urlValue,
                 }],
               },
             }],
@@ -1721,6 +1762,8 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         setFormData={setCustomForm}
         onSubmit={handleCreateCustomAudience}
         submitting={formSubmitting}
+        pixelId={pixelId}
+        shopDomain={shopDomain}
       />
 
       {/* ================================================================= */}
