@@ -1,6 +1,33 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+// Currency conversion — same logic as sync-shopify-metrics
+const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
+const FALLBACK_RATES: Record<string, number> = { CLP: 950, MXN: 17.5, EUR: 0.92, GBP: 0.79 };
+let cachedRates: Record<string, number> | null = null;
+
+async function getExchangeRates(): Promise<Record<string, number>> {
+  try {
+    const response = await fetch(EXCHANGE_RATE_API_URL);
+    const data: any = await response.json();
+    return data.rates || FALLBACK_RATES;
+  } catch {
+    console.error('[fetch-shopify-analytics] Failed to fetch exchange rates, using fallback');
+    return FALLBACK_RATES;
+  }
+}
+
+async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
+  const currency = fromCurrency.toUpperCase();
+  if (currency === 'CLP') return amount;
+  if (!cachedRates) cachedRates = await getExchangeRates();
+  const rates = cachedRates;
+  if (currency === 'USD') return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
+  const fromRate = rates[currency] || 1;
+  const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
+  return (amount / fromRate) * clpRate;
+}
+
 export async function fetchShopifyAnalytics(c: Context) {
   try {
     const serviceClient = getSupabaseAdmin();
@@ -158,7 +185,9 @@ export async function fetchShopifyAnalytics(c: Context) {
       const fs = order.financial_status || '';
       if (fs === 'refunded' || fs === 'voided' || fs === 'cancelled') continue;
 
-      const orderRevenue = parseFloat(order.total_price || '0');
+      const rawRevenue = parseFloat(order.total_price || '0');
+      const orderCurrency = order.currency || 'CLP';
+      const orderRevenue = await convertToCLP(rawRevenue, orderCurrency);
       totalRevenue += orderRevenue;
 
       // Daily breakdown for charts
@@ -175,7 +204,7 @@ export async function fetchShopifyAnalytics(c: Context) {
         const sku = item.sku || item.variant_title || `ID-${item.variant_id || item.product_id}`;
         const existing = skuMap.get(sku) || { sku, name: item.title || item.name || sku, quantity: 0, revenue: 0 };
         existing.quantity += item.quantity || 0;
-        existing.revenue += parseFloat(item.price || '0') * (item.quantity || 0);
+        existing.revenue += await convertToCLP(parseFloat(item.price || '0') * (item.quantity || 0), orderCurrency);
         skuMap.set(sku, existing);
       }
 
@@ -296,9 +325,12 @@ export async function fetchShopifyAnalytics(c: Context) {
 
     console.log(`[fetch-shopify-analytics] Fetched ${checkouts.length} abandoned checkouts (paginated)`);
 
-    abandonedCarts = checkouts.map((c: any) => {
+    const abandonedCartsPromises = checkouts.map(async (c: any) => {
       const email = c.email || c.customer?.email || '';
       if (email) checkoutCustomerEmails.add(email.toLowerCase());
+      const checkoutCurrency = c.currency || c.presentment_currency || 'CLP';
+      const rawTotal = parseFloat(c.total_price || '0');
+      const totalValueCLP = await convertToCLP(rawTotal, checkoutCurrency);
       return {
         id: String(c.id),
         customerEmail: email,
@@ -306,18 +338,19 @@ export async function fetchShopifyAnalytics(c: Context) {
           ? `${c.customer.first_name || ''} ${c.customer.last_name || ''}`.trim()
           : (c.email || 'Sin nombre'),
         phone: c.shipping_address?.phone || c.billing_address?.phone || c.customer?.phone || null,
-        totalValue: parseFloat(c.total_price || '0'),
+        totalValue: totalValueCLP,
         itemCount: (c.line_items || []).reduce((sum: number, li: any) => sum + (li.quantity || 0), 0),
-        lineItems: (c.line_items || []).map((li: any) => ({
+        lineItems: await Promise.all((c.line_items || []).map(async (li: any) => ({
           title: li.title || '',
           quantity: li.quantity || 1,
-          price: parseFloat(li.price || '0'),
+          price: await convertToCLP(parseFloat(li.price || '0'), checkoutCurrency),
           variantTitle: li.variant_title || '',
-        })),
+        }))),
         abandonedAt: c.created_at,
         contacted: false,
       };
     });
+    abandonedCarts = await Promise.all(abandonedCartsPromises);
 
     // --- REAL CONVERSION RATE (checkout → purchase) ---
     // Completed orders / (completed orders + abandoned checkouts) as checkout-to-purchase ratio
