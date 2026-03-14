@@ -297,9 +297,15 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     }
   }
 
-  // Open Meta Ad Library for a given search query
-  function openAdLibrary(query: string) {
-    const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(query)}`;
+  // Open Meta Ad Library — use page_id when available for accurate results
+  function openAdLibrary(query: string, pageId?: string | null) {
+    let url: string;
+    if (pageId) {
+      // Direct link to the page's ads — much more accurate than text search
+      url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&view_all_page_id=${pageId}`;
+    } else {
+      url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(query)}`;
+    }
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
@@ -444,7 +450,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                 </div>
                 {handle.trim() && (
                   <button
-                    onClick={() => openAdLibrary(handle.trim())}
+                    onClick={() => {
+                      const t = tracking.find(tr => tr.ig_handle === handle.trim());
+                      openAdLibrary(handle.trim(), t?.meta_page_id);
+                    }}
                     className="text-xs text-primary hover:underline flex items-center gap-1"
                   >
                     <ExternalLink className="h-3 w-3" />
@@ -720,7 +729,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                       </a>
                     )}
                     <button
-                      onClick={() => openAdLibrary(getTrackingHandle(ad.tracking_id))}
+                      onClick={() => {
+                        const t = tracking.find(tr => tr.id === ad.tracking_id);
+                        openAdLibrary(t?.ig_handle || '', t?.meta_page_id);
+                      }}
                       className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       <Search className="h-3 w-3" />
@@ -773,7 +785,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                   key={t.id}
                   variant="outline"
                   size="sm"
-                  onClick={() => openAdLibrary(t.ig_handle)}
+                  onClick={() => openAdLibrary(t.ig_handle, t.meta_page_id)}
                   className="text-xs gap-1"
                 >
                   <ExternalLink className="h-3 w-3" />

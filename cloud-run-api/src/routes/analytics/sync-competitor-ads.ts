@@ -162,7 +162,8 @@ export async function syncCompetitorAds(c: Context) {
           url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);
           url.searchParams.set('ad_active_status', 'ALL');
           url.searchParams.set('fields', AD_LIBRARY_FIELDS);
-          url.searchParams.set('limit', '25');
+          // Use higher limit when querying by page_id (more relevant results)
+          url.searchParams.set('limit', params.search_page_ids ? '50' : '25');
           for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
           console.log(`[sync-competitor-ads] Ad Library query:`, url.toString().replace(accessToken, '***'));
@@ -248,7 +249,8 @@ export async function syncCompetitorAds(c: Context) {
           }
         }
 
-        // Strategy 3: Fallback to search_terms with variations
+        // Strategy 3: Fallback — use search_terms to DISCOVER the page_id, then
+        // re-query with search_page_ids to get only THEIR ads (not ads that mention them)
         if (ads.length === 0 && !results.find(r => r.handle === handle)) {
           const searchVariations = [
             handle,
@@ -257,15 +259,88 @@ export async function syncCompetitorAds(c: Context) {
           const uniqueSearches = [...new Set(searchVariations)];
 
           for (const term of uniqueSearches) {
-            console.log(`[sync-competitor-ads] ${handle}: Fallback search_terms="${term}"`);
+            console.log(`[sync-competitor-ads] ${handle}: Discovery search_terms="${term}" to find page_id`);
             const result = await fetchAdLibrary({ search_terms: term });
             if (result.error) {
               results.push({ handle, ads_found: 0, status: result.error });
               break;
             }
             if (result.ads.length > 0) {
-              ads = result.ads;
-              searchMethod = `search_terms:${term}`;
+              // Look for the best matching page among results
+              const termLower = term.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const handleLower = handle.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+              // Count ads per page_id and find the best match
+              const pageAdCounts: Record<string, { count: number; name: string; id: string }> = {};
+              for (const ad of result.ads) {
+                if (ad.page_id && ad.page_name) {
+                  if (!pageAdCounts[ad.page_id]) {
+                    pageAdCounts[ad.page_id] = { count: 0, name: ad.page_name, id: ad.page_id };
+                  }
+                  pageAdCounts[ad.page_id].count++;
+                }
+              }
+
+              // Score pages: prefer name match over count
+              let bestPage: { id: string; name: string; score: number } | null = null;
+              for (const [pageId, info] of Object.entries(pageAdCounts)) {
+                const nameLower = info.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                let score = 0;
+                // Exact match
+                if (nameLower === termLower || nameLower === handleLower) score = 100;
+                // Name contains search term or vice versa
+                else if (nameLower.includes(termLower) || termLower.includes(nameLower)) score = 80;
+                else if (nameLower.includes(handleLower) || handleLower.includes(nameLower)) score = 70;
+                // Partial word match
+                else {
+                  const termWords = term.toLowerCase().split(/[\s_-]+/);
+                  const nameWords = info.name.toLowerCase().split(/[\s_-]+/);
+                  const matchingWords = termWords.filter(tw => nameWords.some(nw => nw.includes(tw) || tw.includes(nw)));
+                  if (matchingWords.length > 0) score = 30 + (matchingWords.length / termWords.length) * 30;
+                }
+                // Tiebreak by ad count
+                score += Math.min(info.count, 10) * 0.1;
+
+                if (!bestPage || score > bestPage.score) {
+                  bestPage = { id: pageId, name: info.name, score };
+                }
+              }
+
+              if (bestPage && bestPage.score >= 30) {
+                console.log(`[sync-competitor-ads] ${handle}: Discovered page "${bestPage.name}" (${bestPage.id}) score=${bestPage.score} via search_terms, re-querying with search_page_ids`);
+                resolvedPageId = bestPage.id;
+                resolvedPageName = bestPage.name;
+
+                // Re-query using search_page_ids to get ONLY their ads
+                const pageResult = await fetchAdLibrary({ search_page_ids: bestPage.id });
+                if (pageResult.error) {
+                  results.push({ handle, ads_found: 0, status: pageResult.error });
+                  break;
+                }
+                ads = pageResult.ads;
+                searchMethod = `discovered_page_id:${bestPage.name}`;
+              } else {
+                // No good page match — filter results to only ads FROM pages whose name matches
+                console.log(`[sync-competitor-ads] ${handle}: No strong page match found, filtering search_terms results by page_name similarity`);
+                const filtered = result.ads.filter(ad => {
+                  if (!ad.page_name) return false;
+                  const adPageLower = ad.page_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  return adPageLower.includes(termLower) || termLower.includes(adPageLower)
+                    || adPageLower.includes(handleLower) || handleLower.includes(adPageLower);
+                });
+                if (filtered.length > 0) {
+                  ads = filtered;
+                  searchMethod = `search_terms_filtered:${term}`;
+                  // Cache the page_id from the first filtered result
+                  if (filtered[0].page_id) {
+                    resolvedPageId = filtered[0].page_id;
+                    resolvedPageName = filtered[0].page_name || '';
+                  }
+                } else {
+                  console.log(`[sync-competitor-ads] ${handle}: search_terms returned ${result.ads.length} ads but none matched page name. Skipping to avoid showing irrelevant ads.`);
+                  // Do NOT use these ads — they are ads that MENTION the competitor, not BY the competitor
+                }
+              }
               break;
             }
           }
@@ -290,7 +365,17 @@ export async function syncCompetitorAds(c: Context) {
           .update(updateData)
           .eq('id', tracking.id);
 
-        // Step 3: Upsert ads
+        // Step 3: Clear old ads and insert fresh ones (removes stale "mentioned" ads from previous bad syncs)
+        if (ads.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('competitor_ads')
+            .delete()
+            .eq('tracking_id', tracking.id);
+          if (deleteError) {
+            console.error(`[sync-competitor-ads] Delete old ads for ${handle}:`, deleteError);
+          }
+        }
+
         const adsToUpsert = ads.map((ad) => {
           const startDate = ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time) : null;
           const endDate = ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : null;
