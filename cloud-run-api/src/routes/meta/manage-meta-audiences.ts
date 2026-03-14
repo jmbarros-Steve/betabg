@@ -80,6 +80,8 @@ async function handleCreateCustom(
     rule,
     customer_file_source,
     retention_days = 180,
+    pixel_id,
+    engagement_type,
   } = data;
 
   if (!name) {
@@ -92,12 +94,49 @@ async function handleCreateCustom(
     name,
     subtype,
     description,
-    retention_days,
   };
 
-  // Add rule for website/engagement audiences
+  // Add rule for website audiences (rule built by frontend with pixel_id embedded)
   if (rule) {
     payload.rule = typeof rule === 'object' ? JSON.stringify(rule) : rule;
+  }
+
+  // For website audiences, pixel_id must also be sent as a top-level param
+  if (source_type === 'website' && pixel_id) {
+    payload.pixel_id = pixel_id;
+  }
+
+  // For website/engagement/app_activity, set retention_days at top level
+  if (source_type === 'website' || source_type === 'engagement' || source_type === 'app_activity') {
+    payload.retention_days = retention_days;
+  }
+
+  // Build rule for engagement audiences if not already provided
+  if (source_type === 'engagement' && !rule) {
+    const engagementRules: Record<string, any> = {
+      PAGE: {
+        inclusions: {
+          operator: 'or',
+          rules: [{ event_sources: [{ type: 'page', id: `act_${accountId}` }], retention_seconds: retention_days * 86400 }],
+        },
+      },
+      INSTAGRAM: {
+        inclusions: {
+          operator: 'or',
+          rules: [{ event_sources: [{ type: 'ig_business', id: `act_${accountId}` }], retention_seconds: retention_days * 86400 }],
+        },
+      },
+      VIDEO: {
+        inclusions: {
+          operator: 'or',
+          rules: [{ event_sources: [{ type: 'page', id: `act_${accountId}` }], retention_seconds: retention_days * 86400, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'video_watched' }] } }],
+        },
+      },
+    };
+    const engRule = engagementRules[engagement_type || 'PAGE'];
+    if (engRule) {
+      payload.rule = JSON.stringify(engRule);
+    }
   }
 
   // Add customer_file_source for customer list audiences

@@ -37,9 +37,12 @@ export async function callApi<T = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      // Include details from backend if available (e.g. Meta API error messages)
+      const errorMsg = errorData.error || `Error ${response.status}`;
+      const details = errorData.details ? `: ${errorData.details}` : '';
       return {
         data: null,
-        error: errorData.error || `Error ${response.status}`,
+        error: `${errorMsg}${details}`,
       };
     }
 

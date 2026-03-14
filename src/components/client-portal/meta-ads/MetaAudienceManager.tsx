@@ -1280,6 +1280,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
             }],
           },
         };
+        data.pixel_id = pixelId;
         data.retention_days = customForm.retention_days;
       } else if (customForm.source === 'CUSTOMER_LIST') {
         data.customer_file_source = customForm.customer_list_source === 'CSV'
@@ -1293,7 +1294,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         data.retention_days = customForm.app_activity_days;
       }
 
-      const { error } = await callApi('manage-meta-audiences', {
+      const { data: responseData, error } = await callApi('manage-meta-audiences', {
         body: {
           action: 'create_custom',
           connection_id: metaConnectionId,
@@ -1301,13 +1302,23 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const details = typeof error === 'string' ? error : (error as any)?.message || 'Error desconocido';
+        toast.error(`Error al crear audiencia: ${details}`);
+        return;
+      }
+
+      if (responseData && !responseData.success) {
+        const details = responseData.details || responseData.error || 'Error desconocido de Meta';
+        toast.error(`Meta rechazó la audiencia: ${details}`);
+        return;
+      }
 
       toast.success(`Audiencia "${customForm.name}" creada exitosamente`);
 
-      // Optimistic add
+      // Optimistic add — use real ID from Meta if available
       const newAudience: AudienceRow = {
-        id: crypto.randomUUID(),
+        id: responseData?.audience_id || crypto.randomUUID(),
         name: customForm.name.trim(),
         type: 'custom',
         size: 0,
@@ -1322,9 +1333,10 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
       setCreateCustomOpen(false);
       setCustomForm({ ...EMPTY_CUSTOM_FORM });
-    } catch (err) {
+    } catch (err: any) {
       // Create custom audience error handled via toast
-      toast.error('Error al crear audiencia personalizada');
+      const msg = err?.message || err?.toString?.() || 'Error desconocido';
+      toast.error(`Error al crear audiencia: ${msg}`);
     } finally {
       setFormSubmitting(false);
     }
@@ -1351,7 +1363,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         lookalikeForm.country;
       const lookName = `Lookalike ${lookalikeForm.lookalike_percent}% - ${sourceAudience?.name || 'Origen'} (${countryLabel})`;
 
-      const { error } = await callApi('manage-meta-audiences', {
+      const { data: responseData, error } = await callApi('manage-meta-audiences', {
         body: {
           action: 'create_lookalike',
           connection_id: metaConnectionId,
@@ -1364,17 +1376,27 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const details = typeof error === 'string' ? error : (error as any)?.message || 'Error desconocido';
+        toast.error(`Error al crear lookalike: ${details}`);
+        return;
+      }
+
+      if (responseData && !responseData.success) {
+        const details = responseData.details || responseData.error || 'Error desconocido de Meta';
+        toast.error(`Meta rechazó la audiencia: ${details}`);
+        return;
+      }
 
       toast.success(`Audiencia similar "${lookName}" creada exitosamente`);
 
-      // Optimistic add
+      // Optimistic add — use real ID from Meta if available
       const reach = estimateReach(
         lookalikeForm.country,
         lookalikeForm.lookalike_percent,
       );
       const newAudience: AudienceRow = {
-        id: crypto.randomUUID(),
+        id: responseData?.audience_id || crypto.randomUUID(),
         name: lookName,
         type: 'lookalike',
         size: Math.round((reach.min + reach.max) / 2),
@@ -1390,9 +1412,10 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       setCreateLookalikeOpen(false);
       setLookalikeForm({ ...EMPTY_LOOKALIKE_FORM });
       setActiveTab('lookalike');
-    } catch (err) {
+    } catch (err: any) {
       // Create lookalike error handled via toast
-      toast.error('Error al crear audiencia similar');
+      const msg = err?.message || err?.toString?.() || 'Error desconocido';
+      toast.error(`Error al crear audiencia similar: ${msg}`);
     } finally {
       setFormSubmitting(false);
     }
@@ -1425,14 +1448,19 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const details = typeof error === 'string' ? error : (error as any)?.message || 'Error desconocido';
+        toast.error(`Error al eliminar audiencia: ${details}`);
+        return;
+      }
 
       setAudiences((prev) => prev.filter((a) => a.id !== deleteTarget.id));
       toast.success(`Audiencia "${deleteTarget.name}" eliminada`);
       setDeleteTarget(null);
-    } catch (err) {
+    } catch (err: any) {
       // Delete error handled via toast
-      toast.error('Error al eliminar audiencia');
+      const msg = err?.message || err?.toString?.() || 'Error desconocido';
+      toast.error(`Error al eliminar audiencia: ${msg}`);
     } finally {
       setDeleting(false);
     }
