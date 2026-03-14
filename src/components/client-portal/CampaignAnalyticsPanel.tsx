@@ -140,6 +140,9 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
 
+  // Rules from Meta Wizard (meta_automated_rules)
+  const [automatedRules, setAutomatedRules] = useState<any[]>([]);
+
   const daysFromRange = (range: string): number => {
     const map: Record<string, number> = { '7d': 7, '14d': 14, '30d': 30, '60d': 60, '90d': 90 };
     return map[range] || 30;
@@ -147,6 +150,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   useEffect(() => {
     fetchConnections();
+    fetchAutomatedRules();
   }, [clientId]);
 
   useEffect(() => {
@@ -155,6 +159,19 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       fetchRecommendations();
     }
   }, [connections, selectedConnection, dateRange]);
+
+  async function fetchAutomatedRules() {
+    try {
+      const { data } = await supabase
+        .from('meta_automated_rules')
+        .select('name, condition, action, is_active')
+        .eq('client_id', clientId)
+        .eq('is_active', true);
+      setAutomatedRules(data || []);
+    } catch {
+      // Rules unavailable — use defaults
+    }
+  }
 
   async function fetchConnections() {
     try {
@@ -403,13 +420,29 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const overallRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const overallCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
 
+  // Extract scale % and CPA max from automated rules (Wizard config)
+  const scalePercent = useMemo(() => {
+    const scaleRule = automatedRules.find(r =>
+      r.action?.type === 'INCREASE_BUDGET' && r.action?.percentage
+    );
+    return scaleRule?.action?.percentage || 20; // fallback 20% if no rule configured
+  }, [automatedRules]);
+
+  const maxCpaFromRules = useMemo(() => {
+    const cpaRule = automatedRules.find(r =>
+      r.condition?.metric === 'CPA' && r.condition?.operator === 'GREATER_THAN' && r.condition?.value
+    );
+    // Rules store CPA in CLP — convert to USD for semaphore (which uses USD internally)
+    return cpaRule ? cpaRule.condition.value / 950 : null;
+  }, [automatedRules]);
+
   // Charlie semaphore for ad sets
   const CLP_RATE = 950; // approximate USD -> CLP
-  const getAdSetSemaphore = (adSet: AdSet, maxCpaUsd?: number) => {
+  const getAdSetSemaphore = (adSet: AdSet) => {
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
     const cpa = conversions > 0 ? spend / conversions : null;
-    const maxCpa = maxCpaUsd || 50; // fallback $50 USD
+    const maxCpa = maxCpaFromRules || 50; // from Wizard rules, fallback $50 USD
     const isPaused = adSet.status?.toUpperCase() === 'PAUSED';
 
     // If no data at all, show nodata regardless of status
@@ -430,7 +463,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   };
 
   // Build human-readable explanation for each semaphore state
-  const getAdSetExplanation = (adSet: AdSet, semKey: keyof typeof semaphoreConfig, maxCpaUsd = 50): string => {
+  const getAdSetExplanation = (adSet: AdSet, semKey: keyof typeof semaphoreConfig): string => {
+    const maxCpaUsd = maxCpaFromRules || 50;
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
     const cpa = conversions > 0 ? spend : null;
@@ -450,7 +484,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       case 'learning':
         return `Meta está optimizando este Ad Set. Espera al menos 7 días antes de tomar decisiones — pausar antes destruye el aprendizaje del algoritmo.`;
       case 'good':
-        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp) : '—'} por venta (dentro de tu objetivo). Se puede escalar.`;
+        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp) : '—'} por venta (dentro de tu objetivo). Se puede escalar +${scalePercent}%.`;
       case 'nodata':
         return `Sin datos suficientes para evaluar. Verifica que esté activo en Meta Ads Manager y que tenga presupuesto asignado.`;
       default:
@@ -487,13 +521,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           return updated;
         });
       } else {
-        // Scale: increase budget by 20%
+        // Scale: increase budget by configured percentage from Wizard rules
         const { error } = await callApi('meta-adset-action', {
-          body: { connection_id: connection.id, adset_id: adSetId, action: 'scale', scale_percent: 20 }
+          body: { connection_id: connection.id, adset_id: adSetId, action: 'scale', scale_percent: scalePercent }
         });
         if (error) throw new Error(error);
-        toast.success(`Ad Set "${adSetName}" escalado +20% en Meta`);
-        setCharlieActionSuccess(`Presupuesto de "${adSetName}" aumentado 20% en Meta.`);
+        toast.success(`Ad Set "${adSetName}" escalado +${scalePercent}% en Meta`);
+        setCharlieActionSuccess(`Presupuesto de "${adSetName}" aumentado ${scalePercent}% en Meta.`);
       }
     } catch (err: any) {
       toast.error(`Error al ejecutar acción: ${err?.message || 'Error desconocido'}`);
@@ -1035,7 +1069,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                               type: 'scale', adSetName: adSet.name, adSetId: adSet.id,
                                               spend: parseFloat(adSet.spend) || 0, daysActive: 8
                                             })}>
-                                            📈 Aprobar escalado 20%
+                                            📈 Aprobar escalado +{scalePercent}%
                                           </Button>
                                         )}
                                         {semKey === 'good' && adSet.status?.toUpperCase() === 'PAUSED' && (
@@ -1180,7 +1214,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                           {semaphore === 'good' && adSet.status?.toUpperCase() !== 'PAUSED' && (
                             <Button size="sm" className="text-xs"
                               onClick={() => setCharlieModal({ type: 'scale', adSetName: adSet.name, adSetId: adSet.id, spend: parseFloat(adSet.spend) || 0, daysActive: 8 })}>
-                              📈 Aprobar escalado 20%
+                              📈 Aprobar escalado +{scalePercent}%
                             </Button>
                           )}
                           {semaphore === 'good' && adSet.status?.toUpperCase() === 'PAUSED' && (
@@ -1226,10 +1260,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <div className="space-y-2 pt-2 text-sm">
                 <p><strong>Ad Set:</strong> {charlieModal?.adSetName}</p>
                 <p><strong>Presupuesto actual estimado:</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
-                <p><strong>Nuevo presupuesto (+20%):</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30 * 1.2).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
+                <p><strong>Nuevo presupuesto (+{scalePercent}%):</strong> ${((charlieModal?.spend || 0) * CLP_RATE / 30 * (1 + scalePercent / 100)).toLocaleString('es-CL', {maximumFractionDigits: 0})} CLP/día</p>
                 <div className="bg-green-500/10 rounded-lg p-3 text-xs space-y-1 mt-2">
                   <p className="font-semibold text-green-700">¿Qué va a pasar?</p>
-                  <p>Se enviará una solicitud a Meta para aumentar el presupuesto diario de este Ad Set en un 20%. El cambio se aplica inmediatamente en Meta Ads.</p>
+                  <p>Se enviará una solicitud a Meta para aumentar el presupuesto diario de este Ad Set en un {scalePercent}%. El cambio se aplica inmediatamente en Meta Ads.</p>
+                  {automatedRules.length > 0 && (
+                    <p className="text-muted-foreground mt-1">Configurado en tus reglas automatizadas del Wizard Meta.</p>
+                  )}
                 </div>
                 {charlieActionSuccess && (
                   <div className="bg-green-500/10 rounded-lg p-3 text-xs mt-2">
@@ -1256,7 +1293,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               ) : charlieActionSuccess ? (
                 <><CheckCircle className="w-4 h-4 mr-2" /> Listo</>
               ) : (
-                'Confirmar escalado +20%'
+                `Confirmar escalado +${scalePercent}%`
               )}
             </Button>
           </DialogFooter>
