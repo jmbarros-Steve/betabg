@@ -490,8 +490,11 @@ function AdSetForm({
       {isABO && (
         <>
           <div>
-            <Label><JargonTooltip term="CPA" label="CPA Objetivo" /> (CLP)</Label>
-            <Input type="number" value={cpaTarget} onChange={(e) => setCpaTarget(e.target.value)} placeholder="15000" className="mt-1" />
+            <Label>¿Cuánto es lo máximo que pagarías por cada venta? (CLP)</Label>
+            <Input type="number" value={cpaTarget} onChange={(e) => setCpaTarget(e.target.value)} placeholder="Ej: 15.000" className="mt-1" />
+            <p className="text-xs text-muted-foreground mt-1">
+              Esto se llama CPA (Costo Por Adquisición). Si vendes a $50.000 y tu margen es 40%, tu CPA máximo sería $20.000.
+            </p>
             {recommendedBudget > 0 && (
               <p className="text-xs text-primary mt-1 font-medium">
                 Steve recomienda: ${recommendedBudget.toLocaleString('es-CL')}/día por Ad Set

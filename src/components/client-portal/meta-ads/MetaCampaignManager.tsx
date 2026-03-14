@@ -934,7 +934,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           <CardContent className="pt-6 pb-5 px-6">
             <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">
-                Gasto 30 Días
+                Gasto últimos 30 días
               </span>
               <div className="p-2.5 rounded-xl bg-red-500/10">
                 <TrendingUp className="w-5 h-5 text-red-500" />
@@ -1163,7 +1163,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('spend')}
                       >
-                        Gasto (30d)
+                        Gasto 30d
                         <SortIcon
                           field="spend"
                           currentField={sortField}
@@ -1193,7 +1193,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('cpa')}
                       >
-                        <JargonTooltip term="CPA" />
+                        Costo/Venta
                         <SortIcon
                           field="cpa"
                           currentField={sortField}
@@ -1208,7 +1208,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('ctr')}
                       >
-                        <JargonTooltip term="CTR" />
+                        Tasa Clics
                         <SortIcon
                           field="ctr"
                           currentField={sortField}
@@ -1223,7 +1223,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         className="flex items-center justify-end text-xs uppercase tracking-wider font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
                         onClick={() => handleSort('conversions')}
                       >
-                        Conv.
+                        Ventas
                         <SortIcon
                           field="conversions"
                           currentField={sortField}
@@ -1271,17 +1271,20 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         </td>
 
                         {/* Daily Budget */}
-                        <td className="py-4 px-3 text-right font-medium">
-                          {formatCLP(campaign.daily_budget)}
+                        <td className="py-4 px-3 text-right">
+                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Presupuesto/Día</span>
+                          <span className="font-medium">{formatCLP(campaign.daily_budget)}</span>
                         </td>
 
                         {/* Spend 30d */}
-                        <td className="py-4 px-3 text-right font-medium">
-                          {formatCLP(campaign.spend_30d)}
+                        <td className="py-4 px-3 text-right">
+                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Gasto</span>
+                          <span className="font-medium">{formatCLP(campaign.spend_30d)}</span>
                         </td>
 
                         {/* ROAS */}
                         <td className="py-4 px-3 text-right">
+                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">ROAS</span>
                           <span
                             className={`text-base font-medium ${
                               campaign.roas >= 3
@@ -1301,21 +1304,20 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
                         {/* CPA */}
                         <td className="py-4 px-3 text-right">
-                          {campaign.cpa > 0
-                            ? formatCLP(campaign.cpa)
-                            : '--'}
+                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Costo por venta</span>
+                          <span>{campaign.cpa > 0 ? formatCLP(campaign.cpa) : '--'}</span>
                         </td>
 
                         {/* CTR */}
                         <td className="py-4 px-3 text-right">
-                          {campaign.ctr > 0
-                            ? formatPercent(campaign.ctr)
-                            : '--'}
+                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Tasa de clics</span>
+                          <span>{campaign.ctr > 0 ? formatPercent(campaign.ctr) : '--'}</span>
                         </td>
 
                         {/* Conversions */}
-                        <td className="py-4 px-3 text-right font-medium">
-                          {formatNumber(campaign.conversions)}
+                        <td className="py-4 px-3 text-right">
+                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Ventas</span>
+                          <span className="font-medium">{formatNumber(campaign.conversions)}</span>
                         </td>
 
                         {/* Actions */}

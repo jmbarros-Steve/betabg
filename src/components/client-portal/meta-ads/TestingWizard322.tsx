@@ -155,9 +155,11 @@ function StepConfig({
       </div>
 
       <div>
-        <Label>CPA Objetivo (CLP)</Label>
-        <Input type="number" value={cpaTarget} onChange={(e) => setCpaTarget(e.target.value)} placeholder="Ej: 15000" className="mt-1" />
-        <p className="text-xs text-muted-foreground mt-1">Si no sabes tu CPA, Steve lo estima: AOV x (1 - margen%) / 3. Revisa tu Shopify.</p>
+        <Label>¿Cuánto es lo máximo que pagarías por cada venta? (CLP)</Label>
+        <Input type="number" value={cpaTarget} onChange={(e) => setCpaTarget(e.target.value)} placeholder="Ej: 15.000" className="mt-1" />
+        <p className="text-xs text-muted-foreground mt-1">
+          Esto es tu CPA máximo. Si no lo sabes, Steve lo calcula automáticamente desde tu Shopify: precio promedio × margen ÷ 3.
+        </p>
       </div>
 
       <div>
@@ -367,13 +369,13 @@ function StepBudget({
   return (
     <div className="space-y-5">
       <SteveTip>
-        Presupuesto ideal por Ad Set = (CPA objetivo x 50) / 7 días. Esto da suficiente data estadística para declarar ganadores. Mínimo recomendado = (CPA x 10) / 7.
+        Steve calcula tu presupuesto ideal por conjunto: toma lo máximo que pagarías por venta, multiplica x50 y divide en 7 días. Así hay suficientes datos para saber qué anuncio gana. El mínimo es x10 en vez de x50.
       </SteveTip>
 
       {cpaTarget <= 0 && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
           <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-yellow-700">No definiste un CPA objetivo. Vuelve al paso 1 para ingresarlo o Steve lo estimará de tu Shopify.</p>
+          <p className="text-xs text-yellow-700">No definiste cuánto máximo pagarías por venta. Vuelve al paso 1 para ingresarlo o Steve lo calculará desde tu Shopify.</p>
         </div>
       )}
 
@@ -714,7 +716,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Campaña:</span><span className="font-medium">{campaignName || 'Testing 3:2:2'}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Tipo:</span><Badge className="text-xs bg-blue-500/15 text-blue-700 border-blue-500/30">ABO</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">CPA Objetivo:</span><span className="font-medium">{Number(cpaTarget) > 0 ? fmtCLP(Number(cpaTarget)) : 'No definido'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Máximo por venta:</span><span className="font-medium">{Number(cpaTarget) > 0 ? fmtCLP(Number(cpaTarget)) : 'No definido'}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Presupuesto total/día:</span><span className="font-medium">{fmtCLP(Math.round((Number(cpaTarget) || 15000) * 50 / 7) * 12)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Duración:</span><span className="font-medium">7 días sin tocar</span></div>
               </div>
