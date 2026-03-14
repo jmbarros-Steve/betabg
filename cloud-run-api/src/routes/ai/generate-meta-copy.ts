@@ -582,6 +582,27 @@ export async function generateMetaCopy(c: Context) {
     const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES A EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}`).join('\n')}\n` : '';
     const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nREGLAS:\n${kbKnowledge.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
+    // Fetch Shopify products for concrete context
+    const { data: shopifyProducts } = await supabase
+      .from('shopify_products')
+      .select('title, product_type, price, image_url')
+      .eq('client_id', cId)
+      .limit(10);
+
+    const { data: clientInfo } = await supabase
+      .from('clients')
+      .select('name, company, shop_domain')
+      .eq('id', cId)
+      .maybeSingle();
+
+    const shopifySection = shopifyProducts && shopifyProducts.length > 0
+      ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProducts.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
+      : '';
+
+    const clientSection = clientInfo
+      ? `\nCLIENTE: ${clientInfo.name || clientInfo.company || 'N/A'}${clientInfo.shop_domain ? ` (${clientInfo.shop_domain})` : ''}\n`
+      : '';
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -592,7 +613,7 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        messages: [{ role: 'user', content: `${brandSection}${briefSection}${bugSection}${knowledgeSection}\n${body.instruction}` }],
+        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
       }),
     });
     const aiData: any = await resp.json();
@@ -622,9 +643,29 @@ export async function generateMetaCopy(c: Context) {
     const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
     const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledgeVar.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-    const prompt = `${bugSectionVar}${knowledgeSectionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
+    const [{ data: brandResearchVar }, { data: shopifyProductsVar }, { data: clientInfoVar }] = await Promise.all([
+      supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).single(),
+      supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
+      supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
+    ]);
 
+    const brandContextVar = brandResearchVar ? `\nMARCA: ${brandResearchVar.brand_name || 'N/A'}
+Industria: ${brandResearchVar.industry || 'N/A'}
+Propuesta de valor: ${JSON.stringify(brandResearchVar.value_proposition || 'N/A')}
+Voz de marca: ${JSON.stringify(brandResearchVar.brand_voice || 'N/A')}
+Productos: ${JSON.stringify(brandResearchVar.product_details || 'N/A')}\n` : '';
+
+    const shopifyContextVar = shopifyProductsVar && shopifyProductsVar.length > 0
+      ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProductsVar.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
+      : '';
+
+    const storeNameVar = clientInfoVar?.name || clientInfoVar?.company || '';
+
+    const prompt = `${bugSectionVar}${knowledgeSectionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
+REGLA CRÍTICA: El copy debe ser 100% específico para los productos y marca del cliente. USA los nombres reales de sus productos, sus precios reales, su propuesta de valor real. NUNCA inventes un negocio ficticio ni uses temas genéricos.
+${brandContextVar}${shopifyContextVar}
 DATOS DEL CLIENTE:
+- Tienda: ${storeNameVar}
 - Brief: ${JSON.stringify(rawData, null, 2)}
 - Fotos del producto disponibles: ${(assetUrls || []).join(', ')}
 
@@ -679,8 +720,18 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
     const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-    const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
+    const { data: shopifyProductsBV } = await supabase
+      .from('shopify_products')
+      .select('title, product_type, price, image_url')
+      .eq('client_id', clientId)
+      .limit(10);
 
+    const shopifyContextBV = shopifyProductsBV && shopifyProductsBV.length > 0
+      ? `\nProductos reales de la tienda:\n${shopifyProductsBV.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP)${p.image_url ? ` [foto: ${p.image_url}]` : ''}`).join('\n')}\n`
+      : '';
+
+    const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
+${shopifyContextBV}
 Copy aprobado: ${JSON.stringify(variacionElegida)}
 Formato: ${adType}
 Ángulo: ${angulo}

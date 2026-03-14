@@ -30,12 +30,55 @@ export async function generateImage(c: Context) {
     );
   }
 
+  // Auto-fetch client reference photos if none provided
+  let effectiveFotoBase = fotoBaseUrl;
+  if (!effectiveFotoBase) {
+    const supabaseForQuery = getSupabaseAdmin();
+
+    // Try 1: Get the most recent brand asset uploaded by the client
+    const { data: brandAssets } = await supabaseForQuery
+      .from('ad_assets')
+      .select('asset_url')
+      .eq('client_id', clientId)
+      .eq('tipo', 'imagen')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    // Try 2: Get Shopify product images
+    const { data: shopifyProducts } = await supabaseForQuery
+      .from('shopify_products')
+      .select('image_url, title')
+      .eq('client_id', clientId)
+      .not('image_url', 'is', null)
+      .limit(5);
+
+    // Pick a random reference to add variety
+    const allPhotos: string[] = [];
+    if (brandAssets) allPhotos.push(...brandAssets.map((a: any) => a.asset_url).filter(Boolean));
+    if (shopifyProducts) allPhotos.push(...shopifyProducts.map((p: any) => p.image_url).filter(Boolean));
+
+    if (allPhotos.length > 0) {
+      // Random selection for variety instead of always the same photo
+      effectiveFotoBase = allPhotos[Math.floor(Math.random() * allPhotos.length)];
+    }
+  }
+
   // Adjust prompt if there's rejection text
   const promptBase = rechazoTexto
     ? `${promptGeneracion}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
     : promptGeneracion;
 
-  const promptFinal = `${promptBase}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
+  // Add diversity instruction to avoid repetitive outputs
+  const diversityStyles = [
+    'Vary the model ethnicity, age, and appearance for each generation.',
+    'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
+    'Alternate between close-up portrait, medium shot, and environmental portrait.',
+    'Mix lighting styles: golden hour, studio softbox, natural window light, overcast diffused.',
+    'Vary compositions: rule of thirds, centered, off-center with negative space.',
+  ];
+  const randomDiversity = diversityStyles[Math.floor(Math.random() * diversityStyles.length)];
+
+  const promptFinal = `${promptBase}. ${randomDiversity}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
   let imageUrl: string | null = null;
   let imageBytes: Uint8Array | null = null;
@@ -52,10 +95,10 @@ export async function generateImage(c: Context) {
     const parts: Array<Record<string, any>> = [];
 
     // If a base photo URL is provided, download it and send as visual reference
-    if (fotoBaseUrl) {
+    if (effectiveFotoBase) {
       try {
-        console.log('[generate-image] Downloading reference photo for Gemini:', fotoBaseUrl);
-        const refResponse = await fetch(fotoBaseUrl);
+        console.log('[generate-image] Downloading reference photo for Gemini:', effectiveFotoBase);
+        const refResponse = await fetch(effectiveFotoBase);
         if (refResponse.ok) {
           const refBuffer = await refResponse.arrayBuffer();
           const refBase64 = Buffer.from(refBuffer).toString('base64');
@@ -132,8 +175,8 @@ export async function generateImage(c: Context) {
       enable_safety_checker: true,
     };
 
-    if (fotoBaseUrl) {
-      falBody.image_url = fotoBaseUrl;
+    if (effectiveFotoBase) {
+      falBody.image_url = effectiveFotoBase;
       falBody.image_prompt_strength = 0.3;
     }
 
