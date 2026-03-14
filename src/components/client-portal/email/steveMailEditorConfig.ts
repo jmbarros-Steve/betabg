@@ -476,6 +476,11 @@ export const getSteveMailEditorOptions = (opts?: SteveMailEditorOptions) => {
       video: { enabled: true },
       columns: { enabled: true },
       timer: { enabled: true },
+      // Custom tools registered via customJS
+      'custom#steve_products': { enabled: true },
+      'custom#steve_discount': { enabled: true },
+      'custom#steve_countdown': { enabled: true },
+      'custom#steve_button': { enabled: true },
     },
     tabs: {
       content: { enabled: true },
