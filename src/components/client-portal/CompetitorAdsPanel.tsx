@@ -636,7 +636,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             <div className="ml-auto">
               <Button variant="ghost" size="sm" onClick={handleSync} disabled={syncing}>
                 <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? 'animate-spin' : ''}`} />
-                Re-sync
+                Sincronizar
               </Button>
             </div>
           </div>

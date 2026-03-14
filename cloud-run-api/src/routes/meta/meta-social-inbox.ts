@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-const META_API = 'https://graph.facebook.com/v18.0';
+const META_API = 'https://graph.facebook.com/v21.0';
 
 type Action =
   | 'list_pages'

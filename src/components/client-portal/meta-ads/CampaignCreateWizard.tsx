@@ -1898,7 +1898,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           <StepIndicator
             steps={steps}
             currentIndex={stepIndex}
-            onStepClick={(i) => setStepIndex(i)}
+            onStepClick={(i) => { if (i < stepIndex) setStepIndex(i); }}
           />
 
           {/* Steve AI tip */}
@@ -2174,7 +2174,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               )}
 
               {currentStep === 'review' ? (
-                <Button onClick={handleSubmit} disabled={submitting} size="lg" className="bg-green-600 hover:bg-green-700">
+                <Button onClick={handleSubmit} disabled={submitting || !canProceed()} size="lg" className="bg-green-600 hover:bg-green-700">
                   {submitting ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando campaña...</>
                   ) : (

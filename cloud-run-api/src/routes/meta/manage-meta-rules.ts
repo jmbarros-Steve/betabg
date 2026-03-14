@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-const META_API_BASE = 'https://graph.facebook.com/v18.0';
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
 type Action = 'list' | 'create' | 'update' | 'delete' | 'toggle' | 'execute';
 
@@ -119,9 +119,9 @@ function aggregateMetric(
     }
     case 'FREQUENCY': {
       const imp3 = rows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
-      // Frequency = impressions / reach, but we don't have reach. Use impressions/clicks as proxy.
-      const clk3 = rows.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
-      return clk3 > 0 ? imp3 / clk3 : 0;
+      const reach3 = rows.reduce((s, r) => s + (Number(r.reach) || 0), 0);
+      // Frequency = impressions / reach
+      return reach3 > 0 ? imp3 / reach3 : 0;
     }
     default: return 0;
   }
@@ -177,7 +177,10 @@ async function executeRuleAction(
     }
 
     case 'SCALE_BUDGET': {
-      const targetAmount = action.amount || 0;
+      const targetAmount = Number(action.amount) || 0;
+      if (targetAmount <= 0 || targetAmount > 10000000) {
+        return { executed: false, details: `SCALE_BUDGET omitido: monto inválido ($${targetAmount}). Debe ser positivo y no mayor a $10.000.000.` };
+      }
       const adsetsResult2 = await metaApiRequest(`${campaignId}/adsets`, accessToken, 'GET', {
         fields: 'id,daily_budget',
         limit: '50',

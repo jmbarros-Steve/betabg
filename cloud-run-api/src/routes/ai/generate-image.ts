@@ -22,7 +22,13 @@ export async function generateImage(c: Context) {
     .eq('client_id', clientId)
     .maybeSingle();
 
-  const available = credits?.creditos_disponibles ?? 99999;
+  if (!credits) {
+    return c.json(
+      { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
+      402
+    );
+  }
+  const available = credits.creditos_disponibles ?? 0;
   if (available < 2) {
     return c.json(
       { error: 'NO_CREDITS', message: 'Se necesitan 2 créditos para generar una imagen' },
@@ -296,8 +302,8 @@ export async function generateImage(c: Context) {
   // Deduct credits
   const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
   await supabase.from('client_credits').update({
-    creditos_disponibles: (credits?.creditos_disponibles || 99999) - 2,
-    creditos_usados: (credits?.creditos_usados || 0) + 2,
+    creditos_disponibles: credits.creditos_disponibles - 2,
+    creditos_usados: (credits.creditos_usados || 0) + 2,
   }).eq('client_id', clientId);
 
   await supabase.from('credit_transactions').insert({

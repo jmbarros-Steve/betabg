@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { callApi } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -378,11 +379,15 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           existing.revenue += Number(m.conversion_value) || 0;
           existing.clicks += Number(m.clicks) || 0;
           existing.impressions += Number(m.impressions) || 0;
+          // Use the most recent campaign_status if available
+          if (m.campaign_status) {
+            existing.status = m.campaign_status as CampaignStatus;
+          }
         } else {
           campaignMap.set(m.campaign_id, {
             campaign_id: m.campaign_id,
             campaign_name: m.campaign_name,
-            status: 'ACTIVE' as CampaignStatus,
+            status: (m.campaign_status as CampaignStatus) || 'ACTIVE' as CampaignStatus,
             daily_budget: 0,
             objective: 'CONVERSIONS' as CampaignObjective,
             spend_30d: Number(m.spend) || 0,
@@ -415,13 +420,15 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         const daysActive = uniqueDays.size || 1;
         c.daily_budget = Math.round(c.spend_30d / daysActive);
 
-        // Infer status: if no data in last 3 days, assume PAUSED
-        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0];
-        const recentDays = Array.from(uniqueDays).filter((d) => d >= threeDaysAgo);
-        if (recentDays.length === 0 && daysActive > 0) {
-          c.status = 'PAUSED';
+        // Only infer status when campaign_status was not available from API
+        if (c.status === ('ACTIVE' as CampaignStatus)) {
+          const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0];
+          const recentDays = Array.from(uniqueDays).filter((d) => d >= threeDaysAgo);
+          if (recentDays.length === 0 && daysActive > 0) {
+            c.status = 'PAUSED';
+          }
         }
 
         // Find date range
@@ -440,7 +447,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     } finally {
       setLoading(false);
     }
-  }, [clientId, lastSyncAt]);
+  }, [clientId, lastSyncAt, ctxConnectionId]);
 
   useEffect(() => {
     fetchCampaigns();

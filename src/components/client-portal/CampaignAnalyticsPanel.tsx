@@ -827,7 +827,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                               <p className="font-medium">{formatCurrency(campaign.total_spend)}</p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-xs">Revenue (Atrib.)</p>
+                              <p className="text-muted-foreground text-xs">Ingresos (Atrib.)</p>
                               <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
                             </div>
                             <div>
@@ -844,11 +844,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CPC" /></p>
-                              <p className="font-medium">${campaign.avg_cpc.toFixed(2)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.avg_cpc)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CPM" /></p>
-                              <p className="font-medium">${campaign.avg_cpm.toFixed(2)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.avg_cpm)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CTR" /></p>
@@ -912,7 +912,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs mb-3">
                                         <div>
                                           <p className="text-muted-foreground">Gasto CLP</p>
-                                          <p className="font-medium">${spendClp.toLocaleString('es-CL', {maximumFractionDigits: 0})}</p>
+                                          <p className="font-medium">{formatCurrency(spendClp)}</p>
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground">CPA real</p>

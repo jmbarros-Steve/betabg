@@ -133,11 +133,12 @@ const roasBadgeVariant = (roas: number): string => {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ChangeIndicator({ value }: { value: number | null }) {
+function ChangeIndicator({ value, invertColors = false }: { value: number | null; invertColors?: boolean }) {
   if (value === null) return <span className="text-xs text-muted-foreground">Sin datos previos</span>;
   const isPositive = value >= 0;
+  const isGood = invertColors ? !isPositive : isPositive;
   return (
-    <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
+    <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isGood ? 'text-green-600' : 'text-red-500'}`}>
       {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
       {Math.abs(value).toFixed(1)}% vs periodo anterior
     </span>
@@ -151,6 +152,7 @@ function KpiCard({
   icon: Icon,
   prefix,
   accent = 'blue',
+  invertColors = false,
 }: {
   title: React.ReactNode;
   value: string;
@@ -158,6 +160,7 @@ function KpiCard({
   icon: React.ElementType;
   prefix?: string;
   accent?: string;
+  invertColors?: boolean;
 }) {
   const accentMap: Record<string, string> = {
     blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
@@ -187,7 +190,7 @@ function KpiCard({
         <p className="text-3xl font-bold tracking-tight leading-none mb-2">
           {prefix}{value}
         </p>
-        <ChangeIndicator value={change} />
+        <ChangeIndicator value={change} invertColors={invertColors} />
       </CardContent>
     </Card>
   );
@@ -624,6 +627,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           change={pctChange(totals.spend, prevTotals.spend)}
           icon={DollarSign}
           accent="red"
+          invertColors
         />
         <KpiCard
           title="Impresiones"

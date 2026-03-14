@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-const META_API_BASE = 'https://graph.facebook.com/v18.0';
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
 type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad';
 
@@ -357,7 +357,10 @@ async function handleCreate(
   const allTexts: string[] = (texts && texts.length > 0) ? texts : (primary_text ? [primary_text] : []);
   const allHeadlines: string[] = (headlines && headlines.length > 0) ? headlines : (headline ? [headline] : []);
   const allDescriptions: string[] = (descriptions && descriptions.length > 0) ? descriptions : (description ? [description] : []);
-  const destUrl = destination_url || 'https://example.com';
+  if (!destination_url) {
+    return c.json({ error: 'Missing required field: destination_url. A destination URL is required for conversion campaigns.' }, 400);
+  }
+  const destUrl = destination_url;
 
   const hasCreativeData = allImages.length > 0 || allTexts.length > 0;
 

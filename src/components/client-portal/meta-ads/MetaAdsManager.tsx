@@ -297,8 +297,8 @@ function DashboardSection({ clientId }: { clientId: string }) {
         body: { connection_id: connectionId, platform: 'meta' },
       });
       if (error) {
-        // Error handled by toast
         toast.error('Error sincronizando Meta Ads');
+        return;
       }
       toast.success('Datos sincronizados');
       await fetchData();
