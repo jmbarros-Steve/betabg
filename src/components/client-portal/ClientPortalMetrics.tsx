@@ -18,6 +18,7 @@ import { KPIGridSkeleton, ChartSkeleton, TableSkeleton } from './metrics/Metrics
 import { SmartInsightsPanel } from './metrics/SmartInsightsPanel';
 import { BusinessHealthScore } from './metrics/BusinessHealthScore';
 import { DayOfWeekChart } from './metrics/DayOfWeekChart';
+import { ConversionFunnelPanel } from './metrics/ConversionFunnelPanel';
 
 interface ClientPortalMetricsProps {
   clientId: string;
@@ -140,6 +141,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [cohortData, setCohortData] = useState<{ cohort: string; month0: number; month1?: number; month2?: number; month3?: number; month4?: number; month5?: number }[]>([]);
   const [shopifyDailyData, setShopifyDailyData] = useState<{ date: string; revenue: number; orders: number }[]>([]);
   const [shopifySummary, setShopifySummary] = useState<{ totalRevenue: number; totalOrders: number; averageOrderValue: number } | null>(null);
+  const [funnelData, setFunnelData] = useState<{ sessions: number | null; addToCarts: number | null; checkoutsInitiated: number; purchases: number } | null>(null);
 
   useEffect(() => {
     async function fetchAll() {
@@ -363,6 +365,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             }
             if (analyticsData?.dailyBreakdown) {
               setShopifyDailyData(analyticsData.dailyBreakdown);
+            }
+            if (analyticsData?.funnelData) {
+              setFunnelData(analyticsData.funnelData);
             }
             if (analyticsData?.summary) {
               setShopifySummary(analyticsData.summary);
@@ -846,6 +851,16 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                 </p>
               </CardContent>
             </Card>
+          )}
+
+          {/* Conversion Funnel */}
+          {funnelData && (
+            <ConversionFunnelPanel
+              sessions={funnelData.sessions}
+              addToCarts={funnelData.addToCarts}
+              checkoutsInitiated={funnelData.checkoutsInitiated}
+              purchases={funnelData.purchases}
+            />
           )}
 
           {/* P&L and Cohort side by side */}

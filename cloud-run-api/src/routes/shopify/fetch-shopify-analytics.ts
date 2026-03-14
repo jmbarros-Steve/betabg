@@ -332,9 +332,60 @@ export async function fetchShopifyAnalytics(c: Context) {
       averageOrderValue: totalOrderCount > 0 ? Math.round(totalRevenue / totalOrderCount) : 0,
     };
 
+    // --- CONVERSION FUNNEL via Shopify GraphQL Analytics ---
+    let funnelData: { sessions: number | null; addToCarts: number | null; checkoutsInitiated: number; purchases: number } = {
+      sessions: null,
+      addToCarts: null,
+      checkoutsInitiated: paidOrderCount + abandonedCarts.length,
+      purchases: paidOrderCount,
+    };
+
+    try {
+      const graphqlUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
+
+      // Query online store sessions
+      const sessionsQuery = `{ shopifyqlQuery(query: "FROM visits SHOW sum(totalSessions) AS sessions SINCE -${daysBack}d UNTIL today") { __typename ... on TableResponse { tableData { rowData } } } }`;
+      const addToCartQuery = `{ shopifyqlQuery(query: "FROM products SHOW sum(cartAdditionCount) AS addToCarts SINCE -${daysBack}d UNTIL today") { __typename ... on TableResponse { tableData { rowData } } } }`;
+
+      const [sessionsRes, cartRes] = await Promise.all([
+        fetch(graphqlUrl, {
+          method: 'POST',
+          headers: { ...shopifyHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: sessionsQuery }),
+        }),
+        fetch(graphqlUrl, {
+          method: 'POST',
+          headers: { ...shopifyHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: addToCartQuery }),
+        }),
+      ]);
+
+      if (sessionsRes.ok) {
+        const sessionsJson: any = await sessionsRes.json();
+        const rows = sessionsJson?.data?.shopifyqlQuery?.tableData?.rowData;
+        if (rows && rows.length > 0) {
+          const val = parseFloat(rows[0][0]);
+          if (!isNaN(val)) funnelData.sessions = Math.round(val);
+        }
+      }
+
+      if (cartRes.ok) {
+        const cartJson: any = await cartRes.json();
+        const rows = cartJson?.data?.shopifyqlQuery?.tableData?.rowData;
+        if (rows && rows.length > 0) {
+          const val = parseFloat(rows[0][0]);
+          if (!isNaN(val)) funnelData.addToCarts = Math.round(val);
+        }
+      }
+
+      console.log(`[fetch-shopify-analytics] Funnel: sessions=${funnelData.sessions}, addToCarts=${funnelData.addToCarts}, checkouts=${funnelData.checkoutsInitiated}, purchases=${funnelData.purchases}`);
+    } catch (funnelErr: any) {
+      console.warn('[fetch-shopify-analytics] Funnel analytics unavailable:', funnelErr.message);
+    }
+
     console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs, ${uniqueCustomers} customers, ${cohorts.length} cohorts, revenue=${summary.totalRevenue}`);
 
-    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary });
+    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary, funnelData });
 
   } catch (error: any) {
     console.error('[fetch-shopify-analytics] Error:', error);
