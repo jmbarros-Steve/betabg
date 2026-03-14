@@ -255,6 +255,27 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       setMobileShowThread(true);
       setReplyText('');
 
+      // Mark as read locally — clear the unread dot immediately
+      if ((conv.unread_count || 0) > 0) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c)),
+        );
+
+        // Also fire a backend call to mark as read via Meta API (best-effort)
+        if (conv.type === 'messages' && connectionId && selectedPageId) {
+          callApi('meta-social-inbox', {
+            body: {
+              action: 'mark_read',
+              connection_id: connectionId,
+              page_id: selectedPageId,
+              conversation_id: conv.id,
+            },
+          }).catch(() => {
+            // Silently ignore — local state is already updated
+          });
+        }
+      }
+
       // Only fetch messages for message-type conversations
       if (conv.type === 'messages' && connectionId && selectedPageId) {
         setLoadingMessages(true);

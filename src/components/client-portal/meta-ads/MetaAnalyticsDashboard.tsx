@@ -545,8 +545,8 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-full max-w-xl" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
             <Skeleton key={i} className="h-24" />
           ))}
         </div>
@@ -617,7 +617,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       {/* ------------------------------------------------------------------ */}
       {/* 2. Overview KPI Row                                                */}
       {/* ------------------------------------------------------------------ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Gasto Total"
           value={formatCLP(totals.spend)}
@@ -647,18 +647,25 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           accent="amber"
         />
         <KpiCard
-          title="Conversiones"
+          title="Ventas"
           value={formatNumber(totals.conversions)}
           change={pctChange(totals.conversions, prevTotals.conversions)}
           icon={ShoppingCart}
           accent="green"
         />
         <KpiCard
+          title="Ingresos"
+          value={formatCLP(totals.revenue)}
+          change={pctChange(totals.revenue, prevTotals.revenue)}
+          icon={DollarSign}
+          accent="cyan"
+        />
+        <KpiCard
           title={<JargonTooltip term="ROAS" />}
           value={formatRoas(totals.roas)}
           change={pctChange(totals.roas, prevTotals.roas)}
           icon={TrendingUp}
-          accent="cyan"
+          accent="green"
         />
       </div>
 
@@ -757,7 +764,8 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                       Campaña
                     </th>
                     <SortHeader field="spend" label="Gasto" />
-                    <SortHeader field="conversions" label="Conv." />
+                    <SortHeader field="conversions" label="Ventas" />
+                    <SortHeader field="revenue" label="Ingresos" />
                     <SortHeader field="roas" label={<JargonTooltip term="ROAS" />} />
                     <SortHeader field="ctr" label={<JargonTooltip term="CTR" />} />
                     <SortHeader field="cpa" label={<JargonTooltip term="CPA" />} />
@@ -783,6 +791,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <td className="px-4 py-3">Total ({sortedCampaigns.length})</td>
                     <td className="px-4 py-3 text-right">{formatCLP(totals.spend)}</td>
                     <td className="px-4 py-3 text-right">{formatNumber(totals.conversions)}</td>
+                    <td className="px-4 py-3 text-right">{formatCLP(totals.revenue)}</td>
                     <td className={`px-4 py-3 text-right ${roasColor(totals.roas)}`}>{formatRoas(totals.roas)}</td>
                     <td className="px-4 py-3 text-right">{formatPercent(totals.ctr)}</td>
                     <td className="px-4 py-3 text-right">
@@ -974,6 +983,7 @@ function CampaignRow({
         </td>
         <td className="px-4 py-3 text-right tabular-nums">{formatCLP(c.spend)}</td>
         <td className="px-4 py-3 text-right tabular-nums">{formatNumber(c.conversions)}</td>
+        <td className="px-4 py-3 text-right tabular-nums">{formatCLP(c.revenue)}</td>
         <td className="px-4 py-3 text-right tabular-nums">
           <Badge variant="outline" className={`text-xs ${roasBadgeVariant(c.roas)}`}>
             {formatRoas(c.roas)}
@@ -988,14 +998,15 @@ function CampaignRow({
       {/* Expanded daily breakdown */}
       {isExpanded && c.dailyBreakdown.length > 0 && (
         <tr>
-          <td colSpan={7} className="p-0">
+          <td colSpan={8} className="p-0">
             <div className="bg-muted/20 border-b">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-muted-foreground">
                     <th className="px-4 py-1.5 text-left pl-12">Fecha</th>
                     <th className="px-4 py-1.5 text-right">Gasto</th>
-                    <th className="px-4 py-1.5 text-right">Conv.</th>
+                    <th className="px-4 py-1.5 text-right">Ventas</th>
+                    <th className="px-4 py-1.5 text-right">Ingresos</th>
                     <th className="px-4 py-1.5 text-right"><JargonTooltip term="ROAS" /></th>
                     <th className="px-4 py-1.5 text-right"><JargonTooltip term="CTR" /></th>
                     <th className="px-4 py-1.5 text-right"><JargonTooltip term="CPA" /></th>
@@ -1012,6 +1023,7 @@ function CampaignRow({
                       </td>
                       <td className="px-4 py-1.5 text-right tabular-nums">{formatCLP(d.spend)}</td>
                       <td className="px-4 py-1.5 text-right tabular-nums">{formatNumber(d.conversions)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{formatCLP(d.revenue)}</td>
                       <td className={`px-4 py-1.5 text-right tabular-nums font-medium ${roasColor(d.roas)}`}>
                         {formatRoas(d.roas)}
                       </td>

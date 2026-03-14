@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useMetaBusiness } from './MetaBusinessContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,6 +46,8 @@ import {
   RotateCcw,
   CheckCircle2,
   Info,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -360,6 +363,76 @@ const EMPTY_FORM: {
 };
 
 // ---------------------------------------------------------------------------
+// Brief-based suggested rules
+// ---------------------------------------------------------------------------
+
+interface BriefData {
+  cpaMax: number | null;
+  roasTarget: number | null;
+  budgetMonthly: number | null;
+  hasBrief: boolean;
+}
+
+const DEFAULT_BRIEF: BriefData = {
+  cpaMax: 5000,
+  roasTarget: 3,
+  budgetMonthly: 300000,
+  hasBrief: false,
+};
+
+function buildSuggestedRules(brief: BriefData): (PresetRule & { briefBased: boolean })[] {
+  const cpa = brief.cpaMax ?? DEFAULT_BRIEF.cpaMax!;
+  const roas = brief.roasTarget ?? DEFAULT_BRIEF.roasTarget!;
+  const budget = brief.budgetMonthly ?? DEFAULT_BRIEF.budgetMonthly!;
+  const dailyBudget = Math.round(budget / 30);
+
+  return [
+    {
+      name: `Pausar si CPA > $${cpa.toLocaleString('es-CL')}`,
+      description: brief.hasBrief
+        ? `Basado en tu brief: pausa campañas cuyo CPA supere tu máximo de $${cpa.toLocaleString('es-CL')} CLP en los últimos 7 días.`
+        : `Pausa campañas con CPA superior a $${cpa.toLocaleString('es-CL')} CLP. Completa tu brief para personalizar este valor.`,
+      condition: { metric: 'CPA' as RuleMetric, operator: 'GREATER_THAN' as RuleOperator, value: cpa, timeWindow: 'LAST_7_DAYS' as TimeWindow },
+      action: { type: 'PAUSE_CAMPAIGN' as RuleAction },
+      icon: Pause,
+      color: 'text-red-500',
+      briefBased: brief.hasBrief && brief.cpaMax !== null,
+    },
+    {
+      name: `Escalar +20% si ROAS > ${roas}x por 3 días`,
+      description: brief.hasBrief
+        ? `Basado en tu brief: aumenta presupuesto 20% cuando el ROAS supere ${roas}x en los últimos 3 días.`
+        : `Aumenta presupuesto 20% si ROAS > ${roas}x. Completa tu brief para personalizar este objetivo.`,
+      condition: { metric: 'ROAS' as RuleMetric, operator: 'GREATER_THAN' as RuleOperator, value: roas, timeWindow: 'LAST_3_DAYS' as TimeWindow },
+      action: { type: 'INCREASE_BUDGET' as RuleAction, percentage: 20 },
+      icon: TrendingUp,
+      color: 'text-green-500',
+      briefBased: brief.hasBrief && brief.roasTarget !== null,
+    },
+    {
+      name: `Alertar si gasto diario > $${dailyBudget.toLocaleString('es-CL')}`,
+      description: brief.hasBrief
+        ? `Basado en tu presupuesto mensual de $${budget.toLocaleString('es-CL')}: alerta si el gasto en 3 días supera tu presupuesto diario de $${dailyBudget.toLocaleString('es-CL')}.`
+        : `Alerta si gasto supera $${dailyBudget.toLocaleString('es-CL')} CLP diarios. Completa tu brief para ajustar al presupuesto real.`,
+      condition: { metric: 'SPEND' as RuleMetric, operator: 'GREATER_THAN' as RuleOperator, value: dailyBudget, timeWindow: 'LAST_3_DAYS' as TimeWindow },
+      action: { type: 'SEND_NOTIFICATION' as RuleAction, notificationType: 'IN_APP' as NotificationType },
+      icon: Bell,
+      color: 'text-blue-500',
+      briefBased: brief.hasBrief && brief.budgetMonthly !== null,
+    },
+    {
+      name: 'Pausar si CTR < 0.5% después de 1000 impresiones',
+      description: 'Pausa campañas con CTR muy bajo después de suficientes impresiones para tener datos significativos.',
+      condition: { metric: 'CTR' as RuleMetric, operator: 'LESS_THAN' as RuleOperator, value: 0.5, timeWindow: 'LAST_7_DAYS' as TimeWindow },
+      action: { type: 'PAUSE_CAMPAIGN' as RuleAction },
+      icon: AlertTriangle,
+      color: 'text-amber-500',
+      briefBased: false,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Sample log data (demo)
 // ---------------------------------------------------------------------------
 
@@ -432,6 +505,11 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
   const [saving, setSaving] = useState(false);
   const [executing, setExecuting] = useState(false);
 
+  // Brief-based suggestions
+  const [briefData, setBriefData] = useState<BriefData>(DEFAULT_BRIEF);
+  const [briefLoading, setBriefLoading] = useState(true);
+  const [applyingSuggestion, setApplyingSuggestion] = useState<number | null>(null);
+
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomatedRule | null>(null);
@@ -485,6 +563,72 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
   useEffect(() => {
     fetchRules();
   }, [fetchRules]);
+
+  // --- Fetch brief data for AI suggestions -----------------------------------
+  useEffect(() => {
+    const loadBriefData = async () => {
+      if (!clientId) return;
+      setBriefLoading(true);
+      try {
+        const [{ data: strategyRow }, { data: clientRow }] = await Promise.all([
+          supabase
+            .from('brand_research')
+            .select('research_data')
+            .eq('client_id', clientId)
+            .eq('research_type', 'meta_ads_strategy')
+            .maybeSingle(),
+          supabase
+            .from('clients')
+            .select('presupuesto_ads')
+            .eq('id', clientId)
+            .maybeSingle(),
+        ]);
+
+        let cpaMax: number | null = null;
+        let roasTarget: number | null = null;
+        let budgetMonthly: number | null = clientRow?.presupuesto_ads ?? null;
+
+        if (strategyRow?.research_data && typeof strategyRow.research_data === 'object') {
+          const rd = strategyRow.research_data as Record<string, any>;
+
+          // Extract CPA from kpis_objetivo.bofu.cpa (e.g. "<$5000 CLP" or just a number)
+          const kpis = rd.kpis_objetivo;
+          if (kpis?.bofu?.cpa) {
+            const cpaStr = String(kpis.bofu.cpa);
+            const cpaMatch = cpaStr.match(/[\d.,]+/);
+            if (cpaMatch) {
+              const parsed = parseFloat(cpaMatch[0].replace(/\./g, '').replace(',', '.'));
+              if (!isNaN(parsed) && parsed > 0) cpaMax = parsed;
+            }
+          }
+
+          // Extract ROAS from kpis_objetivo.bofu.roas (e.g. "3x" or ">3x" or just a number)
+          if (kpis?.bofu?.roas) {
+            const roasStr = String(kpis.bofu.roas);
+            const roasMatch = roasStr.match(/[\d.,]+/);
+            if (roasMatch) {
+              const parsed = parseFloat(roasMatch[0].replace(',', '.'));
+              if (!isNaN(parsed) && parsed > 0) roasTarget = parsed;
+            }
+          }
+
+          // Extract budget from presupuesto_sugerido.total if client budget not set
+          if (!budgetMonthly && rd.presupuesto_sugerido?.total) {
+            const bVal = Number(rd.presupuesto_sugerido.total);
+            if (!isNaN(bVal) && bVal > 0) budgetMonthly = bVal;
+          }
+        }
+
+        const hasBrief = cpaMax !== null || roasTarget !== null || budgetMonthly !== null;
+        setBriefData({ cpaMax, roasTarget, budgetMonthly, hasBrief });
+      } catch {
+        // Keep defaults on error
+      } finally {
+        setBriefLoading(false);
+      }
+    };
+    loadBriefData();
+  }, [clientId]);
 
   // --- Derived ---------------------------------------------------------------
   const filteredRules = rules.filter((r) =>
@@ -711,7 +855,125 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
     }
   };
 
+  // --- Apply suggested rule with one click -----------------------------------
+  const applySuggestedRule = async (suggestion: PresetRule & { briefBased: boolean }, index: number) => {
+    if (!ctxConnectionId) {
+      toast.error('No hay conexión Meta Ads activa');
+      return;
+    }
+    setApplyingSuggestion(index);
+    try {
+      const { error } = await callApi('manage-meta-rules', {
+        body: {
+          action: 'create',
+          client_id: clientId,
+          connection_id: ctxConnectionId,
+          data: {
+            name: suggestion.name,
+            condition: suggestion.condition,
+            action: suggestion.action,
+            apply_to: 'ACTIVE_ONLY',
+            specific_campaign_ids: [],
+            check_frequency: 'EVERY_1_HOUR',
+          },
+        },
+      });
+      if (error) throw new Error(error);
+      toast.success(`Regla "${suggestion.name}" creada y activada`);
+      await fetchRules();
+    } catch {
+      toast.error('Error al crear la regla sugerida');
+    } finally {
+      setApplyingSuggestion(null);
+    }
+  };
+
   // --- Sub-renders -----------------------------------------------------------
+
+  const renderSuggestedRules = () => {
+    const suggestions = buildSuggestedRules(briefData);
+
+    // Filter out suggestions that already exist as rules (by matching name prefix)
+    const existingNames = rules.map((r) => r.name.toLowerCase());
+    const available = suggestions.filter(
+      (s) => !existingNames.some((n) => n === s.name.toLowerCase())
+    );
+
+    if (available.length === 0) return null;
+
+    return (
+      <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-indigo-50/30 dark:border-purple-900 dark:from-purple-950/20 dark:to-indigo-950/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-purple-500" />
+            <span>Recomendaciones de Steve</span>
+            {briefData.hasBrief ? (
+              <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                Basado en tu brief
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs">
+                Valores por defecto
+              </Badge>
+            )}
+          </CardTitle>
+          {!briefData.hasBrief && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Completa tu brief de marca para que Steve personalice estas reglas con tus objetivos de CPA, ROAS y presupuesto reales.
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {available.map((suggestion, idx) => {
+              const Icon = suggestion.icon;
+              const isApplying = applyingSuggestion === idx;
+              return (
+                <div
+                  key={idx}
+                  className="flex items-start gap-3 p-3 rounded-lg border bg-background/80 hover:shadow-sm transition-all"
+                >
+                  <div className={`rounded-lg bg-muted p-2 shrink-0 ${suggestion.color}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-sm mb-0.5">{suggestion.name}</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                      {suggestion.description}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1.5 border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-800 dark:hover:bg-purple-950 dark:hover:text-purple-300"
+                      disabled={isApplying}
+                      onClick={() => applySuggestedRule(suggestion, idx)}
+                    >
+                      {isApplying ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Aplicando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3 w-3" />
+                          Aplicar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {suggestion.briefBased && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0 bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300">
+                      Brief
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderRulesList = () => {
     if (rules.length === 0) {
@@ -1422,6 +1684,9 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
           </CardContent>
         </Card>
       </div>
+
+      {/* AI-powered suggestions from brief */}
+      {!briefLoading && renderSuggestedRules()}
 
       {/* Tab navigation */}
       <div className="flex border-b">

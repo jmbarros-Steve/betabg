@@ -12,7 +12,7 @@ import {
   Instagram, Search, Loader2, Trophy, Clock, Eye,
   Megaphone, ShoppingCart, ArrowRight, ExternalLink,
   Plus, X, RefreshCw, TrendingUp, AlertCircle, Link2,
-  Sparkles, Lightbulb, BarChart3, Target, Zap,
+  Sparkles, Lightbulb, BarChart3, Target, Zap, Copy,
 } from 'lucide-react';
 import MetaScopeAlert from './meta-ads/MetaScopeAlert';
 
@@ -154,13 +154,12 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       });
 
       if (response.error) {
-        const errData = response.data;
-        if (errData?.error === 'meta_not_connected') {
+        if (response.error === 'meta_not_connected') {
           toast.error('Conecta Meta Ads primero en la pestaña Conexiones');
           setHasMetaConnection(false);
           return;
         }
-        throw new Error(response.error.message);
+        throw new Error(response.error);
       }
 
       const rawResults = response.data?.results;
@@ -298,6 +297,48 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     }
   }
 
+  // Open Meta Ad Library for a given search query
+  function openAdLibrary(query: string) {
+    const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(query)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  // Send winning patterns to copy generator as context
+  function handleUseWinningPatterns() {
+    if (!analysis) return;
+    const context = [
+      '--- INTELIGENCIA COMPETITIVA ---',
+      '',
+      'PATRONES DETECTADOS:',
+      ...analysis.patrones.map(p => `- ${p}`),
+      '',
+      'ÁNGULOS FRECUENTES:',
+      ...analysis.angulos_frecuentes.map(a => `- ${a}`),
+      '',
+      'CTAs POPULARES:',
+      ...analysis.ctas_populares.map(c => `- ${c}`),
+      '',
+      'FORMATOS:',
+      ...analysis.formatos_usados.map(f => `- ${f}`),
+      '',
+      'ESTIMACIÓN DE GASTO:',
+      analysis.estimacion_gasto,
+      '',
+      'TOP ADS GANADORES:',
+      ...analysis.ganadores_insight.map(g => `- ${g}`),
+      '',
+      'RECOMENDACIONES:',
+      ...analysis.recomendaciones.map(r => `- ${r}`),
+    ].join('\n');
+
+    // Store in sessionStorage so the copy generator can pick it up
+    sessionStorage.setItem('competitor_context', context);
+    toast.success('Patrones copiados. Ve a Generar Copies para usarlos como contexto.');
+
+    // Also copy to clipboard as fallback
+    navigator.clipboard?.writeText(context).catch(() => {});
+  }
+
   const filteredAds = ads.filter(ad => {
     if (filter === 'winners') return (ad.days_running || 0) >= 30;
     if (filter === 'active') return ad.is_active;
@@ -374,29 +415,40 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         <CardContent className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {handles.map((handle, i) => (
-              <div key={i} className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
-                <Input
-                  value={handle}
-                  onChange={(e) => {
-                    const updated = [...handles];
-                    updated[i] = e.target.value.replace(/^@/, '');
-                    setHandles(updated);
-                  }}
-                  placeholder={`competidor_${i + 1}`}
-                  className="pl-7"
-                  disabled={syncing}
-                />
-                {handle && (
-                  <button
-                    onClick={() => {
+              <div key={i} className="space-y-1">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                  <Input
+                    value={handle}
+                    onChange={(e) => {
                       const updated = [...handles];
-                      updated[i] = '';
+                      updated[i] = e.target.value.replace(/^@/, '');
                       setHandles(updated);
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    placeholder={`competidor_${i + 1}`}
+                    className="pl-7"
+                    disabled={syncing}
+                  />
+                  {handle && (
+                    <button
+                      onClick={() => {
+                        const updated = [...handles];
+                        updated[i] = '';
+                        setHandles(updated);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                {handle.trim() && (
+                  <button
+                    onClick={() => openAdLibrary(handle.trim())}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
                   >
-                    <X className="h-3 w-3" />
+                    <ExternalLink className="h-3 w-3" />
+                    Buscar en Meta Ad Library
                   </button>
                 )}
               </div>
@@ -550,10 +602,16 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                   </ul>
                 </div>
 
-                <Button variant="ghost" size="sm" onClick={handleAnalyze} disabled={analyzing} className="w-full text-xs">
-                  {analyzing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                  Re-analizar
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={handleAnalyze} disabled={analyzing} className="flex-1 text-xs">
+                    {analyzing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                    Re-analizar
+                  </Button>
+                  <Button size="sm" onClick={handleUseWinningPatterns} className="flex-1 text-xs gap-1">
+                    <Copy className="h-3 w-3" />
+                    Usar Patrones Ganadores
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -587,15 +645,20 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredAds.map(ad => (
               <Card key={ad.id} className="overflow-hidden">
-                {/* Snapshot link */}
-                {ad.image_url && (
+                {/* Snapshot preview */}
+                {ad.image_url ? (
                   <a href={ad.image_url} target="_blank" rel="noopener noreferrer" className="block">
-                    <div className="h-48 bg-muted flex items-center justify-center text-muted-foreground relative group">
+                    <div className="h-48 bg-muted flex flex-col items-center justify-center text-muted-foreground relative group">
                       <Eye className="h-8 w-8" />
-                      <span className="text-xs mt-1 absolute bottom-2">Ver en Ad Library</span>
+                      <span className="text-xs mt-2">Click para ver snapshot</span>
                       <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </a>
+                ) : (
+                  <div className="h-32 bg-muted/50 flex flex-col items-center justify-center text-muted-foreground">
+                    <Megaphone className="h-6 w-6 mb-1" />
+                    <span className="text-xs">Sin preview</span>
+                  </div>
                 )}
                 <CardContent className="p-4 space-y-2">
                   {/* Header: handle + days */}
@@ -606,7 +669,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                     </Badge>
                     <div className="flex items-center gap-1.5">
                       {(ad.days_running || 0) >= 30 && (
-                        <Badge variant="default" className="text-xs">🏆 Ganador</Badge>
+                        <Badge variant="default" className="text-xs">Ganador</Badge>
                       )}
                       {ad.is_active && (
                         <Badge variant="secondary" className="text-xs">Activo</Badge>
@@ -643,18 +706,27 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                     )}
                   </div>
 
-                  {/* View in Ad Library */}
-                  {ad.image_url && (
-                    <a
-                      href={ad.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline flex items-center gap-1 pt-1"
+                  {/* Links */}
+                  <div className="flex items-center gap-3 pt-1">
+                    {ad.image_url && (
+                      <a
+                        href={ad.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver Snapshot
+                      </a>
+                    )}
+                    <button
+                      onClick={() => openAdLibrary(getTrackingHandle(ad.tracking_id))}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
-                      <ExternalLink className="h-3 w-3" />
-                      Ver en Meta Ad Library
-                    </a>
-                  )}
+                      <Search className="h-3 w-3" />
+                      Buscar en Ad Library
+                    </button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -671,7 +743,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         </>
       )}
 
-      {/* Empty state */}
+      {/* Empty state - no tracking yet */}
       {ads.length === 0 && tracking.length === 0 && (
         <Card className="text-center py-12">
           <CardContent>
@@ -680,6 +752,38 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
               Ingresa los handles de Instagram de tus competidores arriba y Steve buscará sus anuncios
               activos en Meta Ad Library. Los anuncios que llevan más de 30 días son los <strong>ganadores</strong>.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Synced but no ads found */}
+      {ads.length === 0 && tracking.length > 0 && (
+        <Card className="text-center py-8">
+          <CardContent className="space-y-4">
+            <AlertCircle className="h-10 w-10 mx-auto text-muted-foreground" />
+            <h3 className="text-base font-semibold">No se encontraron anuncios via API</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Es posible que la API de Meta no haya encontrado resultados para estos handles.
+              Puedes buscar directamente en Meta Ad Library:
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {tracking.map(t => (
+                <Button
+                  key={t.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openAdLibrary(t.ig_handle)}
+                  className="text-xs gap-1"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  @{t.ig_handle}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tip: Si el nombre de la pagina de Facebook es diferente al handle de Instagram,
+              intenta buscar con el nombre de la marca directamente.
             </p>
           </CardContent>
         </Card>

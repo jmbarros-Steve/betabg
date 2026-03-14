@@ -10,7 +10,8 @@ type Action =
   | 'list_post_comments'
   | 'list_ad_comments'
   | 'reply_message'
-  | 'reply_comment';
+  | 'reply_comment'
+  | 'mark_read';
 
 interface RequestBody {
   action: Action;
@@ -433,6 +434,37 @@ async function handleReplyComment(token: string, body: RequestBody): Promise<{ b
   return { body: { success: true, comment_id: result.data?.id }, status: 200 };
 }
 
+/** Mark a conversation as read via Meta API */
+async function handleMarkRead(token: string, body: RequestBody): Promise<{ body: any; status: number }> {
+  const { page_id, conversation_id } = body;
+  if (!page_id || !conversation_id) {
+    return { body: { success: false, error: 'page_id and conversation_id required' }, status: 400 };
+  }
+
+  // Get page access token
+  const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
+  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+
+  // Meta API: POST /{conversation_id}?is_read=true marks a conversation as read
+  const url = new URL(`${META_API}/${conversation_id}`);
+  url.searchParams.set('access_token', pageToken);
+  url.searchParams.set('is_read', 'true');
+
+  try {
+    const res = await fetch(url.toString(), { method: 'POST' });
+    const data: any = await res.json();
+    if (!res.ok) {
+      console.warn(`[social-inbox] mark_read failed for ${conversation_id}:`, data?.error?.message);
+      // Return success anyway — the local UI state is already updated
+      return { body: { success: true, meta_synced: false }, status: 200 };
+    }
+    return { body: { success: true, meta_synced: true }, status: 200 };
+  } catch (err) {
+    console.warn(`[social-inbox] mark_read network error:`, err);
+    return { body: { success: true, meta_synced: false }, status: 200 };
+  }
+}
+
 // --- Main Handler ---
 
 export async function metaSocialInbox(c: Context) {
@@ -519,6 +551,9 @@ export async function metaSocialInbox(c: Context) {
         break;
       case 'reply_comment':
         result = await handleReplyComment(decryptedToken, body);
+        break;
+      case 'mark_read':
+        result = await handleMarkRead(decryptedToken, body);
         break;
       default:
         result = { body: { error: `Unknown action: ${action}` }, status: 400 };
