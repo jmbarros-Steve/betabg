@@ -21,8 +21,6 @@ import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerato
 import { CampaignStudio } from '@/components/client-portal/campaign-studio/CampaignStudio';
 import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfigPanel';
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
-import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
-import { OnboardingWizard } from '@/components/client-portal/OnboardingWizard';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import MetaAdsManager from '@/components/client-portal/meta-ads/MetaAdsManager';
@@ -34,7 +32,6 @@ import { CommandPalette } from '@/components/client-portal/CommandPalette';
 import { BottomNav } from '@/components/client-portal/BottomNav';
 import { OfflineBanner } from '@/components/client-portal/OfflineBanner';
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
-import { ProductTour } from '@/components/client-portal/ProductTour';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
@@ -57,11 +54,8 @@ export default function ClientPortal() {
   const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(new Set(['connections']));
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
   const [defaultTabResolved, setDefaultTabResolved] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   // Track visited tabs so they stay mounted (preserves state like in-flight API calls)
   useEffect(() => {
@@ -91,7 +85,6 @@ export default function ClientPortal() {
 
   // Onboarding disabled — will rebuild properly later
   useEffect(() => {
-    // setShowOnboarding(false) — onboarding off
   }, [user, isClient, isAdminView]);
 
   // Claridad de sesión: mostrar una vez al entrar al portal que la sesión está activa
@@ -104,12 +97,6 @@ export default function ClientPortal() {
     }
   }, [user, isClient, isAdminView, roleLoading]);
 
-  const handleCompleteOnboarding = () => {
-    if (user) {
-      localStorage.setItem(`bg_onboarding_${user.id}`, 'true');
-    }
-    setShowOnboarding(false);
-  };
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -222,23 +209,22 @@ export default function ClientPortal() {
     resolveDefaultTab();
   }, [defaultTabResolved, roleLoading, authLoading, isAdminView, urlClientId, clientData?.id]);
 
-  // Fetch client logo and onboarding step
+  // Fetch client logo
   useEffect(() => {
     const id = isAdminView ? urlClientId : clientData?.id;
     if (!id) return;
     supabase
       .from('clients')
-      .select('logo_url, onboarding_step')
+      .select("logo_url")
       .eq('id', id)
       .single()
       .then(({ data }) => {
         if (data?.logo_url) setClientLogoUrl(data.logo_url);
-        setOnboardingStep((data as any)?.onboarding_step ?? null);
         setOnboardingChecked(true);
       });
   }, [clientData?.id, urlClientId, isAdminView]);
 
-  if (authLoading || roleLoading || loadingClient || !onboardingChecked) {
+  if (authLoading || roleLoading || loadingClient) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -250,17 +236,7 @@ export default function ClientPortal() {
     return null;
   }
 
-  // Show onboarding wizard for clients who haven't completed it
-  // Onboarding wizard disabled
-  if (false && onboardingStep !== null && !isAdminView && effectiveClientId) {
-    return (
-      <OnboardingWizard
-        clientId={effectiveClientId}
-        initialStep={onboardingStep}
-        onComplete={() => setOnboardingStep(null)}
-      />
-    );
-  }
+    // Onboarding removed
 
   const primaryTabs = [
     { id: 'steve', label: 'Steve', icon: Bot },
@@ -507,10 +483,7 @@ export default function ClientPortal() {
       {/* Cmd+K Command Palette */}
       <CommandPalette onNavigate={(tab) => setActiveTab(tab as TabType)} />
 
-      {/* Product Tour — only for non-onboarding users */}
-      {onboardingStep === null && user && (
-        {/* ProductTour disabled */}
-      )}
+      {/* Onboarding removed */}
 
       {/* Mobile Bottom Navigation */}
       <BottomNav
