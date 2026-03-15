@@ -55,7 +55,7 @@ interface PageInfo {
   name: string;
   category: string | null;
   picture_url: string | null;
-  page_access_token: string | null;
+  has_page_token: boolean;
   instagram: {
     id: string;
     name: string;

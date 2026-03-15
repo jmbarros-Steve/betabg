@@ -79,7 +79,7 @@ async function handleListPages(token: string): Promise<{ body: any; status: numb
     name: p.name,
     category: p.category || null,
     picture_url: p.picture?.data?.url || null,
-    page_access_token: p.access_token || null,
+    has_page_token: !!p.access_token,
     instagram: p.instagram_business_account
       ? {
           id: p.instagram_business_account.id,
@@ -445,11 +445,13 @@ async function handleMarkRead(token: string, body: RequestBody): Promise<{ body:
 
   // Meta API: POST /{conversation_id}?is_read=true marks a conversation as read
   const url = new URL(`${META_API}/${conversation_id}`);
-  url.searchParams.set('access_token', pageToken);
   url.searchParams.set('is_read', 'true');
 
   try {
-    const res = await fetch(url.toString(), { method: 'POST' });
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${pageToken}` },
+    });
     const data: any = await res.json();
     if (!res.ok) {
       console.warn(`[social-inbox] mark_read failed for ${conversation_id}:`, data?.error?.message);
