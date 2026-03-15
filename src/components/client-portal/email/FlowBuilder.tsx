@@ -491,7 +491,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Automatizaciónes</h3>
+          <h3 className="text-lg font-semibold">Automatizaciones</h3>
           <p className="text-sm text-muted-foreground">Envía emails automáticamente según el comportamiento del cliente</p>
         </div>
         <Button size="lg" onClick={openNewFlowPicker} className="gap-2">
@@ -512,7 +512,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             </div>
             <h4 className="text-lg font-semibold mb-2">Automatiza tus emails</h4>
             <p className="text-muted-foreground max-w-md mb-6">
-              Las automatizaciónes envían emails automáticamente cuando algo ocurre en tu tienda. Crea tu primera automatización para empezar.
+              Las automatizaciones envían emails automáticamente cuando algo ocurre en tu tienda. Crea tu primera automatización para empezar.
             </p>
             <Button size="lg" onClick={openNewFlowPicker} className="gap-2">
               <Plus className="w-5 h-5" /> Crear automatización
