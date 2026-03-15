@@ -297,22 +297,32 @@ async function syncMetaCampaigns(
   }
   console.log(`Meta account currency: ${accountCurrency}`);
 
-  // Fetch campaigns with insights
+  // Fetch all campaigns with pagination
   const campaignsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/campaigns`);
   campaignsUrl.searchParams.set('access_token', accessToken);
   campaignsUrl.searchParams.set('fields', 'id,name,status');
   campaignsUrl.searchParams.set('limit', '100');
 
-  const campaignsRes = await fetch(campaignsUrl.toString());
-  if (!campaignsRes.ok) {
-    console.error('Meta campaigns fetch error:', await campaignsRes.text());
-    return metrics;
+  const campaigns: MetaCampaign[] = [];
+  let nextCampaignsUrl: string | null = campaignsUrl.toString();
+
+  while (nextCampaignsUrl) {
+    const campaignsRes = await fetch(nextCampaignsUrl);
+    if (!campaignsRes.ok) {
+      console.error('Meta campaigns fetch error:', await campaignsRes.text());
+      break;
+    }
+
+    const campaignsData: any = await campaignsRes.json();
+    campaigns.push(...(campaignsData.data || []));
+    nextCampaignsUrl = campaignsData.paging?.next || null;
+
+    if (nextCampaignsUrl) {
+      console.log(`Fetching next page of campaigns (${campaigns.length} so far)...`);
+    }
   }
 
-  const campaignsData: any = await campaignsRes.json();
-  const campaigns: MetaCampaign[] = campaignsData.data || [];
-
-  console.log(`Found ${campaigns.length} Meta campaigns`);
+  console.log(`Found ${campaigns.length} Meta campaigns (all pages)`);
 
   // Fetch insights for each campaign
   for (const campaign of campaigns) {
@@ -529,17 +539,23 @@ async function syncMetaAdsetMetrics(
   for (const campaignId of campaignIds) {
     const campaignName = campaignMetrics.find(m => m.campaign_id === campaignId)?.campaign_name || '';
 
-    // Fetch adsets for this campaign
+    // Fetch all adsets for this campaign with pagination
     const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaignId}/adsets`);
     adsetsUrl.searchParams.set('access_token', accessToken);
     adsetsUrl.searchParams.set('fields', 'id,name');
     adsetsUrl.searchParams.set('limit', '100');
 
     try {
-      const adsetsRes = await fetch(adsetsUrl.toString());
-      if (!adsetsRes.ok) continue;
-      const adsetsData: any = await adsetsRes.json();
-      const adsets = adsetsData.data || [];
+      const adsets: Array<{ id: string; name: string }> = [];
+      let nextAdsetsUrl: string | null = adsetsUrl.toString();
+
+      while (nextAdsetsUrl) {
+        const adsetsRes = await fetch(nextAdsetsUrl);
+        if (!adsetsRes.ok) break;
+        const adsetsData: any = await adsetsRes.json();
+        adsets.push(...(adsetsData.data || []));
+        nextAdsetsUrl = adsetsData.paging?.next || null;
+      }
 
       for (const adset of adsets) {
         const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);
