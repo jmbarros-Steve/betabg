@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Mail, MousePointerClick, AlertTriangle, Loader2, DollarSign, Eye, ArrowLeft, Users } from 'lucide-react';
+import { Mail, MousePointerClick, AlertTriangle, Loader2, DollarSign, Eye, ArrowLeft, Users, TrendingUp, Link2, BarChart3, ShieldCheck } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 interface EmailAnalyticsProps {
   clientId: string;
@@ -15,6 +16,7 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
   const [overview, setOverview] = useState<any>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [campaignStats, setCampaignStats] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [days, setDays] = useState('30');
@@ -22,11 +24,17 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
   const loadOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await callApi<any>('email-campaign-analytics', {
-        body: { action: 'overview', client_id: clientId, days: Number(days) },
-      });
-      if (error) { toast.error(error); return; }
-      setOverview(data);
+      const [overviewRes, timelineRes] = await Promise.all([
+        callApi<any>('email-campaign-analytics', {
+          body: { action: 'overview', client_id: clientId, days: Number(days) },
+        }),
+        callApi<any>('email-campaign-analytics', {
+          body: { action: 'timeline', client_id: clientId, days: Number(days) },
+        }),
+      ]);
+      if (overviewRes.error) { toast.error(overviewRes.error); return; }
+      setOverview(overviewRes.data);
+      setTimeline(timelineRes.data?.timeline || []);
     } finally {
       setLoading(false);
     }
@@ -52,6 +60,32 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
     setSelectedCampaign(null);
     setCampaignStats(null);
   };
+
+  // Deliverability health score (0-100)
+  const healthScore = useMemo(() => {
+    if (!overview?.aggregate) return null;
+    const { open_rate, bounce_rate, total_sent } = overview.aggregate;
+    if (!total_sent || total_sent === 0) return null;
+    const openScore = Math.min(parseFloat(open_rate) / 25, 1) * 40; // 25%+ open = perfect
+    const bounceScore = Math.max(0, 1 - parseFloat(bounce_rate) / 5) * 30; // <5% bounce = perfect
+    const unsubRate = parseFloat(overview.aggregate.total_unsubscribed || 0) / total_sent * 100;
+    const unsubScore = Math.max(0, 1 - unsubRate / 2) * 30; // <2% unsub = perfect
+    return Math.round(openScore + bounceScore + unsubScore);
+  }, [overview]);
+
+  // Campaign comparison data for bar chart
+  const campaignComparison = useMemo(() => {
+    if (!overview?.campaigns) return [];
+    return overview.campaigns
+      .filter((c: any) => c.sent_count > 0)
+      .slice(0, 8)
+      .map((c: any) => ({
+        name: c.name?.length > 20 ? c.name.substring(0, 20) + '...' : c.name,
+        fullName: c.name,
+        open_rate: parseFloat(c.open_rate || 0),
+        click_rate: parseFloat(c.click_rate || 0),
+      }));
+  }, [overview]);
 
   if (loading) {
     return (
@@ -88,51 +122,97 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{campaignStats.campaign?.name || 'Campaña'}</CardTitle>
+            <CardDescription>
+              {campaignStats.stats.sent ? `${campaignStats.stats.sent} enviados` : ''}
+              {campaignStats.campaign?.sent_at ? ` · ${new Date(campaignStats.campaign.sent_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* Open rate */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm text-muted-foreground">Tasa de apertura</span>
-                <span className="text-2xl font-bold text-green-600">{campaignStats.stats.open_rate}%</span>
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Open rate */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm text-muted-foreground">Aperturas</span>
+                  <span className="text-xl font-bold text-green-600">{campaignStats.stats.open_rate}%</span>
+                </div>
+                <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${Math.min(campaignStats.stats.open_rate, 100)}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{campaignStats.stats.unique_opens} únicas</p>
               </div>
-              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-green-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(campaignStats.stats.open_rate, 100)}%` }}
-                />
+
+              {/* Click rate */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm text-muted-foreground">Clicks</span>
+                  <span className="text-xl font-bold text-purple-600">{campaignStats.stats.click_rate}%</span>
+                </div>
+                <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${Math.min(campaignStats.stats.click_rate, 100)}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{campaignStats.stats.unique_clicks} únicos</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">{campaignStats.stats.unique_opens} aperturas únicas</p>
             </div>
 
-            {/* Click rate */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm text-muted-foreground">Tasa de clicks</span>
-                <span className="text-2xl font-bold text-purple-600">{campaignStats.stats.click_rate}%</span>
-              </div>
-              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-purple-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(campaignStats.stats.click_rate, 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{campaignStats.stats.unique_clicks} clicks únicos</p>
+            {/* Click-to-open rate */}
+            <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+              <span className="text-sm text-muted-foreground">Click-to-Open Rate (CTOR)</span>
+              <span className="text-sm font-bold">{campaignStats.stats.click_to_open_rate}%</span>
             </div>
 
-            {/* Unsubscribes */}
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm text-muted-foreground">Desuscripciones</span>
-              <span className="text-sm font-medium">{campaignStats.stats.unsubscribe_rate}%</span>
+            {/* Secondary stats */}
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="p-2 rounded-lg bg-muted/30">
+                <p className="text-lg font-semibold">{campaignStats.stats.bounced || 0}</p>
+                <p className="text-xs text-muted-foreground">Rebotes</p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted/30">
+                <p className="text-lg font-semibold">{campaignStats.stats.unsubscribed || 0}</p>
+                <p className="text-xs text-muted-foreground">Bajas</p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted/30">
+                <p className="text-lg font-semibold">{campaignStats.stats.complained || 0}</p>
+                <p className="text-xs text-muted-foreground">Quejas</p>
+              </div>
             </div>
 
             {/* Revenue */}
             {campaignStats.total_revenue > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
                 <DollarSign className="w-5 h-5 text-green-600" />
                 <div>
-                  <p className="font-bold text-green-800">${campaignStats.total_revenue.toFixed(2)}</p>
-                  <p className="text-xs text-green-600">{campaignStats.total_conversions} conversiones atribuidas</p>
+                  <p className="font-bold text-green-800 dark:text-green-400">${campaignStats.total_revenue.toFixed(2)}</p>
+                  <p className="text-xs text-green-600 dark:text-green-500">{campaignStats.total_conversions} conversiones atribuidas</p>
+                </div>
+              </div>
+            )}
+
+            {/* Top clicked links */}
+            {campaignStats.top_links && campaignStats.top_links.length > 0 && (
+              <div className="pt-2 border-t">
+                <div className="flex items-center gap-2 mb-3">
+                  <Link2 className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Links más clickeados</span>
+                </div>
+                <div className="space-y-2">
+                  {campaignStats.top_links.slice(0, 5).map((link: any, i: number) => {
+                    const maxClicks = campaignStats.top_links[0].clicks;
+                    const pct = maxClicks > 0 ? (link.clicks / maxClicks) * 100 : 0;
+                    return (
+                      <div key={i} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground truncate max-w-[70%]" title={link.url}>
+                            {link.url.replace(/^https?:\/\/(www\.)?/, '').substring(0, 50)}
+                          </span>
+                          <span className="font-medium ml-2">{link.clicks} clicks</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -162,6 +242,13 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
   const bounceBg = aggregate.bounce_rate > 5 ? 'bg-red-50' : aggregate.bounce_rate > 2 ? 'bg-orange-50' : 'bg-green-50';
   const openColor = aggregate.open_rate >= 20 ? 'text-green-600' : aggregate.open_rate >= 10 ? 'text-orange-500' : 'text-red-600';
 
+  const healthColor = healthScore !== null
+    ? healthScore >= 80 ? 'text-green-600' : healthScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+    : 'text-muted-foreground';
+  const healthBg = healthScore !== null
+    ? healthScore >= 80 ? 'bg-green-50' : healthScore >= 60 ? 'bg-yellow-50' : 'bg-red-50'
+    : 'bg-muted/50';
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -180,14 +267,14 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
       </div>
 
       {/* Main stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>
           <CardContent className="pt-5 pb-4 text-center">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-2">
               <Mail className="w-5 h-5 text-blue-600" />
             </div>
             <p className="text-2xl font-bold">{aggregate.total_sent?.toLocaleString() ?? 0}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Emails enviados</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Enviados</p>
           </CardContent>
         </Card>
 
@@ -197,7 +284,7 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
               <Eye className="w-5 h-5 text-green-600" />
             </div>
             <p className={`text-2xl font-bold ${openColor}`}>{aggregate.open_rate}%</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Tasa de apertura</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Aperturas</p>
           </CardContent>
         </Card>
 
@@ -207,7 +294,7 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
               <MousePointerClick className="w-5 h-5 text-purple-600" />
             </div>
             <p className="text-2xl font-bold text-purple-600">{aggregate.click_rate}%</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Tasa de clicks</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Clicks</p>
           </CardContent>
         </Card>
 
@@ -217,21 +304,102 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
               <AlertTriangle className={`w-5 h-5 ${bounceColor}`} />
             </div>
             <p className={`text-2xl font-bold ${bounceColor}`}>{aggregate.bounce_rate}%</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Tasa de rebote</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Rebotes</p>
           </CardContent>
         </Card>
+
+        {/* Deliverability health score */}
+        {healthScore !== null && (
+          <Card>
+            <CardContent className="pt-5 pb-4 text-center">
+              <div className={`w-10 h-10 rounded-full ${healthBg} flex items-center justify-center mx-auto mb-2`}>
+                <ShieldCheck className={`w-5 h-5 ${healthColor}`} />
+              </div>
+              <p className={`text-2xl font-bold ${healthColor}`}>{healthScore}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Salud</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Subscriber summary — compact info line */}
+      {/* Subscriber summary */}
       {subscribers && (
         <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/50 rounded-lg text-sm">
           <Users className="w-4 h-4 text-muted-foreground" />
-          <span className="text-muted-foreground">Total contactos activos:</span>
+          <span className="text-muted-foreground">Contactos activos:</span>
           <span className="font-semibold">{subscribers.total?.toLocaleString() ?? 0}</span>
-          <span className="text-muted-foreground mx-1">·</span>
-          <span className="text-muted-foreground">Nuevos este periodo:</span>
+          <span className="text-muted-foreground mx-1">&middot;</span>
+          <span className="text-muted-foreground">Nuevos:</span>
           <span className="font-semibold text-green-600">+{subscribers.new_in_period ?? 0}</span>
         </div>
+      )}
+
+      {/* Engagement Timeline Chart */}
+      {timeline.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-base">Actividad en el tiempo</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={timeline} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(v: string) => {
+                    const d = new Date(v + 'T12:00:00');
+                    return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+                  }}
+                />
+                <YAxis tick={{ fontSize: 10 }} width={40} allowDecimals={false} />
+                <RechartsTooltip
+                  labelFormatter={(v: string) => {
+                    const d = new Date(v + 'T12:00:00');
+                    return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'long' });
+                  }}
+                />
+                <Line type="monotone" dataKey="sent" stroke="#3b82f6" strokeWidth={2} dot={false} name="Enviados" />
+                <Line type="monotone" dataKey="opened" stroke="#22c55e" strokeWidth={2} dot={false} name="Abiertos" />
+                <Line type="monotone" dataKey="clicked" stroke="#a855f7" strokeWidth={2} dot={false} name="Clicks" />
+                <Line type="monotone" dataKey="bounced" stroke="#ef4444" strokeWidth={1} dot={false} name="Rebotes" strokeDasharray="4 4" />
+                <Legend />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Campaign Comparison Bar Chart */}
+      {campaignComparison.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-base">Comparativa de campañas</CardTitle>
+            </div>
+            <CardDescription>Tasa de apertura y clicks por campaña</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={campaignComparison} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={50} />
+                <YAxis tick={{ fontSize: 10 }} width={35} tickFormatter={(v: number) => `${v}%`} />
+                <RechartsTooltip
+                  formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
+                  labelFormatter={(label: string, payload: any[]) => payload?.[0]?.payload?.fullName || label}
+                />
+                <Bar dataKey="open_rate" fill="#22c55e" radius={[3, 3, 0, 0]} name="Aperturas %" />
+                <Bar dataKey="click_rate" fill="#a855f7" radius={[3, 3, 0, 0]} name="Clicks %" />
+                <Legend />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       )}
 
       {/* Campaign performance table */}
@@ -251,40 +419,54 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
                   <tr className="border-b text-muted-foreground text-left">
                     <th className="pb-2 font-medium">Campaña</th>
                     <th className="pb-2 font-medium text-right">Enviados</th>
-                    <th className="pb-2 font-medium text-right">Aperturas %</th>
-                    <th className="pb-2 font-medium text-right">Clicks %</th>
+                    <th className="pb-2 font-medium text-right">Aperturas</th>
+                    <th className="pb-2 font-medium text-right">Clicks</th>
+                    <th className="pb-2 font-medium text-right">Estado</th>
                     <th className="pb-2 font-medium text-right">Fecha</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((campaign: any) => (
-                    <tr
-                      key={campaign.id}
-                      className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => loadCampaignStats(campaign.id)}
-                    >
-                      <td className="py-2.5 pr-4 max-w-[200px]">
-                        <span className="font-medium text-primary hover:underline truncate block">
-                          {campaign.name}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums">{campaign.sent_count ?? 0}</td>
-                      <td className="py-2.5 text-right tabular-nums">
-                        {campaign.open_rate != null ? `${campaign.open_rate}%` : '—'}
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums">
-                        {campaign.click_rate != null ? `${campaign.click_rate}%` : '—'}
-                      </td>
-                      <td className="py-2.5 text-right text-muted-foreground whitespace-nowrap">
-                        {campaign.sent_at
-                          ? new Date(campaign.sent_at).toLocaleDateString()
-                          : campaign.created_at
-                            ? new Date(campaign.created_at).toLocaleDateString()
-                            : '—'
-                        }
-                      </td>
-                    </tr>
-                  ))}
+                  {campaigns.map((campaign: any) => {
+                    const openRate = parseFloat(campaign.open_rate || 0);
+                    const openBadge = openRate >= 25 ? 'bg-green-100 text-green-700' : openRate >= 15 ? 'bg-yellow-100 text-yellow-700' : openRate > 0 ? 'bg-red-100 text-red-700' : 'bg-muted text-muted-foreground';
+                    return (
+                      <tr
+                        key={campaign.id}
+                        className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => loadCampaignStats(campaign.id)}
+                      >
+                        <td className="py-2.5 pr-4 max-w-[200px]">
+                          <span className="font-medium text-primary hover:underline truncate block">
+                            {campaign.name}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums">{campaign.sent_count ?? 0}</td>
+                        <td className="py-2.5 text-right">
+                          {campaign.open_rate != null ? (
+                            <Badge variant="outline" className={`text-xs font-medium ${openBadge}`}>
+                              {campaign.open_rate}%
+                            </Badge>
+                          ) : '—'}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums">
+                          {campaign.click_rate != null ? `${campaign.click_rate}%` : '—'}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {campaign.status === 'sent' ? 'Enviada' : campaign.status === 'draft' ? 'Borrador' : campaign.status === 'scheduled' ? 'Programada' : campaign.status}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 text-right text-muted-foreground whitespace-nowrap">
+                          {campaign.sent_at
+                            ? new Date(campaign.sent_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
+                            : campaign.created_at
+                              ? new Date(campaign.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
+                              : '—'
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
