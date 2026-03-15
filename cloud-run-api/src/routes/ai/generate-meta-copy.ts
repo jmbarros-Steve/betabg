@@ -12,6 +12,138 @@ interface GenerateRequest {
   mode?: 'variaciones' | 'brief_visual' | 'legacy';
 }
 
+// ── VISUAL STYLE POOL (15 styles, rotated per client) ──────────────────────
+const VISUAL_STYLES = [
+  'UGC (user-generated content)', 'Editorial de revista', 'Flat lay cenital',
+  'Lifestyle outdoor', 'Lifestyle indoor', 'Behind-the-scenes',
+  'Antes/Después split', 'Close-up de producto', 'Modelo usando el producto',
+  'Estilo testimonial', 'Minimalista fondo limpio', 'Bold typography overlay',
+  'Comparación split-screen', 'Seasonal/temático', 'Night mood / luces neón',
+] as const;
+
+// ── ANTI-REPETITION HELPERS ────────────────────────────────────────────────
+
+async function fetchRecentCopies(supabase: ReturnType<typeof getSupabaseAdmin>, clientId: string, funnelStage: string, limit = 10) {
+  const { data } = await supabase
+    .from('generated_copies')
+    .select('headlines, primary_text, hooks, angle_category')
+    .eq('client_id', clientId)
+    .eq('funnel_stage', funnelStage)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return data || [];
+}
+
+function buildAntiRepetitionBlock(recentCopies: Array<{ headlines: string[]; primary_text: string | null; hooks: string[] | null; angle_category: string | null }>) {
+  if (recentCopies.length === 0) return '';
+
+  const usedHeadlines = recentCopies.flatMap(c => c.headlines).filter(Boolean);
+  const usedHooks = recentCopies.flatMap(c => c.hooks || []).filter(Boolean);
+  const usedAngles = [...new Set(recentCopies.map(c => c.angle_category).filter(Boolean))];
+
+  let block = `\n═══════════════════════════════════════════════════════════════════════════════
+SISTEMA ANTI-REPETICIÓN (OBLIGATORIO)
+═══════════════════════════════════════════════════════════════════════════════
+PROHIBIDO repetir estos headlines ya usados para este cliente:
+${usedHeadlines.slice(0, 20).map(h => `- "${h}"`).join('\n')}
+`;
+
+  if (usedHooks.length > 0) {
+    block += `\nPROHIBIDO repetir estos hooks ya usados:
+${usedHooks.slice(0, 15).map(h => `- "${h}"`).join('\n')}
+`;
+  }
+
+  if (usedAngles.length > 0) {
+    block += `\nÁngulos ya usados recientemente: ${usedAngles.join(', ')}
+Genera un enfoque COMPLETAMENTE DIFERENTE. Sorpréndeme con creatividad fresca.
+`;
+  }
+
+  block += `\nREGLA: Cada headline, hook y texto principal DEBE ser 100% original y diferente a los anteriores. No recicles estructuras ni sinónimos simples.\n`;
+
+  return block;
+}
+
+async function saveCopyToHistory(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  clientId: string,
+  funnelStage: string,
+  headlines: string[],
+  primaryText: string | null,
+  hooks: string[],
+  angleCategory: string | null,
+  visualStyle: string | null,
+) {
+  await supabase.from('generated_copies').insert({
+    client_id: clientId,
+    funnel_stage: funnelStage,
+    angle_category: angleCategory,
+    headlines,
+    primary_text: primaryText,
+    hooks,
+    visual_style: visualStyle,
+  });
+}
+
+async function pickUnusedAngle(supabase: ReturnType<typeof getSupabaseAdmin>, clientId: string, funnelStage: string): Promise<{ id: string; name: string; description: string; category: string } | null> {
+  // Get recently used angle IDs (last 30 days)
+  const { data: recentUsage } = await supabase
+    .from('copy_angle_usage')
+    .select('angle_id')
+    .eq('client_id', clientId)
+    .eq('funnel_stage', funnelStage)
+    .gte('used_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .order('used_at', { ascending: false });
+
+  const usedIds = new Set((recentUsage || []).map(r => r.angle_id));
+
+  // Get all angles
+  const { data: allAngles } = await supabase
+    .from('copy_angles')
+    .select('id, name, description, category');
+
+  if (!allAngles || allAngles.length === 0) return null;
+
+  // Prefer unused angles
+  const unused = allAngles.filter(a => !usedIds.has(a.id));
+  const pool = unused.length > 0 ? unused : allAngles;
+
+  // Pick random from pool
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+
+  // Record usage
+  await supabase.from('copy_angle_usage').insert({
+    client_id: clientId,
+    angle_id: picked.id,
+    funnel_stage: funnelStage,
+  });
+
+  return picked;
+}
+
+async function pickRotatedVisualStyle(supabase: ReturnType<typeof getSupabaseAdmin>, clientId: string): Promise<string> {
+  const { data: recentStyles } = await supabase
+    .from('visual_style_usage')
+    .select('style_name')
+    .eq('client_id', clientId)
+    .order('used_at', { ascending: false })
+    .limit(5);
+
+  const recentNames = new Set((recentStyles || []).map(s => s.style_name));
+  const unused = VISUAL_STYLES.filter(s => !recentNames.has(s));
+  const pool = unused.length > 0 ? unused : [...VISUAL_STYLES];
+
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+
+  await supabase.from('visual_style_usage').insert({
+    client_id: clientId,
+    style_name: picked,
+  });
+
+  return picked;
+}
+
 const COMBINED_METHODOLOGY = `
 ███████████████████████████████████████████████████████████████████████████████
 █                                                                             █
@@ -592,6 +724,10 @@ export async function generateMetaCopy(c: Context) {
   // Used by TestingWizard322 and CampaignCreateWizard for quick copy generation
   if (body.instruction) {
     const cId = resolvedClientId;
+    const instructionFunnel = body.funnelStage || 'tofu';
+
+    // Fetch anti-repetition data in parallel with other queries
+    const recentCopiesPromise = fetchRecentCopies(supabase, cId, instructionFunnel);
 
     // Fetch client brief, knowledge base, and brand research
     const [{ data: briefData }, { data: brandResearch }, { data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
@@ -634,6 +770,9 @@ export async function generateMetaCopy(c: Context) {
       ? `\nCLIENTE: ${clientInfo.name || clientInfo.company || 'N/A'}${clientInfo.shop_domain ? ` (${clientInfo.shop_domain})` : ''}\n`
       : '';
 
+    const recentCopies = await recentCopiesPromise;
+    const antiRepBlock = buildAntiRepetitionBlock(recentCopies);
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -644,12 +783,18 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
+        temperature: 1.2,
         system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes.',
-        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
+        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepBlock}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
       }),
     });
     const aiData: any = await resp.json();
     const text = aiData?.content?.[0]?.text || '';
+
+    // Save to history for anti-repetition
+    const headlinesFromText = text.match(/[""]([^""]{10,80})[""]|^[•\-\d]+\.\s*(.+)/gm)?.slice(0, 5) || [];
+    saveCopyToHistory(supabase, cId, instructionFunnel, headlinesFromText, text.slice(0, 500), [], null, null);
+
     return c.json({ copy: text, text });
   }
 
@@ -675,6 +820,15 @@ export async function generateMetaCopy(c: Context) {
 
   // ── VARIACIONES MODE ──────────────────────────────────────────────────────
   if (mode === 'variaciones') {
+    // Fetch anti-repetition data + unused angle in parallel
+    const [recentCopies, pickedAngle] = await Promise.all([
+      fetchRecentCopies(supabase, clientId, funnelStage),
+      angulo ? Promise.resolve(null) : pickUnusedAngle(supabase, clientId, funnelStage),
+    ]);
+    const antiRepBlock = buildAntiRepetitionBlock(recentCopies);
+    const effectiveAngulo = angulo || pickedAngle?.name || 'dolor';
+    const angleContext = pickedAngle ? `\nÁNGULO SELECCIONADO POR EL BANCO DE ÁNGULOS:\n- Nombre: ${pickedAngle.name}\n- Descripción: ${pickedAngle.description}\n- Categoría: ${pickedAngle.category}\nUSA este ángulo como base creativa.\n` : '';
+
     const { data: briefData } = await supabase
       .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
       .order('created_at', { ascending: false }).limit(1).single();
@@ -708,13 +862,13 @@ Productos: ${JSON.stringify(brandResearchVar.product_details || 'N/A')}\n` : '';
 
     const prompt = `${bugSectionVar}${knowledgeSectionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
 REGLA CRÍTICA: El copy debe ser 100% específico para los productos y marca del cliente. USA los nombres reales de sus productos, sus precios reales, su propuesta de valor real. NUNCA inventes un negocio ficticio ni uses temas genéricos.
-${brandContextVar}${shopifyContextVar}
+${brandContextVar}${shopifyContextVar}${angleContext}${antiRepBlock}
 DATOS DEL CLIENTE:
 - Tienda: ${storeNameVar}
 - Brief: ${JSON.stringify(rawData, null, 2)}
 - Fotos del producto disponibles: ${(assetUrls || []).join(', ')}
 
-Genera exactamente 3 variaciones usando el ángulo "${angulo}" para un anuncio ${funnelStage?.toUpperCase()} ${adType === 'video' ? 'video' : 'imagen'}.
+Genera exactamente 3 variaciones usando el ángulo "${effectiveAngulo}" para un anuncio ${funnelStage?.toUpperCase()} ${adType === 'video' ? 'video' : 'imagen'}.
 ${customPrompt ? `Instrucciones adicionales: ${customPrompt}` : ''}
 
 Usa las fotos para hacer el copy más específico — menciona colores, diseños o detalles reales que veas.
@@ -735,6 +889,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
+        temperature: 1.2,
         system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. PROHIBIDO hablar de plantas, mascotas, comida u otros temas genéricos que no correspondan al negocio real del cliente.',
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -748,6 +903,12 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const raw = aiData.content?.[0]?.text || '';
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
+
+    // Save to anti-repetition history
+    const varHeadlines = (parsed.variaciones || []).map((v: any) => v.titulo).filter(Boolean);
+    const varTexts = (parsed.variaciones || []).map((v: any) => v.texto_principal).filter(Boolean);
+    saveCopyToHistory(supabase, clientId, funnelStage, varHeadlines, varTexts[0] || null, [], effectiveAngulo, null);
+
     return c.json(parsed);
   }
 
@@ -801,6 +962,7 @@ ${adType === 'static'
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
+        temperature: 1.2,
         system: 'Eres un director creativo experto en producción visual para Meta Ads. REGLA ABSOLUTA: Basa el brief visual SOLO en los productos y marca REALES del cliente. NUNCA inventes productos ni temas genéricos.',
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -818,6 +980,16 @@ ${adType === 'static'
   }
 
   // ── LEGACY MODE ──────────────────────────────────────────────────────────
+
+  // Anti-repetition + angle selection for legacy mode
+  const [legacyRecentCopies, legacyAngle] = await Promise.all([
+    fetchRecentCopies(supabase, clientId, funnelStage),
+    pickUnusedAngle(supabase, clientId, funnelStage),
+  ]);
+  const legacyAntiRep = buildAntiRepetitionBlock(legacyRecentCopies);
+  const legacyAngleContext = legacyAngle
+    ? `\nÁNGULO CREATIVO ASIGNADO: "${legacyAngle.name}" (${legacyAngle.category}) — ${legacyAngle.description}\nUSA este ángulo como inspiración principal para el copy.\n`
+    : '';
 
   const { data: briefData, error: briefError } = await supabase
     .from('buyer_personas')
@@ -1010,7 +1182,7 @@ ${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLoca
   const shopDomainLegacy = clientInfoLegacy?.shop_domain || '';
   const clientHeaderLegacy = clientNameLegacy ? `\nCLIENTE: ${clientNameLegacy}${shopDomainLegacy ? ` (${shopDomainLegacy})` : ''}` : '';
 
-  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + clientHeaderLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
+  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + clientHeaderLegacy + legacyAngleContext + legacyAntiRep + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
 
   console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 
@@ -1024,6 +1196,7 @@ ${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLoca
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
+      temperature: 1.2,
       system: systemPrompt,
       messages: [
         {
@@ -1091,6 +1264,18 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
   }
 
   console.log('Successfully generated copy with Sabri + Russell methodology');
+
+  // Save to anti-repetition history
+  const legacyHeadlines = parsedContent.headlines || [];
+  const legacyHooks = parsedContent.hooks || [];
+  saveCopyToHistory(
+    supabase, clientId, funnelStage,
+    Array.isArray(legacyHeadlines) ? legacyHeadlines : [legacyHeadlines],
+    parsedContent.primaryText || null,
+    Array.isArray(legacyHooks) ? legacyHooks : [],
+    legacyAngle?.category || null,
+    null,
+  );
 
   return c.json(parsedContent);
   } catch (err: any) {
