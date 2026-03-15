@@ -108,11 +108,78 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         blockManager: {
           appendOnClick: true,
         },
+        // Configure panels for clean layout
+        panels: { defaults: [] },
       });
 
       editorRef.current = editor;
 
       editor.on('load', () => {
+        // Fix layout: force canvas to fill available space
+        // The newsletter preset creates panels with inline styles that break flex layout
+        const editorEl = containerRef.current;
+        if (editorEl) {
+          // Fix the editor container
+          const gjsEditor = editorEl.querySelector('.gjs-editor') as HTMLElement;
+          if (gjsEditor) {
+            gjsEditor.style.display = 'flex';
+            gjsEditor.style.flexDirection = 'column';
+            gjsEditor.style.height = '100%';
+            gjsEditor.style.overflow = 'hidden';
+          }
+
+          // Fix the editor row (canvas + sidebar)
+          const editorRow = editorEl.querySelector('.gjs-editor-row') as HTMLElement;
+          if (editorRow) {
+            editorRow.style.display = 'flex';
+            editorRow.style.flex = '1';
+            editorRow.style.height = '100%';
+            editorRow.style.overflow = 'hidden';
+          }
+
+          // Fix canvas to fill space
+          const canvas = editorEl.querySelector('.gjs-cv-canvas') as HTMLElement;
+          if (canvas) {
+            canvas.style.flex = '1';
+            canvas.style.height = '100%';
+            canvas.style.width = 'auto';
+            canvas.style.position = 'relative';
+          }
+
+          // Fix the right panel (blocks/traits/styles)
+          const viewsContainer = editorEl.querySelector('.gjs-pn-views-container') as HTMLElement;
+          if (viewsContainer) {
+            viewsContainer.style.width = '240px';
+            viewsContainer.style.minWidth = '240px';
+            viewsContainer.style.height = '100%';
+            viewsContainer.style.overflowY = 'auto';
+            viewsContainer.style.borderLeft = '1px solid #27272a';
+          }
+
+          // Hide default top toolbar panels (we have our own)
+          const panelsToHide = editorEl.querySelectorAll(
+            '.gjs-pn-commands, .gjs-pn-options, .gjs-pn-devices-c'
+          );
+          panelsToHide.forEach((p) => {
+            (p as HTMLElement).style.display = 'none';
+          });
+
+          // Open the blocks panel by default
+          const blocksBtn = editorEl.querySelector('.gjs-pn-btn[data-tooltip="Open Blocks"]') as HTMLElement;
+          if (blocksBtn) blocksBtn.click();
+
+          // Fallback: try clicking the first view button to show blocks
+          const viewBtns = editorEl.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
+          if (viewBtns.length > 0) {
+            (viewBtns[viewBtns.length - 1] as HTMLElement).click();
+          }
+
+          // Refresh canvas to recalculate dimensions
+          setTimeout(() => {
+            editor.refresh();
+          }, 200);
+        }
+
         onReady?.();
       });
 
