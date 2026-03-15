@@ -15,7 +15,7 @@ import {
   RefreshCw, TrendingUp, TrendingDown, DollarSign,
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
   BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
-  Clock, CheckCircle, PauseCircle, Calendar
+  Clock, CheckCircle, PauseCircle, Calendar, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -569,6 +569,62 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     return result.sort((a, b) => order[a.semaphore] - order[b.semaphore]);
   }, [adSetsByCampaign, aggregatedCampaigns]);
 
+  // Relative time for last sync
+  const lastSyncText = useMemo(() => {
+    const syncTimes = connections
+      .map(c => c.last_sync_at)
+      .filter(Boolean)
+      .map(t => new Date(t!).getTime());
+    if (syncTimes.length === 0) return null;
+    const latest = Math.max(...syncTimes);
+    const diffMs = Date.now() - latest;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'hace menos de 1 min';
+    if (diffMin < 60) return `hace ${diffMin} min`;
+    const diffHrs = Math.floor(diffMin / 60);
+    if (diffHrs < 24) return `hace ${diffHrs}h`;
+    const diffDays = Math.floor(diffHrs / 24);
+    return `hace ${diffDays}d`;
+  }, [connections]);
+
+  // CSV Export
+  function exportCSV() {
+    const headers = ['Campaña', 'Plataforma', 'Gasto CLP', 'Ingresos CLP', 'ROAS', 'Conversiones', 'CPC CLP', 'CPM CLP', 'CTR %'];
+    const rows = aggregatedCampaigns.map(c => [
+      c.campaign_name,
+      c.platform,
+      Math.round(c.total_spend),
+      Math.round(c.total_revenue),
+      c.avg_roas.toFixed(2),
+      c.total_conversions,
+      Math.round(c.avg_cpc),
+      Math.round(c.avg_cpm),
+      c.avg_ctr.toFixed(2),
+    ]);
+    // Totals row
+    rows.push([
+      'TOTAL',
+      '',
+      Math.round(totals.spend),
+      Math.round(totals.revenue),
+      overallRoas.toFixed(2),
+      totals.conversions,
+      totals.clicks > 0 ? Math.round(totals.spend / totals.clicks) : 0,
+      totals.impressions > 0 ? Math.round((totals.spend / totals.impressions) * 1000) : 0,
+      overallCtr.toFixed(2),
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `campañas-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const hasData = metrics.length > 0;
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -675,14 +731,39 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sincronizar
           </Button>
-          {metaAccountCurrency && metaAccountCurrency !== 'CLP' && (
-            <span className="text-xs text-muted-foreground ml-2">
-              Cuenta en {metaAccountCurrency} · Convertido a CLP
+          {hasData && (
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              CSV
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {lastSyncText && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Última actualización: {lastSyncText}
             </span>
+          )}
+          {metaAccountCurrency && metaAccountCurrency !== 'CLP' && (
+            <span>Cuenta en {metaAccountCurrency} · Convertido a CLP</span>
           )}
         </div>
       </div>
 
+      {!hasData && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <BarChart3 className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-muted-foreground font-medium">Sin datos para este período</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Prueba otro rango de fechas o sincroniza las campañas.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasData && <>
       {/* Primary KPIs - large cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
@@ -820,6 +901,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                   <YAxis
                     tick={{ fontSize: 11 }}
                     tickFormatter={(v: number) => formatCurrency(v, 'CLP')}
+                    allowDecimals={false}
+                    width={80}
                   />
                   <RechartsTooltip
                     formatter={(value: number, name: string) => [
@@ -1273,6 +1356,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           )}
         </TabsContent>
       </Tabs>
+      </>}
 
       {/* Charlie Scale Dialog */}
       <Dialog open={charlieModal?.type === 'scale'} onOpenChange={() => { setCharlieModal(null); setCharlieActionSuccess(null); }}>
