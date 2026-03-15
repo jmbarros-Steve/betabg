@@ -27,7 +27,7 @@ async function metaApiRequest(
   };
 
   if (method === 'GET') {
-    url.searchParams.set('access_token', accessToken);
+        (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
     if (body) {
       for (const [key, value] of Object.entries(body)) {
         url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));

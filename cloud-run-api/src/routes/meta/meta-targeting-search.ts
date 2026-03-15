@@ -88,7 +88,7 @@ export async function metaTargetingSearch(c: Context) {
     if (search_type === 'interests') {
       // Search for interests, behaviors, and demographics
       const url = new URL(`${META_API_BASE}/act_${accountId}/targetingsearch`);
-      url.searchParams.set('access_token', decryptedToken);
+      
       url.searchParams.set('q', query);
       url.searchParams.set('type', 'adinterest');
       url.searchParams.set('limit', '15');
@@ -110,7 +110,7 @@ export async function metaTargetingSearch(c: Context) {
     } else if (search_type === 'locations') {
       // Search for geo locations (countries, cities, regions)
       const url = new URL(`${META_API_BASE}/search`);
-      url.searchParams.set('access_token', decryptedToken);
+      
       url.searchParams.set('q', query);
       url.searchParams.set('type', 'adgeolocation');
       url.searchParams.set('limit', '15');
