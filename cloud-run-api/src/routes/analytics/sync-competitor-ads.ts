@@ -89,9 +89,15 @@ export async function syncCompetitorAds(c: Context) {
       const metaAppSecret = process.env.META_APP_SECRET;
       if (metaAppId && metaAppSecret) {
         try {
-          const tokenRes = await fetch(
-            `https://graph.facebook.com/oauth/access_token?client_id=${metaAppId}&client_secret=${metaAppSecret}&grant_type=client_credentials`
-          );
+          const tokenRes = await fetch('https://graph.facebook.com/oauth/access_token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: metaAppId,
+              client_secret: metaAppSecret,
+              grant_type: 'client_credentials',
+            }),
+          });
           const tokenData: any = await tokenRes.json();
           if (tokenData.access_token) {
             accessToken = tokenData.access_token;

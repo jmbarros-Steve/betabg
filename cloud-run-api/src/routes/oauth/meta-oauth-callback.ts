@@ -48,10 +48,18 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Meta configuration error' }, 500);
     }
 
-    const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirect_uri)}&client_secret=${metaAppSecret}&code=${code}`;
-
+    // Exchange code for short-lived token (POST body — keeps secret out of URL/logs)
     console.log('Exchanging code for token...');
-    const tokenResponse = await fetch(tokenUrl);
+    const tokenResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        redirect_uri: redirect_uri,
+        code: code,
+      }),
+    });
     const tokenData = await tokenResponse.json() as any;
 
     if (tokenData.error) {
@@ -62,10 +70,17 @@ export async function metaOauthCallback(c: Context) {
     const accessToken = tokenData.access_token;
     console.log('Access token obtained');
 
-    // Get long-lived access token
-    const longLivedUrl = `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaAppId}&client_secret=${metaAppSecret}&fb_exchange_token=${accessToken}`;
-
-    const longLivedResponse = await fetch(longLivedUrl);
+    // Exchange for long-lived token (POST body — keeps secret out of URL/logs)
+    const longLivedResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'fb_exchange_token',
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        fb_exchange_token: accessToken,
+      }),
+    });
     const longLivedData = await longLivedResponse.json() as any;
 
     const finalToken = longLivedData.access_token || accessToken;
