@@ -31,7 +31,10 @@ export async function getExchangeRates(): Promise<Record<string, number>> {
   }
 
   try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(EXCHANGE_RATE_API_URL, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!response.ok) throw new Error(`API returned ${response.status}`);
     const data: any = await response.json();
     cachedRates = data.rates || FALLBACK_RATES;

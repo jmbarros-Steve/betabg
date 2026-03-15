@@ -498,11 +498,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
     switch (semKey) {
       case 'danger':
-        return `Este Ad Set gasta ${formatCurrency(cpaClp || spendClp)} por venta, muy por encima de tu máximo de ${formatCurrency(maxCpaClp)}. Pausarlo ahorra presupuesto para los Ad Sets que sí funcionan.`;
+        return `Este Ad Set gasta ${formatCurrency(cpaClp || spendClp, 'CLP')} por venta, muy por encima de tu máximo de ${formatCurrency(maxCpaClp, 'CLP')}. Pausarlo ahorra presupuesto para los Ad Sets que sí funcionan.`;
       case 'learning':
         return `Meta está optimizando este Ad Set. Espera al menos 7 días antes de tomar decisiones — pausar antes destruye el aprendizaje del algoritmo.`;
       case 'good':
-        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp) : '—'} por venta (dentro de tu objetivo). Se puede escalar +${scalePercent}%.`;
+        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp, 'CLP') : '—'} por venta (dentro de tu objetivo). Se puede escalar +${scalePercent}%.`;
       case 'nodata':
         return `Sin datos suficientes para evaluar. Verifica que esté activo en Meta Ads Manager y que tenga presupuesto asignado.`;
       default:
@@ -693,7 +693,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <DollarSign className="w-5 h-5 text-red-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend, 'CLP')}</p>
           </CardContent>
         </Card>
 
@@ -705,7 +705,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <DollarSign className="w-5 h-5 text-green-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue, 'CLP')}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {totals.revenue > 0 ? `ROAS: ${overallRoas.toFixed(2)}x` : 'Sin datos de conversión'}
             </p>
@@ -745,7 +745,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="py-4 px-5">
             <span className="text-xs font-medium text-muted-foreground">Costo/Conv</span>
             <p className="text-xl font-bold mt-1">
-              {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions) : '-'}
+              {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions, 'CLP') : '-'}
             </p>
           </CardContent>
         </Card>
@@ -753,7 +753,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="py-4 px-5">
             <JargonTooltip term="CPC" className="text-xs font-medium text-muted-foreground" />
             <p className="text-xl font-bold mt-1">
-              {totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks) : '-'}
+              {totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks, 'CLP') : '-'}
             </p>
           </CardContent>
         </Card>
@@ -761,7 +761,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="py-4 px-5">
             <JargonTooltip term="CPM" className="text-xs font-medium text-muted-foreground" />
             <p className="text-xl font-bold mt-1">
-              {totals.impressions > 0 ? formatCurrency((totals.spend / totals.impressions) * 1000) : '-'}
+              {totals.impressions > 0 ? formatCurrency((totals.spend / totals.impressions) * 1000, 'CLP') : '-'}
             </p>
           </CardContent>
         </Card>
@@ -819,11 +819,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                   />
                   <YAxis
                     tick={{ fontSize: 11 }}
-                    tickFormatter={(v: number) => formatCurrency(v)}
+                    tickFormatter={(v: number) => formatCurrency(v, 'CLP')}
                   />
                   <RechartsTooltip
                     formatter={(value: number, name: string) => [
-                      formatCurrency(value),
+                      formatCurrency(value, 'CLP'),
                       name === 'revenue' ? 'Ingresos' : name === 'spend' ? 'Gasto' : 'Conversiones',
                     ]}
                     labelFormatter={(label: string) => {
@@ -961,11 +961,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                           <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 text-sm">
                             <div>
                               <p className="text-muted-foreground text-xs">Gasto</p>
-                              <p className="font-medium">{formatCurrency(campaign.total_spend)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.total_spend, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs">Ingresos (Atrib.)</p>
-                              <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.total_revenue, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="ROAS" /></p>
@@ -976,16 +976,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                             <div>
                               <p className="text-muted-foreground text-xs">Costo/Conv</p>
                               <p className="font-medium">
-                                {campaign.total_conversions > 0 ? formatCurrency(campaign.total_spend / campaign.total_conversions) : '-'}
+                                {campaign.total_conversions > 0 ? formatCurrency(campaign.total_spend / campaign.total_conversions, 'CLP') : '-'}
                               </p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CPC" /></p>
-                              <p className="font-medium">{formatCurrency(campaign.avg_cpc)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.avg_cpc, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CPM" /></p>
-                              <p className="font-medium">{formatCurrency(campaign.avg_cpm)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.avg_cpm, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CTR" /></p>
@@ -1049,7 +1049,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs mb-3">
                                         <div>
                                           <p className="text-muted-foreground">Gasto CLP</p>
-                                          <p className="font-medium">{formatCurrency(spendClp)}</p>
+                                          <p className="font-medium">{formatCurrency(spendClp, 'CLP')}</p>
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground">CPA real</p>
@@ -1075,7 +1075,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground"><JargonTooltip term="CPM" label="CPM CLP" /></p>
-                                          <p className="font-medium">{formatCurrency(parseFloat(adSet.cpm) * CLP_RATE)}</p>
+                                          <p className="font-medium">{formatCurrency(parseFloat(adSet.cpm) * CLP_RATE, 'CLP')}</p>
                                         </div>
                                       </div>
 

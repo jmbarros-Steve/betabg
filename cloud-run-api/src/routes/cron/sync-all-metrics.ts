@@ -33,7 +33,11 @@ export async function syncAllMetrics(c: Context) {
 
   console.log(`[cron] Found ${connections.length} active connections to sync`);
 
-  const baseUrl = process.env.SELF_URL || `http://localhost:${process.env.PORT || 8080}`;
+  const baseUrl = process.env.SELF_URL;
+  if (!baseUrl) {
+    console.error('[cron] SELF_URL env var is not set');
+    return c.json({ error: 'SELF_URL not configured' }, 500);
+  }
 
   for (const conn of connections) {
     try {
