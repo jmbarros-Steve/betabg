@@ -199,14 +199,18 @@ export async function syncMetaMetrics(c: Context) {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
-    const accountInfoResponse = await fetch(accountInfoUrl);
-    let accountCurrency = 'USD'; // Default to USD
+    const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name`;
+    const accountInfoResponse = await fetch(accountInfoUrl, {
+      headers: { Authorization: `Bearer ${decryptedToken}` },
+    });
+    let accountCurrency = 'CLP'; // Default to CLP (no conversion) to avoid 950x error
 
     if (accountInfoResponse.ok) {
       const accountInfo: AdAccountInfo = await accountInfoResponse.json() as any;
-      accountCurrency = accountInfo.currency || 'USD';
+      accountCurrency = accountInfo.currency || 'CLP';
       console.log(`Ad account currency: ${accountCurrency}`);
+    } else {
+      console.warn('Could not fetch account currency — defaulting to CLP (no conversion)');
     }
 
     // Calculate date range (last 30 days)
@@ -228,7 +232,6 @@ export async function syncMetaMetrics(c: Context) {
     ].join(',');
 
     const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/insights`);
-    insightsUrl.searchParams.set('access_token', decryptedToken);
     insightsUrl.searchParams.set('fields', fields);
     insightsUrl.searchParams.set('time_range', JSON.stringify({
       since: formatDate(startDate),
@@ -244,7 +247,9 @@ export async function syncMetaMetrics(c: Context) {
     let nextUrl: string | null = insightsUrl.toString();
 
     while (nextUrl) {
-      const metaResponse = await fetch(nextUrl);
+      const metaResponse = await fetch(nextUrl, {
+        headers: { Authorization: `Bearer ${decryptedToken}` },
+      });
 
       if (!metaResponse.ok) {
         const errorData: any = await metaResponse.json();

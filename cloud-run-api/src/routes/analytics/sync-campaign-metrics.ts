@@ -326,15 +326,15 @@ async function syncMetaCampaigns(
 
   // Get account currency first
   // Token via Authorization header
-  let accountCurrency = 'USD';
+  let accountCurrency = 'CLP'; // Default CLP (no conversion) to avoid 950x error
   try {
     const accountRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'USD';
+      accountCurrency = accountData.currency || 'CLP';
     }
   } catch (e) {
-    console.log('Could not fetch account currency, defaulting to USD');
+    console.warn('Could not fetch account currency — defaulting to CLP (no conversion)');
   }
   console.log(`Meta account currency: ${accountCurrency}`);
 
@@ -344,7 +344,9 @@ async function syncMetaCampaigns(
   campaignsUrl.searchParams.set('fields', 'id,name,status');
   campaignsUrl.searchParams.set('limit', '100');
 
-  const campaignsRes = await fetch(campaignsUrl.toString());
+  const campaignsRes = await fetch(campaignsUrl.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (!campaignsRes.ok) {
     console.error('Meta campaigns fetch error:', await campaignsRes.text());
     return metrics;
@@ -549,17 +551,17 @@ async function syncMetaAdsetMetrics(
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
   // Get account currency for conversion
-  let accountCurrency = 'USD';
+  let accountCurrency = 'CLP'; // Default CLP (no conversion) to avoid 950x error
   try {
     const accountRes = await fetch(
       `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'USD';
+      accountCurrency = accountData.currency || 'CLP';
     }
   } catch (e) {
-    console.log('Could not fetch account currency for adset sync');
+    console.warn('Could not fetch account currency for adset sync — defaulting to CLP');
   }
 
   // Get unique campaign IDs from already-synced campaign metrics

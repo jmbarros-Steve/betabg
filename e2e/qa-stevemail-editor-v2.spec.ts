@@ -124,6 +124,17 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     const blocks = page.locator('.gjs-blocks-c, .gjs-block-categories').first();
     await expect(blocks).toBeVisible({ timeout: 5000 });
 
+    // Expand all collapsed block categories so all blocks become visible
+    await page.evaluate(() => {
+      document.querySelectorAll('.gjs-block-category .gjs-title').forEach((title) => {
+        const parent = title.closest('.gjs-block-category') as HTMLElement;
+        if (parent && parent.classList.contains('gjs-block-category')) {
+          (title as HTMLElement).click();
+        }
+      });
+    });
+    await page.waitForTimeout(1000);
+
     // Verify essential blocks exist — labels must match grapesjsCustomBlocks.ts
     const expectedBlocks = [
       'Productos',         // steve-products

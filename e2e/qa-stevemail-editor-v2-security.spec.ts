@@ -331,29 +331,30 @@ test.describe('Steve Mail Editor v2 — QA Security & Limits', () => {
       await page.waitForTimeout(2000);
     }
 
-    // Click preview to get the full HTML
-    const previewBtn = page.getByRole('button', { name: /Vista previa/i }).first();
+    // Intercept the save API call to extract the HTML content from getHtml()
     let htmlOutput = '';
-
-    if (await previewBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Use evaluate to click (may be outside viewport)
-      await page.evaluate(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
-        const btn = buttons.find(b => b.textContent?.includes('Vista previa'));
-        if (btn) btn.click();
-      });
-      await page.waitForTimeout(3000);
-
-      const previewDialog = page.locator('[role="dialog"]').first();
-      if (await previewDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const previewIframe = previewDialog.locator('iframe').first();
-        if (await previewIframe.isVisible({ timeout: 3000 }).catch(() => false)) {
-          htmlOutput = await previewIframe.getAttribute('srcdoc') || '';
+    await page.route('**/manage-email-campaigns**', async (route) => {
+      const request = route.request();
+      try {
+        const postData = request.postDataJSON?.() || JSON.parse(request.postData() || '{}');
+        if (postData.html_content) {
+          htmlOutput = postData.html_content;
         }
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1000);
-      }
-    }
+      } catch { /* ignore */ }
+      await route.continue();
+    });
+
+    // Click Guardar to trigger getHtml() export
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const saveBtn = buttons.find(b => {
+        const text = b.textContent || '';
+        return /Guardar/i.test(text) && !/Plantilla/i.test(text);
+      });
+      if (saveBtn) saveBtn.click();
+    });
+    await page.waitForTimeout(5000);
+    await page.unroute('**/manage-email-campaigns**');
 
     if (htmlOutput) {
       const darkModeChecks = [
@@ -374,7 +375,8 @@ test.describe('Steve Mail Editor v2 — QA Security & Limits', () => {
       console.log(`[QA] Dark mode checks: ${passCount}/${darkModeChecks.length} passed`);
       expect(passCount).toBeGreaterThanOrEqual(5);
     } else {
-      console.log('[QA] Could not extract HTML output — preview dialog may not have opened');
+      console.log('[QA] Could not extract HTML output — save may not have triggered');
+      expect(htmlOutput).toBeTruthy();
     }
 
     // Go back
