@@ -30,6 +30,52 @@
   color: #fafafa;
   border: none;
   background-color: #18181b;
+  overflow: hidden;
+}
+
+/* Fix main layout: canvas takes full height, sidebar on right */
+.gjs-editor-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  height: 100%;
+}
+
+/* Canvas fills available space */
+.gjs-editor-row .gjs-cv-canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Right sidebar (panels container) — fixed width */
+.gjs-editor-row .gjs-pn-views-container {
+  width: 260px;
+  min-width: 260px;
+  overflow-y: auto;
+  background-color: #18181b;
+  border-left: 1px solid #27272a;
+}
+
+/* Ensure panels column doesn't collapse */
+.gjs-pn-views-container .gjs-pn-views {
+  display: flex;
+}
+
+/* Left toolbar — vertical icon bar */
+.gjs-pn-commands {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  flex-direction: column;
+  z-index: 3;
+  background-color: #18181b;
+  border-right: 1px solid #27272a;
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
 }
 
 /* ============================================================
@@ -41,6 +87,7 @@
   top: 0;
   width: 100%;
   height: 100%;
+  left: 0;
 }
 
 .gjs-frame-wrapper {
