@@ -54,7 +54,7 @@ export async function metaApiJson<T = any>(
 ): Promise<{ ok: true; data: T } | { ok: false; error: any; status: number }> {
   try {
     const res = await metaApiFetch(path, token, options);
-    const data = await res.json();
+    const data: any = await res.json();
     if (!res.ok || data.error) return { ok: false, error: data.error || data, status: res.status };
     return { ok: true, data: data as T };
   } catch (err: any) {
@@ -90,7 +90,7 @@ export async function metaApiPaginateAll<T = any>(
   const res = await metaApiFetch(path, token, { params });
   if (!res.ok) return all;
 
-  let data = await res.json();
+  let data: any = await res.json();
   if (data.data) all.push(...data.data);
   let nextUrl: string | null = data.paging?.next || null;
 
