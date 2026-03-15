@@ -51,13 +51,22 @@ export async function generateImage(c: Context) {
     );
   }
 
-  // Auto-fetch client reference photos if none provided
+  // ── PRODUCT-MATCHED PHOTO SELECTION ────────────────────────────────────
+  // Instead of random: match product names in the prompt to Shopify product images
   let effectiveFotoBase = fotoBaseUrl;
-  if (!effectiveFotoBase) {
-    const supabaseForQuery = getSupabaseAdmin();
+  let matchedProductName: string | null = null;
 
-    // Try 1: Get the most recent brand asset uploaded by the client
-    const { data: brandAssets } = await supabaseForQuery
+  if (!effectiveFotoBase) {
+    // Fetch Shopify products with images
+    const { data: shopifyProducts } = await supabase
+      .from('shopify_products')
+      .select('image_url, title')
+      .eq('client_id', clientId)
+      .not('image_url', 'is', null)
+      .limit(30);
+
+    // Fetch brand assets as fallback
+    const { data: brandAssets } = await supabase
       .from('ad_assets')
       .select('asset_url')
       .eq('client_id', clientId)
@@ -65,41 +74,94 @@ export async function generateImage(c: Context) {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    // Try 2: Get Shopify product images
-    const { data: shopifyProducts } = await supabaseForQuery
-      .from('shopify_products')
-      .select('image_url, title')
-      .eq('client_id', clientId)
-      .not('image_url', 'is', null)
-      .limit(5);
+    const promptLower = (promptGeneracion || '').toLowerCase();
 
-    // Pick a random reference to add variety
-    const allPhotos: string[] = [];
-    if (brandAssets) allPhotos.push(...brandAssets.map((a: any) => a.asset_url).filter(Boolean));
-    if (shopifyProducts) allPhotos.push(...shopifyProducts.map((p: any) => p.image_url).filter(Boolean));
+    if (shopifyProducts && shopifyProducts.length > 0) {
+      // Step 1: Try exact product name match in the prompt
+      let bestMatch: { url: string; title: string; score: number } | null = null;
 
-    if (allPhotos.length > 0) {
-      // Random selection for variety instead of always the same photo
-      effectiveFotoBase = allPhotos[Math.floor(Math.random() * allPhotos.length)];
+      for (const product of shopifyProducts) {
+        if (!product.image_url || !product.title) continue;
+        const titleLower = product.title.toLowerCase();
+
+        // Exact substring match (highest priority)
+        if (promptLower.includes(titleLower)) {
+          bestMatch = { url: product.image_url, title: product.title, score: 100 };
+          break;
+        }
+
+        // Fuzzy match: count how many words of the product title appear in the prompt
+        const words = titleLower.split(/\s+/).filter(w => w.length > 3);
+        const matchedWords = words.filter(w => promptLower.includes(w));
+        const score = words.length > 0 ? (matchedWords.length / words.length) * 100 : 0;
+
+        if (score >= 50 && (!bestMatch || score > bestMatch.score)) {
+          bestMatch = { url: product.image_url, title: product.title, score };
+        }
+      }
+
+      if (bestMatch) {
+        effectiveFotoBase = bestMatch.url;
+        matchedProductName = bestMatch.title;
+        console.log(`[generate-image] Matched product "${bestMatch.title}" (score: ${bestMatch.score})`);
+      } else {
+        // Step 2: No match — use first product image (most representative)
+        effectiveFotoBase = shopifyProducts[0].image_url;
+        matchedProductName = shopifyProducts[0].title;
+      }
+    }
+
+    // Step 3: Fallback to brand assets if no Shopify products
+    if (!effectiveFotoBase && brandAssets && brandAssets.length > 0) {
+      const validAssets = brandAssets.map((a: any) => a.asset_url).filter(Boolean);
+      if (validAssets.length > 0) {
+        effectiveFotoBase = validAssets[0];
+      }
     }
   }
+
+  // ── VISUAL STYLE ROTATION ──────────────────────────────────────────────
+  const VISUAL_STYLES = [
+    'UGC (user-generated content)', 'Editorial de revista', 'Flat lay cenital',
+    'Lifestyle outdoor', 'Lifestyle indoor', 'Behind-the-scenes',
+    'Antes/Después split', 'Close-up de producto', 'Modelo usando el producto',
+    'Estilo testimonial', 'Minimalista fondo limpio', 'Bold typography overlay',
+    'Comparación split-screen', 'Seasonal/temático', 'Night mood / luces neón',
+  ];
+
+  // Pick a rotated visual style (avoid recent ones)
+  const { data: recentStyles } = await supabase
+    .from('visual_style_usage')
+    .select('style_name')
+    .eq('client_id', clientId)
+    .order('used_at', { ascending: false })
+    .limit(5);
+
+  const recentStyleNames = new Set((recentStyles || []).map((s: any) => s.style_name));
+  const availableStyles = VISUAL_STYLES.filter(s => !recentStyleNames.has(s));
+  const stylePool = availableStyles.length > 0 ? availableStyles : VISUAL_STYLES;
+  const selectedStyle = stylePool[Math.floor(Math.random() * stylePool.length)];
+
+  // Record style usage
+  await supabase.from('visual_style_usage').insert({
+    client_id: clientId,
+    style_name: selectedStyle,
+  });
 
   // Adjust prompt if there's rejection text
   const promptBase = rechazoTexto
     ? `${promptGeneracion}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
     : promptGeneracion;
 
-  // Add diversity instruction to avoid repetitive outputs
-  const diversityStyles = [
-    'Vary the model ethnicity, age, and appearance for each generation.',
-    'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
-    'Alternate between close-up portrait, medium shot, and environmental portrait.',
-    'Mix lighting styles: golden hour, studio softbox, natural window light, overcast diffused.',
-    'Vary compositions: rule of thirds, centered, off-center with negative space.',
-  ];
-  const randomDiversity = diversityStyles[Math.floor(Math.random() * diversityStyles.length)];
+  // Product-specific instruction for matched products
+  const productInstruction = matchedProductName
+    ? ` This is the EXACT product mentioned in the copy: "${matchedProductName}". The photo MUST show THIS specific product, not a generic version.`
+    : '';
 
-  const promptFinal = `${promptBase}. ${randomDiversity}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
+  // Visual style instruction (rotated per client)
+  const styleInstruction = `Visual style: ${selectedStyle}. Apply this photographic style consistently.`;
+
+  const promptFinal = `${promptBase}.${productInstruction} ${styleInstruction} Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
   let imageUrl: string | null = null;
   let imageBytes: Uint8Array | null = null;
@@ -128,7 +190,7 @@ export async function generateImage(c: Context) {
             inlineData: { mimeType, data: refBase64 },
           });
           parts.push({
-            text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this — same shape, same colors, same packaging, same labels, same textures. Do not alter, stylize, or reimagine the product. Place this exact real product into the advertising scene described below. The final image must look like a real photograph taken with a professional camera, NOT an AI illustration.\n\n${promptFinal}`,
+            text: `CRITICAL: This is the REAL product photo${matchedProductName ? ` of "${matchedProductName}"` : ''}. The product in the generated image MUST look EXACTLY like this — same shape, same colors, same packaging, same labels, same textures. Do not alter, stylize, or reimagine the product. Place this exact real product into the advertising scene described below. The final image must look like a real photograph taken with a professional camera, NOT an AI illustration.\n\n${promptFinal}`,
           });
         } else {
           console.warn('[generate-image] Could not download reference photo:', refResponse.status);
