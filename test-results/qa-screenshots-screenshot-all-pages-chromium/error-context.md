@@ -1,0 +1,805 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - img "Steve Ads" [ref=e7]
+          - generic [ref=e9]:
+            - paragraph [ref=e11]: Patricio Correa
+            - paragraph [ref=e12]: Jardin de Eva
+        - generic [ref=e13]:
+          - generic [ref=e14]: Portal Cliente
+          - button [ref=e15] [cursor=pointer]:
+            - img
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - button "Steve" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+          - text: Steve
+        - button "Brief" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+          - text: Brief
+        - button "Métricas" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: Métricas
+        - button "Conexiones" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+          - text: Conexiones
+        - button "Configuración" [ref=e33] [cursor=pointer]:
+          - img [ref=e34]
+          - text: Configuración
+        - button "Más" [ref=e37] [cursor=pointer]:
+          - text: Más
+          - img [ref=e38]
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - heading "Setup del portal" [level=4] [ref=e43]
+            - generic [ref=e44]: 3/5
+            - 'progressbar "Setup del portal: 3 de 5 pasos completados" [ref=e45]'
+          - generic [ref=e47]:
+            - button "Colapsar pasos" [ref=e48] [cursor=pointer]:
+              - img [ref=e49]
+            - button "Cerrar progreso de setup" [ref=e51] [cursor=pointer]:
+              - img [ref=e52]
+        - generic [ref=e55]:
+          - button "Conectar Shopify (completado)" [disabled] [ref=e56]:
+            - img [ref=e57]
+            - generic [ref=e59]: Conectar Shopify
+            - generic [ref=e60]: (completado)
+          - button "Conectar Meta (completado)" [disabled] [ref=e61]:
+            - img [ref=e62]
+            - generic [ref=e64]: Conectar Meta
+            - generic [ref=e65]: (completado)
+          - button "Conectar Google Ads (pendiente)" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic [ref=e69]: Conectar Google Ads
+            - generic [ref=e70]: (pendiente)
+          - button "Completar Brand Brief (pendiente)" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e74]: Completar Brand Brief
+            - generic [ref=e75]: (pendiente)
+          - button "Configurar finanzas (completado)" [disabled] [ref=e76]:
+            - img [ref=e77]
+            - generic [ref=e79]: Configurar finanzas
+            - generic [ref=e80]: (completado)
+      - generic [ref=e84]:
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - img "Steve" [ref=e90]
+              - status "En línea" [ref=e91]
+            - generic [ref=e92]:
+              - heading "Steve" [level=3] [ref=e93]:
+                - text: Steve
+                - img [ref=e94]
+              - paragraph [ref=e96]: Brief completado ✅
+          - button "Reiniciar" [ref=e98] [cursor=pointer]:
+            - img
+            - text: Reiniciar
+        - generic [ref=e102]:
+          - generic [ref=e104]:
+            - img "Steve" [ref=e106]
+            - generic [ref=e109]:
+              - paragraph [ref=e110]:
+                - emphasis [ref=e111]: olisquea el aire y se prepara
+                - text: 🐕
+              - paragraph [ref=e112]:
+                - text: ¡WOOF! Soy Steve, Bulldog Francés con doctorado en Performance Marketing de Stanford. Vamos a ir charlando y con lo que me cuentes voy armando tu
+                - strong [ref=e113]: Brief Estratégico
+                - text: . El brief todavía no está listo — cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso.
+              - paragraph [ref=e114]: "Para empezar necesito UNA cosa:"
+              - paragraph [ref=e115]:
+                - strong [ref=e116]: "Antes de empezar — NECESITO TU PÁGINA WEB:"
+              - paragraph [ref=e117]: Sin tu URL no puedo hacer el análisis SEO, compararte con la competencia ni generar el brief completo. 🌐
+              - paragraph [ref=e118]:
+                - strong [ref=e119]: ¿Cuál es tu sitio web o tienda online?
+              - paragraph [ref=e120]: (Si todavía no tienes, escribe "sin web" y te explico qué hacemos en ese caso)
+          - generic [ref=e122]:
+            - paragraph [ref=e124]: https://www.jardindeeva.cl
+            - img [ref=e127]
+          - generic [ref=e131]:
+            - img "Steve" [ref=e133]
+            - generic [ref=e136]:
+              - paragraph [ref=e137]:
+                - text: "¡Perfecto! 🐕 Ya tengo tu URL guardada:"
+                - strong [ref=e138]: jardindeeva.cl
+                - text: . La voy a usar para todo el análisis.
+              - paragraph [ref=e139]:
+                - text: Ahora sí, arrancamos con lo bueno.
+                - emphasis [ref=e140]: sacude las orejas y se sienta
+                - text: 🐕
+              - paragraph [ref=e141]:
+                - strong [ref=e142]: "Pregunta 1 de 15 — TU NEGOCIO:"
+                - text: ¿A qué se dedica tu empresa y qué vendes exactamente? Dame el pitch de 30 segundos.
+              - paragraph [ref=e143]: Puedes usar un ejemplo de abajo o escribir con tus palabras. 🎯
+          - generic [ref=e145]:
+            - paragraph [ref=e147]: Somos Jardín de Eva, una tienda online de plantas y jardinería en Chile. Vendemos plantas de interior, exterior, maceteros, tierra y accesorios. Nos diferenciamos por entregar plantas sanas con garantía de 30 días y asesoría gratuita de cuidado por WhatsApp.
+            - img [ref=e150]
+          - generic [ref=e154]:
+            - img "Steve" [ref=e156]
+            - generic [ref=e159]:
+              - paragraph [ref=e160]: ¡Me encanta! 🐕 Plantas con garantía de 30 días Y asesoría por WhatsApp — eso ya te pone un escalón arriba de la típica tienda que te vende una planta y si se muere "mala suerte". Buen pitch, claro y directo.
+              - paragraph [ref=e161]:
+                - emphasis [ref=e162]: saca calculadora imaginaria
+                - text: 🧮
+              - paragraph [ref=e163]:
+                - strong [ref=e164]: "Pregunta 2 de 15 — LOS NÚMEROS:"
+              - paragraph [ref=e165]:
+                - text: Necesito la carne de tu negocio.
+                - strong [ref=e166]: Llena los campos del formulario que aparece abajo
+                - text: y yo calculo tu
+                - strong [ref=e167]: Margen Bruto
+                - text: y tu
+                - strong [ref=e168]: CPA Máximo Viable
+                - text: . 💰
+              - paragraph [ref=e169]: "Por ejemplo, en tu industria podría verse algo así:"
+              - list [ref=e170]:
+                - listitem [ref=e171]:
+                  - strong [ref=e172]: "Precio promedio de venta:"
+                  - text: $15.000 CLP (una planta de interior mediana)
+                - listitem [ref=e173]:
+                  - strong [ref=e174]: "Costo del producto:"
+                  - text: $5.000 CLP (planta + macetero + tierra)
+                - listitem [ref=e175]:
+                  - strong [ref=e176]: "Fase del negocio:"
+                  - text: "\"Tenemos ventas pero queremos escalar con ads\""
+              - paragraph [ref=e177]: ¿Alguna duda antes de llenar los campos? 🎯
+          - generic [ref=e179]:
+            - paragraph [ref=e181]: "💰 Precio promedio de venta: $35000 📦 Costo del producto/servicio: $12000 🚚 Costo de envío promedio: $4000 📈 ¿Cuánto facturas mensualmente?: Fase Crecimiento 📢 ¿Cuánto tienes disponible mensualmente para publicidad?: $500.000 - $2.000.000 CLP"
+            - img [ref=e184]
+          - generic [ref=e188]:
+            - img "Steve" [ref=e190]
+            - generic [ref=e193]:
+              - paragraph [ref=e194]: ¡Esos números están buenos! 🐕 Déjame hacer las cuentas rápido...
+              - paragraph [ref=e195]:
+                - emphasis [ref=e196]: teclea furiosamente con las patitas
+                - text: 🧮
+              - separator [ref=e197]
+              - paragraph [ref=e198]:
+                - text: "| 📊"
+                - strong [ref=e199]: Métrica
+                - text: "|"
+                - strong [ref=e200]: Valor
+                - text: "| |---|---| | 💰 Precio promedio | $35.000 CLP | | 📦 Costo producto | $12.000 CLP | | 🚚 Costo envío | $4.000 CLP | |"
+                - strong [ref=e201]: 📈 Margen Bruto
+                - text: "|"
+                - strong [ref=e202]: $19.000 CLP
+                - text: "| |"
+                - strong [ref=e203]: 📊 Margen %
+                - text: "|"
+                - strong [ref=e204]: 54.3%
+                - text: "| |"
+                - strong [ref=e205]: 🎯 CPA Máximo (30%)
+                - text: "|"
+                - strong [ref=e206]: $5.700 CLP
+                - text: "|"
+              - separator [ref=e207]
+              - paragraph [ref=e208]:
+                - strong [ref=e209]: ¿Qué significa esto?
+                - text: Puedes pagar hasta
+                - strong [ref=e210]: $5.700 CLP por cada cliente nuevo
+                - text: en publicidad y seguir siendo rentable. Ese CPA ya lo guardé en la configuración financiera del brief. 📊
+              - paragraph [ref=e211]: Con un margen del 54% estás en una posición sólida para escalar. Y con un presupuesto de $500K-$2M CLP mensuales en ads, hay espacio para testear creativos sin quemarte. En fase de crecimiento, la clave va a ser encontrar ese CPA y mantenerlo estable mientras subes el gasto. 🚀
+              - separator [ref=e212]
+              - paragraph [ref=e213]:
+                - emphasis [ref=e214]: ladea la cabeza curioso
+                - text: 🐕
+              - paragraph [ref=e215]: Para saber dónde enfocar la estrategia necesito que me digas cómo se reparten hoy tus ventas.
+              - paragraph [ref=e216]:
+                - strong [ref=e217]: "Pregunta 3 de 15 — CANALES DE VENTA:"
+              - paragraph [ref=e218]:
+                - text: Ponle porcentaje a cada canal en los campos del formulario abajo.
+                - strong [ref=e219]: Deben sumar 100%.
+                - text: Si no usas un canal, déjalo en 0. 🐕📝
+              - paragraph [ref=e220]: "Por ejemplo, en jardinería online en Chile podría verse algo así:"
+              - list [ref=e221]:
+                - listitem [ref=e222]:
+                  - strong [ref=e223]: "Instagram/Facebook:"
+                  - text: 40%
+                - listitem [ref=e224]:
+                  - strong [ref=e225]: "Sitio web orgánico:"
+                  - text: 25%
+                - listitem [ref=e226]:
+                  - strong [ref=e227]: "WhatsApp directo:"
+                  - text: 30%
+                - listitem [ref=e228]:
+                  - strong [ref=e229]: "Marketplace (MercadoLibre, etc.):"
+                  - text: 5%
+              - paragraph [ref=e230]: ¿Alguna duda antes de llenar los campos?
+          - generic [ref=e232]:
+            - paragraph [ref=e234]: "🛒 Shopify / E-commerce propio: 55 % 🏪 Marketplaces (MercadoLibre, Falabella, etc.): 15 % 🏬 Venta directa / Tienda física: 10 % 📱 WhatsApp: 10 % 📸 Instagram: 5 % 👥 Facebook: 5 %"
+            - img [ref=e237]
+          - generic [ref=e241]:
+            - img "Steve" [ref=e243]
+            - generic [ref=e246]:
+              - paragraph [ref=e247]: Buena distribución 🐕 Que el 55% venga de tu e-commerce propio es una señal sana — tienes control de tu canal principal y no dependes de marketplaces que te comen margen. El 10% de WhatsApp tiene sentido porque ya ofreces asesoría por ahí, así que es natural que se cierren ventas. Instagram y Facebook están bajitos, pero justamente para eso vamos a armar este brief. 🎯
+              - separator [ref=e248]
+              - paragraph [ref=e249]:
+                - emphasis [ref=e250]: se pone serio
+                - text: 🎯
+              - paragraph [ref=e251]: Ahora necesito el perfil de tu cliente ideal para orientar todo el brief.
+              - paragraph [ref=e252]:
+                - strong [ref=e253]: "Pregunta 4 de 15 — TU CLIENTE IDEAL (Buyer Persona):"
+              - paragraph [ref=e254]: Llena los 8 campos del formulario abajo para construir el perfil de tu cliente ideal.
+          - generic [ref=e256]:
+            - paragraph [ref=e258]: "👤 Nombre ficticio: Carolina 🎂 Edad: 32 ⚧ Género: Mujer 📍 Ciudad / Zona: Santiago Centro 💼 Ocupación: Diseñadora de interiores freelance 💰 Ingreso mensual aprox.: $1.200.000 💍 Estado civil / Familia: Soltera, vive con roommate 🎯 ¿Por qué te compra?: Quiere transformar su depto en un oasis verde"
+            - img [ref=e261]
+          - generic [ref=e265]:
+            - img "Steve" [ref=e267]
+            - generic [ref=e270]:
+              - paragraph [ref=e271]: Carolina me cae bien 🐕 Diseñadora de interiores freelance que quiere su propio oasis verde — tiene sentido perfecto. Tiene el ojo para la estética, el ingreso para invertir en plantas de calidad, y vive en un depto en Santiago Centro donde el verde se nota y se necesita. Cuadra con tu producto al 100%.
+              - separator [ref=e272]
+              - paragraph [ref=e273]:
+                - emphasis [ref=e274]: pone cara seria
+                - text: 😰
+              - paragraph [ref=e275]:
+                - strong [ref=e276]: "Pregunta 5 de 15 — SU DOLOR PROFUNDO:"
+              - paragraph [ref=e277]: "Necesito entender el dolor real de tu cliente. No me des una frase. Cuéntame:"
+              - list [ref=e278]:
+                - listitem [ref=e279]:
+                  - strong [ref=e280]: ¿Qué problema específico tiene?
+                - listitem [ref=e281]:
+                  - strong [ref=e282]: ¿Cómo lo ha intentado resolver antes?
+                - listitem [ref=e283]:
+                  - strong [ref=e284]: ¿Por qué esa solución anterior no le dio satisfacción completa?
+              - paragraph [ref=e285]: Sé específico — piensa en situaciones concretas que vive tu cliente.
+              - paragraph [ref=e286]: "Por ejemplo, en tu industria podría ser algo como:"
+              - list [ref=e287]:
+                - listitem [ref=e288]:
+                  - emphasis [ref=e289]: "\"Compró plantas en el Homecenter y se le murieron en 2 semanas porque nadie le explicó cómo cuidarlas\""
+                - listitem [ref=e290]:
+                  - emphasis [ref=e291]: "\"Pidió por MercadoLibre y le llegaron plantas maltratadas, con hojas rotas y tierra seca\""
+                - listitem [ref=e292]:
+                  - emphasis [ref=e293]: "\"Quiere armar un rincón verde en su depto pero no sabe qué plantas aguantan poca luz y tiene miedo de botarla plata\""
+              - paragraph [ref=e294]: Piensa en Carolina — ¿qué le duele de verdad? 🎯
+          - generic [ref=e296]:
+            - paragraph [ref=e298]: A Carolina le frustra que las plantas se le mueran porque no sabe cómo cuidarlas según el clima de Santiago. Ha probado comprar en Easy y Sodimac pero las plantas llegan maltratadas y nadie le explica nada. Lo peor es que gasta plata en plantas caras que terminan muertas en un mes.
+            - img [ref=e301]
+          - generic [ref=e305]:
+            - img "Steve" [ref=e307]
+            - generic [ref=e310]:
+              - paragraph [ref=e311]: "¡Eso es DOLOR de verdad! 🐕 Tiene las tres dimensiones perfectas: el problema (no sabe cuidarlas según el clima de Santiago), el intento fallido (comprar en Easy y Sodimac sin asesoría), y la frustración emocional (gastar plata en plantas caras que se mueren en un mes). Eso duele en el bolsillo y en el orgullo. 💰😤"
+              - separator [ref=e312]
+              - paragraph [ref=e313]:
+                - emphasis [ref=e314]: saca su libreta
+                - text: 📝
+              - paragraph [ref=e315]:
+                - strong [ref=e316]: "Pregunta 6 de 15 — SUS PALABRAS Y OBJECIONES:"
+              - paragraph [ref=e317]:
+                - text: ¿Qué dice EXACTAMENTE tu cliente cuando se queja con un amigo sobre este problema? Dame
+                - strong [ref=e318]: 2 o 3 frases literales distintas
+                - text: — una queja habitual, una objeción de compra, y una frustración pasada.
+              - paragraph [ref=e319]: "Por ejemplo, en tu industria podría sonar así:"
+              - list [ref=e320]:
+                - listitem [ref=e321]:
+                  - emphasis [ref=e322]: "\"Tengo mano negra, se me muere todo lo que compro\""
+                - listitem [ref=e323]:
+                  - emphasis [ref=e324]: "\"¿Y si pido online y me llega toda marchita? No confío\""
+                - listitem [ref=e325]:
+                  - emphasis [ref=e326]: "\"No sé cuál planta aguanta el frío de Santiago en invierno, siempre elijo mal\""
+              - paragraph [ref=e327]: Piensa en Carolina hablando con su roommate o con una amiga — ¿qué dice textual? 🎯
+          - generic [ref=e329]:
+            - paragraph [ref=e331]: "\"Es que todo se me muere, no tengo mano para las plantas\" \"Siempre que compro online llegan marchitas, no confío\" \"Quiero mi depto lleno de verde pero no sé por dónde empezar sin botar plata\""
+            - img [ref=e334]
+          - generic [ref=e338]:
+            - img "Steve" [ref=e340]
+            - generic [ref=e343]:
+              - paragraph [ref=e344]: "¡WOOF! Esas frases son ORO puro 🐕💰 Las tres son perfectas porque cada una toca un nervio distinto:"
+              - list [ref=e345]:
+                - listitem [ref=e346]:
+                  - strong [ref=e347]: "\"No tengo mano\""
+                  - text: → inseguridad personal
+                - listitem [ref=e348]:
+                  - strong [ref=e349]: "\"Llegan marchitas, no confío\""
+                  - text: → desconfianza en el canal online
+                - listitem [ref=e350]:
+                  - strong [ref=e351]: "\"No sé por dónde empezar sin botar plata\""
+                  - text: → miedo a perder dinero
+              - paragraph [ref=e352]: Esas tres frases van directo al copy de tus anuncios. Cuando Carolina lee "¿Se te mueren todas las plantas?" en un ad, siente que le están leyendo la mente. Así se detiene el scroll. 🎯
+              - separator [ref=e353]
+              - paragraph [ref=e354]:
+                - emphasis [ref=e355]: levanta las orejas, ojos brillantes
+                - text: ✨
+              - paragraph [ref=e356]:
+                - strong [ref=e357]: "Pregunta 7 de 15 — LA TRANSFORMACIÓN:"
+              - paragraph [ref=e358]: ¿Cómo se ve la vida de Carolina DESPUÉS de comprarte? ¿A quién quiere impresionar? ¿Qué cambia para ella?
+              - paragraph [ref=e359]: "Por ejemplo, en tu industria podría verse así:"
+              - list [ref=e360]:
+                - listitem [ref=e361]:
+                  - emphasis [ref=e362]: "\"Su depto se ve como esas fotos de Pinterest que siempre guarda — lleno de verde, con plantas sanas que crecen\""
+                - listitem [ref=e363]:
+                  - emphasis [ref=e364]: "\"Cuando invita amigas al depto le dicen '¡qué lindo tu rincón de plantas!' y ella sabe exactamente cómo cuidar cada una\""
+                - listitem [ref=e365]:
+                  - emphasis [ref=e366]: "\"Se siente orgullosa porque por fin no se le muere nada — tiene un chat de WhatsApp donde le resuelven cualquier duda\""
+              - paragraph [ref=e367]: Piensa en Carolina 3 meses después de comprarte — ¿qué cambió? 🐕
+          - generic [ref=e369]:
+            - paragraph [ref=e371]: Carolina pasa de sentirse frustrada con plantas marchitas a ser la amiga que todos consultan sobre plantas. Su depto se transforma en un oasis verde que le da paz y orgullo. Comparte fotos en Instagram con confianza y hasta regala plantas a sus amigas.
+            - img [ref=e374]
+          - generic [ref=e378]:
+            - img "Steve" [ref=e380]
+            - generic [ref=e383]:
+              - paragraph [ref=e384]: ¡ESO es una transformación completa! 🐕🚀 De "se me muere todo" a "soy la amiga experta en plantas que regala plantas a las demás". Pasó de frustración y vergüenza a orgullo y generosidad. Y lo mejor — comparte en Instagram, que es publicidad gratis para ti. Carolina se convierte en tu mejor vendedora sin saberlo. 💰
+              - separator [ref=e385]
+              - paragraph [ref=e386]:
+                - emphasis [ref=e387]: mueve la cola curioso
+                - text: 🐕
+              - paragraph [ref=e388]:
+                - strong [ref=e389]: "Pregunta 8 de 15 — SU MUNDO:"
+              - paragraph [ref=e390]: ¿Qué marcas consume tu cliente ideal? ¿Dónde pasa su tiempo online? ¿Qué estilo de vida tiene? ¿Qué influencers o cuentas sigue?
+              - paragraph [ref=e391]: "Por ejemplo, para Carolina podría ser algo como:"
+              - list [ref=e392]:
+                - listitem [ref=e393]:
+                  - strong [ref=e394]: "Marcas:"
+                  - text: Muji, IKEA, Starbucks, Patagonia
+                - listitem [ref=e395]:
+                  - strong [ref=e396]: "Redes/tiempo online:"
+                  - text: Pinterest buscando inspiración deco, Instagram siguiendo cuentas de plantas y diseño interior, TikTok viendo videos de "plant tours"
+                - listitem [ref=e397]:
+                  - strong [ref=e398]: "Influencers/cuentas:"
+                  - text: "@plantiful.chile, @deco.chile, cuentas de interiorismo minimalista"
+                - listitem [ref=e399]:
+                  - strong [ref=e400]: "Estilo de vida:"
+                  - text: Le gusta el brunch del fin de semana, va a ferias de diseño, compra en tiendas locales con identidad, prefiere lo sustentable
+              - paragraph [ref=e401]: ¿Qué sabes o intuyes sobre el mundo de Carolina? No necesitas datos exactos — tu instinto de negocio también vale aquí. 🎯
+          - generic [ref=e403]:
+            - paragraph [ref=e405]: Trabaja desde casa 3 días a la semana como diseñadora freelance. Le gusta el diseño de interiores, sigue cuentas de plantas en Instagram (@plantlovers, @junglathome). Va a ferias de plantas los fines de semana. Practica yoga, cocina en casa, le importa la sustentabilidad y el consumo consciente.
+            - img [ref=e408]
+          - generic [ref=e412]:
+            - img "Steve" [ref=e414]
+            - generic [ref=e417]:
+              - paragraph [ref=e418]: Eso cuadra perfecto con Carolina 🐕 Trabaja desde casa, así que literalmente VIVE rodeada de sus plantas todos los días — no es decoración de fin de semana, es su ambiente de trabajo. Yoga, cocina en casa, sustentabilidad... es una persona que valora el bienestar y lo consciente. Y que vaya a ferias de plantas los fines de semana me dice que ya está dispuesta a gastar en esto, solo necesita confiar en el canal online. 🎯
+              - separator [ref=e419]
+              - paragraph [ref=e420]:
+                - emphasis [ref=e421]: olfatea el territorio enemigo
+                - text: 🔍
+              - paragraph [ref=e422]:
+                - strong [ref=e423]: "Pregunta 9 de 15 — COMPETENCIA:"
+              - paragraph [ref=e424]:
+                - text: Necesito
+                - strong [ref=e425]: EXACTAMENTE 3 competidores
+                - text: con su página web o Instagram. Llena los campos del formulario abajo.
+              - paragraph [ref=e426]:
+                - text: ⚠️
+                - strong [ref=e427]: Sin 3 competidores con URLs NO avanzamos.
+              - paragraph [ref=e428]: ¿Alguna duda antes de llenar los campos?
+          - generic [ref=e430]:
+            - paragraph [ref=e432]: "Nombre Competidor 1: Easy Chile Web / Instagram Competidor 1: https://www.easy.cl/plantas Nombre Competidor 2: Sodimac Homecenter Web / Instagram Competidor 2: https://www.sodimac.cl/jardin Nombre Competidor 3: PlantAdicta Web / Instagram Competidor 3: https://www.plantadicta.cl"
+            - img [ref=e435]
+          - generic [ref=e438]:
+            - generic [ref=e439]:
+              - img "Steve" [ref=e441]
+              - paragraph [ref=e445]: Interesante mezcla de competidores 🐕 Tienes a los dos gigantes del retail (Easy y Sodimac) que venden plantas como si fueran tornillos — sin amor, sin asesoría, puro volumen. Y PlantAdicta que es más nicho y especializada como tú. Eso me da un panorama completo del campo de batalla. 🎯
+            - generic [ref=e446]:
+              - img "La Chonga" [ref=e448]
+              - generic [ref=e449]:
+                - generic [ref=e450]:
+                  - generic [ref=e451]: 👻
+                  - generic [ref=e452]: Espíritu de La Chonga
+                - paragraph [ref=e455]:
+                  - emphasis [ref=e456]: aparece flotando con una lupa y un informe de competencia
+                  - text: "\"Señorita, para efectos del análisis competitivo, le recomiendo que sea brutalmente honesta sobre las debilidades de cada competidor. Los datos objetivos son la base de cualquier estrategia diferenciadora sólida.\""
+            - generic [ref=e457]:
+              - img "Steve" [ref=e459]
+              - generic [ref=e462]:
+                - paragraph [ref=e463]:
+                  - emphasis [ref=e464]: gruñe con desconfianza
+                  - text: 😤
+                - paragraph [ref=e465]:
+                  - strong [ref=e466]: "Pregunta 10 de 15 — ANÁLISIS COMPETITIVO:"
+                - paragraph [ref=e467]: Ahora necesito que para CADA competidor me digas qué prometen y dónde fallan, y por qué tú lo haces mejor. Llena los campos del formulario abajo.
+                - paragraph [ref=e468]: "Por ejemplo, en tu industria podría verse así:"
+                - list [ref=e469]:
+                  - listitem [ref=e470]:
+                    - strong [ref=e471]: "Easy Chile:"
+                    - emphasis [ref=e472]: "\"Prometen variedad y precios bajos, pero las plantas llegan sin cuidado, sin instrucciones, y si se muere no hay garantía. Nosotros entregamos plantas sanas con garantía de 30 días.\""
+                  - listitem [ref=e473]:
+                    - strong [ref=e474]: "Sodimac:"
+                    - emphasis [ref=e475]: "\"Tienen sección de jardín grande pero es autoservicio total — nadie te asesora. Nosotros te acompañamos por WhatsApp después de la compra.\""
+                  - listitem [ref=e476]:
+                    - strong [ref=e477]: "PlantAdicta:"
+                    - emphasis [ref=e478]: "\"Venden online y son especializadas, pero no tienen asesoría post-venta ni garantía. Nosotros ofrecemos ambas cosas.\""
+                - paragraph [ref=e479]: ¿Te queda claro lo que necesito para cada uno? 🎯
+          - generic [ref=e481]:
+            - paragraph [ref=e483]: "Debilidad Competidor 1 (Easy Chile): Venden plantas baratas pero de mala calidad, sin asesoría ni garantía. Las plantas llegan maltratadas del transporte. Debilidad Competidor 2 (Sodimac Homecenter): Tienen variedad pero cero personalización. Te atiende alguien que no sabe nada de plantas. Debilidad Competidor 3 (PlantAdicta): Buenas plantas pero precios muy altos y despacho solo en RM. No tienen stock constante."
+            - img [ref=e486]
+          - generic [ref=e490]:
+            - img "Steve" [ref=e492]
+            - generic [ref=e495]:
+              - paragraph [ref=e496]: "¡Perfecto análisis! 🐕 Esto me da una foto clara del campo de batalla:"
+              - list [ref=e497]:
+                - listitem [ref=e498]:
+                  - strong [ref=e499]: Easy y Sodimac
+                  - text: = volumen sin alma. Plantas baratas que se mueren y nadie te ayuda. Son el villano perfecto para tu marca.
+                - listitem [ref=e500]:
+                  - strong [ref=e501]: PlantAdicta
+                  - text: "= competidor más directo pero con tres flancos débiles: precio alto, cobertura limitada a RM y stock inconsistente."
+              - paragraph [ref=e502]:
+                - text: "Tú te metes justo en el hueco que dejan los tres:"
+                - strong [ref=e503]: calidad + asesoría + garantía + disponibilidad
+                - text: . Ese es un posicionamiento fuerte. 💰
+              - separator [ref=e504]
+              - paragraph [ref=e505]:
+                - emphasis [ref=e506]: se para firme
+                - text: 🏆
+              - paragraph [ref=e507]:
+                - strong [ref=e508]: "Pregunta 11 de 15 — TU VENTAJA INCOPIABLE:"
+              - paragraph [ref=e509]: ¿Qué tienes que tu competencia JAMÁS podrá copiar? ¿Por qué un cliente se cambiaría de ellos a ti?
+              - paragraph [ref=e510]: "Por ejemplo, en tu industria podría ser algo como:"
+              - list [ref=e511]:
+                - listitem [ref=e512]:
+                  - emphasis [ref=e513]: "\"Nuestro equipo de biólogos revisa cada planta antes del envío y la aclimata al clima de Santiago — eso no lo hace nadie más en Chile\""
+                - listitem [ref=e514]:
+                  - emphasis [ref=e515]: "\"Tenemos un sistema de asesoría por WhatsApp con respuesta en menos de 2 horas donde te mandamos video personalizado si tu planta se pone rara\""
+                - listitem [ref=e516]:
+                  - emphasis [ref=e517]: "\"Cada planta viene con una ficha impresa de cuidado específica para la zona donde vive el cliente — no es genérica, es por comuna\""
+              - paragraph [ref=e518]: Piensa en qué hace que alguien diga "solo le compro a Jardín de Eva" y no vuelva nunca a Easy. 🎯
+          - generic [ref=e520]:
+            - paragraph [ref=e522]: "Nuestra ventaja es que somos expertos en plantas: damos asesoría personalizada gratuita por WhatsApp, tenemos garantía de 30 días (si se te muere la reponemos gratis), y despachamos a todo Chile con empaque especial que protege cada planta en el transporte."
+            - img [ref=e525]
+          - generic [ref=e529]:
+            - img "Steve" [ref=e531]
+            - generic [ref=e534]:
+              - paragraph [ref=e535]:
+                - text: Esa es una ventaja sólida 🐕 El trípode de
+                - strong [ref=e536]: asesoría + garantía + empaque especial
+                - text: es difícil de copiar porque requiere conocimiento real, compromiso post-venta y logística especializada. Easy y Sodimac jamás van a poner a alguien a responderte por WhatsApp cómo salvar tu helecho, y PlantAdicta no tiene la garantía ni el despacho nacional. Buen combo. 🎯
+              - separator [ref=e537]
+              - paragraph [ref=e538]:
+                - emphasis [ref=e539]: se para en dos patas, emocionado
+                - text: 🐄💜
+              - paragraph [ref=e540]:
+                - strong [ref=e541]: "Pregunta 12 de 15 — VACA PÚRPURA Y GRAN PROMESA:"
+              - paragraph [ref=e542]: ¿Qué te hace DESTACAR visualmente o conceptualmente en tu industria? ¿Cuál es tu GRAN PROMESA en una frase que tu cliente ideal no puede ignorar?
+              - paragraph [ref=e543]: "Por ejemplo, en tu industria podría sonar así:"
+              - list [ref=e544]:
+                - listitem [ref=e545]:
+                  - emphasis [ref=e546]: "\"Somos la única tienda en Chile que te garantiza la planta viva 30 días o te la reponemos gratis — sin preguntas\""
+                - listitem [ref=e547]:
+                  - emphasis [ref=e548]: "\"Tu planta llega viva o no pagas. Así de simple.\""
+                - listitem [ref=e549]:
+                  - emphasis [ref=e550]: "\"La primera tienda de plantas en Chile con soporte técnico incluido — como tener un jardinero en tu celular\""
+              - paragraph [ref=e551]: Piensa en esa frase que si Carolina la lee en un anuncio, deja de scrollear y dice "esto es para mí". ¿Cuál es? 🐕
+          - generic [ref=e553]:
+            - paragraph [ref=e555]: Nuestra promesa es 'Tu planta sobrevive o te la reponemos gratis'. Garantía de 30 días que nadie más ofrece en Chile. Además cada planta viene con una ficha de cuidado personalizada según la zona donde vive el cliente.
+            - img [ref=e558]
+          - generic [ref=e562]:
+            - img "Steve" [ref=e564]
+            - generic [ref=e567]:
+              - paragraph [ref=e568]: "¡WOOF! 🐕🔥 \"Tu planta sobrevive o te la reponemos gratis\" — eso es una BOMBA de copy. Es clara, directa, elimina el miedo de Carolina de un golpe. Y la ficha personalizada por zona es el detalle que te separa del montón: no es un papelito genérico, es \"esto es para TU planta en TU depto en Santiago Centro\". Eso es vaca púrpura de verdad — nadie más lo hace. 💜"
+              - separator [ref=e569]
+              - paragraph [ref=e570]:
+                - emphasis [ref=e571]: gruñe pensando en los enemigos de tu marca
+                - text: 🐕
+              - paragraph [ref=e572]:
+                - strong [ref=e573]: "Pregunta 13 de 15 — EL VILLANO:"
+              - paragraph [ref=e574]: ¿Contra qué enemigo común lucha tu marca? ¿Qué creencia errónea quieres erradicar del mercado?
+              - paragraph [ref=e575]: ¿Y qué GARANTÍA "absurda" podrías dar para eliminar el miedo de comprar?
+              - paragraph [ref=e576]: "Por ejemplo, en tu industria:"
+              - list [ref=e577]:
+                - listitem [ref=e578]:
+                  - strong [ref=e579]: "Villano:"
+                  - emphasis [ref=e580]: "\"Las grandes tiendas de retail que te venden plantas como si fueran productos desechables — las apilan sin cuidado, nadie te asesora, y si se muere es tu problema. Queremos matar la idea de que 'las plantas online llegan muertas'.\""
+                - listitem [ref=e581]:
+                  - strong [ref=e582]: "Creencia errónea:"
+                  - emphasis [ref=e583]: "\"'Tengo mano negra, las plantas no son para mí.' — Eso es mentira. No tienes mano negra, tienes CERO información. Con la asesoría correcta cualquiera puede tener un jardín en su depto.\""
+                - listitem [ref=e584]:
+                  - strong [ref=e585]: "Garantía absurda:"
+                  - emphasis [ref=e586]: "\"Si tu planta muere en los primeros 30 días, te mandamos otra GRATIS + una videollamada con nuestro experto para asegurarnos de que la segunda sobreviva.\""
+              - paragraph [ref=e587]: ¿Cuál es el villano de Jardín de Eva? 🎯
+          - generic [ref=e589]:
+            - paragraph [ref=e591]: El villano es la industria de plantas que te vende sin enseñarte a cuidar — cuando la planta muere te dicen 'es que no la regaste bien'. El enemigo es la desinformación y el miedo a comprar plantas online. Nosotros garantizamos que si la planta muere, es nuestra responsabilidad.
+            - img [ref=e594]
+          - generic [ref=e598]:
+            - img "Steve" [ref=e600]
+            - generic [ref=e603]:
+              - paragraph [ref=e604]: "¡ESE es un villano PODEROSO! 🐕😤 \"Te venden sin enseñarte y cuando se muere es TU culpa\" — eso le hierve la sangre a Carolina. Porque ella ya vivió eso en Easy y Sodimac. Y tú le das vuelta la tortilla: \"si se muere, es NUESTRA responsabilidad\". Eso es un cambio de paradigma completo en la industria. De \"tu problema\" a \"nuestro compromiso\". Brutal. 🔥"
+              - paragraph [ref=e605]: La creencia errónea de "tengo mano negra" es perfecta para destruir en los ads — porque no es mano negra, es falta de información. Y Jardín de Eva existe para resolver exactamente eso.
+              - separator [ref=e606]
+              - paragraph [ref=e607]:
+                - emphasis [ref=e608]: olfatea buscando evidencia
+                - text: 📸
+              - paragraph [ref=e609]:
+                - strong [ref=e610]: "Pregunta 14 de 15 — PRUEBA SOCIAL Y TONO:"
+              - paragraph [ref=e611]: ¿Qué prueba tienes de que tu producto funciona? (testimonios, reviews, fotos de clientes)
+              - paragraph [ref=e612]: ¿Y qué TONO de comunicación conecta con tu cliente?
+              - paragraph [ref=e613]: "Por ejemplo, en tu industria podría verse así:"
+              - list [ref=e614]:
+                - listitem [ref=e615]:
+                  - strong [ref=e616]: "Prueba social:"
+                  - emphasis [ref=e617]: "\"Tenemos +200 reviews en Google con promedio de 4.8 estrellas. Clientas nos mandan fotos por WhatsApp de sus plantas 3 meses después diciendo 'mira cómo creció'. Tenemos un highlight en Instagram con antes/después de deptos transformados.\""
+                - listitem [ref=e618]:
+                  - strong [ref=e619]: "Tono:"
+                  - emphasis [ref=e620]: "\"Cercano pero experto — como una amiga que sabe mucho de plantas. No somos técnicos ni fríos, pero tampoco infantiles. Hablamos con cariño pero con autoridad.\""
+              - paragraph [ref=e621]: ¿Qué evidencia tienes y cómo le hablas a Carolina? 🎯
+          - generic [ref=e623]:
+            - paragraph [ref=e625]: Tenemos más de 2.000 reseñas 5 estrellas en Google, 98% de satisfacción, hemos vendido más de 50.000 plantas en 3 años. Nuestro tono es cercano, experto pero no técnico. Como una amiga que sabe mucho de plantas y te ayuda con cariño. Alegre y empoderador.
+            - img [ref=e628]
+          - generic [ref=e632]:
+            - img "Steve" [ref=e634]
+            - generic [ref=e637]:
+              - paragraph [ref=e638]: "¡Esos números son una BESTIA! 🐕💰 2.000 reseñas 5 estrellas y 98% de satisfacción es prueba social de élite — eso mata cualquier objeción de \"¿será confiable?\". Y el tono \"amiga experta en plantas\" calza perfecto con Carolina: ella no quiere un manual de botánica, quiere que alguien le diga \"riégala cada 3 días y ponla cerca de la ventana, va a estar bien\" con cariño. Alegre y empoderador es exactamente lo que necesita alguien que cree que tiene \"mano negra\". 🎯"
+              - separator [ref=e639]
+              - paragraph [ref=e640]:
+                - emphasis [ref=e641]: saca su paleta de colores
+                - text: 🎨🐕
+              - paragraph [ref=e642]:
+                - strong [ref=e643]: "Pregunta 15 de 16 — IDENTIDAD VISUAL Y TONO:"
+              - paragraph [ref=e644]: "Cuéntame sobre la identidad visual de tu marca:"
+              - list [ref=e645]:
+                - listitem [ref=e646]:
+                  - text: 🎨
+                  - strong [ref=e647]: ¿Cuáles son tus colores de marca?
+                  - text: (hex, RGB o nombre)
+                - listitem [ref=e648]:
+                  - text: 🖼
+                  - strong [ref=e649]: ¿Cuál es el estilo visual
+                  - text: que quieres proyectar?
+                - listitem [ref=e650]:
+                  - text: ✍️
+                  - strong [ref=e651]: ¿Tienes un manual de marca o guía de estilo?
+              - paragraph [ref=e652]: "Por ejemplo, en tu industria podría verse así:"
+              - list [ref=e653]:
+                - listitem [ref=e654]:
+                  - emphasis [ref=e655]: "\"Verde bosque (#2D5A27) + blanco crema (#FFF8F0) + toques de terracota (#C4724B). Estilo natural, orgánico, fotos con mucha luz natural y texturas de madera.\""
+                - listitem [ref=e656]:
+                  - emphasis [ref=e657]: "\"Minimalista pero cálido — tipo Pinterest de interiorismo escandinavo con plantas. Nada recargado ni infantil.\""
+                - listitem [ref=e658]:
+                  - emphasis [ref=e659]: "\"Tenemos un manual básico con logo, tipografías y paleta, pero no es muy detallado.\""
+              - paragraph [ref=e660]: ¿Cómo se ve Jardín de Eva visualmente? 🐕
+          - generic [ref=e662]:
+            - paragraph [ref=e664]: "Nuestra identidad es fresca, natural, femenina pero inclusiva. Colores: verde bosque, terracota cálido y crema. Tipografía moderna y limpia. Fotografía lifestyle con plantas en espacios reales de departamentos chilenos. Tono alegre, cercano, empoderador."
+            - img [ref=e667]
+          - generic [ref=e671]:
+            - img "Steve" [ref=e673]
+            - generic [ref=e676]:
+              - paragraph [ref=e677]: ¡Esa identidad es SÓLIDA! 🐕🎨 Verde bosque + terracota + crema es una paleta que grita "natural y premium" sin ser aburrida. Y que las fotos sean en deptos chilenos reales es clave — Carolina ve eso y piensa "ese podría ser MI depto". No es un jardín botánico inalcanzable, es su living con una Monstera al lado del sillón. El tono alegre y empoderador cierra el círculo perfecto con todo lo que me has contado. 🎯
+              - separator [ref=e678]
+              - paragraph [ref=e679]:
+                - emphasis [ref=e680]: saca la cámara y ladra
+                - text: 📸🐕
+              - paragraph [ref=e681]:
+                - strong [ref=e682]: "Pregunta 16 de 16 — ARCHIVOS VISUALES (OBLIGATORIA):"
+              - paragraph [ref=e683]: "Perfecto, tengo todo lo que necesito para tu estrategia. Antes de generar el análisis, necesito que subas:"
+              - paragraph [ref=e684]:
+                - text: 📸
+                - strong [ref=e685]: Logo de tu marca
+                - text: (PNG o JPG) 📦
+                - strong [ref=e686]: Fotos de tu producto principal
+                - text: (mínimo 2) 🖼
+                - strong [ref=e687]: Referencias visuales de anuncios que te gusten
+                - text: (opcional)
+              - paragraph [ref=e688]: Estos archivos los usaré para crear tus creatividades y asegurarme que todo refleje tu marca correctamente.
+              - paragraph [ref=e689]:
+                - text: 📤
+                - strong [ref=e690]: Usa los botones de subida que aparecen AQUÍ ABAJO en el chat.
+              - paragraph [ref=e691]: Si no tienes fotos ahora, escribe "no tengo fotos" y continuamos igual.
+              - paragraph [ref=e692]: Puedes usar un ejemplo de abajo o escribir con tus palabras. 🐕
+          - generic [ref=e694]:
+            - paragraph [ref=e696]: No tengo assets para subir por ahora, saltemos este paso.
+            - img [ref=e699]
+          - generic [ref=e703]:
+            - img "Steve" [ref=e705]
+            - generic [ref=e708]:
+              - paragraph [ref=e709]:
+                - text: ⏳
+                - emphasis [ref=e710]: saca termo y se prepara para el análisis
+                - text: 🐕
+              - paragraph [ref=e711]: ¡WOOF! Tu brief ya está listo. Además estoy lanzando el análisis automático de tu sitio web y el de tu competencia ahora mismo. Puede demorar hasta 8 minutos — anda por un café y cuando vuelvas tendrás el análisis completo de SEO, Keywords y Competencia en las pestañas correspondientes. ¡No cierres la sesión!
+              - separator [ref=e712]
+              - paragraph [ref=e713]: ¡Excelente, hemos terminado! Su Brief Estratégico ya está completo y listo a continuación. Ha sido una conversación muy productiva — Jardín de Eva tiene un negocio sólido con una propuesta diferenciadora real y un mercado con mucho espacio para crecer. Todo lo que necesita para ejecutar está en el documento de abajo.
+              - separator [ref=e714]
+              - heading "1. RESUMEN EJECUTIVO" [level=2] [ref=e715]
+              - list [ref=e716]:
+                - listitem [ref=e717]:
+                  - paragraph [ref=e718]:
+                    - strong [ref=e719]: "Diagnóstico:"
+                    - text: Jardín de Eva es una tienda de e-commerce especializada en plantas y jardinería, operando en Chile con tres años de trayectoria, más de 50.000 unidades vendidas y un capital reputacional de 2.000 reseñas con calificación promedio de 5 estrellas en Google. El negocio se encuentra en Fase de Crecimiento, con presencia multicanal distribuida entre sitio propio Shopify (55%), marketplaces (15%) y canales conversacionales (WhatsApp e Instagram, 15% combinado). El margen bruto unitario del 54% constituye una base financiera sana para escalar inversión en paid media.
+                - listitem [ref=e720]:
+                  - paragraph [ref=e721]:
+                    - strong [ref=e722]: "Oportunidad:"
+                    - text: El mercado de plantas de interior y jardinería en Chile ha experimentado un crecimiento sostenido post-pandemia, con estimaciones de expansión del segmento e-commerce de plantas en Latinoamérica del 18–22% anual. En Chile, el mercado de mascotas verdes y bienestar del hogar captura un segmento urbano de clase media-alta en expansión, concentrado en la Región Metropolitana pero con demanda creciente en regiones. El posicionamiento diferenciador de Jardín de Eva —garantía de 30 días más asesoría post-venta— ataca una brecha estructural que los grandes retailers no están en condiciones de cubrir.
+                - listitem [ref=e723]:
+                  - paragraph [ref=e724]:
+                    - strong [ref=e725]: "Viabilidad:"
+                    - text: Con un margen bruto de $19.000 CLP por unidad y un CPA máximo viable de $4.750 CLP, la estructura financiera permite operar campañas de paid media rentables incluso en escenarios conservadores de conversión. El presupuesto disponible ($500.000–$2.000.000 CLP mensual) es coherente con la fase del negocio y suficiente para ejecutar prospección fría básica más retargeting sin comprometer la rentabilidad unitaria.
+                - listitem [ref=e726]:
+                  - paragraph [ref=e727]:
+                    - strong [ref=e728]: "Recomendación principal:"
+                    - text: Activar de forma inmediata una campaña de Broad Retargeting en Meta Ads orientada a visitantes de los últimos 30 días, con creativos centrados en la garantía de 30 días como argumento de cierre, combinada con una campaña de prospección fría en audiencias de interés (plantas, decoración de interiores, sustentabilidad). Este stack inicial puede alcanzar un ROAS de 3x–4x en las primeras seis semanas con una inversión mensual de $700.000–$1.000.000 CLP.
+              - paragraph [ref=e729]: "Jardín de Eva reúne los activos fundamentales para escalar de manera rentable: propuesta de valor diferenciada, prueba social sólida, y una garantía que elimina la principal barrera de compra del segmento. La ejecución de las recomendaciones contenidas en este documento, implementadas de forma secuencial y medida, puede posicionar a la marca como el referente número uno del e-commerce de plantas en Chile en un horizonte de 12 meses."
+              - paragraph [ref=e730]: El presente brief opera como hoja de ruta estratégica para la inversión en adquisición, posicionamiento orgánico y dominación competitiva. Su implementación rigurosa, con medición semanal de KPIs y ciclos de optimización de 14 días, es la condición necesaria para convertir el crecimiento actual en una posición de mercado sustentable y defensible.
+              - separator [ref=e731]
+              - heading "2. ADN DE MARCA" [level=2] [ref=e732]
+              - list [ref=e733]:
+                - listitem [ref=e734]:
+                  - paragraph [ref=e735]:
+                    - strong [ref=e736]: "Sector y vertical:"
+                    - text: "Jardín de Eva opera en el vertical de retail especializado de plantas y jardinería en modalidad e-commerce, un segmento que en Chile combina el auge del bienestar del hogar con tendencias de consumo consciente y diseño de interiores. El sector se encuentra en expansión acelerada: post-pandemia, el segmento \"plantas de interior\" registró incrementos de búsqueda orgánica superiores al 40% en Chile (Google Trends, 2021–2024). La empresa se posiciona en el extremo premium-accesible del espectro, diferenciándose de los grandes retailers por especialización y servicio."
+                - listitem [ref=e737]:
+                  - paragraph [ref=e738]:
+                    - strong [ref=e739]: "Producto principal y propuesta de valor:"
+                    - text: "La empresa comercializa plantas de interior y exterior, maceteros, sustrato y accesorios de jardinería, con despacho a todo Chile mediante empaque protegido de diseño propio. La propuesta de valor central descansa en tres pilares: (1) calidad garantizada de la planta al momento de entrega, (2) garantía de reposición gratuita de 30 días, y (3) asesoría personalizada post-venta vía WhatsApp. Ningún competidor directo integra los tres pilares de forma simultánea en el mercado chileno."
+                - listitem [ref=e740]:
+                  - paragraph [ref=e741]:
+                    - strong [ref=e742]: "Rango de precios y posicionamiento competitivo:"
+                    - text: "El ticket promedio de $35.000 CLP sitúa a Jardín de Eva en un rango medio-premium. Easy Chile y Sodimac operan en el segmento masivo con tickets inferiores ($8.000–$20.000 CLP), sacrificando calidad y servicio. PlantAdicta apunta al segmento premium con precios superiores ($45.000–$80.000 CLP) pero con cobertura geográfica limitada y stock inconsistente. Jardín de Eva ocupa el espacio de mayor oportunidad: calidad premium con precio accesible y cobertura nacional."
+                - listitem [ref=e743]:
+                  - paragraph [ref=e744]:
+                    - strong [ref=e745]: "Presencia digital y distribución:"
+                    - text: El canal e-commerce propio (Shopify) concentra el 55% de las ventas, señal de tracción orgánica y directa relevante. Los marketplaces (15%) actúan como canal de descubrimiento secundario. WhatsApp e Instagram (15% combinado) reflejan una comunidad activa con potencial de monetización no explorado en su totalidad. La brecha crítica es la ausencia de activos visuales sistematizados para paid media, lo que limita la velocidad de escala en el corto plazo. La presencia en Facebook e Instagram (5% cada uno) indica potencial de crecimiento significativo con inversión y creativos adecuados.
+              - separator [ref=e746]
+              - heading "3. ANÁLISIS FINANCIERO" [level=2] [ref=e747]
+              - paragraph [ref=e748]: "| Indicador | Valor | |---|---| | Ticket promedio | $35.000 CLP | | Costo unitario | $12.000 CLP | | Costo de envío | $4.000 CLP | | Margen bruto unitario | $19.000 CLP (54,3%) | | CPA máximo viable (25% del margen) | $4.750 CLP |"
+              - paragraph [ref=e749]:
+                - strong [ref=e750]: "Conclusión financiera:"
+                - text: El margen bruto del 54,3% posiciona a Jardín de Eva por encima del benchmark típico de e-commerce de productos físicos en Latinoamérica (35–45%), otorgando un colchón financiero adecuado para absorber el costo de adquisición sin comprometer la rentabilidad por transacción. Bajo un escenario de CPA de $4.750 CLP —equivalente al 25% del margen bruto, umbral conservador para e-commerce en etapa de crecimiento—, la empresa puede escalar inversión mensual hasta $2.000.000 CLP y recuperar el costo en el primer pedido, asumiendo una tasa de conversión del sitio de al menos 1,5%.
+              - paragraph [ref=e751]: Para la fase actual, se recomienda iniciar con una inversión mensual de $700.000 CLP distribuida entre Meta Ads (70%) y Google Ads (30%), con un ROAS mínimo objetivo de 3x (equivalente a $105.000 CLP en ingresos atribuidos por cada $35.000 CLP invertidos). El benchmark de e-commerce de plantas y decoración en la región indica ROAS promedio de 2,8x–4,2x en campañas maduras de seis meses. Con los activos de prueba social disponibles (2.000 reseñas, 50.000 plantas vendidas), se estima que la empresa puede alcanzar el extremo superior del benchmark dentro de los primeros 60 días de campaña optimizada.
+              - separator [ref=e752]
+              - heading "4. PERFIL DEL CONSUMIDOR OBJETIVO" [level=2] [ref=e753]
+              - list [ref=e754]:
+                - listitem [ref=e755]:
+                  - paragraph [ref=e756]:
+                    - strong [ref=e757]: "Demográfico:"
+                    - text: Mujer de 28–38 años, residente en zonas urbanas de Santiago (comunas de Providencia, Ñuñoa, Santiago Centro, Las Condes). Ingreso mensual de $900.000–$1.500.000 CLP. Perfil profesional creativo o independiente (diseñadora, comunicadora, profesora, trabajadora remota). Presencia activa en Instagram y Pinterest. Sin hijos o con hijos pequeños, en fase de construcción de identidad del hogar.
+                - listitem [ref=e758]:
+                  - paragraph [ref=e759]:
+                    - strong [ref=e760]: "Dolor profundo:"
+                    - text: Carolina lleva más de un año intentando mantener plantas vivas en su departamento. Ha gastado cerca de $80.000–$120.000 CLP en Easy y Sodimac en plantas que no sobrevivieron más de cuatro semanas. Cada vez que una planta muere, refuerza la narrativa de que "no tiene mano para las plantas", generando culpa y frustración. El problema no es la falta de deseo —sigue el contenido de plantas en Instagram con entusiasmo—, sino la ausencia de soporte post-compra y la desconfianza acumulada frente al canal online. La experiencia previa de recibir plantas marchitas o maltratadas en el despacho ha elevado su umbral de credibilidad al punto de que ningún argumento de precio logra convencerla sin una garantía tangible.
+                - listitem [ref=e761]:
+                  - paragraph [ref=e762]:
+                    - strong [ref=e763]: "Lo que dice literalmente:"
+                  - list [ref=e764]:
+                    - listitem [ref=e765]:
+                      - emphasis [ref=e766]: "\"Es que todo se me muere, no tengo mano para las plantas.\""
+                    - listitem [ref=e767]:
+                      - emphasis [ref=e768]: "\"Siempre que compro online llegan marchitas, no confío.\""
+                    - listitem [ref=e769]:
+                      - emphasis [ref=e770]: "\"Quiero mi depto lleno de verde pero no sé por dónde empezar sin botar plata.\""
+                - listitem [ref=e771]:
+                  - paragraph [ref=e772]:
+                    - strong [ref=e773]: "Transformación buscada:"
+                    - text: "Carolina pasa de sentirse fracasada y gastada a convertirse en la persona de referencia en su círculo social para todo lo relacionado con plantas. Su departamento se transforma visualmente —un activo de su identidad como diseñadora freelance—, y la experiencia de mantener plantas vivas le devuelve confianza y sensación de logro. El acto de compartir fotos de sus plantas en Instagram no es vanidad: es la evidencia tangible de una transformación de identidad."
+                - listitem [ref=e774]:
+                  - paragraph [ref=e775]:
+                    - strong [ref=e776]: "Estilo de vida inferido:"
+                    - text: "Trabaja desde el hogar tres días a la semana, con lo que el entorno físico del departamento tiene un impacto directo en su productividad y bienestar percibido. Consume contenido de sustentabilidad, diseño minimalista y bienestar. Es compradora consciente que investiga antes de comprar: compara opciones, lee reseñas y valora la transparencia de la marca. Asiste a ferias locales de plantas como acto social y de descubrimiento. Practica yoga y cocina en casa, señales de una valoración alta del autocuidado y el espacio personal."
+                - listitem [ref=e777]:
+                  - paragraph [ref=e778]:
+                    - strong [ref=e779]: "Barreras de compra:"
+                  - list [ref=e780]:
+                    - listitem [ref=e781]:
+                      - emphasis [ref=e782]: "\"¿La planta llegará bien?\""
+                      - text: → Jardín de Eva la supera con empaque especializado y garantía de reposición de 30 días.
+                    - listitem [ref=e783]:
+                      - emphasis [ref=e784]: "\"No voy a saber cuidarla y se va a morir igual.\""
+                      - text: → La superan con la ficha de cuidado personalizada por zona geográfica y la asesoría gratuita por WhatsApp.
+                    - listitem [ref=e785]:
+                      - emphasis [ref=e786]: "\"Es caro para algo que puede no funcionar.\""
+                      - text: "→ La garantía transforma el riesgo percibido en una compra sin riesgo: si muere, es responsabilidad de la marca."
+              - paragraph [ref=e787]:
+                - strong [ref=e788]: "Conclusión del perfil:"
+                - text: El perfil de consumidor objetivo de Jardín de Eva es una mujer urbana profesional con alta afinidad por la estética del hogar y la sustentabilidad, bloqueada no por falta de interés sino por experiencias de compra previas fallidas y ausencia de soporte post-venta. Toda la comunicación de la marca debe estar orientada a desactivar el miedo al fracaso y transferir la responsabilidad del resultado de la consumidora a la empresa, posicionando la garantía como el argumento central de conversión y la asesoría como el diferenciador de fidelización.
+              - separator [ref=e789]
+              - heading "5. ANÁLISIS COMPETITIVO ESTRATÉGICO" [level=2] [ref=e790]
+              - paragraph [ref=e791]: "| Competidor | Promesa de Marca | Brecha Identificada | Diferenciador del Cliente | |---|---|---|---| | Easy Chile | Variedad y precio bajo en plantas y jardinería | Plantas de baja calidad, sin asesoría, sin garantía. Experiencia de despacho deficiente. | Jardín de Eva entrega calidad garantizada, empaque protegido y soporte experto post-compra. | | Sodimac Homecenter | Solución completa para el hogar y jardín | Cero especialización: vendedores sin conocimiento de plantas, sin personalización, experiencia genérica. | Jardín de Eva es 100% especialista en plantas: el conocimiento y la asesoría son parte del producto. | | PlantAdicta | Plantas premium para el mercado entusiasta | Precios inaccesibles para el segmento masivo, despacho solo en RM, stock inconsistente. | Jardín de Eva ofrece calidad premium a precio accesible con cobertura nacional y stock estable. |"
+              - paragraph [ref=e792]:
+                - strong [ref=e793]: "Conclusión competitiva:"
+                - text: "El mercado de plantas en Chile presenta una segmentación clara con brechas explotables en ambos extremos. Los grandes retailers (Easy, Sodimac) capturan volumen a costa de calidad y servicio, generando frustración acumulada que empuja a los consumidores hacia alternativas especializadas. Los especialistas premium (PlantAdicta) capturan al entusiasta avanzado pero excluyen al segmento mayoritario por precio y cobertura. Jardín de Eva ocupa el segmento de mayor oportunidad volumétrica: el consumidor urbano de ingresos medios que desea calidad y soporte, y que ha sido quemado por los retailers masivos pero no puede o no quiere pagar los precios del segmento premium puro."
+              - paragraph [ref=e794]: "La ventaja competitiva sostenible de Jardín de Eva descansa en la combinación de tres activos difíciles de replicar simultáneamente: (1) 2.000 reseñas de 5 estrellas como señal de confianza masiva, (2) una garantía de reposición de 30 días que ningún competidor de escala similar ofrece, y (3) la asesoría personalizada por WhatsApp que convierte cada venta en una relación de largo plazo. La replicación de este stack por parte de los grandes retailers implicaría una transformación operacional de tal magnitud que los hace estructuralmente incapaces de competir en este vector."
+              - separator [ref=e795]
+              - heading "6. ESTRATEGIA DE POSICIONAMIENTO Y DIFERENCIACIÓN" [level=2] [ref=e796]
+              - list [ref=e797]:
+                - listitem [ref=e798]:
+                  - paragraph [ref=e799]:
+                    - strong [ref=e800]: "Concepto diferenciador (Vaca Púrpura):"
+                    - text: "\"La única tienda de plantas en Chile donde comprar es sin riesgo: si tu planta muere en 30 días, te la reponemos gratis. Sin preguntas.\" Este posicionamiento convierte la garantía en el producto mismo, diferenciándose en una dimensión que los competidores no pueden atacar sin transformar su modelo operativo completo."
+                - listitem [ref=e801]:
+                  - paragraph [ref=e802]:
+                    - strong [ref=e803]: "Narrativa de marca:"
+                    - text: "El antagonista es la industria tradicional de plantas que vende vida y entrega abandono: te venden la planta, pero cuando muere, la culpa es tuya. Jardín de Eva invierte el modelo: la responsabilidad del éxito de la planta no recae en el comprador sino en la marca. La narrativa es de empoderamiento: \"No es que no tengas mano para las plantas. Es que nadie te había enseñado ni garantizado nada.\""
+                - listitem [ref=e804]:
+                  - paragraph [ref=e805]:
+                    - strong [ref=e806]: "Garantía diferenciadora:"
+                    - text: "Garantía de reposición gratuita de 30 días, activable vía WhatsApp sin formularios ni burocracia. La fricción cero en la activación de la garantía es tan importante como la garantía misma: debe comunicarse como un proceso de un mensaje de WhatsApp, no como un trámite. Esta mecánica convierte a los compradores en embajadores porque la experiencia post-compra supera las expectativas formadas por los competidores."
+                - listitem [ref=e807]:
+                  - paragraph [ref=e808]:
+                    - strong [ref=e809]: "Capital de prueba social:"
+                    - text: "Jardín de Eva dispone de un activo reputacional de primer nivel: 2.000 reseñas de 5 estrellas en Google, 98% de satisfacción declarada, y 50.000 plantas vendidas en 36 meses. Este volumen es suficiente para construir creativos de prueba social con alta credibilidad. Los testimonios deben segmentarse por tipo de objeción (llegó bien / aprendí a cuidarla / me la repusieron sin problemas) para neutralizar cada barrera de compra en los creativos correspondientes."
+                - listitem [ref=e810]:
+                  - paragraph [ref=e811]:
+                    - strong [ref=e812]: "Tono y personalidad de marca:"
+                    - text: "La voz de Jardín de Eva es la de una amiga experta: cercana, sin tecnicismos, empática con el miedo al fracaso, y orgullosa de su conocimiento. El tono combina la calidez de la conversación con la autoridad del expertise. Se evita el tecnicismo botánico innecesario y la condescendencia educativa. La marca habla de igual a igual, celebra los logros pequeños del consumidor y nunca culpa al comprador cuando algo falla."
+                - listitem [ref=e813]:
+                  - paragraph [ref=e814]:
+                    - strong [ref=e815]: "Identidad visual:"
+                    - text: "La paleta cromática —verde bosque, terracota cálido y crema— comunica naturaleza, calidez y sofisticación accesible de forma coherente con el segmento objetivo. La fotografía lifestyle en ambientes reales de departamentos chilenos es el activo visual más poderoso disponible: humaniza el producto y activa la identificación inmediata del consumidor objetivo. La tipografía moderna y limpia refuerza la percepción de marca contemporánea y confiable. En ausencia de assets propios sistematizados, la prioridad inmediata es desarrollar un banco de imágenes lifestyle consistente con estos lineamientos."
+              - separator [ref=e816]
+              - heading "7. EVALUACIÓN ESTRATÉGICA — 7 ACCIONABLES PRIORITARIOS" [level=2] [ref=e817]
+              - 'heading "Accionable 1: Activar la Garantía como Argumento Central de Conversión en Todos los Touchpoints" [level=3] [ref=e818]'
+              - paragraph [ref=e819]:
+                - strong [ref=e820]: "Situación (S):"
+                - text: Jardín de Eva ofrece una garantía de reposición gratuita de 30 días que ningún competidor de escala comparable replica en el mercado chileno. Este activo existe operacionalmente pero no está siendo explotado como argumento primario de conversión en paid media ni en la experiencia del sitio web.
+              - paragraph [ref=e821]:
+                - strong [ref=e822]: "Complicación (C):"
+                - text: La principal barrera de compra del segmento objetivo —el miedo a gastar dinero en una planta que va a morir— permanece activa en el momento de la decisión de compra porque la garantía no está siendo comunicada con suficiente prominencia y especificidad en los puntos de mayor fricción del funnel (homepage, página de producto, checkout, creativos de retargeting).
+              - paragraph [ref=e823]:
+                - strong [ref=e824]: "Resolución (R):"
+                - text: "La garantía debe ocupar el primer lugar en la jerarquía de mensajes en cada touchpoint: (1) en la homepage, debe aparecer above the fold como el headline principal o el segundo elemento más visible después del nombre de marca; (2) en cada página de producto, debe mostrarse como un badge prominente junto al botón de compra con el copy exacto \"Tu planta sobrevive o te la reponemos gratis — 30 días\"; (3) en todos los creativos de retargeting, la garantía debe ser el argumento de cierre en los últimos tres segundos del video o el headline de la imagen estática. La activación de la garantía vía WhatsApp en un solo mensaje debe comunicarse explícitamente para reducir la percepción de burocracia."
+              - paragraph [ref=e825]:
+                - strong [ref=e826]: "Impacto de Negocio:"
+                - text: Incremento estimado en CVR del sitio del 0,4%–0,8% (de 1,5% a 1,9%–2,3%), equivalente a un aumento del 25–50% en conversiones sin incremento de tráfico. En un escenario de 1.000 visitas mensuales al sitio, esto representa 4–8 conversiones adicionales por mes, o $140.000–$280.000 CLP en ingresos incrementales con la inversión de tráfico actual. Implementable en 7 días.
+              - separator [ref=e827]
+              - 'heading "Accionable 2: Desarrollar un Stack de Assets Visuales Mínimo Viable para Paid Media" [level=3] [ref=e828]'
+              - paragraph [ref=e829]:
+                - strong [ref=e830]: "Situación (S):"
+                - text: Jardín de Eva carece de un banco de assets visuales sistematizado para alimentar campañas de paid media de manera sostenida. La identidad visual está definida (verde bosque, terracota, crema; fotografía lifestyle en departamentos chilenos) pero no existe producción de contenido orientada específicamente a formatos publicitarios (video 9:16 para Reels, carrusel para feed, imagen estática 1:1).
+              - paragraph [ref=e831]:
+                - strong [ref=e832]: "Complicación (C):"
+                - text: Sin creativos propios de alta calidad, la empresa no puede escalar inversión en Meta Ads ni en Google Display de forma efectiva. El uso de imágenes genéricas o de stock rompe la identificación del consumidor objetivo con la marca, reduce el CTR y eleva el CPM. En e-commerce de lifestyle, los creativos representan el 60–70% del resultado de una campaña (Facebook IQ, 2023).
+              - paragraph [ref=e833]:
+                - strong [ref=e834]: "Resolución (R):"
+                - text: "Se recomienda ejecutar una sesión de producción de contenido de un día de duración con los siguientes entregables mínimos: (1) 6–8 fotografías lifestyle de plantas en ambientes de departamento (cocina, escritorio, living, dormitorio), en formato horizontal y vertical; (2) 2–3 videos cortos de 15–30 segundos mostrando el proceso de desempaque del pedido (\"unboxing\") con énfasis en el empaque protegido y la ficha de cuidado incluida; (3) 1 video testimonial de cliente real de 30–45 segundos con subtítulos. Con un presupuesto de producción de $150.000–$300.000 CLP, este banco de assets sostiene 60–90 días de campaña activa antes de requerir renovación."
+              - paragraph [ref=e835]:
+                - strong [ref=e836]: "Impacto de Negocio:"
+                - text: "Reducción estimada del CPM en Meta Ads del 20–35% frente a creativos genéricos (benchmark de industria: creativos lifestyle vs. producto puro). CTR proyectado del 2,5%–3,5% vs. 0,8%–1,2% con assets no optimizados. Impacto neto en costo por venta: reducción del CPA del 25–40% en el primer mes de uso de creativos propios."
+              - separator [ref=e837]
+              - 'heading "Accionable 3: Implementar Campaña de Retargeting con Segmentación por Etapa del Funnel" [level=3] [ref=e838]'
+              - paragraph [ref=e839]:
+                - strong [ref=e840]: "Situación (S):"
+                - text: Jardín de Eva genera tráfico orgánico y directo hacia su sitio Shopify, que constituye el 55% de las ventas. Sin embargo, la ausencia de una estructura de retargeting activa implica que el porcentaje de visitantes que no convierte en la primera visita (estimado en el 96–98% del total de visitas para e-commerce promedio) no está siendo recuperado de forma sistemática.
+              - paragraph [ref=e841]:
+                - strong [ref=e842]: "Complicación (C):"
+                - text: En e-commerce de productos no urgentes como plantas decorativas, el ciclo de decisión de compra puede extenderse de 3 a 14 días. Sin retargeting, la marca pierde visibilidad frente a este segmento caliente durante el período de deliberación, permitiendo que competidores o distracciones capturen la atención del potencial comprador antes del cierre.
+              - paragraph [ref=e843]: "**Resolución (R"
+        - generic [ref=e845]:
+          - paragraph [ref=e846]:
+            - text: 🐕 ¡WOOF! Tu Brief de Marca está listo. Ve a la pestaña
+            - strong [ref=e847]: Brief
+            - text: para verlo y descargarlo.
+          - button "Crear nuevo Brief" [ref=e848] [cursor=pointer]:
+            - img
+            - text: Crear nuevo Brief
+    - button [ref=e851] [cursor=pointer]:
+      - img
+    - generic [ref=e852]:
+      - button "Abrir asistente" [ref=e853] [cursor=pointer]:
+        - img "Chonga" [ref=e855]
+      - status "Disponible" [ref=e856]
+    - generic [ref=e862]:
+      - img [ref=e864]
+      - generic [ref=e866]:
+        - heading "¡Bienvenido, Patricio Correa!" [level=2] [ref=e867]
+        - paragraph [ref=e868]: Tu portal de marketing digital está listo. Te explicamos rápidamente cómo sacarle el máximo provecho.
+      - generic [ref=e869]:
+        - button [ref=e870] [cursor=pointer]
+        - button [ref=e871] [cursor=pointer]
+        - button [ref=e872] [cursor=pointer]
+        - button [ref=e873] [cursor=pointer]
+        - button [ref=e874] [cursor=pointer]
+        - button [ref=e875] [cursor=pointer]
+        - button [ref=e876] [cursor=pointer]
+        - button [ref=e877] [cursor=pointer]
+      - generic [ref=e878]:
+        - button "Omitir" [ref=e880] [cursor=pointer]
+        - button "Siguiente" [ref=e881] [cursor=pointer]:
+          - text: Siguiente
+          - img
+    - generic [ref=e884]:
+      - generic [ref=e885]:
+        - generic [ref=e886]:
+          - paragraph [ref=e887]: Paso 1 de 5
+          - heading "Steve — Tu asistente IA" [level=3] [ref=e888]
+        - button [ref=e889] [cursor=pointer]:
+          - img [ref=e890]
+      - paragraph [ref=e893]: Aquí creas tu Brand Brief respondiendo preguntas sobre tu marca. Steve analiza todo y genera tu estrategia.
+      - button "Siguiente" [ref=e902] [cursor=pointer]:
+        - text: Siguiente
+        - img
+```

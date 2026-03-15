@@ -75,6 +75,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@hotjar/browser": "^1.0.9",
+    "@lhci/cli": "^0.15.1",
+    "@percy/cli": "^1.31.9",
+    "@percy/playwright": "^1.0.10",
+    "@stryker-mutator/core": "^9.6.0",
+    "@stryker-mutator/vitest-runner": "^9.6.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",

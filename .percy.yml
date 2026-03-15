@@ -1,0 +1,13 @@
+version: 2
+snapshot:
+  widths:
+    - 375
+    - 1280
+  min-height: 1024
+  percy-css: |
+    /* Hide dynamic content that changes between runs */
+    [data-testid="timestamp"], .toast, .Toastify { display: none !important; }
+discovery:
+  allowed-hostnames:
+    - betabgnuevosupa.vercel.app
+  network-idle-timeout: 500

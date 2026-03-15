@@ -2419,9 +2419,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
       toast.success('Campaña creada como pausada en Meta. Activa cuando estés listo.');
       onComplete?.();
-    } catch (err) {
-      // Submit error — toast shown below
-      toast.error('Error al crear campaña');
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : err?.message || 'Error desconocido';
+      console.error('[CampaignCreateWizard] Publish error:', msg, err);
+      toast.error(`Error al crear campaña: ${msg}`);
     } finally {
       setSubmitting(false);
     }
