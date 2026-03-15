@@ -109,6 +109,7 @@ import { productAlerts } from './email/product-alerts.js';
 import { productAlertWidget } from './email/product-alert-widget.js';
 import { productRecommendations } from './email/product-recommendations.js';
 import { emailAbTesting, executeAbTestWinner } from './email/ab-testing.js';
+import { emailRevenueAttribution } from './email/revenue-attribution.js';
 import { signupForms, signupFormPublic } from './email/signup-forms.js';
 import { formWidget } from './email/form-widget.js';
 import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-api.js';
@@ -241,6 +242,7 @@ export function registerRoutes(app: Hono) {
 
   // A/B testing (auth required)
   app.post('/api/email-ab-testing', authMiddleware, emailAbTesting);
+  app.post('/api/email-revenue-attribution', authMiddleware, emailRevenueAttribution);
   app.post('/api/execute-ab-test-winner', authMiddleware, executeAbTestWinner); // Cloud Tasks internal call
 
   // Signup forms (auth for management)
