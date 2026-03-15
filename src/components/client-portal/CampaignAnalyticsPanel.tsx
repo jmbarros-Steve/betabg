@@ -99,12 +99,16 @@ const priorityConfig = {
   low: { color: 'bg-blue-500/10 text-blue-500 border-blue-500/30', icon: Sparkles },
 };
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('es-CL', { 
-    style: 'currency', 
-    currency: 'CLP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0 
+const formatCurrency = (value: number, currency: string = 'CLP') => {
+  const cur = currency.toUpperCase();
+  // For CLP: no decimals (whole pesos)
+  // For USD/EUR/etc: 2 decimals
+  const isWholeCurrency = cur === 'CLP' || cur === 'COP' || cur === 'JPY' || cur === 'KRW';
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: cur,
+    minimumFractionDigits: isWholeCurrency ? 0 : 2,
+    maximumFractionDigits: isWholeCurrency ? 0 : 2
   }).format(value);
 };
 
@@ -662,15 +666,20 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             </SelectContent>
           </Select>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={syncCampaigns}
             disabled={syncing}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sincronizar
           </Button>
+          {metaAccountCurrency && metaAccountCurrency !== 'CLP' && (
+            <span className="text-xs text-muted-foreground ml-2">
+              Cuenta en {metaAccountCurrency} · Convertido a CLP
+            </span>
+          )}
         </div>
       </div>
 
