@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -119,6 +119,28 @@ const formatNumber = (value: number) => {
 const formatPercent = (value: number) => {
   return `${value.toFixed(2)}%`;
 };
+
+
+// Animated count-up hook
+function useCountUp(end: number, duration = 800): number {
+  const [value, setValue] = useState(0);
+  const prevEnd = useRef(0);
+  useEffect(() => {
+    if (end === prevEnd.current) return;
+    const start = prevEnd.current;
+    prevEnd.current = end;
+    const startTime = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(start + (end - start) * eased);
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [end, duration]);
+  return value;
+}
 
 export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps) {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -627,6 +649,12 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   const hasData = metrics.length > 0;
 
+  // Animated KPI values
+  const animSpend = useCountUp(totals.spend);
+  const animRevenue = useCountUp(totals.revenue);
+  const animRoas = useCountUp(overallRoas, 600);
+  const animConversions = useCountUp(totals.conversions, 600);
+
   // Daily trend data for sparklines
   const dailyTrend = useMemo(() => {
     const map = new Map<string, { date: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
@@ -901,7 +929,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <DollarSign className="w-5 h-5 text-red-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend, 'CLP')}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(animSpend, 'CLP')}</p>
             {dailyTrend.length > 1 && (
               <ResponsiveContainer width="100%" height={32}>
                 <LineChart data={dailyTrend}><Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={1.5} dot={false} /></LineChart>
@@ -918,7 +946,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <DollarSign className="w-5 h-5 text-green-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue, 'CLP')}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(animRevenue, 'CLP')}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {totals.revenue > 0 ? `ROAS: ${overallRoas.toFixed(2)}x` : 'Sin datos de conversión'}
             </p>
@@ -939,7 +967,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               </div>
             </div>
             <p className={`text-3xl font-bold tracking-tight ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
-              {overallRoas.toFixed(2)}x
+              {animRoas.toFixed(2)}x
             </p>
             {dailyTrend.length > 1 && (
               <ResponsiveContainer width="100%" height={32}>
@@ -957,7 +985,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <ShoppingCart className="w-5 h-5 text-amber-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatNumber(totals.conversions)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatNumber(Math.round(animConversions))}</p>
             {dailyTrend.length > 1 && (
               <ResponsiveContainer width="100%" height={32}>
                 <LineChart data={dailyTrend}><Line type="monotone" dataKey="conversions" stroke="#f59e0b" strokeWidth={1.5} dot={false} /></LineChart>
