@@ -1,17 +1,64 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 /**
  * Campaign analytics: aggregate email events per campaign.
  * POST /api/email-campaign-analytics
  */
 export async function emailCampaignAnalytics(c: Context) {
+  const supabase = getSupabaseAdmin();
+
+  // Authenticate user
+  const shopifySessionToken = c.req.header('X-Shopify-Session-Token');
+  const authHeader = c.req.header('Authorization');
+  let userId: string | null = null;
+
+  if (shopifySessionToken) {
+    const validation = await validateShopifySessionToken(shopifySessionToken, supabase);
+    if (!validation.valid || !validation.userId) {
+      return c.json({ error: validation.error || 'Invalid token' }, 401);
+    }
+    userId = validation.userId;
+  } else if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    userId = user.id;
+  } else {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const body = await c.req.json();
   const { action, client_id } = body;
 
   if (!client_id) return c.json({ error: 'client_id is required' }, 400);
 
-  const supabase = getSupabaseAdmin();
+  // Verify user owns this client (admin via user_id OR client via client_user_id)
+  const { data: client, error: clientErr } = await supabase
+    .from('clients')
+    .select('id, user_id, client_user_id')
+    .eq('id', client_id)
+    .single();
+
+  if (clientErr || !client) {
+    return c.json({ error: 'Client not found' }, 404);
+  }
+
+  const isOwner = client.user_id === userId || client.client_user_id === userId;
+
+  // Also check super admin
+  const { data: roleRow } = await supabase
+    .from('user_roles')
+    .select('is_super_admin')
+    .eq('user_id', userId!)
+    .maybeSingle();
+
+  if (!isOwner && !roleRow?.is_super_admin) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   switch (action) {
     case 'campaign-stats': {
