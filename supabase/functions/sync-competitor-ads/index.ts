@@ -116,7 +116,15 @@ Deno.serve(async (req) => {
       if (metaAppId && metaAppSecret) {
         try {
           const tokenRes = await fetch(
-            `https://graph.facebook.com/oauth/access_token?client_id=${metaAppId}&client_secret=${metaAppSecret}&grant_type=client_credentials`
+            'https://graph.facebook.com/oauth/access_token',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                client_id: metaAppId, client_secret: metaAppSecret,
+                grant_type: 'client_credentials',
+              }),
+            }
           );
           const tokenData = await tokenRes.json();
           if (tokenData.access_token) {

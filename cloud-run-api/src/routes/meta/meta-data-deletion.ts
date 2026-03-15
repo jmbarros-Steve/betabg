@@ -29,7 +29,8 @@ async function parseSignedRequest(signedRequest: string, appSecret: string): Pro
     const receivedSig = encodedSig.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     if (expectedSig !== receivedSig) {
-      console.warn('[meta-data-deletion] Signature mismatch, proceeding anyway for compatibility');
+      console.error('[meta-data-deletion] Signature verification failed');
+      return null;
     }
 
     return data;

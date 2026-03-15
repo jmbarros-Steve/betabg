@@ -1,6 +1,48 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
+
+// Currency conversion utilities
+const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
+const FALLBACK_RATES: Record<string, number> = {
+  CLP: 950,
+  MXN: 17.5,
+  EUR: 0.92,
+  GBP: 0.79,
+};
+
+let cachedRates: Record<string, number> = {};
+
+async function getExchangeRates(): Promise<Record<string, number>> {
+  if (Object.keys(cachedRates).length > 0) return cachedRates;
+
+  try {
+    const response = await fetch(EXCHANGE_RATE_API_URL);
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    const data: any = await response.json();
+    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
+    cachedRates = data.rates || FALLBACK_RATES;
+    return cachedRates;
+  } catch (error) {
+    console.error('Failed to fetch exchange rates, using fallback:', error);
+    return FALLBACK_RATES;
+  }
+}
+
+async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
+  const currency = fromCurrency.toUpperCase();
+  if (currency === 'CLP') return amount;
+
+  const rates = await getExchangeRates();
+
+  if (currency === 'USD') {
+    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
+  } else {
+    // Convert FROM -> USD -> CLP
+    const fromRate = rates[currency] || 1;
+    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
+    return (amount / fromRate) * clpRate;
+  }
+}
 
 interface MetaCampaign {
   id: string;
@@ -182,19 +224,6 @@ export async function syncCampaignMetrics(c: Context) {
     console.log(`Upserting ${campaignMetrics.length} campaign metric records (all in CLP)`);
 
     if (campaignMetrics.length > 0) {
-      // Purge stale campaigns only if explicitly requested (e.g., after reconnecting ad account).
-      // Normal syncs use upsert-only to avoid data loss if the process crashes mid-sync.
-      if (purge_stale) {
-        console.log(`[sync-campaign-metrics] Purging old campaign_metrics for connection ${connection_id} (explicit purge requested)`);
-        const { error: purgeError } = await supabase
-          .from('campaign_metrics')
-          .delete()
-          .eq('connection_id', connection_id);
-        if (purgeError) {
-          console.error('Purge error:', purgeError);
-        }
-      }
-
       // Upsert in batches of 100
       for (let i = 0; i < campaignMetrics.length; i += 100) {
         const batch = campaignMetrics.slice(i, i + 100);
@@ -226,10 +255,8 @@ export async function syncCampaignMetrics(c: Context) {
       );
 
       if (adsetMetrics.length > 0) {
-        // Only purge old adset metrics if explicitly requested
-        if (purge_stale) {
-          await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
-        }
+        // Purge old adset metrics for this connection
+        await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
 
         for (let i = 0; i < adsetMetrics.length; i += 100) {
           const batch = adsetMetrics.slice(i, i + 100);
@@ -245,6 +272,20 @@ export async function syncCampaignMetrics(c: Context) {
         }
         adsetsSynced = new Set(adsetMetrics.map(m => m.adset_id)).size;
         console.log(`[sync-campaign-metrics] Synced ${adsetsSynced} ad sets, ${adsetMetrics.length} records`);
+      }
+    }
+
+    // Clean up stale campaign metrics (e.g. from a previously connected ad account)
+    // Done AFTER upsert so the dashboard never shows /bin/bash during sync
+    const currentCampaignIds = [...new Set(campaignMetrics.map(m => m.campaign_id))];
+    if (currentCampaignIds.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from('campaign_metrics')
+        .delete()
+        .eq('connection_id', connection_id)
+        .not('campaign_id', 'in', `(${currentCampaignIds.join(',')})`);
+      if (cleanupError) {
+        console.error('Stale metric cleanup error:', cleanupError);
       }
     }
 
@@ -285,44 +326,36 @@ async function syncMetaCampaigns(
 
   // Get account currency first
   // Token via Authorization header
-  let accountCurrency = 'USD';
+  let accountCurrency = 'CLP'; // Default CLP (no conversion) to avoid 950x error
   try {
     const accountRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'USD';
+      accountCurrency = accountData.currency || 'CLP';
     }
   } catch (e) {
-    console.log('Could not fetch account currency, defaulting to USD');
+    console.warn('Could not fetch account currency — defaulting to CLP (no conversion)');
   }
   console.log(`Meta account currency: ${accountCurrency}`);
 
-  // Fetch all campaigns with pagination
+  // Fetch campaigns with insights
   const campaignsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/campaigns`);
   
   campaignsUrl.searchParams.set('fields', 'id,name,status');
   campaignsUrl.searchParams.set('limit', '100');
 
-  const campaigns: MetaCampaign[] = [];
-  let nextCampaignsUrl: string | null = campaignsUrl.toString();
-
-  while (nextCampaignsUrl) {
-    const campaignsRes = await fetch(nextCampaignsUrl);
-    if (!campaignsRes.ok) {
-      console.error('Meta campaigns fetch error:', await campaignsRes.text());
-      break;
-    }
-
-    const campaignsData: any = await campaignsRes.json();
-    campaigns.push(...(campaignsData.data || []));
-    nextCampaignsUrl = campaignsData.paging?.next || null;
-
-    if (nextCampaignsUrl) {
-      console.log(`Fetching next page of campaigns (${campaigns.length} so far)...`);
-    }
+  const campaignsRes = await fetch(campaignsUrl.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!campaignsRes.ok) {
+    console.error('Meta campaigns fetch error:', await campaignsRes.text());
+    return metrics;
   }
 
-  console.log(`Found ${campaigns.length} Meta campaigns (all pages)`);
+  const campaignsData: any = await campaignsRes.json();
+  const campaigns: MetaCampaign[] = campaignsData.data || [];
+
+  console.log(`Found ${campaigns.length} Meta campaigns`);
 
   // Fetch insights for each campaign
   for (const campaign of campaigns) {
@@ -399,9 +432,8 @@ async function syncGoogleCampaigns(
   const metrics: Array<any> = [];
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-  // Detect account currency dynamically (not all accounts use USD)
-  const sourceCurrency = await fetchGoogleAccountCurrency(customerId, accessToken, developerToken);
-  console.log(`Google Ads account currency: ${sourceCurrency}`);
+  // Google Ads uses USD by default, we convert to CLP
+  const sourceCurrency = 'USD';
 
   const query = `
     SELECT
@@ -519,17 +551,17 @@ async function syncMetaAdsetMetrics(
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
   // Get account currency for conversion
-  let accountCurrency = 'USD';
+  let accountCurrency = 'CLP'; // Default CLP (no conversion) to avoid 950x error
   try {
     const accountRes = await fetch(
       `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'USD';
+      accountCurrency = accountData.currency || 'CLP';
     }
   } catch (e) {
-    console.log('Could not fetch account currency for adset sync');
+    console.warn('Could not fetch account currency for adset sync — defaulting to CLP');
   }
 
   // Get unique campaign IDs from already-synced campaign metrics
@@ -539,23 +571,17 @@ async function syncMetaAdsetMetrics(
   for (const campaignId of campaignIds) {
     const campaignName = campaignMetrics.find(m => m.campaign_id === campaignId)?.campaign_name || '';
 
-    // Fetch all adsets for this campaign with pagination
+    // Fetch adsets for this campaign
     const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaignId}/adsets`);
     
     adsetsUrl.searchParams.set('fields', 'id,name');
     adsetsUrl.searchParams.set('limit', '100');
 
     try {
-      const adsets: Array<{ id: string; name: string }> = [];
-      let nextAdsetsUrl: string | null = adsetsUrl.toString();
-
-      while (nextAdsetsUrl) {
-        const adsetsRes = await fetch(nextAdsetsUrl);
-        if (!adsetsRes.ok) break;
-        const adsetsData: any = await adsetsRes.json();
-        adsets.push(...(adsetsData.data || []));
-        nextAdsetsUrl = adsetsData.paging?.next || null;
-      }
+      const adsetsRes = await fetch(adsetsUrl.toString());
+      if (!adsetsRes.ok) continue;
+      const adsetsData: any = await adsetsRes.json();
+      const adsets = adsetsData.data || [];
 
       for (const adset of adsets) {
         const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);

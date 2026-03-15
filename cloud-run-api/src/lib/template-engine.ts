@@ -189,13 +189,10 @@ export function buildTemplateContext(
 ): TemplateContext {
   const firstName = subscriber.first_name ?? '';
   const lastName = subscriber.last_name ?? '';
-
   const fullName = [firstName, lastName].filter(Boolean).join(' ');
   const brandName = brandInfo?.name ?? '';
   const shopUrl = brandInfo?.shop_url ?? '';
   const brandColor = brandInfo?.color ?? '#000000';
-  const discountCode = metadata?.discount_code ?? '';
-  const unsubUrl = metadata?.unsubscribe_url ?? '';
 
   return {
     person: {
@@ -222,10 +219,9 @@ export function buildTemplateContext(
       total: metadata?.cart_total ?? 0,
     },
     products: products ?? [],
-    discount_code: discountCode,
-    unsubscribe_url: unsubUrl,
-
-    // Flat aliases (English) — so {{ first_name }} works without person. prefix
+    discount_code: metadata?.discount_code ?? '',
+    unsubscribe_url: metadata?.unsubscribe_url ?? '',
+    // Flat aliases so {{ first_name }} works without person. prefix
     first_name: firstName,
     last_name: lastName,
     full_name: fullName,
@@ -233,8 +229,7 @@ export function buildTemplateContext(
     brand_name: brandName,
     shop_url: shopUrl,
     brand_color: brandColor,
-
-    // Spanish aliases — so {{ nombre }}, {{ empresa }} etc. work
+    // Spanish aliases
     nombre: firstName,
     apellido: lastName,
     nombre_completo: fullName,

@@ -74,7 +74,7 @@ export async function fetchCampaignAdsets(c: Context) {
   let adSets: AdSetInsight[] = [];
 
   // Detect ad account currency
-  let accountCurrency = 'USD';
+  let accountCurrency = 'CLP' // Default CLP to avoid 950x error;
 
   if (platform === 'meta') {
     // Fetch account currency from Meta

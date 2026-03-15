@@ -31,9 +31,24 @@ export default function OAuthMetaCallback() {
         return;
       }
 
-      // Get client_id from state or sessionStorage
-      const clientId = state || sessionStorage.getItem('meta_oauth_client_id');
-      
+      // Validate CSRF state — must match what we stored in sessionStorage
+      const storedState = sessionStorage.getItem('meta_oauth_state');
+      let clientId: string | null = null;
+
+      if (state && storedState && state === storedState) {
+        // CSRF validated — extract clientId from state (format: "nonce:clientId")
+        const parts = state.split(':');
+        clientId = parts.length >= 2 ? parts.slice(1).join(':') : null;
+      } else if (state && state.includes(':')) {
+        // State has nonce format but doesn't match stored — CSRF failure
+        setStatus('error');
+        setErrorMessage('Error de seguridad: estado OAuth no válido');
+        return;
+      } else {
+        // Legacy fallback (state is just clientId, no nonce)
+        clientId = state || sessionStorage.getItem('meta_oauth_client_id');
+      }
+
       if (!clientId) {
         setStatus('error');
         setErrorMessage('No se pudo identificar el cliente');
@@ -59,6 +74,7 @@ export default function OAuthMetaCallback() {
         // Tokens are saved in DB by the edge function at this point
         setStatus('success');
         sessionStorage.removeItem('meta_oauth_client_id');
+        sessionStorage.removeItem('meta_oauth_state');
 
         // Standalone: always navigate to portal
         toast.success('¡Meta conectado exitosamente!');

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, Sparkles, Image as ImageIcon, Video, ArrowLeft, ArrowRight,
@@ -121,6 +121,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoPollingId, setVideoPollingId] = useState<string | null>(null);
+  const videoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [generatedAssetUrl, setGeneratedAssetUrl] = useState<string | null>(null);
   const [videoProgress, setVideoProgress] = useState<string>('');
 
@@ -306,6 +307,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     let msgIdx = 0;
     let pollCount = 0;
     const MAX_POLLS = 120; // 10 minutos máximo
+    if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
     const interval = setInterval(async () => {
       pollCount++;
       if (pollCount > MAX_POLLS) {
@@ -338,7 +340,15 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         // Continuar polling en caso de error transitorio de red
       }
     }, 5000);
+    videoIntervalRef.current = interval;
   }, [savedCreativeId, clientId]);
+
+  // Cleanup video polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
+    };
+  }, []);
 
   const steps: WizardStep[] = ['funnel', 'formato', 'angulo', 'instrucciones', 'variaciones', 'brief'];
   const currentStepIdx = steps.indexOf(step);

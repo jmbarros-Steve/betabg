@@ -279,11 +279,13 @@ export async function editImageGemini(c: Context) {
       .from('client-assets')
       .getPublicUrl(storagePath);
 
-    // Deduct credits
-    await supabase.from('client_credits').update({
-      creditos_disponibles: credits.creditos_disponibles - creditCost,
-      creditos_usados: (credits.creditos_usados || 0) + creditCost,
-    }).eq('client_id', clientId);
+    // Deduct credits atomically
+    const { data: deductResult, error: deductError } = await supabase
+      .rpc('deduct_credits', { p_client_id: clientId, p_amount: creditCost });
+
+    if (deductError || !deductResult?.[0]?.success) {
+      console.error('[edit-image-gemini] Atomic credit deduction failed:', deductError || deductResult);
+    }
 
     await supabase.from('credit_transactions').insert({
       client_id: clientId,

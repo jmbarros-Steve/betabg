@@ -11,6 +11,21 @@ export async function generateCopy(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
+    // Verify the authenticated user owns this client
+    const user = c.get('user');
+    if (!user || !clientId) {
+      return c.json({ error: 'Missing authentication or clientId' }, 401);
+    }
+    const { data: ownerCheck } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', clientId)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle();
+    if (!ownerCheck) {
+      return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+    }
+
   const [briefRes, personaRes] = await Promise.all([
     supabase.from('brand_research').select('research_data').eq('client_id', clientId).eq('research_type', 'brand_brief').maybeSingle(),
     supabase.from('buyer_personas').select('persona_data').eq('client_id', clientId).eq('is_complete', true).maybeSingle(),
@@ -166,11 +181,13 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     return c.json({ error: 'Error procesando la respuesta. Intenta de nuevo.' }, 500);
   }
 
-  // Deduct 1 credit
-  await supabase.from('client_credits').update({
-    creditos_disponibles: credits.creditos_disponibles - 1,
-    creditos_usados: (credits.creditos_usados || 0) + 1,
-  }).eq('client_id', clientId);
+  // Deduct 1 credit atomically
+  const { data: deductResult, error: deductError } = await supabase
+    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 1 });
+
+  if (deductError || !deductResult?.[0]?.success) {
+    console.error('[generate-copy] Atomic credit deduction failed:', deductError || deductResult);
+  }
 
   // Record transaction
   await supabase.from('credit_transactions').insert({

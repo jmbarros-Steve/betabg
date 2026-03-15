@@ -125,14 +125,18 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
       'pages_manage_metadata',
       'pages_messaging',
       'catalog_management',
+      'instagram_manage_messages',
       'public_profile',
       'email',
     ].join(',');
 
-    // Store client_id in sessionStorage for callback
+    // Generate CSRF-safe state: random nonce + clientId
+    const nonce = crypto.randomUUID();
+    const oauthState = `${nonce}:${clientId}`;
+    sessionStorage.setItem('meta_oauth_state', oauthState);
     sessionStorage.setItem('meta_oauth_client_id', clientId);
 
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}`;
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${encodeURIComponent(oauthState)}`;
 
     window.location.href = authUrl;
   };

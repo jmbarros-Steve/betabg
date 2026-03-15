@@ -15,6 +15,21 @@ export async function generateImage(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
+  // Verify the authenticated user owns this client
+  const user = c.get('user');
+  if (!user || !clientId) {
+    return c.json({ error: 'Missing authentication or clientId' }, 401);
+  }
+  const { data: ownerCheck } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('id', clientId)
+    .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+    .maybeSingle();
+  if (!ownerCheck) {
+    return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+  }
+
   // Check & deduct 2 credits
   const { data: credits } = await supabase
     .from('client_credits')
@@ -303,7 +318,6 @@ export async function generateImage(c: Context) {
   const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
   const { data: deductResult, error: deductError } = await supabase
     .rpc('deduct_credits', { p_client_id: clientId, p_amount: 2 });
-
   if (deductError || !deductResult?.[0]?.success) {
     console.error('[generate-image] Atomic credit deduction failed:', deductError || deductResult);
   }

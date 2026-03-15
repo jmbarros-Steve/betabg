@@ -568,13 +568,30 @@ export async function generateMetaCopy(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
+    // Extract clientId early (used by both instruction and standard modes)
+    const resolvedClientId = body.client_id || body.clientId;
+    if (!resolvedClientId) {
+      return c.json({ error: 'Missing client_id or clientId' }, 400);
+    }
+
+    // Verify the authenticated user owns this client
+    const user = c.get('user');
+    if (user) {
+      const { data: ownerCheck } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('id', resolvedClientId)
+        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+        .maybeSingle();
+      if (!ownerCheck) {
+        return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+      }
+    }
+
   // ── INSTRUCTION MODE (simple prompt pass-through) ───────────────────────
   // Used by TestingWizard322 and CampaignCreateWizard for quick copy generation
   if (body.instruction) {
-    const cId = body.client_id || body.clientId;
-    if (!cId) {
-      return c.json({ error: 'Missing client_id' }, 400);
-    }
+    const cId = resolvedClientId;
 
     // Fetch client brief, knowledge base, and brand research
     const [{ data: briefData }, { data: brandResearch }, { data: kbBugs }, { data: kbKnowledge }] = await Promise.all([

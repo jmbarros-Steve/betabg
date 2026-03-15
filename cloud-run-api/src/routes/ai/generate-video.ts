@@ -80,11 +80,13 @@ export async function generateVideo(c: Context) {
       }).eq('id', creativeId);
     }
 
-    // Deduct credits immediately
-    await supabase.from('client_credits').update({
-      creditos_disponibles: credits.creditos_disponibles - 10,
-      creditos_usados: (credits.creditos_usados || 0) + 10,
-    }).eq('client_id', clientId);
+    // Deduct credits atomically
+    const { data: deductResult, error: deductError } = await supabase
+      .rpc('deduct_credits', { p_client_id: clientId, p_amount: 10 });
+
+    if (deductError || !deductResult?.[0]?.success) {
+      console.error('[generate-video] Atomic credit deduction failed:', deductError || deductResult);
+    }
 
     await supabase.from('credit_transactions').insert({
       client_id: clientId,

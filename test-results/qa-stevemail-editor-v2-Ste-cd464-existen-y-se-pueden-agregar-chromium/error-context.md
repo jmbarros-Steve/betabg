@@ -1,0 +1,443 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - list
+    - region "Notifications alt+T"
+    - generic:
+      - banner:
+        - generic:
+          - generic:
+            - img
+            - generic:
+              - generic:
+                - paragraph: Patricio Correa
+              - paragraph: Jardin de Eva
+          - generic:
+            - generic: Portal Cliente
+            - button:
+              - img
+      - generic:
+        - generic:
+          - button:
+            - img
+            - text: Steve
+          - button:
+            - img
+            - text: Brief
+          - button:
+            - img
+            - text: Métricas
+          - button:
+            - img
+            - text: Conexiones
+          - button:
+            - img
+            - text: Configuración
+          - button:
+            - text: Steve Mail
+            - img
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=4]: Setup del portal
+              - generic: 2/5
+              - progressbar
+            - generic:
+              - button:
+                - img
+              - button:
+                - img
+          - generic:
+            - button [disabled]:
+              - img
+              - generic: Conectar Shopify
+              - generic: (completado)
+            - button:
+              - img
+              - generic: Conectar Meta
+              - generic: (pendiente)
+            - button:
+              - img
+              - generic: Conectar Google Ads
+              - generic: (pendiente)
+            - button:
+              - img
+              - generic: Completar Brand Brief
+              - generic: (pendiente)
+            - button [disabled]:
+              - img
+              - generic: Configurar finanzas
+              - generic: (completado)
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=2]: Steve Mail
+                    - paragraph: Email marketing para tu tienda
+                  - button:
+                    - img
+                - generic:
+                  - tablist:
+                    - tab [selected]:
+                      - img
+                      - generic:
+                        - generic: Campañas
+                        - generic: Envía emails a tu audiencia
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Contactos
+                        - generic: Tu lista de suscriptores
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Automatizaciones
+                        - generic: Emails automáticos
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Formularios
+                        - generic: Captura nuevos contactos
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Rendimiento
+                        - generic: Métricas y resultados
+                  - generic:
+                    - generic:
+                      - generic:
+                        - button:
+                          - img
+                          - text: Volver
+                        - textbox:
+                          - /placeholder: Nombre de la campaña
+                          - text: QA Editor Test
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: "1"
+                            - generic: Datos
+                          - generic:
+                            - generic: "2"
+                            - generic: Diseño
+                          - generic:
+                            - generic: "3"
+                            - generic: Audiencia
+                          - generic:
+                            - generic: "4"
+                            - generic: Revisar y Enviar
+                        - button:
+                          - img
+                          - text: Plantillas
+                        - button:
+                          - img
+                          - text: Bloques
+                        - button:
+                          - img
+                          - text: Vista previa
+                        - button:
+                          - img
+                          - text: Guardar
+                        - button:
+                          - text: Siguiente
+                          - img
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - iframe [ref=e1]:
+                              
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                                  - generic:
+                                    - img
+                              - generic:
+                                - text:     
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - generic: 
+                                          - text: E-Commerce
+                                        - generic:
+                                          - generic:
+                                            - generic: Productos
+                                          - generic:
+                                            - generic: Descuento
+                                          - generic:
+                                            - generic: Cuenta Regresiva
+                                          - generic:
+                                            - generic: Boton Diseno
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - generic: 1 Section
+                                        - generic:
+                                          - generic: 1/2 Section
+                                        - generic:
+                                          - generic: 1/3 Section
+                                        - generic:
+                                          - generic: 3/7 Section
+                                        - generic:
+                                          - generic: Button
+                                        - generic:
+                                          - generic: Divider
+                                        - generic:
+                                          - generic: Text
+                                        - generic:
+                                          - generic: Text Section
+                                        - generic:
+                                          - generic: Image
+                                        - generic:
+                                          - generic: Quote
+                                        - generic:
+                                          - generic: Link
+                                        - generic:
+                                          - generic: Link Block
+                                        - generic:
+                                          - generic: Grid Items
+                                        - generic:
+                                          - generic: List Items
+      - generic:
+        - generic:
+          - button:
+            - img
+      - generic:
+        - button:
+          - generic:
+            - img
+        - status
+  - dialog "Galeria de Plantillas" [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Galeria de Plantillas" [level=2] [ref=e5]
+      - paragraph [ref=e6]: Selecciona una plantilla para tu email
+    - generic [ref=e8]:
+      - img [ref=e9]
+      - textbox "Buscar plantillas..." [active] [ref=e12]
+    - generic [ref=e13]:
+      - button "Todas 15" [ref=e14] [cursor=pointer]:
+        - text: Todas
+        - generic [ref=e15]: "15"
+      - button "E-commerce 6" [ref=e16] [cursor=pointer]:
+        - text: E-commerce
+        - generic [ref=e17]: "6"
+      - button "Bienvenida 2" [ref=e18] [cursor=pointer]:
+        - text: Bienvenida
+        - generic [ref=e19]: "2"
+      - button "Promocion 4" [ref=e20] [cursor=pointer]:
+        - text: Promocion
+        - generic [ref=e21]: "4"
+      - button "Newsletter 3" [ref=e22] [cursor=pointer]:
+        - text: Newsletter
+        - generic [ref=e23]: "3"
+    - generic [ref=e27]:
+      - generic [ref=e29] [cursor=pointer]:
+        - generic [ref=e31]:
+          - img [ref=e32]
+          - paragraph [ref=e35]: Empezar en Blanco
+        - paragraph [ref=e37]: En Blanco
+      - generic [ref=e39] [cursor=pointer]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - img [ref=e42]
+            - paragraph [ref=e44]: Bienvenida Basica
+          - paragraph [ref=e46]: Ver vista previa
+        - paragraph [ref=e48]: Bienvenida Basica
+      - generic [ref=e50] [cursor=pointer]:
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - img [ref=e53]
+            - paragraph [ref=e55]: Bienvenida con Descuento
+          - paragraph [ref=e57]: Ver vista previa
+        - paragraph [ref=e59]: Bienvenida con Descuento
+      - generic [ref=e61] [cursor=pointer]:
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - img [ref=e64]
+            - paragraph [ref=e66]: Carrito Abandonado
+          - paragraph [ref=e68]: Ver vista previa
+        - paragraph [ref=e70]: Carrito Abandonado
+      - generic [ref=e72] [cursor=pointer]:
+        - generic [ref=e73]:
+          - generic [ref=e74]:
+            - img [ref=e75]
+            - paragraph [ref=e77]: Carrito con Incentivo
+          - paragraph [ref=e79]: Ver vista previa
+        - paragraph [ref=e81]: Carrito con Incentivo
+      - generic [ref=e83] [cursor=pointer]:
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - img [ref=e86]
+            - paragraph [ref=e88]: Lanzamiento de Producto
+          - paragraph [ref=e90]: Ver vista previa
+        - paragraph [ref=e92]: Lanzamiento de Producto
+      - generic [ref=e94] [cursor=pointer]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - img [ref=e97]
+            - paragraph [ref=e99]: Productos Mas Vendidos
+          - paragraph [ref=e101]: Ver vista previa
+        - paragraph [ref=e103]: Productos Mas Vendidos
+      - generic [ref=e105] [cursor=pointer]:
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - img [ref=e108]
+            - paragraph [ref=e110]: Solicitud de Resena
+          - paragraph [ref=e112]: Ver vista previa
+        - paragraph [ref=e114]: Solicitud de Resena
+      - generic [ref=e116] [cursor=pointer]:
+        - generic [ref=e117]:
+          - generic [ref=e118]:
+            - img [ref=e119]
+            - paragraph [ref=e121]: Gracias por tu Compra
+          - paragraph [ref=e123]: Ver vista previa
+        - paragraph [ref=e125]: Gracias por tu Compra
+      - generic [ref=e127] [cursor=pointer]:
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - img [ref=e130]
+            - paragraph [ref=e132]: Venta Flash
+          - paragraph [ref=e134]: Ver vista previa
+        - paragraph [ref=e136]: Venta Flash
+      - generic [ref=e138] [cursor=pointer]:
+        - generic [ref=e139]:
+          - generic [ref=e140]:
+            - img [ref=e141]
+            - paragraph [ref=e143]: Promocion de Temporada
+          - paragraph [ref=e145]: Ver vista previa
+        - paragraph [ref=e147]: Promocion de Temporada
+      - generic [ref=e149] [cursor=pointer]:
+        - generic [ref=e150]:
+          - generic [ref=e151]:
+            - img [ref=e152]
+            - paragraph [ref=e154]: Te Extranamos
+          - paragraph [ref=e156]: Ver vista previa
+        - paragraph [ref=e158]: Te Extranamos
+      - generic [ref=e160] [cursor=pointer]:
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - img [ref=e163]
+            - paragraph [ref=e165]: Oferta Exclusiva VIP
+          - paragraph [ref=e167]: Ver vista previa
+        - paragraph [ref=e169]: Oferta Exclusiva VIP
+      - generic [ref=e171] [cursor=pointer]:
+        - generic [ref=e172]:
+          - generic [ref=e173]:
+            - img [ref=e174]
+            - paragraph [ref=e176]: Newsletter con Articulos
+          - paragraph [ref=e178]: Ver vista previa
+        - paragraph [ref=e180]: Newsletter con Articulos
+      - generic [ref=e182] [cursor=pointer]:
+        - generic [ref=e183]:
+          - generic [ref=e184]:
+            - img [ref=e185]
+            - paragraph [ref=e187]: Newsletter Editorial
+          - paragraph [ref=e189]: Ver vista previa
+        - paragraph [ref=e191]: Newsletter Editorial
+      - generic [ref=e193] [cursor=pointer]:
+        - generic [ref=e194]:
+          - generic [ref=e195]:
+            - img [ref=e196]
+            - paragraph [ref=e198]: Historia de Marca
+          - paragraph [ref=e200]: Ver vista previa
+        - paragraph [ref=e202]: Historia de Marca
+    - button "Close" [ref=e203] [cursor=pointer]:
+      - img [ref=e204]
+      - generic [ref=e207]: Close
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic "rgb(0, 0, 0)"
+      - generic:
+        - button "less"
+    - generic:
+      - generic:
+        - textbox
+      - generic:
+        - link "⨯":
+          - /url: "#"
+        - button "Ok"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic "rgb(0, 0, 0)"
+      - generic:
+        - button "less"
+    - generic:
+      - generic:
+        - textbox
+      - generic:
+        - link "⨯":
+          - /url: "#"
+        - button "Ok"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic "rgb(0, 0, 0)"
+      - generic:
+        - button "less"
+    - generic:
+      - generic:
+        - textbox
+      - generic:
+        - link "⨯":
+          - /url: "#"
+        - button "Ok"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic "rgb(0, 0, 0)"
+      - generic:
+        - button "less"
+    - generic:
+      - generic:
+        - textbox
+      - generic:
+        - link "⨯":
+          - /url: "#"
+        - button "Ok"
+```

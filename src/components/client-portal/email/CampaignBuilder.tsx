@@ -25,6 +25,7 @@ import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
+import { GlobalStylesPanel } from './GlobalStylesPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -447,13 +448,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       '{{ product_url }}': '#',
       '{{ product_recommendations }}': '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td colspan="2" style="padding:0 8px 12px;font-size:18px;font-weight:bold;color:#1a1a1a;">Productos recomendados para ti</td></tr><tr><td style="width:50%;padding:8px;vertical-align:top;text-align:center;"><img src="https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto+1" style="width:100%;max-width:280px;border-radius:8px;" /><p style="margin:8px 0 4px;font-weight:600;font-size:14px;">Producto 1</p><p style="margin:0;font-size:13px;color:#71717a;">$29.990</p></td><td style="width:50%;padding:8px;vertical-align:top;text-align:center;"><img src="https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto+2" style="width:100%;max-width:280px;border-radius:8px;" /><p style="margin:8px 0 4px;font-weight:600;font-size:14px;">Producto 2</p><p style="margin:0;font-size:13px;color:#71717a;">$39.990</p></td></tr></table>',
       '{{ unsubscribe_url }}': '#',
-      '{{ preferences_url }}': '#',
       '{{ subscriber_tags }}': 'vip, frecuente',
       '{{ subscribed_date }}': '1 Ene 2026',
       '{{ current_date }}': '12 Mar 2026',
       '{{ current_month }}': 'Marzo',
       '{{ current_year }}': '2026',
       '{{ fecha }}': '15 Mar 2026',
+      '{{ preferences_url }}': '#',
+      '{{ checkout_url }}': '#',
       // Spanish aliases
       '{{ nombre }}': 'María',
       '{{ apellido }}': 'González',
@@ -461,7 +463,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       '{{ empresa }}': brandInfo.name || 'Tu Marca',
       '{{ tienda_url }}': brandInfo.shop_url || 'https://tutienda.com',
       '{{ color_marca }}': brandInfo.brand_color || '#18181b',
-      '{{ checkout_url }}': '#',
     };
     let result = html;
     for (const [tag, value] of Object.entries(sampleData)) {
@@ -769,6 +770,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               >
                 <Redo2 className="w-3.5 h-3.5" />
               </Button>
+              <div className="w-px h-5 bg-zinc-200" />
+              <GlobalStylesPanel editorRef={emailEditorRef} />
             </div>
 
             {/* GrapeJS editor */}
