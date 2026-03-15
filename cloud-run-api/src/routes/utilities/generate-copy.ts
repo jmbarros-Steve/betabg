@@ -166,11 +166,13 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     return c.json({ error: 'Error procesando la respuesta. Intenta de nuevo.' }, 500);
   }
 
-  // Deduct 1 credit
-  await supabase.from('client_credits').update({
-    creditos_disponibles: credits.creditos_disponibles - 1,
-    creditos_usados: (credits.creditos_usados || 0) + 1,
-  }).eq('client_id', clientId);
+  // Deduct 1 credit atomically
+  const { data: deductResult, error: deductError } = await supabase
+    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 1 });
+
+  if (deductError || !deductResult?.[0]?.success) {
+    console.error('[generate-copy] Atomic credit deduction failed:', deductError || deductResult);
+  }
 
   // Record transaction
   await supabase.from('credit_transactions').insert({
