@@ -654,15 +654,26 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredAds.map(ad => (
               <Card key={ad.id} className="overflow-hidden">
-                {/* Snapshot preview */}
+                {/* Ad snapshot preview — Meta provides iframe URLs */}
                 {ad.image_url ? (
-                  <a href={ad.image_url} target="_blank" rel="noopener noreferrer" className="block">
-                    <div className="h-48 bg-muted flex flex-col items-center justify-center text-muted-foreground relative group">
-                      <Eye className="h-8 w-8" />
-                      <span className="text-xs mt-2">Click para ver snapshot</span>
-                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </a>
+                  <div className="h-56 bg-muted relative">
+                    <iframe
+                      src={ad.image_url}
+                      title={`Ad ${ad.ad_library_id}`}
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts allow-same-origin allow-popups"
+                      loading="lazy"
+                    />
+                    <a
+                      href={ad.image_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+                      title="Abrir en nueva pestaña"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
                 ) : (
                   <div className="h-32 bg-muted/50 flex flex-col items-center justify-center text-muted-foreground">
                     <Megaphone className="h-6 w-6 mb-1" />
@@ -717,15 +728,15 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
                   {/* Links */}
                   <div className="flex items-center gap-3 pt-1">
-                    {ad.image_url && (
+                    {ad.ad_library_id && (
                       <a
-                        href={ad.image_url}
+                        href={`https://www.facebook.com/ads/library/?id=${ad.ad_library_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-primary hover:underline flex items-center gap-1"
                       >
                         <ExternalLink className="h-3 w-3" />
-                        Ver Snapshot
+                        Ver en Ad Library
                       </a>
                     )}
                     <button
@@ -736,7 +747,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                       className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       <Search className="h-3 w-3" />
-                      Buscar en Ad Library
+                      Ver todos sus anuncios
                     </button>
                   </div>
                 </CardContent>
