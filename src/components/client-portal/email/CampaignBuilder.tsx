@@ -18,7 +18,7 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2, AlertTriangle,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
@@ -57,6 +57,8 @@ const CAMPAIGN_TYPES = [
   { value: 'announcement', label: 'Anuncio' },
   { value: 'restock', label: 'Restock / Back in stock' },
 ];
+
+const GMAIL_CLIP_LIMIT = 102 * 1024;
 
 export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -116,6 +118,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Unsaved changes protection
   const [isDirty, setIsDirty] = useState(false);
 
+  // Email weight tracking (Gmail clips at 102KB)
+  const [emailSizeBytes, setEmailSizeBytes] = useState(0);
+
+  // Concurrency: optimistic locking
+  const lastKnownUpdatedAt = useRef<string | null>(null);
+
   useEffect(() => {
     if (!showEditor || !editorReady) { return; }
     const editor = emailEditorRef.current?.getEditor();
@@ -142,6 +150,16 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [showEditor, isDirty]);
+
+  // Poll email size every 3s while editor is open
+  useEffect(() => {
+    if (!showEditor || !editorReady || editorStep !== 'design') return;
+    const interval = setInterval(() => {
+      const html = emailEditorRef.current?.getHtml() || '';
+      setEmailSizeBytes(new Blob([html]).size);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [showEditor, editorReady, editorStep]);
 
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -303,12 +321,25 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         design_json: savedDesign,
         audience_filter: editingCampaign.audience_filter || {},
         recommendation_config: recEnabled ? { type: recType, count: recCount } : null,
+        expected_updated_at: lastKnownUpdatedAt.current,
       },
     });
 
     if (error) { toast.error(error); return; }
+
+    // Handle concurrency conflict
+    if (data?.conflict) {
+      toast.error('Otro usuario modificó esta campaña. Recarga para ver los cambios.');
+      return;
+    }
+
     toast.success(action === 'create' ? 'Campaña creada' : 'Campaña guardada');
     setIsDirty(false);
+
+    // Track the updated_at for optimistic locking
+    if (data?.campaign?.updated_at) {
+      lastKnownUpdatedAt.current = data.campaign.updated_at;
+    }
 
     // If new, update the editing campaign ID
     if (!editingCampaign.id && data?.campaign?.id) {
@@ -844,6 +875,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </Button>
               <div className="w-px h-5 bg-zinc-200" />
               <GlobalStylesPanel editorRef={emailEditorRef} />
+              {emailSizeBytes > 0 && (
+                <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                  emailSizeBytes > GMAIL_CLIP_LIMIT ? 'bg-red-100 text-red-700 font-medium'
+                  : emailSizeBytes > GMAIL_CLIP_LIMIT * 0.8 ? 'bg-yellow-100 text-yellow-700'
+                  : 'text-zinc-500'
+                }`}>
+                  {emailSizeBytes > GMAIL_CLIP_LIMIT && <AlertTriangle className="w-3 h-3" />}
+                  {(emailSizeBytes / 1024).toFixed(0)}KB
+                  {emailSizeBytes > GMAIL_CLIP_LIMIT && ' — Gmail cortará este email'}
+                </span>
+              )}
             </div>
 
             {/* GrapeJS editor */}
