@@ -568,25 +568,25 @@ export async function generateMetaCopy(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
-    // Extract clientId early (used by both instruction and standard modes)
-    const resolvedClientId = body.client_id || body.clientId;
-    if (!resolvedClientId) {
-      return c.json({ error: 'Missing client_id or clientId' }, 400);
-    }
+  // Extract clientId early (used by both instruction and standard modes)
+  const resolvedClientId = body.client_id || body.clientId;
+  if (!resolvedClientId) {
+    return c.json({ error: 'Missing client_id or clientId' }, 400);
+  }
 
-    // Verify the authenticated user owns this client
-    const user = c.get('user');
-    if (user) {
-      const { data: ownerCheck } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('id', resolvedClientId)
-        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-        .maybeSingle();
-      if (!ownerCheck) {
-        return c.json({ error: 'No tienes acceso a este cliente' }, 403);
-      }
+  // Verify the authenticated user owns this client
+  const user = c.get('user');
+  if (user) {
+    const { data: ownerCheck } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', resolvedClientId)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle();
+    if (!ownerCheck) {
+      return c.json({ error: 'No tienes acceso a este cliente' }, 403);
     }
+  }
 
   // ── INSTRUCTION MODE (simple prompt pass-through) ───────────────────────
   // Used by TestingWizard322 and CampaignCreateWizard for quick copy generation
@@ -660,18 +660,7 @@ export async function generateMetaCopy(c: Context) {
     return c.json({ error: 'Missing required parameters' }, 400);
   }
 
-  // Ownership check: verify user owns this client
-  const user = c.get('user');
-  if (user) {
-    const { data: clientRow } = await supabase
-      .from('clients')
-      .select('user_id, client_user_id')
-      .eq('id', clientId)
-      .single();
-    if (clientRow && clientRow.user_id !== user.id && clientRow.client_user_id !== user.id) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-  }
+  // Ownership already verified above (resolvedClientId check)
 
   // ── VARIACIONES MODE ──────────────────────────────────────────────────────
   if (mode === 'variaciones') {
