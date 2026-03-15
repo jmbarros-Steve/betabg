@@ -1,32 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-
-// Currency conversion — same logic as sync-shopify-metrics
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = { CLP: 950, MXN: 17.5, EUR: 0.92, GBP: 0.79 };
-let cachedRates: Record<string, number> | null = null;
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    const data: any = await response.json();
-    return data.rates || FALLBACK_RATES;
-  } catch {
-    console.error('[fetch-shopify-analytics] Failed to fetch exchange rates, using fallback');
-    return FALLBACK_RATES;
-  }
-}
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-  if (!cachedRates) cachedRates = await getExchangeRates();
-  const rates = cachedRates;
-  if (currency === 'USD') return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  const fromRate = rates[currency] || 1;
-  const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-  return (amount / fromRate) * clpRate;
-}
+import { convertToCLP } from '../../lib/currency.js';
 
 export async function fetchShopifyAnalytics(c: Context) {
   try {

@@ -1,49 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin, getSupabaseWithUserToken } from '../../lib/supabase.js';
-
-// Currency conversion utilities
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = {
-  CLP: 950,
-  MXN: 17.5,
-  EUR: 0.92,
-  GBP: 0.79,
-};
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    const data: any = await response.json();
-    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    return data.rates;
-  } catch (error) {
-    console.error('Failed to fetch exchange rates, using fallback:', error);
-    return FALLBACK_RATES;
-  }
-}
-
-// Cache exchange rates per request to avoid repeated API calls
-let cachedRates: Record<string, number> | null = null;
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-
-  if (!cachedRates) {
-    cachedRates = await getExchangeRates();
-  }
-  const rates = cachedRates;
-
-  if (currency === 'USD') {
-    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  } else {
-    // Convert FROM -> USD -> CLP
-    const fromRate = rates[currency] || 1;
-    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-    return (amount / fromRate) * clpRate;
-  }
-}
+import { convertToCLP } from '../../lib/currency.js';
 
 // Helper to validate Shopify Session Token
 async function validateShopifySessionToken(
@@ -232,9 +189,6 @@ export async function syncShopifyMetrics(c: Context) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const shopifyUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
-
-    // Reset cached rates for this request
-    cachedRates = null;
 
     const orders = await fetchAllOrders(shopifyUrl);
     console.log('Fetched orders (paginated):', orders.length);
