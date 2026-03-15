@@ -702,4 +702,209 @@ export function registerSteveBlocks(editor: any): void {
     content: { type: 'steve-button' },
     media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>`,
   });
+
+  // =========================================================================
+  // 5. SOCIAL LINKS
+  // =========================================================================
+  editor.BlockManager.add('steve-social', {
+    label: 'Redes Sociales',
+    category: 'E-Commerce',
+    content: `<div style="text-align:center;padding:20px 16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
+    <a href="https://facebook.com" style="display:inline-block;margin:0 6px;" title="Facebook">
+      <img src="https://cdn-icons-png.flaticon.com/32/733/733547.png" alt="Facebook" width="32" height="32" style="border:0;" />
+    </a>
+    <a href="https://instagram.com" style="display:inline-block;margin:0 6px;" title="Instagram">
+      <img src="https://cdn-icons-png.flaticon.com/32/733/733558.png" alt="Instagram" width="32" height="32" style="border:0;" />
+    </a>
+    <a href="https://twitter.com" style="display:inline-block;margin:0 6px;" title="X / Twitter">
+      <img src="https://cdn-icons-png.flaticon.com/32/733/733579.png" alt="Twitter" width="32" height="32" style="border:0;" />
+    </a>
+    <a href="https://tiktok.com" style="display:inline-block;margin:0 6px;" title="TikTok">
+      <img src="https://cdn-icons-png.flaticon.com/32/3046/3046121.png" alt="TikTok" width="32" height="32" style="border:0;" />
+    </a>
+    <a href="https://wa.me/" style="display:inline-block;margin:0 6px;" title="WhatsApp">
+      <img src="https://cdn-icons-png.flaticon.com/32/733/733585.png" alt="WhatsApp" width="32" height="32" style="border:0;" />
+    </a>
+  </td></tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>`,
+  });
+
+  // =========================================================================
+  // 6. EMAIL HEADER
+  // =========================================================================
+  editor.BlockManager.add('steve-header', {
+    label: 'Header',
+    category: 'Estructura',
+    content: `<div style="background-color:#18181b;padding:24px 32px;text-align:center;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td align="center">
+      <img src="https://placehold.co/160x48/18181b/fafafa?text=TU+LOGO" alt="Logo" style="max-height:48px;border:0;" />
+    </td>
+  </tr><tr>
+    <td align="center" style="padding-top:12px;">
+      <a href="#" style="color:#a1a1aa;text-decoration:none;font-size:13px;margin:0 10px;">Inicio</a>
+      <a href="#" style="color:#a1a1aa;text-decoration:none;font-size:13px;margin:0 10px;">Tienda</a>
+      <a href="#" style="color:#a1a1aa;text-decoration:none;font-size:13px;margin:0 10px;">Ofertas</a>
+      <a href="#" style="color:#a1a1aa;text-decoration:none;font-size:13px;margin:0 10px;">Contacto</a>
+    </td>
+  </tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>`,
+  });
+
+  // =========================================================================
+  // 7. EMAIL FOOTER
+  // =========================================================================
+  editor.BlockManager.add('steve-footer', {
+    label: 'Footer',
+    category: 'Estructura',
+    content: `<div style="background-color:#f4f4f5;padding:32px 24px;text-align:center;border-top:1px solid #e4e4e7;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td align="center">
+      <p style="margin:0 0 8px;font-size:13px;color:#71717a;">{{ empresa }} — {{ direccion }}</p>
+      <p style="margin:0 0 16px;font-size:12px;color:#a1a1aa;">Recibiste este email porque estas suscrito a nuestro newsletter.</p>
+      <a href="{{ unsubscribe_url }}" style="font-size:12px;color:#2563eb;text-decoration:underline;">Desuscribirse</a>
+      <span style="color:#d4d4d8;margin:0 8px;">|</span>
+      <a href="{{ preferences_url }}" style="font-size:12px;color:#2563eb;text-decoration:underline;">Preferencias</a>
+    </td></tr>
+  </table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/></svg>`,
+  });
+
+  // =========================================================================
+  // 8. IMAGE WITH CAPTION
+  // =========================================================================
+  editor.BlockManager.add('steve-image-caption', {
+    label: 'Imagen + Caption',
+    category: 'Contenido',
+    content: `<div style="padding:16px;text-align:center;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
+    <img src="https://placehold.co/560x320/e4e4e7/71717a?text=Tu+Imagen" alt="Imagen" style="width:100%;max-width:560px;border-radius:8px;display:block;" />
+    <p style="margin:12px 0 0;font-size:13px;color:#71717a;font-style:italic;">Agrega un texto descriptivo aqui</p>
+  </td></tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+  });
+
+  // =========================================================================
+  // 9. RICH TEXT BLOCK
+  // =========================================================================
+  editor.BlockManager.add('steve-rich-text', {
+    label: 'Texto Enriquecido',
+    category: 'Contenido',
+    content: `<div style="padding:20px 32px;">
+  <h2 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#18181b;line-height:1.3;">Tu titulo va aqui</h2>
+  <p style="margin:0 0 12px;font-size:15px;color:#3f3f46;line-height:1.6;">Este es un bloque de texto enriquecido. Haz doble click para editar. Puedes agregar <strong>negritas</strong>, <em>italicas</em>, <a href="#" style="color:#2563eb;text-decoration:underline;">enlaces</a> y mas.</p>
+  <p style="margin:0;font-size:15px;color:#3f3f46;line-height:1.6;">Usa este bloque para escribir parrafos de contenido, descripciones de productos, o cualquier texto largo que necesite formato.</p>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  });
+
+  // =========================================================================
+  // 10. DIVIDER
+  // =========================================================================
+  editor.BlockManager.add('steve-divider', {
+    label: 'Separador',
+    category: 'Contenido',
+    content: `<div style="padding:16px 32px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="border-bottom:1px solid #e4e4e7;font-size:1px;line-height:1px;">&nbsp;</td>
+  </tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/></svg>`,
+  });
+
+  // =========================================================================
+  // 11. SPACER
+  // =========================================================================
+  editor.BlockManager.add('steve-spacer', {
+    label: 'Espacio',
+    category: 'Contenido',
+    content: `<div style="height:32px;font-size:1px;line-height:1px;">&nbsp;</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="8 9 12 5 16 9"/><polyline points="8 15 12 19 16 15"/></svg>`,
+  });
+
+  // =========================================================================
+  // 12. TWO COLUMNS
+  // =========================================================================
+  editor.BlockManager.add('steve-two-cols', {
+    label: '2 Columnas',
+    category: 'Estructura',
+    content: `<div style="padding:16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="width:50%;padding:8px;vertical-align:top;">
+      <p style="margin:0;font-size:15px;color:#3f3f46;line-height:1.6;">Contenido columna izquierda. Haz doble click para editar.</p>
+    </td>
+    <td style="width:50%;padding:8px;vertical-align:top;">
+      <p style="margin:0;font-size:15px;color:#3f3f46;line-height:1.6;">Contenido columna derecha. Haz doble click para editar.</p>
+    </td>
+  </tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>`,
+  });
+
+  // =========================================================================
+  // 13. THREE COLUMNS
+  // =========================================================================
+  editor.BlockManager.add('steve-three-cols', {
+    label: '3 Columnas',
+    category: 'Estructura',
+    content: `<div style="padding:16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="width:33.33%;padding:8px;vertical-align:top;text-align:center;">
+      <img src="https://placehold.co/160x160/e4e4e7/71717a?text=1" alt="" style="width:100%;max-width:160px;border-radius:8px;" />
+      <p style="margin:8px 0 0;font-size:14px;color:#3f3f46;">Columna 1</p>
+    </td>
+    <td style="width:33.33%;padding:8px;vertical-align:top;text-align:center;">
+      <img src="https://placehold.co/160x160/e4e4e7/71717a?text=2" alt="" style="width:100%;max-width:160px;border-radius:8px;" />
+      <p style="margin:8px 0 0;font-size:14px;color:#3f3f46;">Columna 2</p>
+    </td>
+    <td style="width:33.33%;padding:8px;vertical-align:top;text-align:center;">
+      <img src="https://placehold.co/160x160/e4e4e7/71717a?text=3" alt="" style="width:100%;max-width:160px;border-radius:8px;" />
+      <p style="margin:8px 0 0;font-size:14px;color:#3f3f46;">Columna 3</p>
+    </td>
+  </tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>`,
+  });
+
+  // =========================================================================
+  // 14. HERO / BANNER
+  // =========================================================================
+  editor.BlockManager.add('steve-hero', {
+    label: 'Hero Banner',
+    category: 'Estructura',
+    content: `<div style="background-color:#18181b;background-image:linear-gradient(135deg,#18181b 0%,#3f3f46 100%);padding:48px 32px;text-align:center;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
+    <h1 style="margin:0 0 12px;font-size:28px;font-weight:700;color:#ffffff;line-height:1.2;">Tu Titulo Principal</h1>
+    <p style="margin:0 0 24px;font-size:16px;color:#a1a1aa;line-height:1.5;max-width:480px;">Subtitulo o descripcion breve que acompana al titulo del banner.</p>
+    <a href="#" style="display:inline-block;padding:14px 32px;background:#2563eb;color:#ffffff;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">Llamada a la Accion</a>
+  </td></tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`,
+  });
+
+  // =========================================================================
+  // 15. IMAGE + TEXT SIDE BY SIDE
+  // =========================================================================
+  editor.BlockManager.add('steve-img-text', {
+    label: 'Imagen + Texto',
+    category: 'Contenido',
+    content: `<div style="padding:16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="width:45%;padding:8px;vertical-align:middle;">
+      <img src="https://placehold.co/280x280/e4e4e7/71717a?text=Imagen" alt="" style="width:100%;max-width:280px;border-radius:8px;display:block;" />
+    </td>
+    <td style="width:55%;padding:8px 8px 8px 20px;vertical-align:middle;">
+      <h3 style="margin:0 0 8px;font-size:18px;font-weight:700;color:#18181b;">Titulo del Producto</h3>
+      <p style="margin:0 0 16px;font-size:14px;color:#52525b;line-height:1.5;">Descripcion breve del producto o contenido destacado que quieras mostrar al lado de la imagen.</p>
+      <a href="#" style="display:inline-block;padding:10px 24px;background:#18181b;color:#ffffff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">Ver Mas</a>
+    </td>
+  </tr></table>
+</div>`,
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="14" y1="8" x2="19" y2="8"/><line x1="14" y1="12" x2="19" y2="12"/><line x1="14" y1="16" x2="17" y2="16"/></svg>`,
+  });
 }
