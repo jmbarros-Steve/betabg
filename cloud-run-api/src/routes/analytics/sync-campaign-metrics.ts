@@ -386,8 +386,9 @@ async function syncGoogleCampaigns(
   const metrics: Array<any> = [];
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-  // Google Ads uses USD by default, we convert to CLP
-  const sourceCurrency = 'USD';
+  // Detect account currency dynamically (not all accounts use USD)
+  const sourceCurrency = await fetchGoogleAccountCurrency(customerId, accessToken, developerToken);
+  console.log(`Google Ads account currency: ${sourceCurrency}`);
 
   const query = `
     SELECT
