@@ -1034,7 +1034,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header — sticky on scroll */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-3 -mx-1 px-1 pt-1 border-b border-transparent [&:not(:first-child)]:border-border/50">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Analytics por Campaña</h2>
@@ -1118,6 +1119,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           )}
         </div>
       </div>
+      </div>{/* end sticky */}
 
       {!hasData && (
         <Card className="border-dashed">
