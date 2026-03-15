@@ -202,16 +202,9 @@ test.describe('Steve Mail — QA Completo', () => {
 
   // ─── 4. Email Editor UX Evaluation ────────────────────────────────────
   test('4. Editor de email — evaluación UX completa', async () => {
-    // Capture browser console logs from the editor
-    page.on('console', msg => {
-      if (msg.text().includes('[SteveMailEditor]')) {
-        console.log(`[MAIL-QA] BROWSER: ${msg.text()}`);
-      }
-    });
-
     // We should be in step 2 (design) after test 3.
-    // Wait extra for GrapeJS to initialize
-    await page.waitForTimeout(5000);
+    // Wait extra for GrapeJS to initialize and layout fix to apply
+    await page.waitForTimeout(6000);
 
     await screenshot(page, '04-editor-full');
 

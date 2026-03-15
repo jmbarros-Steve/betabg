@@ -118,101 +118,70 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
 
       editorRef.current = editor;
 
-      editor.on('load', () => {
-        const el = containerRef.current;
-        console.log('[SteveMailEditor] load event fired, el:', !!el);
-        if (!el) { onReady?.(); return; }
+      // Layout fix: GrapeJS newsletter preset stacks everything vertically.
+      // We override to put canvas on the left and blocks sidebar on the right.
+      // NOTE: editor.on('load') fires synchronously during init(), so we use
+      // setTimeout to run after init completes and the DOM is ready.
+      const el = containerRef.current;
+      const SIDEBAR_W = 220;
 
-        const SIDEBAR_W = 220;
+      const forceLayout = () => {
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.height < 100) return; // container not laid out yet
+        const editorEl = el.querySelector('.gjs-editor') as HTMLElement ?? el;
+        const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
+        const views = el.querySelector('.gjs-pn-views') as HTMLElement;
+        const viewsCont = el.querySelector('.gjs-pn-views-container') as HTMLElement;
+        const canvasW = rect.width - SIDEBAR_W;
+        const canvasH = rect.height;
 
-        const forceLayout = () => {
-          const rect = el.getBoundingClientRect();
-          console.log('[SteveMailEditor] forceLayout:', rect.width, 'x', rect.height);
-          const editorEl = el.querySelector('.gjs-editor') as HTMLElement;
-          console.log('[SteveMailEditor] found:', { editor: !!editorEl, canvas: !!el.querySelector('.gjs-cv-canvas'), views: !!el.querySelector('.gjs-pn-views') });
-          const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
-          const views = el.querySelector('.gjs-pn-views') as HTMLElement;
-          const viewsCont = el.querySelector('.gjs-pn-views-container') as HTMLElement;
-          const canvasW = rect.width - SIDEBAR_W;
-          const canvasH = rect.height;
+        editorEl.style.cssText = `position:relative;width:${rect.width}px;height:${canvasH}px;overflow:hidden;`;
 
-          if (editorEl) {
-            editorEl.style.cssText = `position:relative;width:${rect.width}px;height:${rect.height}px;overflow:hidden;`;
-          }
-          // Hide default command/option panels
-          el.querySelectorAll('.gjs-pn-commands, .gjs-pn-options, .gjs-pn-devices-c').forEach((p) => {
-            (p as HTMLElement).style.cssText = 'display:none !important;height:0 !important;';
-          });
-          if (canvas) {
-            canvas.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;background-color:#f4f4f5;`;
-            // Also resize the iframe and frame-wrapper inside the canvas
-            const frameWrapper = canvas.querySelector('.gjs-frame-wrapper') as HTMLElement;
-            const iframe = canvas.querySelector('iframe') as HTMLIFrameElement;
-            if (frameWrapper) {
-              frameWrapper.style.cssText = `width:100%;height:${canvasH}px;`;
-            }
-            if (iframe) {
-              iframe.style.width = '100%';
-              iframe.style.height = `${canvasH}px`;
-            }
-          }
-          if (views) {
-            views.style.cssText = `position:absolute;top:0;left:${canvasW}px;width:${SIDEBAR_W}px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;`;
-          }
-          if (viewsCont) {
-            viewsCont.style.cssText = `position:absolute;top:40px;left:${canvasW}px;width:${SIDEBAR_W}px;height:${canvasH - 40}px;overflow-y:auto;z-index:5;background-color:#18181b;`;
-          }
-        };
+        // Hide default command/option panels
+        el.querySelectorAll('.gjs-pn-commands, .gjs-pn-options, .gjs-pn-devices-c').forEach((p) => {
+          (p as HTMLElement).style.display = 'none';
+        });
 
-        // Apply layout, open blocks, then refresh so GrapeJS recalculates iframe
-        const applyAndRefresh = () => {
-          forceLayout();
-          // Open blocks panel (last view tab)
+        if (canvas) {
+          canvas.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;background-color:#f4f4f5;`;
+          const fw = canvas.querySelector('.gjs-frame-wrapper') as HTMLElement;
+          const iframe = canvas.querySelector('iframe') as HTMLIFrameElement;
+          if (fw) fw.style.cssText = `width:${canvasW}px;height:${canvasH}px;left:0;top:0;`;
+          if (iframe) { iframe.style.width = `${canvasW}px`; iframe.style.height = `${canvasH}px`; }
+        }
+        if (views) {
+          views.style.cssText = `position:absolute;top:0;left:${canvasW}px;width:${SIDEBAR_W}px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;`;
+        }
+        if (viewsCont) {
+          viewsCont.style.cssText = `position:absolute;top:40px;left:${canvasW}px;width:${SIDEBAR_W}px;height:${canvasH - 40}px;overflow-y:auto;z-index:5;background-color:#18181b;`;
+        }
+      };
+
+      const applyAndRefresh = () => {
+        forceLayout();
+        // Open blocks panel (last view tab)
+        if (el) {
           const viewBtns = el.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
           if (viewBtns.length > 0) {
             (viewBtns[viewBtns.length - 1] as HTMLElement).click();
           }
-          editor.refresh();
-          // After refresh, re-apply layout and directly resize iframe
-          requestAnimationFrame(() => {
-            forceLayout();
-            // Force iframe to fill canvas via GrapeJS Canvas API
-            try {
-              const canvasEl = editor.Canvas.getElement();
-              const frameEl = editor.Canvas.getFrameEl();
-              if (canvasEl && frameEl) {
-                const cRect = canvasEl.getBoundingClientRect();
-                frameEl.style.width = `${cRect.width}px`;
-                frameEl.style.height = `${cRect.height}px`;
-                // Also resize frame wrapper
-                const wrapper = frameEl.parentElement;
-                if (wrapper) {
-                  wrapper.style.width = `${cRect.width}px`;
-                  wrapper.style.height = `${cRect.height}px`;
-                }
-              }
-            } catch (e) { /* ignore if Canvas API unavailable */ }
-          });
-        };
-        setTimeout(applyAndRefresh, 100);
-        // Second pass in case first was too early
-        setTimeout(applyAndRefresh, 500);
+        }
+        editor.refresh();
+        requestAnimationFrame(forceLayout);
+      };
 
-        // Re-apply on window resize
-        const onResize = () => { forceLayout(); editor.refresh(); };
-        window.addEventListener('resize', onResize);
+      // Apply at multiple timings to handle different load scenarios
+      setTimeout(applyAndRefresh, 200);
+      setTimeout(applyAndRefresh, 800);
+      setTimeout(() => { forceLayout(); onReady?.(); }, 1200);
 
-        // Store cleanup ref
-        const origDestroy = editor.destroy.bind(editor);
-        editor.destroy = () => {
-          window.removeEventListener('resize', onResize);
-          origDestroy();
-        };
-
-        onReady?.();
-      });
+      // Re-apply on window resize
+      const onResize = () => { forceLayout(); };
+      window.addEventListener('resize', onResize);
 
       return () => {
+        window.removeEventListener('resize', onResize);
         editor.destroy();
         editorRef.current = null;
       };
