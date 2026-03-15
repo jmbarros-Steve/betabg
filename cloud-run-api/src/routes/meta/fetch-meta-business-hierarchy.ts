@@ -56,11 +56,11 @@ interface BusinessGroup {
 
 async function metaGet(endpoint: string, token: string, params: Record<string, string> = {}): Promise<any> {
   const url = new URL(`${META_BASE}${endpoint}`);
-  url.searchParams.set('access_token', token);
+  
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const err: any = await res.json().catch(() => ({}));
     console.error(`Meta API error on ${endpoint}:`, err);
@@ -76,7 +76,7 @@ async function metaGetAll(endpoint: string, token: string, params: Record<string
 
   // First request
   const firstUrl = new URL(`${META_BASE}${endpoint}`);
-  firstUrl.searchParams.set('access_token', token);
+  
   firstUrl.searchParams.set('limit', '200');
   for (const [k, v] of Object.entries(params)) {
     firstUrl.searchParams.set(k, v);
@@ -84,7 +84,7 @@ async function metaGetAll(endpoint: string, token: string, params: Record<string
   url = firstUrl.toString();
 
   while (url) {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) break;
     const data: any = await res.json();
     if (data.data) results.push(...data.data);

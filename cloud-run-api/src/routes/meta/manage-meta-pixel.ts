@@ -17,7 +17,7 @@ async function metaApiRequest(
   params?: Record<string, string>
 ): Promise<{ ok: boolean; data?: any; error?: string }> {
   const url = new URL(`${META_API_BASE}/${endpoint}`);
-  url.searchParams.set('access_token', accessToken);
+  
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       url.searchParams.set(key, value);

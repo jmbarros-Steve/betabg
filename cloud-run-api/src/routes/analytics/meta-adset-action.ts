@@ -63,7 +63,7 @@ export async function metaAdsetAction(c: Context) {
     if (action === 'pause') {
       // Pause the ad set
       const url = new URL(`https://graph.facebook.com/v21.0/${adset_id}`);
-      url.searchParams.set('access_token', decryptedToken);
+      
 
       const res = await fetch(url.toString(), {
         method: 'POST',
@@ -92,7 +92,7 @@ export async function metaAdsetAction(c: Context) {
 
       // First, fetch current budget
       const getUrl = new URL(`https://graph.facebook.com/v21.0/${adset_id}`);
-      getUrl.searchParams.set('access_token', decryptedToken);
+      
       getUrl.searchParams.set('fields', 'daily_budget,lifetime_budget,name,status');
 
       const getRes = await fetch(getUrl.toString());
@@ -120,7 +120,7 @@ export async function metaAdsetAction(c: Context) {
 
       // Update the budget
       const updateUrl = new URL(`https://graph.facebook.com/v21.0/${adset_id}`);
-      updateUrl.searchParams.set('access_token', decryptedToken);
+      
 
       const updateRes = await fetch(updateUrl.toString(), {
         method: 'POST',
