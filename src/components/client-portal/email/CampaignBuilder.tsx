@@ -108,6 +108,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
 
+  // Save as Template
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [sendMode, setSendMode] = useState<'now' | 'schedule'>('now');
@@ -422,6 +427,36 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   };
 
+  const handleSaveAsTemplate = async () => {
+    if (!saveTemplateName.trim()) {
+      toast.error('Ingresa un nombre para la plantilla');
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      const { html, design } = exportEditorHtml();
+      const { error } = await callApi<any>('email-templates', {
+        body: {
+          action: 'create',
+          client_id: clientId,
+          name: saveTemplateName.trim(),
+          description: `Plantilla guardada desde campaña${editingCampaign?.name ? ': ' + editingCampaign.name : ''}`,
+          category: 'custom',
+          design_json: design,
+          html_preview: html,
+        },
+      });
+      if (error) throw new Error(String(error));
+      toast.success('Plantilla guardada');
+      setShowSaveTemplate(false);
+      setSaveTemplateName('');
+    } catch (err: any) {
+      toast.error('Error al guardar plantilla: ' + (err.message || err));
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const replaceMergeTagsForPreview = (html: string): string => {
     const sampleData: Record<string, string> = {
       '{{ first_name }}': 'María',
@@ -540,6 +575,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                   <Blocks className="w-4 h-4 mr-1" /> Bloques
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowSaveTemplate(true)}>
+                  <Save className="w-4 h-4 mr-1" /> Guardar Plantilla
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => {
                   const { html } = exportEditorHtml();
@@ -1327,6 +1365,36 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Save as Template Dialog */}
+      <Dialog open={showSaveTemplate} onOpenChange={setShowSaveTemplate}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar como Plantilla</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-sm">Nombre de la plantilla</Label>
+              <Input
+                placeholder="Ej: Mi plantilla de bienvenida"
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>Cancelar</Button>
+            <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+              {savingTemplate ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

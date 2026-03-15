@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, FileText, Sparkles } from 'lucide-react';
+import { Search, FileText, Sparkles, User } from 'lucide-react';
 import { emailTemplates } from './emailTemplates';
+import { callApi } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -22,7 +23,7 @@ interface EmailTemplateGalleryProps {
 // Types
 // ---------------------------------------------------------------------------
 
-type TemplateCategory = 'todas' | 'e-commerce' | 'bienvenida' | 'promocion' | 'newsletter' | 'carrito' | 'lanzamiento' | 'temporada';
+type TemplateCategory = 'todas' | 'e-commerce' | 'bienvenida' | 'promocion' | 'newsletter' | 'carrito' | 'lanzamiento' | 'temporada' | 'custom';
 
 interface SystemTemplate {
   id: string;
@@ -45,6 +46,7 @@ const CATEGORIES: { key: TemplateCategory; label: string }[] = [
   { key: 'carrito', label: 'Carrito' },
   { key: 'lanzamiento', label: 'Lanzamiento' },
   { key: 'temporada', label: 'Temporada' },
+  { key: 'custom', label: 'Mis Plantillas' },
 ];
 
 const THUMBNAIL_COLORS: Record<string, string> = {
@@ -55,6 +57,7 @@ const THUMBNAIL_COLORS: Record<string, string> = {
   carrito: '#f59e0b',
   lanzamiento: '#7c3aed',
   temporada: '#059669',
+  custom: '#71717a',
 };
 
 // ---------------------------------------------------------------------------
@@ -1236,41 +1239,67 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
   const [searchQuery, setSearchQuery] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState<SystemTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [savedTemplates, setSavedTemplates] = useState<SystemTemplate[]>([]);
 
-  // Reset state when dialog opens, simulate brief loading
+  // Fetch custom templates from API
+  const fetchSavedTemplates = useCallback(async () => {
+    try {
+      const { data } = await callApi<any>('email-templates', {
+        body: { action: 'list', client_id: clientId },
+      });
+      if (data?.templates) {
+        const mapped: SystemTemplate[] = data.templates
+          .filter((t: any) => !t.is_system)
+          .map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            category: 'custom' as Exclude<TemplateCategory, 'todas'>,
+            thumbnailColor: '#71717a',
+            design_json: t.design_json || t.html_preview || t.base_html,
+            _isSaved: true,
+          }));
+        setSavedTemplates(mapped);
+      }
+    } catch {
+      // Silently ignore — gallery works without saved templates
+    }
+  }, [clientId]);
+
+  // Reset state when dialog opens, fetch saved templates
   useEffect(() => {
     if (isOpen) {
       setSelectedCategory('todas');
       setSearchQuery('');
       setPreviewTemplate(null);
       setIsLoading(true);
-      const timer = setTimeout(() => setIsLoading(false), 400);
-      return () => clearTimeout(timer);
+      fetchSavedTemplates().finally(() => setIsLoading(false));
     }
-  }, [isOpen]);
+  }, [isOpen, fetchSavedTemplates]);
+
+  const allTemplates = useMemo(() => [...SYSTEM_TEMPLATES, ...savedTemplates], [savedTemplates]);
 
   // Count templates per category
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const cat of CATEGORIES) {
       if (cat.key === 'todas') {
-        counts[cat.key] = SYSTEM_TEMPLATES.length;
+        counts[cat.key] = allTemplates.length;
       } else {
-        counts[cat.key] = SYSTEM_TEMPLATES.filter((t) => t.category === cat.key).length;
+        counts[cat.key] = allTemplates.filter((t) => t.category === cat.key).length;
       }
     }
     return counts;
-  }, []);
+  }, [allTemplates]);
 
   const filteredTemplates = useMemo(() => {
-    return SYSTEM_TEMPLATES.filter((tpl) => {
+    return allTemplates.filter((tpl) => {
       const matchesCategory = selectedCategory === 'todas' || tpl.category === selectedCategory;
       const matchesSearch =
         searchQuery.trim() === '' ||
         tpl.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, allTemplates]);
 
   function handleSelectBlank() {
     onSelect(BLANK_DESIGN);
@@ -1370,10 +1399,17 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
                           style={{ backgroundColor: tpl.thumbnailColor + '18' }}
                         >
                           <div className="text-center px-4">
-                            <Sparkles className="h-8 w-8 mx-auto mb-3" style={{ color: tpl.thumbnailColor }} />
+                            {(tpl as any)._isSaved ? (
+                              <User className="h-8 w-8 mx-auto mb-3 text-zinc-500" />
+                            ) : (
+                              <Sparkles className="h-8 w-8 mx-auto mb-3" style={{ color: tpl.thumbnailColor }} />
+                            )}
                             <p className="text-base font-semibold" style={{ color: tpl.thumbnailColor }}>
                               {tpl.name}
                             </p>
+                            {(tpl as any)._isSaved && (
+                              <p className="text-xs text-zinc-400 mt-1">Guardada</p>
+                            )}
                           </div>
                           {/* Hover overlay */}
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
