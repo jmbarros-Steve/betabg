@@ -19,6 +19,11 @@ export async function syncShopifyMetrics(c: Context) {
     // Use service role for all DB operations
     const supabaseService = getSupabaseAdmin();
 
+    // Check for cron secret (automated sync)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedCronSecret = c.req.header('X-Cron-Secret');
+    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
+
     // Check for Shopify Session Token first (embedded app)
     const shopifySessionToken = c.req.header('X-Shopify-Session-Token');
     const authHeader = c.req.header('Authorization');
@@ -26,7 +31,9 @@ export async function syncShopifyMetrics(c: Context) {
     let userId: string | null = null;
     let shopDomain: string | null = null;
 
-    if (shopifySessionToken) {
+    if (isCron) {
+      console.log('[sync-shopify] Cron-triggered sync');
+    } else if (shopifySessionToken) {
       // Embedded Shopify app - validate Session Token
       console.log('[sync-shopify] Validating Shopify Session Token...');
       const validation = await validateShopifySessionToken(shopifySessionToken, supabaseService);
@@ -81,7 +88,7 @@ export async function syncShopifyMetrics(c: Context) {
 
     // Authorization check: verify user owns the client that owns this connection
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
+    const isOwner = isCron || clientData.user_id === userId || clientData.client_user_id === userId;
 
     if (!isOwner) {
       console.error('User does not own this connection');
@@ -92,8 +99,8 @@ export async function syncShopifyMetrics(c: Context) {
       return c.json({ error: 'This endpoint only supports Shopify connections' }, 400);
     }
 
-    // Rate limiting: check last sync time (minimum 5 minutes between syncs)
-    if (connection.last_sync_at) {
+    // Rate limiting: check last sync time (minimum 5 minutes between syncs, skip for cron)
+    if (!isCron && connection.last_sync_at) {
       const lastSync = new Date(connection.last_sync_at);
       const minInterval = 5 * 60 * 1000; // 5 minutes
       if (Date.now() - lastSync.getTime() < minInterval) {

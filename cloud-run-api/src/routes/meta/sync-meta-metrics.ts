@@ -30,6 +30,11 @@ export async function syncMetaMetrics(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
+    // Check for cron secret (automated sync)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedCronSecret = c.req.header('X-Cron-Secret');
+    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
+
     // Check for Shopify Session Token first (embedded app)
     const shopifySessionToken = c.req.header('X-Shopify-Session-Token');
     const authHeader = c.req.header('Authorization');
@@ -37,7 +42,9 @@ export async function syncMetaMetrics(c: Context) {
     let userId: string | null = null;
     let shopDomain: string | null = null;
 
-    if (shopifySessionToken) {
+    if (isCron) {
+      console.log('[sync-meta] Cron-triggered sync');
+    } else if (shopifySessionToken) {
       // Embedded Shopify app - validate Session Token
       console.log('[sync-meta] Validating Shopify Session Token...');
       const validation = await validateShopifySessionToken(shopifySessionToken, supabase);
@@ -95,9 +102,9 @@ export async function syncMetaMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection (admin via user_id OR client via client_user_id)
+    // Verify user owns this connection (skip for cron)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
+    const isOwner = isCron || clientData.user_id === userId || clientData.client_user_id === userId;
 
     if (!isOwner) {
       console.error('Authorization failed:', { userId, clientUserId: clientData.client_user_id, adminId: clientData.user_id });

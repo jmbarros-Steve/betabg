@@ -31,17 +31,29 @@ export async function syncGoogleAdsMetrics(c: Context) {
       return c.json({ error: 'Google Ads configuration missing' }, 500);
     }
 
-    // Get user from auth middleware
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader) {
-      return c.json({ error: 'Missing authorization header' }, 401);
-    }
+    // Check for cron secret (automated sync)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedCronSecret = c.req.header('X-Cron-Secret');
+    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    let user: { id: string } | null = null;
 
-    if (authError || !user) {
-      return c.json({ error: 'Invalid token' }, 401);
+    if (isCron) {
+      console.log('[sync-google] Cron-triggered sync');
+    } else {
+      // Get user from auth middleware
+      const authHeader = c.req.header('Authorization');
+      if (!authHeader) {
+        return c.json({ error: 'Missing authorization header' }, 401);
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError || !authUser) {
+        return c.json({ error: 'Invalid token' }, 401);
+      }
+      user = authUser;
     }
 
     // Get connection_id from request
@@ -74,9 +86,9 @@ export async function syncGoogleAdsMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection (either as admin owner or as client user)
+    // Verify user owns this connection (skip for cron)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string };
-    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
+    if (!isCron && user && clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
