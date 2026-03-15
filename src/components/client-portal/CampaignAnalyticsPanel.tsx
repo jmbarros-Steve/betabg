@@ -140,6 +140,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
   const [metaAccountCurrency, setMetaAccountCurrency] = useState<string>('USD');
+  const [dynamicClpRate, setDynamicClpRate] = useState<number>(950); // fetched from API
 
   // Rules from Meta Wizard (meta_automated_rules)
   const [automatedRules, setAutomatedRules] = useState<any[]>([]);
@@ -152,6 +153,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   useEffect(() => {
     fetchConnections();
     fetchAutomatedRules();
+    // Fetch live exchange rate for CLP conversion
+    fetch('https://api.exchangerate-api.com/v4/latest/USD')
+      .then(r => r.json())
+      .then((d: any) => { if (d.rates?.CLP) setDynamicClpRate(d.rates.CLP); })
+      .catch(() => { /* keep fallback 950 */ });
   }, [clientId]);
 
   useEffect(() => {
@@ -441,12 +447,12 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     // If account is CLP, use CLP value directly. If USD, convert CLP rule to USD.
     return metaAccountCurrency === 'CLP'
       ? cpaRule.condition.value
-      : cpaRule.condition.value / 950;
-  }, [automatedRules, metaAccountCurrency]);
+      : cpaRule.condition.value / dynamicClpRate;
+  }, [automatedRules, metaAccountCurrency, dynamicClpRate]);
 
   // Charlie semaphore for ad sets
   // If account is already in CLP, no conversion needed (rate = 1)
-  const CLP_RATE = metaAccountCurrency === 'CLP' ? 1 : 950;
+  const CLP_RATE = metaAccountCurrency === 'CLP' ? 1 : dynamicClpRate;
   const getAdSetSemaphore = (adSet: AdSet) => {
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
