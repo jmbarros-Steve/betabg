@@ -878,7 +878,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <Redo2 className="w-3.5 h-3.5" />
               </Button>
               <div className="w-px h-5 bg-zinc-200" />
-              <GlobalStylesPanel editorRef={emailEditorRef} />
+              <GlobalStylesPanel editorRef={emailEditorRef} clientId={clientId} />
               <div className="w-px h-5 bg-zinc-200" />
               <Button
                 size="sm"
