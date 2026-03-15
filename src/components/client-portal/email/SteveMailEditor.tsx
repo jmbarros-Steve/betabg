@@ -138,4 +138,5 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
 
 SteveMailEditor.displayName = 'SteveMailEditor';
 
+export { SteveMailEditor };
 export default SteveMailEditor;
