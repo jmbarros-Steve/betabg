@@ -26,6 +26,7 @@ function sanitizeEmailHtml(html: string): string {
       'data-show-price', 'data-show-button', 'data-button-text', 'data-button-color',
       'data-discount-source', 'data-discount-code', 'data-discount-type', 'data-discount-value',
       'data-merge-tag',
+      'data-dynamic-feed',
     ],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'select', 'button'],
     FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur'],
