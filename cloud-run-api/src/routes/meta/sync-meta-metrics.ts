@@ -344,16 +344,17 @@ export async function syncMetaMetrics(c: Context) {
 
     console.log(`Upserting ${metricsToUpsert.length} metrics (all converted to CLP)`);
 
-    // Always purge old metrics for this connection before upserting.
-    // This ensures data integrity when the ad account was changed --
-    // old campaigns have different IDs and won't be overwritten by upsert.
-    console.log(`Purging old platform_metrics for connection ${connection_id}`);
-    const { error: purgeError } = await supabase
-      .from('platform_metrics')
-      .delete()
-      .eq('connection_id', connection_id);
-    if (purgeError) {
-      console.error('Purge error:', purgeError);
+    // Only purge old metrics if explicitly requested (e.g., after reconnecting ad account).
+    // Normal syncs use upsert-only to avoid data loss if the process crashes mid-sync.
+    if (purge_stale) {
+      console.log(`[sync-meta-metrics] Purging old platform_metrics for connection ${connection_id} (explicit purge requested)`);
+      const { error: purgeError } = await supabase
+        .from('platform_metrics')
+        .delete()
+        .eq('connection_id', connection_id);
+      if (purgeError) {
+        console.error('Purge error:', purgeError);
+      }
     }
 
     // Upsert metrics in batches

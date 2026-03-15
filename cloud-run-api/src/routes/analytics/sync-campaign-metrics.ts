@@ -181,19 +181,20 @@ export async function syncCampaignMetrics(c: Context) {
 
     console.log(`Upserting ${campaignMetrics.length} campaign metric records (all in CLP)`);
 
-    // Always purge old campaign metrics for this connection before upserting.
-    // This ensures data integrity when the ad account was changed --
-    // old campaigns have different IDs and won't be overwritten by upsert.
-    console.log(`Purging old campaign_metrics for connection ${connection_id}`);
-    const { error: purgeError } = await supabase
-      .from('campaign_metrics')
-      .delete()
-      .eq('connection_id', connection_id);
-    if (purgeError) {
-      console.error('Purge error:', purgeError);
-    }
-
     if (campaignMetrics.length > 0) {
+      // Purge stale campaigns only if explicitly requested (e.g., after reconnecting ad account).
+      // Normal syncs use upsert-only to avoid data loss if the process crashes mid-sync.
+      if (purge_stale) {
+        console.log(`[sync-campaign-metrics] Purging old campaign_metrics for connection ${connection_id} (explicit purge requested)`);
+        const { error: purgeError } = await supabase
+          .from('campaign_metrics')
+          .delete()
+          .eq('connection_id', connection_id);
+        if (purgeError) {
+          console.error('Purge error:', purgeError);
+        }
+      }
+
       // Upsert in batches of 100
       for (let i = 0; i < campaignMetrics.length; i += 100) {
         const batch = campaignMetrics.slice(i, i + 100);
@@ -225,8 +226,10 @@ export async function syncCampaignMetrics(c: Context) {
       );
 
       if (adsetMetrics.length > 0) {
-        // Purge old adset metrics for this connection
-        await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
+        // Only purge old adset metrics if explicitly requested
+        if (purge_stale) {
+          await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
+        }
 
         for (let i = 0; i < adsetMetrics.length; i += 100) {
           const batch = adsetMetrics.slice(i, i + 100);
