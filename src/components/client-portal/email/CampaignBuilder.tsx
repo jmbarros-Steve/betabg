@@ -882,6 +882,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <div className="w-px h-5 bg-zinc-200" />
               <Button
                 size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setShowProductPanel(true)}
+                title="Insertar productos"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 mr-1" /> Productos
+              </Button>
+              <Button
+                size="sm"
                 variant={showConditionalPanel ? 'default' : 'ghost'}
                 className="h-7 px-2 text-xs"
                 onClick={() => setShowConditionalPanel(!showConditionalPanel)}
