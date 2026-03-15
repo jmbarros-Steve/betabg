@@ -201,12 +201,16 @@ export async function syncMetaMetrics(c: Context) {
     // First, fetch the ad account currency to determine if conversion is needed
     const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
     const accountInfoResponse = await fetch(accountInfoUrl);
-    let accountCurrency = 'USD'; // Default to USD
+    let accountCurrency: string | null = null;
 
     if (accountInfoResponse.ok) {
       const accountInfo: AdAccountInfo = await accountInfoResponse.json() as any;
-      accountCurrency = accountInfo.currency || 'USD';
-      console.log(`Ad account currency: ${accountCurrency}`);
+      accountCurrency = accountInfo.currency || null;
+      if (!accountCurrency) {
+      console.warn('Account currency unknown — treating values as CLP (no conversion)');
+      accountCurrency = 'CLP';
+    }
+    console.log(`Ad account currency: ${accountCurrency}`);
     }
 
     // Calculate date range (last 30 days)

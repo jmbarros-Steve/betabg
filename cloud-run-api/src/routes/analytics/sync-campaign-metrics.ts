@@ -324,15 +324,19 @@ async function syncMetaCampaigns(
 
   // Get account currency first
   // Token via Authorization header
-  let accountCurrency = 'USD';
+  let accountCurrency: string | null = null;
   try {
     const accountRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'USD';
+      accountCurrency = accountData.currency || null;
     }
   } catch (e) {
-    console.log('Could not fetch account currency, defaulting to USD');
+    console.log('Could not fetch account currency — will skip conversion');
+  }
+  if (!accountCurrency) {
+    console.warn('Account currency unknown — treating values as CLP (no conversion)');
+    accountCurrency = 'CLP';
   }
   console.log(`Meta account currency: ${accountCurrency}`);
 
@@ -547,14 +551,14 @@ async function syncMetaAdsetMetrics(
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
   // Get account currency for conversion
-  let accountCurrency = 'USD';
+  let accountCurrency: string | null = null;
   try {
     const accountRes = await fetch(
       `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (accountRes.ok) {
       const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'USD';
+      accountCurrency = accountData.currency || null;
     }
   } catch (e) {
     console.log('Could not fetch account currency for adset sync');
