@@ -1,87 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin, getSupabaseWithUserToken } from '../../lib/supabase.js';
-
-// Currency conversion utilities
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = {
-  CLP: 950,
-  MXN: 17.5,
-  EUR: 0.92,
-  GBP: 0.79,
-};
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    const data: any = await response.json();
-    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    return data.rates;
-  } catch (error) {
-    console.error('Failed to fetch exchange rates, using fallback:', error);
-    return FALLBACK_RATES;
-  }
-}
-
-// Cache exchange rates per request to avoid repeated API calls
-let cachedRates: Record<string, number> | null = null;
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-
-  if (!cachedRates) {
-    cachedRates = await getExchangeRates();
-  }
-  const rates = cachedRates;
-
-  if (currency === 'USD') {
-    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  } else {
-    // Convert FROM -> USD -> CLP
-    const fromRate = rates[currency] || 1;
-    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-    return (amount / fromRate) * clpRate;
-  }
-}
-
-// Helper to validate Shopify Session Token
-async function validateShopifySessionToken(
-  sessionToken: string,
-  supabase: any
-): Promise<{ valid: boolean; shopDomain?: string; userId?: string; error?: string }> {
-  try {
-    // Decode and validate the JWT
-    const [headerB64, payloadB64] = sessionToken.split('.');
-    if (!headerB64 || !payloadB64) {
-      return { valid: false, error: 'Invalid token format' };
-    }
-
-    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-    const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-
-    if (!shopDomain) {
-      return { valid: false, error: 'No shop domain in token' };
-    }
-
-    // Find the user associated with this shop
-    const { data: client, error } = await supabase
-      .from('clients')
-      .select('id, client_user_id, user_id')
-      .eq('shop_domain', shopDomain)
-      .single();
-
-    if (error || !client) {
-      return { valid: false, error: 'Shop not found in database' };
-    }
-
-    const userId = client.client_user_id || client.user_id;
-    return { valid: true, shopDomain, userId };
-  } catch (err: any) {
-    console.error('Session token validation error:', err);
-    return { valid: false, error: err.message };
-  }
-}
+import { convertToCLP } from '../../lib/currency.js';
+import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 interface ShopifyOrder {
   id: number;
@@ -99,6 +19,11 @@ export async function syncShopifyMetrics(c: Context) {
     // Use service role for all DB operations
     const supabaseService = getSupabaseAdmin();
 
+    // Check for cron secret (automated sync)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedCronSecret = c.req.header('X-Cron-Secret');
+    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
+
     // Check for Shopify Session Token first (embedded app)
     const shopifySessionToken = c.req.header('X-Shopify-Session-Token');
     const authHeader = c.req.header('Authorization');
@@ -106,7 +31,9 @@ export async function syncShopifyMetrics(c: Context) {
     let userId: string | null = null;
     let shopDomain: string | null = null;
 
-    if (shopifySessionToken) {
+    if (isCron) {
+      console.log('[sync-shopify] Cron-triggered sync');
+    } else if (shopifySessionToken) {
       // Embedded Shopify app - validate Session Token
       console.log('[sync-shopify] Validating Shopify Session Token...');
       const validation = await validateShopifySessionToken(shopifySessionToken, supabaseService);
@@ -161,7 +88,7 @@ export async function syncShopifyMetrics(c: Context) {
 
     // Authorization check: verify user owns the client that owns this connection
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
+    const isOwner = isCron || clientData.user_id === userId || clientData.client_user_id === userId;
 
     if (!isOwner) {
       console.error('User does not own this connection');
@@ -172,8 +99,8 @@ export async function syncShopifyMetrics(c: Context) {
       return c.json({ error: 'This endpoint only supports Shopify connections' }, 400);
     }
 
-    // Rate limiting: check last sync time (minimum 5 minutes between syncs)
-    if (connection.last_sync_at) {
+    // Rate limiting: check last sync time (minimum 5 minutes between syncs, skip for cron)
+    if (!isCron && connection.last_sync_at) {
       const lastSync = new Date(connection.last_sync_at);
       const minInterval = 5 * 60 * 1000; // 5 minutes
       if (Date.now() - lastSync.getTime() < minInterval) {
@@ -232,9 +159,6 @@ export async function syncShopifyMetrics(c: Context) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const shopifyUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
-
-    // Reset cached rates for this request
-    cachedRates = null;
 
     const orders = await fetchAllOrders(shopifyUrl);
     console.log('Fetched orders (paginated):', orders.length);

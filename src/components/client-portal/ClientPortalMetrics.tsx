@@ -579,7 +579,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       currentRoas: current.avgRoas,
       grossProfit,
       costOfGoods,
-      gatewayFees: current.totalRevenue * gatewayRate,
+      gatewayFees: netRevenue * gatewayRate,
     };
   }, [current, previous, financialConfig, dateRange, customDateRange]);
 
@@ -604,7 +604,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
     // Operational costs
     const shippingCosts = current.totalOrders * financialConfig.shipping_cost_per_order;
-    const shopifyCommission = current.totalRevenue * (financialConfig.shopify_commission_percentage / 100);
+    const shopifyCommission = netRevenue * (financialConfig.shopify_commission_percentage / 100);
 
     const netProfit =
       profitMetrics.grossProfit -
@@ -633,12 +633,28 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     };
   }, [current, profitMetrics, financialConfig, dateRange, customDateRange]);
 
+  // Prorated manual Google spend — used for consistent period comparisons
+  const manualGoogleSpendProrated = useMemo(() => {
+    const prorationFactor = getProrationFactor(dateRange, customDateRange);
+    return Math.round(financialConfig.manual_google_spend * prorationFactor);
+  }, [financialConfig.manual_google_spend, dateRange, customDateRange]);
+
   // Memoized derived KPI values
   const totalAdSpendWithGoogle = profitLossData.totalAdSpend;
+
+  // Previous period total ad spend (consistent with current: includes manual Google)
+  const prevTotalAdSpendWithGoogle = useMemo(() =>
+    previous.totalSpend + manualGoogleSpendProrated,
+    [previous.totalSpend, manualGoogleSpendProrated]);
 
   const effectiveRoas = useMemo(() => totalAdSpendWithGoogle > 0
     ? current.totalRevenue / totalAdSpendWithGoogle
     : 0, [current.totalRevenue, totalAdSpendWithGoogle]);
+
+  // Previous period ROAS using same formula as current (revenue / totalAdSpendWithGoogle)
+  const prevEffectiveRoas = useMemo(() =>
+    prevTotalAdSpendWithGoogle > 0 ? previous.totalRevenue / prevTotalAdSpendWithGoogle : 0,
+    [previous.totalRevenue, prevTotalAdSpendWithGoogle]);
 
   const aov = useMemo(() => current.totalOrders > 0
     ? current.totalRevenue / current.totalOrders
@@ -653,21 +669,22 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
   const statCards = useMemo(() => [
     { title: 'Ingresos Totales', value: `$${current.totalRevenue.toLocaleString('es-CL')}`, currentNum: current.totalRevenue, prevValue: previous.totalRevenue, icon: DollarSign, color: 'text-green-600', tooltip: 'Ingresos totales de Shopify en el período seleccionado', formatter: currencyFormatter },
-    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')}`, currentNum: totalAdSpendWithGoogle, prevValue: previous.totalSpend, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el período', formatter: currencyFormatter },
+    { title: 'Inversión Publicitaria', value: `$${totalAdSpendWithGoogle.toLocaleString('es-CL')}`, currentNum: totalAdSpendWithGoogle, prevValue: prevTotalAdSpendWithGoogle, icon: Target, color: 'text-blue-600', tooltip: 'Gasto total en publicidad (Meta + Google) en el período', formatter: currencyFormatter },
     { title: 'Pedidos', value: current.totalOrders.toLocaleString('es-CL'), currentNum: current.totalOrders, prevValue: previous.totalOrders, icon: ShoppingCart, color: 'text-purple-600', tooltip: 'Número total de pedidos completados en Shopify', formatter: undefined },
     { title: 'Ticket Promedio', value: `$${Math.round(aov).toLocaleString('es-CL')}`, currentNum: aov, prevValue: previousAov, icon: ShoppingCart, color: 'text-amber-600', tooltip: 'Valor promedio de cada pedido. Subirlo es la forma más rápida de aumentar ingresos sin necesitar más clientes', formatter: currencyFormatter },
-    { title: 'ROAS', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: previous.avgRoas, icon: TrendingUp, color: 'text-orange-600', tooltip: 'Retorno de inversión publicitaria — ingresos generados por cada $1 invertido en publicidad. Sobre 3x es bueno, sobre 5x es excelente', formatter: roasFormatter },
-  ], [current, previous, totalAdSpendWithGoogle, effectiveRoas, aov, previousAov, currencyFormatter, roasFormatter]);
+    { title: 'ROAS', value: `${effectiveRoas.toFixed(2)}x`, currentNum: effectiveRoas, prevValue: prevEffectiveRoas, icon: TrendingUp, color: 'text-orange-600', tooltip: 'Retorno de inversión publicitaria — ingresos generados por cada $1 invertido en publicidad. Sobre 3x es bueno, sobre 5x es excelente', formatter: roasFormatter },
+  ], [current, previous, totalAdSpendWithGoogle, prevTotalAdSpendWithGoogle, effectiveRoas, prevEffectiveRoas, aov, previousAov, currencyFormatter, roasFormatter]);
 
   const hasData = useMemo(() => current.totalRevenue > 0 || totalAdSpendWithGoogle > 0 || current.totalOrders > 0, [current.totalRevenue, totalAdSpendWithGoogle, current.totalOrders]);
 
   const exportToCSV = useCallback(() => {
+    const prevRoas = prevEffectiveRoas;
     const rows = [
       ['Métrica', 'Valor', 'Período anterior', 'Cambio %'],
       ['Ingresos Totales (CLP)', String(Math.round(current.totalRevenue)), String(Math.round(previous.totalRevenue)), previous.totalRevenue > 0 ? (((current.totalRevenue - previous.totalRevenue) / previous.totalRevenue) * 100).toFixed(1) + '%' : 'N/A'],
-      ['Inversión Publicitaria (CLP)', String(Math.round(totalAdSpendWithGoogle)), String(Math.round(previous.totalSpend)), previous.totalSpend > 0 ? (((totalAdSpendWithGoogle - previous.totalSpend) / previous.totalSpend) * 100).toFixed(1) + '%' : 'N/A'],
+      ['Inversión Publicitaria (CLP)', String(Math.round(totalAdSpendWithGoogle)), String(Math.round(prevTotalAdSpendWithGoogle)), prevTotalAdSpendWithGoogle > 0 ? (((totalAdSpendWithGoogle - prevTotalAdSpendWithGoogle) / prevTotalAdSpendWithGoogle) * 100).toFixed(1) + '%' : 'N/A'],
       ['Pedidos', String(current.totalOrders), String(previous.totalOrders), previous.totalOrders > 0 ? (((current.totalOrders - previous.totalOrders) / previous.totalOrders) * 100).toFixed(1) + '%' : 'N/A'],
-      ['ROAS', effectiveRoas.toFixed(2), previous.avgRoas.toFixed(2), previous.avgRoas > 0 ? (((effectiveRoas - previous.avgRoas) / previous.avgRoas) * 100).toFixed(1) + '%' : 'N/A'],
+      ['ROAS', effectiveRoas.toFixed(2), prevRoas.toFixed(2), prevRoas > 0 ? (((effectiveRoas - prevRoas) / prevRoas) * 100).toFixed(1) + '%' : 'N/A'],
       ['POAS', profitMetrics.poas.toFixed(2), profitMetrics.previousPoas?.toFixed(2) ?? 'N/A', ''],
       ['CAC (CLP)', String(Math.round(profitMetrics.cac)), profitMetrics.previousCac ? String(Math.round(profitMetrics.previousCac)) : 'N/A', ''],
       ['MER', profitMetrics.mer.toFixed(2), profitMetrics.previousMer?.toFixed(2) ?? 'N/A', ''],

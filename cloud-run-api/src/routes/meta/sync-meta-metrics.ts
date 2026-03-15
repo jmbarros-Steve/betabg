@@ -1,83 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-
-// Currency conversion utilities
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = {
-  CLP: 950,
-  MXN: 17.5,
-  EUR: 0.92,
-  GBP: 0.79,
-};
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    const data: any = await response.json();
-    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    return data.rates;
-  } catch (error) {
-    console.error('Failed to fetch exchange rates, using fallback:', error);
-    return FALLBACK_RATES;
-  }
-}
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-
-  const rates = await getExchangeRates();
-
-  if (currency === 'USD') {
-    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  } else {
-    // Convert FROM -> USD -> CLP
-    const fromRate = rates[currency] || 1;
-    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-    return (amount / fromRate) * clpRate;
-  }
-}
-
-// Helper to validate Shopify Session Token
-async function validateShopifySessionToken(
-  sessionToken: string,
-  supabase: any
-): Promise<{ valid: boolean; shopDomain?: string; userId?: string; error?: string }> {
-  try {
-    // Decode and validate the JWT
-    const [headerB64, payloadB64] = sessionToken.split('.');
-    if (!headerB64 || !payloadB64) {
-      return { valid: false, error: 'Invalid token format' };
-    }
-
-    const payload = JSON.parse(
-      Buffer.from(payloadB64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-    );
-    const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-
-    if (!shopDomain) {
-      return { valid: false, error: 'No shop domain in token' };
-    }
-
-    // Find the user associated with this shop
-    const { data: client, error } = await supabase
-      .from('clients')
-      .select('id, client_user_id, user_id')
-      .eq('shop_domain', shopDomain)
-      .single();
-
-    if (error || !client) {
-      return { valid: false, error: 'Shop not found in database' };
-    }
-
-    const userId = client.client_user_id || client.user_id;
-    return { valid: true, shopDomain, userId };
-  } catch (err: any) {
-    console.error('Session token validation error:', err);
-    return { valid: false, error: err.message };
-  }
-}
+import { convertToCLP } from '../../lib/currency.js';
+import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 interface MetaInsightsResponse {
   data: Array<{
@@ -106,6 +30,11 @@ export async function syncMetaMetrics(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
+    // Check for cron secret (automated sync)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedCronSecret = c.req.header('X-Cron-Secret');
+    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
+
     // Check for Shopify Session Token first (embedded app)
     const shopifySessionToken = c.req.header('X-Shopify-Session-Token');
     const authHeader = c.req.header('Authorization');
@@ -113,7 +42,9 @@ export async function syncMetaMetrics(c: Context) {
     let userId: string | null = null;
     let shopDomain: string | null = null;
 
-    if (shopifySessionToken) {
+    if (isCron) {
+      console.log('[sync-meta] Cron-triggered sync');
+    } else if (shopifySessionToken) {
       // Embedded Shopify app - validate Session Token
       console.log('[sync-meta] Validating Shopify Session Token...');
       const validation = await validateShopifySessionToken(shopifySessionToken, supabase);
@@ -171,9 +102,9 @@ export async function syncMetaMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection (admin via user_id OR client via client_user_id)
+    // Verify user owns this connection (skip for cron)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
+    const isOwner = isCron || clientData.user_id === userId || clientData.client_user_id === userId;
 
     if (!isOwner) {
       console.error('Authorization failed:', { userId, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
@@ -381,16 +312,17 @@ export async function syncMetaMetrics(c: Context) {
 
     console.log(`Upserting ${metricsToUpsert.length} metrics (all converted to CLP)`);
 
-    // Always purge old metrics for this connection before upserting.
-    // This ensures data integrity when the ad account was changed --
-    // old campaigns have different IDs and won't be overwritten by upsert.
-    console.log(`Purging old platform_metrics for connection ${connection_id}`);
-    const { error: purgeError } = await supabase
-      .from('platform_metrics')
-      .delete()
-      .eq('connection_id', connection_id);
-    if (purgeError) {
-      console.error('Purge error:', purgeError);
+    // Only purge old metrics if explicitly requested (e.g., after reconnecting ad account).
+    // Normal syncs use upsert-only to avoid data loss if the process crashes mid-sync.
+    if (purge_stale) {
+      console.log(`[sync-meta-metrics] Purging old platform_metrics for connection ${connection_id} (explicit purge requested)`);
+      const { error: purgeError } = await supabase
+        .from('platform_metrics')
+        .delete()
+        .eq('connection_id', connection_id);
+      if (purgeError) {
+        console.error('Purge error:', purgeError);
+      }
     }
 
     // Upsert metrics in batches

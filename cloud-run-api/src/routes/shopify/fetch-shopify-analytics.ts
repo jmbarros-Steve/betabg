@@ -1,32 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-
-// Currency conversion — same logic as sync-shopify-metrics
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = { CLP: 950, MXN: 17.5, EUR: 0.92, GBP: 0.79 };
-let cachedRates: Record<string, number> | null = null;
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    const data: any = await response.json();
-    return data.rates || FALLBACK_RATES;
-  } catch {
-    console.error('[fetch-shopify-analytics] Failed to fetch exchange rates, using fallback');
-    return FALLBACK_RATES;
-  }
-}
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-  if (!cachedRates) cachedRates = await getExchangeRates();
-  const rates = cachedRates;
-  if (currency === 'USD') return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  const fromRate = rates[currency] || 1;
-  const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-  return (amount / fromRate) * clpRate;
-}
+import { convertToCLP } from '../../lib/currency.js';
+import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 export async function fetchShopifyAnalytics(c: Context) {
   try {
@@ -38,17 +13,11 @@ export async function fetchShopifyAnalytics(c: Context) {
     let userId: string | null = null;
 
     if (shopifySessionToken) {
-      const [, payloadB64] = shopifySessionToken.split('.');
-      if (!payloadB64) {
-        return c.json({ error: 'Invalid token' }, 401);
+      const validation = await validateShopifySessionToken(shopifySessionToken, serviceClient);
+      if (!validation.valid || !validation.userId) {
+        return c.json({ error: validation.error || 'Invalid token' }, 401);
       }
-      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-      const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-      const { data: client } = await serviceClient.from('clients').select('client_user_id, user_id').eq('shop_domain', shopDomain).single();
-      if (!client) {
-        return c.json({ error: 'Shop not found' }, 401);
-      }
-      userId = client.client_user_id || client.user_id;
+      userId = validation.userId;
     } else if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);

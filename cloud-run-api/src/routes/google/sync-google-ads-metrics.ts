@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
 
 interface GoogleAdsRow {
   metrics: {
@@ -30,17 +31,29 @@ export async function syncGoogleAdsMetrics(c: Context) {
       return c.json({ error: 'Google Ads configuration missing' }, 500);
     }
 
-    // Get user from auth middleware
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader) {
-      return c.json({ error: 'Missing authorization header' }, 401);
-    }
+    // Check for cron secret (automated sync)
+    const cronSecret = process.env.CRON_SECRET;
+    const providedCronSecret = c.req.header('X-Cron-Secret');
+    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    let user: { id: string } | null = null;
 
-    if (authError || !user) {
-      return c.json({ error: 'Invalid token' }, 401);
+    if (isCron) {
+      console.log('[sync-google] Cron-triggered sync');
+    } else {
+      // Get user from auth middleware
+      const authHeader = c.req.header('Authorization');
+      if (!authHeader) {
+        return c.json({ error: 'Missing authorization header' }, 401);
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError || !authUser) {
+        return c.json({ error: 'Invalid token' }, 401);
+      }
+      user = authUser;
     }
 
     // Get connection_id from request
@@ -73,9 +86,9 @@ export async function syncGoogleAdsMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection (either as admin owner or as client user)
+    // Verify user owns this connection (skip for cron)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string };
-    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
+    if (!isCron && user && clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
@@ -142,6 +155,10 @@ export async function syncGoogleAdsMetrics(c: Context) {
     startDate.setDate(startDate.getDate() - 30);
 
     const customerId = connection.account_id;
+
+    // Detect account currency for proper CLP conversion
+    const accountCurrency = await fetchGoogleAccountCurrency(customerId, accessToken, developerToken);
+    console.log(`Google Ads account currency: ${accountCurrency}`);
 
     // Build GAQL query for account-level metrics
     const query = `
@@ -228,91 +245,98 @@ export async function syncGoogleAdsMetrics(c: Context) {
 
       const metrics = row.metrics || {};
 
-      // Impressions
+      // Impressions (no currency conversion needed)
       if (metrics.impressions) {
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'impressions',
           metric_value: parseInt(metrics.impressions, 10),
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
 
-      // Clicks
+      // Clicks (no currency conversion needed)
       if (metrics.clicks) {
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'clicks',
           metric_value: parseInt(metrics.clicks, 10),
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
 
-      // Ad Spend (costMicros is in millionths of currency)
+      // Ad Spend (costMicros is in millionths of account currency) → convert to CLP
       if (metrics.costMicros) {
+        const spendRaw = parseInt(metrics.costMicros, 10) / 1000000;
+        const spendCLP = await convertToCLP(spendRaw, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'ad_spend',
-          metric_value: parseInt(metrics.costMicros, 10) / 1000000,
-          currency: 'USD'
+          metric_value: Math.round(spendCLP),
+          currency: 'CLP'
         });
       }
 
-      // Conversions (purchases)
+      // Conversions (count — no conversion needed)
       if (metrics.conversions !== undefined) {
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'conversions',
           metric_value: metrics.conversions,
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
 
-      // Conversion Value
+      // Conversion Value → convert to CLP
       if (metrics.conversionsValue !== undefined) {
+        const valueCLP = await convertToCLP(metrics.conversionsValue, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'conversion_value',
-          metric_value: metrics.conversionsValue,
-          currency: 'USD'
+          metric_value: Math.round(valueCLP),
+          currency: 'CLP'
         });
       }
 
-      // Average CPC
+      // Average CPC → convert to CLP
       if (metrics.averageCpc) {
+        const cpcRaw = parseInt(metrics.averageCpc, 10) / 1000000;
+        const cpcCLP = await convertToCLP(cpcRaw, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'average_cpc',
-          metric_value: parseInt(metrics.averageCpc, 10) / 1000000,
-          currency: 'USD'
+          metric_value: Math.round(cpcCLP),
+          currency: 'CLP'
         });
       }
 
-      // CTR (Click-through rate)
+      // CTR (ratio — no conversion needed)
       if (metrics.ctr !== undefined) {
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'ctr',
           metric_value: metrics.ctr,
-          currency: 'USD'
+          currency: 'CLP'
         });
       }
 
-      // Cost per Conversion
+      // Cost per Conversion → convert to CLP
       if (metrics.costPerConversion !== undefined) {
+        const cpcRaw = metrics.costPerConversion / 1000000;
+        const cpcCLP = await convertToCLP(cpcRaw, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
           metric_type: 'cost_per_conversion',
-          metric_value: metrics.costPerConversion / 1000000,
-          currency: 'USD'
+          metric_value: Math.round(cpcCLP),
+          currency: 'CLP'
         });
       }
     }

@@ -77,6 +77,9 @@ import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
 import { manageMetaRules } from './meta/manage-meta-rules.js';
 import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 
+// Cron
+import { syncAllMetrics } from './cron/sync-all-metrics.js';
+
 // Phase 4: Auth
 import { selfSignup } from './auth/self-signup.js';
 import { adminCreateClient } from './auth/admin-create-client.js';
@@ -259,4 +262,9 @@ export function registerRoutes(app: Hono) {
   app.post('/api/email-flow-webhooks', emailFlowWebhooks); // Shopify webhook triggers - HMAC verified
   app.post('/api/email-flow-execute', authMiddleware, emailFlowExecute); // Cloud Tasks internal call
   app.post('/api/execute-scheduled-campaign', authMiddleware, executeScheduledCampaign); // Cloud Tasks internal call
+
+  // ============================================================
+  // Cron / Scheduled Jobs
+  // ============================================================
+  app.post('/api/cron/sync-all-metrics', syncAllMetrics); // No JWT — uses X-Cron-Secret
 }

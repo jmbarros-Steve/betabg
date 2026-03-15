@@ -643,6 +643,19 @@ export async function generateMetaCopy(c: Context) {
     return c.json({ error: 'Missing required parameters' }, 400);
   }
 
+  // Ownership check: verify user owns this client
+  const user = c.get('user');
+  if (user) {
+    const { data: clientRow } = await supabase
+      .from('clients')
+      .select('user_id, client_user_id')
+      .eq('id', clientId)
+      .single();
+    if (clientRow && clientRow.user_id !== user.id && clientRow.client_user_id !== user.id) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+  }
+
   // ── VARIACIONES MODE ──────────────────────────────────────────────────────
   if (mode === 'variaciones') {
     const { data: briefData } = await supabase

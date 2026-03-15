@@ -15,7 +15,7 @@ import {
   RefreshCw, TrendingUp, TrendingDown, DollarSign,
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
   BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
-  Clock, CheckCircle, PauseCircle, Calendar
+  Clock, CheckCircle, PauseCircle, Calendar, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -99,12 +99,16 @@ const priorityConfig = {
   low: { color: 'bg-blue-500/10 text-blue-500 border-blue-500/30', icon: Sparkles },
 };
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('es-CL', { 
-    style: 'currency', 
-    currency: 'CLP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0 
+const formatCurrency = (value: number, currency: string = 'CLP') => {
+  const cur = currency.toUpperCase();
+  // For CLP: no decimals (whole pesos)
+  // For USD/EUR/etc: 2 decimals
+  const isWholeCurrency = cur === 'CLP' || cur === 'COP' || cur === 'JPY' || cur === 'KRW';
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: cur,
+    minimumFractionDigits: isWholeCurrency ? 0 : 2,
+    maximumFractionDigits: isWholeCurrency ? 0 : 2
   }).format(value);
 };
 
@@ -140,6 +144,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
   const [metaAccountCurrency, setMetaAccountCurrency] = useState<string>('USD');
+  const [dynamicClpRate, setDynamicClpRate] = useState<number>(950); // fetched from API
 
   // Rules from Meta Wizard (meta_automated_rules)
   const [automatedRules, setAutomatedRules] = useState<any[]>([]);
@@ -152,6 +157,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   useEffect(() => {
     fetchConnections();
     fetchAutomatedRules();
+    // Fetch live exchange rate for CLP conversion
+    fetch('https://api.exchangerate-api.com/v4/latest/USD')
+      .then(r => r.json())
+      .then((d: any) => { if (d.rates?.CLP) setDynamicClpRate(d.rates.CLP); })
+      .catch(() => { /* keep fallback 950 */ });
   }, [clientId]);
 
   useEffect(() => {
@@ -223,11 +233,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         ? connections.map(c => c.id) 
         : [selectedConnection];
 
+      const minDate = new Date(Date.now() - daysFromRange(dateRange) * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('campaign_recommendations')
         .select('*')
         .in('connection_id', connectionIds)
         .eq('is_dismissed', false)
+        .gte('created_at', minDate)
         .order('priority', { ascending: true });
 
       if (error) throw error;
@@ -441,12 +453,12 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     // If account is CLP, use CLP value directly. If USD, convert CLP rule to USD.
     return metaAccountCurrency === 'CLP'
       ? cpaRule.condition.value
-      : cpaRule.condition.value / 950;
-  }, [automatedRules, metaAccountCurrency]);
+      : cpaRule.condition.value / dynamicClpRate;
+  }, [automatedRules, metaAccountCurrency, dynamicClpRate]);
 
   // Charlie semaphore for ad sets
   // If account is already in CLP, no conversion needed (rate = 1)
-  const CLP_RATE = metaAccountCurrency === 'CLP' ? 1 : 950;
+  const CLP_RATE = metaAccountCurrency === 'CLP' ? 1 : dynamicClpRate;
   const getAdSetSemaphore = (adSet: AdSet) => {
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
@@ -488,11 +500,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
     switch (semKey) {
       case 'danger':
-        return `Este Ad Set gasta ${formatCurrency(cpaClp || spendClp)} por venta, muy por encima de tu máximo de ${formatCurrency(maxCpaClp)}. Pausarlo ahorra presupuesto para los Ad Sets que sí funcionan.`;
+        return `Este Ad Set gasta ${formatCurrency(cpaClp || spendClp, 'CLP')} por venta, muy por encima de tu máximo de ${formatCurrency(maxCpaClp, 'CLP')}. Pausarlo ahorra presupuesto para los Ad Sets que sí funcionan.`;
       case 'learning':
         return `Meta está optimizando este Ad Set. Espera al menos 7 días antes de tomar decisiones — pausar antes destruye el aprendizaje del algoritmo.`;
       case 'good':
-        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp) : '—'} por venta (dentro de tu objetivo). Se puede escalar +${scalePercent}%.`;
+        return `Este Ad Set está funcionando bien. ROAS ${adSet.roas > 0 ? adSet.roas.toFixed(2) : '—'}x, gastando ${cpaClp ? formatCurrency(cpaClp, 'CLP') : '—'} por venta (dentro de tu objetivo). Se puede escalar +${scalePercent}%.`;
       case 'nodata':
         return `Sin datos suficientes para evaluar. Verifica que esté activo en Meta Ads Manager y que tenga presupuesto asignado.`;
       default:
@@ -558,6 +570,62 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     const order = { danger: 0, nodata: 1, learning: 2, good: 3 };
     return result.sort((a, b) => order[a.semaphore] - order[b.semaphore]);
   }, [adSetsByCampaign, aggregatedCampaigns]);
+
+  // Relative time for last sync
+  const lastSyncText = useMemo(() => {
+    const syncTimes = connections
+      .map(c => c.last_sync_at)
+      .filter(Boolean)
+      .map(t => new Date(t!).getTime());
+    if (syncTimes.length === 0) return null;
+    const latest = Math.max(...syncTimes);
+    const diffMs = Date.now() - latest;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'hace menos de 1 min';
+    if (diffMin < 60) return `hace ${diffMin} min`;
+    const diffHrs = Math.floor(diffMin / 60);
+    if (diffHrs < 24) return `hace ${diffHrs}h`;
+    const diffDays = Math.floor(diffHrs / 24);
+    return `hace ${diffDays}d`;
+  }, [connections]);
+
+  // CSV Export
+  function exportCSV() {
+    const headers = ['Campaña', 'Plataforma', 'Gasto CLP', 'Ingresos CLP', 'ROAS', 'Conversiones', 'CPC CLP', 'CPM CLP', 'CTR %'];
+    const rows = aggregatedCampaigns.map(c => [
+      c.campaign_name,
+      c.platform,
+      Math.round(c.total_spend),
+      Math.round(c.total_revenue),
+      c.avg_roas.toFixed(2),
+      c.total_conversions,
+      Math.round(c.avg_cpc),
+      Math.round(c.avg_cpm),
+      c.avg_ctr.toFixed(2),
+    ]);
+    // Totals row
+    rows.push([
+      'TOTAL',
+      '',
+      Math.round(totals.spend),
+      Math.round(totals.revenue),
+      overallRoas.toFixed(2),
+      totals.conversions,
+      totals.clicks > 0 ? Math.round(totals.spend / totals.clicks) : 0,
+      totals.impressions > 0 ? Math.round((totals.spend / totals.impressions) * 1000) : 0,
+      overallCtr.toFixed(2),
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `campañas-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const hasData = metrics.length > 0;
 
   if (loading) {
     return (
@@ -656,18 +724,48 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             </SelectContent>
           </Select>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={syncCampaigns}
             disabled={syncing}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sincronizar
           </Button>
+          {hasData && (
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              CSV
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {lastSyncText && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Última actualización: {lastSyncText}
+            </span>
+          )}
+          {metaAccountCurrency && metaAccountCurrency !== 'CLP' && (
+            <span>Cuenta en {metaAccountCurrency} · Convertido a CLP</span>
+          )}
         </div>
       </div>
 
+      {!hasData && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <BarChart3 className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-muted-foreground font-medium">Sin datos para este período</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Prueba otro rango de fechas o sincroniza las campañas.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasData && <>
       {/* Primary KPIs - large cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
@@ -678,7 +776,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <DollarSign className="w-5 h-5 text-red-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend, 'CLP')}</p>
           </CardContent>
         </Card>
 
@@ -690,7 +788,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 <DollarSign className="w-5 h-5 text-green-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue)}</p>
+            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue, 'CLP')}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {totals.revenue > 0 ? `ROAS: ${overallRoas.toFixed(2)}x` : 'Sin datos de conversión'}
             </p>
@@ -730,7 +828,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="py-4 px-5">
             <span className="text-xs font-medium text-muted-foreground">Costo/Conv</span>
             <p className="text-xl font-bold mt-1">
-              {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions) : '-'}
+              {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions, 'CLP') : '-'}
             </p>
           </CardContent>
         </Card>
@@ -738,7 +836,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="py-4 px-5">
             <JargonTooltip term="CPC" className="text-xs font-medium text-muted-foreground" />
             <p className="text-xl font-bold mt-1">
-              {totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks) : '-'}
+              {totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks, 'CLP') : '-'}
             </p>
           </CardContent>
         </Card>
@@ -746,7 +844,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           <CardContent className="py-4 px-5">
             <JargonTooltip term="CPM" className="text-xs font-medium text-muted-foreground" />
             <p className="text-xl font-bold mt-1">
-              {totals.impressions > 0 ? formatCurrency((totals.spend / totals.impressions) * 1000) : '-'}
+              {totals.impressions > 0 ? formatCurrency((totals.spend / totals.impressions) * 1000, 'CLP') : '-'}
             </p>
           </CardContent>
         </Card>
@@ -769,10 +867,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             const dailyMap = new Map<string, { date: string; spend: number; revenue: number; conversions: number }>();
             const filteredMetrics = selectedConnection === 'all'
               ? metrics
-              : metrics.filter(m => {
-                  const conn = connections.find(c => c.id === selectedConnection);
-                  return conn && m.platform === conn.platform;
-                });
+              : metrics.filter(m => (m as any).connection_id === selectedConnection);
             filteredMetrics.forEach(m => {
               const existing = dailyMap.get(m.metric_date) || { date: m.metric_date, spend: 0, revenue: 0, conversions: 0 };
               existing.spend += m.spend || 0;
@@ -804,11 +899,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                   />
                   <YAxis
                     tick={{ fontSize: 11 }}
-                    tickFormatter={(v: number) => formatCurrency(v)}
+                    tickFormatter={(v: number) => formatCurrency(v, 'CLP')}
+                    allowDecimals={false}
+                    width={80}
                   />
                   <RechartsTooltip
                     formatter={(value: number, name: string) => [
-                      formatCurrency(value),
+                      formatCurrency(value, 'CLP'),
                       name === 'revenue' ? 'Ingresos' : name === 'spend' ? 'Gasto' : 'Conversiones',
                     ]}
                     labelFormatter={(label: string) => {
@@ -946,11 +1043,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                           <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 text-sm">
                             <div>
                               <p className="text-muted-foreground text-xs">Gasto</p>
-                              <p className="font-medium">{formatCurrency(campaign.total_spend)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.total_spend, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs">Ingresos (Atrib.)</p>
-                              <p className="font-medium">{formatCurrency(campaign.total_revenue)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.total_revenue, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="ROAS" /></p>
@@ -961,16 +1058,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                             <div>
                               <p className="text-muted-foreground text-xs">Costo/Conv</p>
                               <p className="font-medium">
-                                {campaign.total_conversions > 0 ? formatCurrency(campaign.total_spend / campaign.total_conversions) : '-'}
+                                {campaign.total_conversions > 0 ? formatCurrency(campaign.total_spend / campaign.total_conversions, 'CLP') : '-'}
                               </p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CPC" /></p>
-                              <p className="font-medium">{formatCurrency(campaign.avg_cpc)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.avg_cpc, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CPM" /></p>
-                              <p className="font-medium">{formatCurrency(campaign.avg_cpm)}</p>
+                              <p className="font-medium">{formatCurrency(campaign.avg_cpm, 'CLP')}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground text-xs"><JargonTooltip term="CTR" /></p>
@@ -1034,7 +1131,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs mb-3">
                                         <div>
                                           <p className="text-muted-foreground">Gasto CLP</p>
-                                          <p className="font-medium">{formatCurrency(spendClp)}</p>
+                                          <p className="font-medium">{formatCurrency(spendClp, 'CLP')}</p>
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground">CPA real</p>
@@ -1060,7 +1157,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground"><JargonTooltip term="CPM" label="CPM CLP" /></p>
-                                          <p className="font-medium">{formatCurrency(parseFloat(adSet.cpm) * CLP_RATE)}</p>
+                                          <p className="font-medium">{formatCurrency(parseFloat(adSet.cpm) * CLP_RATE, 'CLP')}</p>
                                         </div>
                                       </div>
 
@@ -1258,6 +1355,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           )}
         </TabsContent>
       </Tabs>
+      </>}
 
       {/* Charlie Scale Dialog */}
       <Dialog open={charlieModal?.type === 'scale'} onOpenChange={() => { setCharlieModal(null); setCharlieActionSuccess(null); }}>
