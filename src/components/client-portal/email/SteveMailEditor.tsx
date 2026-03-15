@@ -73,10 +73,14 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
     useEffect(() => {
       if (!containerRef.current) return;
 
+      // Calculate container height in pixels — '100%' fails if parent hasn't laid out yet
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const initHeight = containerRect.height > 100 ? `${containerRect.height}px` : '100%';
+
       const editor = grapesjs.init({
         container: containerRef.current,
         fromElement: false,
-        height: '100%',
+        height: initHeight,
         width: 'auto',
         storageManager: false,
         plugins: [grapesjsPresetNewsletter, registerSteveBlocks, registerMergeTags],
@@ -158,21 +162,38 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         };
 
         // Apply layout, open blocks, then refresh so GrapeJS recalculates iframe
-        setTimeout(() => {
+        const applyAndRefresh = () => {
           forceLayout();
           // Open blocks panel (last view tab)
           const viewBtns = el.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
           if (viewBtns.length > 0) {
             (viewBtns[viewBtns.length - 1] as HTMLElement).click();
           }
-          // Refresh recalculates iframe to fit canvas
           editor.refresh();
-          // Re-apply layout after refresh (in case GrapeJS overrode our styles)
+          // After refresh, re-apply layout and directly resize iframe
           requestAnimationFrame(() => {
             forceLayout();
-            editor.refresh();
+            // Force iframe to fill canvas via GrapeJS Canvas API
+            try {
+              const canvasEl = editor.Canvas.getElement();
+              const frameEl = editor.Canvas.getFrameEl();
+              if (canvasEl && frameEl) {
+                const cRect = canvasEl.getBoundingClientRect();
+                frameEl.style.width = `${cRect.width}px`;
+                frameEl.style.height = `${cRect.height}px`;
+                // Also resize frame wrapper
+                const wrapper = frameEl.parentElement;
+                if (wrapper) {
+                  wrapper.style.width = `${cRect.width}px`;
+                  wrapper.style.height = `${cRect.height}px`;
+                }
+              }
+            } catch (e) { /* ignore if Canvas API unavailable */ }
           });
-        }, 100);
+        };
+        setTimeout(applyAndRefresh, 100);
+        // Second pass in case first was too early
+        setTimeout(applyAndRefresh, 500);
 
         // Re-apply on window resize
         const onResize = () => { forceLayout(); editor.refresh(); };
