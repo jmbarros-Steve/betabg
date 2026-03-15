@@ -205,6 +205,13 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
       {/* Results */}
       {analyzedCompetitors.length > 0 && (
         <div className="space-y-6">
+          {/* Disclaimer */}
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-yellow-700 dark:text-yellow-300">
+              Los datos se extraen del HTML público de la tienda. Campos marcados como "No se pudo verificar" significan que no encontramos evidencia concreta en el sitio — no se inventan datos.
+            </p>
+          </div>
           {/* Summary comparison */}
           <Card>
             <CardHeader className="pb-3">
@@ -232,9 +239,13 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         <tr key={comp.id} className="border-b border-border last:border-0">
                           <td className="py-3 pr-4 font-medium">@{comp.ig_handle}</td>
                           <td className="py-3 px-4">
-                            <Badge variant="outline" className={`text-xs ${PLATFORM_COLORS[dd.tech_stack.platform || 'custom'] || ''}`}>
-                              {dd.tech_stack.platform || 'Custom'}
-                            </Badge>
+                            {dd.tech_stack.platform && dd.tech_stack.platform !== 'custom' ? (
+                              <Badge variant="outline" className={`text-xs ${PLATFORM_COLORS[dd.tech_stack.platform] || ''}`}>
+                                {dd.tech_stack.platform}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Sin verificar</span>
+                            )}
                           </td>
                           <td className="py-3 px-2 text-center">
                             {dd.tracking_scripts.meta_pixel ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" /> : <XCircle className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
@@ -294,11 +305,17 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         <Code className="h-4 w-4 text-primary" />
                         Tech Stack
                       </h4>
-                      <Badge variant="outline" className={`${PLATFORM_COLORS[dd.tech_stack.platform || 'custom'] || ''}`}>
-                        {dd.tech_stack.cms_detected || dd.tech_stack.platform || 'Custom'}
-                      </Badge>
-                      {dd.tech_stack.platform_evidence && (
-                        <p className="text-xs text-muted-foreground">{dd.tech_stack.platform_evidence}</p>
+                      {dd.tech_stack.platform && dd.tech_stack.platform !== 'custom' ? (
+                        <>
+                          <Badge variant="outline" className={`${PLATFORM_COLORS[dd.tech_stack.platform] || ''}`}>
+                            {dd.tech_stack.cms_detected || dd.tech_stack.platform}
+                          </Badge>
+                          {dd.tech_stack.platform_evidence && (
+                            <p className="text-xs text-muted-foreground">{dd.tech_stack.platform_evidence}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No se pudo verificar la plataforma</p>
                       )}
                     </div>
 
@@ -308,16 +325,20 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         <DollarSign className="h-4 w-4 text-primary" />
                         Oferta Irresistible
                       </h4>
-                      {dd.irresistible_offer.h1 && (
+                      {dd.irresistible_offer.h1 ? (
                         <p className="text-sm font-medium">"{dd.irresistible_offer.h1}"</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No se pudo verificar el H1</p>
                       )}
-                      {dd.irresistible_offer.discount_messaging && (
+                      {dd.irresistible_offer.discount_messaging ? (
                         <Badge variant="secondary" className="text-xs">
                           <Tag className="h-3 w-3 mr-1" />
                           {dd.irresistible_offer.discount_messaging}
                         </Badge>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No se detectaron descuentos</p>
                       )}
-                      {dd.irresistible_offer.featured_products.length > 0 && (
+                      {dd.irresistible_offer.featured_products.length > 0 ? (
                         <div className="space-y-1">
                           {dd.irresistible_offer.featured_products.map((p, i) => (
                             <div key={i} className="flex justify-between text-xs">
@@ -326,9 +347,8 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                             </div>
                           ))}
                         </div>
-                      )}
-                      {!dd.irresistible_offer.h1 && dd.irresistible_offer.featured_products.length === 0 && (
-                        <p className="text-xs text-muted-foreground">No se detectó oferta destacada</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No se pudieron verificar productos</p>
                       )}
                     </div>
 
