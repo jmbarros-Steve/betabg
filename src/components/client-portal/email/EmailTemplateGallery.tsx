@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, FileText, Sparkles } from 'lucide-react';
+import { emailTemplates } from './emailTemplates';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -21,7 +22,7 @@ interface EmailTemplateGalleryProps {
 // Types
 // ---------------------------------------------------------------------------
 
-type TemplateCategory = 'todas' | 'e-commerce' | 'bienvenida' | 'promocion' | 'newsletter';
+type TemplateCategory = 'todas' | 'e-commerce' | 'bienvenida' | 'promocion' | 'newsletter' | 'carrito' | 'lanzamiento' | 'temporada';
 
 interface SystemTemplate {
   id: string;
@@ -41,6 +42,9 @@ const CATEGORIES: { key: TemplateCategory; label: string }[] = [
   { key: 'bienvenida', label: 'Bienvenida' },
   { key: 'promocion', label: 'Promocion' },
   { key: 'newsletter', label: 'Newsletter' },
+  { key: 'carrito', label: 'Carrito' },
+  { key: 'lanzamiento', label: 'Lanzamiento' },
+  { key: 'temporada', label: 'Temporada' },
 ];
 
 const THUMBNAIL_COLORS: Record<string, string> = {
@@ -48,6 +52,9 @@ const THUMBNAIL_COLORS: Record<string, string> = {
   bienvenida: '#22c55e',
   newsletter: '#a855f7',
   promocion: '#ef4444',
+  carrito: '#f59e0b',
+  lanzamiento: '#7c3aed',
+  temporada: '#059669',
 };
 
 // ---------------------------------------------------------------------------
@@ -1183,6 +1190,24 @@ const SYSTEM_TEMPLATES: SystemTemplate[] = [
       { u_row: 5, u_column: 7, u_content_text: 7, u_content_heading: 1, u_content_button: 1, u_content_image: 4, u_content_social: 1, u_content_divider: 0 }
     ),
   },
+  // --- GrapeJS HTML Templates (from emailTemplates.ts) ---
+  ...emailTemplates.map((t) => {
+    const categoryMap: Record<string, Exclude<TemplateCategory, 'todas'>> = {
+      welcome: 'bienvenida',
+      promo: 'promocion',
+      newsletter: 'newsletter',
+      abandoned_cart: 'carrito',
+      product_launch: 'lanzamiento',
+      seasonal: 'temporada',
+    };
+    return {
+      id: t.id,
+      name: t.name,
+      category: categoryMap[t.category] || ('e-commerce' as Exclude<TemplateCategory, 'todas'>),
+      thumbnailColor: THUMBNAIL_COLORS[categoryMap[t.category]] || '#3b82f6',
+      design_json: t.html, // HTML string — handled by CampaignBuilder
+    };
+  }),
 ];
 
 // ---------------------------------------------------------------------------
@@ -1395,6 +1420,14 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
           <ScrollArea className="flex-1 px-6 py-4">
             {/* Render a visual representation of the template */}
             <div className="border rounded-lg overflow-hidden bg-zinc-100">
+              {typeof previewTemplate?.design_json === 'string' ? (
+                /* GrapeJS HTML template — render directly */
+                <div
+                  className="bg-white mx-auto"
+                  style={{ maxWidth: 600 }}
+                  dangerouslySetInnerHTML={{ __html: previewTemplate.design_json }}
+                />
+              ) : (
               <div className="bg-white mx-auto" style={{ maxWidth: 600 }}>
                 {previewTemplate?.design_json?.body?.rows?.map((row: any, rowIdx: number) => (
                   <div
@@ -1493,6 +1526,7 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
                   </div>
                 ))}
               </div>
+              )}
             </div>
           </ScrollArea>
 
