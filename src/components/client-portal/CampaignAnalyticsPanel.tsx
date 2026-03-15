@@ -171,6 +171,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   // Rules from Meta Wizard (meta_automated_rules)
   const [automatedRules, setAutomatedRules] = useState<any[]>([]);
+  const [clientName, setClientName] = useState<string>('');
 
   const daysFromRange = (range: string): number => {
     const map: Record<string, number> = { '7d': 7, '14d': 14, '30d': 30, '60d': 60, '90d': 90 };
@@ -206,6 +207,12 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       // Rules unavailable — use defaults
     }
   }
+
+  // Fetch client name for PDF branding
+  useEffect(() => {
+    supabase.from('clients').select('name, company').eq('id', clientId).maybeSingle()
+      .then(({ data }) => { if (data) setClientName(data.name || data.company || ''); });
+  }, [clientId]);
 
   async function fetchConnections() {
     try {
@@ -861,31 +868,60 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     });
   }, [dailyTrend]);
 
-  // PDF export using browser print dialog
+  // PDF export with client branding
   function exportPDF() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Habilita popups para exportar PDF'); return; }
+    const brandName = clientName || 'Cliente';
     const campaignRows = aggregatedCampaigns.map(c =>
-      `<tr><td>${c.campaign_name}</td><td>${c.platform}</td><td>${formatCurrency(c.total_spend, 'CLP')}</td><td>${formatCurrency(c.total_revenue, 'CLP')}</td><td>${c.avg_roas.toFixed(2)}x</td><td>${c.total_conversions}</td><td>${formatCurrency(c.avg_cpc, 'CLP')}</td><td>${c.avg_ctr.toFixed(2)}%</td></tr>`
+      `<tr><td>${c.campaign_name}</td><td>${c.platform}</td><td>${formatCurrency(c.total_spend, 'CLP')}</td><td>${formatCurrency(c.total_revenue, 'CLP')}</td><td style="color:${c.avg_roas >= 2 ? '#16a34a' : c.avg_roas >= 1 ? '#ca8a04' : '#dc2626'};font-weight:700">${c.avg_roas.toFixed(2)}x</td><td>${c.total_conversions}</td><td>${formatCurrency(c.avg_cpc, 'CLP')}</td><td>${c.avg_ctr.toFixed(2)}%</td></tr>`
     ).join('');
     const cohortRows = weeklyCohorts.map(w =>
-      `<tr><td>${w.week}</td><td>${formatCurrency(w.spend, 'CLP')}</td><td>${formatCurrency(w.revenue, 'CLP')}</td><td>${w.roas.toFixed(2)}x</td><td>${w.conversions}</td><td>${w.cpa > 0 ? formatCurrency(w.cpa, 'CLP') : '\u2014'}</td></tr>`
+      `<tr><td>${w.week}</td><td>${formatCurrency(w.spend, 'CLP')}</td><td>${formatCurrency(w.revenue, 'CLP')}</td><td style="color:${w.roas >= 2 ? '#16a34a' : w.roas >= 1 ? '#ca8a04' : '#dc2626'};font-weight:700">${w.roas.toFixed(2)}x</td><td>${w.conversions}</td><td>${w.cpa > 0 ? formatCurrency(w.cpa, 'CLP') : '\u2014'}</td></tr>`
     ).join('');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Reporte Campa\u00f1as - ${dateRange}</title>
-      <style>body{font-family:system-ui,sans-serif;padding:24px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:13px}th{background:#f5f5f5;font-weight:600}h1{font-size:20px}h2{font-size:16px;margin-top:24px}.kpi{display:inline-block;margin:0 24px 12px 0}.kpi .label{font-size:12px;color:#666}.kpi .value{font-size:24px;font-weight:700}@media print{body{padding:0}}</style></head><body>
-      <h1>Reporte de Campa\u00f1as \u2014 \u00daltimos ${daysFromRange(dateRange)} d\u00edas</h1>
-      <p style="color:#666;font-size:12px">Generado: ${new Date().toLocaleString('es-CL')}</p>
-      <div>
-        <div class="kpi"><div class="label">Gasto</div><div class="value">${formatCurrency(totals.spend, 'CLP')}</div></div>
-        <div class="kpi"><div class="label">Ingresos</div><div class="value">${formatCurrency(totals.revenue, 'CLP')}</div></div>
-        <div class="kpi"><div class="label">ROAS</div><div class="value">${overallRoas.toFixed(2)}x</div></div>
-        <div class="kpi"><div class="label">Conversiones</div><div class="value">${formatNumber(totals.conversions)}</div></div>
+    const monthlyCohortRows = monthlyCohorts.map(c =>
+      `<tr><td>${new Date(c.month + '-15').toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}</td><td>${formatCurrency(c.spend, 'CLP')}</td><td>${formatCurrency(c.revenue, 'CLP')}</td><td style="color:${c.roas >= 2 ? '#16a34a' : c.roas >= 1 ? '#ca8a04' : '#dc2626'};font-weight:700">${c.roas.toFixed(2)}x</td><td>${c.conversions}</td><td>${c.cpa > 0 ? formatCurrency(c.cpa, 'CLP') : '\u2014'}</td><td>${c.ltv > 0 ? formatCurrency(c.ltv, 'CLP') : '\u2014'}</td><td>${c.retention !== null ? c.retention.toFixed(0) + '%' : '\u2014'}</td></tr>`
+    ).join('');
+    const alertsHtml = smartAlerts.length > 0 ? `<h2>\u26a0\ufe0f Alertas</h2><ul style="list-style:none;padding:0">${smartAlerts.map(a => `<li style="padding:6px 12px;margin:4px 0;border-radius:6px;font-size:13px;background:${a.type === 'critical' ? '#fef2f2' : a.type === 'warning' ? '#fefce8' : '#eff6ff'};border:1px solid ${a.type === 'critical' ? '#fecaca' : a.type === 'warning' ? '#fde68a' : '#bfdbfe'}">${a.message}</li>`).join('')}</ul>` : '';
+    const platformRows = platformComparison.map(p =>
+      `<tr><td style="text-transform:capitalize;font-weight:500">${p.platform}</td><td>${formatCurrency(p.spend, 'CLP')}</td><td>${formatCurrency(p.revenue, 'CLP')}</td><td style="color:${p.roas >= 2 ? '#16a34a' : p.roas >= 1 ? '#ca8a04' : '#dc2626'};font-weight:700">${p.roas.toFixed(2)}x</td><td>${p.conversions}</td><td>${p.cpa > 0 ? formatCurrency(p.cpa, 'CLP') : '\u2014'}</td></tr>`
+    ).join('');
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>${brandName} \u2014 Reporte de Performance</title>
+      <style>
+        *{box-sizing:border-box}body{font-family:'Segoe UI',system-ui,sans-serif;padding:40px;color:#1a1a1a;max-width:1100px;margin:0 auto}
+        .header{border-bottom:3px solid #6366f1;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end}
+        .header h1{font-size:24px;margin:0;color:#1e1b4b}.header .meta{text-align:right;color:#64748b;font-size:12px}
+        .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:24px 0}
+        .kpi-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center}
+        .kpi-card .label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+        .kpi-card .value{font-size:28px;font-weight:700}.kpi-card .sub{font-size:11px;color:#94a3b8;margin-top:2px}
+        table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+        th{background:#f1f5f9;padding:10px 12px;text-align:left;font-weight:600;color:#475569;border-bottom:2px solid #e2e8f0}
+        td{padding:8px 12px;border-bottom:1px solid #f1f5f9}tr:hover td{background:#fafafa}
+        h2{font-size:16px;color:#1e1b4b;margin:32px 0 8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
+        .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
+        @media print{body{padding:20px}.header{border-color:#1e1b4b}}
+      </style></head><body>
+      <div class="header">
+        <div><h1>${brandName}</h1><p style="margin:4px 0 0;color:#6366f1;font-size:14px;font-weight:500">Reporte de Performance</p></div>
+        <div class="meta"><div>\u00daltimos ${daysFromRange(dateRange)} d\u00edas</div><div>${new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
       </div>
+      <div class="kpis">
+        <div class="kpi-card"><div class="label">Gasto Total</div><div class="value">${formatCurrency(totals.spend, 'CLP')}</div></div>
+        <div class="kpi-card"><div class="label">Ingresos</div><div class="value" style="color:#16a34a">${formatCurrency(totals.revenue, 'CLP')}</div></div>
+        <div class="kpi-card"><div class="label">ROAS</div><div class="value" style="color:${overallRoas >= 3 ? '#16a34a' : overallRoas >= 2 ? '#ca8a04' : '#dc2626'}">${overallRoas.toFixed(2)}x</div></div>
+        <div class="kpi-card"><div class="label">Conversiones</div><div class="value">${formatNumber(totals.conversions)}</div><div class="sub">CPA: ${totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions, 'CLP') : '\u2014'} \u00b7 CTR: ${overallCtr.toFixed(2)}%</div></div>
+      </div>
+      ${alertsHtml}
+      ${platformComparison.length > 1 ? `<h2>Comparativo por Plataforma</h2><table><thead><tr><th>Plataforma</th><th>Gasto</th><th>Ingresos</th><th>ROAS</th><th>Conv.</th><th>CPA</th></tr></thead><tbody>${platformRows}</tbody></table>` : ''}
       <h2>Campa\u00f1as</h2>
       <table><thead><tr><th>Campa\u00f1a</th><th>Plataforma</th><th>Gasto</th><th>Ingresos</th><th>ROAS</th><th>Conv.</th><th>CPC</th><th>CTR</th></tr></thead>
       <tbody>${campaignRows}
-      <tr style="font-weight:bold"><td>TOTAL</td><td></td><td>${formatCurrency(totals.spend, 'CLP')}</td><td>${formatCurrency(totals.revenue, 'CLP')}</td><td>${overallRoas.toFixed(2)}x</td><td>${totals.conversions}</td><td>${totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks, 'CLP') : '-'}</td><td>${overallCtr.toFixed(2)}%</td></tr></tbody></table>
+      <tr style="font-weight:bold;background:#f1f5f9"><td>TOTAL</td><td></td><td>${formatCurrency(totals.spend, 'CLP')}</td><td>${formatCurrency(totals.revenue, 'CLP')}</td><td>${overallRoas.toFixed(2)}x</td><td>${totals.conversions}</td><td>${totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks, 'CLP') : '-'}</td><td>${overallCtr.toFixed(2)}%</td></tr></tbody></table>
       ${weeklyCohorts.length > 0 ? `<h2>An\u00e1lisis Semanal</h2><table><thead><tr><th>Semana</th><th>Gasto</th><th>Ingresos</th><th>ROAS</th><th>Conv.</th><th>CPA</th></tr></thead><tbody>${cohortRows}</tbody></table>` : ''}
+      ${monthlyCohorts.length > 1 ? `<h2>Cohort Mensual \u2014 Retenci\u00f3n y LTV</h2><table><thead><tr><th>Mes</th><th>Gasto</th><th>Ingresos</th><th>ROAS</th><th>Conv.</th><th>CPA</th><th>LTV/Conv</th><th>Ret.</th></tr></thead><tbody>${monthlyCohortRows}</tbody></table>` : ''}
+      <div class="footer">Generado por Steve \u00b7 ${new Date().toLocaleString('es-CL')} \u00b7 Datos de Meta Ads y Google Ads</div>
       </body></html>`);
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
@@ -1039,7 +1075,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sincronizar
           </Button>
-          {hasData && (
+          {hasData && (<>
             <Button variant="outline" size="sm" onClick={exportCSV}>
               <Download className="w-4 h-4 mr-2" />
               CSV
@@ -1056,7 +1092,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <LayoutDashboard className="w-4 h-4 mr-2" />
               {viewMode === 'executive' ? 'Vista Completa' : 'Resumen'}
             </Button>
-          )}
+          </>)}
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {lastSyncText && (
