@@ -1002,6 +1002,105 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         </CardContent>
       </Card>
 
+      {/* Top/Bottom 5 Campaigns by ROAS */}
+      {aggregatedCampaigns.length >= 2 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="border-green-500/15">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-green-500" />
+                Top 5 Campañas (ROAS)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {aggregatedCampaigns
+                .filter(c => c.avg_roas > 0)
+                .sort((a, b) => b.avg_roas - a.avg_roas)
+                .slice(0, 5)
+                .map((c, i) => (
+                  <div key={c.campaign_id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 truncate flex-1">
+                      <span className="text-xs text-muted-foreground w-4">{i + 1}.</span>
+                      <img src={c.platform === 'meta' ? logoMeta : logoGoogle} alt="" className="w-3.5 h-3.5" />
+                      <span className="truncate">{c.campaign_name}</span>
+                    </div>
+                    <span className="font-bold text-green-600 ml-2">{c.avg_roas.toFixed(2)}x</span>
+                  </div>
+                ))}
+              {aggregatedCampaigns.filter(c => c.avg_roas > 0).length === 0 && (
+                <p className="text-xs text-muted-foreground">Sin datos de ROAS</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="border-red-500/15">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingDown className="w-4 h-4 text-red-500" />
+                Bottom 5 Campañas (ROAS)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {aggregatedCampaigns
+                .filter(c => c.total_spend > 0)
+                .sort((a, b) => a.avg_roas - b.avg_roas)
+                .slice(0, 5)
+                .map((c, i) => (
+                  <div key={c.campaign_id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 truncate flex-1">
+                      <span className="text-xs text-muted-foreground w-4">{i + 1}.</span>
+                      <img src={c.platform === 'meta' ? logoMeta : logoGoogle} alt="" className="w-3.5 h-3.5" />
+                      <span className="truncate">{c.campaign_name}</span>
+                    </div>
+                    <span className={`font-bold ml-2 ${c.avg_roas < 1 ? 'text-red-500' : 'text-yellow-600'}`}>{c.avg_roas.toFixed(2)}x</span>
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Performance Heatmap by Day of Week */}
+      {dailyTrend.length > 6 && (() => {
+        const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const dayData = dayNames.map((name, dayIdx) => {
+          const daysOfWeek = dailyTrend.filter(d => new Date(d.date + 'T12:00:00').getDay() === dayIdx);
+          const avgSpend = daysOfWeek.length > 0 ? daysOfWeek.reduce((s, d) => s + d.spend, 0) / daysOfWeek.length : 0;
+          const avgConv = daysOfWeek.length > 0 ? daysOfWeek.reduce((s, d) => s + d.conversions, 0) / daysOfWeek.length : 0;
+          const avgRoas = avgSpend > 0 ? daysOfWeek.reduce((s, d) => s + d.revenue, 0) / daysOfWeek.reduce((s, d) => s + d.spend, 0) : 0;
+          return { name, spend: avgSpend, conversions: avgConv, roas: avgRoas, count: daysOfWeek.length };
+        });
+        const maxRoas = Math.max(...dayData.map(d => d.roas), 0.01);
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Performance por Día de la Semana</CardTitle>
+              <CardDescription>Promedio de ROAS, gasto y conversiones por día</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-7 gap-2">
+                {dayData.map(d => {
+                  const intensity = d.roas / maxRoas;
+                  const bg = intensity > 0.7 ? 'bg-green-500/20 border-green-500/30'
+                    : intensity > 0.4 ? 'bg-yellow-500/15 border-yellow-500/25'
+                    : d.count > 0 ? 'bg-red-500/10 border-red-500/20'
+                    : 'bg-muted/20 border-border';
+                  return (
+                    <div key={d.name} className={`rounded-lg border p-3 text-center ${bg}`}>
+                      <p className="text-xs font-medium text-muted-foreground">{d.name}</p>
+                      <p className={`text-lg font-bold mt-1 ${d.roas >= 2 ? 'text-green-600' : d.roas >= 1 ? 'text-yellow-600' : 'text-red-500'}`}>
+                        {d.roas.toFixed(1)}x
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{formatCurrency(d.spend, 'CLP')}</p>
+                      <p className="text-[10px] text-muted-foreground">{d.conversions.toFixed(1)} conv</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Spend vs Revenue Chart */}
       <Card>
         <CardHeader className="pb-2">
