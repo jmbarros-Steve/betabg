@@ -15,7 +15,7 @@ import {
   RefreshCw, TrendingUp, TrendingDown, DollarSign,
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
   BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
-  Clock, CheckCircle, PauseCircle, Calendar, Download, MousePointerClick, Bell
+  Clock, CheckCircle, PauseCircle, Calendar, Download, MousePointerClick, Bell, LayoutDashboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -165,6 +165,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [charlieActionLoading, setCharlieActionLoading] = useState(false);
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
+  const [viewMode, setViewMode] = useState<'full' | 'executive'>('full');
   const [metaAccountCurrency, setMetaAccountCurrency] = useState<string>('USD');
   const [dynamicClpRate, setDynamicClpRate] = useState<number>(950); // fetched from API
 
@@ -933,6 +934,14 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               <Download className="w-4 h-4 mr-2" />
               PDF
             </Button>
+            <Button
+              variant={viewMode === 'executive' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode(v => v === 'full' ? 'executive' : 'full')}
+            >
+              <LayoutDashboard className="w-4 h-4 mr-2" />
+              {viewMode === 'executive' ? 'Vista Completa' : 'Resumen'}
+            </Button>
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -961,6 +970,68 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       )}
 
       {hasData && <>
+
+      {/* Executive Summary View */}
+      {viewMode === 'executive' && (
+        <Card className="border-2 border-primary/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <LayoutDashboard className="w-5 h-5" />
+              Resumen Ejecutivo
+            </CardTitle>
+            <CardDescription>\u00daltimos {daysFromRange(dateRange)} d\u00edas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[
+                { label: 'Gasto Total', value: formatCurrency(totals.spend, 'CLP'), className: '' },
+                { label: 'Ingresos', value: formatCurrency(totals.revenue, 'CLP'), className: 'text-green-600' },
+                { label: 'ROAS', value: `${overallRoas.toFixed(2)}x`, className: overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500' },
+                { label: 'Conversiones', value: formatNumber(totals.conversions), className: '' },
+                { label: 'CPA', value: totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions, 'CLP') : '\u2014', className: '' },
+                { label: 'CTR', value: formatPercent(overallCtr), className: '' },
+              ].map(kpi => (
+                <div key={kpi.label} className="text-center p-4 rounded-lg bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
+                  <p className={`text-xl font-bold ${kpi.className}`}>{kpi.value}</p>
+                </div>
+              ))}
+            </div>
+            {dailyTrend.length > 1 && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Gasto vs Ingresos</p>
+                  <ResponsiveContainer width="100%" height={80}>
+                    <LineChart data={dailyTrend}>
+                      <Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={1.5} dot={false} />
+                      <Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={1.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Conversiones diarias</p>
+                  <ResponsiveContainer width="100%" height={80}>
+                    <LineChart data={dailyTrend}>
+                      <Line type="monotone" dataKey="conversions" stroke="#f59e0b" strokeWidth={1.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+            {smartAlerts.length > 0 && (
+              <div className="mt-4 space-y-1">
+                {smartAlerts.slice(0, 3).map((alert, i) => (
+                  <p key={i} className={`text-xs px-2 py-1 rounded ${alert.type === 'critical' ? 'bg-red-500/10 text-red-600' : 'bg-yellow-500/10 text-yellow-600'}`}>
+                    {alert.type === 'critical' ? '\u26a0\ufe0f' : '\u2139\ufe0f'} {alert.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {viewMode === 'full' && <>
       {/* Primary KPIs - large cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
@@ -1778,6 +1849,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           )}
         </TabsContent>
       </Tabs>
+      </>}{/* end viewMode full */}
       </>}
 
       {/* Charlie Scale Dialog */}
