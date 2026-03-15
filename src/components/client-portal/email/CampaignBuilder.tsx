@@ -18,7 +18,7 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
@@ -83,6 +83,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [editorDevice, setEditorDevice] = useState<'Desktop' | 'Mobile'>('Desktop');
 
   // A/B Testing (hidden behind advanced options)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -719,6 +720,47 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         {/* Step 2: Design (GrapeJS) */}
         {editorStep === 'design' && (
           <>
+            {/* Editor toolbar: device toggle + undo/redo */}
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-zinc-50 shrink-0">
+              <div className="flex items-center gap-1 border rounded-md p-0.5">
+                <Button
+                  size="sm"
+                  variant={editorDevice === 'Desktop' ? 'default' : 'ghost'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => { setEditorDevice('Desktop'); emailEditorRef.current?.setDevice('Desktop'); }}
+                >
+                  <Monitor className="w-3.5 h-3.5 mr-1" /> Desktop
+                </Button>
+                <Button
+                  size="sm"
+                  variant={editorDevice === 'Mobile' ? 'default' : 'ghost'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => { setEditorDevice('Mobile'); emailEditorRef.current?.setDevice('Mobile'); }}
+                >
+                  <Smartphone className="w-3.5 h-3.5 mr-1" /> Mobile
+                </Button>
+              </div>
+              <div className="w-px h-5 bg-zinc-200" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => emailEditorRef.current?.undo()}
+                title="Deshacer"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => emailEditorRef.current?.redo()}
+                title="Rehacer"
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+
             {/* GrapeJS editor */}
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">

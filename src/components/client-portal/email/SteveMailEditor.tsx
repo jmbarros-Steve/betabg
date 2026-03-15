@@ -11,6 +11,10 @@ export interface SteveMailEditorRef {
   getHtml(): string;
   getProjectData(): any;
   addComponents(html: string): void;
+  setDevice(device: 'Desktop' | 'Mobile'): void;
+  undo(): void;
+  redo(): void;
+  getEditor(): any;
 }
 
 interface SteveMailEditorProps {
@@ -67,6 +71,28 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         const editor = editorRef.current;
         if (!editor) return;
         editor.addComponents(html);
+      },
+
+      setDevice(device: 'Desktop' | 'Mobile') {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.setDevice(device);
+      },
+
+      undo() {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.UndoManager.undo();
+      },
+
+      redo() {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.UndoManager.redo();
+      },
+
+      getEditor() {
+        return editorRef.current;
       },
     }));
 
