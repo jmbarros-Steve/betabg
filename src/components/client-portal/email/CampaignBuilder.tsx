@@ -165,7 +165,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   useEffect(() => {
     if (!editorReady) return;
     if (designJson) {
-      emailEditorRef.current?.loadDesign(editingCampaign?.html_content || '', designJson);
+      if (typeof designJson === 'string') {
+        // GrapeJS HTML template
+        emailEditorRef.current?.loadDesign(designJson);
+      } else {
+        // Unlayer design_json
+        emailEditorRef.current?.loadDesign(editingCampaign?.html_content || '', designJson);
+      }
     } else if (editingCampaign?.html_content) {
       emailEditorRef.current?.loadDesign(editingCampaign.html_content);
     }
@@ -403,7 +409,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       setDesignJson(templateDesign);
       // Also load immediately if editor is already ready
       if (editorReady && emailEditorRef.current) {
-        emailEditorRef.current.loadDesign('', templateDesign);
+        if (typeof templateDesign === 'string') {
+          // GrapeJS HTML template — load as raw HTML
+          emailEditorRef.current.loadDesign(templateDesign);
+        } else {
+          // Unlayer design_json — load as project data
+          emailEditorRef.current.loadDesign('', templateDesign);
+        }
       }
     }
   };
