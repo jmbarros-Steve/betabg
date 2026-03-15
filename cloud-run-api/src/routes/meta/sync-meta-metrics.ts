@@ -381,19 +381,7 @@ export async function syncMetaMetrics(c: Context) {
 
     console.log(`Upserting ${metricsToUpsert.length} metrics (all converted to CLP)`);
 
-    // Always purge old metrics for this connection before upserting.
-    // This ensures data integrity when the ad account was changed --
-    // old campaigns have different IDs and won't be overwritten by upsert.
-    console.log(`Purging old platform_metrics for connection ${connection_id}`);
-    const { error: purgeError } = await supabase
-      .from('platform_metrics')
-      .delete()
-      .eq('connection_id', connection_id);
-    if (purgeError) {
-      console.error('Purge error:', purgeError);
-    }
-
-    // Upsert metrics in batches
+    // Upsert metrics (no pre-delete — avoids dashboard showing /bin/bash during sync)
     if (metricsToUpsert.length > 0) {
       const { error: upsertError } = await supabase
         .from('platform_metrics')
@@ -409,6 +397,18 @@ export async function syncMetaMetrics(c: Context) {
           500
         );
       }
+    }
+
+    // Clean up stale metrics from previously connected ad accounts
+    const syncedDates = [...new Set(metricsToUpsert.map(m => m.metric_date))];
+    const syncedTypes = [...new Set(metricsToUpsert.map(m => m.metric_type))];
+    if (syncedDates.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from('platform_metrics')
+        .delete()
+        .eq('connection_id', connection_id)
+        .not('metric_date', 'in', `(${syncedDates.join(',')})`);
+      if (cleanupError) console.error('Stale metric cleanup error:', cleanupError);
     }
 
     // Update last_sync_at

@@ -223,18 +223,6 @@ export async function syncCampaignMetrics(c: Context) {
 
     console.log(`Upserting ${campaignMetrics.length} campaign metric records (all in CLP)`);
 
-    // Always purge old campaign metrics for this connection before upserting.
-    // This ensures data integrity when the ad account was changed --
-    // old campaigns have different IDs and won't be overwritten by upsert.
-    console.log(`Purging old campaign_metrics for connection ${connection_id}`);
-    const { error: purgeError } = await supabase
-      .from('campaign_metrics')
-      .delete()
-      .eq('connection_id', connection_id);
-    if (purgeError) {
-      console.error('Purge error:', purgeError);
-    }
-
     if (campaignMetrics.length > 0) {
       // Upsert in batches of 100
       for (let i = 0; i < campaignMetrics.length; i += 100) {
@@ -284,6 +272,20 @@ export async function syncCampaignMetrics(c: Context) {
         }
         adsetsSynced = new Set(adsetMetrics.map(m => m.adset_id)).size;
         console.log(`[sync-campaign-metrics] Synced ${adsetsSynced} ad sets, ${adsetMetrics.length} records`);
+      }
+    }
+
+    // Clean up stale campaign metrics (e.g. from a previously connected ad account)
+    // Done AFTER upsert so the dashboard never shows /bin/bash during sync
+    const currentCampaignIds = [...new Set(campaignMetrics.map(m => m.campaign_id))];
+    if (currentCampaignIds.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from('campaign_metrics')
+        .delete()
+        .eq('connection_id', connection_id)
+        .not('campaign_id', 'in', `(${currentCampaignIds.join(',')})`);
+      if (cleanupError) {
+        console.error('Stale metric cleanup error:', cleanupError);
       }
     }
 
