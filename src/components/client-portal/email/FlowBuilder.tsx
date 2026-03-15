@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import {
   GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowLeft,
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Settings2,
+  Cake, Eye, Search,
 } from 'lucide-react';
 import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
@@ -110,6 +111,61 @@ const TRIGGER_CONFIG: Record<string, {
     defaultSteps: 3,
     defaultDelays: [0, 604800, 1209600],
   },
+  birthday: {
+    label: 'Cumpleaños',
+    description: 'Envia un email especial cuando un suscriptor cumple años',
+    icon: Cake,
+    defaultName: 'Feliz cumpleaños',
+    defaultSteps: 2,
+    defaultDelays: [0, 86400],
+  },
+  browse_abandonment: {
+    label: 'Navegación abandonada',
+    description: 'Se activa cuando un visitante ve productos pero no agrega al carrito',
+    icon: Search,
+    defaultName: 'Navegación abandonada',
+    defaultSteps: 2,
+    defaultDelays: [3600, 86400],
+  },
+};
+
+// ── Trigger-specific settings definitions ─────────────────────
+const TRIGGER_SETTINGS: Record<string, { key: string; label: string; type: 'number' | 'select'; unit?: string; options?: { value: string; label: string }[]; defaultValue: string | number }[]> = {
+  abandoned_cart: [
+    { key: 'wait_minutes', label: 'Esperar antes de enviar', type: 'select', options: [
+      { value: '30', label: '30 minutos' }, { value: '60', label: '1 hora' }, { value: '120', label: '2 horas' },
+      { value: '240', label: '4 horas' }, { value: '720', label: '12 horas' }, { value: '1440', label: '24 horas' },
+    ], defaultValue: '60' },
+    { key: 'min_cart_value', label: 'Valor mínimo del carrito ($)', type: 'number', defaultValue: 0 },
+  ],
+  winback: [
+    { key: 'inactivity_days', label: 'Días sin comprar', type: 'select', options: [
+      { value: '30', label: '30 días' }, { value: '60', label: '60 días' }, { value: '90', label: '90 días' },
+      { value: '120', label: '120 días' }, { value: '180', label: '6 meses' }, { value: '365', label: '1 año' },
+    ], defaultValue: '90' },
+  ],
+  birthday: [
+    { key: 'days_before', label: 'Enviar antes del cumpleaños', type: 'select', options: [
+      { value: '0', label: 'El mismo día' }, { value: '1', label: '1 día antes' },
+      { value: '3', label: '3 días antes' }, { value: '7', label: '1 semana antes' },
+    ], defaultValue: '0' },
+    { key: 'include_discount', label: 'Incluir descuento', type: 'select', options: [
+      { value: 'none', label: 'Sin descuento' }, { value: '10', label: '10% descuento' },
+      { value: '15', label: '15% descuento' }, { value: '20', label: '20% descuento' },
+    ], defaultValue: 'none' },
+  ],
+  browse_abandonment: [
+    { key: 'min_products_viewed', label: 'Mínimo de productos vistos', type: 'number', defaultValue: 2 },
+    { key: 'wait_minutes', label: 'Esperar antes de enviar', type: 'select', options: [
+      { value: '30', label: '30 minutos' }, { value: '60', label: '1 hora' }, { value: '120', label: '2 horas' },
+      { value: '240', label: '4 horas' },
+    ], defaultValue: '60' },
+  ],
+  post_purchase: [
+    { key: 'exclude_repeat', label: 'Excluir compradores recurrentes', type: 'select', options: [
+      { value: 'false', label: 'No' }, { value: 'true', label: 'Sí' },
+    ], defaultValue: 'false' },
+  ],
 };
 
 export function FlowBuilder({ clientId }: FlowBuilderProps) {
@@ -454,6 +510,83 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               {editingFlow.trigger_type && (
                 <p className="text-xs text-muted-foreground">{TRIGGER_CONFIG[editingFlow.trigger_type]?.description}</p>
               )}
+              {/* Trigger-specific settings */}
+              {editingFlow.trigger_type && TRIGGER_SETTINGS[editingFlow.trigger_type] && (
+                <div className="border-t pt-3 mt-2">
+                  <p className="text-xs font-medium mb-2">Configuración del trigger</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {TRIGGER_SETTINGS[editingFlow.trigger_type].map((setting) => (
+                      <div key={setting.key}>
+                        <Label className="text-xs">{setting.label}</Label>
+                        {setting.type === 'select' ? (
+                          <Select
+                            value={String(editingFlow.settings?.trigger_config?.[setting.key] ?? setting.defaultValue)}
+                            onValueChange={(v) => setEditingFlow(prev => prev ? {
+                              ...prev, settings: {
+                                ...prev.settings,
+                                trigger_config: { ...prev.settings?.trigger_config, [setting.key]: v },
+                              },
+                            } : prev)}
+                          >
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {setting.options?.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            type="number"
+                            className="h-8 text-sm"
+                            value={editingFlow.settings?.trigger_config?.[setting.key] ?? setting.defaultValue}
+                            onChange={(e) => setEditingFlow(prev => prev ? {
+                              ...prev, settings: {
+                                ...prev.settings,
+                                trigger_config: { ...prev.settings?.trigger_config, [setting.key]: e.target.value },
+                              },
+                            } : prev)}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 border-t pt-3">
+                <div>
+                  <Label className="text-xs">Horas silenciosas (inicio)</Label>
+                  <Select
+                    value={editingFlow.settings?.quiet_hours_start || '22'}
+                    onValueChange={(v) => setEditingFlow(prev => prev ? {
+                      ...prev, settings: { ...prev.settings, quiet_hours_start: v },
+                    } : prev)}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Horas silenciosas (fin)</Label>
+                  <Select
+                    value={editingFlow.settings?.quiet_hours_end || '8'}
+                    onValueChange={(v) => setEditingFlow(prev => prev ? {
+                      ...prev, settings: { ...prev.settings, quiet_hours_end: v },
+                    } : prev)}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </div>
         )}

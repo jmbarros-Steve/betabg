@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Mail, Clock, GitBranch, Plus, Trash2, Eye, Edit,
   ShoppingCart, UserPlus, Package, UserX, Zap, ChevronDown,
+  Cake, Search,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -53,6 +54,8 @@ const TRIGGER_ICONS: Record<string, any> = {
   first_purchase: Package,
   post_purchase: Package,
   winback: UserX,
+  birthday: Cake,
+  browse_abandonment: Search,
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -62,6 +65,8 @@ const TRIGGER_LABELS: Record<string, string> = {
   first_purchase: 'Primera compra',
   post_purchase: 'Post-compra',
   winback: 'Cliente inactivo',
+  birthday: 'Cumpleaños',
+  browse_abandonment: 'Navegación abandonada',
 };
 
 const CONDITION_TYPES = [
