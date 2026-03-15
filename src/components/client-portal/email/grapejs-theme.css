@@ -33,49 +33,48 @@
   overflow: hidden;
 }
 
-/* Fix main layout: canvas takes full height, sidebar on right */
+/* ── Clean layout: canvas fills space, blocks sidebar on right ── */
+
+/* Hide default GrapeJS top panels — we have our own toolbar */
+.gjs-pn-commands,
+.gjs-pn-options,
+.gjs-pn-devices-c,
+.gjs-pn-views {
+  display: none !important;
+}
+
+/* Editor takes full height */
+.gjs-editor {
+  position: relative;
+  height: 100% !important;
+}
+
+/* Editor row: horizontal layout */
 .gjs-editor-row {
-  display: flex;
-  justify-content: flex-start;
-  align-items: stretch;
-  flex-wrap: nowrap;
-  height: 100%;
+  display: flex !important;
+  flex-direction: row !important;
+  height: 100% !important;
+  overflow: hidden;
 }
 
-/* Canvas fills available space */
+/* Canvas takes most of the space */
 .gjs-editor-row .gjs-cv-canvas {
-  flex: 1;
-  min-width: 0;
+  flex: 1 !important;
+  height: 100% !important;
+  width: auto !important;
+  position: relative !important;
 }
 
-/* Right sidebar (panels container) — fixed width */
-.gjs-editor-row .gjs-pn-views-container {
-  width: 260px;
-  min-width: 260px;
-  overflow-y: auto;
-  background-color: #18181b;
-  border-left: 1px solid #27272a;
-}
-
-/* Ensure panels column doesn't collapse */
-.gjs-pn-views-container .gjs-pn-views {
-  display: flex;
-}
-
-/* Left toolbar — vertical icon bar */
-.gjs-pn-commands {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 40px;
-  flex-direction: column;
-  z-index: 3;
-  background-color: #18181b;
-  border-right: 1px solid #27272a;
-  display: flex;
-  align-items: center;
-  padding: 4px 0;
+/* Right sidebar — blocks/traits/styles panel container */
+.gjs-pn-views-container {
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  background-color: #18181b !important;
+  border-left: 1px solid #27272a !important;
+  display: block !important;
 }
 
 /* ============================================================

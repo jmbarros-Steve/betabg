@@ -1,0 +1,138 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - list
+    - region "Notifications alt+T"
+    - generic:
+      - banner:
+        - generic:
+          - generic:
+            - img
+            - generic:
+              - generic:
+                - paragraph: Patricio Correa
+              - paragraph: Jardin de Eva
+          - generic:
+            - generic: Portal Cliente
+            - button:
+              - img
+      - generic:
+        - generic:
+          - button:
+            - img
+            - text: Steve
+          - button:
+            - img
+            - text: Brief
+          - button:
+            - img
+            - text: Métricas
+          - button:
+            - img
+            - text: Conexiones
+          - button:
+            - img
+            - text: Configuración
+          - button:
+            - text: Steve Mail
+            - img
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=4]: Setup del portal
+              - generic: 2/5
+              - progressbar
+            - generic:
+              - button:
+                - img
+              - button:
+                - img
+          - generic:
+            - button [disabled]:
+              - img
+              - generic: Conectar Shopify
+              - generic: (completado)
+            - button:
+              - img
+              - generic: Conectar Meta
+              - generic: (pendiente)
+            - button:
+              - img
+              - generic: Conectar Google Ads
+              - generic: (pendiente)
+            - button:
+              - img
+              - generic: Completar Brand Brief
+              - generic: (pendiente)
+            - button [disabled]:
+              - img
+              - generic: Configurar finanzas
+              - generic: (completado)
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=2]: Steve Mail
+                    - paragraph: Email marketing para tu tienda
+                  - button [expanded]:
+                    - img
+                - generic:
+                  - tablist:
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Campañas
+                        - generic: Envía emails a tu audiencia
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Contactos
+                        - generic: Tu lista de suscriptores
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Automatizaciones
+                        - generic: Emails automáticos
+                    - tab:
+                      - img
+                      - generic:
+                        - generic: Formularios
+                        - generic: Captura nuevos contactos
+                    - tab [selected]:
+                      - img
+                      - generic:
+                        - generic: Rendimiento
+                        - generic: Métricas y resultados
+                  - tabpanel:
+                    - generic:
+                      - generic:
+                        - img
+                        - paragraph: Aún no has enviado campañas. Los resultados aparecerán aquí después de tu primer envío.
+      - generic:
+        - generic:
+          - button:
+            - img
+      - generic:
+        - button:
+          - generic:
+            - img
+        - status
+  - dialog "Configuración" [ref=e2]:
+    - heading "Configuración" [level=2] [ref=e4]
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - heading "Configurar dominio de envío" [level=3] [ref=e8]
+        - paragraph [ref=e9]: "Envía emails desde tu propio dominio (ej: info@tutienda.com)"
+      - generic [ref=e10]:
+        - text: "Paso 1: Tu dominio"
+        - generic [ref=e11]:
+          - textbox "tutienda.com" [ref=e13]
+          - button "Verificar" [disabled]
+    - button "Close" [active] [ref=e14] [cursor=pointer]:
+      - img [ref=e15]
+      - generic [ref=e18]: Close
+```
