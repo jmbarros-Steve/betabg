@@ -118,58 +118,62 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         const el = containerRef.current;
         if (!el) { onReady?.(); return; }
 
-        // Force layout: canvas left, sidebar right (override GrapeJS inline styles)
+        const SIDEBAR_W = 220;
+
         const forceLayout = () => {
+          const rect = el.getBoundingClientRect();
+          const editorEl = el.querySelector('.gjs-editor') as HTMLElement;
           const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
           const views = el.querySelector('.gjs-pn-views') as HTMLElement;
           const viewsCont = el.querySelector('.gjs-pn-views-container') as HTMLElement;
-          const editorEl = el.querySelector('.gjs-editor') as HTMLElement;
+          const canvasW = rect.width - SIDEBAR_W;
+          const canvasH = rect.height;
 
           if (editorEl) {
-            editorEl.style.cssText = 'position:relative;height:100%;overflow:hidden;';
+            editorEl.style.cssText = `position:relative;width:${rect.width}px;height:${rect.height}px;overflow:hidden;`;
           }
-
           // Hide default command/option panels
           el.querySelectorAll('.gjs-pn-commands, .gjs-pn-options, .gjs-pn-devices-c').forEach((p) => {
-            (p as HTMLElement).style.cssText = 'display:none;height:0;';
+            (p as HTMLElement).style.cssText = 'display:none !important;height:0 !important;';
           });
-
           if (canvas) {
-            canvas.style.cssText = 'position:absolute;top:0;left:0;right:220px;bottom:0;width:auto;height:auto;background-color:#f4f4f5;';
+            canvas.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;background-color:#f4f4f5;`;
           }
           if (views) {
-            views.style.cssText = 'position:absolute;top:0;right:0;width:220px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;';
+            views.style.cssText = `position:absolute;top:0;left:${canvasW}px;width:${SIDEBAR_W}px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;`;
           }
           if (viewsCont) {
-            viewsCont.style.cssText = 'position:absolute;top:40px;right:0;bottom:0;width:220px;overflow-y:auto;z-index:5;background-color:#18181b;';
+            viewsCont.style.cssText = `position:absolute;top:40px;left:${canvasW}px;width:${SIDEBAR_W}px;height:${canvasH - 40}px;overflow-y:auto;z-index:5;background-color:#18181b;`;
           }
         };
 
-        // Apply layout immediately and after a short delay (GrapeJS recalculates)
-        forceLayout();
+        // Apply layout, open blocks, then refresh so GrapeJS recalculates iframe
         setTimeout(() => {
           forceLayout();
-          // Open blocks panel
+          // Open blocks panel (last view tab)
           const viewBtns = el.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
           if (viewBtns.length > 0) {
             (viewBtns[viewBtns.length - 1] as HTMLElement).click();
           }
+          // Refresh recalculates iframe to fit canvas
           editor.refresh();
-          // Apply once more after refresh recalculates
-          setTimeout(forceLayout, 200);
-        }, 300);
-
-        // MutationObserver to re-apply layout when GrapeJS recalculates
-        const observer = new MutationObserver(() => {
-          const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
-          if (canvas && canvas.style.height !== 'auto') {
+          // Re-apply layout after refresh (in case GrapeJS overrode our styles)
+          requestAnimationFrame(() => {
             forceLayout();
-          }
-        });
-        const gjsEditor = el.querySelector('.gjs-editor');
-        if (gjsEditor) {
-          observer.observe(gjsEditor, { attributes: true, subtree: true, attributeFilter: ['style'] });
-        }
+            editor.refresh();
+          });
+        }, 100);
+
+        // Re-apply on window resize
+        const onResize = () => { forceLayout(); editor.refresh(); };
+        window.addEventListener('resize', onResize);
+
+        // Store cleanup ref
+        const origDestroy = editor.destroy.bind(editor);
+        editor.destroy = () => {
+          window.removeEventListener('resize', onResize);
+          origDestroy();
+        };
 
         onReady?.();
       });
