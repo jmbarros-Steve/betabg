@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import EmailEditor, { EditorRef } from 'react-email-editor';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +13,7 @@ import {
   GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowDown,
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Eye, Bell, TrendingDown, Split,
 } from 'lucide-react';
-import { getSteveMailEditorOptions, registerSteveMailTools, type ShopifyProduct } from './steveMailEditorConfig';
-import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
+import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 
@@ -144,28 +142,11 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const [showEditor, setShowEditor] = useState(false);
   const [editingFlow, setEditingFlow] = useState<Partial<Flow> | null>(null);
 
-  // Unlayer for individual email editing
+  // GrapeJS for individual email editing
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
-  const emailEditorRef = useRef<EditorRef>(null);
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const emailEditorRef = useRef<SteveMailEditorRef>(null);
   const [editorReady, setEditorReady] = useState(false);
-  const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
-
-  // Load Shopify products for custom tool previews
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await callApi<any>('email-product-recommendations', {
-          body: { action: 'list_products', client_id: clientId },
-        });
-        if (data?.products) setShopifyProducts(data.products);
-      } catch { /* optional */ }
-    })();
-  }, [clientId]);
-
-  // Memoize Unlayer options to prevent editor re-creation on every render
-  const editorOptions = useMemo(() => getSteveMailEditorOptions(), []);
 
   // AI generation
   const [generating, setGenerating] = useState(false);
@@ -192,18 +173,6 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   }, [clientId]);
 
   useEffect(() => { loadFlows(); }, [loadFlows]);
-
-  // Force Unlayer inner divs to fill container height
-  useEffect(() => {
-    if (!editorReady || !editorContainerRef.current) return;
-    const container = editorContainerRef.current;
-    const root = container.querySelector(':scope > div');
-    if (root instanceof HTMLElement) {
-      root.style.height = '100%';
-      const inner = root.querySelector(':scope > div');
-      if (inner instanceof HTMLElement) inner.style.height = '100%';
-    }
-  }, [editorReady]);
 
   const handleGenerateFlowWithAI = async (triggerType: string) => {
     setGenerating(true);
@@ -369,24 +338,21 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     setEditingFlow({ ...editingFlow, steps });
   };
 
-  const openStepInUnlayer = (index: number) => {
+  const openStepInEditor = (index: number) => {
     setEditingStepIndex(index);
     setEditorReady(false);
     setShowEmailEditor(true);
   };
 
-  const saveStepFromUnlayer = () => {
-    const editor = emailEditorRef.current?.editor;
-    if (!editor || editingStepIndex === null) return;
+  const saveStepFromEditor = () => {
+    if (!emailEditorRef.current || editingStepIndex === null) return;
 
-    editor.saveDesign((design: any) => {
-      editor.exportHtml(({ html }: { html: string }) => {
-        updateStep(editingStepIndex, { html_content: html, design_json: design });
-        setShowEmailEditor(false);
-        setEditingStepIndex(null);
-        toast.success('Email guardado');
-      });
-    });
+    const html = emailEditorRef.current.getHtml();
+    const projectData = emailEditorRef.current.getProjectData();
+    updateStep(editingStepIndex, { html_content: html, design_json: projectData });
+    setShowEmailEditor(false);
+    setEditingStepIndex(null);
+    toast.success('Email guardado');
   };
 
   const statusConfig: Record<string, { label: string; color: string }> = {
@@ -403,7 +369,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     return `${Math.round(seconds / 86400)} días`;
   };
 
-  // =============== UNLAYER EMAIL EDITOR (FULLSCREEN) ===============
+  // =============== GRAPEJS EMAIL EDITOR (FULLSCREEN) ===============
   if (showEmailEditor && editingStepIndex !== null) {
     const currentStep = editingFlow?.steps?.[editingStepIndex];
 
@@ -418,7 +384,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               Email {editingStepIndex + 1}: {currentStep?.subject || 'Sin asunto'}
             </span>
           </div>
-          <Button size="sm" onClick={saveStepFromUnlayer}>
+          <Button size="sm" onClick={saveStepFromEditor}>
             <Save className="w-4 h-4 mr-1" /> Guardar Email
           </Button>
         </div>
@@ -453,26 +419,17 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         </div>
 
         <div className="flex-1 min-h-0 relative">
-          <div ref={editorContainerRef} className="absolute inset-0">
-            <EmailEditor
+          <div className="absolute inset-0">
+            <SteveMailEditor
               ref={emailEditorRef}
               onReady={() => {
                 setEditorReady(true);
-                // Register Steve custom tools
-                const editor = emailEditorRef.current?.editor;
-                if (editor) {
-                  registerSteveMailTools(editor, shopifyProducts);
-                }
                 // Load existing design
                 const step = editingFlow?.steps?.[editingStepIndex];
-                if (step?.design_json) {
-                  emailEditorRef.current?.editor?.loadDesign(step.design_json as any);
-                } else if (step?.html_content) {
-                  const design = htmlToUnlayerDesign(step.html_content);
-                  emailEditorRef.current?.editor?.loadDesign(design as any);
+                if (step?.html_content || step?.design_json) {
+                  emailEditorRef.current?.loadDesign(step.html_content || '', step.design_json);
                 }
               }}
-              options={editorOptions}
               style={{ height: '100%' }}
             />
           </div>
@@ -486,10 +443,12 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           onSelect={(design) => {
             setShowTemplateGallery(false);
             if (design) {
-              // Wait for editor to be ready if it isn't yet
+              // For template gallery, load the design HTML
               const tryLoad = () => {
-                if (emailEditorRef.current?.editor) {
-                  emailEditorRef.current.editor.loadDesign(design);
+                if (emailEditorRef.current) {
+                  // design may be HTML string or a project object with html
+                  const htmlContent = typeof design === 'string' ? design : (design as any).html || '';
+                  emailEditorRef.current.loadDesign(htmlContent);
                 } else {
                   setTimeout(tryLoad, 200);
                 }
@@ -502,7 +461,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         {/* Universal Blocks Panel */}
         <UniversalBlocksPanel
           clientId={clientId}
-          editor={emailEditorRef.current?.editor}
+          editor={emailEditorRef.current}
           isOpen={showUniversalBlocks}
           onClose={() => setShowUniversalBlocks(false)}
         />
@@ -816,7 +775,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                               variant="outline"
                               size="sm"
                               className="w-full"
-                              onClick={() => openStepInUnlayer(index)}
+                              onClick={() => openStepInEditor(index)}
                             >
                               <Edit className="w-3.5 h-3.5 mr-1.5" />
                               {step.html_content ? 'Editar en Editor Visual' : 'Diseñar Email'}

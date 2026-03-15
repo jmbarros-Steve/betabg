@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import EmailEditor, { EditorRef } from 'react-email-editor';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,6 @@ import {
   Send, Plus, Edit, Trash2, Clock, Play, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck, Filter,
 } from 'lucide-react';
-import { getSteveMailEditorOptions, registerSteveMailTools, type ShopifyProduct } from './steveMailEditorConfig';
-import { htmlToUnlayerDesign, type UnlayerDesignJson } from '@/components/client-portal/klaviyo/htmlToUnlayerDesign';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
@@ -70,11 +68,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign> | null>(null);
   const [editorStep, setEditorStep] = useState<'setup' | 'design' | 'review'>('setup');
 
-  // Unlayer
-  const emailEditorRef = useRef<EditorRef>(null);
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  // GrapeJS editor
+  const emailEditorRef = useRef<SteveMailEditorRef>(null);
   const [editorReady, setEditorReady] = useState(false);
-  const [designJson, setDesignJson] = useState<UnlayerDesignJson | null>(null);
+  const [designJson, setDesignJson] = useState<any>(null);
 
   // AI generation
   const [generating, setGenerating] = useState(false);
@@ -106,15 +103,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
-  const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
-
-  // Memoize Unlayer options to prevent editor re-creation on every render
-  const editorOptions = useMemo(
-    () => getSteveMailEditorOptions({
-      designTags: Object.keys(brandInfo).length > 0 ? brandInfo : undefined,
-    }),
-    [brandInfo]
-  );
 
   // Send confirmation
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -161,18 +149,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     })();
   }, [clientId]);
 
-  // Load Shopify products for custom tool previews
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await callApi<any>('email-product-recommendations', {
-          body: { action: 'list_products', client_id: clientId },
-        });
-        if (data?.products) setShopifyProducts(data.products);
-      } catch { /* Products are optional for editor preview */ }
-    })();
-  }, [clientId]);
-
   // Close sub-dialogs when editor closes to prevent orphan Radix portals
   useEffect(() => {
     if (!showEditor) {
@@ -184,24 +160,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   }, [showEditor]);
 
-  // Force Unlayer inner divs to fill container height
+  // Load design when editor becomes ready or designJson/editingCampaign changes
   useEffect(() => {
-    if (!editorReady || !editorContainerRef.current) return;
-    const container = editorContainerRef.current;
-    const root = container.querySelector(':scope > div');
-    if (root instanceof HTMLElement) {
-      root.style.height = '100%';
-      const inner = root.querySelector(':scope > div');
-      if (inner instanceof HTMLElement) inner.style.height = '100%';
+    if (!editorReady) return;
+    if (designJson) {
+      emailEditorRef.current?.loadDesign(editingCampaign?.html_content || '', designJson);
+    } else if (editingCampaign?.html_content) {
+      emailEditorRef.current?.loadDesign(editingCampaign.html_content);
     }
-  }, [editorReady]);
-
-  // Load design when editor becomes ready or designJson changes
-  useEffect(() => {
-    if (editorReady && designJson) {
-      emailEditorRef.current?.editor?.loadDesign(designJson as any);
-    }
-  }, [editorReady, designJson]);
+  }, [editorReady, designJson, editingCampaign?.html_content]);
 
   const handleGenerateWithAI = async () => {
     setGenerating(true);
@@ -228,11 +195,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         html_content: html,
       }));
 
-      // Convert to Unlayer design and load
-      const design = htmlToUnlayerDesign(html);
-      setDesignJson(design);
+      // Load HTML into GrapeJS editor
+      setDesignJson(null);
       if (editorReady) {
-        emailEditorRef.current?.editor?.loadDesign(design as any);
+        emailEditorRef.current?.loadDesign(html);
       }
 
       toast.success('Email generado con Steve AI');
@@ -243,32 +209,26 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   };
 
-  const exportEditorHtml = (): Promise<{ html: string; design: any }> => {
-    return new Promise((resolve) => {
-      const editor = emailEditorRef.current?.editor;
-      if (!editor) {
-        resolve({ html: editingCampaign?.html_content || '', design: designJson });
-        return;
-      }
-      editor.saveDesign((design: any) => {
-        editor.exportHtml(({ html }: { html: string }) => {
-          // Embed conditional block conditions into the HTML body
-          let finalHtml = html;
-          if (blockConditions.length > 0) {
-            const condAttr = serializeConditionsToAttr(blockConditions);
-            // Wrap the <body> content in a conditional div
-            finalHtml = finalHtml.replace(
-              /(<body[^>]*>)/i,
-              `$1<div ${condAttr}>`
-            ).replace(
-              /(<\/body>)/i,
-              '</div>$1'
-            );
-          }
-          resolve({ html: finalHtml, design });
-        });
-      });
-    });
+  const exportEditorHtml = (): { html: string; design: any } => {
+    const editorRef = emailEditorRef.current;
+    if (!editorRef) {
+      return { html: editingCampaign?.html_content || '', design: designJson };
+    }
+    let html = editorRef.getHtml() || '';
+    const design = editorRef.getProjectData();
+
+    // Embed conditional block conditions into the HTML body
+    if (blockConditions.length > 0) {
+      const condAttr = serializeConditionsToAttr(blockConditions);
+      html = html.replace(
+        /(<body[^>]*>)/i,
+        `$1<div ${condAttr}>`
+      ).replace(
+        /(<\/body>)/i,
+        '</div>$1'
+      );
+    }
+    return { html, design };
   };
 
   const handleSaveCampaign = async () => {
@@ -277,9 +237,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     let htmlContent = editingCampaign.html_content || '';
     let savedDesign = designJson;
 
-    // If on design step, export from Unlayer
+    // If on design step, export from GrapeJS
     if (editorStep === 'design' || editorStep === 'review') {
-      const { html, design } = await exportEditorHtml();
+      const { html, design } = exportEditorHtml();
       htmlContent = html;
       savedDesign = design;
     }
@@ -405,7 +365,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       audience_filter: {},
     };
     setEditingCampaign(c);
-    setDesignJson(campaign?.design_json ? campaign.design_json : campaign?.html_content ? htmlToUnlayerDesign(campaign.html_content) : null);
+    setDesignJson(campaign?.design_json || null);
     setEditorStep('setup');
     setEditorReady(false);
     setCampaignType('promotional');
@@ -428,8 +388,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       // Store in state — useEffect will load when editor is ready
       setDesignJson(templateDesign);
       // Also load immediately if editor is already ready
-      if (editorReady && emailEditorRef.current?.editor) {
-        emailEditorRef.current.editor.loadDesign(templateDesign);
+      if (editorReady && emailEditorRef.current) {
+        emailEditorRef.current.loadDesign('', templateDesign);
       }
     }
   };
@@ -473,8 +433,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return result;
   };
 
-  const goToReviewStep = async () => {
-    const { html, design } = await exportEditorHtml();
+  const goToReviewStep = () => {
+    const { html, design } = exportEditorHtml();
     setEditingCampaign(prev => ({ ...prev, html_content: html }));
     setDesignJson(design);
     setPreviewHtml(replaceMergeTagsForPreview(html));
@@ -767,7 +727,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </div>
         )}
 
-        {/* Step: Design (Unlayer) */}
+        {/* Step: Design (GrapeJS) */}
         {editorStep === 'design' && (
           <>
             {/* Subject bar */}
@@ -813,20 +773,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </Button>
             </div>
 
-            {/* Unlayer editor */}
+            {/* GrapeJS editor */}
             <div className="flex-1 min-h-0 relative">
-              <div ref={editorContainerRef} className="absolute inset-0">
-                <EmailEditor
+              <div className="absolute inset-0">
+                <SteveMailEditor
                   ref={emailEditorRef}
-                  onReady={() => {
-                    setEditorReady(true);
-                    // Register Steve custom tools (Productos, Descuento, Countdown, Boton)
-                    const editor = emailEditorRef.current?.editor;
-                    if (editor) {
-                      registerSteveMailTools(editor, shopifyProducts);
-                    }
-                  }}
-                  options={editorOptions}
+                  onReady={() => setEditorReady(true)}
                   style={{ height: '100%' }}
                 />
               </div>
@@ -843,7 +795,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             {/* Universal Blocks Panel */}
             <UniversalBlocksPanel
               clientId={clientId}
-              editor={emailEditorRef.current?.editor}
+              editor={emailEditorRef.current}
               isOpen={showUniversalBlocks}
               onClose={() => setShowUniversalBlocks(false)}
             />
@@ -854,49 +806,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               isOpen={showImageEditor}
               onClose={() => setShowImageEditor(false)}
               onImageReady={(url) => {
-                const editor = emailEditorRef.current?.editor;
-                if (!editor) {
+                if (!emailEditorRef.current) {
                   toast.info('Copia la URL: ' + url);
                   return;
                 }
-                editor.saveDesign((design: any) => {
-                  const ts = Date.now();
-                  const newRow = {
-                    id: `ai_img_row_${ts}`,
-                    cells: [1],
-                    columns: [{
-                      id: `ai_img_col_${ts}`,
-                      contents: [{
-                        type: 'image',
-                        values: {
-                          containerPadding: '10px',
-                          anchor: '',
-                          src: { url, width: 600, height: 300, autoWidth: true },
-                          textAlign: 'center',
-                          altText: 'Imagen editada',
-                          action: { name: 'web', values: { href: '', target: '_blank' } },
-                          hideDesktop: false,
-                          displayCondition: null,
-                          _meta: { htmlID: `u_ai_img_${ts}`, htmlClassNames: 'u_content_image' },
-                          selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
-                        },
-                      }],
-                      values: { _meta: { htmlID: `u_ai_col_${ts}`, htmlClassNames: 'u_column' } },
-                    }],
-                    values: {
-                      displayCondition: null, columns: false, backgroundColor: '', columnsBackgroundColor: '',
-                      backgroundImage: { url: '', fullWidth: true, repeat: 'no-repeat', size: 'custom', position: 'center' },
-                      padding: '0px', anchor: '', hideDesktop: false,
-                      _meta: { htmlID: `u_ai_row_${ts}`, htmlClassNames: 'u_row' },
-                      selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
-                    },
-                  };
-                  design.body.rows.push(newRow);
-                  design.counters.u_row = (design.counters.u_row || 1) + 1;
-                  design.counters.u_content_image = (design.counters.u_content_image || 1) + 1;
-                  editor.loadDesign(design);
-                  toast.success('Imagen insertada al final del email');
-                });
+                const imgHtml = `<div style="text-align:center;padding:10px;"><img src="${url}" alt="Imagen editada" style="max-width:100%;width:600px;" /></div>`;
+                emailEditorRef.current.addComponents(imgHtml);
+                toast.success('Imagen insertada al final del email');
               }}
               brandColor={brandInfo.brand_color}
               brandSecondaryColor={brandInfo.brand_secondary_color}
@@ -908,41 +824,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               isOpen={showProductPanel}
               onClose={() => setShowProductPanel(false)}
               onInsert={(html) => {
-                const editor = emailEditorRef.current?.editor;
-                if (!editor) return;
-                editor.saveDesign((design: any) => {
-                  const ts = Date.now();
-                  const newRow = {
-                    id: `prod_row_${ts}`,
-                    cells: [1],
-                    columns: [{
-                      id: `prod_col_${ts}`,
-                      contents: [{
-                        type: 'html',
-                        values: {
-                          containerPadding: '0px',
-                          anchor: '',
-                          html,
-                          hideDesktop: false,
-                          displayCondition: null,
-                          _meta: { htmlID: `u_prod_html_${ts}`, htmlClassNames: 'u_content_html' },
-                          selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
-                        },
-                      }],
-                      values: { _meta: { htmlID: `u_prod_col_${ts}`, htmlClassNames: 'u_column' } },
-                    }],
-                    values: {
-                      displayCondition: null, columns: false, backgroundColor: '', columnsBackgroundColor: '',
-                      backgroundImage: { url: '', fullWidth: true, repeat: 'no-repeat', size: 'custom', position: 'center' },
-                      padding: '0px', anchor: '', hideDesktop: false,
-                      _meta: { htmlID: `u_prod_row_${ts}`, htmlClassNames: 'u_row' },
-                      selectable: true, draggable: true, duplicatable: true, deletable: true, hideable: true,
-                    },
-                  };
-                  design.body.rows.push(newRow);
-                  design.counters.u_row = (design.counters.u_row || 1) + 1;
-                  editor.loadDesign(design);
-                });
+                if (!emailEditorRef.current) return;
+                emailEditorRef.current.addComponents(html);
               }}
             />
 

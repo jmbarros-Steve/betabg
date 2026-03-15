@@ -34,6 +34,7 @@ import {
   Calendar,
   Package,
 } from 'lucide-react';
+import { type SteveMailEditorRef } from './SteveMailEditor';
 
 interface UniversalBlock {
   id: string;
@@ -46,7 +47,7 @@ interface UniversalBlock {
 
 interface UniversalBlocksPanelProps {
   clientId: string;
-  editor: any;
+  editor: SteveMailEditorRef | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -120,15 +121,10 @@ export function UniversalBlocksPanel({
 
     setSaving(true);
     try {
-      const designJson = await new Promise<any>((resolve, reject) => {
-        editor.exportHtml((data: any) => {
-          if (data?.design) {
-            resolve(data.design);
-          } else {
-            reject(new Error('No se pudo obtener el diseño del editor'));
-          }
-        });
-      });
+      const html = editor.getHtml();
+      if (!html) {
+        throw new Error('No se pudo obtener el diseño del editor');
+      }
 
       const { error } = await callApi('universal-blocks', {
         body: {
@@ -136,7 +132,7 @@ export function UniversalBlocksPanel({
           client_id: clientId,
           name: saveName.trim(),
           category: saveCategory,
-          block_json: designJson,
+          block_json: html,
         },
       });
 
@@ -164,7 +160,7 @@ export function UniversalBlocksPanel({
     }
 
     try {
-      editor.loadDesign(block.block_json);
+      editor.addComponents(block.block_json);
 
       // Increment usage count
       await callApi('universal-blocks', {

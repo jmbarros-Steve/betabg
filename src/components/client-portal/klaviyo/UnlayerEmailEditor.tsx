@@ -1,19 +1,16 @@
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import EmailEditor, { EditorRef } from 'react-email-editor';
+import { useRef, useState, useCallback } from 'react';
 import { X, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { unlayerMergeTagsConfig } from './klaviyoMergeTags';
-import { htmlToUnlayerDesign, type UnlayerDesignJson } from './htmlToUnlayerDesign';
-import { getSteveMailEditorOptions, registerSteveMailTools } from '@/components/client-portal/email/steveMailEditorConfig';
+import { SteveMailEditor, type SteveMailEditorRef } from '../email/SteveMailEditor';
 
 export interface EditorEmail {
   subject: string;
   previewText: string;
   htmlContent: string;
-  designJson?: UnlayerDesignJson | null;
+  designJson?: any | null;
 }
 
 interface UnlayerEmailEditorProps {
@@ -23,90 +20,58 @@ interface UnlayerEmailEditorProps {
 }
 
 export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: UnlayerEmailEditorProps) {
-  const emailEditorRef = useRef<EditorRef>(null);
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const emailEditorRef = useRef<SteveMailEditorRef>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [emails, setEmails] = useState<EditorEmail[]>(() =>
-    initialEmails.map((e) => ({
-      ...e,
-      designJson: e.designJson || htmlToUnlayerDesign(e.htmlContent),
-    }))
+    initialEmails.map((e) => ({ ...e }))
   );
   const [editorReady, setEditorReady] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Memoize Unlayer options to prevent editor re-creation on every render
-  const editorOptions = useMemo(
-    () => getSteveMailEditorOptions({ mergeTagsOverride: unlayerMergeTagsConfig.mergeTags }),
-    []
-  );
-
   const currentEmail = emails[activeIndex];
 
-  // Load design when editor becomes ready
-  useEffect(() => {
-    if (editorReady && currentEmail?.designJson) {
-      emailEditorRef.current?.editor?.loadDesign(currentEmail.designJson as any);
+  const handleEditorReady = useCallback(() => {
+    setEditorReady(true);
+    const email = initialEmails[0];
+    if (email) {
+      emailEditorRef.current?.loadDesign(email.htmlContent, email.designJson);
     }
-  }, [editorReady]);
+  }, [initialEmails]);
 
-  // Force react-email-editor internal divs to fill container height
-  // The library sets hardcoded heights (500px/150px) on its wrapper divs
-  useEffect(() => {
-    if (!editorReady || !editorContainerRef.current) return;
-    const container = editorContainerRef.current;
-    // Target: container > react-email-editor-root > inner-flex-div
-    const root = container.querySelector(':scope > div');
-    if (root instanceof HTMLElement) {
-      root.style.height = '100%';
-      const inner = root.querySelector(':scope > div');
-      if (inner instanceof HTMLElement) {
-        inner.style.height = '100%';
-      }
-    }
-  }, [editorReady]);
+  const saveCurrentEmail = useCallback((): EditorEmail[] => {
+    const editor = emailEditorRef.current;
+    if (!editor) return emails;
 
-  const saveCurrentEmail = useCallback((): Promise<EditorEmail[]> => {
-    return new Promise((resolve) => {
-      const editor = emailEditorRef.current?.editor;
-      if (!editor) {
-        resolve(emails);
-        return;
-      }
-
-      editor.saveDesign((design: any) => {
-        editor.exportHtml(({ html }: { html: string }) => {
-          const updated = emails.map((e, i) =>
-            i === activeIndex ? { ...e, designJson: design, htmlContent: html } : e
-          );
-          setEmails(updated);
-          resolve(updated);
-        });
-      });
-    });
+    const html = editor.getHtml();
+    const projectData = editor.getProjectData();
+    const updated = emails.map((e, i) =>
+      i === activeIndex ? { ...e, designJson: projectData, htmlContent: html } : e
+    );
+    setEmails(updated);
+    return updated;
   }, [activeIndex, emails]);
 
   const handleTabChange = useCallback(
-    async (newIndex: number) => {
+    (newIndex: number) => {
       if (newIndex === activeIndex || !editorReady) return;
 
       // Save current email state
-      const updated = await saveCurrentEmail();
+      const updated = saveCurrentEmail();
 
       setActiveIndex(newIndex);
       // Load the new email design
-      const nextDesign = updated[newIndex]?.designJson;
-      if (nextDesign) {
-        emailEditorRef.current?.editor?.loadDesign(nextDesign as any);
+      const nextEmail = updated[newIndex];
+      if (nextEmail) {
+        emailEditorRef.current?.loadDesign(nextEmail.htmlContent, nextEmail.designJson);
       }
     },
     [activeIndex, editorReady, saveCurrentEmail]
   );
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     setSaving(true);
     try {
-      const finalEmails = await saveCurrentEmail();
+      const finalEmails = saveCurrentEmail();
       onSave(finalEmails);
       toast.success('Emails guardados');
     } catch (err) {
@@ -203,15 +168,12 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
         </div>
       </div>
 
-      {/* Unlayer editor */}
+      {/* GrapeJS editor */}
       <div className="flex-1 min-h-0 relative">
-        <div ref={editorContainerRef} className="absolute inset-0">
-          <EmailEditor
+        <div className="absolute inset-0">
+          <SteveMailEditor
             ref={emailEditorRef}
-            onReady={() => {
-              setEditorReady(true);
-            }}
-            options={editorOptions}
+            onReady={handleEditorReady}
             style={{ height: '100%' }}
           />
         </div>
