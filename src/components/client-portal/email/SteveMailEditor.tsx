@@ -1,10 +1,36 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import grapesjs from 'grapesjs';
 import grapesjsPresetNewsletter from 'grapesjs-preset-newsletter';
+import DOMPurify from 'dompurify';
 import { registerSteveBlocks } from './grapesjsCustomBlocks';
 import { registerMergeTags } from './grapesjsMergeTags';
 import { esLocale } from './grapesjsI18n';
 import './grapejs-theme.css';
+
+/** Sanitize HTML for email output — strip scripts, event handlers, iframes */
+function sanitizeEmailHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    WHOLE_DOCUMENT: false,
+    ALLOW_TAGS: [
+      'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption', 'colgroup', 'col',
+      'div', 'span', 'p', 'a', 'img', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'ul', 'ol', 'li', 'b', 'i', 'u', 'strong', 'em', 'small', 'sub', 'sup', 'blockquote',
+      'center', 'font', 'section', 'header', 'footer', 'nav', 'article',
+    ],
+    ALLOW_ATTR: [
+      'style', 'class', 'id', 'src', 'href', 'alt', 'title', 'width', 'height',
+      'border', 'cellpadding', 'cellspacing', 'align', 'valign', 'bgcolor',
+      'target', 'rel', 'role', 'aria-label', 'aria-hidden',
+      'data-steve-products', 'data-steve-discount', 'data-steve-condition',
+      'data-product-type', 'data-product-count', 'data-columns',
+      'data-show-price', 'data-show-button', 'data-button-text', 'data-button-color',
+      'data-discount-source', 'data-discount-code', 'data-discount-type', 'data-discount-value',
+      'data-merge-tag',
+    ],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'select', 'button'],
+    FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur'],
+  });
+}
 
 export interface SteveMailEditorRef {
   loadDesign(html: string, projectData?: any): void;
@@ -41,7 +67,7 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
       getHtml(): string {
         const editor = editorRef.current;
         if (!editor) return '';
-        const html = editor.getHtml();
+        const html = sanitizeEmailHtml(editor.getHtml());
         const css = editor.getCss();
         return [
           '<!DOCTYPE html>',
@@ -67,6 +93,15 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
           '  .center-on-narrow{text-align:center!important;display:block!important;margin-left:auto!important;margin-right:auto!important;float:none!important}',
           '  table[class="body"] .content{padding:8px!important}',
           '}',
+          '/* Dark mode support */',
+          '@media (prefers-color-scheme:dark){',
+          '  body,table,td{background-color:#1a1a1a!important;color:#e4e4e7!important}',
+          '  h1,h2,h3,h4,h5,h6{color:#fafafa!important}',
+          '  a{color:#818cf8!important}',
+          '  .email-container{background-color:#27272a!important}',
+          '  img{opacity:.9}',
+          '}',
+          ':root{color-scheme:light dark;supported-color-schemes:light dark}',
           css,
           '</style>',
           '</head>',

@@ -18,7 +18,7 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2, AlertTriangle,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
@@ -57,6 +57,8 @@ const CAMPAIGN_TYPES = [
   { value: 'announcement', label: 'Anuncio' },
   { value: 'restock', label: 'Restock / Back in stock' },
 ];
+
+const GMAIL_CLIP_LIMIT = 102 * 1024;
 
 export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -107,6 +109,57 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
+
+  // Save as Template
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  // Unsaved changes protection
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Email weight tracking (Gmail clips at 102KB)
+  const [emailSizeBytes, setEmailSizeBytes] = useState(0);
+
+  // Concurrency: optimistic locking
+  const lastKnownUpdatedAt = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!showEditor || !editorReady) { return; }
+    const editor = emailEditorRef.current?.getEditor();
+    if (!editor) return;
+    const markDirty = () => setIsDirty(true);
+    editor.on('component:add', markDirty);
+    editor.on('component:remove', markDirty);
+    editor.on('component:update', markDirty);
+    editor.on('style:change', markDirty);
+    return () => {
+      editor.off('component:add', markDirty);
+      editor.off('component:remove', markDirty);
+      editor.off('component:update', markDirty);
+      editor.off('style:change', markDirty);
+    };
+  }, [showEditor, editorReady]);
+
+  useEffect(() => {
+    if (!showEditor || !isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [showEditor, isDirty]);
+
+  // Poll email size every 3s while editor is open
+  useEffect(() => {
+    if (!showEditor || !editorReady || editorStep !== 'design') return;
+    const interval = setInterval(() => {
+      const html = emailEditorRef.current?.getHtml() || '';
+      setEmailSizeBytes(new Blob([html]).size);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [showEditor, editorReady, editorStep]);
 
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -268,11 +321,25 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         design_json: savedDesign,
         audience_filter: editingCampaign.audience_filter || {},
         recommendation_config: recEnabled ? { type: recType, count: recCount } : null,
+        expected_updated_at: lastKnownUpdatedAt.current,
       },
     });
 
     if (error) { toast.error(error); return; }
+
+    // Handle concurrency conflict
+    if (data?.conflict) {
+      toast.error('Otro usuario modificó esta campaña. Recarga para ver los cambios.');
+      return;
+    }
+
     toast.success(action === 'create' ? 'Campaña creada' : 'Campaña guardada');
+    setIsDirty(false);
+
+    // Track the updated_at for optimistic locking
+    if (data?.campaign?.updated_at) {
+      lastKnownUpdatedAt.current = data.campaign.updated_at;
+    }
 
     // If new, update the editing campaign ID
     if (!editingCampaign.id && data?.campaign?.id) {
@@ -422,6 +489,36 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   };
 
+  const handleSaveAsTemplate = async () => {
+    if (!saveTemplateName.trim()) {
+      toast.error('Ingresa un nombre para la plantilla');
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      const { html, design } = exportEditorHtml();
+      const { error } = await callApi<any>('email-templates', {
+        body: {
+          action: 'create',
+          client_id: clientId,
+          name: saveTemplateName.trim(),
+          description: `Plantilla guardada desde campaña${editingCampaign?.name ? ': ' + editingCampaign.name : ''}`,
+          category: 'custom',
+          design_json: design,
+          html_preview: html,
+        },
+      });
+      if (error) throw new Error(String(error));
+      toast.success('Plantilla guardada');
+      setShowSaveTemplate(false);
+      setSaveTemplateName('');
+    } catch (err: any) {
+      toast.error('Error al guardar plantilla: ' + (err.message || err));
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const replaceMergeTagsForPreview = (html: string): string => {
     const sampleData: Record<string, string> = {
       '{{ first_name }}': 'María',
@@ -496,9 +593,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return (
       <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0 overflow-x-auto">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => setShowEditor(false)}>
+            <Button variant="ghost" size="sm" onClick={() => {
+              if (isDirty && !window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
+              setShowEditor(false);
+            }}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Volver
             </Button>
             {editorStep === 'design' ? (
@@ -540,6 +640,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                   <Blocks className="w-4 h-4 mr-1" /> Bloques
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowSaveTemplate(true)}>
+                  <Save className="w-4 h-4 mr-1" /> Guardar Plantilla
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => {
                   const { html } = exportEditorHtml();
@@ -772,6 +875,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </Button>
               <div className="w-px h-5 bg-zinc-200" />
               <GlobalStylesPanel editorRef={emailEditorRef} />
+              {emailSizeBytes > 0 && (
+                <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                  emailSizeBytes > GMAIL_CLIP_LIMIT ? 'bg-red-100 text-red-700 font-medium'
+                  : emailSizeBytes > GMAIL_CLIP_LIMIT * 0.8 ? 'bg-yellow-100 text-yellow-700'
+                  : 'text-zinc-500'
+                }`}>
+                  {emailSizeBytes > GMAIL_CLIP_LIMIT && <AlertTriangle className="w-3 h-3" />}
+                  {(emailSizeBytes / 1024).toFixed(0)}KB
+                  {emailSizeBytes > GMAIL_CLIP_LIMIT && ' — Gmail cortará este email'}
+                </span>
+              )}
             </div>
 
             {/* GrapeJS editor */}
@@ -1327,6 +1441,36 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Save as Template Dialog */}
+      <Dialog open={showSaveTemplate} onOpenChange={setShowSaveTemplate}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar como Plantilla</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-sm">Nombre de la plantilla</Label>
+              <Input
+                placeholder="Ej: Mi plantilla de bienvenida"
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>Cancelar</Button>
+            <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+              {savingTemplate ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
