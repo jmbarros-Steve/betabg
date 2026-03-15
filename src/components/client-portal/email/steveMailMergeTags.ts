@@ -9,18 +9,18 @@ export const steveMailMergeTags = {
   contacto: {
     name: 'Contacto',
     mergeTags: {
-      first_name: { name: 'Nombre', value: '{{ first_name }}', sample: 'María' },
-      last_name: { name: 'Apellido', value: '{{ last_name }}', sample: 'González' },
-      full_name: { name: 'Nombre completo', value: '{{ full_name }}', sample: 'María González' },
+      nombre: { name: 'Nombre', value: '{{ nombre }}', sample: 'María' },
+      apellido: { name: 'Apellido', value: '{{ apellido }}', sample: 'González' },
+      nombre_completo: { name: 'Nombre completo', value: '{{ nombre_completo }}', sample: 'María González' },
       email: { name: 'Email del contacto', value: '{{ email }}', sample: 'maria@ejemplo.com' },
     },
   },
   tienda: {
     name: 'Mi Tienda',
     mergeTags: {
-      brand_name: { name: 'Nombre de mi marca', value: '{{ brand_name }}', sample: 'Tu Marca' },
-      shop_url: { name: 'URL de mi tienda', value: '{{ shop_url }}', sample: 'https://tutienda.com' },
-      brand_color: { name: 'Color principal de marca', value: '{{ brand_color }}', sample: '#18181b' },
+      empresa: { name: 'Nombre de mi marca', value: '{{ empresa }}', sample: 'Tu Marca' },
+      tienda_url: { name: 'URL de mi tienda', value: '{{ tienda_url }}', sample: 'https://tutienda.com' },
+      color_marca: { name: 'Color principal de marca', value: '{{ color_marca }}', sample: '#18181b' },
     },
   },
   compras: {

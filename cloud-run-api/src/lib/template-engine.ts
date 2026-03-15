@@ -189,13 +189,17 @@ export function buildTemplateContext(
 ): TemplateContext {
   const firstName = subscriber.first_name ?? '';
   const lastName = subscriber.last_name ?? '';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ');
+  const brandName = brandInfo?.name ?? '';
+  const shopUrl = brandInfo?.shop_url ?? '';
+  const brandColor = brandInfo?.color ?? '#000000';
 
   return {
     person: {
       first_name: firstName,
       last_name: lastName,
       email: subscriber.email,
-      full_name: [firstName, lastName].filter(Boolean).join(' '),
+      full_name: fullName,
       tags: subscriber.tags ?? [],
       total_orders: subscriber.total_orders ?? 0,
       total_spent: subscriber.total_spent ?? 0,
@@ -203,12 +207,12 @@ export function buildTemplateContext(
       custom_fields: subscriber.custom_fields ?? {},
     },
     brand: {
-      name: brandInfo?.name ?? '',
+      name: brandName,
       logo_url: brandInfo?.logo_url ?? '',
-      color: brandInfo?.color ?? '#000000',
+      color: brandColor,
       secondary_color: brandInfo?.secondary_color ?? '#666666',
       font: brandInfo?.font ?? 'Arial, sans-serif',
-      shop_url: brandInfo?.shop_url ?? '',
+      shop_url: shopUrl,
     },
     cart: {
       url: metadata?.cart_url ?? '',
@@ -217,6 +221,21 @@ export function buildTemplateContext(
     products: products ?? [],
     discount_code: metadata?.discount_code ?? '',
     unsubscribe_url: metadata?.unsubscribe_url ?? '',
+    // Flat aliases so {{ first_name }} works without person. prefix
+    first_name: firstName,
+    last_name: lastName,
+    full_name: fullName,
+    email: subscriber.email,
+    brand_name: brandName,
+    shop_url: shopUrl,
+    brand_color: brandColor,
+    // Spanish aliases
+    nombre: firstName,
+    apellido: lastName,
+    nombre_completo: fullName,
+    empresa: brandName,
+    tienda_url: shopUrl,
+    color_marca: brandColor,
   };
 }
 

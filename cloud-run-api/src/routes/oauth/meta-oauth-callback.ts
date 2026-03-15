@@ -11,7 +11,6 @@ export async function metaOauthCallback(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // User already verified by authMiddleware
     const user = c.get('user');
     if (!user) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -24,7 +23,6 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
 
-    // Verify user owns this client
     const { data: client, error: clientError } = await supabase
       .from('clients')
       .select('id, client_user_id')
@@ -39,7 +37,6 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Access denied' }, 403);
     }
 
-    // Exchange code for access token
     const metaAppId = process.env.META_APP_ID;
     const metaAppSecret = process.env.META_APP_SECRET;
 
@@ -48,10 +45,18 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Meta configuration error' }, 500);
     }
 
-    const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirect_uri)}&client_secret=${metaAppSecret}&code=${code}`;
-
+    // Exchange code for short-lived token (POST body keeps secret out of URL/logs)
     console.log('Exchanging code for token...');
-    const tokenResponse = await fetch(tokenUrl);
+    const tokenResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        redirect_uri: redirect_uri,
+        code: code,
+      }),
+    });
     const tokenData = await tokenResponse.json() as any;
 
     if (tokenData.error) {
@@ -62,20 +67,33 @@ export async function metaOauthCallback(c: Context) {
     const accessToken = tokenData.access_token;
     console.log('Access token obtained');
 
-    // Get long-lived access token
-    const longLivedUrl = `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaAppId}&client_secret=${metaAppSecret}&fb_exchange_token=${accessToken}`;
-
-    const longLivedResponse = await fetch(longLivedUrl);
+    // Exchange for long-lived token (POST body keeps secret out of URL/logs)
+    const longLivedResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'fb_exchange_token',
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        fb_exchange_token: accessToken,
+      }),
+    });
     const longLivedData = await longLivedResponse.json() as any;
 
     const finalToken = longLivedData.access_token || accessToken;
-    console.log('Long-lived token obtained');
+    // Meta returns expires_in (seconds) for long-lived tokens (~60 days)
+    const tokenExpiresIn = longLivedData.expires_in || 5184000;
+    const tokenExpiresAt = new Date(Date.now() + tokenExpiresIn * 1000).toISOString();
+    console.log(`Long-lived token obtained, expires in ${tokenExpiresIn}s (${tokenExpiresAt})`);
 
-    // Fetch businesses and ad accounts to verify access
-    // We do NOT auto-select an account — the user will choose from the portfolio selector
+    // Fetch businesses and ad accounts (Authorization header, not URL params)
     const [accountsResponse, businessesResponse] = await Promise.all([
-      fetch(`https://graph.facebook.com/v21.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`),
-      fetch(`https://graph.facebook.com/v21.0/me/businesses?access_token=${finalToken}&fields=id,name`),
+      fetch('https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,account_status', {
+        headers: { Authorization: `Bearer ${finalToken}` },
+      }),
+      fetch('https://graph.facebook.com/v21.0/me/businesses?fields=id,name', {
+        headers: { Authorization: `Bearer ${finalToken}` },
+      }),
     ]);
 
     const accountsData = await accountsResponse.json() as any;
@@ -89,12 +107,9 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'No ad accounts or businesses found for this user' }, 400);
     }
 
-    // NO auto-selection: account_id starts as null
-    // User must select a portfolio/negocio from the Business Manager hierarchy
     const accountId: string | null = null;
     const accountName: string | null = businesses.length > 0 ? businesses[0].name : null;
 
-    // Encrypt the token
     const { data: encryptedToken, error: encryptError } = await supabase
       .rpc('encrypt_platform_token', { raw_token: finalToken });
 
@@ -103,7 +118,6 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Failed to secure token' }, 500);
     }
 
-    // Check if connection already exists
     const { data: existingConnection } = await supabase
       .from('platform_connections')
       .select('id, account_id, store_name')
@@ -113,11 +127,11 @@ export async function metaOauthCallback(c: Context) {
 
     let connectionResult;
     if (existingConnection) {
-      // Update existing connection — preserve existing account_id if user already selected one
       connectionResult = await supabase
         .from('platform_connections')
         .update({
           access_token_encrypted: encryptedToken,
+          token_expires_at: tokenExpiresAt,
           account_id: existingConnection.account_id || accountId,
           store_name: existingConnection.store_name || accountName,
           is_active: true,
@@ -127,13 +141,13 @@ export async function metaOauthCallback(c: Context) {
         .select()
         .single();
     } else {
-      // Create new connection — account_id is null until user picks a portfolio
       connectionResult = await supabase
         .from('platform_connections')
         .insert({
           client_id: client_id,
           platform: 'meta',
           access_token_encrypted: encryptedToken,
+          token_expires_at: tokenExpiresAt,
           account_id: accountId,
           store_name: accountName,
           is_active: true,
@@ -149,7 +163,6 @@ export async function metaOauthCallback(c: Context) {
 
     console.log('Connection saved successfully');
 
-    // Return all available accounts and businesses so frontend can build hierarchy
     const allAccounts = adAccounts.map((a: any) => ({
       id: a.id.replace('act_', ''),
       name: a.name,
