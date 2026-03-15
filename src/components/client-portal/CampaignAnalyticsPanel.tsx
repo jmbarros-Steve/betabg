@@ -695,6 +695,59 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     return alerts;
   }, [totals, dailyTrend, overallRoas, overallCtr]);
 
+  // Weekly cohort analysis: ROAS and CPA per week
+  const weeklyCohorts = useMemo(() => {
+    if (dailyTrend.length < 7) return [];
+    const weeks: Array<{ week: string; spend: number; revenue: number; conversions: number; roas: number; cpa: number }> = [];
+    let weekStart = 0;
+    while (weekStart < dailyTrend.length) {
+      const weekSlice = dailyTrend.slice(weekStart, weekStart + 7);
+      const spend = weekSlice.reduce((s, d) => s + d.spend, 0);
+      const revenue = weekSlice.reduce((s, d) => s + d.revenue, 0);
+      const conversions = weekSlice.reduce((s, d) => s + d.conversions, 0);
+      const startDate = weekSlice[0].date;
+      const endDate = weekSlice[weekSlice.length - 1].date;
+      weeks.push({
+        week: `${startDate.slice(5)} \u2192 ${endDate.slice(5)}`,
+        spend, revenue, conversions,
+        roas: spend > 0 ? revenue / spend : 0,
+        cpa: conversions > 0 ? spend / conversions : 0,
+      });
+      weekStart += 7;
+    }
+    return weeks;
+  }, [dailyTrend]);
+
+  // PDF export using browser print dialog
+  function exportPDF() {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { toast.error('Habilita popups para exportar PDF'); return; }
+    const campaignRows = aggregatedCampaigns.map(c =>
+      `<tr><td>${c.campaign_name}</td><td>${c.platform}</td><td>${formatCurrency(c.total_spend, 'CLP')}</td><td>${formatCurrency(c.total_revenue, 'CLP')}</td><td>${c.avg_roas.toFixed(2)}x</td><td>${c.total_conversions}</td><td>${formatCurrency(c.avg_cpc, 'CLP')}</td><td>${c.avg_ctr.toFixed(2)}%</td></tr>`
+    ).join('');
+    const cohortRows = weeklyCohorts.map(w =>
+      `<tr><td>${w.week}</td><td>${formatCurrency(w.spend, 'CLP')}</td><td>${formatCurrency(w.revenue, 'CLP')}</td><td>${w.roas.toFixed(2)}x</td><td>${w.conversions}</td><td>${w.cpa > 0 ? formatCurrency(w.cpa, 'CLP') : '\u2014'}</td></tr>`
+    ).join('');
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Reporte Campa\u00f1as - ${dateRange}</title>
+      <style>body{font-family:system-ui,sans-serif;padding:24px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:13px}th{background:#f5f5f5;font-weight:600}h1{font-size:20px}h2{font-size:16px;margin-top:24px}.kpi{display:inline-block;margin:0 24px 12px 0}.kpi .label{font-size:12px;color:#666}.kpi .value{font-size:24px;font-weight:700}@media print{body{padding:0}}</style></head><body>
+      <h1>Reporte de Campa\u00f1as \u2014 \u00daltimos ${daysFromRange(dateRange)} d\u00edas</h1>
+      <p style="color:#666;font-size:12px">Generado: ${new Date().toLocaleString('es-CL')}</p>
+      <div>
+        <div class="kpi"><div class="label">Gasto</div><div class="value">${formatCurrency(totals.spend, 'CLP')}</div></div>
+        <div class="kpi"><div class="label">Ingresos</div><div class="value">${formatCurrency(totals.revenue, 'CLP')}</div></div>
+        <div class="kpi"><div class="label">ROAS</div><div class="value">${overallRoas.toFixed(2)}x</div></div>
+        <div class="kpi"><div class="label">Conversiones</div><div class="value">${formatNumber(totals.conversions)}</div></div>
+      </div>
+      <h2>Campa\u00f1as</h2>
+      <table><thead><tr><th>Campa\u00f1a</th><th>Plataforma</th><th>Gasto</th><th>Ingresos</th><th>ROAS</th><th>Conv.</th><th>CPC</th><th>CTR</th></tr></thead>
+      <tbody>${campaignRows}
+      <tr style="font-weight:bold"><td>TOTAL</td><td></td><td>${formatCurrency(totals.spend, 'CLP')}</td><td>${formatCurrency(totals.revenue, 'CLP')}</td><td>${overallRoas.toFixed(2)}x</td><td>${totals.conversions}</td><td>${totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks, 'CLP') : '-'}</td><td>${overallCtr.toFixed(2)}%</td></tr></tbody></table>
+      ${weeklyCohorts.length > 0 ? `<h2>An\u00e1lisis Semanal</h2><table><thead><tr><th>Semana</th><th>Gasto</th><th>Ingresos</th><th>ROAS</th><th>Conv.</th><th>CPA</th></tr></thead><tbody>${cohortRows}</tbody></table>` : ''}
+      </body></html>`);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -805,6 +858,10 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             <Button variant="outline" size="sm" onClick={exportCSV}>
               <Download className="w-4 h-4 mr-2" />
               CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportPDF}>
+              <Download className="w-4 h-4 mr-2" />
+              PDF
             </Button>
           )}
         </div>
@@ -1100,6 +1157,57 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           </Card>
         );
       })()}
+
+      {/* Weekly Cohort Analysis */}
+      {weeklyCohorts.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Evoluci\u00f3n Semanal</CardTitle>
+            <CardDescription>ROAS y CPA por semana \u2014 detecta tendencias</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Semana</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Gasto</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Ingresos</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">ROAS</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Conv.</th>
+                    <th className="pb-2 text-muted-foreground font-medium">CPA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyCohorts.map((w, i) => {
+                    const prevRoas = i > 0 ? weeklyCohorts[i - 1].roas : null;
+                    const roasDelta = prevRoas !== null && prevRoas > 0 ? ((w.roas - prevRoas) / prevRoas) * 100 : null;
+                    return (
+                      <tr key={w.week} className="border-b border-border/50">
+                        <td className="py-2 pr-4 font-medium">{w.week}</td>
+                        <td className="py-2 pr-4">{formatCurrency(w.spend, 'CLP')}</td>
+                        <td className="py-2 pr-4">{formatCurrency(w.revenue, 'CLP')}</td>
+                        <td className="py-2 pr-4">
+                          <span className={w.roas >= 2 ? 'text-green-600 font-bold' : w.roas >= 1 ? 'text-yellow-600 font-bold' : 'text-red-500 font-bold'}>
+                            {w.roas.toFixed(2)}x
+                          </span>
+                          {roasDelta !== null && (
+                            <span className={`ml-1 text-xs ${roasDelta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {roasDelta >= 0 ? '\u25b2' : '\u25bc'}{Math.abs(roasDelta).toFixed(0)}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">{w.conversions}</td>
+                        <td className="py-2">{w.cpa > 0 ? formatCurrency(w.cpa, 'CLP') : '\u2014'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Spend vs Revenue Chart */}
       <Card>
