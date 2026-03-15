@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const BASE_URL = 'https://betabgnuevosupa.vercel.app';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://betabgnuevosupa.vercel.app';
 const EMAIL = 'patricio.correa@jardindeeva.cl';
 const PASSWORD = 'Jardin2026';
 
