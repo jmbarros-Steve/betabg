@@ -1956,14 +1956,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       // Check for issues that require going back to a previous step
       const hasBudget = budgetType === 'CBO' ? !!campBudget : !!adsetBudget;
       const hasAudience = audienceDesc.trim() || selectedAudienceIds.length > 0;
-      if ((!hasBudget || !hasAudience) && !existingAdsetId) {
+      // Audience is OPTIONAL — broad targeting if empty
+      if (!hasBudget && !existingAdsetId) {
         // Find the adset-config step index and navigate there
         const adsetStepIdx = steps.findIndex((s) => s.key === 'adset-config');
         if (adsetStepIdx >= 0) {
-          const missing: string[] = [];
-          if (!hasBudget) missing.push('presupuesto diario');
-          if (!hasAudience) missing.push('audiencia');
-          toast.error(`Completa: ${missing.join(' y ')}. Te llevamos al paso correcto.`);
+          toast.error('Completa: presupuesto diario. Te llevamos al paso correcto.');
           setStepIndex(adsetStepIdx);
           return;
         }
