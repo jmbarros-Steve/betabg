@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'https://betabgnuevosupa.vercel.app';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:4173';
 const EMAIL = 'patricio.correa@jardindeeva.cl';
 const PASSWORD = 'Jardin2026';
 
@@ -73,8 +73,27 @@ async function openEditorAndWait(page: Page) {
   const nextBtn = page.getByRole('button', { name: /Siguiente.*Diseñar/i }).first();
   if (await nextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await nextBtn.click();
-    await page.waitForTimeout(8000); // GrapeJS needs time
+    await page.waitForTimeout(5000);
   }
+
+  // Dismiss template gallery dialog if it opens automatically
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const dialog = page.locator('[role="dialog"]').first();
+    if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+      // Try clicking X close button or pressing Escape
+      const closeBtn = dialog.locator('button[aria-label="Close"], button:has(svg.lucide-x)').first();
+      if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await closeBtn.click({ force: true });
+      } else {
+        await page.keyboard.press('Escape');
+      }
+      await page.waitForTimeout(1500);
+    } else {
+      break;
+    }
+  }
+
+  await page.waitForTimeout(5000); // GrapeJS needs time to fully render
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -105,47 +124,42 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     const blocks = page.locator('.gjs-blocks-c, .gjs-block-categories').first();
     await expect(blocks).toBeVisible({ timeout: 5000 });
 
-    // Verify essential blocks exist
+    // Count all blocks registered in GrapeJS (including inside collapsed categories)
+    // Using page.evaluate to check DOM presence, not viewport visibility
     const expectedBlocks = [
-      'Productos',       // steve-products
-      'Descuento',       // steve-discount
-      'Botón CTA',       // steve-button
-      'Redes Sociales',  // steve-social
-      'Header',          // steve-header
-      'Footer',          // steve-footer
-      'Imagen + Caption',// steve-image-caption
-      'Texto Enriquecido', // steve-rich-text
-      'Separador',       // steve-divider
-      'Espacio',         // steve-spacer
-      '2 Columnas',      // steve-two-cols
-      '3 Columnas',      // steve-three-cols
-      'Hero Banner',     // steve-hero
+      'Productos', 'Descuento', 'Cuenta Regresiva', 'Boton Diseno',
+      'Redes Sociales', 'Header', 'Footer', 'Texto Enriquecido',
+      'Separador', 'Espacio', '2 Columnas', '3 Columnas', 'Hero Banner',
     ];
 
-    const found: string[] = [];
-    const notFound: string[] = [];
-
-    for (const label of expectedBlocks) {
-      const block = page.locator('.gjs-block').filter({ hasText: new RegExp(label, 'i') }).first();
-      const isVis = await block.isVisible({ timeout: 2000 }).catch(() => false);
-      if (isVis) {
-        found.push(label);
-      } else {
-        notFound.push(label);
+    const blockCheckResult = await page.evaluate((labels: string[]) => {
+      const allBlocks = Array.from(document.querySelectorAll('.gjs-block'));
+      const found: string[] = [];
+      const notFound: string[] = [];
+      for (const label of labels) {
+        const regex = new RegExp(label, 'i');
+        const exists = allBlocks.some(b => regex.test(b.textContent || ''));
+        if (exists) found.push(label);
+        else notFound.push(label);
       }
-      console.log(`[QA] Block "${label}": ${isVis ? 'FOUND' : 'NOT FOUND'}`);
+      return { found, notFound, totalBlocks: allBlocks.length };
+    }, expectedBlocks);
+
+    for (const label of blockCheckResult.found) {
+      console.log(`[QA] Block "${label}": FOUND`);
     }
+    for (const label of blockCheckResult.notFound) {
+      console.log(`[QA] Block "${label}": NOT FOUND`);
+    }
+    console.log(`[QA] Blocks: ${blockCheckResult.found.length}/${expectedBlocks.length} found (${blockCheckResult.totalBlocks} total in DOM)`);
 
-    console.log(`[QA] Blocks: ${found.length}/${expectedBlocks.length} found`);
-    if (notFound.length > 0) console.log(`[QA] Missing blocks: ${notFound.join(', ')}`);
-
-    // At least 8 custom blocks should exist
-    expect(found.length).toBeGreaterThanOrEqual(8);
+    // At least 10 of our custom blocks should exist in the DOM
+    expect(blockCheckResult.found.length).toBeGreaterThanOrEqual(10);
 
     // Try clicking a block to add it to canvas
     const heroBlock = page.locator('.gjs-block').filter({ hasText: /Hero/i }).first();
     if (await heroBlock.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await heroBlock.click();
+      await heroBlock.click({ force: true });
       await page.waitForTimeout(2000);
       console.log('[QA] Added Hero block to canvas');
     }
@@ -165,7 +179,7 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     // Add a text block via the block manager
     const textBlock = page.locator('.gjs-block').filter({ hasText: /Texto/i }).first();
     if (await textBlock.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await textBlock.click();
+      await textBlock.click({ force: true });
       await page.waitForTimeout(2000);
     }
 
@@ -176,7 +190,7 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     // Add a divider block
     const dividerBlock = page.locator('.gjs-block').filter({ hasText: /Separador/i }).first();
     if (await dividerBlock.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await dividerBlock.click();
+      await dividerBlock.click({ force: true });
       await page.waitForTimeout(2000);
     }
 

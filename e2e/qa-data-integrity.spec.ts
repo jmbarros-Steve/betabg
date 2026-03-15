@@ -9,7 +9,7 @@ const ADMIN_PASSWORD = process.env.STEVE_TEST_PASSWORD || 'Jardin2026';
 
 async function login(page: Page): Promise<string | null> {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(\`\${BASE_URL}/auth\`);
+  await page.goto(`${BASE_URL}/auth`);
   await page.locator('#email').fill(ADMIN_EMAIL);
   await page.locator('#password').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
@@ -76,18 +76,18 @@ test('T1 — Rate Limiting: meta-fetch.ts has 429 retry logic in source code', a
   // Fire 5 rapid requests to the same endpoint to test stability
   const results = await Promise.all(
     Array.from({ length: 5 }, (_, i) =>
-      page.request.post(\`\${API_URL}/api/check-meta-scopes\`, {
+      page.request.post(`${API_URL}/api/check-meta-scopes`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': \`Bearer \${token}\`,
+          'Authorization': `Bearer ${token}`,
         },
-        data: { connection_id: \`00000000-0000-0000-0000-00000000000\${i}\` },
+        data: { connection_id: `00000000-0000-0000-0000-00000000000${i}` },
       }).then(r => ({ status: r.status(), i }))
         .catch(e => ({ status: 0, i, error: e.message }))
     )
   );
 
-  console.log('[QA-RATE] Rapid fire results:', results.map(r => \`\${r.i}:\${r.status}\`).join(', '));
+  console.log('[QA-RATE] Rapid fire results:', results.map(r => `${r.i}:${r.status}`).join(', '));
 
   // All should return valid HTTP status (not crash)
   for (const r of results) {
@@ -97,7 +97,7 @@ test('T1 — Rate Limiting: meta-fetch.ts has 429 retry logic in source code', a
 
   // Test that the API can handle burst traffic without 500s
   const non500 = results.filter(r => r.status !== 500 && r.status !== 502 && r.status !== 503);
-  console.log(\`[QA-RATE] \${non500.length}/5 requests returned non-5xx status\`);
+  console.log(`[QA-RATE] ${non500.length}/5 requests returned non-5xx status`);
   expect(non500.length).toBeGreaterThanOrEqual(3);
 
   console.log('[QA-RATE] T1 PASSED — API stable under burst traffic');
@@ -113,26 +113,26 @@ test('T2 — Pagination: campaign sync handles paginated results', async ({ page
     return;
   }
 
-  const res = await page.request.post(\`\${API_URL}/api/sync-campaign-metrics\`, {
+  const res = await page.request.post(`${API_URL}/api/sync-campaign-metrics`, {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': \`Bearer \${token}\`,
+      'Authorization': `Bearer ${token}`,
     },
     data: { connection_id: '00000000-0000-0000-0000-000000000000' },
   });
 
-  console.log(\`[QA-PAGINATION] sync-campaign-metrics with fake id: \${res.status()}\`);
+  console.log(`[QA-PAGINATION] sync-campaign-metrics with fake id: ${res.status()}`);
   expect([400, 404]).toContain(res.status());
 
-  const res2 = await page.request.post(\`\${API_URL}/api/fetch-meta-ad-accounts\`, {
+  const res2 = await page.request.post(`${API_URL}/api/fetch-meta-ad-accounts`, {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': \`Bearer \${token}\`,
+      'Authorization': `Bearer ${token}`,
     },
     data: { connection_id: '00000000-0000-0000-0000-000000000000' },
   });
 
-  console.log(\`[QA-PAGINATION] fetch-meta-ad-accounts with fake id: \${res2.status()}\`);
+  console.log(`[QA-PAGINATION] fetch-meta-ad-accounts with fake id: ${res2.status()}`);
   expect([400, 404]).toContain(res2.status());
 
   await goToMetaTab(page);
@@ -150,7 +150,7 @@ test('T2 — Pagination: campaign sync handles paginated results', async ({ page
   const hasEmptyState = await page.locator('text=/sin campañas|no hay|vacío|conecta/i')
     .first().isVisible({ timeout: 3000 }).catch(() => false);
 
-  console.log(\`[QA-PAGINATION] Campaigns visible: \${hasCampaigns}, empty state: \${hasEmptyState}\`);
+  console.log(`[QA-PAGINATION] Campaigns visible: ${hasCampaigns}, empty state: ${hasEmptyState}`);
   expect(hasCampaigns || hasEmptyState).toBe(true);
 
   await page.screenshot({ path: 'e2e/screenshots/qa-data-02-campaigns.png' });
@@ -182,10 +182,10 @@ test('T3 — Permissions: each Meta endpoint rejects unauthorized access', async
   const results: Array<{ endpoint: string; status: number }> = [];
 
   for (const ep of endpoints) {
-    const res = await page.request.post(\`\${API_URL}\${ep.path}\`, {
+    const res = await page.request.post(`${API_URL}${ep.path}`, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': \`Bearer \${token}\`,
+        'Authorization': `Bearer ${token}`,
       },
       data: ep.data,
     });
@@ -194,17 +194,17 @@ test('T3 — Permissions: each Meta endpoint rejects unauthorized access', async
 
   console.log('[QA-PERMS] Results:');
   for (const r of results) {
-    console.log(\`  \${r.endpoint}: \${r.status}\`);
+    console.log(`  ${r.endpoint}: ${r.status}`);
     expect(r.status).not.toBe(200);
     expect(r.status).not.toBe(500);
     expect(r.status).not.toBe(502);
   }
 
-  const noAuthRes = await page.request.post(\`\${API_URL}/api/sync-meta-metrics\`, {
+  const noAuthRes = await page.request.post(`${API_URL}/api/sync-meta-metrics`, {
     headers: { 'Content-Type': 'application/json' },
     data: { connection_id: fakeConnectionId },
   });
-  console.log(\`[QA-PERMS] No-auth sync-meta-metrics: \${noAuthRes.status()}\`);
+  console.log(`[QA-PERMS] No-auth sync-meta-metrics: ${noAuthRes.status()}`);
   expect([401, 404]).toContain(noAuthRes.status());
 
   console.log('[QA-PERMS] T3 PASSED — All endpoints reject unauthorized access');
@@ -214,12 +214,12 @@ test('T3 — Permissions: each Meta endpoint rejects unauthorized access', async
 // TEST 4: WEBHOOK — meta-data-deletion handles malformed/duplicate
 // ══════════════════════════════════════════════════════════════════════
 test('T4 — Webhook: meta-data-deletion handles malformed and duplicate requests', async ({ page }) => {
-  const res1 = await page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+  const res1 = await page.request.post(`${API_URL}/api/meta-data-deletion`, {
     headers: { 'Content-Type': 'application/json' },
     data: {},
   });
   const body1 = await res1.json().catch(() => null);
-  console.log(\`[QA-WEBHOOK] Empty body: \${res1.status()} \${JSON.stringify(body1)}\`);
+  console.log(`[QA-WEBHOOK] Empty body: ${res1.status()} ${JSON.stringify(body1)}`);
 
   if (res1.status() === 404) {
     console.log('[QA-WEBHOOK] Endpoint not deployed yet — testing locally via code review');
@@ -231,58 +231,58 @@ test('T4 — Webhook: meta-data-deletion handles malformed and duplicate request
   expect(body1?.url).toBeTruthy();
   expect(body1?.confirmation_code).toBeTruthy();
 
-  const res2 = await page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+  const res2 = await page.request.post(`${API_URL}/api/meta-data-deletion`, {
     headers: { 'Content-Type': 'application/json' },
     data: { signed_request: 'not.a.valid.request' },
   });
   const body2 = await res2.json();
-  console.log(\`[QA-WEBHOOK] Garbage signed_request: \${res2.status()} \${JSON.stringify(body2)}\`);
+  console.log(`[QA-WEBHOOK] Garbage signed_request: ${res2.status()} ${JSON.stringify(body2)}`);
   expect(res2.status()).toBe(200);
   expect(body2.url).toBeTruthy();
   expect(body2.confirmation_code).toBeTruthy();
 
-  const res3 = await page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+  const res3 = await page.request.post(`${API_URL}/api/meta-data-deletion`, {
     data: 'signed_request=garbage',
   });
   const body3 = await res3.json().catch(() => null);
-  console.log(\`[QA-WEBHOOK] No content-type: \${res3.status()}\`);
+  console.log(`[QA-WEBHOOK] No content-type: ${res3.status()}`);
   expect(res3.status()).toBe(200);
 
-  const res4 = await page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+  const res4 = await page.request.post(`${API_URL}/api/meta-data-deletion`, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     data: 'signed_request=invalid.base64payload',
   });
   const body4 = await res4.json();
-  console.log(\`[QA-WEBHOOK] Form-encoded invalid: \${res4.status()} \${JSON.stringify(body4)}\`);
+  console.log(`[QA-WEBHOOK] Form-encoded invalid: ${res4.status()} ${JSON.stringify(body4)}`);
   expect(res4.status()).toBe(200);
   expect(body4.confirmation_code).toBeTruthy();
 
   const [dup1, dup2] = await Promise.all([
-    page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+    page.request.post(`${API_URL}/api/meta-data-deletion`, {
       headers: { 'Content-Type': 'application/json' },
       data: { signed_request: 'dup.test' },
     }).then(async r => ({ status: r.status(), body: await r.json() })),
-    page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+    page.request.post(`${API_URL}/api/meta-data-deletion`, {
       headers: { 'Content-Type': 'application/json' },
       data: { signed_request: 'dup.test' },
     }).then(async r => ({ status: r.status(), body: await r.json() })),
   ]);
 
-  console.log(\`[QA-WEBHOOK] Duplicate 1: \${dup1.body.confirmation_code}\`);
-  console.log(\`[QA-WEBHOOK] Duplicate 2: \${dup2.body.confirmation_code}\`);
+  console.log(`[QA-WEBHOOK] Duplicate 1: ${dup1.body.confirmation_code}`);
+  console.log(`[QA-WEBHOOK] Duplicate 2: ${dup2.body.confirmation_code}`);
   expect(dup1.body.confirmation_code).not.toBe(dup2.body.confirmation_code);
 
   const fakePayload = Buffer.from(JSON.stringify({ user_id: '12345', algorithm: 'HMAC-SHA256' }))
     .toString('base64')
     .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
-  const fakeSignedRequest = \`invalidsignature.\${fakePayload}\`;
+  const fakeSignedRequest = `invalidsignature.${fakePayload}`;
 
-  const res6 = await page.request.post(\`\${API_URL}/api/meta-data-deletion\`, {
+  const res6 = await page.request.post(`${API_URL}/api/meta-data-deletion`, {
     headers: { 'Content-Type': 'application/json' },
     data: { signed_request: fakeSignedRequest },
   });
   const body6 = await res6.json();
-  console.log(\`[QA-WEBHOOK] Valid payload + bad sig: \${res6.status()} user=\${body6.confirmation_code ? 'unknown (sig rejected)' : 'ERROR'}\`);
+  console.log(`[QA-WEBHOOK] Valid payload + bad sig: ${res6.status()} user=${body6.confirmation_code ? 'unknown (sig rejected)' : 'ERROR'}`);
   expect(res6.status()).toBe(200);
   expect(body6.confirmation_code).toBeTruthy();
 
@@ -323,14 +323,14 @@ test('T5 — Empty Data: Meta module shows empty state without errors', async ({
       const hasContent = await page.locator('table, [class*="card"], [class*="chart"], text=/sin.*datos|no hay|conecta|vincul|empty/i')
         .first().isVisible({ timeout: 3000 }).catch(() => false);
 
-      console.log(\`[QA-EMPTY] Tab "\${tab}": error=\${hasError}, content/empty_state=\${hasContent}\`);
+      console.log(`[QA-EMPTY] Tab "${tab}": error=${hasError}, content/empty_state=${hasContent}`);
 
       if (hasError) {
-        console.error(\`[QA-EMPTY] ALERT — "\${tab}" shows error!\`);
+        console.error(`[QA-EMPTY] ALERT — "${tab}" shows error!`);
       }
       expect(hasError).toBe(false);
     } else {
-      console.log(\`[QA-EMPTY] Tab "\${tab}": not found (may not exist)\`);
+      console.log(`[QA-EMPTY] Tab "${tab}": not found (may not exist)`);
     }
   }
 
