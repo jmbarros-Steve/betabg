@@ -36,6 +36,7 @@ function sanitizeEmailHtml(html: string): string {
 export interface SteveMailEditorRef {
   loadDesign(html: string, projectData?: any): void;
   getHtml(): string;
+  getSelectedHtml(): string | null;
   getProjectData(): any;
   addComponents(html: string): void;
   setDevice(device: 'Desktop' | 'Mobile'): void;
@@ -111,6 +112,14 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
           '</body>',
           '</html>',
         ].join('\n');
+      },
+
+      getSelectedHtml(): string | null {
+        const editor = editorRef.current;
+        if (!editor) return null;
+        const selected = editor.getSelected();
+        if (!selected) return null;
+        return selected.toHTML();
       },
 
       getProjectData(): any {
