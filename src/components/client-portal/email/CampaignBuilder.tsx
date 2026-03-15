@@ -26,6 +26,7 @@ import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
 import { GlobalStylesPanel } from './GlobalStylesPanel';
+import { ABTestResultsPanel } from './ABTestResultsPanel';
 
 interface CampaignBuilderProps {
   clientId: string;

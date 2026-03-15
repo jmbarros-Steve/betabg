@@ -1202,6 +1202,14 @@ const SYSTEM_TEMPLATES: SystemTemplate[] = [
       abandoned_cart: 'carrito',
       product_launch: 'lanzamiento',
       seasonal: 'temporada',
+      thank_you: 'e-commerce',
+      review_request: 'e-commerce',
+      restock: 'e-commerce',
+      birthday: 'promocion',
+      loyalty: 'promocion',
+      referral: 'promocion',
+      winback: 'promocion',
+      announcement: 'lanzamiento',
     };
     return {
       id: t.id,
