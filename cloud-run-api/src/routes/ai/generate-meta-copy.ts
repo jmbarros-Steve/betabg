@@ -1196,7 +1196,7 @@ ${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLoca
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      temperature: 1.2,
+      temperature: 1.0,
       system: systemPrompt,
       messages: [
         {
