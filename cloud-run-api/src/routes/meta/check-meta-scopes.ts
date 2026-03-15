@@ -5,7 +5,6 @@ export async function checkMetaScopes(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Verify JWT
     const authHeader = c.req.header('Authorization');
     if (!authHeader) {
       return c.json({ error: 'Missing authorization header' }, 401);
@@ -25,7 +24,6 @@ export async function checkMetaScopes(c: Context) {
       return c.json({ error: 'Missing connection_id' }, 400);
     }
 
-    // Fetch connection
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
       .select(`
@@ -40,7 +38,6 @@ export async function checkMetaScopes(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify ownership
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
     const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
 
@@ -52,7 +49,6 @@ export async function checkMetaScopes(c: Context) {
       return c.json({ error: 'No access token', granted: [], missing_all: true }, 200);
     }
 
-    // Decrypt token
     const { data: decryptedToken, error: decryptError } = await supabase
       .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
 
@@ -60,9 +56,10 @@ export async function checkMetaScopes(c: Context) {
       return c.json({ error: 'Failed to decrypt token', granted: [] }, 200);
     }
 
-    // Check permissions via Meta Graph API
-    const permUrl = `https://graph.facebook.com/v21.0/me/permissions?access_token=${encodeURIComponent(decryptedToken)}`;
-    const permResponse = await fetch(permUrl);
+    // Check permissions via Meta Graph API (token in header, not URL)
+    const permResponse = await fetch('https://graph.facebook.com/v21.0/me/permissions', {
+      headers: { Authorization: `Bearer ${decryptedToken}` },
+    });
     const permData: any = await permResponse.json();
 
     if (!permResponse.ok || !permData.data) {

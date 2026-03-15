@@ -452,6 +452,16 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       '{{ current_date }}': '12 Mar 2026',
       '{{ current_month }}': 'Marzo',
       '{{ current_year }}': '2026',
+      '{{ fecha }}': '15 Mar 2026',
+      '{{ preferences_url }}': '#',
+      '{{ checkout_url }}': '#',
+      // Spanish aliases
+      '{{ nombre }}': 'María',
+      '{{ apellido }}': 'González',
+      '{{ nombre_completo }}': 'María González',
+      '{{ empresa }}': brandInfo.name || 'Tu Marca',
+      '{{ tienda_url }}': brandInfo.shop_url || 'https://tutienda.com',
+      '{{ color_marca }}': brandInfo.brand_color || '#18181b',
     };
     let result = html;
     for (const [tag, value] of Object.entries(sampleData)) {
@@ -759,6 +769,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               >
                 <Redo2 className="w-3.5 h-3.5" />
               </Button>
+              <div className="w-px h-5 bg-zinc-200" />
+              <GlobalStylesPanel editorRef={emailEditorRef} />
             </div>
 
             {/* GrapeJS editor */}
