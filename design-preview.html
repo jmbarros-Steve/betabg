@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Portal — Design Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #06060a;
+    --card: rgba(255,255,255,0.04);
+    --card-border: rgba(255,255,255,0.08);
+    --card-hover: rgba(255,255,255,0.07);
+    --text: #f0f0f5;
+    --text-muted: #6b7280;
+    --primary: #6366f1;
+    --primary-glow: rgba(99,102,241,0.15);
+    --green: #22c55e;
+    --green-glow: rgba(34,197,94,0.2);
+    --red: #ef4444;
+    --red-glow: rgba(239,68,68,0.2);
+    --amber: #f59e0b;
+    --blue: #3b82f6;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated mesh gradient background */
+  .mesh-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 20%, rgba(99,102,241,0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(34,197,94,0.05), transparent),
+      radial-gradient(ellipse 50% 50% at 50% 50%, rgba(245,158,11,0.03), transparent);
+    animation: meshMove 20s ease-in-out infinite alternate;
+  }
+  @keyframes meshMove {
+    0% { background-position: 0% 0%, 100% 100%, 50% 50%; }
+    100% { background-position: 100% 100%, 0% 0%, 80% 20%; }
+  }
+
+  /* Noise texture overlay */
+  .noise {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .container {
+    position: relative;
+    z-index: 2;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    background: rgba(6,6,10,0.7);
+    border-bottom: 1px solid var(--card-border);
+    padding: 16px 0;
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-orb {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    box-shadow: 0 0 20px var(--primary-glow);
+  }
+  .logo-text { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; }
+  .logo-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: var(--primary-glow);
+    color: #a5b4fc;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  /* Nav pills */
+  .nav-pills {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.04);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+  }
+  .nav-pill {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: none;
+  }
+  .nav-pill:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .nav-pill.active {
+    color: #fff;
+    background: var(--primary);
+    box-shadow: 0 0 20px var(--primary-glow), 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .user-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .cmd-k {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+  }
+  .cmd-k kbd { font-family: inherit; font-weight: 600; }
+
+  /* ─── MAIN CONTENT ─── */
+  main { padding: 32px 0 80px; }
+
+  /* Section header */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .section-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .date-pills {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.04);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+  }
+  .date-pill {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: all 0.2s;
+  }
+  .date-pill:hover { color: var(--text); }
+  .date-pill.active { color: #fff; background: rgba(255,255,255,0.1); }
+
+  /* ─── KPI CARDS ─── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 1024px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 640px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent, transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .kpi-card:hover {
+    background: var(--card-hover);
+    border-color: rgba(255,255,255,0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .kpi-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .kpi-value.positive { color: var(--green); text-shadow: 0 0 30px var(--green-glow); }
+  .kpi-value.neutral { color: var(--text); }
+
+  .kpi-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 100px;
+  }
+  .kpi-trend.up { background: var(--green-glow); color: var(--green); }
+  .kpi-trend.down { background: var(--red-glow); color: var(--red); }
+  .kpi-trend-label { color: var(--text-muted); font-size: 11px; font-weight: 400; margin-left: 4px; }
+
+  .sparkline {
+    margin-top: 12px;
+    height: 32px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .spark-bar {
+    flex: 1;
+    border-radius: 2px;
+    transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: 3px;
+  }
+
+  /* ─── CHART CARDS ─── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+
+  .glass-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent, transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 100px;
+    background: var(--primary-glow);
+    color: #a5b4fc;
+    font-weight: 600;
+  }
+
+  /* SVG Chart */
+  .chart-container { position: relative; height: 200px; }
+  .chart-svg { width: 100%; height: 100%; }
+  .chart-line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .chart-line.revenue { stroke: var(--primary); filter: drop-shadow(0 0 8px var(--primary-glow)); }
+  .chart-line.prev { stroke: rgba(255,255,255,0.15); stroke-dasharray: 4 4; stroke-width: 1.5; }
+  .chart-area {
+    opacity: 0.15;
+  }
+  .chart-area.revenue { fill: url(#grad-purple); }
+  .chart-grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
+
+  /* ─── AI INSIGHTS PANEL ─── */
+  .ai-panel {
+    background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04));
+    border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .ai-panel::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(99,102,241,0.05), transparent 50%);
+    animation: aiPulse 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes aiPulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 0.6; transform: scale(1.2); }
+  }
+
+  .ai-orb {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6, #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 0 30px rgba(99,102,241,0.3);
+    animation: orbGlow 3s ease-in-out infinite;
+    position: relative;
+    z-index: 1;
+  }
+  @keyframes orbGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.2); }
+    50% { box-shadow: 0 0 40px rgba(99,102,241,0.4), 0 0 80px rgba(99,102,241,0.1); }
+  }
+  .ai-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+  }
+  .ai-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+  }
+  .ai-insight {
+    position: relative;
+    z-index: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #d1d5db;
+    transition: all 0.2s;
+  }
+  .ai-insight:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(99,102,241,0.2);
+  }
+  .ai-insight strong { color: var(--text); font-weight: 600; }
+  .ai-insight .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .tag.positive { background: var(--green-glow); color: var(--green); }
+  .tag.warning { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .tag.action { background: var(--primary-glow); color: #a5b4fc; }
+
+  /* ─── BOTTOM ROW ─── */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 768px) { .bottom-grid { grid-template-columns: 1fr; } }
+
+  .metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--card-border);
+    font-size: 13px;
+  }
+  .metric-row:last-child { border: none; }
+  .metric-row-label { color: var(--text-muted); }
+  .metric-row-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Mini bar chart */
+  .mini-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 24px;
+  }
+  .mini-bar {
+    width: 8px;
+    border-radius: 2px;
+    transition: all 0.5s;
+  }
+
+  /* ─── STATUS BAR ─── */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    backdrop-filter: blur(20px);
+    background: rgba(6,6,10,0.8);
+    border-top: 1px solid var(--card-border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 100%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green-glow);
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .typing-dots span {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 100%;
+    background: var(--primary);
+    margin: 0 1px;
+    animation: typingBounce 1.4s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+  }
+
+  /* ─── ANIMATIONS ─── */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.15s; }
+  .delay-3 { animation-delay: 0.2s; }
+  .delay-4 { animation-delay: 0.25s; }
+  .delay-5 { animation-delay: 0.3s; }
+  .delay-6 { animation-delay: 0.35s; }
+  .delay-7 { animation-delay: 0.4s; }
+
+  /* Number count-up animation */
+  .count-up {
+    display: inline-block;
+  }
+
+  /* Live badge */
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    padding: 3px 8px;
+    border-radius: 100px;
+    background: var(--green-glow);
+  }
+  .live-badge::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 100%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+</style>
+</head>
+<body>
+
+<div class="mesh-bg"></div>
+<div class="noise"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="container header-inner">
+    <div class="logo">
+      <div class="logo-orb">S</div>
+      <span class="logo-text">Steve</span>
+      <span class="logo-badge">AI PLATFORM</span>
+    </div>
+    <nav class="nav-pills">
+      <button class="nav-pill active">Métricas</button>
+      <button class="nav-pill">Steve</button>
+      <button class="nav-pill">Campañas</button>
+      <button class="nav-pill">Conexiones</button>
+      <button class="nav-pill">Meta Ads</button>
+    </nav>
+    <div class="user-area">
+      <span class="cmd-k"><kbd>⌘K</kbd></span>
+      <div class="avatar">JM</div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+  <div class="container">
+
+    <!-- Section Header -->
+    <div class="section-header fade-up">
+      <div>
+        <div class="section-title">Métricas en Tiempo Real</div>
+        <div class="section-subtitle">Últimos 30 días · Actualizado hace 3 min</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="live-badge">LIVE</span>
+        <div class="date-pills">
+          <button class="date-pill">7D</button>
+          <button class="date-pill active">30D</button>
+          <button class="date-pill">90D</button>
+          <button class="date-pill">YTD</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="kpi-grid">
+      <div class="kpi-card fade-up delay-1">
+        <div class="kpi-label">
+          Revenue
+          <div class="kpi-icon" style="background:rgba(34,197,94,0.1);color:var(--green)">$</div>
+        </div>
+        <div class="kpi-value positive" id="kpi-revenue">$0</div>
+        <div>
+          <span class="kpi-trend up">↑ 23.4%</span>
+          <span class="kpi-trend-label">vs periodo anterior</span>
+        </div>
+        <div class="sparkline" id="spark-revenue"></div>
+      </div>
+
+      <div class="kpi-card fade-up delay-2">
+        <div class="kpi-label">
+          Ad Spend
+          <div class="kpi-icon" style="background:rgba(239,68,68,0.1);color:var(--red)">⬇</div>
+        </div>
+        <div class="kpi-value neutral" id="kpi-spend">$0</div>
+        <div>
+          <span class="kpi-trend down">↓ 5.2%</span>
+          <span class="kpi-trend-label">vs periodo anterior</span>
+        </div>
+        <div class="sparkline" id="spark-spend"></div>
+      </div>
+
+      <div class="kpi-card fade-up delay-3">
+        <div class="kpi-label">
+          ROAS
+          <div class="kpi-icon" style="background:var(--primary-glow);color:#a5b4fc">✦</div>
+        </div>
+        <div class="kpi-value positive" id="kpi-roas">0x</div>
+        <div>
+          <span class="kpi-trend up">↑ 31.0%</span>
+          <span class="kpi-trend-label">vs periodo anterior</span>
+        </div>
+        <div class="sparkline" id="spark-roas"></div>
+      </div>
+
+      <div class="kpi-card fade-up delay-4">
+        <div class="kpi-label">
+          Pedidos
+          <div class="kpi-icon" style="background:rgba(59,130,246,0.1);color:var(--blue)">📦</div>
+        </div>
+        <div class="kpi-value neutral" id="kpi-orders">0</div>
+        <div>
+          <span class="kpi-trend up">↑ 18.7%</span>
+          <span class="kpi-trend-label">vs periodo anterior</span>
+        </div>
+        <div class="sparkline" id="spark-orders"></div>
+      </div>
+
+      <div class="kpi-card fade-up delay-5">
+        <div class="kpi-label">
+          POAS
+          <div class="kpi-icon" style="background:rgba(245,158,11,0.1);color:var(--amber)">💰</div>
+        </div>
+        <div class="kpi-value positive" id="kpi-poas">0x</div>
+        <div>
+          <span class="kpi-trend up">↑ 42.1%</span>
+          <span class="kpi-trend-label">vs periodo anterior</span>
+        </div>
+        <div class="sparkline" id="spark-poas"></div>
+      </div>
+    </div>
+
+    <!-- CHARTS + AI PANEL -->
+    <div class="chart-grid">
+      <div class="glass-card fade-up delay-5">
+        <div class="card-title">
+          Revenue vs Gasto Publicitario
+          <span class="card-badge">30 días</span>
+        </div>
+        <div class="chart-container">
+          <svg class="chart-svg" viewBox="0 0 600 200" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="grad-purple" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="grad-green" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#22c55e" stop-opacity="0.2"/>
+                <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Grid lines -->
+            <line x1="0" y1="50" x2="600" y2="50" class="chart-grid-line"/>
+            <line x1="0" y1="100" x2="600" y2="100" class="chart-grid-line"/>
+            <line x1="0" y1="150" x2="600" y2="150" class="chart-grid-line"/>
+            <!-- Previous period -->
+            <path class="chart-line prev" d="M0,140 C50,130 100,145 150,125 C200,105 250,120 300,100 C350,80 400,95 450,85 C500,75 550,90 600,70"/>
+            <!-- Revenue area -->
+            <path class="chart-area revenue" d="M0,120 C50,100 100,115 150,90 C200,65 250,80 300,55 C350,35 400,50 450,30 C500,20 550,35 600,15 L600,200 L0,200 Z"/>
+            <!-- Revenue line -->
+            <path class="chart-line revenue" d="M0,120 C50,100 100,115 150,90 C200,65 250,80 300,55 C350,35 400,50 450,30 C500,20 550,35 600,15">
+              <animate attributeName="d" dur="1s" from="M0,180 C50,180 100,180 150,180 C200,180 250,180 300,180 C350,180 400,180 450,180 C500,180 550,180 600,180" to="M0,120 C50,100 100,115 150,90 C200,65 250,80 300,55 C350,35 400,50 450,30 C500,20 550,35 600,15" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1"/>
+            </path>
+            <!-- Spend line -->
+            <path style="fill:none;stroke:var(--amber);stroke-width:2;opacity:0.6" d="M0,170 C50,165 100,168 150,160 C200,155 250,158 300,152 C350,148 400,150 450,145 C500,142 550,146 600,140">
+              <animate attributeName="d" dur="1.2s" from="M0,180 C50,180 100,180 150,180 C200,180 250,180 300,180 C350,180 400,180 450,180 C500,180 550,180 600,180" to="M0,170 C50,165 100,168 150,160 C200,155 250,158 300,152 C350,148 400,150 450,145 C500,142 550,146 600,140" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1"/>
+            </path>
+          </svg>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text-muted)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:3px;border-radius:2px;background:var(--primary)"></span> Revenue</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:3px;border-radius:2px;background:var(--amber);opacity:0.6"></span> Ad Spend</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:3px;border-radius:2px;background:rgba(255,255,255,0.15);border:none;border-top:1px dashed rgba(255,255,255,0.3)"></span> Periodo anterior</span>
+        </div>
+      </div>
+
+      <!-- AI Insights Panel -->
+      <div class="ai-panel fade-up delay-6">
+        <div class="ai-orb">🧠</div>
+        <div class="ai-title">Steve Insights</div>
+        <div class="ai-subtitle">
+          Analizando datos
+          <span class="typing-dots"><span></span><span></span><span></span></span>
+        </div>
+        <div class="ai-insight">
+          <span class="tag positive">ROAS</span>
+          <strong>ROAS subió 31%</strong> esta semana. Tu campaña "Summer Sale" está escalando bien — considera aumentar presupuesto 20%
+        </div>
+        <div class="ai-insight">
+          <span class="tag warning">CAC</span>
+          <strong>CAC aumentó $2.400</strong> en Google Ads. Los keywords "zapatillas running" están caros — prueba long-tail
+        </div>
+        <div class="ai-insight">
+          <span class="tag action">ACCIÓN</span>
+          <strong>3 carritos abandonados</strong> de alto valor ($180k+). Activa el flow de recuperación en Klaviyo
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="bottom-grid">
+      <div class="glass-card fade-up delay-6">
+        <div class="card-title">Rentabilidad</div>
+        <div class="metric-row">
+          <span class="metric-row-label">Margen Bruto</span>
+          <span class="metric-row-value" style="color:var(--green)">42.3%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">POAS</span>
+          <span class="metric-row-value" style="color:var(--green)">2.8x</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">CAC</span>
+          <span class="metric-row-value">$12.450</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">MER</span>
+          <span class="metric-row-value" style="color:var(--green)">4.2x</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Break-even ROAS</span>
+          <span class="metric-row-value">1.73x</span>
+        </div>
+      </div>
+
+      <div class="glass-card fade-up delay-7">
+        <div class="card-title">Top SKUs</div>
+        <div class="metric-row">
+          <span class="metric-row-label">Air Max 90 — Black</span>
+          <span class="metric-row-value">$4.230.000</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Ultra Boost 22</span>
+          <span class="metric-row-value">$3.180.000</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">NB 574 Grey</span>
+          <span class="metric-row-value">$2.540.000</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Vans Old Skool</span>
+          <span class="metric-row-value">$1.870.000</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Converse Chuck 70</span>
+          <span class="metric-row-value">$1.420.000</span>
+        </div>
+      </div>
+
+      <div class="glass-card fade-up delay-7">
+        <div class="card-title">
+          Ventas por Canal
+          <div class="mini-bars">
+            <div class="mini-bar" style="height:100%;background:var(--primary)"></div>
+            <div class="mini-bar" style="height:60%;background:var(--green)"></div>
+            <div class="mini-bar" style="height:35%;background:var(--amber)"></div>
+            <div class="mini-bar" style="height:20%;background:var(--blue)"></div>
+          </div>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Online Store</span>
+          <span class="metric-row-value">68%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Instagram</span>
+          <span class="metric-row-value">18%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Google Shopping</span>
+          <span class="metric-row-value">9%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row-label">Directo</span>
+          <span class="metric-row-value">5%</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div>
+    <span class="status-dot"></span>
+    Shopify · Meta · Google conectados
+  </div>
+  <div style="display:flex;gap:16px;align-items:center">
+    <span>Última sync: hace 3 min</span>
+    <span style="color:var(--text-muted)">Steve v2.4</span>
+  </div>
+</div>
+
+<script>
+  // Animated count-up
+  function countUp(el, target, prefix = '', suffix = '', decimals = 0) {
+    const duration = 1500;
+    const start = performance.now();
+    function update(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      const current = target * eased;
+      if (decimals > 0) {
+        el.textContent = prefix + current.toFixed(decimals) + suffix;
+      } else {
+        el.textContent = prefix + Math.round(current).toLocaleString('es-CL') + suffix;
+      }
+      if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+  }
+
+  // Init count-ups after page load
+  setTimeout(() => {
+    countUp(document.getElementById('kpi-revenue'), 28450000, '$');
+    countUp(document.getElementById('kpi-spend'), 4200000, '$');
+    countUp(document.getElementById('kpi-roas'), 6.77, '', 'x', 2);
+    countUp(document.getElementById('kpi-orders'), 847);
+    countUp(document.getElementById('kpi-poas'), 2.84, '', 'x', 2);
+  }, 400);
+
+  // Generate sparklines
+  function generateSparkline(containerId, color, data) {
+    const container = document.getElementById(containerId);
+    const max = Math.max(...data);
+    data.forEach((val, i) => {
+      const bar = document.createElement('div');
+      bar.className = 'spark-bar';
+      bar.style.background = color;
+      bar.style.height = '3px';
+      bar.style.opacity = '0.6';
+      container.appendChild(bar);
+      setTimeout(() => {
+        bar.style.height = (val / max * 100) + '%';
+        bar.style.opacity = i === data.length - 1 ? '1' : '0.4';
+      }, 600 + i * 30);
+    });
+  }
+
+  const revenueData = [65, 72, 58, 80, 95, 88, 110, 105, 120, 98, 135, 142, 130, 155];
+  const spendData = [40, 42, 38, 45, 43, 47, 44, 46, 42, 48, 45, 43, 47, 44];
+  const roasData = [1.6, 1.7, 1.5, 1.8, 2.2, 1.9, 2.5, 2.3, 2.9, 2.0, 3.0, 3.3, 2.8, 3.5];
+  const ordersData = [22, 28, 19, 35, 42, 38, 48, 45, 52, 40, 58, 62, 55, 68];
+  const poasData = [0.8, 0.9, 0.7, 1.1, 1.4, 1.2, 1.6, 1.5, 1.9, 1.3, 2.0, 2.3, 1.8, 2.8];
+
+  generateSparkline('spark-revenue', 'var(--green)', revenueData);
+  generateSparkline('spark-spend', 'var(--red)', spendData);
+  generateSparkline('spark-roas', 'var(--primary)', roasData);
+  generateSparkline('spark-orders', 'var(--blue)', ordersData);
+  generateSparkline('spark-poas', 'var(--amber)', poasData);
+</script>
+
+</body>
+</html>
