@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -166,6 +167,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
   const [viewMode, setViewMode] = useState<'full' | 'executive'>('full');
+  const [marginRate, setMarginRate] = useState<number>(40); // default 40% margin
   const [metaAccountCurrency, setMetaAccountCurrency] = useState<string>('USD');
   const [dynamicClpRate, setDynamicClpRate] = useState<number>(950); // fetched from API
 
@@ -465,6 +467,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   const overallRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const overallCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+
+  // Contribution margin metrics
+  const marginMetrics = useMemo(() => {
+    const grossProfit = totals.revenue * (marginRate / 100);
+    const netProfit = grossProfit - totals.spend;
+    const poas = totals.spend > 0 ? grossProfit / totals.spend : 0;
+    const breakEvenRoas = marginRate > 0 ? 100 / marginRate : 3.33;
+    const marginPerConversion = totals.conversions > 0 ? netProfit / totals.conversions : 0;
+    return { grossProfit, netProfit, poas, breakEvenRoas, marginPerConversion };
+  }, [totals, marginRate]);
 
   // Extract scale % and CPA max from automated rules (Wizard config)
   const scalePercent = useMemo(() => {
@@ -1291,6 +1303,60 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           </CardContent>
         </Card>
       </div>
+
+      {/* Contribution Margin */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Margen de Contribuci\u00f3n</CardTitle>
+              <CardDescription>Rentabilidad real descontando costos de ads</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Margen bruto:</span>
+              <Input
+                type="number"
+                value={marginRate}
+                onChange={(e) => setMarginRate(Math.max(1, Math.min(99, Number(e.target.value) || 40)))}
+                className="w-16 h-8 text-xs text-center"
+                min={1} max={99}
+              />
+              <span className="text-xs text-muted-foreground">%</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="text-center p-3 rounded-lg bg-muted/30">
+              <p className="text-xs text-muted-foreground mb-1">Beneficio Bruto</p>
+              <p className="text-lg font-bold">{formatCurrency(marginMetrics.grossProfit, 'CLP')}</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted/30">
+              <p className="text-xs text-muted-foreground mb-1">Beneficio Neto</p>
+              <p className={`text-lg font-bold ${marginMetrics.netProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {formatCurrency(marginMetrics.netProfit, 'CLP')}
+              </p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted/30">
+              <p className="text-xs text-muted-foreground mb-1">POAS</p>
+              <p className={`text-lg font-bold ${marginMetrics.poas >= 1 ? 'text-green-600' : 'text-red-500'}`}>
+                {marginMetrics.poas.toFixed(2)}x
+              </p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted/30">
+              <p className="text-xs text-muted-foreground mb-1">Break-Even ROAS</p>
+              <p className="text-lg font-bold">{marginMetrics.breakEvenRoas.toFixed(2)}x</p>
+              <p className="text-[10px] text-muted-foreground">Actual: {overallRoas.toFixed(2)}x {overallRoas >= marginMetrics.breakEvenRoas ? '\u2705' : '\u274c'}</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted/30">
+              <p className="text-xs text-muted-foreground mb-1">Margen/Conv</p>
+              <p className={`text-lg font-bold ${marginMetrics.marginPerConversion >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {totals.conversions > 0 ? formatCurrency(marginMetrics.marginPerConversion, 'CLP') : '\u2014'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Smart Alerts */}
       {smartAlerts.length > 0 && (
