@@ -579,7 +579,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       currentRoas: current.avgRoas,
       grossProfit,
       costOfGoods,
-      gatewayFees: current.totalRevenue * gatewayRate,
+      gatewayFees: netRevenue * gatewayRate,
     };
   }, [current, previous, financialConfig, dateRange, customDateRange]);
 
@@ -604,7 +604,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
     // Operational costs
     const shippingCosts = current.totalOrders * financialConfig.shipping_cost_per_order;
-    const shopifyCommission = current.totalRevenue * (financialConfig.shopify_commission_percentage / 100);
+    const shopifyCommission = netRevenue * (financialConfig.shopify_commission_percentage / 100);
 
     const netProfit =
       profitMetrics.grossProfit -
