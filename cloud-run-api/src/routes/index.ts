@@ -112,6 +112,9 @@ import { emailAbTesting, executeAbTestWinner } from './email/ab-testing.js';
 import { signupForms, signupFormPublic } from './email/signup-forms.js';
 import { formWidget } from './email/form-widget.js';
 import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-api.js';
+import { smartSendTime } from './email/smart-send-time.js';
+import { emailSendQueue } from './email/send-queue.js';
+import { emailListCleanup } from './email/list-cleanup.js';
 
 /**
  * Registers all API routes on the Hono app.
@@ -259,4 +262,9 @@ export function registerRoutes(app: Hono) {
   app.post('/api/email-flow-webhooks', emailFlowWebhooks); // Shopify webhook triggers - HMAC verified
   app.post('/api/email-flow-execute', authMiddleware, emailFlowExecute); // Cloud Tasks internal call
   app.post('/api/execute-scheduled-campaign', authMiddleware, executeScheduledCampaign); // Cloud Tasks internal call
+
+  // Smart Send Time, Throttled Queue, List Cleanup
+  app.post('/api/email-smart-send-time', authMiddleware, smartSendTime);
+  app.post('/api/email-send-queue', authMiddleware, emailSendQueue);
+  app.post('/api/email-list-cleanup', authMiddleware, emailListCleanup);
 }
