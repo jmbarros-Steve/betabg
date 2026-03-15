@@ -264,7 +264,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     });
 
     if (error) { toast.error(error); return; }
-    toast.success(action === 'create' ? 'Campa\u00f1a creada' : 'Campa\u00f1a guardada');
+    toast.success(action === 'create' ? 'Campaña creada' : 'Campaña guardada');
 
     // If new, update the editing campaign ID
     if (!editingCampaign.id && data?.campaign?.id) {
@@ -279,12 +279,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       if (!scheduleDate) { toast.error('Selecciona una fecha'); return; }
       // Save first
       await handleSaveCampaign();
-      if (!editingCampaign?.id) { toast.error('Guarda la campa\u00f1a primero'); return; }
+      if (!editingCampaign?.id) { toast.error('Guarda la campaña primero'); return; }
       const { error } = await callApi('manage-email-campaigns', {
         body: { action: 'schedule', client_id: clientId, campaign_id: editingCampaign.id, scheduled_at: scheduleDate },
       });
       if (error) { toast.error(error); return; }
-      toast.success('Campa\u00f1a programada');
+      toast.success('Campaña programada');
       setShowSendDialog(false);
       setShowEditor(false);
       loadCampaigns();
@@ -293,7 +293,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
     // Send now
     await handleSaveCampaign();
-    if (!editingCampaign?.id) { toast.error('Guarda la campa\u00f1a primero'); return; }
+    if (!editingCampaign?.id) { toast.error('Guarda la campaña primero'); return; }
     setShowSendDialog(false);
 
     setSending(true);
@@ -321,7 +321,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const handleSendTest = async () => {
-    if (!editingCampaign?.html_content) { toast.error('Dise\u00f1a el email primero'); return; }
+    if (!editingCampaign?.html_content) { toast.error('Diseña el email primero'); return; }
     setSendingTest(true);
     try {
       await handleSaveCampaign();
@@ -350,7 +350,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       body: { action: 'delete', client_id: clientId, campaign_id: campaignId },
     });
     if (error) { toast.error(error); return; }
-    toast.success('Campa\u00f1a eliminada');
+    toast.success('Campaña eliminada');
     setDeleteConfirmId(null);
     loadCampaigns();
   };
@@ -410,9 +410,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
   const replaceMergeTagsForPreview = (html: string): string => {
     const sampleData: Record<string, string> = {
-      '{{ first_name }}': 'Mar\u00eda',
-      '{{ last_name }}': 'Gonz\u00e1lez',
-      '{{ full_name }}': 'Mar\u00eda Gonz\u00e1lez',
+      '{{ first_name }}': 'María',
+      '{{ last_name }}': 'González',
+      '{{ full_name }}': 'María González',
       '{{ email }}': 'maria@ejemplo.com',
       '{{ brand_name }}': brandInfo.name || 'Tu Marca',
       '{{ shop_url }}': brandInfo.shop_url || 'https://tutienda.com',
@@ -424,7 +424,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       '{{ cart_url }}': '#',
       '{{ cart_total }}': '$49.990',
       '{{ cart_items_count }}': '3',
-      '{{ cart_first_item_name }}': 'Polera B\u00e1sica',
+      '{{ cart_first_item_name }}': 'Polera Básica',
       '{{ cart_first_item_image }}': 'https://placehold.co/280x280/f4f4f5/a1a1aa?text=Producto',
       '{{ discount_code }}': 'STEVE20',
       '{{ shopify_discount_code }}': 'STEVE-20%OFF',
@@ -455,7 +455,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     setEditorStep('review');
   };
 
-  const stepLabels = ['Datos', 'Dise\u00f1o', 'Audiencia', 'Revisar y Enviar'];
+  const stepLabels = ['Datos', 'Diseño', 'Audiencia', 'Revisar y Enviar'];
   const stepKeys: Array<'setup' | 'design' | 'audience' | 'review'> = ['setup', 'design', 'audience', 'review'];
   const currentStepIndex = stepKeys.indexOf(editorStep);
 
@@ -482,11 +482,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 value={editingCampaign?.name || ''}
                 onChange={(e) => setEditingCampaign(prev => ({ ...prev, name: e.target.value }))}
                 className="h-8 text-sm font-medium w-64"
-                placeholder="Nombre de la campa\u00f1a"
+                placeholder="Nombre de la campaña"
               />
             ) : (
               <span className="text-sm font-medium">
-                {editingCampaign?.name || 'Nueva Campa\u00f1a'}
+                {editingCampaign?.name || 'Nueva Campaña'}
               </span>
             )}
           </div>
@@ -542,17 +542,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
               <div>
-                <h2 className="text-xl font-semibold mb-1">Paso 1: Datos de la campa\u00f1a</h2>
+                <h2 className="text-xl font-semibold mb-1">Paso 1: Datos de la campaña</h2>
                 <p className="text-sm text-muted-foreground">Define el nombre, asunto y remitente</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <Label>Nombre de la campa\u00f1a *</Label>
+                  <Label>Nombre de la campaña *</Label>
                   <Input
                     value={editingCampaign?.name || ''}
                     onChange={(e) => setEditingCampaign(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ej: Promoci\u00f3n Black Friday"
+                    placeholder="Ej: Promoción Black Friday"
                   />
                 </div>
 
@@ -564,7 +564,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                       onChange={(e) => setEditingCampaign(prev => ({ ...prev, subject: e.target.value }))}
                       placeholder="Ej: 30% de descuento solo hoy"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">M\u00e1x 50 caracteres recomendado.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Máx 50 caracteres recomendado.</p>
                   </div>
                   <div>
                     <Label>Preview text</Label>
@@ -608,7 +608,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs">Tipo de campa\u00f1a</Label>
+                      <Label className="text-xs">Tipo de campaña</Label>
                       <Select value={campaignType} onValueChange={setCampaignType}>
                         <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -623,7 +623,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                       <Input
                         value={aiInstructions}
                         onChange={(e) => setAiInstructions(e.target.value)}
-                        placeholder="Ej: Enf\u00f3cate en el descuento del 30%"
+                        placeholder="Ej: Enfócate en el descuento del 30%"
                         className="h-9"
                       />
                     </div>
@@ -640,7 +640,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     )}
                   </Button>
                   {editingCampaign?.html_content && (
-                    <p className="text-xs text-green-600 font-medium">Email generado. Contin\u00faa al editor para personalizarlo.</p>
+                    <p className="text-xs text-green-600 font-medium">Email generado. Continúa al editor para personalizarlo.</p>
                   )}
                 </CardContent>
               </Card>
@@ -651,24 +651,24 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShoppingBag className="w-5 h-5 text-green-600" />
-                      <h3 className="font-semibold">Productos Din\u00e1micos</h3>
+                      <h3 className="font-semibold">Productos Dinámicos</h3>
                     </div>
                     <Switch checked={recEnabled} onCheckedChange={setRecEnabled} />
                   </div>
                   {recEnabled && (
                     <div className="space-y-3 pt-1">
                       <p className="text-xs text-muted-foreground">
-                        Usa el merge tag <code className="bg-muted px-1 rounded">{'{{ product_recommendations }}'}</code> en el dise\u00f1o para insertar productos personalizados.
+                        Usa el merge tag <code className="bg-muted px-1 rounded">{'{{ product_recommendations }}'}</code> en el diseño para insertar productos personalizados.
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label className="text-xs">Tipo de recomendaci\u00f3n</Label>
+                          <Label className="text-xs">Tipo de recomendación</Label>
                           <Select value={recType} onValueChange={setRecType}>
                             <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="best_sellers">M\u00e1s vendidos</SelectItem>
+                              <SelectItem value="best_sellers">Más vendidos</SelectItem>
                               <SelectItem value="new_arrivals">Nuevos</SelectItem>
-                              <SelectItem value="recently_viewed">\u00daltimos vistos</SelectItem>
+                              <SelectItem value="recently_viewed">Últimos vistos</SelectItem>
                               <SelectItem value="abandoned_cart">Carrito abandonado</SelectItem>
                               <SelectItem value="complementary">Complementarios</SelectItem>
                               <SelectItem value="all">Todos los productos</SelectItem>
@@ -697,7 +697,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   <ArrowLeft className="w-4 h-4 mr-1" /> Cancelar
                 </Button>
                 <Button size="lg" onClick={goToDesignStep}>
-                  Siguiente: Dise\u00f1ar Email <ChevronRight className="w-4 h-4 ml-1" />
+                  Siguiente: Diseñar Email <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </div>
             </div>
@@ -773,7 +773,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Define condiciones para mostrar/ocultar bloques seg\u00fan datos del suscriptor.
+                  Define condiciones para mostrar/ocultar bloques según datos del suscriptor.
                   Selecciona un bloque en el editor y aplica condiciones.
                 </p>
                 <ConditionalBlockPanel
@@ -791,7 +791,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
               <div>
                 <h2 className="text-xl font-semibold mb-1">Paso 3: Audiencia</h2>
-                <p className="text-sm text-muted-foreground">Define a qui\u00e9n enviar esta campa\u00f1a</p>
+                <p className="text-sm text-muted-foreground">Define a quién enviar esta campaña</p>
               </div>
 
               <Card className="bg-muted/50">
@@ -802,7 +802,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     </div>
                     <div>
                       <p className="font-medium">Todos los contactos suscritos</p>
-                      <p className="text-sm text-muted-foreground">{subscriberCount} contactos recibir\u00e1n esta campa\u00f1a</p>
+                      <p className="text-sm text-muted-foreground">{subscriberCount} contactos recibirán esta campaña</p>
                     </div>
                   </div>
                 </CardContent>
@@ -826,7 +826,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
               <div>
                 <h2 className="text-xl font-semibold mb-1">Paso 4: Revisar y Enviar</h2>
-                <p className="text-sm text-muted-foreground">Revisa tu campa\u00f1a antes de enviarla</p>
+                <p className="text-sm text-muted-foreground">Revisa tu campaña antes de enviarla</p>
               </div>
 
               {/* Summary */}
@@ -834,7 +834,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <CardContent className="py-4 space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-muted-foreground">Campa\u00f1a</p>
+                      <p className="text-xs text-muted-foreground">Campaña</p>
                       <p className="font-medium">{editingCampaign?.name || 'Sin nombre'}</p>
                     </div>
                     <div>
@@ -919,14 +919,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                             <Input
                               value={abSubjectB}
                               onChange={(e) => setAbSubjectB(e.target.value)}
-                              placeholder="Ej: \u00a1No te lo pierdas! 30% OFF"
+                              placeholder="Ej: ¡No te lo pierdas! 30% OFF"
                               className="h-9"
                             />
                           </div>
                           <div>
                             <Label className="text-xs">Porcentaje de prueba: {abTestPercent}%</Label>
                             <p className="text-xs text-muted-foreground mb-2">
-                              {Math.round(subscriberCount * abTestPercent / 100)} contactos por variante \u00b7 {subscriberCount - Math.round(subscriberCount * abTestPercent / 100) * 2} reciben la ganadora
+                              {Math.round(subscriberCount * abTestPercent / 100)} contactos por variante · {subscriberCount - Math.round(subscriberCount * abTestPercent / 100) * 2} reciben la ganadora
                             </p>
                             <Slider
                               value={[abTestPercent]}
@@ -936,7 +936,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label className="text-xs">M\u00e9trica ganadora</Label>
+                              <Label className="text-xs">Métrica ganadora</Label>
                               <Select value={abWinningMetric} onValueChange={setAbWinningMetric}>
                                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -947,7 +947,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                               </Select>
                             </div>
                             <div>
-                              <Label className="text-xs">Duraci\u00f3n del test</Label>
+                              <Label className="text-xs">Duración del test</Label>
                               <Select value={String(abDurationHours)} onValueChange={(v) => setAbDurationHours(Number(v))}>
                                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -995,7 +995,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                         setSendMode('now');
                         setShowSendDialog(true);
                       } else {
-                        toast.info('Guarda la campa\u00f1a primero');
+                        toast.info('Guarda la campaña primero');
                       }
                     }}
                     disabled={sending || !editingCampaign?.subject || !editingCampaign?.html_content}
@@ -1017,11 +1017,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Enviar Campa\u00f1a</DialogTitle>
+              <DialogTitle>Enviar Campaña</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
-                Esta campa\u00f1a se enviar\u00e1 a <span className="font-medium text-foreground">{subscriberCount} contactos</span>. Esta acci\u00f3n no se puede deshacer.
+                Esta campaña se enviará a <span className="font-medium text-foreground">{subscriberCount} contactos</span>. Esta acción no se puede deshacer.
               </p>
               <div className="flex gap-3">
                 <Button
@@ -1041,7 +1041,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </div>
               {sendMode === 'schedule' && (
                 <div>
-                  <Label>Fecha y hora de env\u00edo</Label>
+                  <Label>Fecha y hora de envío</Label>
                   <Input
                     type="datetime-local"
                     value={scheduleDate}
@@ -1054,7 +1054,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               <Button variant="outline" onClick={() => setShowSendDialog(false)}>Cancelar</Button>
               <Button onClick={confirmSend} disabled={sending}>
                 {sending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-                {sendMode === 'now' ? 'Confirmar Env\u00edo' : 'Programar Env\u00edo'}
+                {sendMode === 'now' ? 'Confirmar Envío' : 'Programar Envío'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1105,11 +1105,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Campa\u00f1as de Email</h3>
-          <p className="text-sm text-muted-foreground">Crea y env\u00eda campa\u00f1as a tus contactos</p>
+          <h3 className="text-lg font-semibold">Campañas de Email</h3>
+          <p className="text-sm text-muted-foreground">Crea y envía campañas a tus contactos</p>
         </div>
         <Button size="lg" className="px-6" onClick={() => openEditor()}>
-          <Plus className="w-5 h-5 mr-2" /> Nueva Campa\u00f1a
+          <Plus className="w-5 h-5 mr-2" /> Nueva Campaña
         </Button>
       </div>
 
@@ -1121,10 +1121,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Send className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground mb-1">No hay campa\u00f1as todav\u00eda</p>
-            <p className="text-sm text-muted-foreground mb-4">Crea tu primera campa\u00f1a de email</p>
+            <p className="text-muted-foreground mb-1">No hay campañas todavía</p>
+            <p className="text-sm text-muted-foreground mb-4">Crea tu primera campaña de email</p>
             <Button size="lg" className="px-6" onClick={() => openEditor()}>
-              <Plus className="w-5 h-5 mr-2" /> Crear Campa\u00f1a
+              <Plus className="w-5 h-5 mr-2" /> Crear Campaña
             </Button>
           </CardContent>
         </Card>
@@ -1244,9 +1244,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar campa\u00f1a</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar campaña</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acci\u00f3n eliminar\u00e1 la campa\u00f1a permanentemente. No se puede deshacer.
+              Esta acción eliminará la campaña permanentemente. No se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

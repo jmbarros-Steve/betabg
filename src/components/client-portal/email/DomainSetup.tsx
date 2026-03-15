@@ -62,7 +62,7 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
       if (data?.verified) {
         toast.success('Dominio verificado exitosamente');
       } else {
-        toast.info('Todavia no verificado. Revisa que los registros DNS esten correctos.');
+        toast.info('Todavía no verificado. Revisa que los registros DNS esten correctos.');
       }
       loadDomain();
     } finally {
@@ -87,9 +87,9 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h3 className="text-base font-semibold">Configurar dominio de envio</h3>
+        <h3 className="text-base font-semibold">Configurar dominio de envío</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Envia emails desde tu propio dominio (ej: info@tutienda.com)
+          Envía emails desde tu propio dominio (ej: info@tutienda.com)
         </p>
       </div>
 
@@ -199,7 +199,7 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
                 </table>
               </div>
               <p className="text-xs text-muted-foreground">
-                Agrega estos registros DNS en tu proveedor de dominio. La verificacion puede tomar hasta 72 horas.
+                Agrega estos registros DNS en tu proveedor de dominio. La verificación puede tomar hasta 72 horas.
               </p>
             </div>
           )}
@@ -208,7 +208,7 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
           {domain.status !== 'verified' && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">
-                Paso 3: Comprobar verificacion
+                Paso 3: Comprobar verificación
               </Label>
               <Button
                 onClick={handleCheck}
@@ -219,7 +219,7 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
                 {checking ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
-                Comprobar verificacion
+                Comprobar verificación
               </Button>
             </div>
           )}
@@ -229,7 +229,7 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
             <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-4 text-center">
               <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
               <p className="text-sm font-medium text-green-800 dark:text-green-300">
-                Tu dominio esta verificado y listo para enviar emails.
+                Tu dominio está verificado y listo para enviar emails.
               </p>
             </div>
           )}

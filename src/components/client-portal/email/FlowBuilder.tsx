@@ -43,7 +43,7 @@ interface FlowStep {
 }
 
 const CONDITION_TYPES = [
-  { value: 'opened_email', label: 'Abrio el email' },
+  { value: 'opened_email', label: 'Abrió el email' },
   { value: 'clicked_email', label: 'Hizo clic en el email' },
   { value: 'has_purchased', label: 'Ha comprado' },
   { value: 'subscriber_property', label: 'Propiedad del suscriptor' },
@@ -104,7 +104,7 @@ const TRIGGER_CONFIG: Record<string, {
   },
   post_purchase: {
     label: 'Post-compra',
-    description: 'Se activa despues de que un cliente realiza una compra',
+    description: 'Se activa después de que un cliente realiza una compra',
     icon: Package,
     defaultName: 'Post-compra',
     defaultSteps: 2,
@@ -127,11 +127,11 @@ const DELAY_OPTIONS = [
   { value: 7200, label: '2 horas' },
   { value: 14400, label: '4 horas' },
   { value: 43200, label: '12 horas' },
-  { value: 86400, label: '1 dia' },
-  { value: 172800, label: '2 dias' },
-  { value: 259200, label: '3 dias' },
-  { value: 604800, label: '7 dias' },
-  { value: 1209600, label: '14 dias' },
+  { value: 86400, label: '1 día' },
+  { value: 172800, label: '2 días' },
+  { value: 259200, label: '3 días' },
+  { value: 604800, label: '7 días' },
+  { value: 1209600, label: '14 días' },
 ];
 
 export function FlowBuilder({ clientId }: FlowBuilderProps) {
@@ -207,9 +207,9 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       });
       setShowTriggerPicker(false);
       setShowEditor(true);
-      toast.success(`Automatizacion de ${config.label} generada con AI`);
+      toast.success(`Automatización de ${config.label} generada con AI`);
     } catch (err) {
-      toast.error('Error generando automatizacion');
+      toast.error('Error generando automatización');
     } finally {
       setGenerating(false);
     }
@@ -217,7 +217,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
 
   const handleSave = async () => {
     if (!editingFlow?.name || !editingFlow?.trigger_type) {
-      toast.error('Nombre y tipo de automatizacion son requeridos');
+      toast.error('Nombre y tipo de automatización son requeridos');
       return;
     }
 
@@ -235,7 +235,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     });
 
     if (error) { toast.error(error); return; }
-    toast.success(action === 'create' ? 'Automatizacion creada' : 'Automatizacion actualizada');
+    toast.success(action === 'create' ? 'Automatización creada' : 'Automatización actualizada');
     setShowEditor(false);
     setEditingFlow(null);
     loadFlows();
@@ -246,7 +246,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       body: { action: 'activate', client_id: clientId, flow_id: flowId },
     });
     if (error) { toast.error(error); return; }
-    toast.success('Automatizacion activada');
+    toast.success('Automatización activada');
     loadFlows();
   };
 
@@ -255,7 +255,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       body: { action: 'pause', client_id: clientId, flow_id: flowId },
     });
     if (error) { toast.error(error); return; }
-    toast.success('Automatizacion pausada');
+    toast.success('Automatización pausada');
     loadFlows();
   };
 
@@ -264,7 +264,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       body: { action: 'delete', client_id: clientId, flow_id: flowId },
     });
     if (error) { toast.error(error); return; }
-    toast.success('Automatizacion eliminada');
+    toast.success('Automatización eliminada');
     loadFlows();
   };
 
@@ -491,11 +491,11 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Automatizaciones</h3>
-          <p className="text-sm text-muted-foreground">Envia emails automaticamente segun el comportamiento del cliente</p>
+          <h3 className="text-lg font-semibold">Automatizaciónes</h3>
+          <p className="text-sm text-muted-foreground">Envía emails automáticamente según el comportamiento del cliente</p>
         </div>
         <Button size="lg" onClick={openNewFlowPicker} className="gap-2">
-          <Plus className="w-5 h-5" /> Nueva Automatizacion
+          <Plus className="w-5 h-5" /> Nueva Automatización
         </Button>
       </div>
 
@@ -512,10 +512,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             </div>
             <h4 className="text-lg font-semibold mb-2">Automatiza tus emails</h4>
             <p className="text-muted-foreground max-w-md mb-6">
-              Las automatizaciones envian emails automaticamente cuando algo ocurre en tu tienda. Crea tu primera automatizacion para empezar.
+              Las automatizaciónes envían emails automáticamente cuando algo ocurre en tu tienda. Crea tu primera automatización para empezar.
             </p>
             <Button size="lg" onClick={openNewFlowPicker} className="gap-2">
-              <Plus className="w-5 h-5" /> Crear automatizacion
+              <Plus className="w-5 h-5" /> Crear automatización
             </Button>
           </CardContent>
         </Card>
@@ -578,9 +578,9 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       <Dialog open={showTriggerPicker} onOpenChange={setShowTriggerPicker}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nueva Automatizacion</DialogTitle>
+            <DialogTitle>Nueva Automatización</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground mb-4">Elige cuando se activara esta automatizacion:</p>
+          <p className="text-sm text-muted-foreground mb-4">Elige cuando se activará esta automatización:</p>
           <div className="space-y-2">
             {Object.entries(TRIGGER_CONFIG).map(([key, config]) => {
               const Icon = config.icon;
@@ -602,7 +602,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             })}
           </div>
           <div className="border-t pt-3 mt-2">
-            <p className="text-xs text-muted-foreground text-center mb-2">O genera todos los emails automaticamente con AI</p>
+            <p className="text-xs text-muted-foreground text-center mb-2">O genera todos los emails automáticamente con AI</p>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(TRIGGER_CONFIG).map(([key, config]) => (
                 <Button
@@ -626,7 +626,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       <Dialog open={showEditor} onOpenChange={setShowEditor}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingFlow?.id ? 'Editar automatizacion' : 'Nueva automatizacion'}</DialogTitle>
+            <DialogTitle>{editingFlow?.id ? 'Editar automatización' : 'Nueva automatización'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             {/* Name & Trigger */}
@@ -664,7 +664,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             {/* Settings */}
             <Card className="bg-muted/30">
               <CardContent className="py-3 space-y-3">
-                <p className="text-sm font-medium">Configuracion</p>
+                <p className="text-sm font-medium">Configuración</p>
                 <div className="flex items-center justify-between">
                   <Label className="text-sm">Salir del flujo si el cliente compra</Label>
                   <Switch
@@ -695,7 +695,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
 
             {/* ===== FLOW STEPS (VISUAL) ===== */}
             <div>
-              <Label className="text-sm font-medium">Pasos de la automatizacion</Label>
+              <Label className="text-sm font-medium">Pasos de la automatización</Label>
               <div className="space-y-0 mt-3">
                 {(editingFlow?.steps || []).map((step, index) => {
                   const isCondition = step.type === 'condition';
@@ -753,7 +753,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                               onClick={() => openStepInEditor(index)}
                             >
                               <Edit className="w-3.5 h-3.5 mr-1.5" />
-                              {step.html_content ? 'Editar diseno' : 'Disenar email'}
+                              {step.html_content ? 'Editar diseño' : 'Diseñar email'}
                             </Button>
                           </CardContent>
                         </Card>
@@ -794,7 +794,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                           <CardContent className="py-3 space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium flex items-center gap-1.5">
-                                <GitBranch className="w-3.5 h-3.5 text-purple-600" /> Condicion
+                                <GitBranch className="w-3.5 h-3.5 text-purple-600" /> Condición
                               </span>
                               <Button variant="ghost" size="sm" onClick={() => removeStep(index)}>
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -933,7 +933,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                   <Clock className="w-4 h-4 mr-1.5" /> Esperar
                 </Button>
                 <Button variant="outline" className="flex-1" onClick={addConditionStep}>
-                  <GitBranch className="w-4 h-4 mr-1.5" /> Condicion
+                  <GitBranch className="w-4 h-4 mr-1.5" /> Condición
                 </Button>
               </div>
             </div>
@@ -941,7 +941,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditor(false)}>Cancelar</Button>
             <Button onClick={handleSave}>
-              {editingFlow?.id ? 'Guardar cambios' : 'Crear automatizacion'}
+              {editingFlow?.id ? 'Guardar cambios' : 'Crear automatización'}
             </Button>
           </DialogFooter>
         </DialogContent>
