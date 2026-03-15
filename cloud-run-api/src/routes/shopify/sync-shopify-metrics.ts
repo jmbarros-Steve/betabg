@@ -1,44 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin, getSupabaseWithUserToken } from '../../lib/supabase.js';
 import { convertToCLP } from '../../lib/currency.js';
-
-// Helper to validate Shopify Session Token
-async function validateShopifySessionToken(
-  sessionToken: string,
-  supabase: any
-): Promise<{ valid: boolean; shopDomain?: string; userId?: string; error?: string }> {
-  try {
-    // Decode and validate the JWT
-    const [headerB64, payloadB64] = sessionToken.split('.');
-    if (!headerB64 || !payloadB64) {
-      return { valid: false, error: 'Invalid token format' };
-    }
-
-    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-    const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-
-    if (!shopDomain) {
-      return { valid: false, error: 'No shop domain in token' };
-    }
-
-    // Find the user associated with this shop
-    const { data: client, error } = await supabase
-      .from('clients')
-      .select('id, client_user_id, user_id')
-      .eq('shop_domain', shopDomain)
-      .single();
-
-    if (error || !client) {
-      return { valid: false, error: 'Shop not found in database' };
-    }
-
-    const userId = client.client_user_id || client.user_id;
-    return { valid: true, shopDomain, userId };
-  } catch (err: any) {
-    console.error('Session token validation error:', err);
-    return { valid: false, error: err.message };
-  }
-}
+import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 interface ShopifyOrder {
   id: number;

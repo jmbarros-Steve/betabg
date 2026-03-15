@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { convertToCLP } from '../../lib/currency.js';
+import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 export async function fetchShopifyAnalytics(c: Context) {
   try {
@@ -12,17 +13,11 @@ export async function fetchShopifyAnalytics(c: Context) {
     let userId: string | null = null;
 
     if (shopifySessionToken) {
-      const [, payloadB64] = shopifySessionToken.split('.');
-      if (!payloadB64) {
-        return c.json({ error: 'Invalid token' }, 401);
+      const validation = await validateShopifySessionToken(shopifySessionToken, serviceClient);
+      if (!validation.valid || !validation.userId) {
+        return c.json({ error: validation.error || 'Invalid token' }, 401);
       }
-      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-      const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-      const { data: client } = await serviceClient.from('clients').select('client_user_id, user_id').eq('shop_domain', shopDomain).single();
-      if (!client) {
-        return c.json({ error: 'Shop not found' }, 401);
-      }
-      userId = client.client_user_id || client.user_id;
+      userId = validation.userId;
     } else if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
