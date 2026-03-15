@@ -124,16 +124,12 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     const blocks = page.locator('.gjs-blocks-c, .gjs-block-categories').first();
     await expect(blocks).toBeVisible({ timeout: 5000 });
 
-    // Count all blocks registered in GrapeJS (including inside collapsed categories)
-    // Using page.evaluate to check DOM presence, not viewport visibility
-    const expectedBlocks = [
-      'Productos', 'Descuento', 'Cuenta Regresiva', 'Boton Diseno',
-      'Redes Sociales', 'Header', 'Footer', 'Texto Enriquecido',
-      'Separador', 'Espacio', '2 Columnas', '3 Columnas', 'Hero Banner',
-    ];
+    // Check Steve custom blocks exist in DOM (4 custom + newsletter preset blocks)
+    const steveBlocks = ['Productos', 'Descuento', 'Cuenta Regresiva', 'Boton Diseno'];
 
     const blockCheckResult = await page.evaluate((labels: string[]) => {
       const allBlocks = Array.from(document.querySelectorAll('.gjs-block'));
+      const allLabels = allBlocks.map(b => (b.textContent || '').trim());
       const found: string[] = [];
       const notFound: string[] = [];
       for (const label of labels) {
@@ -142,8 +138,8 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
         if (exists) found.push(label);
         else notFound.push(label);
       }
-      return { found, notFound, totalBlocks: allBlocks.length };
-    }, expectedBlocks);
+      return { found, notFound, totalBlocks: allBlocks.length, allLabels };
+    }, steveBlocks);
 
     for (const label of blockCheckResult.found) {
       console.log(`[QA] Block "${label}": FOUND`);
@@ -151,17 +147,21 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     for (const label of blockCheckResult.notFound) {
       console.log(`[QA] Block "${label}": NOT FOUND`);
     }
-    console.log(`[QA] Blocks: ${blockCheckResult.found.length}/${expectedBlocks.length} found (${blockCheckResult.totalBlocks} total in DOM)`);
+    console.log(`[QA] Steve blocks: ${blockCheckResult.found.length}/${steveBlocks.length} found`);
+    console.log(`[QA] Total blocks in DOM: ${blockCheckResult.totalBlocks} (Steve + newsletter preset)`);
+    console.log(`[QA] All block labels: ${blockCheckResult.allLabels.join(', ')}`);
 
-    // At least 10 of our custom blocks should exist in the DOM
-    expect(blockCheckResult.found.length).toBeGreaterThanOrEqual(10);
+    // All 4 custom Steve blocks must exist
+    expect(blockCheckResult.found.length).toBe(steveBlocks.length);
+    // Newsletter preset adds more blocks (Section, Button, Text, Image, etc.)
+    expect(blockCheckResult.totalBlocks).toBeGreaterThanOrEqual(10);
 
     // Try clicking a block to add it to canvas
-    const heroBlock = page.locator('.gjs-block').filter({ hasText: /Hero/i }).first();
-    if (await heroBlock.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await heroBlock.click({ force: true });
+    const productsBlock = page.locator('.gjs-block').filter({ hasText: /Productos/i }).first();
+    if (await productsBlock.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await productsBlock.click({ force: true });
       await page.waitForTimeout(2000);
-      console.log('[QA] Added Hero block to canvas');
+      console.log('[QA] Added Productos block to canvas');
     }
 
     await page.screenshot({ path: 'e2e/screenshots/qa-v2-01-blocks.png', fullPage: true });
