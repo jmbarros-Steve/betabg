@@ -774,6 +774,42 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       alerts.push({ type: 'critical', message: `${formatCurrency(totals.spend, 'CLP')} gastados sin conversiones. Revisa pixel y tracking.` });
     }
 
+    // Anomaly detection: z-score on daily spend
+    if (dailyTrend.length >= 7) {
+      const spends = dailyTrend.map(d => d.spend);
+      const mean = spends.reduce((s, v) => s + v, 0) / spends.length;
+      const stdDev = Math.sqrt(spends.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / spends.length);
+      if (stdDev > 0) {
+        const last3 = dailyTrend.slice(-3);
+        for (const day of last3) {
+          const zScore = (day.spend - mean) / stdDev;
+          if (zScore > 2) {
+            const date = new Date(day.date + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+            alerts.push({ type: 'warning', message: `Anomal\u00eda: gasto del ${date} (${formatCurrency(day.spend, 'CLP')}) es ${zScore.toFixed(1)}\u03c3 sobre el promedio.` });
+          }
+        }
+        // Revenue anomaly (drop)
+        const revenues = dailyTrend.map(d => d.revenue);
+        const revMean = revenues.reduce((s, v) => s + v, 0) / revenues.length;
+        const revStd = Math.sqrt(revenues.reduce((s, v) => s + Math.pow(v - revMean, 2), 0) / revenues.length);
+        if (revStd > 0 && revMean > 0) {
+          const lastDay = dailyTrend[dailyTrend.length - 1];
+          const revZ = (lastDay.revenue - revMean) / revStd;
+          if (revZ < -2) {
+            const date = new Date(lastDay.date + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+            alerts.push({ type: 'critical', message: `Ca\u00edda de ingresos: ${date} (${formatCurrency(lastDay.revenue, 'CLP')}) es ${Math.abs(revZ).toFixed(1)}\u03c3 bajo el promedio.` });
+          }
+        }
+      }
+
+      // CTR anomaly per campaign
+      for (const campaign of aggregatedCampaigns.slice(0, 10)) {
+        if (campaign.total_impressions > 5000 && campaign.avg_ctr < 0.5) {
+          alerts.push({ type: 'info', message: `"${campaign.campaign_name.slice(0, 40)}" tiene CTR ${campaign.avg_ctr.toFixed(2)}% con ${formatNumber(campaign.total_impressions)} impresiones. Considerar pausar.` });
+        }
+      }
+    }
+
     return alerts;
   }, [totals, dailyTrend, overallRoas, overallCtr]);
 
