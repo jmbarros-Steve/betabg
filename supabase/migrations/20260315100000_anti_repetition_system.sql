@@ -27,7 +27,7 @@ CREATE POLICY "Users can read own client copies"
 -- 2. Copy angles bank
 CREATE TABLE IF NOT EXISTS copy_angles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   description TEXT NOT NULL,
   category TEXT NOT NULL CHECK (category IN (
     'dolor', 'aspiracion', 'curiosidad', 'fomo', 'testimonio',

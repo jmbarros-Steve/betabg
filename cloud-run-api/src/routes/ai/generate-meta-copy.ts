@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { VISUAL_STYLES } from '../../lib/visual-styles.js';
 
 interface GenerateRequest {
   clientId: string;
@@ -11,15 +12,6 @@ interface GenerateRequest {
   variacionElegida?: Record<string, string>;
   mode?: 'variaciones' | 'brief_visual' | 'legacy';
 }
-
-// ── VISUAL STYLE POOL (15 styles, rotated per client) ──────────────────────
-const VISUAL_STYLES = [
-  'UGC (user-generated content)', 'Editorial de revista', 'Flat lay cenital',
-  'Lifestyle outdoor', 'Lifestyle indoor', 'Behind-the-scenes',
-  'Antes/Después split', 'Close-up de producto', 'Modelo usando el producto',
-  'Estilo testimonial', 'Minimalista fondo limpio', 'Bold typography overlay',
-  'Comparación split-screen', 'Seasonal/temático', 'Night mood / luces neón',
-] as const;
 
 // ── ANTI-REPETITION HELPERS ────────────────────────────────────────────────
 
@@ -75,15 +67,20 @@ async function saveCopyToHistory(
   angleCategory: string | null,
   visualStyle: string | null,
 ) {
-  await supabase.from('generated_copies').insert({
-    client_id: clientId,
-    funnel_stage: funnelStage,
-    angle_category: angleCategory,
-    headlines,
-    primary_text: primaryText,
-    hooks,
-    visual_style: visualStyle,
-  });
+  try {
+    const { error } = await supabase.from('generated_copies').insert({
+      client_id: clientId,
+      funnel_stage: funnelStage,
+      angle_category: angleCategory,
+      headlines,
+      primary_text: primaryText,
+      hooks,
+      visual_style: visualStyle,
+    });
+    if (error) console.error('[saveCopyToHistory] DB error:', error.message);
+  } catch (err) {
+    console.error('[saveCopyToHistory] Unexpected error:', err);
+  }
 }
 
 async function pickUnusedAngle(supabase: ReturnType<typeof getSupabaseAdmin>, clientId: string, funnelStage: string): Promise<{ id: string; name: string; description: string; category: string } | null> {
@@ -109,17 +106,20 @@ async function pickUnusedAngle(supabase: ReturnType<typeof getSupabaseAdmin>, cl
   const unused = allAngles.filter(a => !usedIds.has(a.id));
   const pool = unused.length > 0 ? unused : allAngles;
 
-  // Pick random from pool
-  const picked = pool[Math.floor(Math.random() * pool.length)];
+  // Pick random from pool — does NOT record usage yet (caller records after successful generation)
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
-  // Record usage
-  await supabase.from('copy_angle_usage').insert({
-    client_id: clientId,
-    angle_id: picked.id,
-    funnel_stage: funnelStage,
-  });
-
-  return picked;
+async function recordAngleUsage(supabase: ReturnType<typeof getSupabaseAdmin>, clientId: string, angleId: string, funnelStage: string) {
+  try {
+    await supabase.from('copy_angle_usage').insert({
+      client_id: clientId,
+      angle_id: angleId,
+      funnel_stage: funnelStage,
+    });
+  } catch (err) {
+    console.error('[recordAngleUsage] Error:', err);
+  }
 }
 
 async function pickRotatedVisualStyle(supabase: ReturnType<typeof getSupabaseAdmin>, clientId: string): Promise<string> {
@@ -783,7 +783,7 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        temperature: 1.2,
+        temperature: 1.0,
         system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes.',
         messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepBlock}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
       }),
@@ -792,8 +792,8 @@ export async function generateMetaCopy(c: Context) {
     const text = aiData?.content?.[0]?.text || '';
 
     // Save to history for anti-repetition
-    const headlinesFromText = text.match(/[""]([^""]{10,80})[""]|^[•\-\d]+\.\s*(.+)/gm)?.slice(0, 5) || [];
-    saveCopyToHistory(supabase, cId, instructionFunnel, headlinesFromText, text.slice(0, 500), [], null, null);
+    const headlinesFromText = text.match(/[""\u201C\u201D]([^""\u201C\u201D]{10,80})[""\u201C\u201D]|^[•\-\d]+\.\s*(.+)/gm)?.slice(0, 5) || [];
+    await saveCopyToHistory(supabase, cId, instructionFunnel, headlinesFromText, text.slice(0, 500), [], null, null);
 
     return c.json({ copy: text, text });
   }
@@ -805,8 +805,7 @@ export async function generateMetaCopy(c: Context) {
     return c.json({ error: 'Missing required parameters' }, 400);
   }
 
-  // Ownership check: verify user owns this client
-  const user = c.get('user');
+  // Ownership check: verify user owns this client (reuses `user` from top of function)
   if (user) {
     const { data: clientRow } = await supabase
       .from('clients')
@@ -889,7 +888,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        temperature: 1.2,
+        temperature: 1.0,
         system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. PROHIBIDO hablar de plantas, mascotas, comida u otros temas genéricos que no correspondan al negocio real del cliente.',
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -904,10 +903,11 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
 
-    // Save to anti-repetition history
+    // Save to anti-repetition history + record angle usage AFTER successful generation
     const varHeadlines = (parsed.variaciones || []).map((v: any) => v.titulo).filter(Boolean);
     const varTexts = (parsed.variaciones || []).map((v: any) => v.texto_principal).filter(Boolean);
-    saveCopyToHistory(supabase, clientId, funnelStage, varHeadlines, varTexts[0] || null, [], effectiveAngulo, null);
+    await saveCopyToHistory(supabase, clientId, funnelStage, varHeadlines, varTexts[0] || null, [], effectiveAngulo, null);
+    if (pickedAngle) await recordAngleUsage(supabase, clientId, pickedAngle.id, funnelStage);
 
     return c.json(parsed);
   }
@@ -962,7 +962,7 @@ ${adType === 'static'
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        temperature: 1.2,
+        temperature: 1.0,
         system: 'Eres un director creativo experto en producción visual para Meta Ads. REGLA ABSOLUTA: Basa el brief visual SOLO en los productos y marca REALES del cliente. NUNCA inventes productos ni temas genéricos.',
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -1265,10 +1265,10 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
 
   console.log('Successfully generated copy with Sabri + Russell methodology');
 
-  // Save to anti-repetition history
+  // Save to anti-repetition history + record angle usage AFTER successful generation
   const legacyHeadlines = parsedContent.headlines || [];
   const legacyHooks = parsedContent.hooks || [];
-  saveCopyToHistory(
+  await saveCopyToHistory(
     supabase, clientId, funnelStage,
     Array.isArray(legacyHeadlines) ? legacyHeadlines : [legacyHeadlines],
     parsedContent.primaryText || null,
@@ -1276,6 +1276,7 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
     legacyAngle?.category || null,
     null,
   );
+  if (legacyAngle) await recordAngleUsage(supabase, clientId, legacyAngle.id, funnelStage);
 
   return c.json(parsedContent);
   } catch (err: any) {
