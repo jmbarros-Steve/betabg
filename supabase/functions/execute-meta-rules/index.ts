@@ -153,10 +153,11 @@ Deno.serve(async (req) => {
     console.log(`[execute-meta-rules] Found ${rules.length} active rules for client ${client_id}`);
 
     // Fetch campaign metrics from DB (already synced)
+    // Note: campaign_metrics uses connection_id, not client_id
     const { data: campaigns } = await supabase
       .from('campaign_metrics')
       .select('*')
-      .eq('client_id', client_id)
+      .eq('connection_id', connection_id)
       .eq('platform', 'meta');
 
     if (!campaigns?.length) {
