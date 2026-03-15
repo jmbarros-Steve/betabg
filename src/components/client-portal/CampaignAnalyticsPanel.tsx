@@ -15,10 +15,10 @@ import {
   RefreshCw, TrendingUp, TrendingDown, DollarSign,
   Eye, ShoppingCart, Sparkles, AlertTriangle, Rocket, X, Target,
   BarChart3, AlertCircle, Link2, ChevronDown, ChevronRight, Layers,
-  Clock, CheckCircle, PauseCircle, Calendar, Download
+  Clock, CheckCircle, PauseCircle, Calendar, Download, MousePointerClick, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
 
@@ -627,6 +627,74 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   const hasData = metrics.length > 0;
 
+  // Daily trend data for sparklines
+  const dailyTrend = useMemo(() => {
+    const map = new Map<string, { date: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
+    for (const m of metrics) {
+      const d = m.metric_date;
+      const existing = map.get(d) || { date: d, spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0 };
+      existing.spend += Number(m.spend) || 0;
+      existing.revenue += Number(m.conversion_value) || 0;
+      existing.impressions += Number(m.impressions) || 0;
+      existing.clicks += Number(m.clicks) || 0;
+      existing.conversions += Number(m.conversions) || 0;
+      map.set(d, existing);
+    }
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [metrics]);
+
+  // Funnel data: impressions -> clicks -> conversions with drop-off %
+  const funnelSteps = useMemo(() => {
+    const imp = totals.impressions;
+    const cli = totals.clicks;
+    const conv = totals.conversions;
+    return [
+      { label: 'Impresiones', value: imp, pct: 100, icon: Eye, color: 'bg-blue-500' },
+      { label: 'Clicks', value: cli, pct: imp > 0 ? (cli / imp) * 100 : 0, icon: MousePointerClick, color: 'bg-cyan-500' },
+      { label: 'Conversiones', value: conv, pct: cli > 0 ? (conv / cli) * 100 : 0, icon: ShoppingCart, color: 'bg-green-500' },
+    ];
+  }, [totals]);
+
+  // Smart alerts
+  const smartAlerts = useMemo(() => {
+    const alerts: Array<{ type: 'critical' | 'warning' | 'info'; message: string }> = [];
+    const prevDays = dailyTrend.slice(0, Math.floor(dailyTrend.length / 2));
+    const recentDays = dailyTrend.slice(Math.floor(dailyTrend.length / 2));
+
+    const prevSpend = prevDays.reduce((s, d) => s + d.spend, 0);
+    const prevConv = prevDays.reduce((s, d) => s + d.conversions, 0);
+    const recentSpend = recentDays.reduce((s, d) => s + d.spend, 0);
+    const recentConv = recentDays.reduce((s, d) => s + d.conversions, 0);
+
+    const prevCpa = prevConv > 0 ? prevSpend / prevConv : 0;
+    const recentCpa = recentConv > 0 ? recentSpend / recentConv : 0;
+
+    // CPA spike > 20%
+    if (prevCpa > 0 && recentCpa > prevCpa * 1.2) {
+      const pctIncrease = Math.round(((recentCpa - prevCpa) / prevCpa) * 100);
+      alerts.push({ type: 'critical', message: `CPA subió ${pctIncrease}% (${formatCurrency(prevCpa, 'CLP')} → ${formatCurrency(recentCpa, 'CLP')})` });
+    }
+
+    // ROAS below break-even (< 1x)
+    if (overallRoas > 0 && overallRoas < 1) {
+      alerts.push({ type: 'critical', message: `ROAS ${overallRoas.toFixed(2)}x — por debajo del break-even. Estás perdiendo dinero.` });
+    } else if (overallRoas > 0 && overallRoas < 2) {
+      alerts.push({ type: 'warning', message: `ROAS ${overallRoas.toFixed(2)}x — cerca del break-even. Margen ajustado.` });
+    }
+
+    // CTR too low (< 1%)
+    if (overallCtr > 0 && overallCtr < 1 && totals.impressions > 1000) {
+      alerts.push({ type: 'warning', message: `CTR ${overallCtr.toFixed(2)}% — debajo del 1%. Revisa creativos y segmentación.` });
+    }
+
+    // Spend without conversions
+    if (totals.spend > 50000 && totals.conversions === 0) {
+      alerts.push({ type: 'critical', message: `${formatCurrency(totals.spend, 'CLP')} gastados sin conversiones. Revisa pixel y tracking.` });
+    }
+
+    return alerts;
+  }, [totals, dailyTrend, overallRoas, overallCtr]);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -769,7 +837,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       {/* Primary KPIs - large cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
+          <CardContent className="pt-6 pb-3 px-6">
             <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">Gasto Total</span>
               <div className="p-2.5 rounded-xl bg-red-500/10">
@@ -777,11 +845,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               </div>
             </div>
             <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend, 'CLP')}</p>
+            {dailyTrend.length > 1 && (
+              <ResponsiveContainer width="100%" height={32}>
+                <LineChart data={dailyTrend}><Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={1.5} dot={false} /></LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
+          <CardContent className="pt-6 pb-3 px-6">
             <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">Ingresos Totales</span>
               <div className="p-2.5 rounded-xl bg-green-500/10">
@@ -792,11 +865,16 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             <p className="text-xs text-muted-foreground mt-1">
               {totals.revenue > 0 ? `ROAS: ${overallRoas.toFixed(2)}x` : 'Sin datos de conversión'}
             </p>
+            {dailyTrend.length > 1 && (
+              <ResponsiveContainer width="100%" height={32}>
+                <LineChart data={dailyTrend}><Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={1.5} dot={false} /></LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border bg-gradient-to-br from-cyan-500/8 to-transparent border-cyan-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
+          <CardContent className="pt-6 pb-3 px-6">
             <div className="flex items-start justify-between mb-3">
               <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
               <div className="p-2.5 rounded-xl bg-cyan-500/10">
@@ -806,18 +884,28 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             <p className={`text-3xl font-bold tracking-tight ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
               {overallRoas.toFixed(2)}x
             </p>
+            {dailyTrend.length > 1 && (
+              <ResponsiveContainer width="100%" height={32}>
+                <LineChart data={dailyTrend.map(d => ({ ...d, roas: d.spend > 0 ? d.revenue / d.spend : 0 }))}><Line type="monotone" dataKey="roas" stroke="#06b6d4" strokeWidth={1.5} dot={false} /></LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border bg-gradient-to-br from-amber-500/8 to-transparent border-amber-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
+          <CardContent className="pt-6 pb-3 px-6">
             <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">Conversiones</span>
               <div className="p-2.5 rounded-xl bg-amber-500/10">
-                <Eye className="w-5 h-5 text-amber-500" />
+                <ShoppingCart className="w-5 h-5 text-amber-500" />
               </div>
             </div>
             <p className="text-3xl font-bold tracking-tight">{formatNumber(totals.conversions)}</p>
+            {dailyTrend.length > 1 && (
+              <ResponsiveContainer width="100%" height={32}>
+                <LineChart data={dailyTrend}><Line type="monotone" dataKey="conversions" stroke="#f59e0b" strokeWidth={1.5} dot={false} /></LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -855,6 +943,64 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
           </CardContent>
         </Card>
       </div>
+
+      {/* Smart Alerts */}
+      {smartAlerts.length > 0 && (
+        <div className="space-y-2">
+          {smartAlerts.map((alert, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm ${
+                alert.type === 'critical' ? 'bg-red-500/8 border-red-500/20 text-red-700 dark:text-red-400' :
+                alert.type === 'warning' ? 'bg-yellow-500/8 border-yellow-500/20 text-yellow-700 dark:text-yellow-400' :
+                'bg-blue-500/8 border-blue-500/20 text-blue-700 dark:text-blue-400'
+              }`}
+            >
+              {alert.type === 'critical' ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <Bell className="w-4 h-4 shrink-0" />}
+              {alert.message}
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Conversion Funnel */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Embudo de Conversión</CardTitle>
+          <CardDescription>Caída por etapa del funnel</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-2">
+            {funnelSteps.map((step, i) => {
+              const Icon = step.icon;
+              const widthPct = Math.max(20, step.value > 0 ? (step.value / (funnelSteps[0].value || 1)) * 100 : 0);
+              return (
+                <div key={step.label} className="flex-1 flex flex-col items-center">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">{step.label}</span>
+                  </div>
+                  <div className="w-full bg-muted/30 rounded-full h-8 overflow-hidden">
+                    <div
+                      className={`${step.color} h-full rounded-full flex items-center justify-center transition-all duration-700`}
+                      style={{ width: `${widthPct}%`, minWidth: '40px' }}
+                    >
+                      <span className="text-white text-xs font-bold drop-shadow">{formatNumber(step.value)}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {i === 0 ? '100%' : `${step.pct.toFixed(2)}%`}
+                    {i > 0 && <span className="text-red-400 ml-1">(-{(100 - step.pct).toFixed(1)}%)</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Spend vs Revenue Chart */}
       <Card>
