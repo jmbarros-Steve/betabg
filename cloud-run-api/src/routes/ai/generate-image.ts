@@ -91,8 +91,8 @@ export async function generateImage(c: Context) {
         }
 
         // Fuzzy match: count how many words of the product title appear in the prompt
-        const words = titleLower.split(/\s+/).filter(w => w.length > 3);
-        const matchedWords = words.filter(w => promptLower.includes(w));
+        const words = titleLower.split(/\s+/).filter((w: string) => w.length > 3);
+        const matchedWords = words.filter((w: string) => promptLower.includes(w));
         const score = words.length > 0 ? (matchedWords.length / words.length) * 100 : 0;
 
         if (score >= 50 && (!bestMatch || score > bestMatch.score)) {
