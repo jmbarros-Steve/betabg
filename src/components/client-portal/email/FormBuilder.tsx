@@ -6,14 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   FileText, Plus, Edit, Trash2, Play, Pause, Loader2,
-  Eye, MousePointerClick, ScrollText, Clock, Palette,
-  Tag, Gift, X, BarChart3,
+  Eye, MousePointerClick, Clock, Tag, Gift, X, BarChart3,
+  ChevronDown, ChevronUp, Layers, SlidersHorizontal,
+  PanelTop, PanelRight, Minus, Maximize,
 } from 'lucide-react';
 
 interface FormBuilderProps {
@@ -54,40 +53,21 @@ interface FormTriggers {
   show_frequency: 'once' | 'session' | 'always';
 }
 
-const FORM_TYPES: { value: SignupForm['form_type']; label: string; description: string }[] = [
-  { value: 'popup', label: 'Popup', description: 'Ventana centrada en pantalla' },
-  { value: 'slide_in', label: 'Slide-in', description: 'Aparece desde una esquina' },
-  { value: 'inline', label: 'Inline', description: 'Embebido en la página' },
-  { value: 'full_page', label: 'Página completa', description: 'Cubre toda la pantalla' },
-];
-
 const FORM_TYPE_LABELS: Record<string, string> = {
   popup: 'Popup',
   slide_in: 'Slide-in',
-  inline: 'Inline',
-  full_page: 'Full Page',
+  inline: 'Barra',
+  full_page: 'Pagina completa',
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Borrador', color: 'bg-gray-100 text-gray-800' },
+  draft: { label: 'Inactivo', color: 'bg-gray-100 text-gray-800' },
   active: { label: 'Activo', color: 'bg-green-100 text-green-800' },
-  paused: { label: 'Pausado', color: 'bg-yellow-100 text-yellow-800' },
+  paused: { label: 'Inactivo', color: 'bg-yellow-100 text-yellow-800' },
 };
 
-const FREQUENCY_OPTIONS = [
-  { value: 'once', label: 'Una sola vez' },
-  { value: 'session', label: 'Una vez por sesión' },
-  { value: 'always', label: 'Siempre' },
-];
-
-const INCENTIVE_TYPES = [
-  { value: 'none', label: 'Sin incentivo' },
-  { value: 'discount_code', label: 'Código de descuento' },
-  { value: 'free_shipping', label: 'Envío gratis' },
-];
-
 const DEFAULT_DESIGN: FormDesign = {
-  headline: 'Suscríbete a nuestro newsletter',
+  headline: 'Suscribete a nuestro newsletter',
   description: 'Recibe ofertas exclusivas y novedades directo en tu email.',
   button_text: 'Suscribirme',
   button_color: '#7c3aed',
@@ -105,6 +85,13 @@ const DEFAULT_TRIGGERS: FormTriggers = {
   show_frequency: 'once',
 };
 
+const FORM_TYPE_CARDS: { value: SignupForm['form_type']; label: string; description: string; Icon: typeof PanelTop }[] = [
+  { value: 'popup', label: 'Popup', description: 'Ventana centrada en pantalla', Icon: Layers },
+  { value: 'slide_in', label: 'Slide-in', description: 'Aparece desde una esquina', Icon: PanelRight },
+  { value: 'inline', label: 'Barra', description: 'Embebido en la pagina', Icon: Minus },
+  { value: 'full_page', label: 'Pagina completa', description: 'Cubre toda la pantalla', Icon: Maximize },
+];
+
 export function FormBuilder({ clientId }: FormBuilderProps) {
   const [forms, setForms] = useState<SignupForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +101,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
   const [editingForm, setEditingForm] = useState<Partial<SignupForm> | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   const loadForms = useCallback(async () => {
     setLoading(true);
@@ -145,6 +133,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
       });
     }
     setTagInput('');
+    setOptionsOpen(false);
     setShowEditor(true);
   };
 
@@ -187,7 +176,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
       body: { action: 'activate', client_id: clientId, form_id: formId },
     });
     if (error) { toast.error(error); return; }
-    toast.success('Formulario activado (ScriptTag instalado en Shopify)');
+    toast.success('Formulario activado - se instalara automaticamente en tu tienda');
     loadForms();
   };
 
@@ -196,7 +185,7 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
       body: { action: 'pause', client_id: clientId, form_id: formId },
     });
     if (error) { toast.error(error); return; }
-    toast.success('Formulario pausado (ScriptTag removido)');
+    toast.success('Formulario desactivado');
     loadForms();
   };
 
@@ -225,11 +214,6 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
     });
   };
 
-  const updateIncentive = (field: 'incentive_type' | 'incentive_value', value: string) => {
-    if (!editingForm) return;
-    setEditingForm({ ...editingForm, [field]: value });
-  };
-
   const addTag = () => {
     const tag = tagInput.trim();
     if (!tag || !editingForm) return;
@@ -255,6 +239,8 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
     return ((submissions / views) * 100).toFixed(1) + '%';
   };
 
+  const hasIncentive = editingForm?.incentive_type === 'discount_code' || editingForm?.incentive_type === 'free_shipping';
+
   // =============== MAIN VIEW ===============
   return (
     <div className="space-y-4">
@@ -263,8 +249,8 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
           <h3 className="text-lg font-semibold">Formularios de Registro</h3>
           <p className="text-sm text-muted-foreground">Captura suscriptores con popups y formularios en tu tienda</p>
         </div>
-        <Button onClick={() => openEditor()}>
-          <Plus className="w-4 h-4 mr-1.5" /> Nuevo Formulario
+        <Button size="lg" onClick={() => openEditor()} className="shadow-sm">
+          <Plus className="w-5 h-5 mr-2" /> Nuevo Formulario
         </Button>
       </div>
 
@@ -274,143 +260,147 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
         </div>
       ) : forms.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No hay formularios. Crea tu primer formulario de registro.</p>
-            <Button className="mt-4" onClick={() => openEditor()}>
-              <Plus className="w-4 h-4 mr-1.5" /> Crear Formulario
+          <CardContent className="flex flex-col items-center justify-center py-16 px-8">
+            <FileText className="w-12 h-12 text-muted-foreground mb-4" />
+            <h4 className="font-semibold text-lg mb-2">Empieza a crecer tu lista</h4>
+            <p className="text-muted-foreground text-center max-w-md mb-6">
+              Los formularios capturan emails de visitantes de tu tienda. Crea tu primer formulario para empezar a crecer tu lista.
+            </p>
+            <Button size="lg" onClick={() => openEditor()} className="shadow-sm">
+              <Plus className="w-5 h-5 mr-2" /> Crear Formulario
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {forms.map((form) => (
-            <Card key={form.id}>
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <FileText className="w-4.5 h-4.5 text-muted-foreground" />
+          {forms.map((form) => {
+            const isActive = form.status === 'active';
+            return (
+              <Card key={form.id}>
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <FileText className="w-4.5 h-4.5 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h4 className="font-medium truncate">{form.name}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {FORM_TYPE_LABELS[form.form_type] || form.form_type}
+                          </Badge>
+                          <Badge className={STATUS_CONFIG[form.status]?.color || 'bg-gray-100'}>
+                            {STATUS_CONFIG[form.status]?.label || form.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-3 h-3" /> {form.total_views || 0} vistas
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MousePointerClick className="w-3 h-3" /> {form.total_submissions || 0} suscripciones
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <BarChart3 className="w-3 h-3" /> {conversionRate(form.total_views, form.total_submissions)} conversion
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <h4 className="font-medium truncate">{form.name}</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {FORM_TYPE_LABELS[form.form_type] || form.form_type}
-                        </Badge>
-                        <Badge className={STATUS_CONFIG[form.status]?.color || 'bg-gray-100'}>
-                          {STATUS_CONFIG[form.status]?.label || form.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Eye className="w-3 h-3" /> {form.total_views || 0} vistas
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MousePointerClick className="w-3 h-3" /> {form.total_submissions || 0} registros
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <BarChart3 className="w-3 h-3" /> {conversionRate(form.total_views, form.total_submissions)} conversion
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button variant="outline" size="sm" onClick={() => openEditor(form)}>
+                        <Edit className="w-4 h-4 mr-1" /> Editar
+                      </Button>
+                      {isActive ? (
+                        <Button variant="outline" size="sm" onClick={() => handlePause(form.id)}>
+                          <Pause className="w-4 h-4 mr-1" /> Desactivar
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => handleActivate(form.id)}
+                          title="Se instalara automaticamente en tu tienda Shopify"
+                        >
+                          <Play className="w-4 h-4 mr-1" /> Activar
+                        </Button>
+                      )}
+                      {!isActive && (
+                        <Button variant="destructive" size="sm" onClick={() => handleDelete(form.id)}>
+                          <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button variant="outline" size="sm" onClick={() => openEditor(form)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    {form.status === 'draft' || form.status === 'paused' ? (
-                      <Button size="sm" onClick={() => handleActivate(form.id)}>
-                        <Play className="w-4 h-4 mr-1" /> Activar
-                      </Button>
-                    ) : (
-                      <Button variant="outline" size="sm" onClick={() => handlePause(form.id)}>
-                        <Pause className="w-4 h-4 mr-1" /> Pausar
-                      </Button>
-                    )}
-                    {form.status !== 'active' && (
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(form.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Create/Edit Form Dialog */}
+      {/* =============== CREATE / EDIT DIALOG =============== */}
       <Dialog open={showEditor} onOpenChange={setShowEditor}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingForm?.id ? 'Editar Formulario' : 'Nuevo Formulario'}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5">
-            {/* Name + Type */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Nombre *</Label>
-                <Input
-                  value={editingForm?.name || ''}
-                  onChange={(e) => setEditingForm(prev => prev ? { ...prev, name: e.target.value } : prev)}
-                  placeholder="Ej: Popup de bienvenida"
-                />
-              </div>
-              <div>
-                <Label>Tipo de formulario</Label>
-                <Select
-                  value={editingForm?.form_type || 'popup'}
-                  onValueChange={(v) => setEditingForm(prev =>
-                    prev ? { ...prev, form_type: v as SignupForm['form_type'] } : prev
-                  )}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {FORM_TYPES.map(t => (
-                      <SelectItem key={t.value} value={t.value}>
-                        <div>
-                          <span>{t.label}</span>
-                          <span className="text-xs text-muted-foreground ml-2">- {t.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <div className="space-y-6">
+            {/* Form name */}
+            <div>
+              <Label>Nombre del formulario *</Label>
+              <Input
+                value={editingForm?.name || ''}
+                onChange={(e) => setEditingForm(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                placeholder="Ej: Popup de bienvenida"
+                className="mt-1"
+              />
+            </div>
+
+            {/* ---- FORM TYPE: Visual cards ---- */}
+            <div>
+              <Label className="mb-2 block">Tipo de formulario</Label>
+              <div className="grid grid-cols-4 gap-3">
+                {FORM_TYPE_CARDS.map(({ value, label, description, Icon }) => {
+                  const selected = editingForm?.form_type === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setEditingForm(prev => prev ? { ...prev, form_type: value } : prev)}
+                      className={`
+                        rounded-lg border-2 p-4 text-center transition-all cursor-pointer
+                        ${selected
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : 'border-muted hover:border-muted-foreground/30 hover:bg-muted/30'
+                        }
+                      `}
+                    >
+                      <Icon className={`w-8 h-8 mx-auto mb-2 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <p className={`text-sm font-medium ${selected ? 'text-primary' : ''}`}>{label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Tabs for design, triggers, incentive, tags */}
-            <Tabs defaultValue="design" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="design" className="text-xs">
-                  <Palette className="w-3.5 h-3.5 mr-1.5" /> Diseño
-                </TabsTrigger>
-                <TabsTrigger value="triggers" className="text-xs">
-                  <MousePointerClick className="w-3.5 h-3.5 mr-1.5" /> Triggers
-                </TabsTrigger>
-                <TabsTrigger value="incentive" className="text-xs">
-                  <Gift className="w-3.5 h-3.5 mr-1.5" /> Incentivo
-                </TabsTrigger>
-                <TabsTrigger value="tags" className="text-xs">
-                  <Tag className="w-3.5 h-3.5 mr-1.5" /> Tags
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Tab: Diseño */}
-              <TabsContent value="design" className="space-y-4 mt-4">
+            {/* ---- DESIGN SECTION ---- */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Left: form fields */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-4 h-4" /> Diseno
+                </h4>
                 <div>
-                  <Label>Titular</Label>
+                  <Label className="text-sm">Titular</Label>
                   <Input
                     value={editingForm?.design?.headline || ''}
                     onChange={(e) => updateDesign({ headline: e.target.value })}
-                    placeholder="Suscríbete a nuestro newsletter"
+                    placeholder="Suscribete a nuestro newsletter"
                   />
                 </div>
                 <div>
-                  <Label>Descripción</Label>
+                  <Label className="text-sm">Descripcion</Label>
                   <Input
                     value={editingForm?.design?.description || ''}
                     onChange={(e) => updateDesign({ description: e.target.value })}
@@ -418,30 +408,14 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                   />
                 </div>
                 <div>
-                  <Label>Texto del botón</Label>
+                  <Label className="text-sm">Texto del boton</Label>
                   <Input
                     value={editingForm?.design?.button_text || ''}
                     onChange={(e) => updateDesign({ button_text: e.target.value })}
                     placeholder="Suscribirme"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs">Color del botón</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={editingForm?.design?.button_color || '#7c3aed'}
-                        onChange={(e) => updateDesign({ button_color: e.target.value })}
-                        className="w-8 h-8 rounded cursor-pointer border"
-                      />
-                      <Input
-                        value={editingForm?.design?.button_color || '#7c3aed'}
-                        onChange={(e) => updateDesign({ button_color: e.target.value })}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                  </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Color de fondo</Label>
                     <div className="flex items-center gap-2 mt-1">
@@ -459,51 +433,31 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs">Color de texto</Label>
+                    <Label className="text-xs">Color del boton</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
-                        value={editingForm?.design?.text_color || '#1f2937'}
-                        onChange={(e) => updateDesign({ text_color: e.target.value })}
+                        value={editingForm?.design?.button_color || '#7c3aed'}
+                        onChange={(e) => updateDesign({ button_color: e.target.value })}
                         className="w-8 h-8 rounded cursor-pointer border"
                       />
                       <Input
-                        value={editingForm?.design?.text_color || '#1f2937'}
-                        onChange={(e) => updateDesign({ text_color: e.target.value })}
+                        value={editingForm?.design?.button_color || '#7c3aed'}
+                        onChange={(e) => updateDesign({ button_color: e.target.value })}
                         className="h-8 text-xs font-mono"
                       />
                     </div>
                   </div>
                 </div>
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm">Mostrar campo de nombre</Label>
-                      <p className="text-xs text-muted-foreground">Pedir nombre además del email</p>
-                    </div>
-                    <Switch
-                      checked={editingForm?.design?.show_name_field ?? false}
-                      onCheckedChange={(v) => updateDesign({ show_name_field: v })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm">Mostrar campo de teléfono</Label>
-                      <p className="text-xs text-muted-foreground">Pedir teléfono para SMS marketing</p>
-                    </div>
-                    <Switch
-                      checked={editingForm?.design?.show_phone_field ?? false}
-                      onCheckedChange={(v) => updateDesign({ show_phone_field: v })}
-                    />
-                  </div>
-                </div>
+              </div>
 
-                {/* Live preview */}
+              {/* Right: live preview */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Vista previa</h4>
                 <Card className="bg-muted/30 border-dashed">
                   <CardContent className="py-4">
-                    <p className="text-xs font-medium text-muted-foreground mb-3">Vista previa</p>
                     <div
-                      className="rounded-lg p-6 text-center max-w-sm mx-auto shadow-sm border"
+                      className="rounded-lg p-6 text-center max-w-xs mx-auto shadow-sm border"
                       style={{
                         backgroundColor: editingForm?.design?.background_color || '#ffffff',
                         color: editingForm?.design?.text_color || '#1f2937',
@@ -513,21 +467,11 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                         {editingForm?.design?.headline || 'Titular'}
                       </h4>
                       <p className="text-sm mb-4 opacity-80">
-                        {editingForm?.design?.description || 'Descripción'}
+                        {editingForm?.design?.description || 'Descripcion'}
                       </p>
-                      {editingForm?.design?.show_name_field && (
-                        <div className="mb-2 rounded border px-3 py-2 text-left text-xs text-gray-400 bg-white">
-                          Nombre
-                        </div>
-                      )}
                       <div className="mb-2 rounded border px-3 py-2 text-left text-xs text-gray-400 bg-white">
                         Email
                       </div>
-                      {editingForm?.design?.show_phone_field && (
-                        <div className="mb-2 rounded border px-3 py-2 text-left text-xs text-gray-400 bg-white">
-                          Teléfono
-                        </div>
-                      )}
                       <button
                         className="w-full rounded-md py-2 text-sm font-semibold text-white mt-1"
                         style={{ backgroundColor: editingForm?.design?.button_color || '#7c3aed' }}
@@ -536,190 +480,139 @@ export function FormBuilder({ clientId }: FormBuilderProps) {
                       >
                         {editingForm?.design?.button_text || 'Suscribirme'}
                       </button>
+                      {hasIncentive && editingForm?.incentive_value && (
+                        <p className="text-xs mt-3 opacity-70">
+                          Recibiras: {editingForm.incentive_value}
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </div>
+            </div>
 
-              {/* Tab: Triggers */}
-              <TabsContent value="triggers" className="space-y-4 mt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm">Exit Intent</Label>
-                    <p className="text-xs text-muted-foreground">Mostrar cuando el usuario intenta salir de la página</p>
+            {/* ---- OPTIONS ACCORDION ---- */}
+            <div className="border rounded-lg">
+              <button
+                type="button"
+                onClick={() => setOptionsOpen(!optionsOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 rounded-lg transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+                  Opciones avanzadas
+                  <span className="text-xs text-muted-foreground font-normal">(descuento, cuando mostrar, tags)</span>
+                </span>
+                {optionsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {optionsOpen && (
+                <div className="px-4 pb-4 space-y-6 border-t pt-4">
+
+                  {/* -- Incentive section -- */}
+                  <div className="space-y-3">
+                    <h5 className="text-sm font-semibold flex items-center gap-1.5">
+                      <Gift className="w-4 h-4" /> Descuento
+                    </h5>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm">Ofrecer descuento</Label>
+                        <p className="text-xs text-muted-foreground">Los formularios con descuento tienen hasta 3x mas conversion</p>
+                      </div>
+                      <Switch
+                        checked={hasIncentive}
+                        onCheckedChange={(checked) => {
+                          if (!editingForm) return;
+                          setEditingForm({
+                            ...editingForm,
+                            incentive_type: checked ? 'discount_code' : 'none',
+                            incentive_value: checked ? editingForm.incentive_value || '' : '',
+                          });
+                        }}
+                      />
+                    </div>
+                    {hasIncentive && (
+                      <div>
+                        <Label className="text-sm">Codigo de descuento</Label>
+                        <Input
+                          value={editingForm?.incentive_value || ''}
+                          onChange={(e) => {
+                            if (!editingForm) return;
+                            setEditingForm({ ...editingForm, incentive_value: e.target.value });
+                          }}
+                          placeholder="Ej: BIENVENIDO10"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">El codigo que recibira el suscriptor despues de registrarse</p>
+                      </div>
+                    )}
                   </div>
-                  <Switch
-                    checked={editingForm?.trigger_rules?.exit_intent ?? true}
-                    onCheckedChange={(v) => updateTriggers({ exit_intent: v })}
-                  />
-                </div>
 
-                <div>
-                  <Label className="text-sm flex items-center gap-1.5">
-                    <ScrollText className="w-3.5 h-3.5" /> Profundidad de scroll (%)
-                  </Label>
-                  <p className="text-xs text-muted-foreground mb-1.5">
-                    Mostrar cuando el usuario ha scrolleado este porcentaje. 0 = desactivado.
-                  </p>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editingForm?.trigger_rules?.scroll_depth ?? 0}
-                    onChange={(e) => updateTriggers({ scroll_depth: Number(e.target.value) })}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-sm flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" /> Tiempo en página (segundos)
-                  </Label>
-                  <p className="text-xs text-muted-foreground mb-1.5">
-                    Mostrar después de este tiempo en la página. 0 = inmediato.
-                  </p>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={editingForm?.trigger_rules?.time_on_page ?? 5}
-                    onChange={(e) => updateTriggers({ time_on_page: Number(e.target.value) })}
-                    placeholder="5"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-sm">Filtro de URL de página</Label>
-                  <p className="text-xs text-muted-foreground mb-1.5">
-                    Solo mostrar en páginas que contengan esta URL. Vacío = todas las páginas.
-                  </p>
-                  <Input
-                    value={editingForm?.trigger_rules?.page_url_filter || ''}
-                    onChange={(e) => updateTriggers({ page_url_filter: e.target.value })}
-                    placeholder="Ej: /collections/ o /products/"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-sm">Frecuencia de muestra</Label>
-                  <p className="text-xs text-muted-foreground mb-1.5">
-                    Con qué frecuencia mostrar el formulario al mismo visitante.
-                  </p>
-                  <Select
-                    value={editingForm?.trigger_rules?.show_frequency || 'once'}
-                    onValueChange={(v) => updateTriggers({ show_frequency: v as FormTriggers['show_frequency'] })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {FREQUENCY_OPTIONS.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </TabsContent>
-
-              {/* Tab: Incentivo */}
-              <TabsContent value="incentive" className="space-y-4 mt-4">
-                <div>
-                  <Label className="text-sm">Tipo de incentivo</Label>
-                  <p className="text-xs text-muted-foreground mb-1.5">
-                    Ofrece algo a cambio del registro para aumentar la conversión.
-                  </p>
-                  <Select
-                    value={editingForm?.incentive_type || 'none'}
-                    onValueChange={(v) => updateIncentive('incentive_type', v)}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {INCENTIVE_TYPES.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {editingForm?.incentive_type && editingForm.incentive_type !== 'none' && (
-                  <div>
-                    <Label className="text-sm">
-                      {editingForm.incentive_type === 'discount_code' ? 'Código de descuento' : 'Mensaje de envío gratis'}
-                    </Label>
-                    <p className="text-xs text-muted-foreground mb-1.5">
-                      {editingForm.incentive_type === 'discount_code'
-                        ? 'El código que recibirá el suscriptor (ej: BIENVENIDO10)'
-                        : 'El texto que se mostrará (ej: Envío gratis en tu primera compra)'
-                      }
-                    </p>
-                    <Input
-                      value={editingForm?.incentive_value || ''}
-                      onChange={(e) => updateIncentive('incentive_value', e.target.value)}
-                      placeholder={
-                        editingForm.incentive_type === 'discount_code'
-                          ? 'BIENVENIDO10'
-                          : 'Envío gratis en tu primera compra'
-                      }
-                    />
+                  {/* -- Triggers section -- */}
+                  <div className="space-y-3">
+                    <h5 className="text-sm font-semibold flex items-center gap-1.5">
+                      <Clock className="w-4 h-4" /> Cuando mostrar
+                    </h5>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm">Mostrar al intentar salir</Label>
+                        <p className="text-xs text-muted-foreground">Aparece cuando el visitante mueve el mouse hacia arriba</p>
+                      </div>
+                      <Switch
+                        checked={editingForm?.trigger_rules?.exit_intent ?? true}
+                        onCheckedChange={(v) => updateTriggers({ exit_intent: v })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Esperar (segundos)</Label>
+                      <p className="text-xs text-muted-foreground mb-1">Cuanto esperar antes de mostrar el formulario</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="60"
+                        value={editingForm?.trigger_rules?.time_on_page ?? 5}
+                        onChange={(e) => updateTriggers({ time_on_page: Number(e.target.value) })}
+                        className="w-24"
+                      />
+                    </div>
                   </div>
-                )}
 
-                {editingForm?.incentive_type === 'none' && (
-                  <Card className="bg-muted/30">
-                    <CardContent className="py-4 text-center">
-                      <Gift className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        Los formularios con incentivo tienen hasta 3x más conversión.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              {/* Tab: Tags */}
-              <TabsContent value="tags" className="space-y-4 mt-4">
-                <div>
-                  <Label className="text-sm">Tags a aplicar al suscribirse</Label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Estos tags se asignarán automáticamente a cada nuevo suscriptor de este formulario.
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="Ej: popup-bienvenida"
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-                    />
-                    <Button variant="outline" size="sm" onClick={addTag} disabled={!tagInput.trim()}>
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                  {/* -- Tags section -- */}
+                  <div className="space-y-3">
+                    <h5 className="text-sm font-semibold flex items-center gap-1.5">
+                      <Tag className="w-4 h-4" /> Etiquetar nuevos suscriptores como...
+                    </h5>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        placeholder="Ej: popup-bienvenida"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                      />
+                      <Button variant="outline" size="sm" onClick={addTag} disabled={!tagInput.trim()}>
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {(editingForm?.tags_to_apply || []).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {(editingForm?.tags_to_apply || []).map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-sm py-1 px-2.5">
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag)}
+                              className="ml-1.5 hover:text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {(editingForm?.tags_to_apply || []).length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {(editingForm?.tags_to_apply || []).map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-sm py-1 px-2.5">
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="ml-1.5 hover:text-destructive"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="bg-muted/30">
-                    <CardContent className="py-4 text-center">
-                      <Tag className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        Agrega tags para segmentar a los suscriptores de este formulario.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </Tabs>
+              )}
+            </div>
           </div>
 
           <DialogFooter>

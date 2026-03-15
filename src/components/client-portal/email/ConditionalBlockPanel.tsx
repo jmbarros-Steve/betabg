@@ -1,16 +1,8 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Plus, Trash2, Filter, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Eye } from 'lucide-react';
 
 export interface BlockCondition {
   field: string;
@@ -23,73 +15,8 @@ interface ConditionalBlockPanelProps {
   onChange: (conditions: BlockCondition[]) => void;
 }
 
-const CONDITION_FIELDS = [
-  { value: 'person.total_orders', label: 'Total de pedidos', type: 'number' },
-  { value: 'person.total_spent', label: 'Total gastado', type: 'number' },
-  { value: 'person.tags', label: 'Tags del contacto', type: 'text' },
-  {
-    value: 'person.last_order_at',
-    label: 'Fecha último pedido',
-    type: 'text',
-  },
-  {
-    value: 'person.custom_fields.*',
-    label: 'Campo personalizado',
-    type: 'text',
-  },
-  { value: 'brand.name', label: 'Nombre de la marca', type: 'text' },
-];
-
-const CONDITION_OPERATORS = [
-  { value: 'equals', label: 'es igual a' },
-  { value: 'not_equals', label: 'no es igual a' },
-  { value: 'greater_than', label: 'mayor que' },
-  { value: 'less_than', label: 'menor que' },
-  { value: 'contains', label: 'contiene' },
-  { value: 'not_contains', label: 'no contiene' },
-  { value: 'exists', label: 'existe' },
-  { value: 'not_exists', label: 'no existe' },
-];
-
-const NO_VALUE_OPERATORS = ['exists', 'not_exists'];
-
-function getFieldType(fieldValue: string): string {
-  const field = CONDITION_FIELDS.find((f) => f.value === fieldValue);
-  return field?.type || 'text';
-}
-
-function getFieldLabel(fieldValue: string): string {
-  const field = CONDITION_FIELDS.find((f) => f.value === fieldValue);
-  return field?.label || fieldValue;
-}
-
-function getOperatorLabel(operatorValue: string): string {
-  const op = CONDITION_OPERATORS.find((o) => o.value === operatorValue);
-  return op?.label || operatorValue;
-}
-
-function buildPreviewText(conditions: BlockCondition[]): string {
-  if (conditions.length === 0) {
-    return 'Este bloque se mostrará siempre';
-  }
-
-  const parts = conditions.map((c) => {
-    const fieldLabel = getFieldLabel(c.field);
-    const opLabel = getOperatorLabel(c.operator);
-
-    if (NO_VALUE_OPERATORS.includes(c.operator)) {
-      return `${fieldLabel} ${opLabel}`;
-    }
-    return `${fieldLabel} ${opLabel} '${c.value}'`;
-  });
-
-  return `Este bloque se mostrará si: ${parts.join(' Y ')}`;
-}
-
 /**
  * Serialize conditions to a data-attribute string for embedding in HTML.
- * Uses double quotes for the attribute and HTML-encodes the JSON value
- * to prevent XSS from condition values containing quotes.
  */
 export function serializeConditionsToAttr(conditions: BlockCondition[]): string {
   if (conditions.length === 0) return '';
@@ -99,156 +26,146 @@ export function serializeConditionsToAttr(conditions: BlockCondition[]): string 
   return `data-steve-condition="${json}"`;
 }
 
+// Helper to check if a specific condition exists in the array
+function hasCondition(conditions: BlockCondition[], field: string, operator: string, value?: string): boolean {
+  return conditions.some(
+    (c) => c.field === field && c.operator === operator && (value === undefined || c.value === value)
+  );
+}
+
+// Helper to find a condition's value
+function getConditionValue(conditions: BlockCondition[], field: string, operator: string): string {
+  const found = conditions.find((c) => c.field === field && c.operator === operator);
+  return found?.value || '';
+}
+
+// Build a user-friendly preview in Spanish
+function buildPreviewText(
+  hasBought: boolean,
+  isNew: boolean,
+  spentMore: string,
+  tag: string
+): string {
+  const parts: string[] = [];
+  if (hasBought) parts.push('han comprado antes');
+  if (isNew) parts.push('son clientes nuevos');
+  if (spentMore) parts.push(`han gastado mas de $${spentMore}`);
+  if (tag) parts.push(`tienen la etiqueta '${tag}'`);
+
+  if (parts.length === 0) return 'Este bloque se mostrara siempre.';
+  return `Este bloque se muestra a clientes que ${parts.join(' y ')}.`;
+}
+
 export function ConditionalBlockPanel({
   conditions,
   onChange,
 }: ConditionalBlockPanelProps) {
-  const handleAddCondition = () => {
-    onChange([
-      ...conditions,
-      { field: 'person.total_orders', operator: 'equals', value: '' },
-    ]);
-  };
+  // Derive toggle states from conditions
+  const hasBought = hasCondition(conditions, 'person.total_orders', 'greater_than', '0');
+  const isNew = hasCondition(conditions, 'person.total_orders', 'equals', '0');
+  const spentMore = getConditionValue(conditions, 'person.total_spent', 'greater_than');
+  const tag = getConditionValue(conditions, 'person.tags', 'contains');
 
-  const handleUpdateCondition = (
-    index: number,
-    updates: Partial<BlockCondition>
+  // Rebuild conditions array from simplified form state
+  const rebuildConditions = (
+    newHasBought: boolean,
+    newIsNew: boolean,
+    newSpentMore: string,
+    newTag: string
   ) => {
-    const updated = conditions.map((c, i) => {
-      if (i !== index) return c;
-      const merged = { ...c, ...updates };
-      // Clear value when switching to an operator that doesn't need one
-      if (updates.operator && NO_VALUE_OPERATORS.includes(updates.operator)) {
-        merged.value = '';
-      }
-      return merged;
-    });
-    onChange(updated);
+    const result: BlockCondition[] = [];
+    if (newHasBought) {
+      result.push({ field: 'person.total_orders', operator: 'greater_than', value: '0' });
+    }
+    if (newIsNew) {
+      result.push({ field: 'person.total_orders', operator: 'equals', value: '0' });
+    }
+    if (newSpentMore) {
+      result.push({ field: 'person.total_spent', operator: 'greater_than', value: newSpentMore });
+    }
+    if (newTag) {
+      result.push({ field: 'person.tags', operator: 'contains', value: newTag });
+    }
+    onChange(result);
   };
 
-  const handleRemoveCondition = (index: number) => {
-    onChange(conditions.filter((_, i) => i !== index));
-  };
-
-  const previewText = buildPreviewText(conditions);
+  const previewText = buildPreviewText(hasBought, isNew, spentMore, tag);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-sm font-medium">
-          Condiciones de visibilidad
-        </Label>
+      <div>
+        <Label className="text-sm font-semibold">Mostrar este bloque si...</Label>
+        <p className="text-xs text-muted-foreground mt-1">
+          Elige que clientes veran este contenido en el email.
+        </p>
       </div>
 
-      {/* Condition rows */}
-      {conditions.length > 0 && (
-        <div className="space-y-3">
-          {conditions.map((condition, index) => {
-            const fieldType = getFieldType(condition.field);
-            const needsValue = !NO_VALUE_OPERATORS.includes(
-              condition.operator
-            );
-
-            return (
-              <Card key={index}>
-                <CardContent className="p-3 space-y-2">
-                  {index > 0 && (
-                    <div className="flex items-center gap-2 pb-1">
-                      <div className="h-px flex-1 bg-border" />
-                      <span className="text-xs font-medium text-muted-foreground uppercase">
-                        Y
-                      </span>
-                      <div className="h-px flex-1 bg-border" />
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 space-y-2">
-                      {/* Field selector */}
-                      <Select
-                        value={condition.field}
-                        onValueChange={(val) =>
-                          handleUpdateCondition(index, { field: val })
-                        }
-                      >
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue placeholder="Campo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CONDITION_FIELDS.map((f) => (
-                            <SelectItem key={f.value} value={f.value}>
-                              {f.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {/* Operator selector */}
-                      <Select
-                        value={condition.operator}
-                        onValueChange={(val) =>
-                          handleUpdateCondition(index, { operator: val })
-                        }
-                      >
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue placeholder="Operador" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CONDITION_OPERATORS.map((op) => (
-                            <SelectItem key={op.value} value={op.value}>
-                              {op.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {/* Value input */}
-                      {needsValue && (
-                        <Input
-                          type={fieldType === 'number' ? 'number' : 'text'}
-                          placeholder="Valor"
-                          value={condition.value}
-                          onChange={(e) =>
-                            handleUpdateCondition(index, {
-                              value: e.target.value,
-                            })
-                          }
-                          className="h-9 text-xs"
-                        />
-                      )}
-                    </div>
-
-                    {/* Delete button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveCondition(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+      {/* Simple form */}
+      <div className="space-y-4">
+        {/* Toggle: Ha comprado antes */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Ha comprado antes</p>
+            <p className="text-xs text-muted-foreground">
+              Solo clientes con al menos 1 pedido
+            </p>
+          </div>
+          <Switch
+            checked={hasBought}
+            onCheckedChange={(checked) => {
+              // If enabling "ha comprado", disable "es nuevo" (they're mutually exclusive)
+              rebuildConditions(checked, checked ? false : isNew, spentMore, tag);
+            }}
+          />
         </div>
-      )}
 
-      {/* Add condition button */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={handleAddCondition}
-      >
-        <Plus className="h-4 w-4 mr-2" />
-        Agregar condición
-      </Button>
+        {/* Toggle: Es cliente nuevo */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Es cliente nuevo</p>
+            <p className="text-xs text-muted-foreground">
+              Solo clientes sin ningun pedido
+            </p>
+          </div>
+          <Switch
+            checked={isNew}
+            onCheckedChange={(checked) => {
+              // If enabling "es nuevo", disable "ha comprado" (mutually exclusive)
+              rebuildConditions(checked ? false : hasBought, checked, spentMore, tag);
+            }}
+          />
+        </div>
 
-      {/* Preview text */}
+        {/* Number input: Ha gastado mas de $X */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">Ha gastado mas de</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">$</span>
+            <Input
+              type="number"
+              min="0"
+              placeholder="0"
+              value={spentMore}
+              onChange={(e) => rebuildConditions(hasBought, isNew, e.target.value, tag)}
+              className="h-9 w-32 text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Text input: Tiene la etiqueta */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">Tiene la etiqueta</Label>
+          <Input
+            placeholder="ej: VIP, mayorista, recurrente"
+            value={tag}
+            onChange={(e) => rebuildConditions(hasBought, isNew, spentMore, e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Preview */}
       <div className="flex items-start gap-2 rounded-md bg-muted/50 border p-3">
         <Eye className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
         <p className="text-xs text-muted-foreground leading-relaxed">

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Send, GitBranch, BarChart3, Globe, Filter, Bell, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Users, Send, GitBranch, BarChart3, FileText, Settings } from 'lucide-react';
 import { SubscribersList } from './SubscribersList';
 import { CampaignBuilder } from './CampaignBuilder';
 import { FlowBuilder } from './FlowBuilder';
 import { EmailAnalytics } from './EmailAnalytics';
 import { DomainSetup } from './DomainSetup';
-import { SegmentBuilder } from './SegmentBuilder';
-import { ProductAlerts } from './ProductAlerts';
 import { FormBuilder } from './FormBuilder';
 
 interface EmailMarketingProps {
@@ -15,57 +15,77 @@ interface EmailMarketingProps {
 }
 
 export function EmailMarketing({ clientId }: EmailMarketingProps) {
-  const [activeTab, setActiveTab] = useState('subscribers');
+  const [activeTab, setActiveTab] = useState('campaigns');
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Steve Mail</h2>
-        <p className="text-muted-foreground">Email marketing nativo — sin depender de Klaviyo</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Steve Mail</h2>
+          <p className="text-muted-foreground">Email marketing para tu tienda</p>
+        </div>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" title="Configuración de dominio">
+              <Settings className="w-4 h-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Configuración</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <DomainSetup clientId={clientId} />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex w-full overflow-x-auto">
-          <TabsTrigger value="subscribers" className="flex items-center gap-1.5 text-xs flex-1">
-            <Users className="w-3.5 h-3.5" />
-            Contactos
-          </TabsTrigger>
+        <TabsList className="flex w-full">
           <TabsTrigger value="campaigns" className="flex items-center gap-1.5 text-xs flex-1">
             <Send className="w-3.5 h-3.5" />
-            Campañas
+            <div className="flex flex-col items-start">
+              <span>Campañas</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Envía emails a tu audiencia</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="subscribers" className="flex items-center gap-1.5 text-xs flex-1">
+            <Users className="w-3.5 h-3.5" />
+            <div className="flex flex-col items-start">
+              <span>Contactos</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Tu lista de suscriptores</span>
+            </div>
           </TabsTrigger>
           <TabsTrigger value="flows" className="flex items-center gap-1.5 text-xs flex-1">
             <GitBranch className="w-3.5 h-3.5" />
-            Flujos
+            <div className="flex flex-col items-start">
+              <span>Automatizaciones</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Emails automáticos</span>
+            </div>
           </TabsTrigger>
           <TabsTrigger value="forms" className="flex items-center gap-1.5 text-xs flex-1">
             <FileText className="w-3.5 h-3.5" />
-            Formularios
-          </TabsTrigger>
-          <TabsTrigger value="alerts" className="flex items-center gap-1.5 text-xs flex-1">
-            <Bell className="w-3.5 h-3.5" />
-            Alertas
-          </TabsTrigger>
-          <TabsTrigger value="segments" className="flex items-center gap-1.5 text-xs flex-1">
-            <Filter className="w-3.5 h-3.5" />
-            Segmentos
+            <div className="flex flex-col items-start">
+              <span>Formularios</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Captura nuevos contactos</span>
+            </div>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-1.5 text-xs flex-1">
             <BarChart3 className="w-3.5 h-3.5" />
-            Analytics
-          </TabsTrigger>
-          <TabsTrigger value="domains" className="flex items-center gap-1.5 text-xs flex-1">
-            <Globe className="w-3.5 h-3.5" />
-            Dominio
+            <div className="flex flex-col items-start">
+              <span>Rendimiento</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Métricas y resultados</span>
+            </div>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="subscribers">
-          <SubscribersList clientId={clientId} />
-        </TabsContent>
-
         <TabsContent value="campaigns">
           <CampaignBuilder clientId={clientId} />
+        </TabsContent>
+
+        <TabsContent value="subscribers">
+          <SubscribersList clientId={clientId} />
         </TabsContent>
 
         <TabsContent value="flows">
@@ -76,20 +96,8 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
           <FormBuilder clientId={clientId} />
         </TabsContent>
 
-        <TabsContent value="alerts">
-          <ProductAlerts clientId={clientId} />
-        </TabsContent>
-
-        <TabsContent value="segments">
-          <SegmentBuilder clientId={clientId} />
-        </TabsContent>
-
         <TabsContent value="analytics">
           <EmailAnalytics clientId={clientId} />
-        </TabsContent>
-
-        <TabsContent value="domains">
-          <DomainSetup clientId={clientId} />
         </TabsContent>
       </Tabs>
     </div>

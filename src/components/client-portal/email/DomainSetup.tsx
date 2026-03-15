@@ -1,214 +1,239 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Globe, CheckCircle2, Clock, AlertTriangle, Copy, RefreshCw, Plus, Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Copy, Loader2, Globe } from 'lucide-react';
 
 interface DomainSetupProps {
   clientId: string;
 }
 
 export function DomainSetup({ clientId }: DomainSetupProps) {
-  const [domains, setDomains] = useState<any[]>([]);
+  const [domain, setDomain] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [newDomain, setNewDomain] = useState('');
   const [adding, setAdding] = useState(false);
-  const [checking, setChecking] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
-  const loadDomains = useCallback(async () => {
+  const loadDomain = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await callApi<any>('verify-email-domain', {
         body: { action: 'list', client_id: clientId },
       });
       if (error) { toast.error(error); return; }
-      setDomains(data?.domains || []);
+      // Only show the first domain for simplicity
+      const domains = data?.domains || [];
+      setDomain(domains.length > 0 ? domains[0] : null);
     } finally {
       setLoading(false);
     }
   }, [clientId]);
 
-  useEffect(() => { loadDomains(); }, [loadDomains]);
+  useEffect(() => { loadDomain(); }, [loadDomain]);
 
   const handleAdd = async () => {
-    if (!newDomain) { toast.error('Dominio es requerido'); return; }
+    if (!newDomain) { toast.error('Ingresa tu dominio'); return; }
     setAdding(true);
     try {
       const { data, error } = await callApi<any>('verify-email-domain', {
         body: { action: 'initiate', client_id: clientId, domain: newDomain },
       });
       if (error) { toast.error(error); return; }
-      toast.success('Dominio agregado. Agrega los registros DNS y verifica.');
+      toast.success('Dominio agregado. Ahora agrega los registros DNS.');
       setNewDomain('');
-      loadDomains();
+      loadDomain();
     } finally {
       setAdding(false);
     }
   };
 
-  const handleCheck = async (domain: string) => {
-    setChecking(domain);
+  const handleCheck = async () => {
+    if (!domain) return;
+    setChecking(true);
     try {
       const { data, error } = await callApi<any>('verify-email-domain', {
-        body: { action: 'check', client_id: clientId, domain },
+        body: { action: 'check', client_id: clientId, domain: domain.domain },
       });
       if (error) { toast.error(error); return; }
       if (data?.verified) {
-        toast.success(`${domain} verificado exitosamente!`);
+        toast.success('Dominio verificado exitosamente');
       } else {
-        toast.info(`${domain} todavía no verificado. Estado: ${data?.status}`);
+        toast.info('Todavia no verificado. Revisa que los registros DNS esten correctos.');
       }
-      loadDomains();
+      loadDomain();
     } finally {
-      setChecking(null);
+      setChecking(false);
     }
-  };
-
-  const handleDelete = async (domain: string) => {
-    const { error } = await callApi('verify-email-domain', {
-      body: { action: 'delete', client_id: clientId, domain },
-    });
-    if (error) { toast.error(error); return; }
-    toast.success('Dominio eliminado');
-    loadDomains();
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copiado al portapapeles');
+    toast.success('Copiado');
   };
 
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case 'verified': return <CheckCircle2 className="w-4 h-4 text-green-600" />;
-      case 'pending': return <Clock className="w-4 h-4 text-yellow-600" />;
-      case 'failed': return <AlertTriangle className="w-4 h-4 text-red-600" />;
-      default: return <Clock className="w-4 h-4 text-gray-400" />;
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold">Configuración de Dominio</h3>
-        <p className="text-sm text-muted-foreground">
-          Verifica tu dominio para enviar emails que no caigan en spam
+        <h3 className="text-base font-semibold">Configurar dominio de envio</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Envia emails desde tu propio dominio (ej: info@tutienda.com)
         </p>
       </div>
 
-      {/* Add domain */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex items-end gap-3">
+      {/* Step 1: Enter domain — only show if no domain configured yet */}
+      {!domain && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Paso 1: Tu dominio</Label>
+          <div className="flex items-end gap-2">
             <div className="flex-1">
-              <Label>Agregar dominio</Label>
               <Input
                 value={newDomain}
                 onChange={(e) => setNewDomain(e.target.value)}
-                placeholder="tudominio.com"
+                placeholder="tutienda.com"
+                onKeyDown={(e) => e.key === 'Enter' && newDomain && handleAdd()}
               />
             </div>
             <Button onClick={handleAdd} disabled={adding || !newDomain}>
-              {adding ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
+              {adding ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Verificar
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Domain list */}
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin" />
         </div>
-      ) : domains.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Globe className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">
-              No hay dominios configurados. Agrega tu dominio para empezar a enviar emails.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        domains.map((domain) => (
-          <Card key={domain.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {statusIcon(domain.status)}
-                  <CardTitle className="text-base">{domain.domain}</CardTitle>
-                  <Badge className={
-                    domain.status === 'verified' ? 'bg-green-100 text-green-800' :
-                    domain.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }>
-                    {domain.status === 'verified' ? 'Verificado' :
-                     domain.status === 'pending' ? 'Pendiente' : 'Error'}
-                  </Badge>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCheck(domain.domain)}
-                    disabled={checking === domain.domain}
-                  >
-                    {checking === domain.domain ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(domain.domain)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+      )}
+
+      {/* Domain info & DNS records */}
+      {domain && (
+        <div className="space-y-4">
+          {/* Domain name + status */}
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+            <Globe className="w-5 h-5 text-muted-foreground shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{domain.domain}</p>
+            </div>
+            <Badge
+              className={
+                domain.status === 'verified'
+                  ? 'bg-green-100 text-green-800'
+                  : domain.status === 'failed'
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-yellow-100 text-yellow-800'
+              }
+            >
+              {domain.status === 'verified' && (
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+              )}
+              {domain.status === 'pending' && (
+                <Clock className="w-3 h-3 mr-1" />
+              )}
+              {domain.status === 'failed' && (
+                <AlertTriangle className="w-3 h-3 mr-1" />
+              )}
+              {domain.status === 'verified'
+                ? 'Verificado'
+                : domain.status === 'failed'
+                ? 'Error'
+                : 'Pendiente'}
+            </Badge>
+          </div>
+
+          {/* Step 2: DNS records table — only show when not yet verified */}
+          {domain.status !== 'verified' && domain.dns_records?.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Paso 2: Agrega estos registros DNS
+              </Label>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      <th className="text-left px-3 py-2 font-medium">Tipo</th>
+                      <th className="text-left px-3 py-2 font-medium">Nombre</th>
+                      <th className="text-left px-3 py-2 font-medium">Valor</th>
+                      <th className="px-3 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {domain.dns_records.map((record: any, i: number) => (
+                      <tr key={i} className="border-b last:border-b-0">
+                        <td className="px-3 py-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            {record.type}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2">
+                          <code className="bg-muted px-1 py-0.5 rounded text-[11px] break-all">
+                            {record.name}
+                          </code>
+                        </td>
+                        <td className="px-3 py-2">
+                          <code className="bg-muted px-1 py-0.5 rounded text-[11px] break-all">
+                            {record.value}
+                          </code>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => copyToClipboard(record.value)}
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </CardHeader>
-            {domain.dns_records?.length > 0 && domain.status !== 'verified' && (
-              <CardContent>
-                <p className="text-sm font-medium mb-3">Registros DNS requeridos:</p>
-                <div className="space-y-3">
-                  {domain.dns_records.map((record: any, i: number) => (
-                    <div key={i} className="bg-muted/50 rounded-lg p-3 text-sm">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">{record.type}</Badge>
-                          <span className="text-xs text-muted-foreground">{record.purpose}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(record.value)}
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <div>
-                          <span className="text-xs text-muted-foreground">Name: </span>
-                          <code className="text-xs bg-background px-1.5 py-0.5 rounded">{record.name}</code>
-                        </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground">Value: </span>
-                          <code className="text-xs bg-background px-1.5 py-0.5 rounded break-all">{record.value}</code>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Agrega estos registros en tu proveedor de DNS. La verificación puede tardar 24-72 horas.
-                </p>
-              </CardContent>
-            )}
-          </Card>
-        ))
+              <p className="text-xs text-muted-foreground">
+                Agrega estos registros DNS en tu proveedor de dominio. La verificacion puede tomar hasta 72 horas.
+              </p>
+            </div>
+          )}
+
+          {/* Step 3: Check verification — only show when not yet verified */}
+          {domain.status !== 'verified' && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Paso 3: Comprobar verificacion
+              </Label>
+              <Button
+                onClick={handleCheck}
+                disabled={checking}
+                variant="outline"
+                className="w-full"
+              >
+                {checking ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Comprobar verificacion
+              </Button>
+            </div>
+          )}
+
+          {/* Verified success state */}
+          {domain.status === 'verified' && (
+            <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-4 text-center">
+              <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                Tu dominio esta verificado y listo para enviar emails.
+              </p>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

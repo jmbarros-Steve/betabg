@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -27,12 +25,8 @@ import {
   Save,
   Trash2,
   Search,
-  Plus,
   Loader2,
   X,
-  BarChart3,
-  Calendar,
-  Package,
 } from 'lucide-react';
 import { type SteveMailEditorRef } from './SteveMailEditor';
 
@@ -53,16 +47,14 @@ interface UniversalBlocksPanelProps {
 }
 
 const BLOCK_CATEGORIES = [
-  { value: 'all', label: 'Todas' },
-  { value: 'header', label: 'Encabezado' },
+  { value: 'all', label: 'Todos' },
+  { value: 'header', label: 'Encabezados' },
+  { value: 'product', label: 'Productos' },
+  { value: 'cta', label: 'Botones' },
   { value: 'footer', label: 'Pie de página' },
-  { value: 'product', label: 'Producto' },
-  { value: 'cta', label: 'Llamada a la acción' },
-  { value: 'testimonial', label: 'Testimonio' },
-  { value: 'social', label: 'Redes sociales' },
-  { value: 'content', label: 'Contenido' },
-  { value: 'other', label: 'Otro' },
 ];
+
+const SAVE_CATEGORIES = BLOCK_CATEGORIES.filter((c) => c.value !== 'all');
 
 export function UniversalBlocksPanel({
   clientId,
@@ -78,7 +70,7 @@ export function UniversalBlocksPanel({
   // Save dialog state
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
-  const [saveCategory, setSaveCategory] = useState('content');
+  const [saveCategory, setSaveCategory] = useState('header');
   const [saving, setSaving] = useState(false);
 
   // Delete confirmation state
@@ -144,7 +136,7 @@ export function UniversalBlocksPanel({
       toast.success('Bloque guardado exitosamente');
       setShowSaveDialog(false);
       setSaveName('');
-      setSaveCategory('content');
+      setSaveCategory('header');
       fetchBlocks();
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar el bloque');
@@ -221,50 +213,56 @@ export function UniversalBlocksPanel({
     return matchesSearch && matchesCategory;
   });
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('es-CL', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  const getCategoryLabel = (value: string) => {
-    return (
-      BLOCK_CATEGORIES.find((c) => c.value === value)?.label || value
-    );
-  };
-
   if (!isOpen) return null;
 
   return (
     <>
-      <div className="fixed inset-y-0 right-0 z-50 w-96 bg-background border-l shadow-xl flex flex-col">
+      {/* Slide-in panel */}
+      <div className="fixed inset-y-0 right-0 z-50 w-96 bg-background border-l shadow-xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-2">
-            <Blocks className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Bloques universales</h2>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <h2 className="text-lg font-semibold">Biblioteca de Bloques</h2>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1.5 hover:bg-muted transition-colors"
+          >
             <X className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
 
-        {/* Save button */}
-        <div className="p-4 border-b">
+        {/* Save block button */}
+        <div className="px-4 pt-4 pb-2">
           <Button
             className="w-full"
             onClick={() => setShowSaveDialog(true)}
             disabled={!editor}
           >
             <Save className="h-4 w-4 mr-2" />
-            Guardar bloque actual
+            Guardar bloque
           </Button>
         </div>
 
-        {/* Search and filter */}
-        <div className="p-4 space-y-3 border-b">
+        {/* Category pills */}
+        <div className="px-4 pt-2 pb-1">
+          <div className="flex gap-1.5 flex-wrap">
+            {BLOCK_CATEGORIES.map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => setCategoryFilter(cat.value)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  categoryFilter === cat.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -274,23 +272,11 @@ export function UniversalBlocksPanel({
               className="pl-9"
             />
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              {BLOCK_CATEGORIES.map((cat) => (
-                <SelectItem key={cat.value} value={cat.value}>
-                  {cat.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Block list */}
         <ScrollArea className="flex-1">
-          <div className="p-4 space-y-3">
+          <div className="px-4 pb-4 space-y-2">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -298,55 +284,47 @@ export function UniversalBlocksPanel({
             ) : filteredBlocks.length === 0 ? (
               <div className="text-center py-12 px-4">
                 <Blocks className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {blocks.length === 0
-                    ? 'No tienes bloques guardados. Selecciona un bloque en el editor y guardalo aqui.'
+                    ? 'No tienes bloques guardados. Diseña un email y guarda secciones que quieras reutilizar.'
                     : 'No se encontraron bloques con los filtros actuales.'}
                 </p>
               </div>
             ) : (
               filteredBlocks.map((block) => (
-                <Card
+                <div
                   key={block.id}
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => handleInsertBlock(block)}
+                  className="group relative rounded-lg border bg-card p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/30 hover:bg-accent/30"
                 >
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {block.name}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <Badge variant="secondary" className="text-xs">
-                            {getCategoryLabel(block.category)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <BarChart3 className="h-3 w-3" />
-                            {block.usage_count} usos
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDate(block.created_at)}
-                          </span>
-                        </div>
+                  {/* Small HTML preview */}
+                  <div className="rounded border bg-muted/30 mb-2 h-16 overflow-hidden pointer-events-none">
+                    {typeof block.block_json === 'string' ? (
+                      <div
+                        className="origin-top-left scale-[0.25] w-[400%] h-[400%]"
+                        dangerouslySetInnerHTML={{ __html: block.block_json }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Blocks className="h-5 w-5 text-muted-foreground/40" />
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(block);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    )}
+                  </div>
+
+                  {/* Block name */}
+                  <p className="font-medium text-sm truncate">{block.name}</p>
+
+                  {/* Delete button — visible on hover only */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(block);
+                    }}
+                    className="absolute top-2 right-2 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))
             )}
           </div>
@@ -355,20 +333,21 @@ export function UniversalBlocksPanel({
 
       {/* Save Block Dialog */}
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Guardar bloque</DialogTitle>
-            <DialogDescription>
-              Guarda el diseño actual del editor como un bloque reutilizable.
+            <DialogDescription className="sr-only">
+              Guarda el diseño actual como bloque reutilizable
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Nombre del bloque</Label>
+              <Label>Nombre</Label>
               <Input
-                placeholder="Ej: Header principal, CTA producto..."
+                placeholder="Ej: Header principal"
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
+                autoFocus
               />
             </div>
             <div className="space-y-2">
@@ -378,13 +357,11 @@ export function UniversalBlocksPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {BLOCK_CATEGORIES.filter((c) => c.value !== 'all').map(
-                    (cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    )
-                  )}
+                  {SAVE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -404,10 +381,7 @@ export function UniversalBlocksPanel({
                   Guardando...
                 </>
               ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Guardar
-                </>
+                'Guardar'
               )}
             </Button>
           </DialogFooter>
@@ -421,13 +395,16 @@ export function UniversalBlocksPanel({
           if (!open) setDeleteTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Eliminar bloque</DialogTitle>
-            <DialogDescription>
-              Esta accion no se puede deshacer. El bloque &quot;{deleteTarget?.name}&quot; sera eliminado permanentemente.
+            <DialogTitle>¿Eliminar este bloque?</DialogTitle>
+            <DialogDescription className="sr-only">
+              Confirmar eliminación del bloque
             </DialogDescription>
           </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            El bloque &quot;{deleteTarget?.name}&quot; será eliminado permanentemente.
+          </p>
           <DialogFooter>
             <Button
               variant="outline"
@@ -447,10 +424,7 @@ export function UniversalBlocksPanel({
                   Eliminando...
                 </>
               ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </>
+                'Eliminar'
               )}
             </Button>
           </DialogFooter>

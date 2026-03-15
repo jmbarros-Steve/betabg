@@ -2,13 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import {
-  Loader2, Eraser, Palette, Sparkles, Wand2, ImagePlus, Copy, X, Check,
-} from 'lucide-react';
+import { Loader2, Eraser, Sparkles, Wand2, Check, X } from 'lucide-react';
 
 interface ImageEditorPanelProps {
   clientId: string;
@@ -19,59 +16,6 @@ interface ImageEditorPanelProps {
   brandColor?: string;
   brandSecondaryColor?: string;
 }
-
-const ACTIONS = [
-  {
-    id: 'remove_background',
-    label: 'Quitar Fondo',
-    description: 'Elimina el fondo y deja solo el producto',
-    icon: Eraser,
-    needsImage: true,
-    credits: 1,
-  },
-  {
-    id: 'apply_brand_colors',
-    label: 'Colores de Marca',
-    description: 'Aplica tu paleta de colores a la imagen',
-    icon: Palette,
-    needsImage: true,
-    credits: 1,
-  },
-  {
-    id: 'enhance',
-    label: 'Mejorar Calidad',
-    description: 'Mejora iluminación, nitidez y colores',
-    icon: Sparkles,
-    needsImage: true,
-    credits: 1,
-  },
-  {
-    id: 'variation',
-    label: 'Generar Variación',
-    description: 'Crea una versión alternativa de la imagen',
-    icon: Copy,
-    needsImage: true,
-    credits: 2,
-  },
-  {
-    id: 'custom_edit',
-    label: 'Edición Libre',
-    description: 'Describe qué quieres cambiar',
-    icon: Wand2,
-    needsImage: true,
-    credits: 1,
-    needsPrompt: true,
-  },
-  {
-    id: 'generate_email_banner',
-    label: 'Generar Banner',
-    description: 'Crea un banner para tu email desde cero',
-    icon: ImagePlus,
-    needsImage: false,
-    credits: 2,
-    needsPrompt: true,
-  },
-];
 
 export function ImageEditorPanel({
   clientId,
@@ -86,19 +30,12 @@ export function ImageEditorPanel({
   const [customPrompt, setCustomPrompt] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState(currentImageUrl || '');
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [selectedAction, setSelectedAction] = useState<string | null>(null);
 
-  const handleAction = async (actionId: string) => {
-    const action = ACTIONS.find(a => a.id === actionId);
-    if (!action) return;
+  const imageUrl = imageUrlInput || currentImageUrl;
 
-    if (action.needsImage && !imageUrlInput && !currentImageUrl) {
-      toast.error('Necesitas una imagen para esta acción');
-      return;
-    }
-
-    if (action.needsPrompt && !customPrompt) {
-      setSelectedAction(actionId);
+  const handleAction = async (actionId: string, prompt?: string) => {
+    if (actionId !== 'custom_edit' && !imageUrl) {
+      toast.error('Primero ingresa la URL de una imagen');
       return;
     }
 
@@ -110,12 +47,10 @@ export function ImageEditorPanel({
         body: {
           clientId,
           action: actionId,
-          imageUrl: imageUrlInput || currentImageUrl,
-          prompt: customPrompt || undefined,
+          imageUrl,
+          prompt: prompt || undefined,
           brandColor,
           brandSecondaryColor,
-          width: actionId === 'generate_email_banner' ? 600 : undefined,
-          height: actionId === 'generate_email_banner' ? 300 : undefined,
         },
       });
 
@@ -132,8 +67,6 @@ export function ImageEditorPanel({
       toast.error('Error procesando la imagen');
     } finally {
       setProcessing(false);
-      setSelectedAction(null);
-      setCustomPrompt('');
     }
   };
 
@@ -145,13 +78,19 @@ export function ImageEditorPanel({
     }
   };
 
+  const discard = () => {
+    setResultUrl(null);
+  };
+
+  const hasImage = !!imageUrl;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="w-5 h-5" />
-            Editor de Imágenes — Gemini AI
+            Editor de Imagenes
           </DialogTitle>
         </DialogHeader>
 
@@ -162,102 +101,120 @@ export function ImageEditorPanel({
             <Input
               value={imageUrlInput}
               onChange={(e) => setImageUrlInput(e.target.value)}
-              placeholder="https://... o pega la URL de una imagen del editor"
+              placeholder="https://... pega la URL de tu imagen"
               className="text-sm"
             />
-            {(imageUrlInput || currentImageUrl) && (
-              <div className="rounded-lg overflow-hidden border bg-muted/30 max-h-48 flex items-center justify-center">
+            {hasImage && (
+              <div className="rounded-lg overflow-hidden border bg-muted/30 max-h-40 flex items-center justify-center">
                 <img
-                  src={imageUrlInput || currentImageUrl}
+                  src={imageUrl}
                   alt="Imagen original"
-                  className="max-h-48 object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  className="max-h-40 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
                 />
               </div>
             )}
           </div>
 
-          {/* Actions grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {ACTIONS.map((action) => {
-              const Icon = action.icon;
-              const disabled = processing || (action.needsImage && !imageUrlInput && !currentImageUrl);
-
-              return (
-                <Card
-                  key={action.id}
-                  className={`cursor-pointer transition-all hover:border-primary/50 ${
-                    disabled ? 'opacity-40 cursor-not-allowed' : ''
-                  } ${selectedAction === action.id ? 'border-primary ring-1 ring-primary' : ''}`}
-                  onClick={() => !disabled && !processing && handleAction(action.id)}
-                >
-                  <CardContent className="p-3 flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{action.label}</p>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{action.credits} crédito{action.credits > 1 ? 's' : ''}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Prompt input for actions that need it */}
-          {selectedAction && ACTIONS.find(a => a.id === selectedAction)?.needsPrompt && (
-            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
-              <Label className="text-sm">
-                {selectedAction === 'generate_email_banner'
-                  ? 'Describe el banner que quieres'
-                  : 'Describe qué quieres cambiar'}
-              </Label>
-              <Input
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder={
-                  selectedAction === 'generate_email_banner'
-                    ? 'Ej: Banner minimalista con degradado azul para venta de verano'
-                    : 'Ej: Cambiar el fondo a un estudio con luces cálidas'
-                }
-                className="text-sm"
-                onKeyDown={(e) => e.key === 'Enter' && customPrompt && handleAction(selectedAction)}
-              />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => handleAction(selectedAction)} disabled={!customPrompt || processing}>
-                  {processing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Sparkles className="w-4 h-4 mr-1" />}
-                  Generar
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => { setSelectedAction(null); setCustomPrompt(''); }}>
-                  <X className="w-4 h-4 mr-1" /> Cancelar
-                </Button>
-              </div>
-            </div>
-          )}
-
           {/* Processing indicator */}
           {processing && (
-            <div className="flex items-center justify-center py-8 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Procesando con Gemini AI...</p>
+            <div className="flex items-center justify-center py-6 gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Procesando...</p>
             </div>
           )}
 
           {/* Result preview */}
           {resultUrl && (
-            <div className="space-y-3 p-3 border rounded-lg bg-green-50 dark:bg-green-950/20">
-              <p className="text-sm font-medium text-green-700 dark:text-green-400">Resultado</p>
-              <div className="rounded-lg overflow-hidden border max-h-64 flex items-center justify-center bg-white">
-                <img src={resultUrl} alt="Resultado" className="max-h-64 object-contain" />
+            <div className="space-y-3 p-3 rounded-lg border bg-green-50 dark:bg-green-950/20">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                Resultado
+              </p>
+              <div className="rounded-lg overflow-hidden border max-h-48 flex items-center justify-center bg-white">
+                <img
+                  src={resultUrl}
+                  alt="Resultado"
+                  className="max-h-48 object-contain"
+                />
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={useResult}>
-                  <Check className="w-4 h-4 mr-1" /> Usar esta imagen
+                  <Check className="w-4 h-4 mr-1" /> Usar
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setResultUrl(null)}>
-                  Descartar
+                <Button size="sm" variant="outline" onClick={discard}>
+                  <X className="w-4 h-4 mr-1" /> Descartar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions — only show when not processing and no result */}
+          {!processing && !resultUrl && (
+            <div className="space-y-3">
+              {/* Action 1: Remove background */}
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4"
+                disabled={!hasImage}
+                onClick={() => handleAction('remove_background')}
+              >
+                <Eraser className="w-5 h-5 mr-3 shrink-0 text-primary" />
+                <div className="text-left">
+                  <p className="text-sm font-medium">Quitar fondo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Elimina el fondo y deja solo el producto
+                  </p>
+                </div>
+              </Button>
+
+              {/* Action 2: Enhance quality */}
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4"
+                disabled={!hasImage}
+                onClick={() => handleAction('enhance')}
+              >
+                <Sparkles className="w-5 h-5 mr-3 shrink-0 text-primary" />
+                <div className="text-left">
+                  <p className="text-sm font-medium">Mejorar calidad</p>
+                  <p className="text-xs text-muted-foreground">
+                    Mejora iluminacion, nitidez y colores
+                  </p>
+                </div>
+              </Button>
+
+              {/* Action 3: Custom AI edit */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Editar con IA</p>
+                    <p className="text-xs text-muted-foreground">
+                      Describe que quieres cambiar
+                    </p>
+                  </div>
+                </div>
+                <Input
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  placeholder="Ej: Cambiar el fondo a un estudio con luces calidas"
+                  className="text-sm"
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' &&
+                    customPrompt &&
+                    hasImage &&
+                    handleAction('custom_edit', customPrompt)
+                  }
+                />
+                <Button
+                  size="sm"
+                  disabled={!customPrompt || !hasImage}
+                  onClick={() => handleAction('custom_edit', customPrompt)}
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Generar
                 </Button>
               </div>
             </div>

@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Users, RefreshCw, Plus, Search, Download, Loader2, ShoppingBag } from 'lucide-react';
+import { Users, Plus, Search, Download, Loader2, ShoppingBag, MoreVertical } from 'lucide-react';
 
 interface SubscribersListProps {
   clientId: string;
@@ -30,6 +31,7 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
   const [stats, setStats] = useState({ total: 0, subscribed: 0, unsubscribed: 0, bounced: 0 });
 
   const pageSize = 50;
+  const totalPages = Math.ceil(total / pageSize);
 
   const loadSubscribers = useCallback(async () => {
     setLoading(true);
@@ -123,20 +125,19 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
     toast.success(`Exportados ${data?.count || 0} contactos`);
   };
 
-  const statusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      subscribed: 'bg-green-100 text-green-800',
-      unsubscribed: 'bg-gray-100 text-gray-800',
-      bounced: 'bg-red-100 text-red-800',
-      complained: 'bg-orange-100 text-orange-800',
+  const sourceLabel = (source: string) => {
+    const labels: Record<string, string> = {
+      shopify: 'Shopify',
+      manual: 'Manual',
+      form: 'Formulario',
     };
-    return <Badge className={variants[status] || 'bg-gray-100'}>{status}</Badge>;
+    return labels[source?.toLowerCase()] || source || '—';
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Stats cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -155,46 +156,50 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
             <p className="text-xs text-muted-foreground">Desuscritos</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="text-2xl font-bold text-red-500">{stats.bounced}</div>
-            <p className="text-xs text-muted-foreground">Rebotados</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por email o nombre..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            className="pl-10"
+            className="pl-10 h-10"
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-full sm:w-[140px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="subscribed">Suscritos</SelectItem>
+            <SelectItem value="subscribed">Activos</SelectItem>
             <SelectItem value="unsubscribed">Desuscritos</SelectItem>
-            <SelectItem value="bounced">Rebotados</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
-          <Plus className="w-4 h-4 mr-1" /> Agregar
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-          {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShoppingBag className="w-4 h-4 mr-1" />}
-          Sync Shopify
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          <Download className="w-4 h-4 mr-1" /> Exportar
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+            {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShoppingBag className="w-4 h-4 mr-1" />}
+            Importar de Shopify
+          </Button>
+          <Button size="sm" onClick={() => setShowAddDialog(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Agregar contacto
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="px-2">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExport}>
+                <Download className="w-4 h-4 mr-2" /> Exportar contactos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Table */}
@@ -207,37 +212,50 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fuente</TableHead>
-                <TableHead className="text-right">Pedidos</TableHead>
-                <TableHead className="text-right">Gastado</TableHead>
-                <TableHead>Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={4} className="text-center py-8">
                     <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : subscribers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    No hay contactos. Sincroniza con Shopify para comenzar.
+                  <TableCell colSpan={4} className="text-center py-12">
+                    <Users className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground mb-4">
+                        Tu lista de contactos está vacía. Importa tus clientes de Shopify o agrega contactos manualmente.
+                    </p>
+                    <div className="flex justify-center gap-3">
+                      <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+                        {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShoppingBag className="w-4 h-4 mr-1" />}
+                        Importar de Shopify
+                      </Button>
+                      <Button size="sm" onClick={() => setShowAddDialog(true)}>
+                        <Plus className="w-4 h-4 mr-1" /> Agregar contacto
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 subscribers.map((sub) => (
                   <TableRow key={sub.id}>
                     <TableCell className="font-medium text-sm">{sub.email}</TableCell>
-                    <TableCell className="text-sm">{[sub.first_name, sub.last_name].filter(Boolean).join(' ') || '—'}</TableCell>
-                    <TableCell>{statusBadge(sub.status)}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-xs">{sub.source}</Badge></TableCell>
-                    <TableCell className="text-right text-sm">{sub.total_orders || 0}</TableCell>
-                    <TableCell className="text-right text-sm">${Number(sub.total_spent || 0).toFixed(0)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {sub.subscribed_at ? new Date(sub.subscribed_at).toLocaleDateString() : '—'}
+                    <TableCell className="text-sm">
+                      {[sub.first_name, sub.last_name].filter(Boolean).join(' ') || '—'}
+                    </TableCell>
+                    <TableCell>
+                      {sub.status === 'subscribed' ? (
+                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Suscrito</Badge>
+                      ) : (
+                        <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-100">Desuscrito</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">{sourceLabel(sub.source)}</Badge>
                     </TableCell>
                   </TableRow>
                 ))
@@ -251,7 +269,7 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
       {total > pageSize && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Mostrando {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} de {total}
+            Página {page + 1} de {totalPages}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 0}>
