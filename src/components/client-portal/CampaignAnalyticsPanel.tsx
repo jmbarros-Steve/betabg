@@ -778,12 +778,54 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-32 mb-3" />
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-8 w-16 rounded-md" />)}
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Skeleton className="h-9 w-48 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+          </div>
         </div>
-        <Skeleton className="h-64" />
+        {/* KPI cards skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="border">
+              <CardContent className="pt-6 pb-3 px-6">
+                <div className="flex justify-between mb-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-10 w-10 rounded-xl" />
+                </div>
+                <Skeleton className="h-9 w-36 mb-2" />
+                <Skeleton className="h-8 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {/* Secondary KPIs skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="bg-muted/30">
+              <CardContent className="py-4 px-5">
+                <Skeleton className="h-3 w-16 mb-2" />
+                <Skeleton className="h-7 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {/* Chart skeleton */}
+        <Card>
+          <CardContent className="pt-6">
+            <Skeleton className="h-4 w-48 mb-4" />
+            <Skeleton className="h-[300px] w-full rounded-lg" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
