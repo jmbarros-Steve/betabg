@@ -251,7 +251,8 @@ export default function ClientPortal() {
   }
 
   // Show onboarding wizard for clients who haven't completed it
-  if (onboardingStep !== null && !isAdminView && effectiveClientId) {
+  // Onboarding wizard disabled
+  if (false && onboardingStep !== null && !isAdminView && effectiveClientId) {
     return (
       <OnboardingWizard
         clientId={effectiveClientId}
@@ -501,20 +502,14 @@ export default function ClientPortal() {
         <ChongaSupport clientId={effectiveClientId} />
       )}
 
-      {/* Onboarding Modal */}
-      {showOnboarding && (
-        <ClientOnboarding
-          onComplete={handleCompleteOnboarding}
-          clientName={displayClient?.name}
-        />
-      )}
+      {/* Onboarding Modal — disabled */}
 
       {/* Cmd+K Command Palette */}
       <CommandPalette onNavigate={(tab) => setActiveTab(tab as TabType)} />
 
       {/* Product Tour — only for non-onboarding users */}
       {onboardingStep === null && user && (
-        <ProductTour userId={user.id} onNavigate={(tab) => setActiveTab(tab as TabType)} />
+        {/* ProductTour disabled */}
       )}
 
       {/* Mobile Bottom Navigation */}
