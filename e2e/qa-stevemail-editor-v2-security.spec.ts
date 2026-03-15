@@ -411,15 +411,17 @@ test.describe('Steve Mail Editor v2 — QA Security & Limits', () => {
     const gjsEditor = page.locator('.gjs-editor').first();
     await expect(gjsEditor).toBeVisible({ timeout: 10000 });
 
-    // Add several blocks to build up content
-    const blockNames = ['Hero', 'Texto', 'Separador', 'Header', 'Footer', 'Productos'];
-    for (const name of blockNames) {
-      const block = page.locator('.gjs-block').filter({ hasText: new RegExp(name, 'i') }).first();
-      if (await block.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await block.click({ force: true });
-        await page.waitForTimeout(1000);
+    // Add several blocks to build up content (use evaluate — blocks may be outside viewport)
+    const blockNames = ['Productos', 'Descuento', 'Cuenta Regresiva', 'Boton Diseno'];
+    await page.evaluate((names: string[]) => {
+      const allBlocks = Array.from(document.querySelectorAll('.gjs-block'));
+      for (const name of names) {
+        const regex = new RegExp(name, 'i');
+        const block = allBlocks.find(b => regex.test(b.textContent || ''));
+        if (block) (block as HTMLElement).click();
       }
-    }
+    }, blockNames);
+    await page.waitForTimeout(2000);
 
     // Wait for the email size indicator to update (polls every 3s)
     await page.waitForTimeout(5000);
