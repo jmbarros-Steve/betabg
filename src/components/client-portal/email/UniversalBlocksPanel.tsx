@@ -352,9 +352,11 @@ export function UniversalBlocksPanel({
                   {/* Small HTML preview */}
                   <div className="rounded border bg-muted/30 mb-2 h-16 overflow-hidden pointer-events-none">
                     {typeof block.block_json === 'string' ? (
-                      <div
-                        className="origin-top-left scale-[0.25] w-[400%] h-[400%]"
-                        dangerouslySetInnerHTML={{ __html: block.block_json }}
+                      <iframe
+                        srcDoc={block.block_json}
+                        sandbox=""
+                        className="origin-top-left scale-[0.25] w-[400%] h-[400%] pointer-events-none border-0"
+                        title={`Preview: ${block.name}`}
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">

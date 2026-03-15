@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/command";
 import {
   BarChart3, Bot, FileText, Link2, Settings, ShoppingBag,
-  PieChart, Instagram, Code, Lightbulb, Sparkles, Target,
+  PieChart, Code, Lightbulb, Sparkles, Target,
   Mail, MailCheck
 } from "lucide-react";
 
@@ -25,7 +25,6 @@ const sections = [
   { id: "config", label: "Configuración Financiera", icon: Settings, group: "Principal" },
   { id: "shopify", label: "Shopify Dashboard", icon: ShoppingBag, group: "Herramientas" },
   { id: "campaigns", label: "Campañas Analytics", icon: PieChart, group: "Herramientas" },
-  { id: "competitors", label: "Competencia", icon: Instagram, group: "Herramientas" },
   { id: "deepdive", label: "Deep Dive Competencia", icon: Code, group: "Herramientas" },
   { id: "estrategia", label: "Estrategia", icon: Lightbulb, group: "Herramientas" },
   { id: "copies", label: "Meta Ads Manager", icon: Sparkles, group: "Plataformas" },

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Instagram, Code, ShoppingBag, Lightbulb, ChevronDown } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,7 +24,6 @@ import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { ClientOnboarding } from '@/components/client-portal/ClientOnboarding';
 import { OnboardingWizard } from '@/components/client-portal/OnboardingWizard';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
-import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import MetaAdsManager from '@/components/client-portal/meta-ads/MetaAdsManager';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
@@ -279,7 +278,6 @@ export default function ClientPortal() {
   const secondaryTabs = [
     { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
-    { id: 'competitors', label: 'Competencia', icon: Instagram },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
     { id: 'estrategia', label: 'Estrategia', icon: Lightbulb },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
@@ -427,13 +425,6 @@ export default function ClientPortal() {
                   clientId={effectiveClientId}
                   onEditBrief={() => setActiveTab('steve')}
                 />
-              </TabErrorBoundary>
-            </div>
-          )}
-          {visitedTabs.has('competitors') && effectiveClientId && (
-            <div className={activeTab !== 'competitors' ? 'hidden' : ''}>
-              <TabErrorBoundary tabName="Competencia">
-                <CompetitorAdsPanel clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}

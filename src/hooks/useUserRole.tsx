@@ -53,7 +53,30 @@ export function useUserRole(): UseUserRoleReturn {
           supabase.rpc('is_shopify_user', { _user_id: user.id }),
         ]);
 
-        // Silently handle RPC errors — functions may not exist for all users
+        // Log RPC errors — these must never be silent
+        if (adminErr) console.error('[useUserRole] has_role(admin) RPC failed:', adminErr.message);
+        if (clientErr) console.error('[useUserRole] has_role(client) RPC failed:', clientErr.message);
+        if (superAdminErr) console.error('[useUserRole] is_super_admin RPC failed:', superAdminErr.message);
+        if (shopifyErr) console.error('[useUserRole] is_shopify_user RPC failed:', shopifyErr.message);
+
+        // Fallback: if has_role RPCs failed, check clients table directly
+        let effectiveIsClient = isClient ?? false;
+        let effectiveIsAdmin = isAdmin ?? false;
+
+        if (clientErr || adminErr) {
+          console.warn('[useUserRole] RPC failed, using clients table fallback');
+          const { data: fallbackClients, error: fallbackErr } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('client_user_id', user.id)
+            .limit(1);
+
+          if (fallbackErr) {
+            console.error('[useUserRole] Fallback query failed:', fallbackErr.message);
+          } else if (fallbackClients && fallbackClients.length > 0) {
+            effectiveIsClient = true;
+          }
+        }
 
         setIsSuperAdmin(superAdminCheck ?? false);
         // Super admins should NOT be flagged as Shopify users even if linked to a shop
@@ -69,10 +92,10 @@ export function useUserRole(): UseUserRoleReturn {
         } else if (shopifyUserCheck) {
           // Shopify users are clients, regardless of role table
           userRole = 'client';
-        } else if (isAdmin && !shopifyUserCheck) {
+        } else if (effectiveIsAdmin && !shopifyUserCheck) {
           // Regular admin (but this should be deprecated - use super_admin)
           userRole = 'admin';
-        } else if (isClient) {
+        } else if (effectiveIsClient) {
           userRole = 'client';
         } else {
           userRole = null;
@@ -94,14 +117,14 @@ export function useUserRole(): UseUserRoleReturn {
             ? clients.find(c => c.shop_domain) || clients[0]
             : null;
 
-          // clientError silently ignored — clientData stays null
+          if (clientError) console.error('[useUserRole] Failed to fetch client data:', clientError.message);
 
           setClientData(client);
         } else {
           setClientData(null);
         }
-      } catch {
-        // Error in fetchRole — role remains null
+      } catch (err) {
+        console.error('[useUserRole] Unexpected error in fetchRole:', err);
       } finally {
         setLoading(false);
       }

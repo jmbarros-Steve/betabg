@@ -57,7 +57,7 @@
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  right: 220px !important;
+  right: 260px !important;
   bottom: 0 !important;
   width: auto !important;
   height: auto !important;
@@ -68,7 +68,7 @@
   position: absolute !important;
   top: 0 !important;
   right: 0 !important;
-  width: 220px !important;
+  width: 260px !important;
   z-index: 5 !important;
   display: flex !important;
   padding: 6px 4px !important;
@@ -81,7 +81,7 @@
   top: 40px !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 220px !important;
+  width: 260px !important;
   overflow-y: auto !important;
   z-index: 5 !important;
 }

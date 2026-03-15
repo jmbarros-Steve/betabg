@@ -52,35 +52,61 @@ export async function generateImage(c: Context) {
   }
 
   // Auto-fetch client reference photos if none provided
+  // PRIORITY: Match product mentioned in the copy prompt to use its REAL Shopify photo
   let effectiveFotoBase = fotoBaseUrl;
   if (!effectiveFotoBase) {
     const supabaseForQuery = getSupabaseAdmin();
 
-    // Try 1: Get the most recent brand asset uploaded by the client
-    const { data: brandAssets } = await supabaseForQuery
-      .from('ad_assets')
-      .select('asset_url')
-      .eq('client_id', clientId)
-      .eq('tipo', 'imagen')
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    // Try 2: Get Shopify product images
+    // Get ALL Shopify product images with titles for matching
     const { data: shopifyProducts } = await supabaseForQuery
       .from('shopify_products')
       .select('image_url, title')
       .eq('client_id', clientId)
       .not('image_url', 'is', null)
-      .limit(5);
+      .limit(50);
 
-    // Pick a random reference to add variety
-    const allPhotos: string[] = [];
-    if (brandAssets) allPhotos.push(...brandAssets.map((a: any) => a.asset_url).filter(Boolean));
-    if (shopifyProducts) allPhotos.push(...shopifyProducts.map((p: any) => p.image_url).filter(Boolean));
+    // Try to match a product mentioned in the copy/prompt text
+    if (shopifyProducts && shopifyProducts.length > 0 && promptGeneracion) {
+      const promptLower = promptGeneracion.toLowerCase();
 
-    if (allPhotos.length > 0) {
-      // Random selection for variety instead of always the same photo
-      effectiveFotoBase = allPhotos[Math.floor(Math.random() * allPhotos.length)];
+      // Score each product by how well its title matches the prompt
+      let bestMatch: { url: string; score: number } | null = null;
+      for (const product of shopifyProducts) {
+        if (!product.image_url || !product.title) continue;
+        const titleLower = product.title.toLowerCase();
+        const titleWords = titleLower.split(/\s+/).filter((w: string) => w.length > 2);
+        // Count how many significant words from the product title appear in the prompt
+        const matchingWords = titleWords.filter((word: string) => promptLower.includes(word));
+        const score = matchingWords.length / Math.max(titleWords.length, 1);
+        // Require at least 1 matching word and a decent ratio
+        if (matchingWords.length >= 1 && (!bestMatch || score > bestMatch.score)) {
+          bestMatch = { url: product.image_url, score };
+        }
+      }
+
+      if (bestMatch && bestMatch.score >= 0.3) {
+        effectiveFotoBase = bestMatch.url;
+        console.log(`[generate-image] Matched product from copy: ${bestMatch.url} (score: ${bestMatch.score.toFixed(2)})`);
+      }
+    }
+
+    // Fallback: brand assets or random product photo
+    if (!effectiveFotoBase) {
+      const { data: brandAssets } = await supabaseForQuery
+        .from('ad_assets')
+        .select('asset_url')
+        .eq('client_id', clientId)
+        .eq('tipo', 'imagen')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const allPhotos: string[] = [];
+      if (brandAssets) allPhotos.push(...brandAssets.map((a: any) => a.asset_url).filter(Boolean));
+      if (shopifyProducts) allPhotos.push(...shopifyProducts.map((p: any) => p.image_url).filter(Boolean));
+
+      if (allPhotos.length > 0) {
+        effectiveFotoBase = allPhotos[Math.floor(Math.random() * allPhotos.length)];
+      }
     }
   }
 

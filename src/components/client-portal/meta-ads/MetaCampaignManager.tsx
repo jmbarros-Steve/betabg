@@ -1325,19 +1325,19 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
                         {/* Daily Budget */}
                         <td className="py-4 px-3 text-right">
-                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Presupuesto/Día</span>
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">Presupuesto/Día</span>
                           <span className="font-medium">{formatCLP(campaign.daily_budget)}</span>
                         </td>
 
                         {/* Spend 30d */}
                         <td className="py-4 px-3 text-right">
-                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Gasto</span>
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">Gasto 30d</span>
                           <span className="font-medium">{formatCLP(campaign.spend_30d)}</span>
                         </td>
 
                         {/* ROAS */}
                         <td className="py-4 px-3 text-right">
-                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">ROAS</span>
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">ROAS</span>
                           <span
                             className={`text-base font-medium ${
                               campaign.roas >= 3
@@ -1357,19 +1357,19 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
                         {/* CPA */}
                         <td className="py-4 px-3 text-right">
-                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Costo por venta</span>
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">CPA</span>
                           <span>{campaign.cpa > 0 ? formatCLP(campaign.cpa) : '--'}</span>
                         </td>
 
                         {/* CTR */}
                         <td className="py-4 px-3 text-right">
-                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Tasa de clics</span>
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">CTR</span>
                           <span>{campaign.ctr > 0 ? formatPercent(campaign.ctr) : '--'}</span>
                         </td>
 
                         {/* Conversions */}
                         <td className="py-4 px-3 text-right">
-                          <span className="block text-[10px] text-muted-foreground lg:hidden mb-0.5">Ventas</span>
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">Ventas</span>
                           <span className="font-medium">{formatNumber(campaign.conversions)}</span>
                         </td>
 

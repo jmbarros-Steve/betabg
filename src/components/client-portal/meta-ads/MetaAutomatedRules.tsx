@@ -380,7 +380,7 @@ const DEFAULT_BRIEF: BriefData = {
   hasBrief: false,
 };
 
-function buildSuggestedRules(brief: BriefData): (PresetRule & { briefBased: boolean })[] {
+function buildSuggestedRules(brief: BriefData): (PresetRule & { briefBased: boolean; frequency?: 'daily' | 'weekly' | 'once' })[] {
   const cpa = brief.cpaMax ?? DEFAULT_BRIEF.cpaMax!;
   const roas = brief.roasTarget ?? DEFAULT_BRIEF.roasTarget!;
   const budget = brief.budgetMonthly ?? DEFAULT_BRIEF.budgetMonthly!;
@@ -399,15 +399,16 @@ function buildSuggestedRules(brief: BriefData): (PresetRule & { briefBased: bool
       briefBased: brief.hasBrief && brief.cpaMax !== null,
     },
     {
-      name: `Escalar +20% si ROAS > ${roas}x por 3 días`,
+      name: `Escalar +20% diario si ROAS > ${roas}x por 3 días`,
       description: brief.hasBrief
-        ? `Basado en tu brief: aumenta presupuesto 20% cuando el ROAS supere ${roas}x en los últimos 3 días.`
-        : `Aumenta presupuesto 20% si ROAS > ${roas}x. Completa tu brief para personalizar este objetivo.`,
+        ? `Basado en tu brief: aumenta presupuesto diario un 20% cuando el ROAS supere ${roas}x en los últimos 3 días. Se ejecuta una vez al día (máx. 1 escalamiento por 24h).`
+        : `Aumenta presupuesto diario un 20% si ROAS > ${roas}x en los últimos 3 días. Se ejecuta una vez al día. Completa tu brief para personalizar este objetivo.`,
       condition: { metric: 'ROAS' as RuleMetric, operator: 'GREATER_THAN' as RuleOperator, value: roas, timeWindow: 'LAST_3_DAYS' as TimeWindow },
       action: { type: 'INCREASE_BUDGET' as RuleAction, percentage: 20 },
       icon: TrendingUp,
       color: 'text-green-500',
       briefBased: brief.hasBrief && brief.roasTarget !== null,
+      frequency: 'daily' as const,
     },
     {
       name: `Alertar si gasto diario > $${dailyBudget.toLocaleString('es-CL')}`,
@@ -856,7 +857,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
   };
 
   // --- Apply suggested rule with one click -----------------------------------
-  const applySuggestedRule = async (suggestion: PresetRule & { briefBased: boolean }, index: number) => {
+  const applySuggestedRule = async (suggestion: PresetRule & { briefBased: boolean; frequency?: string }, index: number) => {
     if (!ctxConnectionId) {
       toast.error('No hay conexión Meta Ads activa');
       return;
@@ -937,29 +938,38 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-sm mb-0.5">{suggestion.name}</h4>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h4 className="font-semibold text-sm">{suggestion.name}</h4>
+                      {suggestion.frequency && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium border-green-300 text-green-700 dark:border-green-700 dark:text-green-400">
+                          {suggestion.frequency === 'daily' ? '⏱ Diario' : suggestion.frequency === 'weekly' ? '📅 Semanal' : '1️⃣ Una vez'}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground leading-relaxed mb-2">
                       {suggestion.description}
                     </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs gap-1.5 border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-800 dark:hover:bg-purple-950 dark:hover:text-purple-300"
-                      disabled={isApplying}
-                      onClick={() => applySuggestedRule(suggestion, idx)}
-                    >
-                      {isApplying ? (
-                        <>
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Aplicando...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="h-3 w-3" />
-                          Aplicar
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1.5 border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-purple-800 dark:hover:bg-purple-950 dark:hover:text-purple-300"
+                        disabled={isApplying}
+                        onClick={() => applySuggestedRule(suggestion, idx)}
+                      >
+                        {isApplying ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Aplicando...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="h-3 w-3" />
+                            Crear regla en Meta
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   {suggestion.briefBased && (
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0 bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300">

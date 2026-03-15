@@ -29,7 +29,7 @@ export function MetricsDateFilter({ value, onChange, customRange, onCustomRangeC
     { value: '7d', label: '7 días' },
     { value: '30d', label: '30 días' },
     { value: '90d', label: '90 días' },
-    { value: 'mtd', label: 'Mes actual' },
+    { value: 'mtd', label: 'Este mes' },
     { value: 'ytd', label: 'Año actual' },
   ];
 

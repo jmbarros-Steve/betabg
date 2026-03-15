@@ -43,9 +43,11 @@ export async function productRecommendations(c: Context) {
     case 'generate': {
       const { subscriber_id, recommendation_type, count } = body;
       const products = await getProductCatalog(supabase, client_id);
-      const subscriber = subscriber_id
-        ? (await supabase.from('email_subscribers').select('*').eq('id', subscriber_id).single()).data
-        : null;
+      let subscriber = null;
+      if (subscriber_id) {
+        const { data, error } = await supabase.from('email_subscribers').select('*').eq('id', subscriber_id).single();
+        if (!error) subscriber = data;
+      }
 
       const html = await generateRecommendationBlock(
         supabase,
@@ -530,9 +532,11 @@ export async function replaceProductRecommendations(
 
   const products = await getProductCatalog(supabase, clientId);
 
-  const subscriber = subscriberId
-    ? (await supabase.from('email_subscribers').select('*').eq('id', subscriberId).single()).data
-    : null;
+  let subscriber = null;
+  if (subscriberId) {
+    const { data, error } = await supabase.from('email_subscribers').select('*').eq('id', subscriberId).single();
+    if (!error) subscriber = data;
+  }
 
   const recommendationHtml = await generateRecommendationBlock(
     supabase,
