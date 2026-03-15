@@ -596,6 +596,309 @@ async function enrollInFlows(
 }
 
 /**
+ * Cron: Winback trigger — finds customers who haven't ordered in N days and enrolls them.
+ * POST /api/email-flow-cron-winback (called by Cloud Scheduler)
+ */
+export async function emailFlowCronWinback(c: Context) {
+  const supabase = getSupabaseAdmin();
+
+  // Get all active winback flows
+  const { data: flows } = await supabase
+    .from('email_flows')
+    .select('*')
+    .eq('trigger_type', 'winback')
+    .eq('status', 'active');
+
+  if (!flows || flows.length === 0) {
+    return c.json({ processed: 0, message: 'No active winback flows' });
+  }
+
+  let totalEnrolled = 0;
+
+  for (const flow of flows) {
+    const inactivityDays = parseInt(flow.settings?.trigger_config?.inactivity_days || '90', 10);
+    const cutoffDate = new Date(Date.now() - inactivityDays * 86400 * 1000).toISOString();
+
+    // Find subscribers with Shopify customer IDs who ordered before the cutoff
+    // and haven't ordered since
+    const { data: candidates } = await supabase
+      .from('email_subscribers')
+      .select('id, email, shopify_customer_id')
+      .eq('client_id', flow.client_id)
+      .eq('status', 'subscribed')
+      .not('shopify_customer_id', 'is', null)
+      .not('last_order_at', 'is', null)
+      .lt('last_order_at', cutoffDate)
+      .limit(100);
+
+    if (!candidates || candidates.length === 0) continue;
+
+    for (const subscriber of candidates) {
+      // Check not already enrolled
+      const { count } = await supabase
+        .from('email_flow_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('flow_id', flow.id)
+        .eq('subscriber_id', subscriber.id)
+        .in('status', ['active', 'completed']);
+
+      if (count && count > 0) continue;
+
+      const steps = flow.steps as any[];
+      const firstStepDelay = steps[0]?.delay_seconds || 0;
+      const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
+
+      const { data: enrollment, error } = await supabase
+        .from('email_flow_enrollments')
+        .insert({
+          flow_id: flow.id,
+          subscriber_id: subscriber.id,
+          client_id: flow.client_id,
+          status: 'active',
+          current_step: 0,
+          next_send_at: nextSendAt.toISOString(),
+          metadata: { trigger: 'winback', inactivity_days: inactivityDays },
+        })
+        .select('id')
+        .single();
+
+      if (error) continue;
+
+      try {
+        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, flow.client_id);
+        totalEnrolled++;
+      } catch (err) {
+        console.error('Failed to schedule winback step:', err);
+      }
+    }
+  }
+
+  console.log(`Winback cron: enrolled ${totalEnrolled} subscribers`);
+  return c.json({ processed: totalEnrolled });
+}
+
+/**
+ * Cron: Birthday trigger — finds subscribers with birthday today (or N days ahead).
+ * POST /api/email-flow-cron-birthday (called by Cloud Scheduler)
+ */
+export async function emailFlowCronBirthday(c: Context) {
+  const supabase = getSupabaseAdmin();
+
+  const { data: flows } = await supabase
+    .from('email_flows')
+    .select('*')
+    .eq('trigger_type', 'birthday')
+    .eq('status', 'active');
+
+  if (!flows || flows.length === 0) {
+    return c.json({ processed: 0, message: 'No active birthday flows' });
+  }
+
+  let totalEnrolled = 0;
+
+  for (const flow of flows) {
+    const daysBefore = parseInt(flow.settings?.trigger_config?.days_before || '0', 10);
+    const targetDate = new Date(Date.now() + daysBefore * 86400 * 1000);
+    const targetMonth = targetDate.getMonth() + 1;
+    const targetDay = targetDate.getDate();
+
+    // Find subscribers whose birthday matches target date
+    // birthday stored as metadata field (month-day) or custom_fields.birthday
+    const { data: subscribers } = await supabase
+      .from('email_subscribers')
+      .select('id, email, custom_fields')
+      .eq('client_id', flow.client_id)
+      .eq('status', 'subscribed')
+      .limit(500);
+
+    if (!subscribers) continue;
+
+    // Filter by birthday match
+    const matches = subscribers.filter((sub: any) => {
+      const bd = sub.custom_fields?.birthday || sub.custom_fields?.birthdate;
+      if (!bd) return false;
+      try {
+        const bdDate = new Date(bd);
+        return bdDate.getMonth() + 1 === targetMonth && bdDate.getDate() === targetDay;
+      } catch { return false; }
+    });
+
+    for (const subscriber of matches) {
+      const { count } = await supabase
+        .from('email_flow_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('flow_id', flow.id)
+        .eq('subscriber_id', subscriber.id)
+        .eq('status', 'active');
+
+      if (count && count > 0) continue;
+
+      // Prevent re-enrollment within same year
+      const { count: yearCount } = await supabase
+        .from('email_flow_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('flow_id', flow.id)
+        .eq('subscriber_id', subscriber.id)
+        .gte('created_at', new Date(new Date().getFullYear(), 0, 1).toISOString());
+
+      if (yearCount && yearCount > 0) continue;
+
+      const steps = flow.steps as any[];
+      const firstStepDelay = steps[0]?.delay_seconds || 0;
+      const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
+
+      const { data: enrollment, error } = await supabase
+        .from('email_flow_enrollments')
+        .insert({
+          flow_id: flow.id,
+          subscriber_id: subscriber.id,
+          client_id: flow.client_id,
+          status: 'active',
+          current_step: 0,
+          next_send_at: nextSendAt.toISOString(),
+          metadata: {
+            trigger: 'birthday',
+            birthday: subscriber.custom_fields?.birthday || subscriber.custom_fields?.birthdate,
+            include_discount: flow.settings?.trigger_config?.include_discount || 'none',
+          },
+        })
+        .select('id')
+        .single();
+
+      if (error) continue;
+
+      try {
+        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, flow.client_id);
+        totalEnrolled++;
+      } catch (err) {
+        console.error('Failed to schedule birthday step:', err);
+      }
+    }
+  }
+
+  console.log(`Birthday cron: enrolled ${totalEnrolled} subscribers`);
+  return c.json({ processed: totalEnrolled });
+}
+
+/**
+ * Track browse events — called from storefront tracking pixel.
+ * POST /api/email-flow-track-browse
+ * Body: { client_id, email, product_id, product_title, product_url, product_image }
+ */
+export async function emailFlowTrackBrowse(c: Context) {
+  const body = await c.req.json();
+  const { client_id, email, product_id, product_title, product_url, product_image } = body;
+
+  if (!client_id || !email || !product_id) {
+    return c.json({ error: 'Missing client_id, email, or product_id' }, 400);
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  // Find or create subscriber
+  const { data: subscriber } = await supabase
+    .from('email_subscribers')
+    .select('id, email, status')
+    .eq('client_id', client_id)
+    .eq('email', email.toLowerCase())
+    .single();
+
+  if (!subscriber || subscriber.status !== 'subscribed') {
+    return c.json({ tracked: false, reason: 'not_subscribed' });
+  }
+
+  // Store browse event in subscriber's metadata
+  const { data: existing } = await supabase
+    .from('email_subscribers')
+    .select('custom_fields')
+    .eq('id', subscriber.id)
+    .single();
+
+  const customFields = existing?.custom_fields || {};
+  const browseHistory = customFields.browse_history || [];
+
+  // Add to browse history (max 20 items, dedup by product_id)
+  const filtered = browseHistory.filter((b: any) => b.product_id !== product_id);
+  filtered.unshift({
+    product_id,
+    product_title,
+    product_url,
+    product_image,
+    viewed_at: new Date().toISOString(),
+  });
+  customFields.browse_history = filtered.slice(0, 20);
+
+  await supabase
+    .from('email_subscribers')
+    .update({ custom_fields: customFields })
+    .eq('id', subscriber.id);
+
+  // Check if we should trigger browse_abandonment flow
+  // (viewed enough products in the last hour, no cart created)
+  const recentBrowses = customFields.browse_history.filter((b: any) => {
+    const viewedAt = new Date(b.viewed_at).getTime();
+    return Date.now() - viewedAt < 3600 * 1000; // last hour
+  });
+
+  const { data: flows } = await supabase
+    .from('email_flows')
+    .select('*')
+    .eq('client_id', client_id)
+    .eq('trigger_type', 'browse_abandonment')
+    .eq('status', 'active');
+
+  if (flows && flows.length > 0) {
+    for (const flow of flows) {
+      const minViewed = parseInt(flow.settings?.trigger_config?.min_products_viewed || '2', 10);
+      if (recentBrowses.length < minViewed) continue;
+
+      // Check not already enrolled recently (within 24h)
+      const { count } = await supabase
+        .from('email_flow_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('flow_id', flow.id)
+        .eq('subscriber_id', subscriber.id)
+        .gte('created_at', new Date(Date.now() - 86400 * 1000).toISOString());
+
+      if (count && count > 0) continue;
+
+      const waitMinutes = parseInt(flow.settings?.trigger_config?.wait_minutes || '60', 10);
+      const steps = flow.steps as any[];
+      const firstStepDelay = steps[0]?.delay_seconds || waitMinutes * 60;
+      const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
+
+      const { data: enrollment, error } = await supabase
+        .from('email_flow_enrollments')
+        .insert({
+          flow_id: flow.id,
+          subscriber_id: subscriber.id,
+          client_id: client_id,
+          status: 'active',
+          current_step: 0,
+          next_send_at: nextSendAt.toISOString(),
+          metadata: {
+            trigger: 'browse_abandonment',
+            browsed_products: recentBrowses.slice(0, 5),
+          },
+        })
+        .select('id')
+        .single();
+
+      if (error) continue;
+
+      try {
+        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, client_id);
+        console.log(`Enrolled ${subscriber.email} in browse abandonment flow ${flow.id}`);
+      } catch (err) {
+        console.error('Failed to schedule browse abandonment step:', err);
+      }
+    }
+  }
+
+  return c.json({ tracked: true });
+}
+
+/**
  * Schedule a flow step via Cloud Tasks.
  */
 async function scheduleFlowStepViaCloudTasks(

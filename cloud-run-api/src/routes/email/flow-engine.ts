@@ -435,9 +435,61 @@ async function evaluateBranchCondition(
       return (count || 0) > 0;
     }
 
+    case 'opened_any_email': {
+      const days = parseInt(condition.operator || '30', 10);
+      const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
+      const { count } = await supabase
+        .from('email_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('subscriber_id', subscriber.id)
+        .eq('event_type', 'opened')
+        .gte('created_at', since);
+      return (count || 0) > 0;
+    }
+
+    case 'clicked_any_email': {
+      const days = parseInt(condition.operator || '30', 10);
+      const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
+      const { count } = await supabase
+        .from('email_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('subscriber_id', subscriber.id)
+        .eq('event_type', 'clicked')
+        .gte('created_at', since);
+      return (count || 0) > 0;
+    }
+
+    case 'total_orders': {
+      const orderCount = subscriber.total_orders || subscriber.custom_fields?.total_orders || 0;
+      return compareValues(orderCount, condition.operator, condition.value);
+    }
+
+    case 'total_spent': {
+      const totalSpent = subscriber.total_spent || subscriber.custom_fields?.total_spent || 0;
+      return compareValues(totalSpent, condition.operator, condition.value);
+    }
+
+    case 'last_order_days': {
+      const lastOrderAt = subscriber.last_order_at || subscriber.custom_fields?.last_order_at;
+      if (!lastOrderAt) return compareValues(999, condition.operator, condition.value);
+      const daysSinceOrder = Math.floor((Date.now() - new Date(lastOrderAt).getTime()) / 86400000);
+      return compareValues(daysSinceOrder, condition.operator, condition.value);
+    }
+
     case 'subscriber_property': {
-      const fieldValue = subscriber[condition.field];
+      const fieldValue = subscriber[condition.field] ?? subscriber.custom_fields?.[condition.field];
       return compareValues(fieldValue, condition.operator, condition.value);
+    }
+
+    case 'subscriber_tag': {
+      const tags = subscriber.tags || subscriber.custom_fields?.tags || [];
+      const hasTag = Array.isArray(tags) ? tags.includes(condition.value) : String(tags).includes(condition.value);
+      return condition.operator === 'neq' ? !hasTag : hasTag;
+    }
+
+    case 'subscriber_source': {
+      const source = subscriber.source || '';
+      return condition.operator === 'neq' ? source !== condition.value : source === condition.value;
     }
 
     default:
