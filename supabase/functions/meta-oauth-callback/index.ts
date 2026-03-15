@@ -86,10 +86,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    const tokenUrl = `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirect_uri)}&client_secret=${metaAppSecret}&code=${code}`;
-
+    // Exchange code for token (POST body — keeps secret out of URL/logs)
     console.log('Exchanging code for token...');
-    const tokenResponse = await fetch(tokenUrl);
+    const tokenResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        redirect_uri: redirect_uri,
+        code: code,
+      }),
+    });
     const tokenData = await tokenResponse.json();
 
     if (tokenData.error) {
@@ -103,20 +111,32 @@ Deno.serve(async (req) => {
     const accessToken = tokenData.access_token;
     console.log('Access token obtained');
 
-    // Get long-lived access token
-    const longLivedUrl = `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaAppId}&client_secret=${metaAppSecret}&fb_exchange_token=${accessToken}`;
-    
-    const longLivedResponse = await fetch(longLivedUrl);
+    // Exchange for long-lived token (POST body — keeps secret out of URL/logs)
+    const longLivedResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'fb_exchange_token',
+        client_id: metaAppId,
+        client_secret: metaAppSecret,
+        fb_exchange_token: accessToken,
+      }),
+    });
     const longLivedData = await longLivedResponse.json();
 
     const finalToken = longLivedData.access_token || accessToken;
-    console.log('Long-lived token obtained');
+    const tokenExpiresIn = longLivedData.expires_in || 5184000;
+    const tokenExpiresAt = new Date(Date.now() + tokenExpiresIn * 1000).toISOString();
+    console.log(`Long-lived token obtained, expires in ${tokenExpiresIn}s`);
 
-    // Fetch businesses and ad accounts to verify access
-    // We do NOT auto-select an account — the user will choose from the portfolio selector
+    // Fetch businesses and ad accounts to verify access (Authorization header)
     const [accountsResponse, businessesResponse] = await Promise.all([
-      fetch(`https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}&fields=name,account_id,account_status`),
-      fetch(`https://graph.facebook.com/v18.0/me/businesses?access_token=${finalToken}&fields=id,name`),
+      fetch('https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,account_status', {
+        headers: { Authorization: `Bearer ${finalToken}` },
+      }),
+      fetch('https://graph.facebook.com/v21.0/me/businesses?fields=id,name', {
+        headers: { Authorization: `Bearer ${finalToken}` },
+      }),
     ]);
 
     const accountsData = await accountsResponse.json();
@@ -134,7 +154,6 @@ Deno.serve(async (req) => {
     }
 
     // NO auto-selection: account_id starts as null
-    // User must select a portfolio/negocio from the Business Manager hierarchy
     const accountId: string | null = null;
     const accountName: string | null = businesses.length > 0 ? businesses[0].name : null;
 
@@ -160,11 +179,11 @@ Deno.serve(async (req) => {
 
     let connectionResult;
     if (existingConnection) {
-      // Update existing connection — preserve existing account_id if user already selected one
       connectionResult = await supabase
         .from('platform_connections')
         .update({
           access_token_encrypted: encryptedToken,
+          token_expires_at: tokenExpiresAt,
           account_id: existingConnection.account_id || accountId,
           store_name: existingConnection.store_name || accountName,
           is_active: true,
@@ -174,13 +193,13 @@ Deno.serve(async (req) => {
         .select()
         .single();
     } else {
-      // Create new connection — account_id is null until user picks a portfolio
       connectionResult = await supabase
         .from('platform_connections')
         .insert({
           client_id: client_id,
           platform: 'meta',
           access_token_encrypted: encryptedToken,
+          token_expires_at: tokenExpiresAt,
           account_id: accountId,
           store_name: accountName,
           is_active: true,
@@ -199,7 +218,6 @@ Deno.serve(async (req) => {
 
     console.log('Connection saved successfully');
 
-    // Return all available accounts and businesses so frontend can build hierarchy
     const allAccounts = adAccounts.map((a: any) => ({
       id: a.id.replace('act_', ''),
       name: a.name,

@@ -2,7 +2,11 @@
  * Shared Meta Graph API fetch utility.
  * Uses Authorization: Bearer header instead of access_token query param
  * to prevent token leakage in server logs, proxy logs, and stack traces.
+ *
+ * Includes automatic token refresh on expiry (error code 190).
  */
+
+import { isTokenExpiredError, handleTokenExpired } from './meta-token-refresh.js';
 
 const META_API_VERSION = 'v21.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
@@ -93,6 +97,42 @@ export async function metaApiJson<T = any>(
     }
     return { ok: false, error: { message: err.message }, status: 500 };
   }
+}
+
+/**
+ * Fetch JSON from Meta API with automatic token refresh on expiry.
+ * If the token is expired (error 190), refreshes it and retries once.
+ *
+ * @param connectionId - The platform_connections.id (needed to refresh + persist new token)
+ */
+export async function metaApiJsonWithRefresh<T = any>(
+  path: string,
+  token: string,
+  connectionId: string,
+  options: MetaFetchOptions = {}
+): Promise<{ ok: true; data: T; token: string } | { ok: false; error: any; status: number; tokenExpired?: boolean }> {
+  const result = await metaApiJson<T>(path, token, options);
+
+  if (!result.ok && isTokenExpiredError(result.error)) {
+    console.log(`[meta-fetch] Token expired for connection ${connectionId}, attempting refresh...`);
+    const newToken = await handleTokenExpired(connectionId);
+
+    if (newToken) {
+      console.log('[meta-fetch] Token refreshed, retrying request...');
+      const retryResult = await metaApiJson<T>(path, newToken, options);
+      if (retryResult.ok) {
+        return { ...retryResult, token: newToken };
+      }
+      return { ...retryResult, tokenExpired: true };
+    }
+
+    return { ...result, tokenExpired: true };
+  }
+
+  if (result.ok) {
+    return { ...result, token };
+  }
+  return result;
 }
 
 /**
