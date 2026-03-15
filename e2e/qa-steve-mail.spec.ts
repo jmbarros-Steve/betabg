@@ -574,7 +574,7 @@ test.describe('Steve Mail — QA Completo', () => {
 
     // Contactos
     await clickTab(page, 'Contactos');
-    const importBtn = page.getByRole('button', { name: /Importar.*Shopify/i });
+    const importBtn = page.getByRole('button', { name: /Importar.*Shopify/i }).first();
     checks.push({ area: 'Contactos', item: 'Import Shopify CTA', status: await importBtn.isVisible().catch(() => false) ? 'PASS' : 'FAIL', note: 'Importar de Shopify button' });
 
     const searchBar = page.locator('input[placeholder*="Buscar"]').first();

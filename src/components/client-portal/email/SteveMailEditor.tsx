@@ -115,68 +115,60 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
       editorRef.current = editor;
 
       editor.on('load', () => {
-        // The newsletter preset creates a flat layout: canvas small on top, panels below.
-        // We restructure the DOM to: canvas fills height, blocks sidebar on the right.
         const el = containerRef.current;
-        if (el) {
-          const gjsEditor = el.querySelector('.gjs-editor') as HTMLElement;
+        if (!el) { onReady?.(); return; }
+
+        // Force layout: canvas left, sidebar right (override GrapeJS inline styles)
+        const forceLayout = () => {
           const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
-          const viewsContainer = el.querySelector('.gjs-pn-views-container') as HTMLElement;
-          const viewsPanel = el.querySelector('.gjs-pn-views') as HTMLElement;
+          const views = el.querySelector('.gjs-pn-views') as HTMLElement;
+          const viewsCont = el.querySelector('.gjs-pn-views-container') as HTMLElement;
+          const editorEl = el.querySelector('.gjs-editor') as HTMLElement;
 
-          if (gjsEditor) {
-            // Create a wrapper row div for canvas + sidebar
-            const row = document.createElement('div');
-            row.className = 'steve-editor-row';
-            row.style.cssText = 'display:flex;flex:1;height:0;min-height:0;overflow:hidden;';
-
-            // Move canvas into row
-            if (canvas) {
-              canvas.style.cssText = 'flex:1;height:100%;width:auto;position:relative;background:#f4f4f5;';
-              row.appendChild(canvas);
-            }
-
-            // Create right sidebar from views
-            const sidebar = document.createElement('div');
-            sidebar.className = 'steve-editor-sidebar';
-            sidebar.style.cssText = 'width:240px;min-width:240px;height:100%;overflow-y:auto;background:#18181b;border-left:1px solid #27272a;display:flex;flex-direction:column;';
-
-            // Move view tabs into sidebar header
-            if (viewsPanel) {
-              viewsPanel.style.cssText = 'display:flex;padding:4px 8px;background:#18181b;border-bottom:1px solid #27272a;gap:2px;flex-shrink:0;';
-              sidebar.appendChild(viewsPanel);
-            }
-
-            // Move views container (blocks/styles/traits content) into sidebar
-            if (viewsContainer) {
-              viewsContainer.style.cssText = 'flex:1;overflow-y:auto;background:#18181b;width:100%;';
-              sidebar.appendChild(viewsContainer);
-            }
-
-            row.appendChild(sidebar);
-
-            // Hide all default top panels
-            const toHide = gjsEditor.querySelectorAll(
-              '.gjs-pn-commands, .gjs-pn-options, .gjs-pn-devices-c'
-            );
-            toHide.forEach((p) => (p as HTMLElement).style.display = 'none');
-
-            // Make editor a flex column
-            gjsEditor.style.cssText = 'display:flex;flex-direction:column;height:100%;overflow:hidden;background:#18181b;font-family:Inter,sans-serif;font-size:13px;color:#fafafa;border:none;';
-
-            // Append the row to editor (after hiding panels)
-            gjsEditor.appendChild(row);
+          if (editorEl) {
+            editorEl.style.cssText = 'position:relative;height:100%;overflow:hidden;';
           }
 
-          // Open blocks panel by default
-          setTimeout(() => {
-            const viewBtns = el.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
-            if (viewBtns.length > 0) {
-              // Last button is typically "Blocks"
-              (viewBtns[viewBtns.length - 1] as HTMLElement).click();
-            }
-            editor.refresh();
-          }, 300);
+          // Hide default command/option panels
+          el.querySelectorAll('.gjs-pn-commands, .gjs-pn-options, .gjs-pn-devices-c').forEach((p) => {
+            (p as HTMLElement).style.cssText = 'display:none;height:0;';
+          });
+
+          if (canvas) {
+            canvas.style.cssText = 'position:absolute;top:0;left:0;right:220px;bottom:0;width:auto;height:auto;background-color:#f4f4f5;';
+          }
+          if (views) {
+            views.style.cssText = 'position:absolute;top:0;right:0;width:220px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;';
+          }
+          if (viewsCont) {
+            viewsCont.style.cssText = 'position:absolute;top:40px;right:0;bottom:0;width:220px;overflow-y:auto;z-index:5;background-color:#18181b;';
+          }
+        };
+
+        // Apply layout immediately and after a short delay (GrapeJS recalculates)
+        forceLayout();
+        setTimeout(() => {
+          forceLayout();
+          // Open blocks panel
+          const viewBtns = el.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
+          if (viewBtns.length > 0) {
+            (viewBtns[viewBtns.length - 1] as HTMLElement).click();
+          }
+          editor.refresh();
+          // Apply once more after refresh recalculates
+          setTimeout(forceLayout, 200);
+        }, 300);
+
+        // MutationObserver to re-apply layout when GrapeJS recalculates
+        const observer = new MutationObserver(() => {
+          const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
+          if (canvas && canvas.style.height !== 'auto') {
+            forceLayout();
+          }
+        });
+        const gjsEditor = el.querySelector('.gjs-editor');
+        if (gjsEditor) {
+          observer.observe(gjsEditor, { attributes: true, subtree: true, attributeFilter: ['style'] });
         }
 
         onReady?.();
