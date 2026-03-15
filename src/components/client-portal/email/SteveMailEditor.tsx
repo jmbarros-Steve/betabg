@@ -120,13 +120,16 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
 
       editor.on('load', () => {
         const el = containerRef.current;
+        console.log('[SteveMailEditor] load event fired, el:', !!el);
         if (!el) { onReady?.(); return; }
 
         const SIDEBAR_W = 220;
 
         const forceLayout = () => {
           const rect = el.getBoundingClientRect();
+          console.log('[SteveMailEditor] forceLayout:', rect.width, 'x', rect.height);
           const editorEl = el.querySelector('.gjs-editor') as HTMLElement;
+          console.log('[SteveMailEditor] found:', { editor: !!editorEl, canvas: !!el.querySelector('.gjs-cv-canvas'), views: !!el.querySelector('.gjs-pn-views') });
           const canvas = el.querySelector('.gjs-cv-canvas') as HTMLElement;
           const views = el.querySelector('.gjs-pn-views') as HTMLElement;
           const viewsCont = el.querySelector('.gjs-pn-views-container') as HTMLElement;

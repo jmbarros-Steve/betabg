@@ -202,6 +202,13 @@ test.describe('Steve Mail — QA Completo', () => {
 
   // ─── 4. Email Editor UX Evaluation ────────────────────────────────────
   test('4. Editor de email — evaluación UX completa', async () => {
+    // Capture browser console logs from the editor
+    page.on('console', msg => {
+      if (msg.text().includes('[SteveMailEditor]')) {
+        console.log(`[MAIL-QA] BROWSER: ${msg.text()}`);
+      }
+    });
+
     // We should be in step 2 (design) after test 3.
     // Wait extra for GrapeJS to initialize
     await page.waitForTimeout(5000);
@@ -292,8 +299,36 @@ test.describe('Steve Mail — QA Completo', () => {
     console.log(`[MAIL-QA] Next step button: ${hasNext ? 'VISIBLE' : 'NOT FOUND'}`);
 
     // ── Editor dimensions check ──
-    if (hasFrame) {
-      const box = await gjsFrame.boundingBox();
+    if (hasFrame || hasCanvas || hasEditor) {
+      // Log all relevant element dimensions for debugging
+      const dims = await page.evaluate(() => {
+        const results: Record<string, string> = {};
+        const els = [
+          '.gjs-editor', '.gjs-cv-canvas', '.gjs-frame-wrapper',
+          '.gjs-frame', '.gjs-pn-views', '.gjs-pn-views-container'
+        ];
+        for (const sel of els) {
+          const el = document.querySelector(sel) as HTMLElement;
+          if (el) {
+            const r = el.getBoundingClientRect();
+            results[sel] = `${Math.round(r.width)}x${Math.round(r.height)} style=[${el.style.cssText.substring(0, 80)}]`;
+          } else {
+            results[sel] = 'NOT FOUND';
+          }
+        }
+        // Also check the container
+        const container = document.querySelector('.gjs-editor')?.parentElement;
+        if (container) {
+          const cr = container.getBoundingClientRect();
+          results['container'] = `${Math.round(cr.width)}x${Math.round(cr.height)}`;
+        }
+        return results;
+      });
+      for (const [sel, dim] of Object.entries(dims)) {
+        console.log(`[MAIL-QA] DOM ${sel}: ${dim}`);
+      }
+
+      const box = hasFrame ? await gjsFrame.boundingBox() : null;
       if (box) {
         console.log(`[MAIL-QA] Editor iframe: ${Math.round(box.width)}x${Math.round(box.height)}`);
         if (box.width < 300) console.log('[MAIL-QA] FAIL: Editor too narrow (<300px)');
