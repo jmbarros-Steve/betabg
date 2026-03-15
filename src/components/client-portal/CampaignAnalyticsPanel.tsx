@@ -18,7 +18,7 @@ import {
   Clock, CheckCircle, PauseCircle, Calendar, Download, MousePointerClick, Bell, LayoutDashboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
 
@@ -655,6 +655,59 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const animRevenue = useCountUp(totals.revenue);
   const animRoas = useCountUp(overallRoas, 600);
   const animConversions = useCountUp(totals.conversions, 600);
+
+  // Budget pacing
+  const budgetPacing = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    const monthPct = (dayOfMonth / daysInMonth) * 100;
+    const avgDailySpend = dailyTrend.length > 0 ? dailyTrend.slice(-30).reduce((s, d) => s + d.spend, 0) / Math.min(dailyTrend.length, 30) : 0;
+    const projectedMonthlySpend = avgDailySpend * daysInMonth;
+    const currentMonthSpend = dailyTrend
+      .filter(d => { const dt = new Date(d.date + 'T12:00:00'); return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); })
+      .reduce((s, d) => s + d.spend, 0);
+    const spendPct = projectedMonthlySpend > 0 ? (currentMonthSpend / projectedMonthlySpend) * 100 : 0;
+    return { monthPct, spendPct, currentMonthSpend, projectedMonthlySpend, avgDailySpend, daysInMonth, dayOfMonth };
+  }, [dailyTrend]);
+
+  // Platform comparison
+  const platformComparison = useMemo(() => {
+    const platforms: Record<string, { spend: number; revenue: number; clicks: number; impressions: number; conversions: number }> = {};
+    for (const m of metrics) {
+      const p = m.platform || 'unknown';
+      if (!platforms[p]) platforms[p] = { spend: 0, revenue: 0, clicks: 0, impressions: 0, conversions: 0 };
+      platforms[p].spend += Number(m.spend) || 0;
+      platforms[p].revenue += Number(m.conversion_value) || 0;
+      platforms[p].clicks += Number(m.clicks) || 0;
+      platforms[p].impressions += Number(m.impressions) || 0;
+      platforms[p].conversions += Number(m.conversions) || 0;
+    }
+    return Object.entries(platforms).map(([platform, data]) => ({
+      platform, ...data,
+      roas: data.spend > 0 ? data.revenue / data.spend : 0,
+      ctr: data.impressions > 0 ? (data.clicks / data.impressions) * 100 : 0,
+      cpa: data.conversions > 0 ? data.spend / data.conversions : 0,
+      cpc: data.clicks > 0 ? data.spend / data.clicks : 0,
+    }));
+  }, [metrics]);
+
+  // Trend projection (7 days)
+  const trendWithProjection = useMemo(() => {
+    if (dailyTrend.length < 7) return [];
+    const recent = dailyTrend.slice(-7);
+    const avgSpend = recent.reduce((s, d) => s + d.spend, 0) / 7;
+    const avgRev = recent.reduce((s, d) => s + d.revenue, 0) / 7;
+    const spendSlope = (recent[recent.length - 1].spend - recent[0].spend) / 6;
+    const revSlope = (recent[recent.length - 1].revenue - recent[0].revenue) / 6;
+    const projected = [];
+    const lastDate = new Date(dailyTrend[dailyTrend.length - 1].date + 'T12:00:00');
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(lastDate); d.setDate(d.getDate() + i);
+      projected.push({ date: d.toISOString().split('T')[0], spend: 0, revenue: 0, projectedSpend: Math.max(0, avgSpend + spendSlope * i), projectedRevenue: Math.max(0, avgRev + revSlope * i) });
+    }
+    return [...dailyTrend.map(d => ({ ...d, projectedSpend: 0, projectedRevenue: 0 })), ...projected];
+  }, [dailyTrend]);
 
   // Daily trend data for sparklines
   const dailyTrend = useMemo(() => {
@@ -1346,6 +1399,115 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Budget Pacing */}
+      {budgetPacing.avgDailySpend > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Budget Pacing</CardTitle>
+            <CardDescription>D\u00eda {budgetPacing.dayOfMonth}/{budgetPacing.daysInMonth} del mes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Mes transcurrido</span>
+                  <span className="font-medium">{budgetPacing.monthPct.toFixed(0)}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.min(budgetPacing.monthPct, 100)}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Budget gastado (vs proyectado)</span>
+                  <span className={`font-medium ${budgetPacing.spendPct > budgetPacing.monthPct * 1.15 ? 'text-red-500' : budgetPacing.spendPct < budgetPacing.monthPct * 0.85 ? 'text-yellow-500' : 'text-green-500'}`}>
+                    {budgetPacing.spendPct.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${budgetPacing.spendPct > budgetPacing.monthPct * 1.15 ? 'bg-red-500' : budgetPacing.spendPct < budgetPacing.monthPct * 0.85 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(budgetPacing.spendPct, 100)}%` }} />
+                </div>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                <span>Gastado: {formatCurrency(budgetPacing.currentMonthSpend, 'CLP')}</span>
+                <span>Proyecci\u00f3n mes: {formatCurrency(budgetPacing.projectedMonthlySpend, 'CLP')}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Platform Comparison */}
+      {platformComparison.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Meta vs Google</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Plataforma</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Gasto</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Ingresos</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">ROAS</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">Conv.</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">CPA</th>
+                    <th className="pb-2 pr-4 text-muted-foreground font-medium">CTR</th>
+                    <th className="pb-2 text-muted-foreground font-medium">CPC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {platformComparison.map(p => (
+                    <tr key={p.platform} className="border-b border-border/50">
+                      <td className="py-2 pr-4">
+                        <div className="flex items-center gap-2">
+                          <img src={p.platform === 'meta' ? logoMeta : logoGoogle} alt="" className="w-4 h-4" />
+                          <span className="font-medium capitalize">{p.platform}</span>
+                        </div>
+                      </td>
+                      <td className="py-2 pr-4">{formatCurrency(p.spend, 'CLP')}</td>
+                      <td className="py-2 pr-4">{formatCurrency(p.revenue, 'CLP')}</td>
+                      <td className="py-2 pr-4"><span className={p.roas >= 2 ? 'text-green-600 font-bold' : p.roas >= 1 ? 'text-yellow-600 font-bold' : 'text-red-500 font-bold'}>{p.roas.toFixed(2)}x</span></td>
+                      <td className="py-2 pr-4">{p.conversions}</td>
+                      <td className="py-2 pr-4">{p.cpa > 0 ? formatCurrency(p.cpa, 'CLP') : '\u2014'}</td>
+                      <td className="py-2 pr-4">{p.ctr.toFixed(2)}%</td>
+                      <td className="py-2">{formatCurrency(p.cpc, 'CLP')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Trend with 7-day Projection */}
+      {trendWithProjection.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Tendencia + Proyecci\u00f3n 7 d\u00edas</CardTitle>
+            <CardDescription>L\u00ednea punteada = proyecci\u00f3n lineal</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={trendWithProjection} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => new Date(v + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })} />
+                <YAxis tick={{ fontSize: 10 }} width={70} allowDecimals={false} tickFormatter={(v: number) => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
+                <RechartsTooltip formatter={(value: number) => formatCurrency(value, 'CLP')} />
+                <Area type="monotone" dataKey="spend" stroke="#ef4444" fill="#ef444420" strokeWidth={1.5} name="Gasto" />
+                <Area type="monotone" dataKey="revenue" stroke="#22c55e" fill="#22c55e20" strokeWidth={1.5} name="Ingresos" />
+                <Area type="monotone" dataKey="projectedSpend" stroke="#ef4444" fill="#ef444410" strokeWidth={1.5} strokeDasharray="5 5" name="Gasto (proy.)" />
+                <Area type="monotone" dataKey="projectedRevenue" stroke="#22c55e" fill="#22c55e10" strokeWidth={1.5} strokeDasharray="5 5" name="Ingresos (proy.)" />
+                <Legend />
+              </AreaChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       )}
