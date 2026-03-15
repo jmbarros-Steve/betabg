@@ -28,11 +28,10 @@ interface RequestBody {
 
 async function metaGet(endpoint: string, token: string, params?: Record<string, string>) {
   const url = new URL(`${META_API}/${endpoint}`);
-  url.searchParams.set('access_token', token);
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   }
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   const data: any = await res.json();
   if (!res.ok) {
     console.error(`Meta GET /${endpoint} error:`, data);
@@ -43,10 +42,9 @@ async function metaGet(endpoint: string, token: string, params?: Record<string, 
 
 async function metaPost(endpoint: string, token: string, body: Record<string, any>) {
   const url = new URL(`${META_API}/${endpoint}`);
-  url.searchParams.set('access_token', token);
   const res = await fetch(url.toString(), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
   const text = await res.text();

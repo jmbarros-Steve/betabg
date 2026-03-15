@@ -157,7 +157,7 @@ export async function syncCompetitorAds(c: Context) {
         // Helper: fetch Ad Library with given params
         async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
           const url = new URL('https://graph.facebook.com/v21.0/ads_archive');
-          url.searchParams.set('access_token', accessToken);
+          
           url.searchParams.set('ad_type', 'ALL');
           url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);
           url.searchParams.set('ad_active_status', 'ALL');
@@ -189,7 +189,7 @@ export async function syncCompetitorAds(c: Context) {
             const url = new URL('https://graph.facebook.com/v21.0/pages/search');
             url.searchParams.set('q', searchQuery);
             url.searchParams.set('fields', 'id,name,verification_status');
-            url.searchParams.set('access_token', accessToken);
+            
             const res = await fetch(url.toString());
             const json: any = await res.json();
             if (json.data && json.data.length > 0) {

@@ -82,9 +82,9 @@ export async function fetchCampaignAdsets(c: Context) {
       const accountId = connection.account_id;
       if (accountId) {
         const acctUrl = new URL(`https://graph.facebook.com/v21.0/act_${accountId.replace('act_', '')}`);
-        acctUrl.searchParams.set('access_token', decryptedToken);
+        
         acctUrl.searchParams.set('fields', 'currency');
-        const acctRes = await fetch(acctUrl.toString());
+        const acctRes = await fetch(acctUrl.toString(), { headers: { Authorization: `Bearer ${decryptedToken}` } });
         if (acctRes.ok) {
           const acctData: any = await acctRes.json();
           accountCurrency = acctData.currency || 'USD';
@@ -97,11 +97,11 @@ export async function fetchCampaignAdsets(c: Context) {
 
     // Fetch ad sets for this campaign with insights
     const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign_id}/adsets`);
-    adsetsUrl.searchParams.set('access_token', decryptedToken);
+    
     adsetsUrl.searchParams.set('fields', 'id,name,status');
     adsetsUrl.searchParams.set('limit', '100');
 
-    const adsetsRes = await fetch(adsetsUrl.toString());
+    const adsetsRes = await fetch(adsetsUrl.toString(), { headers: { Authorization: `Bearer ${decryptedToken}` } });
     if (!adsetsRes.ok) {
       const errorText = await adsetsRes.text();
       console.error('Meta adsets fetch error:', errorText);
@@ -116,7 +116,7 @@ export async function fetchCampaignAdsets(c: Context) {
     // Fetch insights for each adset
     for (const adset of rawAdsets) {
       const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);
-      insightsUrl.searchParams.set('access_token', decryptedToken);
+      
       insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
       insightsUrl.searchParams.set('time_range', JSON.stringify({
         since: formatDate(startDate),
@@ -124,7 +124,7 @@ export async function fetchCampaignAdsets(c: Context) {
       }));
 
       try {
-        const insightsRes = await fetch(insightsUrl.toString());
+        const insightsRes = await fetch(insightsUrl.toString(), { headers: { Authorization: `Bearer ${decryptedToken}` } });
         if (!insightsRes.ok) continue;
 
         const insightsData: any = await insightsRes.json();
