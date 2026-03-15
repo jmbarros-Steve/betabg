@@ -96,6 +96,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [abWinningMetric, setAbWinningMetric] = useState('open_rate');
   const [abDurationHours, setAbDurationHours] = useState(4);
 
+  // A/B Results
+  const [abResultsCampaignId, setAbResultsCampaignId] = useState<string | null>(null);
+
   // Product Recommendations
   const [recEnabled, setRecEnabled] = useState(false);
   const [recType, setRecType] = useState('best_sellers');
@@ -1367,14 +1370,24 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                       </>
                     )}
                     {campaign.status === 'sent' && campaign.html_content && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setPreviewHtml(campaign.html_content); setShowPreview(true); }}
-                        title="Vista previa"
-                      >
-                        <Eye className="w-4 h-4 mr-1" /> Ver
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setPreviewHtml(campaign.html_content); setShowPreview(true); }}
+                          title="Vista previa"
+                        >
+                          <Eye className="w-4 h-4 mr-1" /> Ver
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAbResultsCampaignId(campaign.id)}
+                          title="Resultados A/B"
+                        >
+                          <FlaskConical className="w-4 h-4 mr-1" /> A/B
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1471,6 +1484,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* A/B Test Results Panel */}
+      <ABTestResultsPanel
+        campaignId={abResultsCampaignId || ''}
+        clientId={clientId}
+        isOpen={!!abResultsCampaignId}
+        onClose={() => setAbResultsCampaignId(null)}
+      />
     </div>
   );
 }
