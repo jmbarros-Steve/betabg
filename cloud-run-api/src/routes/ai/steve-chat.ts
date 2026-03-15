@@ -784,6 +784,84 @@ export async function steveChat(c: Context) {
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
     ).join('\n\n') || '';
 
+    // Load real metrics from platform_metrics + campaign_metrics
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Get client's connections
+    const { data: connections } = await supabase
+      .from('platform_connections')
+      .select('id, platform')
+      .eq('client_id', client_id)
+      .eq('status', 'active');
+
+    const connIds = (connections || []).map((c: { id: string }) => c.id);
+
+    let metricsContext = '';
+
+    if (connIds.length > 0) {
+      // Fetch platform_metrics (Shopify revenue, Meta spend, etc.)
+      const { data: platformMetrics } = await supabase
+        .from('platform_metrics')
+        .select('metric_type, metric_value, metric_date, currency')
+        .in('connection_id', connIds)
+        .gte('metric_date', thirtyDaysAgo)
+        .order('metric_date', { ascending: false })
+        .limit(200);
+
+      // Fetch campaign_metrics (Meta/Google campaigns)
+      const { data: campaignMetrics } = await supabase
+        .from('campaign_metrics')
+        .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date')
+        .in('connection_id', connIds)
+        .gte('metric_date', thirtyDaysAgo)
+        .order('metric_date', { ascending: false })
+        .limit(200);
+
+      // Aggregate platform metrics by type
+      if (platformMetrics && platformMetrics.length > 0) {
+        const byType: Record<string, { total: number; count: number; currency: string | null }> = {};
+        for (const m of platformMetrics) {
+          if (!byType[m.metric_type]) {
+            byType[m.metric_type] = { total: 0, count: 0, currency: m.currency };
+          }
+          byType[m.metric_type].total += Number(m.metric_value) || 0;
+          byType[m.metric_type].count += 1;
+        }
+        const metricLines = Object.entries(byType).map(([type, data]) =>
+          `- ${type}: ${Math.round(data.total).toLocaleString()} ${data.currency || ''} (${data.count} registros, últimos 30 días)`
+        ).join('\n');
+        metricsContext += `\nMÉTRICAS DE PLATAFORMA (últimos 30 días, datos reales de la DB):\n${metricLines}\n`;
+      }
+
+      // Aggregate campaign metrics
+      if (campaignMetrics && campaignMetrics.length > 0) {
+        const byCampaign: Record<string, { spend: number; impressions: number; clicks: number; conversions: number; revenue: number; status: string }> = {};
+        for (const m of campaignMetrics) {
+          const name = m.campaign_name || 'Sin nombre';
+          if (!byCampaign[name]) {
+            byCampaign[name] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0, status: m.campaign_status || 'UNKNOWN' };
+          }
+          byCampaign[name].spend += Number(m.spend) || 0;
+          byCampaign[name].impressions += Number(m.impressions) || 0;
+          byCampaign[name].clicks += Number(m.clicks) || 0;
+          byCampaign[name].conversions += Number(m.conversions) || 0;
+          byCampaign[name].revenue += Number(m.conversion_value) || 0;
+        }
+        const campaignLines = Object.entries(byCampaign).slice(0, 10).map(([name, d]) => {
+          const roas = d.spend > 0 ? (d.revenue / d.spend).toFixed(2) : 'N/A';
+          const ctr = d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(2) : 'N/A';
+          return `- "${name}" [${d.status}]: Gasto $${Math.round(d.spend).toLocaleString()}, Revenue $${Math.round(d.revenue).toLocaleString()}, ROAS ${roas}x, CTR ${ctr}%, ${d.conversions} conversiones`;
+        }).join('\n');
+        metricsContext += `\nCAMPAÑAS ACTIVAS (datos reales de Meta/Google, últimos 30 días):\n${campaignLines}\n`;
+      }
+
+      if (!metricsContext) {
+        metricsContext = '\nMÉTRICAS: El cliente tiene conexiones activas pero aún no hay datos de métricas en los últimos 30 días.\n';
+      }
+    } else {
+      metricsContext = '\nMÉTRICAS: El cliente aún no tiene plataformas conectadas (Meta, Google, Shopify).\n';
+    }
+
     const estrategiaSystemPrompt = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el consultor estratégico del cliente.
 
 PERSONALIDAD:
@@ -796,7 +874,9 @@ PERSONALIDAD:
 
 🌎 IDIOMA: Español latinoamericano neutro. NO uses voseo argentino.
 
-ROL: Consultor estratégico libre. El cliente puede preguntarte CUALQUIER COSA sobre marketing, estrategia, competencia, posicionamiento, pricing, campañas, copywriting, SEO, etc. Responde con profundidad y datos concretos basándote en el brief y la investigación del cliente.
+ROL: Consultor estratégico libre. El cliente puede preguntarte CUALQUIER COSA sobre marketing, estrategia, competencia, posicionamiento, pricing, campañas, copywriting, SEO, etc. Responde con profundidad y datos concretos basándote en el brief, la investigación del cliente Y LOS DATOS REALES DE SUS MÉTRICAS.
+
+IMPORTANTE: Tienes acceso a las métricas reales del cliente desde su base de datos. ÚSALAS para dar recomendaciones basadas en datos. Si el cliente pregunta por sus campañas, ROAS, spend, etc., responde con los números reales que tienes abajo. NUNCA digas "no tengo acceso a Meta" o "no puedo ver tus métricas" — SÍ tienes los datos.
 
 NO eres un cuestionario. NO hagas preguntas estructuradas. Simplemente conversa y asesora.
 
@@ -806,9 +886,10 @@ BRIEF DEL CLIENTE:
 ${briefSummary}
 
 ${researchContext ? `INVESTIGACIÓN DE MARCA:\n${researchContext}\n` : ''}
+${metricsContext}
 ${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
 
-Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables.`;
+Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
