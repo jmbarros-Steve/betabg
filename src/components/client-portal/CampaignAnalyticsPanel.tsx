@@ -800,6 +800,31 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     return weeks;
   }, [dailyTrend]);
 
+  // Monthly cohort: spend, revenue, ROAS, CPA by month
+  const monthlyCohorts = useMemo(() => {
+    const months = new Map<string, { spend: number; revenue: number; conversions: number; clicks: number; impressions: number }>();
+    for (const d of dailyTrend) {
+      const month = d.date.slice(0, 7); // YYYY-MM
+      const existing = months.get(month) || { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 };
+      existing.spend += d.spend;
+      existing.revenue += d.revenue;
+      existing.conversions += d.conversions;
+      existing.clicks += d.clicks;
+      existing.impressions += d.impressions;
+      months.set(month, existing);
+    }
+    const sorted = Array.from(months.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return sorted.map(([month, data], i) => {
+      const roas = data.spend > 0 ? data.revenue / data.spend : 0;
+      const cpa = data.conversions > 0 ? data.spend / data.conversions : 0;
+      const ltv = data.conversions > 0 ? data.revenue / data.conversions : 0;
+      const prevData = i > 0 ? sorted[i - 1][1] : null;
+      const prevConv = prevData ? prevData.conversions : 0;
+      const retention = prevConv > 0 && data.conversions > 0 ? Math.min((data.conversions / prevConv) * 100, 200) : null;
+      return { month, ...data, roas, cpa, ltv, retention };
+    });
+  }, [dailyTrend]);
+
   // PDF export using browser print dialog
   function exportPDF() {
     const printWindow = window.open('', '_blank');
@@ -1396,6 +1421,54 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Monthly Cohort Analysis */}
+      {monthlyCohorts.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Cohort Mensual — Retenci\u00f3n y LTV</CardTitle>
+            <CardDescription>M\u00e9tricas por mes de adquisici\u00f3n</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">Mes</th>
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">Gasto</th>
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">Ingresos</th>
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">ROAS</th>
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">Conv.</th>
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">CPA</th>
+                    <th className="pb-2 pr-3 text-muted-foreground font-medium">LTV/Conv</th>
+                    <th className="pb-2 text-muted-foreground font-medium">Ret. %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyCohorts.map((c, i) => (
+                    <tr key={c.month} className="border-b border-border/50">
+                      <td className="py-2 pr-3 font-medium">{new Date(c.month + '-15').toLocaleDateString('es-CL', { month: 'short', year: '2-digit' })}</td>
+                      <td className="py-2 pr-3">{formatCurrency(c.spend, 'CLP')}</td>
+                      <td className="py-2 pr-3">{formatCurrency(c.revenue, 'CLP')}</td>
+                      <td className="py-2 pr-3"><span className={c.roas >= 2 ? 'text-green-600 font-bold' : c.roas >= 1 ? 'text-yellow-600 font-bold' : 'text-red-500 font-bold'}>{c.roas.toFixed(2)}x</span></td>
+                      <td className="py-2 pr-3">{c.conversions}</td>
+                      <td className="py-2 pr-3">{c.cpa > 0 ? formatCurrency(c.cpa, 'CLP') : '\u2014'}</td>
+                      <td className="py-2 pr-3">{c.ltv > 0 ? formatCurrency(c.ltv, 'CLP') : '\u2014'}</td>
+                      <td className="py-2">
+                        {c.retention !== null ? (
+                          <span className={c.retention >= 100 ? 'text-green-600 font-medium' : c.retention >= 70 ? 'text-yellow-600' : 'text-red-500'}>
+                            {c.retention.toFixed(0)}%
+                          </span>
+                        ) : i === 0 ? '\u2014' : '0%'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
