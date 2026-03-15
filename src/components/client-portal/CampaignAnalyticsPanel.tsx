@@ -675,6 +675,22 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const animRoas = useCountUp(overallRoas, 600);
   const animConversions = useCountUp(totals.conversions, 600);
 
+  // Daily trend data for sparklines (must be declared before memos that depend on it)
+  const dailyTrend = useMemo(() => {
+    const map = new Map<string, { date: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
+    for (const m of metrics) {
+      const d = m.metric_date;
+      const existing = map.get(d) || { date: d, spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0 };
+      existing.spend += Number(m.spend) || 0;
+      existing.revenue += Number(m.conversion_value) || 0;
+      existing.impressions += Number(m.impressions) || 0;
+      existing.clicks += Number(m.clicks) || 0;
+      existing.conversions += Number(m.conversions) || 0;
+      map.set(d, existing);
+    }
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [metrics]);
+
   // Budget pacing
   const budgetPacing = useMemo(() => {
     const now = new Date();
@@ -727,22 +743,6 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     }
     return [...dailyTrend.map(d => ({ ...d, projectedSpend: 0, projectedRevenue: 0 })), ...projected];
   }, [dailyTrend]);
-
-  // Daily trend data for sparklines
-  const dailyTrend = useMemo(() => {
-    const map = new Map<string, { date: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
-    for (const m of metrics) {
-      const d = m.metric_date;
-      const existing = map.get(d) || { date: d, spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0 };
-      existing.spend += Number(m.spend) || 0;
-      existing.revenue += Number(m.conversion_value) || 0;
-      existing.impressions += Number(m.impressions) || 0;
-      existing.clicks += Number(m.clicks) || 0;
-      existing.conversions += Number(m.conversions) || 0;
-      map.set(d, existing);
-    }
-    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [metrics]);
 
   // Funnel data: impressions -> clicks -> conversions with drop-off %
   const funnelSteps = useMemo(() => {
