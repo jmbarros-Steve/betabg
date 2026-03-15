@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -130,7 +130,7 @@ const CONDITION_OPERATORS: Record<string, { value: string; label: string }[]> = 
 const NEEDS_VALUE: string[] = ['total_orders', 'total_spent', 'last_order_days', 'subscriber_property', 'subscriber_tag', 'subscriber_source'];
 const NEEDS_FIELD: string[] = ['subscriber_property'];
 
-const DELAY_OPTIONS = [
+const DELAY_PRESETS = [
   { value: 0, label: 'Inmediato' },
   { value: 1800, label: '30 min' },
   { value: 3600, label: '1 hora' },
@@ -142,14 +142,34 @@ const DELAY_OPTIONS = [
   { value: 259200, label: '3 días' },
   { value: 604800, label: '7 días' },
   { value: 1209600, label: '14 días' },
+  { value: 2592000, label: '30 días' },
+  { value: -1, label: 'Personalizado...' },
 ];
 
 function delayLabel(seconds: number) {
-  const opt = DELAY_OPTIONS.find(o => o.value === seconds);
-  if (opt) return opt.label;
+  const preset = DELAY_PRESETS.find(o => o.value === seconds);
+  if (preset) return preset.label;
+  if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
-  return `${Math.round(seconds / 86400)}d`;
+  if (seconds < 86400) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.round((seconds % 3600) / 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(seconds / 86400);
+  const h = Math.round((seconds % 86400) / 3600);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+}
+
+function secondsFromParts(days: number, hours: number, minutes: number) {
+  return days * 86400 + hours * 3600 + minutes * 60;
+}
+
+function partsFromSeconds(seconds: number) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  return { days, hours, minutes };
 }
 
 // ── Node width / layout constants ──────────────────────────────────────────
@@ -264,7 +284,7 @@ function EmailNode({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {DELAY_OPTIONS.map(opt => (
+                  {DELAY_PRESETS.filter(p => p.value >= 0).map(opt => (
                     <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -299,30 +319,81 @@ function DelayNode({
   onUpdate: (updates: Partial<FlowStep>) => void;
   onRemove: () => void;
 }) {
+  const isCustom = !DELAY_PRESETS.some(p => p.value === step.delay_seconds && p.value >= 0);
+  const [showCustom, setShowCustom] = React.useState(isCustom);
+  const parts = partsFromSeconds(step.delay_seconds);
+
   return (
     <div className="flex justify-center">
       <div
-        className="flex items-center gap-3 px-4 py-2.5 rounded-full border-2 border-orange-300 bg-orange-50"
+        className="flex flex-col gap-2 px-4 py-2.5 rounded-xl border-2 border-orange-300 bg-orange-50"
         style={{ width: NODE_W }}
       >
-        <Clock className="w-4 h-4 text-orange-600 shrink-0" />
-        <span className="text-xs font-medium text-orange-800 shrink-0">Esperar</span>
-        <Select
-          value={String(step.delay_seconds)}
-          onValueChange={(v) => onUpdate({ delay_seconds: Number(v) })}
-        >
-          <SelectTrigger className="h-7 text-xs border-orange-200 bg-white flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {DELAY_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-orange-400 hover:text-destructive shrink-0" onClick={onRemove}>
-          <Trash2 className="w-3 h-3" />
-        </Button>
+        <div className="flex items-center gap-3">
+          <Clock className="w-4 h-4 text-orange-600 shrink-0" />
+          <span className="text-xs font-medium text-orange-800 shrink-0">Esperar</span>
+          {!showCustom ? (
+            <Select
+              value={String(step.delay_seconds)}
+              onValueChange={(v) => {
+                if (v === '-1') { setShowCustom(true); return; }
+                onUpdate({ delay_seconds: Number(v) });
+              }}
+            >
+              <SelectTrigger className="h-7 text-xs border-orange-200 bg-white flex-1">
+                <SelectValue>{delayLabel(step.delay_seconds)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {DELAY_PRESETS.map(opt => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="text-xs text-orange-700 font-medium flex-1">{delayLabel(step.delay_seconds)}</span>
+          )}
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-orange-400 hover:text-destructive shrink-0" onClick={onRemove}>
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+        {showCustom && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Input
+                type="number" min={0} max={365}
+                className="h-7 w-14 text-xs border-orange-200 text-center"
+                value={parts.days}
+                onChange={(e) => onUpdate({ delay_seconds: secondsFromParts(Number(e.target.value) || 0, parts.hours, parts.minutes) })}
+              />
+              <span className="text-[10px] text-orange-600">d</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number" min={0} max={23}
+                className="h-7 w-12 text-xs border-orange-200 text-center"
+                value={parts.hours}
+                onChange={(e) => onUpdate({ delay_seconds: secondsFromParts(parts.days, Number(e.target.value) || 0, parts.minutes) })}
+              />
+              <span className="text-[10px] text-orange-600">h</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number" min={0} max={59}
+                className="h-7 w-12 text-xs border-orange-200 text-center"
+                value={parts.minutes}
+                onChange={(e) => onUpdate({ delay_seconds: secondsFromParts(parts.days, parts.hours, Number(e.target.value) || 0) })}
+              />
+              <span className="text-[10px] text-orange-600">m</span>
+            </div>
+            <Button
+              variant="ghost" size="sm"
+              className="h-6 text-[10px] text-orange-600"
+              onClick={() => setShowCustom(false)}
+            >
+              Presets
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
