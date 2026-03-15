@@ -139,6 +139,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   const [charlieActionLoading, setCharlieActionLoading] = useState(false);
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
+  const [metaAccountCurrency, setMetaAccountCurrency] = useState<string>('USD');
 
   // Rules from Meta Wizard (meta_automated_rules)
   const [automatedRules, setAutomatedRules] = useState<any[]>([]);
@@ -339,6 +340,9 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
       if (error) throw error;
 
+      if (data.account_currency) {
+        setMetaAccountCurrency(data.account_currency);
+      }
       setAdSetsByCampaign(prev => ({
         ...prev,
         [campaignId]: data.ad_sets || []
@@ -432,17 +436,22 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
     const cpaRule = automatedRules.find(r =>
       r.condition?.metric === 'CPA' && r.condition?.operator === 'GREATER_THAN' && r.condition?.value
     );
-    // Rules store CPA in CLP — convert to USD for semaphore (which uses USD internally)
-    return cpaRule ? cpaRule.condition.value / 950 : null;
-  }, [automatedRules]);
+    if (!cpaRule) return null;
+    // Rules store CPA in CLP. Semaphore compares against spend in account currency.
+    // If account is CLP, use CLP value directly. If USD, convert CLP rule to USD.
+    return metaAccountCurrency === 'CLP'
+      ? cpaRule.condition.value
+      : cpaRule.condition.value / 950;
+  }, [automatedRules, metaAccountCurrency]);
 
   // Charlie semaphore for ad sets
-  const CLP_RATE = 950; // approximate USD -> CLP
+  // If account is already in CLP, no conversion needed (rate = 1)
+  const CLP_RATE = metaAccountCurrency === 'CLP' ? 1 : 950;
   const getAdSetSemaphore = (adSet: AdSet) => {
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
     const cpa = conversions > 0 ? spend / conversions : null;
-    const maxCpa = maxCpaFromRules || 50; // from Wizard rules, fallback $50 USD
+    const maxCpa = maxCpaFromRules || (metaAccountCurrency === 'CLP' ? 47500 : 50); // from Wizard rules
     const isPaused = adSet.status?.toUpperCase() === 'PAUSED';
 
     // If no data at all, show nodata regardless of status
@@ -464,14 +473,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   // Build human-readable explanation for each semaphore state
   const getAdSetExplanation = (adSet: AdSet, semKey: keyof typeof semaphoreConfig): string => {
-    const maxCpaUsd = maxCpaFromRules || 50;
+    const maxCpaAcc = maxCpaFromRules || (metaAccountCurrency === 'CLP' ? 47500 : 50);
     const spend = parseFloat(adSet.spend) || 0;
     const conversions = adSet.conversions || 0;
-    const cpa = conversions > 0 ? spend : null;
     const cpaPerConv = conversions > 0 ? spend / conversions : null;
     const spendClp = spend * CLP_RATE;
     const cpaClp = cpaPerConv !== null ? cpaPerConv * CLP_RATE : null;
-    const maxCpaClp = maxCpaUsd * CLP_RATE;
+    const maxCpaClp = maxCpaAcc * CLP_RATE;
     const isPaused = adSet.status?.toUpperCase() === 'PAUSED';
 
     if (isPaused) {

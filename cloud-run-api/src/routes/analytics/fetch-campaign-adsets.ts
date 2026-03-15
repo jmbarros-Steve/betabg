@@ -73,7 +73,28 @@ export async function fetchCampaignAdsets(c: Context) {
 
   let adSets: AdSetInsight[] = [];
 
+  // Detect ad account currency
+  let accountCurrency = 'USD';
+
   if (platform === 'meta') {
+    // Fetch account currency from Meta
+    try {
+      const accountId = connection.account_id;
+      if (accountId) {
+        const acctUrl = new URL(`https://graph.facebook.com/v21.0/act_${accountId.replace('act_', '')}`);
+        acctUrl.searchParams.set('access_token', decryptedToken);
+        acctUrl.searchParams.set('fields', 'currency');
+        const acctRes = await fetch(acctUrl.toString());
+        if (acctRes.ok) {
+          const acctData: any = await acctRes.json();
+          accountCurrency = acctData.currency || 'USD';
+          console.log(`Meta account currency: ${accountCurrency}`);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch account currency, defaulting to USD');
+    }
+
     // Fetch ad sets for this campaign with insights
     const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign_id}/adsets`);
     adsetsUrl.searchParams.set('access_token', decryptedToken);
@@ -147,6 +168,7 @@ export async function fetchCampaignAdsets(c: Context) {
     success: true,
     ad_sets: adSets,
     campaign_id,
-    platform
+    platform,
+    account_currency: accountCurrency,
   });
 }
