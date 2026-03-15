@@ -124,56 +124,37 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     const blocks = page.locator('.gjs-blocks-c, .gjs-block-categories').first();
     await expect(blocks).toBeVisible({ timeout: 5000 });
 
-    // Expand all collapsed block categories so custom blocks become visible
-    await page.evaluate(() => {
-      document.querySelectorAll('.gjs-block-category').forEach((cat) => {
-        const blocksContainer = cat.querySelector('.gjs-blocks-c') as HTMLElement;
-        const title = cat.querySelector('.gjs-title') as HTMLElement;
-        if (blocksContainer && title) {
-          const isCollapsed = blocksContainer.style.display === 'none' ||
-            getComputedStyle(blocksContainer).display === 'none';
-          if (isCollapsed) title.click();
-        }
-      });
-    });
-    await page.waitForTimeout(1500);
-
-    // Verify essential blocks exist — labels must match grapesjsCustomBlocks.ts
+    // Count all blocks registered in GrapeJS (including inside collapsed categories)
+    // Using page.evaluate to check DOM presence, not viewport visibility
     const expectedBlocks = [
-      'Productos',         // steve-products
-      'Descuento',         // steve-discount
-      'Cuenta Regresiva',  // steve-countdown
-      'Boton Diseno',      // steve-button
-      'Redes Sociales',    // steve-social
-      'Header',            // steve-header
-      'Footer',            // steve-footer
-      'Texto Enriquecido', // steve-rich-text
-      'Separador',         // steve-divider
-      'Espacio',           // steve-spacer
-      '2 Columnas',        // steve-two-cols
-      '3 Columnas',        // steve-three-cols
-      'Hero Banner',       // steve-hero
+      'Productos', 'Descuento', 'Cuenta Regresiva', 'Boton Diseno',
+      'Redes Sociales', 'Header', 'Footer', 'Texto Enriquecido',
+      'Separador', 'Espacio', '2 Columnas', '3 Columnas', 'Hero Banner',
     ];
 
-    const found: string[] = [];
-    const notFound: string[] = [];
-
-    for (const label of expectedBlocks) {
-      const block = page.locator('.gjs-block').filter({ hasText: new RegExp(label, 'i') }).first();
-      const isVis = await block.isVisible({ timeout: 2000 }).catch(() => false);
-      if (isVis) {
-        found.push(label);
-      } else {
-        notFound.push(label);
+    const blockCheckResult = await page.evaluate((labels: string[]) => {
+      const allBlocks = Array.from(document.querySelectorAll('.gjs-block'));
+      const found: string[] = [];
+      const notFound: string[] = [];
+      for (const label of labels) {
+        const regex = new RegExp(label, 'i');
+        const exists = allBlocks.some(b => regex.test(b.textContent || ''));
+        if (exists) found.push(label);
+        else notFound.push(label);
       }
-      console.log(`[QA] Block "${label}": ${isVis ? 'FOUND' : 'NOT FOUND'}`);
+      return { found, notFound, totalBlocks: allBlocks.length };
+    }, expectedBlocks);
+
+    for (const label of blockCheckResult.found) {
+      console.log(`[QA] Block "${label}": FOUND`);
     }
+    for (const label of blockCheckResult.notFound) {
+      console.log(`[QA] Block "${label}": NOT FOUND`);
+    }
+    console.log(`[QA] Blocks: ${blockCheckResult.found.length}/${expectedBlocks.length} found (${blockCheckResult.totalBlocks} total in DOM)`);
 
-    console.log(`[QA] Blocks: ${found.length}/${expectedBlocks.length} found`);
-    if (notFound.length > 0) console.log(`[QA] Missing blocks: ${notFound.join(', ')}`);
-
-    // At least 10 custom blocks should exist
-    expect(found.length).toBeGreaterThanOrEqual(10);
+    // At least 10 of our custom blocks should exist in the DOM
+    expect(blockCheckResult.found.length).toBeGreaterThanOrEqual(10);
 
     // Try clicking a block to add it to canvas
     const heroBlock = page.locator('.gjs-block').filter({ hasText: /Hero/i }).first();
