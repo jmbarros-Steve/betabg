@@ -69,12 +69,66 @@ const TRIGGER_LABELS: Record<string, string> = {
   browse_abandonment: 'Navegación abandonada',
 };
 
-const CONDITION_TYPES = [
-  { value: 'opened_email', label: 'Abrió el email' },
-  { value: 'clicked_email', label: 'Hizo clic en el email' },
-  { value: 'has_purchased', label: 'Ha comprado' },
-  { value: 'subscriber_property', label: 'Propiedad del suscriptor' },
+const CONDITION_CATEGORIES = [
+  { group: 'Engagement', items: [
+    { value: 'opened_email', label: 'Abrió el email' },
+    { value: 'clicked_email', label: 'Hizo clic en el email' },
+    { value: 'opened_any_email', label: 'Abrió algún email (últimos N días)' },
+    { value: 'clicked_any_email', label: 'Hizo clic en algún email (últimos N días)' },
+  ]},
+  { group: 'Compras', items: [
+    { value: 'has_purchased', label: 'Ha comprado' },
+    { value: 'total_orders', label: 'Número de compras' },
+    { value: 'total_spent', label: 'Monto total gastado' },
+    { value: 'last_order_days', label: 'Días desde última compra' },
+  ]},
+  { group: 'Suscriptor', items: [
+    { value: 'subscriber_property', label: 'Propiedad del suscriptor' },
+    { value: 'subscriber_tag', label: 'Tiene tag' },
+    { value: 'subscriber_source', label: 'Fuente de suscripción' },
+  ]},
 ];
+
+const CONDITION_TYPES = CONDITION_CATEGORIES.flatMap(c => c.items);
+
+const CONDITION_OPERATORS: Record<string, { value: string; label: string }[]> = {
+  opened_email: [],
+  clicked_email: [],
+  has_purchased: [],
+  opened_any_email: [
+    { value: '7', label: 'últimos 7 días' }, { value: '14', label: 'últimos 14 días' },
+    { value: '30', label: 'últimos 30 días' }, { value: '90', label: 'últimos 90 días' },
+  ],
+  clicked_any_email: [
+    { value: '7', label: 'últimos 7 días' }, { value: '14', label: 'últimos 14 días' },
+    { value: '30', label: 'últimos 30 días' }, { value: '90', label: 'últimos 90 días' },
+  ],
+  total_orders: [
+    { value: 'gt', label: 'Mayor que' }, { value: 'gte', label: 'Mayor o igual' },
+    { value: 'lt', label: 'Menor que' }, { value: 'eq', label: 'Igual a' },
+  ],
+  total_spent: [
+    { value: 'gt', label: 'Mayor que' }, { value: 'gte', label: 'Mayor o igual' },
+    { value: 'lt', label: 'Menor que' }, { value: 'eq', label: 'Igual a' },
+  ],
+  last_order_days: [
+    { value: 'gt', label: 'Más de' }, { value: 'lt', label: 'Menos de' }, { value: 'eq', label: 'Exactamente' },
+  ],
+  subscriber_property: [
+    { value: 'eq', label: 'Es igual a' }, { value: 'neq', label: 'No es igual a' },
+    { value: 'contains', label: 'Contiene' }, { value: 'is_null', label: 'Está vacío' },
+    { value: 'not_null', label: 'No está vacío' },
+  ],
+  subscriber_tag: [
+    { value: 'eq', label: 'Tiene el tag' }, { value: 'neq', label: 'No tiene el tag' },
+  ],
+  subscriber_source: [
+    { value: 'eq', label: 'Es' }, { value: 'neq', label: 'No es' },
+  ],
+};
+
+const NEEDS_VALUE: string[] = ['total_orders', 'total_spent', 'last_order_days', 'subscriber_property', 'subscriber_tag', 'subscriber_source'];
+const NEEDS_FIELD: string[] = ['subscriber_property'];
 
 const DELAY_OPTIONS = [
   { value: 0, label: 'Inmediato' },
@@ -299,31 +353,72 @@ function ConditionNode({
 }) {
   return (
     <div className="flex flex-col items-center">
-      {/* Condition diamond */}
+      {/* Condition card */}
       <div
-        className="relative flex items-center gap-3 px-5 py-3 rounded-xl border-2 border-purple-300 bg-purple-50"
-        style={{ width: NODE_W }}
+        className="relative flex flex-col gap-2 px-5 py-3 rounded-xl border-2 border-purple-300 bg-purple-50"
+        style={{ width: NODE_W + 40 }}
       >
-        <GitBranch className="w-4 h-4 text-purple-600 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-medium text-purple-600 uppercase tracking-wider mb-1">Condición</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitBranch className="w-4 h-4 text-purple-600 shrink-0" />
+            <p className="text-[10px] font-medium text-purple-600 uppercase tracking-wider">Condición</p>
+          </div>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-purple-400 hover:text-destructive shrink-0" onClick={onRemove}>
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+        <Select
+          value={step.condition?.type || 'opened_email'}
+          onValueChange={(v) => onUpdate({ condition: { type: v } })}
+        >
+          <SelectTrigger className="h-7 text-xs border-purple-200 bg-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CONDITION_CATEGORIES.map(cat => (
+              <div key={cat.group}>
+                <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat.group}</div>
+                {cat.items.map(ct => (
+                  <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+                ))}
+              </div>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Operator selector (if applicable) */}
+        {step.condition?.type && CONDITION_OPERATORS[step.condition.type]?.length > 0 && (
           <Select
-            value={step.condition?.type || 'opened_email'}
-            onValueChange={(v) => onUpdate({ condition: { ...step.condition, type: v } })}
+            value={step.condition?.operator || CONDITION_OPERATORS[step.condition.type][0]?.value || ''}
+            onValueChange={(v) => onUpdate({ condition: { ...step.condition, operator: v } })}
           >
             <SelectTrigger className="h-7 text-xs border-purple-200 bg-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CONDITION_TYPES.map(ct => (
-                <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+              {CONDITION_OPERATORS[step.condition.type].map(op => (
+                <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-purple-400 hover:text-destructive shrink-0" onClick={onRemove}>
-          <Trash2 className="w-3 h-3" />
-        </Button>
+        )}
+        {/* Field name input (for subscriber_property) */}
+        {step.condition?.type && NEEDS_FIELD.includes(step.condition.type) && (
+          <Input
+            className="h-7 text-xs border-purple-200"
+            placeholder="Nombre del campo (ej: city, source)"
+            value={step.condition?.field || ''}
+            onChange={(e) => onUpdate({ condition: { ...step.condition, field: e.target.value } })}
+          />
+        )}
+        {/* Value input (for numeric/text conditions) */}
+        {step.condition?.type && NEEDS_VALUE.includes(step.condition.type) && step.condition?.operator !== 'is_null' && step.condition?.operator !== 'not_null' && (
+          <Input
+            className="h-7 text-xs border-purple-200"
+            placeholder="Valor"
+            value={step.condition?.value || ''}
+            onChange={(e) => onUpdate({ condition: { ...step.condition, value: e.target.value } })}
+          />
+        )}
       </div>
 
       {/* Branch split connector */}
