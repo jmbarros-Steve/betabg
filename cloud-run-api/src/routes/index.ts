@@ -103,7 +103,7 @@ import { manageEmailCampaigns, executeScheduledCampaign } from './email/manage-c
 import { trackOpen, trackClick, sesWebhooks } from './email/track-events.js';
 import { emailUnsubscribe } from './email/unsubscribe.js';
 import { emailFlowExecute, manageEmailFlows } from './email/flow-engine.js';
-import { emailFlowWebhooks } from './email/flow-webhooks.js';
+import { emailFlowWebhooks, emailFlowCronWinback, emailFlowCronBirthday, emailFlowTrackBrowse } from './email/flow-webhooks.js';
 import { queryEmailSubscribers } from './email/query-subscribers.js';
 import { verifyEmailDomain } from './email/verify-domain.js';
 import { emailCampaignAnalytics } from './email/campaign-analytics.js';
@@ -112,9 +112,13 @@ import { productAlerts } from './email/product-alerts.js';
 import { productAlertWidget } from './email/product-alert-widget.js';
 import { productRecommendations } from './email/product-recommendations.js';
 import { emailAbTesting, executeAbTestWinner } from './email/ab-testing.js';
+import { emailRevenueAttribution } from './email/revenue-attribution.js';
 import { signupForms, signupFormPublic } from './email/signup-forms.js';
 import { formWidget } from './email/form-widget.js';
 import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-api.js';
+import { smartSendTime } from './email/smart-send-time.js';
+import { emailSendQueue } from './email/send-queue.js';
+import { emailListCleanup } from './email/list-cleanup.js';
 
 /**
  * Registers all API routes on the Hono app.
@@ -241,6 +245,7 @@ export function registerRoutes(app: Hono) {
 
   // A/B testing (auth required)
   app.post('/api/email-ab-testing', authMiddleware, emailAbTesting);
+  app.post('/api/email-revenue-attribution', authMiddleware, emailRevenueAttribution);
   app.post('/api/execute-ab-test-winner', authMiddleware, executeAbTestWinner); // Cloud Tasks internal call
 
   // Signup forms (auth for management)
@@ -261,7 +266,15 @@ export function registerRoutes(app: Hono) {
   app.post('/api/email-ses-webhooks', sesWebhooks); // SES bounce/complaint notifications
   app.post('/api/email-flow-webhooks', emailFlowWebhooks); // Shopify webhook triggers - HMAC verified
   app.post('/api/email-flow-execute', authMiddleware, emailFlowExecute); // Cloud Tasks internal call
+  app.post('/api/email-flow-cron-winback', authMiddleware, emailFlowCronWinback); // Cron: winback trigger
+  app.post('/api/email-flow-cron-birthday', authMiddleware, emailFlowCronBirthday); // Cron: birthday trigger
+  app.post('/api/email-flow-track-browse', emailFlowTrackBrowse); // Browse tracking pixel (public)
   app.post('/api/execute-scheduled-campaign', authMiddleware, executeScheduledCampaign); // Cloud Tasks internal call
+
+  // Smart Send Time, Throttled Queue, List Cleanup
+  app.post('/api/email-smart-send-time', authMiddleware, smartSendTime);
+  app.post('/api/email-send-queue', authMiddleware, emailSendQueue);
+  app.post('/api/email-list-cleanup', authMiddleware, emailListCleanup);
 
   // ============================================================
   // Cron / Scheduled Jobs

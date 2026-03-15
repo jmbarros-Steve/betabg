@@ -23,7 +23,7 @@ interface EmailTemplateGalleryProps {
 // Types
 // ---------------------------------------------------------------------------
 
-type TemplateCategory = 'todas' | 'e-commerce' | 'bienvenida' | 'promocion' | 'newsletter' | 'carrito' | 'lanzamiento' | 'temporada' | 'custom';
+type TemplateCategory = 'todas' | 'e-commerce' | 'bienvenida' | 'promocion' | 'newsletter' | 'carrito' | 'lanzamiento' | 'temporada' | 'win_back' | 'post_purchase' | 'review_request' | 'back_in_stock' | 'birthday' | 'custom';
 
 interface SystemTemplate {
   id: string;
@@ -44,6 +44,11 @@ const CATEGORIES: { key: TemplateCategory; label: string }[] = [
   { key: 'promocion', label: 'Promocion' },
   { key: 'newsletter', label: 'Newsletter' },
   { key: 'carrito', label: 'Carrito' },
+  { key: 'win_back', label: 'Win-back' },
+  { key: 'post_purchase', label: 'Post-compra' },
+  { key: 'review_request', label: 'Reviews' },
+  { key: 'back_in_stock', label: 'Back in Stock' },
+  { key: 'birthday', label: 'Cumpleanos' },
   { key: 'lanzamiento', label: 'Lanzamiento' },
   { key: 'temporada', label: 'Temporada' },
   { key: 'custom', label: 'Mis Plantillas' },
@@ -55,6 +60,11 @@ const THUMBNAIL_COLORS: Record<string, string> = {
   newsletter: '#a855f7',
   promocion: '#ef4444',
   carrito: '#f59e0b',
+  win_back: '#8b5cf6',
+  post_purchase: '#0ea5e9',
+  review_request: '#eab308',
+  back_in_stock: '#10b981',
+  birthday: '#ec4899',
   lanzamiento: '#7c3aed',
   temporada: '#059669',
   custom: '#71717a',
@@ -1202,6 +1212,17 @@ const SYSTEM_TEMPLATES: SystemTemplate[] = [
       abandoned_cart: 'carrito',
       product_launch: 'lanzamiento',
       seasonal: 'temporada',
+      win_back: 'win_back',
+      post_purchase: 'post_purchase',
+      review_request: 'review_request',
+      back_in_stock: 'back_in_stock',
+      birthday: 'birthday',
+      thank_you: 'post_purchase',
+      restock: 'back_in_stock',
+      loyalty: 'promocion',
+      referral: 'post_purchase',
+      winback: 'win_back',
+      announcement: 'lanzamiento',
     };
     return {
       id: t.id,

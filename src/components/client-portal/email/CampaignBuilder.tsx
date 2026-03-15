@@ -26,6 +26,7 @@ import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
 import { GlobalStylesPanel } from './GlobalStylesPanel';
+import { ABTestResultsPanel } from './ABTestResultsPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -95,6 +96,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [abTestPercent, setAbTestPercent] = useState(20);
   const [abWinningMetric, setAbWinningMetric] = useState('open_rate');
   const [abDurationHours, setAbDurationHours] = useState(4);
+
+  // A/B Results
+  const [abResultsCampaignId, setAbResultsCampaignId] = useState<string | null>(null);
 
   // Product Recommendations
   const [recEnabled, setRecEnabled] = useState(false);
@@ -874,7 +878,26 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <Redo2 className="w-3.5 h-3.5" />
               </Button>
               <div className="w-px h-5 bg-zinc-200" />
-              <GlobalStylesPanel editorRef={emailEditorRef} />
+              <GlobalStylesPanel editorRef={emailEditorRef} clientId={clientId} />
+              <div className="w-px h-5 bg-zinc-200" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setShowProductPanel(true)}
+                title="Insertar productos"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 mr-1" /> Productos
+              </Button>
+              <Button
+                size="sm"
+                variant={showConditionalPanel ? 'default' : 'ghost'}
+                className="h-7 px-2 text-xs"
+                onClick={() => setShowConditionalPanel(!showConditionalPanel)}
+                title="Contenido condicional"
+              >
+                <Eye className="w-3.5 h-3.5 mr-1" /> Condicional
+              </Button>
               {emailSizeBytes > 0 && (
                 <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                   emailSizeBytes > GMAIL_CLIP_LIMIT ? 'bg-red-100 text-red-700 font-medium'
@@ -1367,14 +1390,24 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                       </>
                     )}
                     {campaign.status === 'sent' && campaign.html_content && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setPreviewHtml(campaign.html_content); setShowPreview(true); }}
-                        title="Vista previa"
-                      >
-                        <Eye className="w-4 h-4 mr-1" /> Ver
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setPreviewHtml(campaign.html_content); setShowPreview(true); }}
+                          title="Vista previa"
+                        >
+                          <Eye className="w-4 h-4 mr-1" /> Ver
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAbResultsCampaignId(campaign.id)}
+                          title="Resultados A/B"
+                        >
+                          <FlaskConical className="w-4 h-4 mr-1" /> A/B
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1471,6 +1504,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* A/B Test Results Panel */}
+      <ABTestResultsPanel
+        campaignId={abResultsCampaignId || ''}
+        clientId={clientId}
+        isOpen={!!abResultsCampaignId}
+        onClose={() => setAbResultsCampaignId(null)}
+      />
     </div>
   );
 }

@@ -26,6 +26,7 @@ function sanitizeEmailHtml(html: string): string {
       'data-show-price', 'data-show-button', 'data-button-text', 'data-button-color',
       'data-discount-source', 'data-discount-code', 'data-discount-type', 'data-discount-value',
       'data-merge-tag',
+      'data-dynamic-feed',
     ],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'select', 'button'],
     FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur'],
@@ -35,6 +36,7 @@ function sanitizeEmailHtml(html: string): string {
 export interface SteveMailEditorRef {
   loadDesign(html: string, projectData?: any): void;
   getHtml(): string;
+  getSelectedHtml(): string | null;
   getProjectData(): any;
   addComponents(html: string): void;
   setDevice(device: 'Desktop' | 'Mobile'): void;
@@ -110,6 +112,14 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
           '</body>',
           '</html>',
         ].join('\n');
+      },
+
+      getSelectedHtml(): string | null {
+        const editor = editorRef.current;
+        if (!editor) return null;
+        const selected = editor.getSelected();
+        if (!selected) return null;
+        return selected.toHTML();
       },
 
       getProjectData(): any {

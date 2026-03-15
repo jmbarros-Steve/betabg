@@ -36,6 +36,12 @@ export async function trackOpen(c: Context) {
             },
           });
           if (error) console.error('Failed to record open event:', error);
+
+          // Update last_engaged_at for smart send time & sunset detection
+          await supabase
+            .from('email_subscribers')
+            .update({ last_engaged_at: new Date().toISOString() })
+            .eq('id', data.subscriber_id);
         }
       } catch (err) {
         console.error('Open tracking error:', err);
@@ -97,6 +103,12 @@ export async function trackClick(c: Context) {
             },
           });
           if (error) console.error('Failed to record click event:', error);
+
+          // Update last_engaged_at for smart send time & sunset detection
+          await supabase
+            .from('email_subscribers')
+            .update({ last_engaged_at: new Date().toISOString() })
+            .eq('id', data.subscriber_id);
         }
       } catch (err) {
         console.error('Click tracking error:', err);
@@ -140,22 +152,43 @@ export async function sesWebhooks(c: Context) {
 
     if (notificationType === 'Bounce') {
       const bounce = message.bounce;
+      const isHardBounce = bounce.bounceType === 'Permanent';
+
       for (const recipient of bounce.bouncedRecipients || []) {
         const email = recipient.emailAddress?.toLowerCase();
         if (!email) continue;
 
-        // Find subscriber by email and mark as bounced
         const { data: subscribers } = await supabase
           .from('email_subscribers')
-          .select('id, client_id')
+          .select('id, client_id, bounce_count')
           .eq('email', email)
-          .eq('status', 'subscribed');
+          .in('status', ['subscribed', 'bounced']);
 
         for (const sub of subscribers || []) {
-          await supabase
-            .from('email_subscribers')
-            .update({ status: 'bounced', updated_at: new Date().toISOString() })
-            .eq('id', sub.id);
+          const currentBounceCount = (sub.bounce_count ?? 0) + 1;
+
+          if (isHardBounce) {
+            // Hard bounce: mark as bounced immediately, never send again
+            await supabase
+              .from('email_subscribers')
+              .update({
+                status: 'bounced',
+                bounce_count: currentBounceCount,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id);
+          } else {
+            // Soft bounce: increment counter, mark as bounced after 3 attempts
+            const newStatus = currentBounceCount >= 3 ? 'bounced' : 'subscribed';
+            await supabase
+              .from('email_subscribers')
+              .update({
+                status: newStatus,
+                bounce_count: currentBounceCount,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id);
+          }
 
           await supabase.from('email_events').insert({
             client_id: sub.client_id,
@@ -164,6 +197,8 @@ export async function sesWebhooks(c: Context) {
             metadata: {
               bounce_type: bounce.bounceType,
               bounce_sub_type: bounce.bounceSubType,
+              is_hard_bounce: isHardBounce,
+              bounce_count: currentBounceCount,
               diagnostic: recipient.diagnosticCode,
             },
           });

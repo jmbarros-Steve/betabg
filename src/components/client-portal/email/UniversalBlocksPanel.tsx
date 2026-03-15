@@ -27,6 +27,8 @@ import {
   Search,
   Loader2,
   X,
+  MousePointerClick,
+  FileDown,
 } from 'lucide-react';
 import { type SteveMailEditorRef } from './SteveMailEditor';
 
@@ -49,12 +51,17 @@ interface UniversalBlocksPanelProps {
 const BLOCK_CATEGORIES = [
   { value: 'all', label: 'Todos' },
   { value: 'header', label: 'Encabezados' },
+  { value: 'hero', label: 'Hero' },
+  { value: 'section', label: 'Secciones' },
   { value: 'product', label: 'Productos' },
   { value: 'cta', label: 'Botones' },
+  { value: 'content', label: 'Contenido' },
   { value: 'footer', label: 'Pie de página' },
 ];
 
 const SAVE_CATEGORIES = BLOCK_CATEGORIES.filter((c) => c.value !== 'all');
+
+type SaveSource = 'selection' | 'full';
 
 export function UniversalBlocksPanel({
   clientId,
@@ -70,7 +77,8 @@ export function UniversalBlocksPanel({
   // Save dialog state
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveName, setSaveName] = useState('');
-  const [saveCategory, setSaveCategory] = useState('header');
+  const [saveCategory, setSaveCategory] = useState('section');
+  const [saveSource, setSaveSource] = useState<SaveSource>('selection');
   const [saving, setSaving] = useState(false);
 
   // Delete confirmation state
@@ -101,6 +109,28 @@ export function UniversalBlocksPanel({
     }
   }, [isOpen, fetchBlocks]);
 
+  /** Get HTML from the currently selected GrapeJS component */
+  const getSelectedHtml = (): string | null => {
+    const grapejsEditor = editor?.getEditor?.();
+    if (!grapejsEditor) return null;
+    const selected = grapejsEditor.getSelected();
+    if (!selected) return null;
+    return selected.toHTML();
+  };
+
+  const openSaveDialog = (source: SaveSource) => {
+    if (source === 'selection') {
+      const html = getSelectedHtml();
+      if (!html) {
+        toast.error('Selecciona un componente en el editor primero');
+        return;
+      }
+    }
+    setSaveSource(source);
+    setSaveCategory(source === 'selection' ? 'section' : 'header');
+    setShowSaveDialog(true);
+  };
+
   const handleSaveBlock = async () => {
     if (!saveName.trim()) {
       toast.error('Ingresa un nombre para el bloque');
@@ -113,7 +143,17 @@ export function UniversalBlocksPanel({
 
     setSaving(true);
     try {
-      const html = editor.getHtml();
+      let html: string | null = null;
+
+      if (saveSource === 'selection') {
+        html = getSelectedHtml();
+        if (!html) {
+          throw new Error('No hay componente seleccionado. Selecciona una sección en el editor.');
+        }
+      } else {
+        html = editor.getHtml();
+      }
+
       if (!html) {
         throw new Error('No se pudo obtener el diseño del editor');
       }
@@ -133,13 +173,16 @@ export function UniversalBlocksPanel({
         return;
       }
 
-      toast.success('Bloque guardado exitosamente');
+      toast.success(
+        saveSource === 'selection'
+          ? 'Sección guardada exitosamente'
+          : 'Bloque guardado exitosamente'
+      );
       setShowSaveDialog(false);
       setSaveName('');
-      setSaveCategory('header');
       fetchBlocks();
     } catch (err: any) {
-      toast.error(err.message || 'Error al guardar el bloque');
+      toast.error(err.message || 'Error al guardar');
     } finally {
       setSaving(false);
     }
@@ -170,7 +213,7 @@ export function UniversalBlocksPanel({
         )
       );
 
-      toast.success(`Bloque "${block.name}" insertado`);
+      toast.success(`"${block.name}" insertado`);
     } catch (err) {
       toast.error('Error al insertar el bloque');
     }
@@ -221,7 +264,7 @@ export function UniversalBlocksPanel({
       <div className="fixed inset-y-0 right-0 z-50 w-96 bg-background border-l shadow-xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="text-lg font-semibold">Biblioteca de Bloques</h2>
+          <h2 className="text-lg font-semibold">Biblioteca de Secciones</h2>
           <button
             onClick={onClose}
             className="rounded-md p-1.5 hover:bg-muted transition-colors"
@@ -230,15 +273,24 @@ export function UniversalBlocksPanel({
           </button>
         </div>
 
-        {/* Save block button */}
-        <div className="px-4 pt-4 pb-2">
+        {/* Save buttons */}
+        <div className="px-4 pt-4 pb-2 space-y-2">
           <Button
             className="w-full"
-            onClick={() => setShowSaveDialog(true)}
+            onClick={() => openSaveDialog('selection')}
             disabled={!editor}
           >
-            <Save className="h-4 w-4 mr-2" />
-            Guardar bloque
+            <MousePointerClick className="h-4 w-4 mr-2" />
+            Guardar sección seleccionada
+          </Button>
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={() => openSaveDialog('full')}
+            disabled={!editor}
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Guardar email completo
           </Button>
         </div>
 
@@ -266,7 +318,7 @@ export function UniversalBlocksPanel({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar bloques..."
+              placeholder="Buscar secciones..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -286,8 +338,8 @@ export function UniversalBlocksPanel({
                 <Blocks className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {blocks.length === 0
-                    ? 'No tienes bloques guardados. Diseña un email y guarda secciones que quieras reutilizar.'
-                    : 'No se encontraron bloques con los filtros actuales.'}
+                    ? 'No tienes secciones guardadas. Selecciona un componente en el editor y guárdalo como sección reutilizable.'
+                    : 'No se encontraron secciones con los filtros actuales.'}
                 </p>
               </div>
             ) : (
@@ -311,8 +363,13 @@ export function UniversalBlocksPanel({
                     )}
                   </div>
 
-                  {/* Block name */}
-                  <p className="font-medium text-sm truncate">{block.name}</p>
+                  {/* Block info */}
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-sm truncate">{block.name}</p>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full capitalize shrink-0 ml-2">
+                      {BLOCK_CATEGORIES.find((c) => c.value === block.category)?.label || block.category}
+                    </span>
+                  </div>
 
                   {/* Delete button — visible on hover only */}
                   <button
@@ -335,16 +392,27 @@ export function UniversalBlocksPanel({
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Guardar bloque</DialogTitle>
+            <DialogTitle>
+              {saveSource === 'selection' ? 'Guardar sección' : 'Guardar email completo'}
+            </DialogTitle>
             <DialogDescription className="sr-only">
-              Guarda el diseño actual como bloque reutilizable
+              {saveSource === 'selection'
+                ? 'Guarda la sección seleccionada como bloque reutilizable'
+                : 'Guarda el diseño completo como bloque reutilizable'}
             </DialogDescription>
           </DialogHeader>
+
+          {saveSource === 'selection' && (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              Se guardará el componente seleccionado en el editor como sección reutilizable.
+            </p>
+          )}
+
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Nombre</Label>
               <Input
-                placeholder="Ej: Header principal"
+                placeholder={saveSource === 'selection' ? 'Ej: Hero principal' : 'Ej: Template newsletter'}
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
                 autoFocus
@@ -397,13 +465,13 @@ export function UniversalBlocksPanel({
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>¿Eliminar este bloque?</DialogTitle>
+            <DialogTitle>¿Eliminar esta sección?</DialogTitle>
             <DialogDescription className="sr-only">
               Confirmar eliminación del bloque
             </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground py-2">
-            El bloque &quot;{deleteTarget?.name}&quot; será eliminado permanentemente.
+            &quot;{deleteTarget?.name}&quot; será eliminado permanentemente.
           </p>
           <DialogFooter>
             <Button

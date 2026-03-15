@@ -223,6 +223,26 @@ function lightenColor(hex: string): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
+function dynamicFeedHTML(
+  feedType: string,
+  count: string,
+  columns: string,
+  title: string,
+): string {
+  return `<div data-steve-products="true" data-product-type="${feedType}" data-product-count="${count}" data-columns="${columns}" data-show-price="true" data-show-button="true" data-button-text="Comprar" data-button-color="#18181b" data-dynamic-feed="true" style="padding:16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <tr><td style="padding:0 0 16px;text-align:center;">
+      <p style="margin:0 0 4px;font-size:11px;color:#a1a1aa;text-transform:uppercase;letter-spacing:1px;">Productos dinamicos</p>
+      <p style="margin:0;font-size:18px;font-weight:700;color:#18181b;">${title}</p>
+    </td></tr>
+    <tr><td style="padding:20px;text-align:center;background:#fafafa;border-radius:8px;border:1px dashed #d4d4d8;">
+      <p style="margin:0 0 4px;font-size:14px;color:#71717a;">${count} productos · ${columns} columna${parseInt(columns) > 1 ? 's' : ''}</p>
+      <p style="margin:0;font-size:12px;color:#a1a1aa;">Se personalizan automaticamente con datos de Shopify al enviar</p>
+    </td></tr>
+  </table>
+</div>`;
+}
+
 /** Default end-date: 7 days from now */
 function defaultEndDate(): string {
   const d = new Date();
@@ -888,7 +908,114 @@ export function registerSteveBlocks(editor: any): void {
   });
 
   // =========================================================================
-  // 15. IMAGE + TEXT SIDE BY SIDE
+  // 15. DYNAMIC PRODUCT FEED
+  // =========================================================================
+  editor.Components.addType('steve-dynamic-feed', {
+    isComponent(el: HTMLElement) {
+      return el?.getAttribute?.('data-dynamic-feed') === 'true';
+    },
+    model: {
+      defaults: {
+        tagName: 'div',
+        droppable: false,
+        traits: [
+          {
+            type: 'select',
+            name: 'feedType',
+            label: 'Tipo de Feed',
+            options: [
+              { id: 'best_sellers', label: 'Best Sellers' },
+              { id: 'recently_viewed', label: 'Ultimos Vistos' },
+              { id: 'new_arrivals', label: 'Recomendados / Nuevos' },
+              { id: 'back_in_stock', label: 'Back in Stock' },
+              { id: 'complementary', label: 'Complementarios' },
+              { id: 'abandoned_cart', label: 'Carrito Abandonado' },
+            ],
+            changeProp: true,
+          },
+          {
+            type: 'select',
+            name: 'feedCount',
+            label: 'Cantidad',
+            options: [
+              { id: '2', label: '2' },
+              { id: '3', label: '3' },
+              { id: '4', label: '4' },
+              { id: '6', label: '6' },
+              { id: '8', label: '8' },
+            ],
+            changeProp: true,
+          },
+          {
+            type: 'select',
+            name: 'feedColumns',
+            label: 'Columnas',
+            options: [
+              { id: '1', label: '1' },
+              { id: '2', label: '2' },
+              { id: '3', label: '3' },
+            ],
+            changeProp: true,
+          },
+          {
+            type: 'checkbox',
+            name: 'feedShowPrice',
+            label: 'Mostrar Precio',
+            changeProp: true,
+          },
+          {
+            type: 'text',
+            name: 'feedButtonText',
+            label: 'Texto del Boton',
+            changeProp: true,
+          },
+        ],
+        feedType: 'best_sellers',
+        feedCount: '4',
+        feedColumns: '2',
+        feedShowPrice: true,
+        feedButtonText: 'Comprar',
+      },
+      init(this: any) {
+        this.on('change:feedType change:feedCount change:feedColumns change:feedShowPrice change:feedButtonText', this.updateContent);
+        this.updateContent();
+      },
+      updateContent(this: any) {
+        const feedType = this.get('feedType') || 'best_sellers';
+        const count = this.get('feedCount') || '4';
+        const cols = this.get('feedColumns') || '2';
+        const feedLabels: Record<string, string> = {
+          best_sellers: 'Los mas vendidos',
+          recently_viewed: 'Ultimos vistos',
+          new_arrivals: 'Recomendados para ti',
+          back_in_stock: 'De vuelta en stock',
+          complementary: 'Tambien te puede gustar',
+          abandoned_cart: 'Olvidaste algo en tu carrito',
+        };
+        const html = dynamicFeedHTML(feedType, count, cols, feedLabels[feedType] || 'Productos');
+        this.set('content', '');
+        this.components(html);
+      },
+      toHTML(this: any) {
+        const feedType = this.get('feedType') || 'best_sellers';
+        const count = this.get('feedCount') || '4';
+        const cols = this.get('feedColumns') || '2';
+        const showPrice = this.get('feedShowPrice') !== false;
+        const buttonText = this.get('feedButtonText') || 'Comprar';
+        return `<div data-steve-products="true" data-product-type="${feedType}" data-product-count="${count}" data-columns="${cols}" data-show-price="${showPrice}" data-show-button="true" data-button-text="${buttonText}" data-button-color="#18181b" data-dynamic-feed="true" style="padding:16px;"><!-- Dynamic feed: ${feedType} --></div>`;
+      },
+    },
+  });
+
+  editor.BlockManager.add('steve-dynamic-feed', {
+    label: 'Feed Dinamico',
+    category: 'E-Commerce',
+    content: { type: 'steve-dynamic-feed' },
+    media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+  });
+
+  // =========================================================================
+  // 16. IMAGE + TEXT SIDE BY SIDE
   // =========================================================================
   editor.BlockManager.add('steve-img-text', {
     label: 'Imagen + Texto',

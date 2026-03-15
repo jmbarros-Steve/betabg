@@ -1,21 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
-  GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowDown,
-  Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Eye, Bell, TrendingDown,
+  GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowLeft,
+  Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Settings2,
+  Cake, Eye, Search,
 } from 'lucide-react';
 import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
+import { FlowCanvas } from './FlowCanvas';
 
 interface FlowBuilderProps {
   clientId: string;
@@ -23,7 +25,6 @@ interface FlowBuilderProps {
 
 interface FlowStep {
   type?: 'email' | 'condition' | 'delay';
-  // Email fields
   subject?: string;
   preview_text?: string;
   html_content?: string;
@@ -31,7 +32,6 @@ interface FlowStep {
   delay_seconds: number;
   from_name?: string;
   conditions?: any;
-  // Condition fields
   condition?: {
     type: string;
     field?: string;
@@ -41,13 +41,6 @@ interface FlowStep {
   yes_steps?: FlowStep[];
   no_steps?: FlowStep[];
 }
-
-const CONDITION_TYPES = [
-  { value: 'opened_email', label: 'Abrió el email' },
-  { value: 'clicked_email', label: 'Hizo clic en el email' },
-  { value: 'has_purchased', label: 'Ha comprado' },
-  { value: 'subscriber_property', label: 'Propiedad del suscriptor' },
-];
 
 interface Flow {
   id: string;
@@ -104,7 +97,7 @@ const TRIGGER_CONFIG: Record<string, {
   },
   post_purchase: {
     label: 'Post-compra',
-    description: 'Se activa después de que un cliente realiza una compra',
+    description: 'Se activa despues de que un cliente realiza una compra',
     icon: Package,
     defaultName: 'Post-compra',
     defaultSteps: 2,
@@ -118,48 +111,78 @@ const TRIGGER_CONFIG: Record<string, {
     defaultSteps: 3,
     defaultDelays: [0, 604800, 1209600],
   },
+  birthday: {
+    label: 'Cumpleaños',
+    description: 'Envia un email especial cuando un suscriptor cumple años',
+    icon: Cake,
+    defaultName: 'Feliz cumpleaños',
+    defaultSteps: 2,
+    defaultDelays: [0, 86400],
+  },
+  browse_abandonment: {
+    label: 'Navegación abandonada',
+    description: 'Se activa cuando un visitante ve productos pero no agrega al carrito',
+    icon: Search,
+    defaultName: 'Navegación abandonada',
+    defaultSteps: 2,
+    defaultDelays: [3600, 86400],
+  },
 };
 
-const DELAY_OPTIONS = [
-  { value: 0, label: 'Inmediato' },
-  { value: 1800, label: '30 minutos' },
-  { value: 3600, label: '1 hora' },
-  { value: 7200, label: '2 horas' },
-  { value: 14400, label: '4 horas' },
-  { value: 43200, label: '12 horas' },
-  { value: 86400, label: '1 día' },
-  { value: 172800, label: '2 días' },
-  { value: 259200, label: '3 días' },
-  { value: 604800, label: '7 días' },
-  { value: 1209600, label: '14 días' },
-];
+// ── Trigger-specific settings definitions ─────────────────────
+const TRIGGER_SETTINGS: Record<string, { key: string; label: string; type: 'number' | 'select'; unit?: string; options?: { value: string; label: string }[]; defaultValue: string | number }[]> = {
+  abandoned_cart: [
+    { key: 'wait_minutes', label: 'Esperar antes de enviar', type: 'select', options: [
+      { value: '30', label: '30 minutos' }, { value: '60', label: '1 hora' }, { value: '120', label: '2 horas' },
+      { value: '240', label: '4 horas' }, { value: '720', label: '12 horas' }, { value: '1440', label: '24 horas' },
+    ], defaultValue: '60' },
+    { key: 'min_cart_value', label: 'Valor mínimo del carrito ($)', type: 'number', defaultValue: 0 },
+  ],
+  winback: [
+    { key: 'inactivity_days', label: 'Días sin comprar', type: 'select', options: [
+      { value: '30', label: '30 días' }, { value: '60', label: '60 días' }, { value: '90', label: '90 días' },
+      { value: '120', label: '120 días' }, { value: '180', label: '6 meses' }, { value: '365', label: '1 año' },
+    ], defaultValue: '90' },
+  ],
+  birthday: [
+    { key: 'days_before', label: 'Enviar antes del cumpleaños', type: 'select', options: [
+      { value: '0', label: 'El mismo día' }, { value: '1', label: '1 día antes' },
+      { value: '3', label: '3 días antes' }, { value: '7', label: '1 semana antes' },
+    ], defaultValue: '0' },
+    { key: 'include_discount', label: 'Incluir descuento', type: 'select', options: [
+      { value: 'none', label: 'Sin descuento' }, { value: '10', label: '10% descuento' },
+      { value: '15', label: '15% descuento' }, { value: '20', label: '20% descuento' },
+    ], defaultValue: 'none' },
+  ],
+  browse_abandonment: [
+    { key: 'min_products_viewed', label: 'Mínimo de productos vistos', type: 'number', defaultValue: 2 },
+    { key: 'wait_minutes', label: 'Esperar antes de enviar', type: 'select', options: [
+      { value: '30', label: '30 minutos' }, { value: '60', label: '1 hora' }, { value: '120', label: '2 horas' },
+      { value: '240', label: '4 horas' },
+    ], defaultValue: '60' },
+  ],
+  post_purchase: [
+    { key: 'exclude_repeat', label: 'Excluir compradores recurrentes', type: 'select', options: [
+      { value: 'false', label: 'No' }, { value: 'true', label: 'Sí' },
+    ], defaultValue: 'false' },
+  ],
+};
 
 export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Editor state
   const [showEditor, setShowEditor] = useState(false);
   const [editingFlow, setEditingFlow] = useState<Partial<Flow> | null>(null);
-
-  // GrapeJS for individual email editing
+  const [showSettings, setShowSettings] = useState(false);
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const emailEditorRef = useRef<SteveMailEditorRef>(null);
-  const [editorReady, setEditorReady] = useState(false);
-
-  // AI generation
+  const [, setEditorReady] = useState(false);
   const [generating, setGenerating] = useState(false);
-
-  // Preview
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-
-  // Template Gallery & Universal Blocks
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
-
-  // Trigger selection step
   const [showTriggerPicker, setShowTriggerPicker] = useState(false);
 
   const loadFlows = useCallback(async () => {
@@ -182,94 +205,68 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     try {
       const config = TRIGGER_CONFIG[triggerType];
       const { data, error } = await callApi<any>('generate-steve-mail-content', {
-        body: {
-          action: 'generate_flow_emails',
-          client_id: clientId,
-          flow_type: triggerType,
-          email_count: config.defaultSteps,
-        },
+        body: { action: 'generate_flow_emails', client_id: clientId, flow_type: triggerType, email_count: config.defaultSteps },
       });
       if (error) { toast.error(error); return; }
-
       const emails = data?.emails || [];
       const steps: FlowStep[] = emails.map((email: any, i: number) => ({
+        type: 'email' as const,
         subject: email.subject || `Email ${i + 1}`,
         preview_text: email.preview_text || '',
         html_content: email.html_content || '',
         delay_seconds: email.delay_seconds || config.defaultDelays[i] || 86400,
       }));
-
       setEditingFlow({
         name: config.defaultName,
         trigger_type: triggerType,
-        steps: steps.length > 0 ? steps : [{ subject: '', html_content: '', delay_seconds: config.defaultDelays[0] }],
+        steps: steps.length > 0 ? steps : [{ type: 'email', subject: '', html_content: '', delay_seconds: config.defaultDelays[0] }],
         settings: { exit_on_purchase: true, quiet_hours_start: '22', quiet_hours_end: '8' },
       });
       setShowTriggerPicker(false);
       setShowEditor(true);
-      toast.success(`Automatización de ${config.label} generada con AI`);
-    } catch (err) {
-      toast.error('Error generando automatización');
+      toast.success(`Automatizacion de ${config.label} generada con AI`);
+    } catch {
+      toast.error('Error generando automatizacion');
     } finally {
       setGenerating(false);
     }
   };
 
   const handleSave = async () => {
-    if (!editingFlow?.name || !editingFlow?.trigger_type) {
-      toast.error('Nombre y tipo de automatización son requeridos');
-      return;
-    }
-
+    if (!editingFlow?.name || !editingFlow?.trigger_type) { toast.error('Nombre y tipo son requeridos'); return; }
     const action = editingFlow.id ? 'update' : 'create';
     const { error } = await callApi('manage-email-flows', {
       body: {
-        action,
-        client_id: clientId,
-        flow_id: editingFlow.id,
-        name: editingFlow.name,
-        trigger_type: editingFlow.trigger_type,
-        steps: editingFlow.steps || [],
-        settings: editingFlow.settings || {},
+        action, client_id: clientId, flow_id: editingFlow.id, name: editingFlow.name,
+        trigger_type: editingFlow.trigger_type, steps: editingFlow.steps || [], settings: editingFlow.settings || {},
       },
     });
-
     if (error) { toast.error(error); return; }
-    toast.success(action === 'create' ? 'Automatización creada' : 'Automatización actualizada');
+    toast.success(action === 'create' ? 'Automatizacion creada' : 'Automatizacion actualizada');
     setShowEditor(false);
     setEditingFlow(null);
     loadFlows();
   };
 
   const handleActivate = async (flowId: string) => {
-    const { error } = await callApi('manage-email-flows', {
-      body: { action: 'activate', client_id: clientId, flow_id: flowId },
-    });
+    const { error } = await callApi('manage-email-flows', { body: { action: 'activate', client_id: clientId, flow_id: flowId } });
     if (error) { toast.error(error); return; }
-    toast.success('Automatización activada');
+    toast.success('Activada');
     loadFlows();
   };
 
   const handlePause = async (flowId: string) => {
-    const { error } = await callApi('manage-email-flows', {
-      body: { action: 'pause', client_id: clientId, flow_id: flowId },
-    });
+    const { error } = await callApi('manage-email-flows', { body: { action: 'pause', client_id: clientId, flow_id: flowId } });
     if (error) { toast.error(error); return; }
-    toast.success('Automatización pausada');
+    toast.success('Pausada');
     loadFlows();
   };
 
   const handleDelete = async (flowId: string) => {
-    const { error } = await callApi('manage-email-flows', {
-      body: { action: 'delete', client_id: clientId, flow_id: flowId },
-    });
+    const { error } = await callApi('manage-email-flows', { body: { action: 'delete', client_id: clientId, flow_id: flowId } });
     if (error) { toast.error(error); return; }
-    toast.success('Automatización eliminada');
+    toast.success('Eliminada');
     loadFlows();
-  };
-
-  const openNewFlowPicker = () => {
-    setShowTriggerPicker(true);
   };
 
   const selectTriggerAndOpen = (triggerType: string) => {
@@ -284,67 +281,46 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     setShowEditor(true);
   };
 
-  const openEditor = (flow: Flow) => {
-    setEditingFlow(flow);
-    setShowEditor(true);
-  };
-
-  const addEmailStep = () => {
+  const addStep = (type: 'email' | 'delay' | 'condition') => {
     if (!editingFlow) return;
-    setEditingFlow({
-      ...editingFlow,
-      steps: [...(editingFlow.steps || []), { type: 'email', subject: '', html_content: '', delay_seconds: 86400 }],
-    });
+    const s: FlowStep = type === 'email'
+      ? { type: 'email', subject: '', html_content: '', delay_seconds: 86400 }
+      : type === 'delay'
+        ? { type: 'delay', delay_seconds: 86400 }
+        : { type: 'condition', delay_seconds: 0, condition: { type: 'opened_email' }, yes_steps: [], no_steps: [] };
+    setEditingFlow({ ...editingFlow, steps: [...(editingFlow.steps || []), s] });
   };
 
-  const addDelayStep = () => {
-    if (!editingFlow) return;
-    setEditingFlow({
-      ...editingFlow,
-      steps: [...(editingFlow.steps || []), { type: 'delay', delay_seconds: 86400 }],
-    });
-  };
-
-  const addConditionStep = () => {
-    if (!editingFlow) return;
-    setEditingFlow({
-      ...editingFlow,
-      steps: [...(editingFlow.steps || []), { type: 'condition', delay_seconds: 0, condition: { type: 'opened_email' }, yes_steps: [], no_steps: [] }],
-    });
-  };
-
-  const addSubStep = (parentIndex: number, branch: 'yes_steps' | 'no_steps', stepType: 'email' | 'condition') => {
+  const addSubStep = (pi: number, branch: 'yes_steps' | 'no_steps', st: 'email' | 'condition') => {
     if (!editingFlow) return;
     const steps = [...(editingFlow.steps || [])];
-    const parent = { ...steps[parentIndex] };
-    const branchSteps = [...(parent[branch] || [])];
-    if (stepType === 'email') {
-      branchSteps.push({ type: 'email', subject: '', html_content: '', delay_seconds: 0 });
-    } else {
-      branchSteps.push({ type: 'condition', delay_seconds: 0, condition: { type: 'opened_email' }, yes_steps: [], no_steps: [] });
-    }
-    parent[branch] = branchSteps;
-    steps[parentIndex] = parent;
+    const parent = { ...steps[pi] };
+    const bs = [...(parent[branch] || [])];
+    bs.push(st === 'email'
+      ? { type: 'email', subject: '', html_content: '', delay_seconds: 0 }
+      : { type: 'condition', delay_seconds: 0, condition: { type: 'opened_email' }, yes_steps: [], no_steps: [] });
+    parent[branch] = bs;
+    steps[pi] = parent;
     setEditingFlow({ ...editingFlow, steps });
   };
 
-  const updateSubStep = (parentIndex: number, branch: 'yes_steps' | 'no_steps', subIndex: number, updates: Partial<FlowStep>) => {
+  const updateSubStep = (pi: number, branch: 'yes_steps' | 'no_steps', si: number, updates: Partial<FlowStep>) => {
     if (!editingFlow) return;
     const steps = [...(editingFlow.steps || [])];
-    const parent = { ...steps[parentIndex] };
-    const branchSteps = [...(parent[branch] || [])];
-    branchSteps[subIndex] = { ...branchSteps[subIndex], ...updates };
-    parent[branch] = branchSteps;
-    steps[parentIndex] = parent;
+    const parent = { ...steps[pi] };
+    const bs = [...(parent[branch] || [])];
+    bs[si] = { ...bs[si], ...updates };
+    parent[branch] = bs;
+    steps[pi] = parent;
     setEditingFlow({ ...editingFlow, steps });
   };
 
-  const removeSubStep = (parentIndex: number, branch: 'yes_steps' | 'no_steps', subIndex: number) => {
+  const removeSubStep = (pi: number, branch: 'yes_steps' | 'no_steps', si: number) => {
     if (!editingFlow) return;
     const steps = [...(editingFlow.steps || [])];
-    const parent = { ...steps[parentIndex] };
-    parent[branch] = (parent[branch] || []).filter((_, i) => i !== subIndex);
-    steps[parentIndex] = parent;
+    const parent = { ...steps[pi] };
+    parent[branch] = (parent[branch] || []).filter((_: any, i: number) => i !== si);
+    steps[pi] = parent;
     setEditingFlow({ ...editingFlow, steps });
   };
 
@@ -357,8 +333,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
 
   const removeStep = (index: number) => {
     if (!editingFlow) return;
-    const steps = (editingFlow.steps || []).filter((_, i) => i !== index);
-    setEditingFlow({ ...editingFlow, steps });
+    setEditingFlow({ ...editingFlow, steps: (editingFlow.steps || []).filter((_: any, i: number) => i !== index) });
   };
 
   const openStepInEditor = (index: number) => {
@@ -369,10 +344,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
 
   const saveStepFromEditor = () => {
     if (!emailEditorRef.current || editingStepIndex === null) return;
-
-    const html = emailEditorRef.current.getHtml();
-    const projectData = emailEditorRef.current.getProjectData();
-    updateStep(editingStepIndex, { html_content: html, design_json: projectData });
+    updateStep(editingStepIndex, {
+      html_content: emailEditorRef.current.getHtml(),
+      design_json: emailEditorRef.current.getProjectData(),
+    });
     setShowEmailEditor(false);
     setEditingStepIndex(null);
     toast.success('Email guardado');
@@ -384,22 +359,11 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     paused: { label: 'Pausado', color: 'bg-yellow-100 text-yellow-800' },
   };
 
-  const delayLabel = (seconds: number) => {
-    const opt = DELAY_OPTIONS.find(o => o.value === seconds);
-    if (opt) return opt.label;
-    if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-    if (seconds < 86400) return `${Math.round(seconds / 3600)} horas`;
-    return `${Math.round(seconds / 86400)} dias`;
-  };
-
-  const triggerLabel = (triggerType: string) => {
-    return TRIGGER_CONFIG[triggerType]?.label || triggerType;
-  };
+  const triggerLabel = (t: string) => TRIGGER_CONFIG[t]?.label || t;
 
   // =============== FULLSCREEN EMAIL EDITOR ===============
   if (showEmailEditor && editingStepIndex !== null) {
     const currentStep = editingFlow?.steps?.[editingStepIndex];
-
     return (
       <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0">
@@ -411,13 +375,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               Email {editingStepIndex + 1}: {currentStep?.subject || 'Sin asunto'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setShowEmailEditor(false); setEditingStepIndex(null); }}>
-              <X className="w-4 h-4 mr-1" /> Cancelar
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => { setShowEmailEditor(false); setEditingStepIndex(null); }}>
+            <X className="w-4 h-4 mr-1" /> Cancelar
+          </Button>
         </div>
-
         <div className="flex items-center gap-4 px-4 py-2 border-b shrink-0">
           <div className="flex items-center gap-2 flex-1">
             <Label className="text-xs whitespace-nowrap">Asunto:</Label>
@@ -429,15 +390,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowTemplateGallery(true)}>
-              Templates
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
-              Bloques
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowTemplateGallery(true)}>Templates</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>Bloques</Button>
           </div>
         </div>
-
         <div className="flex-1 min-h-0 relative">
           <div className="absolute inset-0">
             <SteveMailEditor
@@ -453,8 +409,6 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             />
           </div>
         </div>
-
-        {/* Template Gallery */}
         <EmailTemplateGallery
           clientId={clientId}
           isOpen={showTemplateGallery}
@@ -464,8 +418,8 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             if (design) {
               const tryLoad = () => {
                 if (emailEditorRef.current) {
-                  const htmlContent = typeof design === 'string' ? design : (design as any).html || '';
-                  emailEditorRef.current.loadDesign(htmlContent);
+                  const h = typeof design === 'string' ? design : (design as any).html || '';
+                  emailEditorRef.current.loadDesign(h);
                 } else {
                   setTimeout(tryLoad, 200);
                 }
@@ -474,8 +428,6 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             }
           }}
         />
-
-        {/* Universal Blocks Panel */}
         <UniversalBlocksPanel
           clientId={clientId}
           editor={emailEditorRef.current}
@@ -486,25 +438,204 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     );
   }
 
+  // =============== FULLSCREEN VISUAL FLOW EDITOR ===============
+  if (showEditor && editingFlow) {
+    const TriggerIcon = TRIGGER_CONFIG[editingFlow.trigger_type || '']?.icon || GitBranch;
+    const emailCount = (editingFlow.steps || []).filter(s => s.type !== 'delay' && s.type !== 'condition').length;
+    const conditionCount = (editingFlow.steps || []).filter(s => s.type === 'condition').length;
+
+    return (
+      <div className="fixed inset-0 z-[90] bg-background flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => { setShowEditor(false); setEditingFlow(null); }}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Volver
+            </Button>
+            <div className="h-5 w-px bg-border" />
+            <TriggerIcon className="w-4 h-4 text-purple-600" />
+            <Input
+              value={editingFlow.name || ''}
+              onChange={(e) => setEditingFlow(prev => prev ? { ...prev, name: e.target.value } : prev)}
+              className="h-8 text-sm font-medium w-64 border-transparent hover:border-input focus:border-input"
+              placeholder="Nombre de la automatizacion"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 mr-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> {emailCount} emails</span>
+              {conditionCount > 0 && (
+                <span className="flex items-center gap-1"><GitBranch className="w-3.5 h-3.5" /> {conditionCount} condiciones</span>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
+              <Settings2 className="w-4 h-4 mr-1" /> Config
+            </Button>
+            {!editingFlow.id && editingFlow.trigger_type && (
+              <Button variant="outline" size="sm" onClick={() => handleGenerateFlowWithAI(editingFlow.trigger_type!)} disabled={generating}>
+                {generating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1 text-purple-600" />}
+                Generar con AI
+              </Button>
+            )}
+            <Button onClick={handleSave}>
+              <Save className="w-4 h-4 mr-1" /> {editingFlow.id ? 'Guardar' : 'Crear'}
+            </Button>
+          </div>
+        </div>
+
+        {showSettings && (
+          <div className="border-b bg-muted/30 px-4 py-3">
+            <div className="max-w-xl mx-auto space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Se activa cuando</Label>
+                  <Select value={editingFlow.trigger_type || 'abandoned_cart'} onValueChange={(v) => setEditingFlow(prev => prev ? { ...prev, trigger_type: v } : prev)}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(TRIGGER_CONFIG).map(([key, { label }]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between pt-5">
+                  <Label className="text-xs">Salir si el cliente compra</Label>
+                  <Switch
+                    checked={editingFlow.settings?.exit_on_purchase ?? true}
+                    onCheckedChange={(v) => setEditingFlow(prev =>
+                      prev ? { ...prev, settings: { ...prev.settings, exit_on_purchase: v } } : prev
+                    )}
+                  />
+                </div>
+              </div>
+              {editingFlow.trigger_type && (
+                <p className="text-xs text-muted-foreground">{TRIGGER_CONFIG[editingFlow.trigger_type]?.description}</p>
+              )}
+              {/* Trigger-specific settings */}
+              {editingFlow.trigger_type && TRIGGER_SETTINGS[editingFlow.trigger_type] && (
+                <div className="border-t pt-3 mt-2">
+                  <p className="text-xs font-medium mb-2">Configuración del trigger</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {TRIGGER_SETTINGS[editingFlow.trigger_type].map((setting) => (
+                      <div key={setting.key}>
+                        <Label className="text-xs">{setting.label}</Label>
+                        {setting.type === 'select' ? (
+                          <Select
+                            value={String(editingFlow.settings?.trigger_config?.[setting.key] ?? setting.defaultValue)}
+                            onValueChange={(v) => setEditingFlow(prev => prev ? {
+                              ...prev, settings: {
+                                ...prev.settings,
+                                trigger_config: { ...prev.settings?.trigger_config, [setting.key]: v },
+                              },
+                            } : prev)}
+                          >
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {setting.options?.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            type="number"
+                            className="h-8 text-sm"
+                            value={editingFlow.settings?.trigger_config?.[setting.key] ?? setting.defaultValue}
+                            onChange={(e) => setEditingFlow(prev => prev ? {
+                              ...prev, settings: {
+                                ...prev.settings,
+                                trigger_config: { ...prev.settings?.trigger_config, [setting.key]: e.target.value },
+                              },
+                            } : prev)}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 border-t pt-3">
+                <div>
+                  <Label className="text-xs">Horas silenciosas (inicio)</Label>
+                  <Select
+                    value={editingFlow.settings?.quiet_hours_start || '22'}
+                    onValueChange={(v) => setEditingFlow(prev => prev ? {
+                      ...prev, settings: { ...prev.settings, quiet_hours_start: v },
+                    } : prev)}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Horas silenciosas (fin)</Label>
+                  <Select
+                    value={editingFlow.settings?.quiet_hours_end || '8'}
+                    onValueChange={(v) => setEditingFlow(prev => prev ? {
+                      ...prev, settings: { ...prev.settings, quiet_hours_end: v },
+                    } : prev)}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-auto p-6">
+          <div className="max-w-2xl mx-auto">
+            <FlowCanvas
+              triggerType={editingFlow.trigger_type || 'welcome'}
+              steps={editingFlow.steps || []}
+              onUpdateStep={updateStep}
+              onRemoveStep={removeStep}
+              onAddStep={addStep}
+              onOpenStepEditor={openStepInEditor}
+              onPreviewStep={(html) => { setPreviewHtml(html); setShowPreview(true); }}
+              onAddSubStep={addSubStep}
+              onUpdateSubStep={updateSubStep}
+              onRemoveSubStep={removeSubStep}
+            />
+          </div>
+        </div>
+
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogContent className="max-w-3xl max-h-[90vh]">
+            <DialogHeader><DialogTitle>Vista previa del email</DialogTitle></DialogHeader>
+            <div className="border rounded-lg overflow-hidden bg-white">
+              <iframe srcDoc={previewHtml} className="w-full min-h-[500px]" title="Email Preview" sandbox="allow-same-origin" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   // =============== MAIN VIEW ===============
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Automatizaciones</h3>
-          <p className="text-sm text-muted-foreground">Envía emails automáticamente según el comportamiento del cliente</p>
+          <p className="text-sm text-muted-foreground">Envia emails automaticamente segun el comportamiento del cliente</p>
         </div>
-        <Button size="lg" onClick={openNewFlowPicker} className="gap-2">
-          <Plus className="w-5 h-5" /> Nueva Automatización
+        <Button size="lg" onClick={() => setShowTriggerPicker(true)} className="gap-2">
+          <Plus className="w-5 h-5" /> Nueva Automatizacion
         </Button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin" />
-        </div>
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
       ) : flows.length === 0 ? (
-        /* ===== EMPTY STATE ===== */
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mb-4">
@@ -512,15 +643,14 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             </div>
             <h4 className="text-lg font-semibold mb-2">Automatiza tus emails</h4>
             <p className="text-muted-foreground max-w-md mb-6">
-              Las automatizaciones envían emails automáticamente cuando algo ocurre en tu tienda. Crea tu primera automatización para empezar.
+              Las automatizaciones envian emails automaticamente cuando algo ocurre en tu tienda.
             </p>
-            <Button size="lg" onClick={openNewFlowPicker} className="gap-2">
-              <Plus className="w-5 h-5" /> Crear automatización
+            <Button size="lg" onClick={() => setShowTriggerPicker(true)} className="gap-2">
+              <Plus className="w-5 h-5" /> Crear automatizacion
             </Button>
           </CardContent>
         </Card>
       ) : (
-        /* ===== FLOW LIST ===== */
         <div className="space-y-3">
           {flows.map((flow) => {
             const TriggerIcon = TRIGGER_CONFIG[flow.trigger_type]?.icon || GitBranch;
@@ -536,21 +666,21 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <h4 className="font-medium truncate">{flow.name}</h4>
-                          <Badge className={status?.color || 'bg-gray-100'}>
-                            {status?.label || flow.status}
-                          </Badge>
+                          <Badge className={status?.color || 'bg-gray-100'}>{status?.label || flow.status}</Badge>
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <TriggerIcon className="w-3 h-3" />
-                            {triggerLabel(flow.trigger_type)}
+                            <TriggerIcon className="w-3 h-3" /> {triggerLabel(flow.trigger_type)}
                           </span>
-                          <span>{flow.total_sent || 0} emails enviados</span>
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" /> {(flow.steps || []).filter(s => s.type !== 'delay' && s.type !== 'condition').length} emails
+                          </span>
+                          <span>{flow.total_sent || 0} enviados</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 ml-4">
-                      <Button variant="outline" size="sm" onClick={() => openEditor(flow)}>
+                      <Button variant="outline" size="sm" onClick={() => { setEditingFlow(flow); setShowEditor(true); }}>
                         <Edit className="w-4 h-4 mr-1" /> Editar
                       </Button>
                       {flow.status === 'draft' || flow.status === 'paused' ? (
@@ -574,22 +704,15 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         </div>
       )}
 
-      {/* ===== TRIGGER PICKER DIALOG ===== */}
       <Dialog open={showTriggerPicker} onOpenChange={setShowTriggerPicker}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Nueva Automatización</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground mb-4">Elige cuando se activará esta automatización:</p>
+          <DialogHeader><DialogTitle>Nueva Automatizacion</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground mb-4">Elige cuando se activara:</p>
           <div className="space-y-2">
             {Object.entries(TRIGGER_CONFIG).map(([key, config]) => {
               const Icon = config.icon;
               return (
-                <div
-                  key={key}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
-                  onClick={() => selectTriggerAndOpen(key)}
-                >
+                <div key={key} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors" onClick={() => selectTriggerAndOpen(key)}>
                   <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
                     <Icon className="w-5 h-5 text-purple-600" />
                   </div>
@@ -602,17 +725,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             })}
           </div>
           <div className="border-t pt-3 mt-2">
-            <p className="text-xs text-muted-foreground text-center mb-2">O genera todos los emails automáticamente con AI</p>
+            <p className="text-xs text-muted-foreground text-center mb-2">O genera todos los emails automaticamente con AI</p>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(TRIGGER_CONFIG).map(([key, config]) => (
-                <Button
-                  key={key}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => handleGenerateFlowWithAI(key)}
-                  disabled={generating}
-                >
+                <Button key={key} variant="outline" size="sm" className="text-xs" onClick={() => handleGenerateFlowWithAI(key)} disabled={generating}>
                   {generating ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1 text-purple-600" />}
                   {config.label}
                 </Button>
@@ -622,344 +738,11 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         </DialogContent>
       </Dialog>
 
-      {/* ===== FLOW EDITOR DIALOG ===== */}
-      <Dialog open={showEditor} onOpenChange={setShowEditor}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingFlow?.id ? 'Editar automatización' : 'Nueva automatización'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5">
-            {/* Name & Trigger */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Nombre *</Label>
-                <Input
-                  value={editingFlow?.name || ''}
-                  onChange={(e) => setEditingFlow(prev => prev ? { ...prev, name: e.target.value } : prev)}
-                  placeholder="Ej: Carrito abandonado"
-                />
-              </div>
-              <div>
-                <Label>Se activa cuando *</Label>
-                <Select
-                  value={editingFlow?.trigger_type || 'abandoned_cart'}
-                  onValueChange={(v) => setEditingFlow(prev => prev ? { ...prev, trigger_type: v } : prev)}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(TRIGGER_CONFIG).map(([key, { label }]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {editingFlow?.trigger_type && (
-              <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
-                {TRIGGER_CONFIG[editingFlow.trigger_type]?.description}
-              </p>
-            )}
-
-            {/* Settings */}
-            <Card className="bg-muted/30">
-              <CardContent className="py-3 space-y-3">
-                <p className="text-sm font-medium">Configuración</p>
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Salir del flujo si el cliente compra</Label>
-                  <Switch
-                    checked={editingFlow?.settings?.exit_on_purchase ?? true}
-                    onCheckedChange={(v) => setEditingFlow(prev =>
-                      prev ? { ...prev, settings: { ...prev.settings, exit_on_purchase: v } } : prev
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* AI Generate Button */}
-            {!editingFlow?.id && editingFlow?.trigger_type && (
-              <Button
-                variant="outline"
-                className="w-full border-dashed border-2"
-                onClick={() => handleGenerateFlowWithAI(editingFlow.trigger_type!)}
-                disabled={generating}
-              >
-                {generating ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando emails con AI...</>
-                ) : (
-                  <><Sparkles className="w-4 h-4 mr-2 text-purple-600" /> Generar todos los emails con Steve AI</>
-                )}
-              </Button>
-            )}
-
-            {/* ===== FLOW STEPS (VISUAL) ===== */}
-            <div>
-              <Label className="text-sm font-medium">Pasos de la automatización</Label>
-              <div className="space-y-0 mt-3">
-                {(editingFlow?.steps || []).map((step, index) => {
-                  const isCondition = step.type === 'condition';
-                  const isDelay = step.type === 'delay';
-                  const isEmail = !isCondition && !isDelay;
-
-                  return (
-                    <div key={index}>
-                      {/* Vertical connector */}
-                      {index > 0 && (
-                        <div className="flex items-center justify-center py-1">
-                          <ArrowDown className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      )}
-
-                      {/* ---- EMAIL STEP ---- */}
-                      {isEmail && (
-                        <Card className={step.html_content ? 'border-green-200' : ''}>
-                          <CardContent className="py-3 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium flex items-center gap-1.5">
-                                <Mail className="w-3.5 h-3.5 text-blue-600" /> Email
-                                {step.html_content && (
-                                  <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 ml-1">
-                                    Listo
-                                  </Badge>
-                                )}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                {step.html_content && (
-                                  <Button variant="ghost" size="sm" onClick={() => { setPreviewHtml(step.html_content || ''); setShowPreview(true); }}>
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </Button>
-                                )}
-                                {(editingFlow?.steps?.length || 0) > 1 && (
-                                  <Button variant="ghost" size="sm" onClick={() => removeStep(index)}>
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Asunto</Label>
-                              <Input
-                                className="h-8 text-sm"
-                                value={step.subject || ''}
-                                onChange={(e) => updateStep(index, { subject: e.target.value })}
-                                placeholder="Ej: Olvidaste algo en tu carrito"
-                              />
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                              onClick={() => openStepInEditor(index)}
-                            >
-                              <Edit className="w-3.5 h-3.5 mr-1.5" />
-                              {step.html_content ? 'Editar diseño' : 'Diseñar email'}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* ---- DELAY STEP ---- */}
-                      {isDelay && (
-                        <Card className="border-orange-200">
-                          <CardContent className="py-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-orange-600" /> Esperar
-                              </span>
-                              <Button variant="ghost" size="sm" onClick={() => removeStep(index)}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                            <div className="mt-2">
-                              <Select
-                                value={String(step.delay_seconds)}
-                                onValueChange={(v) => updateStep(index, { delay_seconds: Number(v) })}
-                              >
-                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {DELAY_OPTIONS.map(opt => (
-                                    <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* ---- CONDITION STEP ---- */}
-                      {isCondition && (
-                        <Card className="border-purple-200">
-                          <CardContent className="py-3 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium flex items-center gap-1.5">
-                                <GitBranch className="w-3.5 h-3.5 text-purple-600" /> Condición
-                              </span>
-                              <Button variant="ghost" size="sm" onClick={() => removeStep(index)}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Si el cliente...</Label>
-                              <Select
-                                value={step.condition?.type || 'opened_email'}
-                                onValueChange={(v) => updateStep(index, { condition: { ...step.condition, type: v } })}
-                              >
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {CONDITION_TYPES.map(ct => (
-                                    <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* YES / NO Branches */}
-                            <div className="grid grid-cols-2 gap-3 mt-2">
-                              {/* YES branch */}
-                              <div className="border-l-2 border-green-400 pl-3 space-y-2">
-                                <span className="text-xs font-semibold text-green-700">Si</span>
-                                {(step.yes_steps || []).map((subStep, subIdx) => (
-                                  <Card key={subIdx} className={`${subStep.html_content ? 'border-green-200' : ''}`}>
-                                    <CardContent className="py-2 space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-medium flex items-center gap-1">
-                                          <Mail className="w-3 h-3" /> Email
-                                        </span>
-                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeSubStep(index, 'yes_steps', subIdx)}>
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                      <Input
-                                        className="h-7 text-xs"
-                                        value={subStep.subject || ''}
-                                        onChange={(e) => updateSubStep(index, 'yes_steps', subIdx, { subject: e.target.value })}
-                                        placeholder="Asunto"
-                                      />
-                                      <Select
-                                        value={String(subStep.delay_seconds)}
-                                        onValueChange={(v) => updateSubStep(index, 'yes_steps', subIdx, { delay_seconds: Number(v) })}
-                                      >
-                                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                          {DELAY_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                                <Button variant="ghost" size="sm" className="h-7 text-[10px] w-full" onClick={() => addSubStep(index, 'yes_steps', 'email')}>
-                                  <Mail className="w-3 h-3 mr-1" /> Agregar email
-                                </Button>
-                              </div>
-
-                              {/* NO branch */}
-                              <div className="border-l-2 border-red-400 pl-3 space-y-2">
-                                <span className="text-xs font-semibold text-red-700">No</span>
-                                {(step.no_steps || []).map((subStep, subIdx) => (
-                                  <Card key={subIdx} className={`${subStep.html_content ? 'border-green-200' : ''}`}>
-                                    <CardContent className="py-2 space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-medium flex items-center gap-1">
-                                          <Mail className="w-3 h-3" /> Email
-                                        </span>
-                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeSubStep(index, 'no_steps', subIdx)}>
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                      <Input
-                                        className="h-7 text-xs"
-                                        value={subStep.subject || ''}
-                                        onChange={(e) => updateSubStep(index, 'no_steps', subIdx, { subject: e.target.value })}
-                                        placeholder="Asunto"
-                                      />
-                                      <Select
-                                        value={String(subStep.delay_seconds)}
-                                        onValueChange={(v) => updateSubStep(index, 'no_steps', subIdx, { delay_seconds: Number(v) })}
-                                      >
-                                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                          {DELAY_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                                <Button variant="ghost" size="sm" className="h-7 text-[10px] w-full" onClick={() => addSubStep(index, 'no_steps', 'email')}>
-                                  <Mail className="w-3 h-3 mr-1" /> Agregar email
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* Inline delay for old email steps that have delay_seconds (backward compat) */}
-                      {isEmail && index > 0 && step.delay_seconds > 0 && (
-                        <div className="flex items-center justify-center my-1">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1">
-                            <Clock className="w-3 h-3" />
-                            Esperar: {delayLabel(step.delay_seconds)}
-                            <Select
-                              value={String(step.delay_seconds)}
-                              onValueChange={(v) => updateStep(index, { delay_seconds: Number(v) })}
-                            >
-                              <SelectTrigger className="h-6 text-[10px] border-0 bg-transparent w-auto min-w-0 px-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {DELAY_OPTIONS.map(opt => (
-                                  <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Add step buttons -- 3 clear options */}
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={addEmailStep}>
-                  <Mail className="w-4 h-4 mr-1.5" /> Email
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={addDelayStep}>
-                  <Clock className="w-4 h-4 mr-1.5" /> Esperar
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={addConditionStep}>
-                  <GitBranch className="w-4 h-4 mr-1.5" /> Condición
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditor(false)}>Cancelar</Button>
-            <Button onClick={handleSave}>
-              {editingFlow?.id ? 'Guardar cambios' : 'Crear automatización'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Vista previa del email</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Vista previa</DialogTitle></DialogHeader>
           <div className="border rounded-lg overflow-hidden bg-white">
-            <iframe
-              srcDoc={previewHtml}
-              className="w-full min-h-[500px]"
-              title="Email Preview"
-              sandbox="allow-same-origin"
-            />
+            <iframe srcDoc={previewHtml} className="w-full min-h-[500px]" title="Preview" sandbox="allow-same-origin" />
           </div>
         </DialogContent>
       </Dialog>
