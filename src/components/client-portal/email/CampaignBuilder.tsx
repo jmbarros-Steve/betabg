@@ -113,6 +113,36 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [saveTemplateName, setSaveTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
 
+  // Unsaved changes protection
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!showEditor || !editorReady) { return; }
+    const editor = emailEditorRef.current?.getEditor();
+    if (!editor) return;
+    const markDirty = () => setIsDirty(true);
+    editor.on('component:add', markDirty);
+    editor.on('component:remove', markDirty);
+    editor.on('component:update', markDirty);
+    editor.on('style:change', markDirty);
+    return () => {
+      editor.off('component:add', markDirty);
+      editor.off('component:remove', markDirty);
+      editor.off('component:update', markDirty);
+      editor.off('style:change', markDirty);
+    };
+  }, [showEditor, editorReady]);
+
+  useEffect(() => {
+    if (!showEditor || !isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [showEditor, isDirty]);
+
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [sendMode, setSendMode] = useState<'now' | 'schedule'>('now');
@@ -278,6 +308,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
     if (error) { toast.error(error); return; }
     toast.success(action === 'create' ? 'Campaña creada' : 'Campaña guardada');
+    setIsDirty(false);
 
     // If new, update the editing campaign ID
     if (!editingCampaign.id && data?.campaign?.id) {
@@ -531,9 +562,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return (
       <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0 overflow-x-auto">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => setShowEditor(false)}>
+            <Button variant="ghost" size="sm" onClick={() => {
+              if (isDirty && !window.confirm('Tienes cambios sin guardar. ¿Seguro que quieres salir?')) return;
+              setShowEditor(false);
+            }}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Volver
             </Button>
             {editorStep === 'design' ? (
