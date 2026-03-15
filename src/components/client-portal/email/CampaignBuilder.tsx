@@ -1091,7 +1091,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     srcDoc={previewHtml}
                     className="w-full min-h-[600px]"
                     title="Email Preview"
-                    sandbox="allow-same-origin allow-popups"
+                    sandbox=""
                   />
                 </div>
               </div>
@@ -1294,7 +1294,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   srcDoc={previewHtml}
                   className="w-full min-h-[500px]"
                   title="Email Preview"
-                  sandbox="allow-same-origin allow-popups"
+                  sandbox=""
                 />
               </div>
             </div>
@@ -1447,7 +1447,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 srcDoc={previewHtml}
                 className="w-full min-h-[500px]"
                 title="Email Preview"
-                sandbox="allow-same-origin allow-popups"
+                sandbox=""
               />
             </div>
           </div>
