@@ -138,6 +138,16 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
           });
           if (canvas) {
             canvas.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;background-color:#f4f4f5;`;
+            // Also resize the iframe and frame-wrapper inside the canvas
+            const frameWrapper = canvas.querySelector('.gjs-frame-wrapper') as HTMLElement;
+            const iframe = canvas.querySelector('iframe') as HTMLIFrameElement;
+            if (frameWrapper) {
+              frameWrapper.style.cssText = `width:100%;height:${canvasH}px;`;
+            }
+            if (iframe) {
+              iframe.style.width = '100%';
+              iframe.style.height = `${canvasH}px`;
+            }
           }
           if (views) {
             views.style.cssText = `position:absolute;top:0;left:${canvasW}px;width:${SIDEBAR_W}px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;`;
