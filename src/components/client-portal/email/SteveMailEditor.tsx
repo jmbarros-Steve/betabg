@@ -27,6 +27,8 @@ function sanitizeEmailHtml(html: string): string {
       'data-discount-source', 'data-discount-code', 'data-discount-type', 'data-discount-value',
       'data-merge-tag',
       'data-dynamic-feed',
+      'data-steve-image',
+      'data-steve-countdown',
     ],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'select', 'button'],
     FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur'],
@@ -199,8 +201,51 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         blockManager: {
           appendOnClick: true,
         },
-        // Configure panels for clean layout
-        panels: { defaults: [] },
+        styleManager: {
+          sectors: [
+            {
+              name: 'Dimensiones',
+              open: false,
+              properties: [
+                { property: 'width' },
+                { property: 'max-width' },
+                { property: 'height' },
+                { property: 'padding' },
+                { property: 'margin' },
+              ],
+            },
+            {
+              name: 'Tipograf\u00eda',
+              open: false,
+              properties: [
+                { property: 'font-family' },
+                { property: 'font-size' },
+                { property: 'font-weight' },
+                { property: 'color' },
+                { property: 'line-height' },
+                { property: 'text-align' },
+                { property: 'text-decoration' },
+              ],
+            },
+            {
+              name: 'Fondo',
+              open: false,
+              properties: [
+                { property: 'background-color' },
+                { property: 'background-image' },
+              ],
+            },
+            {
+              name: 'Borde',
+              open: false,
+              properties: [
+                { property: 'border' },
+                { property: 'border-radius' },
+              ],
+            },
+          ],
+        },
+        // Let the newsletter preset set up default panels, then we customize layout
       });
 
       editorRef.current = editor;
@@ -210,7 +255,7 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
       // NOTE: editor.on('load') fires synchronously during init(), so we use
       // setTimeout to run after init completes and the DOM is ready.
       const el = containerRef.current;
-      const SIDEBAR_W = 220;
+      const SIDEBAR_W = 260;
 
       const forceLayout = () => {
         if (!el) return;
@@ -245,15 +290,28 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         }
       };
 
+      // Auto-switch to traits panel when a component is selected
+      editor.on('component:selected', () => {
+        const selected = editor.getSelected();
+        if (!selected) return;
+        // If it's a Steve custom block, open traits (settings); otherwise open style manager
+        const type = selected.get('type') || '';
+        if (type.startsWith('steve-')) {
+          editor.Panels.getButton('views', 'open-tm')?.set('active', true);
+        } else {
+          editor.Panels.getButton('views', 'open-sm')?.set('active', true);
+        }
+      });
+
+      // When nothing is selected, go back to blocks panel
+      editor.on('component:deselected', () => {
+        editor.Panels.getButton('views', 'open-blocks')?.set('active', true);
+      });
+
       const applyAndRefresh = () => {
         forceLayout();
-        // Open blocks panel (last view tab)
-        if (el) {
-          const viewBtns = el.querySelectorAll('.gjs-pn-views .gjs-pn-btn');
-          if (viewBtns.length > 0) {
-            (viewBtns[viewBtns.length - 1] as HTMLElement).click();
-          }
-        }
+        // Open blocks panel by default
+        editor.Panels.getButton('views', 'open-blocks')?.set('active', true);
         editor.refresh();
         requestAnimationFrame(forceLayout);
       };

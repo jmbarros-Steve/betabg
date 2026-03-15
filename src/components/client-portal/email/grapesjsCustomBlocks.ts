@@ -795,17 +795,137 @@ export function registerSteveBlocks(editor: any): void {
   });
 
   // =========================================================================
-  // 8. IMAGE WITH CAPTION
+  // 8. IMAGE WITH CAPTION (configurable component)
   // =========================================================================
-  editor.BlockManager.add('steve-image-caption', {
-    label: 'Imagen + Caption',
-    category: 'Contenido',
-    content: `<div style="padding:16px;text-align:center;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
-    <img src="https://placehold.co/560x320/e4e4e7/71717a?text=Tu+Imagen" alt="Imagen" style="width:100%;max-width:560px;border-radius:8px;display:block;" />
-    <p style="margin:12px 0 0;font-size:13px;color:#71717a;font-style:italic;">Agrega un texto descriptivo aqui</p>
+  editor.Components.addType('steve-image', {
+    isComponent(el: HTMLElement) {
+      return el?.getAttribute?.('data-steve-image') === 'true';
+    },
+    model: {
+      defaults: {
+        tagName: 'div',
+        droppable: false,
+        traits: [
+          {
+            type: 'text',
+            name: 'imgSrc',
+            label: 'URL de Imagen',
+            placeholder: 'https://... o sube una imagen',
+            changeProp: true,
+          },
+          {
+            type: 'text',
+            name: 'imgAlt',
+            label: 'Texto alternativo',
+            changeProp: true,
+          },
+          {
+            type: 'text',
+            name: 'imgLink',
+            label: 'URL al hacer click',
+            placeholder: 'https://tu-tienda.com/producto',
+            changeProp: true,
+          },
+          {
+            type: 'text',
+            name: 'imgCaption',
+            label: 'Caption (pie de imagen)',
+            changeProp: true,
+          },
+          {
+            type: 'select',
+            name: 'imgMaxWidth',
+            label: 'Ancho maximo',
+            options: [
+              { id: '280', label: 'Pequeno (280px)' },
+              { id: '400', label: 'Mediano (400px)' },
+              { id: '560', label: 'Grande (560px)' },
+              { id: '100%', label: 'Completo' },
+            ],
+            changeProp: true,
+          },
+          {
+            type: 'select',
+            name: 'imgBorderRadius',
+            label: 'Bordes',
+            options: [
+              { id: '0', label: 'Sin redondeo' },
+              { id: '8', label: 'Redondeado' },
+              { id: '16', label: 'Muy redondeado' },
+              { id: '50%', label: 'Circular' },
+            ],
+            changeProp: true,
+          },
+          {
+            type: 'select',
+            name: 'imgAlign',
+            label: 'Alineacion',
+            options: [
+              { id: 'left', label: 'Izquierda' },
+              { id: 'center', label: 'Centro' },
+              { id: 'right', label: 'Derecha' },
+            ],
+            changeProp: true,
+          },
+        ],
+        imgSrc: 'https://placehold.co/560x320/e4e4e7/71717a?text=Tu+Imagen',
+        imgAlt: 'Imagen',
+        imgLink: '',
+        imgCaption: '',
+        imgMaxWidth: '560',
+        imgBorderRadius: '8',
+        imgAlign: 'center',
+      },
+      init(this: any) {
+        this.on('change:imgSrc change:imgAlt change:imgLink change:imgCaption change:imgMaxWidth change:imgBorderRadius change:imgAlign', this.updateContent);
+        this.updateContent();
+      },
+      updateContent(this: any) {
+        const src = this.get('imgSrc') || 'https://placehold.co/560x320/e4e4e7/71717a?text=Tu+Imagen';
+        const alt = this.get('imgAlt') || 'Imagen';
+        const link = this.get('imgLink') || '';
+        const caption = this.get('imgCaption') || '';
+        const maxW = this.get('imgMaxWidth') || '560';
+        const radius = this.get('imgBorderRadius') || '8';
+        const align = this.get('imgAlign') || 'center';
+
+        const mw = maxW === '100%' ? '100%' : `${maxW}px`;
+        const br = radius === '50%' ? '50%' : `${radius}px`;
+        const imgTag = `<img src="${src}" alt="${alt}" style="width:100%;max-width:${mw};border-radius:${br};display:block;" />`;
+        const wrapped = link ? `<a href="${link}" target="_blank" style="display:inline-block;">${imgTag}</a>` : imgTag;
+        const captionHtml = caption ? `<p style="margin:12px 0 0;font-size:13px;color:#71717a;font-style:italic;">${caption}</p>` : '';
+
+        const html = `<div data-steve-image="true" style="padding:16px;text-align:${align};">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="${align}">
+    ${wrapped}
+    ${captionHtml}
   </td></tr></table>
-</div>`,
+</div>`;
+        this.set('content', '');
+        this.components(html);
+      },
+      toHTML(this: any) {
+        const src = this.get('imgSrc') || 'https://placehold.co/560x320/e4e4e7/71717a?text=Tu+Imagen';
+        const alt = this.get('imgAlt') || 'Imagen';
+        const link = this.get('imgLink') || '';
+        const caption = this.get('imgCaption') || '';
+        const maxW = this.get('imgMaxWidth') || '560';
+        const radius = this.get('imgBorderRadius') || '8';
+        const align = this.get('imgAlign') || 'center';
+        const mw = maxW === '100%' ? '100%' : `${maxW}px`;
+        const br = radius === '50%' ? '50%' : `${radius}px`;
+        const imgTag = `<img src="${src}" alt="${alt}" style="width:100%;max-width:${mw};border-radius:${br};display:block;" />`;
+        const wrapped = link ? `<a href="${link}" target="_blank" style="display:inline-block;">${imgTag}</a>` : imgTag;
+        const captionHtml = caption ? `<p style="margin:12px 0 0;font-size:13px;color:#71717a;font-style:italic;">${caption}</p>` : '';
+        return `<div data-steve-image="true" style="padding:16px;text-align:${align};"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="${align}">${wrapped}${captionHtml}</td></tr></table></div>`;
+      },
+    },
+  });
+
+  editor.BlockManager.add('steve-image-caption', {
+    label: 'Imagen',
+    category: 'Contenido',
+    content: { type: 'steve-image' },
     media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
   });
 
