@@ -292,9 +292,11 @@ export default function ClientPortal() {
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="mesh-bg" />
+      <div className="noise-overlay fixed inset-0 z-[1] pointer-events-none" />
       <OfflineBanner />
       {/* Header */}
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border">
         <div className="container px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {isAdminView && (
@@ -302,8 +304,10 @@ export default function ClientPortal() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             )}
+            <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center font-extrabold text-sm shadow-[0_0_20px_rgba(99,102,241,0.3)]">S</div>
             <img src={logo} alt="Steve Ads" className="h-12 w-auto" />
-            <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1" />
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/15 text-indigo-300 font-semibold tracking-wide">AI PLATFORM</span>
+            <div className="hidden sm:block h-8 w-px bg-border mx-1" />
             <div className="hidden sm:flex flex-col items-start justify-center">
               {clientLogoUrl && (
                 <img
@@ -328,11 +332,11 @@ export default function ClientPortal() {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-slate-400 hidden sm:block">
+            <span className="text-sm font-medium text-muted-foreground hidden sm:block">
               Portal Cliente
             </span>
             {!isAdminView && (
-              <Button variant="ghost" size="icon" onClick={signOut} className="text-slate-400 hover:text-slate-700">
+              <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="w-5 h-5" />
               </Button>
             )}
@@ -340,17 +344,17 @@ export default function ClientPortal() {
         </div>
       </header>
 
-      <div className="container px-6 py-8 pb-20 md:pb-8">
+      <div className="container px-6 py-8 pb-20 md:pb-12 relative z-[2]">
         {/* Tabs — hidden on mobile where BottomNav is used */}
-        <div className="hidden md:flex gap-2 mb-8 overflow-x-auto pb-2">
+        <div className="hidden md:flex gap-2 mb-8 overflow-x-auto pb-2 bg-white/[0.04] p-1 rounded-xl border border-white/[0.08]">
           {primaryTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-card text-slate-600 hover:bg-slate-100 border border-border'
+                  ? 'bg-primary text-white shadow-[0_0_20px_rgba(99,102,241,0.3)]'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -360,10 +364,10 @@ export default function ClientPortal() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
                   secondaryTabs.some(t => t.id === activeTab)
-                    ? 'bg-primary text-white shadow-md'
-                    : 'bg-card text-slate-600 hover:bg-slate-100 border border-border'
+                    ? 'bg-primary text-white shadow-[0_0_20px_rgba(99,102,241,0.3)]'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
                 }`}
               >
                 {secondaryTabs.find(t => t.id === activeTab)?.label || 'Más'}
@@ -531,6 +535,15 @@ export default function ClientPortal() {
       {onboardingStep === null && user && (
         <ProductTour userId={user.id} onNavigate={(tab) => setActiveTab(tab as TabType)} />
       )}
+
+      {/* Status Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl bg-background/80 border-t border-border px-6 py-2.5 hidden md:flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)] animate-pulse" />
+          <span>Plataformas conectadas</span>
+        </div>
+        <span>Steve v2.4</span>
+      </div>
 
       {/* Mobile Bottom Navigation */}
       <BottomNav

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { SteveMailEditor, type SteveMailEditorRef } from '../email/SteveMailEditor';
+import SteveMailEditor, { type SteveMailEditorRef } from '../email/SteveMailEditor';
 
 export interface EditorEmail {
   subject: string;

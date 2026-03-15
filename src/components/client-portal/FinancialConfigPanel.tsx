@@ -262,7 +262,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Margin Settings */}
-        <Card className="bg-card border border-border rounded-xl p-6">
+        <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm p-6">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Percent className="w-4 h-4" />
@@ -341,7 +341,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
               {Object.keys(config.product_margins).length > 0 && (
                 <div className="space-y-2 max-h-[150px] overflow-y-auto">
                   {Object.entries(config.product_margins).map(([sku, margin]) => (
-                    <div key={sku} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                    <div key={sku} className="flex items-center justify-between p-2 bg-white/[0.04] border border-white/[0.06] rounded-lg">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="font-mono text-xs">
                           {sku}
@@ -365,7 +365,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
         </Card>
 
         {/* Fixed Costs & Operational Costs */}
-        <Card className="bg-card border border-border rounded-xl p-6">
+        <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm p-6">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
@@ -433,7 +433,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
                 Agregar costo fijo
               </Button>
               {config.fixed_cost_items.length > 0 && (
-                <div className="flex justify-between items-center pt-2 border-t border-border">
+                <div className="flex justify-between items-center pt-2 border-t border-white/[0.08]">
                   <span className="text-sm font-medium">Total costos fijos</span>
                   <span className="font-semibold">
                     ${formatCLP(config.fixed_cost_items.reduce((sum, i) => sum + i.amount, 0))} CLP/mes
@@ -544,7 +544,7 @@ export function FinancialConfigPanel({ clientId }: FinancialConfigPanelProps) {
       </div>
 
       {/* Summary */}
-      <Card className="bg-muted/30">
+      <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm">
         <CardContent className="py-4">
           <div className="flex flex-wrap gap-6">
             <div>

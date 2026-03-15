@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export function KPICardSkeleton() {
   return (
-    <Card className="bg-card border rounded-xl">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <Skeleton className="h-4 w-28" />
         <Skeleton className="h-5 w-5 rounded" />
@@ -29,7 +29,7 @@ export function KPIGridSkeleton() {
 
 export function ChartSkeleton() {
   return (
-    <Card className="bg-card border rounded-xl">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl">
       <CardHeader>
         <Skeleton className="h-5 w-48" />
       </CardHeader>
@@ -42,7 +42,7 @@ export function ChartSkeleton() {
 
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <Card className="bg-card border rounded-xl">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl">
       <CardHeader>
         <Skeleton className="h-5 w-40" />
       </CardHeader>

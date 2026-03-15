@@ -25,7 +25,7 @@ export function ConversionLtvPanel({
       tooltip: 'Porcentaje de sesiones que terminan en compra. 1-3% es normal para ecommerce',
       icon: Percent,
       color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      bgColor: 'bg-blue-500/10',
     },
     {
       title: 'LTV Promedio',
@@ -34,7 +34,7 @@ export function ConversionLtvPanel({
       tooltip: 'Lifetime Value — valor promedio que genera un cliente a lo largo de su relación con tu marca',
       icon: DollarSign,
       color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      bgColor: 'bg-green-500/10',
     },
     {
       title: 'Clientes Totales',
@@ -43,7 +43,7 @@ export function ConversionLtvPanel({
       tooltip: 'Número total de clientes únicos que realizaron al menos una compra en el período',
       icon: Users,
       color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      bgColor: 'bg-purple-500/10',
     },
     {
       title: 'Clientes Recurrentes',
@@ -52,7 +52,7 @@ export function ConversionLtvPanel({
       tooltip: 'Porcentaje de clientes que han comprado más de una vez. Sobre 20% es bueno',
       icon: TrendingUp,
       color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      bgColor: 'bg-orange-500/10',
     },
   ];
 
@@ -64,7 +64,7 @@ export function ConversionLtvPanel({
       </h3>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {metrics.map((metric) => (
-        <Card key={metric.title} className="bg-card border border-border rounded-xl card-hover">
+        <Card key={metric.title} className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">

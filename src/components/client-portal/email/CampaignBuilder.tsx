@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
+import SteveMailEditor, { type SteveMailEditorRef } from './SteveMailEditor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

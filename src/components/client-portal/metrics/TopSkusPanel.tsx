@@ -19,7 +19,7 @@ export function TopSkusPanel({ skus, currency = 'CLP' }: TopSkusPanelProps) {
   const maxQuantity = skus.length > 0 ? Math.max(...skus.map((s) => s.quantity), 1) : 1;
 
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
       <CardHeader>
         <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Package className="w-4 h-4" />

@@ -119,7 +119,7 @@ function WhatsAppPreview({ cart, onSend }: { cart: AbandonedCart; onSend: () => 
       <textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        className="w-full h-40 text-xs p-3 rounded-lg border border-border bg-muted/30 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"
+        className="w-full h-40 text-xs p-3 rounded-lg border border-white/[0.08] bg-white/[0.06] resize-none focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"
         placeholder="Edita el mensaje o escribe el tuyo..."
       />
       <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
   const estimatedRecovery = Math.round(uncontactedValue * 0.12); // ~12% avg e-commerce recovery rate
 
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -242,26 +242,26 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
       <CardContent>
         {/* Dinero sobre la mesa */}
         {uncontactedValue > 0 && (
-          <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
+          <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-5 h-5 text-orange-600" />
-              <p className="font-semibold text-orange-800 dark:text-orange-300">Dinero sobre la mesa</p>
+              <p className="font-semibold text-orange-400">Dinero sobre la mesa</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-orange-600 dark:text-orange-400">Valor sin contactar</p>
-                <p className="text-2xl font-bold text-orange-800 dark:text-orange-200">${uncontactedValue.toLocaleString('es-CL')}</p>
+                <p className="text-xs text-orange-400">Valor sin contactar</p>
+                <p className="text-2xl font-bold text-orange-300">${uncontactedValue.toLocaleString('es-CL')}</p>
               </div>
               <div>
-                <p className="text-xs text-orange-600 dark:text-orange-400">Recuperable estimado (~12%)</p>
-                <p className="text-2xl font-bold text-green-700 dark:text-green-400">${estimatedRecovery.toLocaleString('es-CL')}</p>
+                <p className="text-xs text-orange-400">Recuperable estimado (~12%)</p>
+                <p className="text-2xl font-bold text-green-400">${estimatedRecovery.toLocaleString('es-CL')}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-white/[0.04] border border-white/[0.06] rounded-lg">
           <div>
             <p className="text-xs text-muted-foreground">Total carritos</p>
             <p className="text-xl font-bold">{stats.total}</p>
@@ -321,14 +321,14 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
               return (
                 <div
                   key={cart.id}
-                  className={`border rounded-lg hover:bg-muted/30 transition-colors ${
-                    isRecent && !cart.contacted ? 'border-orange-300 bg-orange-50/30' : 'border-border'
+                  className={`border rounded-lg hover:bg-white/[0.04] transition-colors ${
+                    isRecent && !cart.contacted ? 'border-orange-500/30 bg-orange-500/5' : 'border-white/[0.06]'
                   }`}
                 >
                   <div className="flex items-center justify-between p-3">
                     <div className="flex items-center gap-3">
                       <button
-                        className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+                        className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center hover:bg-white/[0.1] transition-colors"
                         onClick={() => cart.lineItems && cart.lineItems.length > 0 && toggleExpanded(cart.id)}
                         title={cart.lineItems?.length ? (isExpanded ? 'Ocultar productos' : 'Ver productos') : ''}
                       >
@@ -376,7 +376,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-500/10"
                                 title="Enviar WhatsApp"
                               >
                                 <MessageCircle className="w-4 h-4" />
@@ -433,7 +433,7 @@ export function AbandonedCartsPanel({ carts, currency = 'CLP', onUpdateContactSt
                   </div>
                   {/* Expandable line items */}
                   {isExpanded && cart.lineItems && cart.lineItems.length > 0 && (
-                    <div className="border-t border-border px-3 pb-3 pt-2">
+                    <div className="border-t border-white/[0.06] px-3 pb-3 pt-2">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Productos en el carrito:</p>
                       <div className="space-y-1">
                         {cart.lineItems.map((item, idx) => (

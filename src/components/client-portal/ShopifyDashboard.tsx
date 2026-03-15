@@ -161,7 +161,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   if (!hasConnection) {
     return (
-      <Card className="bg-card border border-border rounded-xl card-hover">
+      <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
         <CardContent className="py-12 text-center">
           <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">Conecta Shopify en la pestaña "Conexiones" para ver tu dashboard</p>
@@ -196,10 +196,10 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const abandonedValue = abandonedCarts.reduce((s, c) => s + c.totalValue, 0);
 
   const shopifyKpis = [
-    { title: 'Ingresos del Período', value: `$${Math.round(shopifyTotalRevenue).toLocaleString('es-CL')}`, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-100', tooltip: 'Ingresos totales de tu tienda Shopify en el período seleccionado' },
-    { title: 'Pedidos', value: shopifyTotalOrders.toLocaleString('es-CL'), icon: Package, color: 'text-blue-600', bgColor: 'bg-blue-100', tooltip: 'Cantidad de pedidos completados en el período' },
-    { title: 'Ticket Promedio', value: shopifyTotalOrders > 0 ? `$${Math.round(shopifyAov).toLocaleString('es-CL')}` : '—', icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-100', tooltip: 'Valor promedio de cada pedido. Aumentarlo es clave para crecer sin necesitar más clientes' },
-    { title: 'Dinero en Carritos', value: `$${Math.round(abandonedValue).toLocaleString('es-CL')}`, subtitle: `${abandonedCarts.length} carritos abandonados`, icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', tooltip: 'Valor total de carritos abandonados. Contacta a estos clientes por WhatsApp o email para recuperar ventas' },
+    { title: 'Ingresos del Período', value: `$${Math.round(shopifyTotalRevenue).toLocaleString('es-CL')}`, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-500/10', tooltip: 'Ingresos totales de tu tienda Shopify en el período seleccionado' },
+    { title: 'Pedidos', value: shopifyTotalOrders.toLocaleString('es-CL'), icon: Package, color: 'text-blue-600', bgColor: 'bg-blue-500/10', tooltip: 'Cantidad de pedidos completados en el período' },
+    { title: 'Ticket Promedio', value: shopifyTotalOrders > 0 ? `$${Math.round(shopifyAov).toLocaleString('es-CL')}` : '—', icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-500/10', tooltip: 'Valor promedio de cada pedido. Aumentarlo es clave para crecer sin necesitar más clientes' },
+    { title: 'Dinero en Carritos', value: `$${Math.round(abandonedValue).toLocaleString('es-CL')}`, subtitle: `${abandonedCarts.length} carritos abandonados`, icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-500/10', tooltip: 'Valor total de carritos abandonados. Contacta a estos clientes por WhatsApp o email para recuperar ventas' },
   ] as const;
 
   const formatCurrency = (value: number) => {
@@ -235,7 +235,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {shopifyKpis.map((kpi) => (
-          <Card key={kpi.title} className="bg-card border border-border rounded-xl card-hover">
+          <Card key={kpi.title} className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -267,7 +267,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       {/* Daily Sales Chart */}
       {dailyBreakdown.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-card border border-border rounded-xl card-hover">
+          <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <TrendingUp className="w-4 h-4" />
@@ -316,7 +316,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
           </Card>
 
           {/* Abandoned Carts by Day */}
-          <Card className="bg-card border border-border rounded-xl card-hover">
+          <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
@@ -372,7 +372,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       )}
 
       {/* Ventas por Canal */}
-      <Card className="bg-card border border-border rounded-xl card-hover">
+      <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Globe className="w-4 h-4" />
@@ -420,7 +420,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       </div>
 
       {/* UTMs con más ventas */}
-      <Card className="bg-card border border-border rounded-xl card-hover">
+      <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Link2 className="w-4 h-4" />
@@ -463,7 +463,7 @@ function UtmTable({ utmPerformance }: { utmPerformance: UtmData[] }) {
   });
 
   const headerRow = (
-    <tr className="border-b">
+    <tr className="border-b border-white/[0.06] bg-white/[0.04]">
       <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Fuente</th>
       <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Medio</th>
       <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Campaña</th>
@@ -473,7 +473,7 @@ function UtmTable({ utmPerformance }: { utmPerformance: UtmData[] }) {
   );
 
   const renderRow = (utm: UtmData, i: number) => (
-    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+    <tr key={i} className="border-b border-white/[0.06] hover:bg-white/[0.04] transition-colors">
       <td className="py-2 pr-4">
         <Badge variant="outline" className="text-xs">{utm.source || '—'}</Badge>
       </td>
@@ -511,7 +511,7 @@ function UtmTable({ utmPerformance }: { utmPerformance: UtmData[] }) {
                 return (
                   <tr
                     key={virtualRow.key}
-                    className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                    className="border-b border-white/[0.06] hover:bg-white/[0.04] transition-colors"
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -545,7 +545,7 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
 
   if (products.length === 0) {
     return (
-      <Card className="bg-card border border-border rounded-xl card-hover">
+      <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Search className="w-4 h-4" />
@@ -634,7 +634,7 @@ function SeoAnalysisCard({ products }: { products: any[] }) {
   };
 
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>

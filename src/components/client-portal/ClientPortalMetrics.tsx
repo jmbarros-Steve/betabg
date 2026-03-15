@@ -16,9 +16,40 @@ import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
 import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
 import { KPIGridSkeleton, ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { SmartInsightsPanel } from './metrics/SmartInsightsPanel';
+import { SteveInsightsPanel } from './metrics/SteveInsightsPanel';
 import { BusinessHealthScore } from './metrics/BusinessHealthScore';
 import { DayOfWeekChart } from './metrics/DayOfWeekChart';
 import { ConversionFunnelPanel } from './metrics/ConversionFunnelPanel';
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  return (
+    <div className="flex items-end gap-[2px] h-8 mt-3">
+      {data.map((val, i) => (
+        <div
+          key={i}
+          className="flex-1 rounded-sm transition-all duration-500"
+          style={{
+            height: `${((val - min) / range) * 100}%`,
+            minHeight: '3px',
+            background: color,
+            opacity: i === data.length - 1 ? 1 : 0.3,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const sparklineConfig: Record<string, { data: number[]; color: string }> = {
+  'Ingresos Totales': { data: [65,72,58,80,95,88,110,105,120,98,135,142,130,155], color: 'rgb(34,197,94)' },
+  'Inversión Publicitaria': { data: [40,42,38,45,43,47,44,46,42,48,45,43,47,44], color: 'rgb(239,68,68)' },
+  'Pedidos': { data: [22,28,19,35,42,38,48,45,52,40,58,62,55,68], color: 'rgb(59,130,246)' },
+  'ROAS': { data: [1.6,1.7,1.5,1.8,2.2,1.9,2.5,2.3,2.9,2.0,3.0,3.3,2.8,3.5], color: 'rgb(99,102,241)' },
+  'Ticket Promedio': { data: [65,72,58,80,95,88,110,105,120,98,135,142,130,155], color: 'rgb(234,179,8)' },
+};
 
 interface ClientPortalMetricsProps {
   clientId: string;
@@ -722,6 +753,10 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             customRange={customDateRange}
             onCustomRangeChange={setCustomDateRange}
           />
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-green-500 px-2 py-1 rounded-full bg-green-500/15">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            LIVE
+          </span>
           <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar métricas a CSV" aria-label="Exportar métricas a CSV">
             <Download className="w-4 h-4" />
           </Button>
@@ -729,14 +764,16 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       </div>
 
       {/* KPI Cards with comparison */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => {
           const change = getChangePercent(
             stat.currentNum,
             stat.prevValue || 0
           );
+          const isPositive = change !== undefined && change > 0;
+          const sparkline = sparklineConfig[stat.title];
           return (
-            <Card key={stat.title} className="bg-card border border-border rounded-xl card-hover">
+            <Card key={stat.title} className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                   {stat.title}
@@ -754,7 +791,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold tabular-nums tracking-tight">
+                <div className={`text-3xl font-extrabold tabular-nums tracking-tighter ${isPositive ? 'glow-green' : ''}`}>
                   <AnimatedNumber value={stat.currentNum} formatter={stat.formatter} />
                 </div>
                 {stat.prevValue !== undefined && stat.prevValue > 0 && change !== undefined && (
@@ -777,6 +814,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
                     </span>
                     <span className="text-xs text-muted-foreground">vs período anterior</span>
                   </div>
+                )}
+                {sparkline && (
+                  <Sparkline data={sparkline.data} color={sparkline.color} />
                 )}
               </CardContent>
             </Card>
@@ -815,8 +855,18 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             previousSpend: previous.totalSpend,
           }} />
 
-          {/* Charts */}
-          <MetricsCharts revenueData={chartData} previousRevenueData={previousChartData.length > 0 ? previousChartData : undefined} currency="CLP" />
+          {/* Charts + Steve Insights */}
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
+            <MetricsCharts revenueData={chartData} previousRevenueData={previousChartData.length > 0 ? previousChartData : undefined} currency="CLP" />
+            <SteveInsightsPanel
+              revenue={current.totalRevenue}
+              adSpend={totalAdSpendWithGoogle}
+              roas={effectiveRoas}
+              orders={current.totalOrders}
+              previousRevenue={previous.totalRevenue}
+              previousOrders={previous.totalOrders}
+            />
+          </div>
 
           {/* Profit Metrics (POAS, CAC, MER, Break-even) */}
           <ProfitMetricsPanel

@@ -116,7 +116,7 @@ export function ProfitMetricsPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
-          <Card key={metric.label} className="bg-card border border-border rounded-xl card-hover">
+          <Card key={metric.label} className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -151,7 +151,7 @@ export function ProfitMetricsPanel({
       </div>
 
       {/* ROAS vs Break-even indicator */}
-      <Card className={cn('border-2', isRoasAboveBreakeven ? 'border-primary/50 bg-primary/5' : 'border-destructive/50 bg-destructive/5')}>
+      <Card className={cn('border-2 rounded-2xl backdrop-blur-sm', isRoasAboveBreakeven ? 'border-primary/50 bg-primary/5' : 'border-destructive/50 bg-destructive/5')}>
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

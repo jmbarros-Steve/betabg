@@ -8,6 +8,25 @@ interface MetricsChartsProps {
   currency?: string;
 }
 
+const darkTooltipStyle = {
+  background: 'rgba(10,10,15,0.9)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: '12px',
+  backdropFilter: 'blur(12px)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+  color: '#f0f0f5',
+  fontSize: '12px',
+  padding: '12px 16px',
+};
+
+const darkTooltipLabelStyle = { color: 'rgba(255,255,255,0.5)', marginBottom: '4px' };
+
+const darkAxisTick = (fontSize: number) => ({ fill: 'rgba(255,255,255,0.4)', fontSize });
+const darkAxisLine = { stroke: 'rgba(255,255,255,0.06)' };
+const darkGridStroke = 'rgba(255,255,255,0.04)';
+
+const cardClass = 'bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm';
+
 export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CLP' }: MetricsChartsProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
@@ -20,8 +39,9 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
   const tickFontSize = isMobile ? 10 : 12;
   const xAxisProps = {
     dataKey: "date" as const,
-    tick: { fontSize: tickFontSize },
-    className: "text-muted-foreground",
+    tick: darkAxisTick(tickFontSize),
+    axisLine: darkAxisLine,
+    tickLine: darkAxisLine,
     tickFormatter: (val: string) => val.slice(5),
     interval: isMobile ? ('preserveStartEnd' as const) : (0 as const),
     angle: isMobile ? -45 : 0,
@@ -47,10 +67,26 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
     }));
   }, [revenueData, previousRevenueData]);
 
+  const gradientDefs = (
+    <>
+      <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
+        <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+      </linearGradient>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </>
+  );
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Revenue vs Spend Chart */}
-      <Card className="bg-card border border-border rounded-xl card-hover">
+      <Card className={cardClass}>
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-foreground">
             {hasSpendData ? 'Ingresos vs Inversión por Día' : 'Ingresos por Día'}
@@ -61,38 +97,30 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
             {hasSpendData ? (
               <ComposedChart data={mergedData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
                 <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
-                  </linearGradient>
+                  {gradientDefs}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <CartesianGrid strokeDasharray="3 3" stroke={darkGridStroke} />
                 <XAxis {...xAxisProps} />
                 <YAxis
                   yAxisId="left"
-                  tick={{ fontSize: tickFontSize }}
-                  className="text-muted-foreground"
+                  tick={darkAxisTick(tickFontSize)}
+                  axisLine={darkAxisLine}
+                  tickLine={darkAxisLine}
                   tickFormatter={formatCurrency}
                   width={isMobile ? 45 : 60}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: tickFontSize }}
-                  className="text-muted-foreground"
+                  tick={darkAxisTick(tickFontSize)}
+                  axisLine={darkAxisLine}
+                  tickLine={darkAxisLine}
                   tickFormatter={formatCurrency}
                   width={isMobile ? 45 : 60}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
+                  contentStyle={darkTooltipStyle}
+                  labelStyle={darkTooltipLabelStyle}
                   formatter={(value: number, name: string) => [
                     `$${value.toLocaleString('es-CL')} ${currency}`,
                     name === 'prevRevenue' ? 'Período anterior' : name === 'revenue' ? 'Ingresos' : 'Inversión'
@@ -106,19 +134,20 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                   yAxisId="left"
                   type="monotone"
                   dataKey="revenue"
-                  stroke="hsl(var(--primary))"
+                  stroke="#6366f1"
                   strokeWidth={2}
                   fillOpacity={1}
-                  fill="url(#colorRevenue)"
+                  fill="url(#gradRevenue)"
                   name="revenue"
+                  filter="url(#glow)"
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="spend"
-                  stroke="hsl(var(--destructive))"
+                  stroke="#f59e0b"
                   strokeWidth={2}
-                  strokeDasharray="5 5"
+                  strokeOpacity={0.7}
                   dot={false}
                   name="spend"
                 />
@@ -127,7 +156,7 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                     yAxisId="left"
                     type="monotone"
                     dataKey="prevRevenue"
-                    stroke="#94a3b8"
+                    stroke="rgba(255,255,255,0.15)"
                     strokeDasharray="5 5"
                     strokeWidth={1.5}
                     dot={false}
@@ -139,25 +168,20 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
             ) : (
               <ComposedChart data={mergedData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
                 <defs>
-                  <linearGradient id="colorRevenueSingle" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
+                  {gradientDefs}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <CartesianGrid strokeDasharray="3 3" stroke={darkGridStroke} />
                 <XAxis {...xAxisProps} />
                 <YAxis
-                  tick={{ fontSize: tickFontSize }}
-                  className="text-muted-foreground"
+                  tick={darkAxisTick(tickFontSize)}
+                  axisLine={darkAxisLine}
+                  tickLine={darkAxisLine}
                   tickFormatter={formatCurrency}
                   width={isMobile ? 45 : 60}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
+                  contentStyle={darkTooltipStyle}
+                  labelStyle={darkTooltipLabelStyle}
                   formatter={(value: number, name: string) => [
                     `$${value.toLocaleString('es-CL')} ${currency}`,
                     name === 'prevRevenue' ? 'Período anterior' : 'Ingresos'
@@ -170,16 +194,17 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
                 <Area
                   type="monotone"
                   dataKey="revenue"
-                  stroke="hsl(var(--primary))"
+                  stroke="#6366f1"
                   strokeWidth={2}
                   fillOpacity={1}
-                  fill="url(#colorRevenueSingle)"
+                  fill="url(#gradRevenue)"
+                  filter="url(#glow)"
                 />
                 {hasPreviousData && (
                   <Line
                     type="monotone"
                     dataKey="prevRevenue"
-                    stroke="#94a3b8"
+                    stroke="rgba(255,255,255,0.15)"
                     strokeDasharray="5 5"
                     strokeWidth={1.5}
                     dot={false}
@@ -193,19 +218,19 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
           {(hasSpendData || hasPreviousData) && (
             <div className={`flex items-center justify-center ${isMobile ? 'gap-4' : 'gap-6'} mt-4 text-xs flex-wrap`}>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-primary" />
-                <span className="text-muted-foreground">Ingresos</span>
+                <div className="w-3 h-3 rounded-full" style={{ background: '#6366f1' }} />
+                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Ingresos</span>
               </div>
               {hasSpendData && (
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-0" style={{ borderTop: '2px dashed hsl(var(--destructive))' }} />
-                  <span className="text-muted-foreground">Inversión Publicitaria</span>
+                  <div className="w-5 h-0" style={{ borderTop: '2px dashed #f59e0b' }} />
+                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>Inversión Publicitaria</span>
                 </div>
               )}
               {hasPreviousData && (
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-0.5" style={{ borderTop: '2px dashed #94a3b8' }} />
-                  <span className="text-muted-foreground">Período anterior</span>
+                  <div className="w-6 h-0.5" style={{ borderTop: '2px dashed rgba(255,255,255,0.15)' }} />
+                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>Período anterior</span>
                 </div>
               )}
             </div>
@@ -214,7 +239,7 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
       </Card>
 
       {/* Orders Chart */}
-      <Card className="bg-card border border-border rounded-xl card-hover">
+      <Card className={cardClass}>
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-foreground">
             Órdenes por Día
@@ -223,15 +248,16 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
         <CardContent>
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: isMobile ? 20 : 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid strokeDasharray="3 3" stroke={darkGridStroke} />
               <XAxis {...xAxisProps} />
-              <YAxis tick={{ fontSize: tickFontSize }} className="text-muted-foreground" />
+              <YAxis
+                tick={darkAxisTick(tickFontSize)}
+                axisLine={darkAxisLine}
+                tickLine={darkAxisLine}
+              />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
+                contentStyle={darkTooltipStyle}
+                labelStyle={darkTooltipLabelStyle}
                 formatter={(value: number) => [value.toLocaleString('es-CL'), 'Órdenes']}
                 labelFormatter={(label: string) => {
                     const d = new Date(label + 'T12:00:00');
@@ -240,9 +266,8 @@ export function MetricsCharts({ revenueData, previousRevenueData, currency = 'CL
               />
               <Bar
                 dataKey="orders"
-                fill="hsl(var(--primary))"
+                fill="rgba(59,130,246,0.5)"
                 radius={[4, 4, 0, 0]}
-                opacity={0.8}
               />
             </BarChart>
           </ResponsiveContainer>

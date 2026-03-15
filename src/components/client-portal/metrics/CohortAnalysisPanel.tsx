@@ -29,7 +29,7 @@ function getRetentionColor(rate: number): string {
 
 export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
       <CardHeader>
         <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Users className="w-4 h-4" />
@@ -58,7 +58,7 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr>
+              <tr className="bg-white/[0.04]">
                 <th className="text-left py-2 px-3 text-muted-foreground font-medium">Mes</th>
                 <th className="text-center py-2 px-3 text-muted-foreground font-medium">Nuevos</th>
                 {[1, 2, 3, 4, 5].map((m) => (
@@ -70,7 +70,7 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
             </thead>
             <tbody>
               {cohorts.map((cohort) => (
-                <tr key={cohort.cohort} className="border-t border-border">
+                <tr key={cohort.cohort} className="border-t border-white/[0.06]">
                   <td className="py-2 px-3 font-medium whitespace-nowrap">{cohort.cohort}</td>
                   <td className="py-2 px-3 text-center">
                     <span className="px-2 py-1 rounded text-xs font-semibold bg-primary/10 text-primary">

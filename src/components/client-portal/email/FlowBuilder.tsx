@@ -13,7 +13,7 @@ import {
   GitBranch, Plus, Play, Pause, Trash2, Edit, Loader2, Clock, Mail, ArrowDown,
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Eye, Bell, TrendingDown, Split,
 } from 'lucide-react';
-import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
+import SteveMailEditor, { type SteveMailEditorRef } from './SteveMailEditor';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 

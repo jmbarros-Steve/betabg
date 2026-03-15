@@ -72,7 +72,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
   const [showProductDetail, setShowProductDetail] = useState(false);
 
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-white/[0.04] border border-white/[0.08] rounded-2xl backdrop-blur-sm hover:bg-white/[0.07] hover:border-white/[0.12] transition-all">
       <CardHeader>
         <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
           <FileText className="w-5 h-5" />
@@ -133,7 +133,7 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
             <CollapsibleContent>
               {productBreakdown && productBreakdown.length > 0 ? (
                 <div className="mt-3 space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs text-muted-foreground pb-1 border-b border-border/50 px-1">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs text-muted-foreground pb-1 border-b border-white/[0.06] px-1">
                     <span>Producto</span>
                     <span className="text-right w-20">Ingreso</span>
                     <span className="text-right w-20">Costo</span>
@@ -142,13 +142,13 @@ export function ProfitLossPanel({ data, previousData, currency = 'CLP', periodLa
                   {productBreakdown.map((product, index) => (
                     <div
                       key={index}
-                      className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-xs py-1.5 px-1 rounded hover:bg-muted/50 transition-colors"
+                      className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-xs py-1.5 px-1 rounded hover:bg-white/[0.04] transition-colors"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {product.image ? (
                           <img src={product.image} alt="" className="w-6 h-6 rounded object-cover shrink-0" />
                         ) : (
-                          <div className="w-6 h-6 rounded bg-muted flex items-center justify-center shrink-0">
+                          <div className="w-6 h-6 rounded bg-white/[0.06] flex items-center justify-center shrink-0">
                             <Package className="w-3 h-3 text-muted-foreground" />
                           </div>
                         )}
