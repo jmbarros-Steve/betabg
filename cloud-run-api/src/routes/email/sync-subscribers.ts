@@ -219,15 +219,27 @@ export async function syncSubscribers(c: Context) {
 
       if (error) return c.json({ error: error.message }, 500);
 
-      // Count by status
-      const { data: counts } = await supabase.rpc('exec_sql', {
-        query: `
-          SELECT status, count(*) as count
-          FROM email_subscribers
-          WHERE client_id = '${client_id}'
-          GROUP BY status
-        `,
-      });
+      // Count by status (using parameterized query builder instead of raw SQL)
+      const { data: subscribedCount } = await supabase
+        .from('email_subscribers')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', client_id)
+        .eq('status', 'subscribed');
+      const { data: _uC, count: unsubscribedCount } = await supabase
+        .from('email_subscribers')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', client_id)
+        .eq('status', 'unsubscribed');
+      const { data: _bC, count: bouncedCount } = await supabase
+        .from('email_subscribers')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', client_id)
+        .eq('status', 'bounced');
+      const counts = [
+        { status: 'subscribed', count: subscribedCount || 0 },
+        { status: 'unsubscribed', count: unsubscribedCount || 0 },
+        { status: 'bounced', count: bouncedCount || 0 },
+      ];
 
       // Simple count approach
       const { count: total } = await supabase

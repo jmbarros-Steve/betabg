@@ -76,6 +76,16 @@ export async function trackClick(c: Context) {
 
   const decodedUrl = decodeURIComponent(targetUrl);
 
+  // Validate redirect URL to prevent open redirect attacks
+  try {
+    const parsed = new URL(decodedUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return c.text('Invalid URL protocol', 400);
+    }
+  } catch {
+    return c.text('Invalid URL', 400);
+  }
+
   if (eventId) {
     // Fire-and-forget: record click then redirect
     const supabase = getSupabaseAdmin();
@@ -133,7 +143,14 @@ export async function sesWebhooks(c: Context) {
   if (body.Type === 'SubscriptionConfirmation') {
     console.log('SNS subscription confirmation received, confirming...');
     if (body.SubscribeURL) {
-      await fetch(body.SubscribeURL);
+      // Validate that SubscribeURL is a legitimate AWS SNS endpoint to prevent SSRF
+      const snsUrlPattern = /^https:\/\/sns\.[a-z0-9-]+\.amazonaws\.com\//;
+      if (snsUrlPattern.test(body.SubscribeURL)) {
+        await fetch(body.SubscribeURL);
+      } else {
+        console.error('[ses-webhooks] Rejected suspicious SubscribeURL:', body.SubscribeURL);
+        return c.json({ error: 'Invalid SubscribeURL' }, 400);
+      }
     }
     return c.json({ confirmed: true });
   }
