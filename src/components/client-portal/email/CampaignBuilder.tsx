@@ -879,6 +879,16 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </Button>
               <div className="w-px h-5 bg-zinc-200" />
               <GlobalStylesPanel editorRef={emailEditorRef} />
+              <div className="w-px h-5 bg-zinc-200" />
+              <Button
+                size="sm"
+                variant={showConditionalPanel ? 'default' : 'ghost'}
+                className="h-7 px-2 text-xs"
+                onClick={() => setShowConditionalPanel(!showConditionalPanel)}
+                title="Contenido condicional"
+              >
+                <Eye className="w-3.5 h-3.5 mr-1" /> Condicional
+              </Button>
               {emailSizeBytes > 0 && (
                 <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                   emailSizeBytes > GMAIL_CLIP_LIMIT ? 'bg-red-100 text-red-700 font-medium'
