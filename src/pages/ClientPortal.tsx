@@ -89,15 +89,9 @@ export default function ClientPortal() {
   const displayClient = isAdminView ? adminViewClient : clientData;
   const effectiveClientId = isAdminView ? urlClientId : clientData?.id;
 
-  // Check if this is first visit for onboarding
+  // Onboarding disabled — will rebuild properly later
   useEffect(() => {
-    if (user && isClient && !isAdminView) {
-      const onboardingKey = `bg_onboarding_${user.id}`;
-      const hasSeenOnboarding = localStorage.getItem(onboardingKey);
-      if (!hasSeenOnboarding) {
-        setShowOnboarding(true);
-      }
-    }
+    // setShowOnboarding(false) — onboarding off
   }, [user, isClient, isAdminView]);
 
   // Claridad de sesión: mostrar una vez al entrar al portal que la sesión está activa
