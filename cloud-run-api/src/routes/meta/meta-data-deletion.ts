@@ -62,14 +62,19 @@ export async function metaDataDeletion(c: Context) {
       signedRequest = params.get('signed_request') || '';
     }
 
-    let userId = 'unknown';
-
-    if (signedRequest && metaAppSecret) {
-      const data = await parseSignedRequest(signedRequest, metaAppSecret);
-      if (data?.user_id) {
-        userId = String(data.user_id);
-      }
+    // Signature verification is mandatory for GDPR compliance
+    if (!signedRequest || !metaAppSecret) {
+      console.error('[meta-data-deletion] Missing signed_request or META_APP_SECRET');
+      return c.json({ error: 'Invalid request: missing signature' }, 400);
     }
+
+    const signedData = await parseSignedRequest(signedRequest, metaAppSecret);
+    if (!signedData) {
+      console.error('[meta-data-deletion] Signature verification failed');
+      return c.json({ error: 'Invalid signature' }, 403);
+    }
+
+    const userId = signedData.user_id ? String(signedData.user_id) : 'unknown';
 
     // Generate a unique confirmation code
     const confirmationCode = randomUUID();

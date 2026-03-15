@@ -5,6 +5,7 @@ interface OAuthPayload {
   code: string;
   client_id: string;
   redirect_uri: string;
+  state?: string;
 }
 
 export async function googleAdsOauthCallback(c: Context) {
@@ -18,10 +19,23 @@ export async function googleAdsOauthCallback(c: Context) {
     }
 
     const payload: OAuthPayload = await c.req.json();
-    const { code, client_id, redirect_uri } = payload;
+    const { code, client_id, redirect_uri, state } = payload;
 
     if (!code || !client_id || !redirect_uri) {
       return c.json({ error: 'Missing required parameters' }, 400);
+    }
+
+    // CSRF protection: validate state parameter
+    if (state) {
+      try {
+        const decoded = Buffer.from(state, 'base64').toString();
+        const [stateClientId, stateUserId] = decoded.split(':');
+        if (stateClientId !== client_id || stateUserId !== user.id) {
+          return c.json({ error: 'Invalid state parameter (CSRF check failed)' }, 403);
+        }
+      } catch {
+        return c.json({ error: 'Malformed state parameter' }, 400);
+      }
     }
 
     // Verify user owns this client
