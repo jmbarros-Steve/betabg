@@ -27,7 +27,7 @@ import {
   Search,
   Loader2,
   X,
-  MousePointerSquare,
+  MousePointerClick,
   FileDown,
 } from 'lucide-react';
 import { type SteveMailEditorRef } from './SteveMailEditor';
@@ -280,7 +280,7 @@ export function UniversalBlocksPanel({
             onClick={() => openSaveDialog('selection')}
             disabled={!editor}
           >
-            <MousePointerSquare className="h-4 w-4 mr-2" />
+            <MousePointerClick className="h-4 w-4 mr-2" />
             Guardar sección seleccionada
           </Button>
           <Button
