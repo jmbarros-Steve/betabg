@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Mail, MousePointerClick, AlertTriangle, Loader2, DollarSign, Eye, ArrowLeft, Users, TrendingUp, Link2, BarChart3, ShieldCheck } from 'lucide-react';
+import { Mail, MousePointerClick, AlertTriangle, Loader2, DollarSign, Eye, ArrowLeft, Users, TrendingUp, Link2, BarChart3, ShieldCheck, Target } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 interface EmailAnalyticsProps {
@@ -85,6 +85,29 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
         open_rate: parseFloat(c.open_rate || 0),
         click_rate: parseFloat(c.click_rate || 0),
       }));
+  }, [overview]);
+
+  // Industry benchmarks (ecommerce averages from Mailchimp/Klaviyo reports)
+  const BENCHMARKS = {
+    open_rate: 20.0,
+    click_rate: 2.5,
+    bounce_rate: 0.4,
+    unsubscribe_rate: 0.2,
+  };
+
+  const benchmarkComparison = useMemo(() => {
+    if (!overview?.aggregate) return null;
+    const agg = overview.aggregate;
+    const sent = agg.total_sent || 0;
+    if (sent === 0) return null;
+    const unsubRate = sent > 0 ? ((agg.total_unsubscribed || 0) / sent) * 100 : 0;
+    const metrics = [
+      { label: 'Tasa de apertura', client: parseFloat(agg.open_rate), benchmark: BENCHMARKS.open_rate, unit: '%', higherBetter: true },
+      { label: 'Tasa de clicks', client: parseFloat(agg.click_rate), benchmark: BENCHMARKS.click_rate, unit: '%', higherBetter: true },
+      { label: 'Tasa de rebote', client: parseFloat(agg.bounce_rate), benchmark: BENCHMARKS.bounce_rate, unit: '%', higherBetter: false },
+      { label: 'Tasa de baja', client: parseFloat(unsubRate.toFixed(2)), benchmark: BENCHMARKS.unsubscribe_rate, unit: '%', higherBetter: false },
+    ];
+    return metrics;
   }, [overview]);
 
   if (loading) {
@@ -332,6 +355,68 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
           <span className="text-muted-foreground">Nuevos:</span>
           <span className="font-semibold text-green-600">+{subscribers.new_in_period ?? 0}</span>
         </div>
+      )}
+
+      {/* Industry Benchmarks Comparison */}
+      {benchmarkComparison && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-base">Comparativo con industria</CardTitle>
+            </div>
+            <CardDescription>Tu rendimiento vs promedio ecommerce</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {benchmarkComparison.map((m) => {
+                const maxVal = Math.max(m.client, m.benchmark) * 1.3 || 1;
+                const clientPct = (m.client / maxVal) * 100;
+                const benchPct = (m.benchmark / maxVal) * 100;
+                const isGood = m.higherBetter ? m.client >= m.benchmark : m.client <= m.benchmark;
+                const diff = m.higherBetter ? m.client - m.benchmark : m.benchmark - m.client;
+                const diffPct = m.benchmark > 0 ? ((diff / m.benchmark) * 100).toFixed(0) : '0';
+                return (
+                  <div key={m.label} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{m.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${isGood ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'}`}>
+                          {isGood ? '+' : ''}{diffPct}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-16">T{'\u00FA'}</span>
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${isGood ? 'bg-green-500' : 'bg-red-400'}`}
+                            style={{ width: `${Math.min(clientPct, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold w-14 text-right">{m.client}{m.unit}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-16">Industria</span>
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all bg-slate-400"
+                            style={{ width: `${Math.min(benchPct, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-muted-foreground w-14 text-right">{m.benchmark}{m.unit}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-4 pt-2 border-t">
+              Benchmarks basados en promedios de ecommerce (Mailchimp/Klaviyo 2025)
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Engagement Timeline Chart */}
