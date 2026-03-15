@@ -233,11 +233,13 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         ? connections.map(c => c.id) 
         : [selectedConnection];
 
+      const minDate = new Date(Date.now() - daysFromRange(dateRange) * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('campaign_recommendations')
         .select('*')
         .in('connection_id', connectionIds)
         .eq('is_dismissed', false)
+        .gte('created_at', minDate)
         .order('priority', { ascending: true });
 
       if (error) throw error;
@@ -865,10 +867,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
             const dailyMap = new Map<string, { date: string; spend: number; revenue: number; conversions: number }>();
             const filteredMetrics = selectedConnection === 'all'
               ? metrics
-              : metrics.filter(m => {
-                  const conn = connections.find(c => c.id === selectedConnection);
-                  return conn && m.platform === conn.platform;
-                });
+              : metrics.filter(m => (m as any).connection_id === selectedConnection);
             filteredMetrics.forEach(m => {
               const existing = dailyMap.get(m.metric_date) || { date: m.metric_date, spend: 0, revenue: 0, conversions: 0 };
               existing.spend += m.spend || 0;
