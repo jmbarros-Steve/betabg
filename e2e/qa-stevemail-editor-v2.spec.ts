@@ -156,10 +156,14 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     // Newsletter preset adds more blocks (Section, Button, Text, Image, etc.)
     expect(blockCheckResult.totalBlocks).toBeGreaterThanOrEqual(10);
 
-    // Try clicking a block to add it to canvas
-    const productsBlock = page.locator('.gjs-block').filter({ hasText: /Productos/i }).first();
-    if (await productsBlock.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await productsBlock.click({ force: true });
+    // Try clicking a block to add it to canvas (use evaluate — block may be outside viewport)
+    const addedBlock = await page.evaluate(() => {
+      const block = Array.from(document.querySelectorAll('.gjs-block'))
+        .find(b => /Productos/i.test(b.textContent || ''));
+      if (block) { (block as HTMLElement).click(); return true; }
+      return false;
+    });
+    if (addedBlock) {
       await page.waitForTimeout(2000);
       console.log('[QA] Added Productos block to canvas');
     }
