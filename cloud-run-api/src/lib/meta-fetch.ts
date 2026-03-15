@@ -43,7 +43,27 @@ export async function metaApiFetch(
   fetchOptions.signal = controller.signal;
 
   try {
-    return await fetch(url.toString(), fetchOptions);
+    const response = await fetch(url.toString(), fetchOptions);
+
+    // Handle rate limiting (HTTP 429) with exponential backoff
+    if (response.status === 429) {
+      clearTimeout(timeoutId);
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
+      const waitMs = Math.min(retryAfter * 1000, 30000);
+      console.warn(`[meta-fetch] Rate limited (429), waiting ${waitMs}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+
+      // Retry once
+      const retryController = new AbortController();
+      const retryTimeoutId = setTimeout(() => retryController.abort(), timeout);
+      try {
+        return await fetch(url.toString(), { ...fetchOptions, signal: retryController.signal });
+      } finally {
+        clearTimeout(retryTimeoutId);
+      }
+    }
+
+    return response;
   } finally {
     clearTimeout(timeoutId);
   }
