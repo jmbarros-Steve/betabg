@@ -1,0 +1,114 @@
+name: JIT Tests (AI-Generated)
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  jit-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          DIFF=$(git diff origin/main...HEAD -- '*.ts' '*.tsx' ':!*.spec.*' ':!*.test.*' | head -500)
+          echo "diff<<DIFFEOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "DIFFEOF" >> $GITHUB_OUTPUT
+
+      - name: Generate JIT tests with Claude
+        id: generate
+        if: steps.diff.outputs.diff != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          DIFF='${{ steps.diff.outputs.diff }}'
+          
+          PROMPT="Basado en este diff de código de una app React + Playwright, genera EXACTAMENTE 5 tests de Playwright que verifiquen los cambios. La app está en https://betabgnuevosupa.vercel.app. Responde SOLO con código TypeScript válido, sin markdown, sin explicaciones. Usa import { test, expect } from '@playwright/test'. Cada test debe ser independiente.
+
+          DIFF:
+          ${DIFF}"
+
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "{
+              \"model\": \"claude-haiku-4-5-20241022\",
+              \"max_tokens\": 4096,
+              \"messages\": [{\"role\": \"user\", \"content\": $(echo "$PROMPT" | jq -Rs .)}]
+            }")
+
+          CODE=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+
+          if [ -z "$CODE" ]; then
+            echo "Claude did not respond. Skipping JIT tests."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "$CODE" > e2e/_jit-pr-tests.spec.ts
+          echo "skipped=false" >> $GITHUB_OUTPUT
+
+      - name: Run JIT tests
+        id: jit
+        if: steps.generate.outputs.skipped != 'true'
+        continue-on-error: true
+        run: |
+          npx playwright test e2e/_jit-pr-tests.spec.ts --reporter=line 2>&1 | tee /tmp/jit-results.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          TEST_BASE_URL: https://betabgnuevosupa.vercel.app
+
+      - name: Comment on PR
+        if: steps.generate.outputs.skipped != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('/tmp/jit-results.txt', 'utf8');
+            const passed = results.includes('passed') && !results.includes('failed');
+            
+            const emoji = passed ? '✅' : '❌';
+            const status = passed ? 'JIT Tests pasaron' : 'JIT Tests encontraron problemas';
+            
+            const body = `## 🤖 ${emoji} ${status}
+
+            Tests generados automáticamente por Claude basados en el diff de este PR:
+
+            \`\`\`
+            ${results.substring(0, 3000)}
+            \`\`\`
+
+            ${!passed ? '⚠️ **Revisa los fallos antes de mergear.**' : ''}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Cleanup
+        if: always()
+        run: rm -f e2e/_jit-pr-tests.spec.ts
