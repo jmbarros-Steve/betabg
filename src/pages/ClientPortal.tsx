@@ -220,7 +220,6 @@ export default function ClientPortal() {
       .single()
       .then(({ data }) => {
         if (data?.logo_url) setClientLogoUrl(data.logo_url);
-        setOnboardingChecked(true);
       });
   }, [clientData?.id, urlClientId, isAdminView]);
 

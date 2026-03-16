@@ -1,0 +1,1 @@
+{"code":"PGRST205","details":null,"hint":"Perhaps you meant the table 'public.blog_posts'","message":"Could not find the table 'public.shopify_products' in the schema cache"}
