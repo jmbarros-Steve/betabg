@@ -109,7 +109,7 @@ export async function fetchMetaAdAccounts(c: Context) {
     // First, check token permissions
     console.log('Checking token permissions...');
     const permissionsUrl = new URL('https://graph.facebook.com/v21.0/me/permissions');
-    
+    permissionsUrl.searchParams.set('access_token', decryptedToken);
 
     const permissionsResponse = await fetch(permissionsUrl.toString());
     const permissionsData: MetaPermissionsResponse = await permissionsResponse.json() as any;
