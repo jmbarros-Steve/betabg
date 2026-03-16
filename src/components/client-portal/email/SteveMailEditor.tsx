@@ -50,10 +50,11 @@ export interface SteveMailEditorRef {
 interface SteveMailEditorProps {
   onReady?: () => void;
   style?: React.CSSProperties;
+  clientId?: string;
 }
 
 const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
-  ({ onReady, style }, ref) => {
+  ({ onReady, style, clientId }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<any>(null);
 
@@ -249,6 +250,11 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
       });
 
       editorRef.current = editor;
+
+      // Store clientId on editor for plugins that need API access (e.g. Shopify product picker)
+      if (clientId) {
+        (editor as any).__steveClientId = clientId;
+      }
 
       // Layout fix: GrapeJS newsletter preset stacks everything vertically.
       // We override to put canvas on the left and blocks sidebar on the right.
