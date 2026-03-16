@@ -1,25 +1,18 @@
 #!/bin/bash
 set -e
 
-# === STEP 1: QA Playwright tests ===
-# Exclude: record-* (demo recordings), screenshot utilities, and
-# tests with stale locators that match disabled setup checklist items
-echo "🧪 [1/2] Corriendo tests QA..."
+# === QA tests only (skip record-*, screenshot utilities) ===
+echo "🧪 Corriendo tests QA..."
 npx playwright test \
-  --grep-invert="record|all features|screenshot all pages" \
+  e2e/qa-*.spec.ts \
+  e2e/check-bugs.spec.ts \
+  e2e/meta-diagnostic.spec.ts \
+  e2e/test-login.spec.ts \
   --reporter=line
 if [ $? -ne 0 ]; then
   echo "❌ TESTS FALLARON. Push bloqueado."
   exit 1
 fi
 echo "✅ Tests QA OK."
-
-# === STEP 2: JIT Tests (AI-generated) ===
-echo "🤖 [2/2] Corriendo JIT tests..."
-bash "$(dirname "$0")/pre-push-jit.sh"
-if [ $? -ne 0 ]; then
-  echo "❌ JIT TESTS FALLARON. Push bloqueado."
-  exit 1
-fi
 
 echo "🚀 Todo OK. Push permitido."

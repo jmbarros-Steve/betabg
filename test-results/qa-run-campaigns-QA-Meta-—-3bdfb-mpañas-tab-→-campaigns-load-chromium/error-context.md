@@ -101,7 +101,7 @@
               - generic [ref=e109]:
                 - generic [ref=e110]: Gasto Total
                 - img [ref=e112]
-              - paragraph [ref=e114]: $483.777
+              - paragraph [ref=e114]: $484.116
             - generic [ref=e116]:
               - generic [ref=e117]:
                 - generic [ref=e118]: Ingresos Totales
@@ -121,7 +121,7 @@
           - generic [ref=e142]:
             - generic [ref=e144]:
               - text: Costo/Conv
-              - paragraph [ref=e145]: $43.980
+              - paragraph [ref=e145]: $44.011
             - generic [ref=e147]:
               - text: CPC
               - paragraph [ref=e148]: $65
@@ -192,7 +192,7 @@
                   - generic [ref=e315]:
                     - generic [ref=e316]:
                       - paragraph [ref=e317]: Gasto
-                      - paragraph [ref=e318]: $304.000
+                      - paragraph [ref=e318]: $304.339
                     - generic [ref=e319]:
                       - paragraph [ref=e320]: Ingresos (Atrib.)
                       - paragraph [ref=e321]: $797.400
@@ -201,7 +201,7 @@
                       - paragraph [ref=e324]: 2.62x
                     - generic [ref=e325]:
                       - paragraph [ref=e326]: Costo/Conv
-                      - paragraph [ref=e327]: $30.400
+                      - paragraph [ref=e327]: $30.434
                     - generic [ref=e328]:
                       - paragraph [ref=e329]: CPC
                       - paragraph [ref=e330]: $57
@@ -210,7 +210,7 @@
                       - paragraph [ref=e333]: $2.809
                     - generic [ref=e334]:
                       - paragraph [ref=e335]: CTR
-                      - paragraph [ref=e336]: 4.90%
+                      - paragraph [ref=e336]: 4.89%
                     - generic [ref=e337]:
                       - paragraph [ref=e338]: Conversiones
                       - paragraph [ref=e339]: "10"

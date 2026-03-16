@@ -10,7 +10,7 @@
       - generic [ref=e5]:
         - generic [ref=e6]:
           - img "Steve Ads" [ref=e7]
-          - paragraph [ref=e11]: qa-test-1773662080173
+          - paragraph [ref=e11]: qa-test-1773664060443
         - generic [ref=e12]:
           - generic [ref=e13]: Portal Cliente
           - button [ref=e14] [cursor=pointer]:
