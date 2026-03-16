@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Send, User, Lightbulb, AlertTriangle } from 'lucide-react';
+import { Send, User, Lightbulb, AlertTriangle, Activity, WifiOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
 
@@ -35,8 +35,16 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [briefComplete, setBriefComplete] = useState<boolean | null>(null);
+  const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const suggestedQuestions = [
+    '¿Cómo están mis campañas de Meta este mes?',
+    '¿Cuál es mi ROAS real y cómo mejorarlo?',
+    'Analiza mi TOFU: gasté mucho con poco retorno',
+    '¿Qué estrategia recomiendas para escalar?',
+  ];
 
   useEffect(() => {
     initializeConversation();
@@ -62,6 +70,15 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
         .eq('client_id', clientId)
         .maybeSingle();
       setBriefComplete(persona?.is_complete ?? false);
+
+      // Check platform connections for metrics availability
+      const { data: connections } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('is_active', true)
+        .limit(1);
+      setHasConnections(!!connections && connections.length > 0);
 
       // Find existing estrategia conversation
       const { data: existingConvs, error: convError } = await supabase
@@ -205,19 +222,48 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
         </div>
       )}
 
+      {/* Metrics connection banner */}
+      {hasConnections === true && (
+        <div className="px-4 py-2 bg-green-50 dark:bg-green-950/30 border-b border-green-200 dark:border-green-800 flex items-center gap-2 flex-shrink-0">
+          <Activity className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+          <p className="text-xs text-green-700 dark:text-green-300">
+            Conectado a datos reales — las respuestas incluyen métricas actualizadas de tus plataformas.
+          </p>
+        </div>
+      )}
+      {hasConnections === false && (
+        <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/30 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 flex-shrink-0">
+          <WifiOff className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 flex-shrink-0" />
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            Sin conexiones activas — Steve responderá con conocimiento general. Conecta tus plataformas para análisis con datos reales.
+          </p>
+        </div>
+      )}
+
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-5">
           {messages.length === 0 && !isLoading && (
-            <div className="flex flex-col items-center justify-center h-full py-16 text-center">
+            <div className="flex flex-col items-center justify-center h-full py-10 text-center">
               <Avatar className="h-16 w-16 border-2 border-primary/20 mb-4">
                 <AvatarImage src={avatarSteve} alt="Steve" />
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">🐕</AvatarFallback>
               </Avatar>
               <h3 className="text-lg font-semibold mb-2">Steve Estrategia</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Pregunta lo que quieras sobre marketing, estrategia, competencia, posicionamiento, pricing, campañas, copywriting, SEO... Steve tiene acceso a tu brief y análisis de marca.
+              <p className="text-sm text-muted-foreground max-w-md mb-4">
+                Tengo acceso a tus métricas de Meta, Shopify y el brief de tu marca. Puedes preguntarme sobre tus campañas, ROAS, estrategia, competencia, etc.
               </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+                {suggestedQuestions.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => sendMessage(q)}
+                    className="text-left text-xs px-3 py-2.5 rounded-lg border border-border bg-background hover:bg-accent hover:border-primary/30 transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
