@@ -310,6 +310,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       savedDesign = design;
     }
 
+    // Validate content is not empty before saving
+    const strippedHtml = htmlContent.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+    if (!strippedHtml && !savedDesign) {
+      toast.error('El email está vacío. Diseña el contenido antes de guardar.');
+      return;
+    }
+
     const action = editingCampaign.id ? 'update' : 'create';
     const { data, error } = await callApi<any>('manage-email-campaigns', {
       body: {

@@ -229,8 +229,10 @@ Deno.serve(async (req) => {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
-    const accountInfoResponse = await fetch(accountInfoUrl);
+    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name`;
+    const accountInfoResponse = await fetch(accountInfoUrl, {
+      headers: { 'Authorization': `Bearer ${decryptedToken}` },
+    });
     let accountCurrency = 'USD'; // Default to USD
 
     if (accountInfoResponse.ok) {

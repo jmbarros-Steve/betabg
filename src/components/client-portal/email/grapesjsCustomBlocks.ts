@@ -256,6 +256,81 @@ function defaultEndDate(): string {
 
 export function registerSteveBlocks(editor: any): void {
   // =========================================================================
+  // CUSTOM TRAIT: Shopify Product Image Picker
+  // Fetches products from shopify_products and lets user pick one to set image
+  // =========================================================================
+  editor.TraitManager.addType('shopify-product-picker', {
+    createInput({ trait }: any) {
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <select class="gjs-field" style="width:100%;padding:4px 6px;font-size:12px;background:#27272a;color:#fafafa;border:1px solid #3f3f46;border-radius:4px;">
+          <option value="">Elegir producto de Shopify...</option>
+          <option value="__loading" disabled>Cargando productos...</option>
+        </select>
+      `;
+      const select = el.querySelector('select') as HTMLSelectElement;
+
+      // Fetch Shopify products
+      const clientId = (editor as any).__steveClientId;
+      if (clientId) {
+        import('@/lib/api').then(({ callApi }) => {
+          callApi('fetch-shopify-products', {
+            body: { client_id: clientId, limit: 30 },
+          }).then(({ data }: any) => {
+            // Remove loading option
+            const loadingOpt = select.querySelector('option[value="__loading"]');
+            if (loadingOpt) loadingOpt.remove();
+
+            const products = data?.products || data || [];
+            if (products.length === 0) {
+              const opt = document.createElement('option');
+              opt.value = '';
+              opt.disabled = true;
+              opt.textContent = 'No hay productos';
+              select.appendChild(opt);
+              return;
+            }
+            for (const p of products) {
+              if (!p.image_url) continue;
+              const opt = document.createElement('option');
+              opt.value = JSON.stringify({ image_url: p.image_url, title: p.title, handle: p.handle });
+              opt.textContent = `${p.title} ($${Number(p.price || 0).toLocaleString('es-CL')})`;
+              select.appendChild(opt);
+            }
+          }).catch(() => {
+            const loadingOpt = select.querySelector('option[value="__loading"]');
+            if (loadingOpt) loadingOpt.textContent = 'Error cargando productos';
+          });
+        });
+      } else {
+        const loadingOpt = select.querySelector('option[value="__loading"]');
+        if (loadingOpt) loadingOpt.textContent = 'clientId no disponible';
+      }
+
+      // On change, update image src and alt
+      select.addEventListener('change', () => {
+        if (!select.value) return;
+        try {
+          const product = JSON.parse(select.value);
+          const component = editor.getSelected();
+          if (component) {
+            component.set('imgSrc', product.image_url);
+            component.set('imgAlt', product.title || 'Producto');
+            if (product.handle) {
+              const domain = (editor as any).__steveShopDomain || '';
+              if (domain) {
+                component.set('imgLink', `https://${domain}/products/${product.handle}`);
+              }
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      });
+
+      return el;
+    },
+  });
+
+  // =========================================================================
   // 1. PRODUCT GRID
   // =========================================================================
   editor.Components.addType('steve-products', {
@@ -806,6 +881,11 @@ export function registerSteveBlocks(editor: any): void {
         tagName: 'div',
         droppable: false,
         traits: [
+          {
+            type: 'shopify-product-picker',
+            name: 'shopifyProduct',
+            label: 'Producto de Shopify',
+          },
           {
             type: 'text',
             name: 'imgSrc',
