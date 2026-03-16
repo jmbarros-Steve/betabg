@@ -12,6 +12,11 @@ import { Send, User, Lightbulb, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import avatarSteve from '@/assets/avatar-steve.png';
 
+/** Strip <thinking>...</thinking> blocks that leak from chain-of-thought models */
+function stripThinking(text: string): string {
+  return text.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -237,7 +242,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
                   </Avatar>
                   <div className="max-w-[80%] px-4 py-3 text-sm shadow-sm bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm">
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                      <ReactMarkdown>{stripThinking(message.content)}</ReactMarkdown>
                     </div>
                   </div>
                 </div>

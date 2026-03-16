@@ -667,6 +667,21 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
         <span className="ml-auto">Haz clic en una campaña para expandir su jerarquía</span>
       </div>
 
+      {/* Column headers */}
+      {filtered.length > 0 && (
+        <div className="flex items-center px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide border-b">
+          <span className="flex-1">Campaña</span>
+          <span className="flex items-center gap-4 shrink-0">
+            <span className="w-20 text-right">Gasto</span>
+            <span className="w-14 text-right">ROAS</span>
+            <span className="w-20 text-right">CPA</span>
+            <span className="w-14 text-right">CTR</span>
+            <span className="w-14 text-right">Conv.</span>
+            <span className="w-16 text-right">Ad Sets</span>
+          </span>
+        </div>
+      )}
+
       {/* Campaign tree */}
       {filtered.length === 0 ? (
         <Card className="border-dashed">

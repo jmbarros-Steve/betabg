@@ -792,7 +792,7 @@ export async function steveChat(c: Context) {
       .from('platform_connections')
       .select('id, platform')
       .eq('client_id', client_id)
-      .eq('status', 'active');
+      .eq('is_active', true);
 
     const connIds = (connections || []).map((c: { id: string }) => c.id);
 
@@ -922,7 +922,9 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     }
 
     const aiData: any = await aiResponse.json();
-    const assistantMsg = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu pregunta?';
+    const rawMsg = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu pregunta?';
+    // Strip <thinking>...</thinking> blocks from chain-of-thought models
+    const assistantMsg = rawMsg.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
 
     await supabase.from('steve_messages').insert({
       conversation_id: estrategiaConvId,
