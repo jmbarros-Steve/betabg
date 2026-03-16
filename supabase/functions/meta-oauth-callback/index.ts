@@ -119,11 +119,25 @@ Deno.serve(async (req) => {
       }),
     });
     const longLivedData = await longLivedResponse.json();
+    console.log('[meta-oauth] Long-lived exchange response:', JSON.stringify({ 
+      has_token: !!longLivedData.access_token, 
+      expires_in: longLivedData.expires_in,
+      error: longLivedData.error?.message || null
+    }));
 
-    const finalToken = longLivedData.access_token || accessToken;
+    if (longLivedData.error) {
+      console.error('[meta-oauth] Long-lived exchange failed:', longLivedData.error);
+      // Do NOT fallback to short-lived token — it expires in minutes
+      return new Response(
+        JSON.stringify({ error: 'Failed to exchange for long-lived token: ' + longLivedData.error.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const finalToken = longLivedData.access_token;
     const tokenExpiresIn = longLivedData.expires_in || 5184000;
     const tokenExpiresAt = new Date(Date.now() + tokenExpiresIn * 1000).toISOString();
-    console.log(`Long-lived token obtained, expires in ${tokenExpiresIn}s`);
+    console.log(`[meta-oauth] Long-lived token obtained, expires in ${tokenExpiresIn}s (${Math.floor(tokenExpiresIn/86400)} days)`);
 
     // Fetch businesses and ad accounts to verify access
     // We do NOT auto-select an account — the user will choose from the portfolio selector
