@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { criterioEmailEvaluate } from '../ai/criterio-email.js';
 
 const KLAVIYO_REVISION = '2024-10-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
@@ -301,6 +302,41 @@ export async function klaviyoPushEmails(c: Context) {
       return c.json({ error: 'Plan not found' }, 404);
     }
 
+    // CRITERIO pre-flight: evaluate each email before pushing
+    const rawEmailsForCheck = plan.emails;
+    const emailsForCheck: EmailStep[] = typeof rawEmailsForCheck === 'string' ? JSON.parse(rawEmailsForCheck) : rawEmailsForCheck as EmailStep[];
+
+    // Get shop_id from the plan's client connection
+    const { data: connData } = await serviceSupabase
+      .from('platform_connections')
+      .select('client_id, clients!inner(shop_id)')
+      .eq('id', connection_id)
+      .single();
+    const shopId = (connData as any)?.clients?.shop_id;
+
+    if (shopId) {
+      for (const emailToCheck of emailsForCheck) {
+        const criterioResult = await criterioEmailEvaluate({
+          subject: emailToCheck.subject,
+          preview_text: emailToCheck.previewText,
+          html: generateEmailHtml(emailToCheck),
+        }, shopId);
+
+        if (!criterioResult.can_publish) {
+          return c.json({
+            error: 'CRITERIO rechazó el email',
+            email_subject: emailToCheck.subject,
+            score: criterioResult.score,
+            reason: criterioResult.reason,
+            failed_rules: criterioResult.failed_rules,
+          }, 422);
+        }
+      }
+    }
+
+    // REGLA INQUEBRANTABLE: all Klaviyo emails born as DRAFT
+    const effectiveSendStrategy = 'draft';
+
     const apiKey = await decryptApiKey(connection_id);
     const rawEmails = plan.emails;
     const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
@@ -335,7 +371,7 @@ export async function klaviyoPushEmails(c: Context) {
         apiKey,
         emailName,
         list_id,
-        send_strategy || 'scheduled',
+        effectiveSendStrategy,
         emailScheduledAt,
       );
       const campaignId = campaign.id;
@@ -358,11 +394,11 @@ export async function klaviyoPushEmails(c: Context) {
       await updateCampaignMessage(apiKey, messageId, email.subject, email.previewText || '');
       console.log(`  Message updated with subject`);
 
-      // 7. Schedule/send based on strategy
-      if (send_strategy === 'draft') {
-        console.log(`  Campaign created as draft`);
+      // 7. All campaigns created as DRAFT (CRITERIO enforced)
+      if (effectiveSendStrategy === 'draft') {
+        console.log(`  Campaign created as draft (CRITERIO enforced)`);
         results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'draft' });
-      } else if (send_strategy === 'immediate' && i === 0) {
+      } else if (effectiveSendStrategy === 'immediate' && i === 0) {
         try {
           await sendCampaign(apiKey, campaignId);
           console.log(`  Campaign sent!`);

@@ -165,6 +165,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return () => clearInterval(interval);
   }, [showEditor, editorReady, editorStep]);
 
+  // CRITERIO pre-flight check
+  const [criterioLoading, setCriterioLoading] = useState(false);
+  const [criterioResult, setCriterioResult] = useState<{ can_publish: boolean; score: number; reason: string; failed_rules: Array<{ rule_id: string; severity: string; details: string }> } | null>(null);
+
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [sendMode, setSendMode] = useState<'now' | 'schedule'>('now');
@@ -361,9 +365,50 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const confirmSend = async () => {
+    // CRITERIO pre-flight check
+    setCriterioLoading(true);
+    setCriterioResult(null);
+    try {
+      const { html } = exportEditorHtml();
+      const { data: criterio, error: criterioError } = await callApi<any>('criterio-email', {
+        body: {
+          email_data: {
+            id: editingCampaign?.id,
+            subject: editingCampaign?.subject,
+            preview_text: editingCampaign?.preview_text,
+            html: html || editingCampaign?.html_content,
+            send_hour: sendMode === 'schedule' && scheduleDate ? new Date(scheduleDate).getHours() : new Date().getHours(),
+            timezone: 'America/Santiago',
+            segment_size: subscriberCount,
+            segment_excludes_unsubscribed: true,
+          },
+          shop_id: clientId,
+        },
+      });
+
+      if (criterioError) {
+        toast.error(`Error en CRITERIO: ${criterioError}`);
+        setCriterioLoading(false);
+        return;
+      }
+
+      if (criterio && !criterio.can_publish) {
+        setCriterioResult(criterio);
+        setCriterioLoading(false);
+        return;
+      }
+
+      setCriterioResult(criterio);
+    } catch {
+      toast.error('Error al evaluar CRITERIO');
+      setCriterioLoading(false);
+      return;
+    }
+    setCriterioLoading(false);
+
+    // CRITERIO passed — proceed with send/schedule
     if (sendMode === 'schedule') {
       if (!scheduleDate) { toast.error('Selecciona una fecha'); return; }
-      // Save first
       await handleSaveCampaign();
       if (!editingCampaign?.id) { toast.error('Guarda la campaña primero'); return; }
       const { error } = await callApi('manage-email-campaigns', {
@@ -1225,48 +1270,98 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         )}
 
         {/* Unified Send/Schedule Dialog */}
-        <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <Dialog open={showSendDialog} onOpenChange={(open) => { setShowSendDialog(open); if (!open) { setCriterioResult(null); setCriterioLoading(false); } }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Enviar Campaña</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              <p className="text-sm text-muted-foreground">
-                Esta campaña se enviará a <span className="font-medium text-foreground">{subscriberCount} contactos</span>. Esta acción no se puede deshacer.
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant={sendMode === 'now' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => setSendMode('now')}
-                >
-                  <Send className="w-4 h-4 mr-1.5" /> Enviar ahora
-                </Button>
-                <Button
-                  variant={sendMode === 'schedule' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => setSendMode('schedule')}
-                >
-                  <CalendarClock className="w-4 h-4 mr-1.5" /> Programar
-                </Button>
-              </div>
-              {sendMode === 'schedule' && (
-                <div>
-                  <Label>Fecha y hora de envío</Label>
-                  <Input
-                    type="datetime-local"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                  />
+              {/* CRITERIO evaluation status */}
+              {criterioLoading && (
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  <div>
+                    <p className="font-medium text-blue-900">CRITERIO evaluando...</p>
+                    <p className="text-sm text-blue-700">Verificando reglas de calidad del email</p>
+                  </div>
                 </div>
+              )}
+
+              {criterioResult && !criterioResult.can_publish && (
+                <div className="p-4 rounded-lg bg-red-50 border border-red-200 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <p className="font-medium text-red-900">CRITERIO rechazó el email</p>
+                  </div>
+                  <p className="text-sm text-red-700">Score: {criterioResult.score}% — {criterioResult.reason}</p>
+                  {criterioResult.failed_rules?.length > 0 && (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {criterioResult.failed_rules.map((rule, i) => (
+                        <div key={i} className="text-xs p-2 rounded bg-red-100 text-red-800">
+                          <span className="font-medium">[{rule.severity}]</span> {rule.rule_id} — {rule.details || 'Regla no cumplida'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {criterioResult && criterioResult.can_publish && (
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                  <MailCheck className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-900">CRITERIO aprobado — Score {criterioResult.score}%</p>
+                    <p className="text-sm text-green-700">El email cumple las reglas de calidad</p>
+                  </div>
+                </div>
+              )}
+
+              {!criterioLoading && !criterioResult && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Esta campaña se enviará a <span className="font-medium text-foreground">{subscriberCount} contactos</span>. Esta acción no se puede deshacer.
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant={sendMode === 'now' ? 'default' : 'outline'}
+                      className="flex-1"
+                      onClick={() => setSendMode('now')}
+                    >
+                      <Send className="w-4 h-4 mr-1.5" /> Enviar ahora
+                    </Button>
+                    <Button
+                      variant={sendMode === 'schedule' ? 'default' : 'outline'}
+                      className="flex-1"
+                      onClick={() => setSendMode('schedule')}
+                    >
+                      <CalendarClock className="w-4 h-4 mr-1.5" /> Programar
+                    </Button>
+                  </div>
+                  {sendMode === 'schedule' && (
+                    <div>
+                      <Label>Fecha y hora de envío</Label>
+                      <Input
+                        type="datetime-local"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSendDialog(false)}>Cancelar</Button>
-              <Button onClick={confirmSend} disabled={sending}>
-                {sending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-                {sendMode === 'now' ? 'Confirmar Envío' : 'Programar Envío'}
-              </Button>
+              {criterioResult && !criterioResult.can_publish ? (
+                <Button variant="outline" onClick={() => { setCriterioResult(null); }}>
+                  Volver a intentar
+                </Button>
+              ) : (
+                <Button onClick={confirmSend} disabled={sending || criterioLoading}>
+                  {(sending || criterioLoading) && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                  {sendMode === 'now' ? 'Confirmar Envío' : 'Programar Envío'}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { criterioEmailEvaluate } from '../ai/criterio-email.js';
 
 export async function uploadKlaviyoDrafts(c: Context) {
   try {
@@ -47,6 +48,32 @@ export async function uploadKlaviyoDrafts(c: Context) {
     const clientData = (conn as any).clients as { user_id: string; client_user_id: string | null };
     if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    // CRITERIO pre-flight check
+    const { data: connClient } = await supabase
+      .from('platform_connections')
+      .select('client_id, clients!inner(shop_id)')
+      .eq('id', connectionId)
+      .single();
+    const shopId = (connClient as any)?.clients?.shop_id;
+
+    if (shopId) {
+      const criterioResult = await criterioEmailEvaluate({
+        subject: campaign.subject || campaign.name,
+        preview_text: campaign.previewText || '',
+        html: campaign.html || '',
+      }, shopId);
+
+      if (!criterioResult.can_publish) {
+        return c.json({
+          error: 'CRITERIO rechazó el email',
+          email_subject: campaign.subject || campaign.name,
+          score: criterioResult.score,
+          reason: criterioResult.reason,
+          failed_rules: criterioResult.failed_rules,
+        }, 422);
+      }
     }
 
     const { data: apiKeyData } = await supabase.rpc('decrypt_platform_token', {
