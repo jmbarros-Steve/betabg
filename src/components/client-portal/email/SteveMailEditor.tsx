@@ -286,7 +286,11 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
           views.style.cssText = `position:absolute;top:0;left:${canvasW}px;width:${SIDEBAR_W}px;height:40px;z-index:5;display:flex;padding:6px 4px;gap:2px;background-color:#18181b;border-bottom:1px solid #27272a;`;
         }
         if (viewsCont) {
-          viewsCont.style.cssText = `position:absolute;top:40px;left:${canvasW}px;width:${SIDEBAR_W}px;height:${canvasH - 40}px;overflow-y:auto;z-index:5;background-color:#18181b;`;
+          viewsCont.style.cssText = `position:absolute;top:40px;left:${canvasW}px;width:${SIDEBAR_W}px;height:${canvasH - 40}px;overflow-y:auto;overflow-x:hidden;z-index:5;background-color:#18181b;display:block;visibility:visible;`;
+          // Ensure child panels (traits, styles, blocks) fill the container
+          viewsCont.querySelectorAll('.gjs-traits-cs, .gjs-sm-sectors, .gjs-blocks-cs').forEach((child) => {
+            (child as HTMLElement).style.width = '100%';
+          });
         }
       };
 
@@ -301,6 +305,19 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         } else {
           editor.Panels.getButton('views', 'open-sm')?.set('active', true);
         }
+        // Ensure the views-container is visible after panel switch
+        requestAnimationFrame(() => {
+          const vc = el?.querySelector('.gjs-pn-views-container') as HTMLElement;
+          if (vc) {
+            vc.style.display = 'block';
+            vc.style.visibility = 'visible';
+          }
+          // Ensure traits/styles panels inside views-container are visible
+          const traitsSector = el?.querySelector('.gjs-trt-traits') as HTMLElement;
+          if (traitsSector) traitsSector.style.display = '';
+          const smSectors = el?.querySelector('.gjs-sm-sectors') as HTMLElement;
+          if (smSectors) smSectors.style.display = '';
+        });
       });
 
       // When nothing is selected, go back to blocks panel
