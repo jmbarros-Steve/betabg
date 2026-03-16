@@ -7,25 +7,40 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
  * POST /api/generate-steve-mail-content
  */
 export async function generateSteveMailContent(c: Context) {
-  const body = await c.req.json();
-  const { action, client_id } = body;
+  try {
+    const body = await c.req.json();
+    const { action, client_id } = body;
 
-  if (!client_id) return c.json({ error: 'client_id is required' }, 400);
+    if (!client_id) return c.json({ error: 'client_id is required' }, 400);
 
-  const supabase = getSupabaseAdmin();
+    const supabase = getSupabaseAdmin();
 
-  // Load brand context
-  const ctx = await loadBrandContext(supabase, client_id);
+    // Load brand context
+    const ctx = await loadBrandContext(supabase, client_id);
 
-  switch (action) {
-    case 'generate_campaign_html':
-      return c.json(await handleGenerateCampaignHtml(body, ctx));
-    case 'generate_flow_emails':
-      return c.json(await handleGenerateFlowEmails(body, ctx));
-    case 'generate_subjects':
-      return c.json(await handleGenerateSubjects(body, ctx));
-    default:
-      return c.json({ error: `Unknown action: ${action}` }, 400);
+    switch (action) {
+      case 'generate_campaign_html':
+        return c.json(await handleGenerateCampaignHtml(body, ctx));
+      case 'generate_flow_emails':
+        return c.json(await handleGenerateFlowEmails(body, ctx));
+      case 'generate_subjects':
+        return c.json(await handleGenerateSubjects(body, ctx));
+      default:
+        return c.json({ error: `Unknown action: ${action}` }, 400);
+    }
+  } catch (error: unknown) {
+    console.error('Error in generate-steve-mail-content:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    if (message === 'ANTHROPIC_API_KEY not configured') {
+      return c.json({ error: 'AI service not configured. Contact support.' }, 503);
+    }
+    if (message.includes('Rate limit')) {
+      return c.json({ error: 'AI service busy. Try again in a moment.' }, 429);
+    }
+    if (message.includes('Failed to parse AI response')) {
+      return c.json({ error: 'AI generated an invalid response. Try again.' }, 502);
+    }
+    return c.json({ error: message }, 500);
   }
 }
 

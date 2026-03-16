@@ -207,7 +207,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       const { data, error } = await callApi<any>('generate-steve-mail-content', {
         body: { action: 'generate_flow_emails', client_id: clientId, flow_type: triggerType, email_count: config.defaultSteps },
       });
-      if (error) { toast.error(error); return; }
+      if (error) { toast.error(`Error al generar: ${error}`); return; }
       const emails = data?.emails || [];
       const steps: FlowStep[] = emails.map((email: any, i: number) => ({
         type: 'email' as const,
@@ -226,7 +226,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       setShowEditor(true);
       toast.success(`Automatizacion de ${config.label} generada con AI`);
     } catch {
-      toast.error('Error generando automatizacion');
+      toast.error('Error al generar la automatización. Inténtalo de nuevo.');
     } finally {
       setGenerating(false);
     }

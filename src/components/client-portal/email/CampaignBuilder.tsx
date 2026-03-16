@@ -269,7 +269,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
       toast.success('Email generado con Steve AI');
     } catch (err) {
-      toast.error('Error generando contenido');
+      toast.error('Error al generar el email. Inténtalo de nuevo.');
     } finally {
       setGenerating(false);
     }

@@ -29,11 +29,17 @@ export async function callApi<T = any>(
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch(`${API_URL}/api/${functionName}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -49,6 +55,9 @@ export async function callApi<T = any>(
     const data = await response.json();
     return { data, error: null };
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return { data: null, error: 'La solicitud tardó demasiado. Inténtalo de nuevo.' };
+    }
     // Network or unexpected error — surface message to caller
     return { data: null, error: err.message };
   }
