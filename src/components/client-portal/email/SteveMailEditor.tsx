@@ -192,6 +192,10 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         },
         canvas: {
           styles: [],
+          // Inject white background into the canvas iframe body
+          scripts: [
+            `document.body.style.backgroundColor='#ffffff';document.body.style.margin='0';`,
+          ],
         },
         deviceManager: {
           devices: [
@@ -338,6 +342,28 @@ const SteveMailEditor = forwardRef<SteveMailEditorRef, SteveMailEditorProps>(
         editor.refresh();
         requestAnimationFrame(forceLayout);
       };
+
+      // Clear the default newsletter preset content — start with a blank canvas
+      // and add a helpful placeholder so the user knows what to do.
+      editor.on('load', () => {
+        const comps = editor.getComponents();
+        if (comps.length > 0) {
+          // Remove the default newsletter template injected by the preset
+          comps.reset();
+        }
+        // Add a minimal centered email wrapper with instructions
+        editor.addComponents(`
+          <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;margin:0 auto;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+            <tr>
+              <td style="padding:40px 30px;text-align:center;color:#a1a1aa;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 8px;font-size:28px;">📧</p>
+                <p style="margin:0 0 4px;font-weight:600;color:#71717a;">Arrastra bloques desde el panel derecho</p>
+                <p style="margin:0;font-size:13px;">o usa el botón <strong>Plantillas</strong> de la barra superior para elegir un diseño</p>
+              </td>
+            </tr>
+          </table>
+        `);
+      });
 
       // Apply at multiple timings to handle different load scenarios
       setTimeout(applyAndRefresh, 200);
