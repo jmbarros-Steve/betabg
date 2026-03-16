@@ -1,0 +1,260 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications (F8)":
+      - list
+    - region "Notifications alt+T"
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]:
+            - img "Steve Ads" [ref=e7]
+            - generic [ref=e9]:
+              - paragraph [ref=e11]: Patricio Correa
+              - paragraph [ref=e12]: Jardin de Eva
+          - generic [ref=e13]:
+            - generic [ref=e14]: Portal Cliente
+            - button [ref=e15] [cursor=pointer]:
+              - img
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - button "Steve" [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+            - text: Steve
+          - button "Brief" [ref=e22] [cursor=pointer]:
+            - img [ref=e23]
+            - text: Brief
+          - button "Métricas" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+            - text: Métricas
+          - button "Conexiones" [ref=e29] [cursor=pointer]:
+            - img [ref=e30]
+            - text: Conexiones
+          - button "Configuración" [ref=e33] [cursor=pointer]:
+            - img [ref=e34]
+            - text: Configuración
+          - button "Campañas" [active] [ref=e37] [cursor=pointer]:
+            - text: Campañas
+            - img [ref=e38]
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - heading "Setup del portal" [level=4] [ref=e43]
+              - generic [ref=e44]: 4/5
+              - 'progressbar "Setup del portal: 4 de 5 pasos completados" [ref=e45]'
+            - generic [ref=e47]:
+              - button "Colapsar pasos" [ref=e48] [cursor=pointer]:
+                - img [ref=e49]
+              - button "Cerrar progreso de setup" [ref=e51] [cursor=pointer]:
+                - img [ref=e52]
+          - generic [ref=e55]:
+            - button "Conectar Shopify (completado)" [disabled] [ref=e56]:
+              - img [ref=e57]
+              - generic [ref=e59]: Conectar Shopify
+              - generic [ref=e60]: (completado)
+            - button "Conectar Meta (completado)" [disabled] [ref=e61]:
+              - img [ref=e62]
+              - generic [ref=e64]: Conectar Meta
+              - generic [ref=e65]: (completado)
+            - button "Conectar Google Ads (pendiente)" [ref=e66] [cursor=pointer]:
+              - img [ref=e67]
+              - generic [ref=e69]: Conectar Google Ads
+              - generic [ref=e70]: (pendiente)
+            - button "Completar Brand Brief (completado)" [disabled] [ref=e71]:
+              - img [ref=e72]
+              - generic [ref=e74]: Completar Brand Brief
+              - generic [ref=e75]: (completado)
+            - button "Configurar finanzas (completado)" [disabled] [ref=e76]:
+              - img [ref=e77]
+              - generic [ref=e79]: Configurar finanzas
+              - generic [ref=e80]: (completado)
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - heading "Analytics por Campaña" [level=2] [ref=e86]
+              - paragraph [ref=e87]: Últimos 30 días
+              - generic [ref=e88]:
+                - button "7 días" [ref=e89] [cursor=pointer]
+                - button "14 días" [ref=e90] [cursor=pointer]
+                - button "30 días" [ref=e91] [cursor=pointer]
+                - button "60 días" [ref=e92] [cursor=pointer]
+                - button "90 días" [ref=e93] [cursor=pointer]
+            - generic [ref=e94]:
+              - combobox [ref=e95] [cursor=pointer]:
+                - generic: Todas las plataformas
+                - img [ref=e96]
+              - button "Sincronizar" [ref=e98] [cursor=pointer]:
+                - img
+                - text: Sincronizar
+              - button "CSV" [ref=e99] [cursor=pointer]:
+                - img
+                - text: CSV
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - img [ref=e102]
+                - text: "Última actualización: hace menos de 1 min"
+              - generic [ref=e105]: Cuenta en USD · Convertido a CLP
+          - generic [ref=e106]:
+            - generic [ref=e108]:
+              - generic [ref=e109]:
+                - generic [ref=e110]: Gasto Total
+                - img [ref=e112]
+              - paragraph [ref=e114]: $483.777
+            - generic [ref=e116]:
+              - generic [ref=e117]:
+                - generic [ref=e118]: Ingresos Totales
+                - img [ref=e120]
+              - paragraph [ref=e122]: $851.400
+              - paragraph [ref=e123]: "ROAS: 1.76x"
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - generic [ref=e127]: ROAS
+                - img [ref=e129]
+              - paragraph [ref=e132]: 1.76x
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - generic [ref=e136]: Conversiones
+                - img [ref=e138]
+              - paragraph [ref=e141]: "11"
+          - generic [ref=e142]:
+            - generic [ref=e144]:
+              - text: Costo/Conv
+              - paragraph [ref=e145]: $43.980
+            - generic [ref=e147]:
+              - text: CPC
+              - paragraph [ref=e148]: $65
+            - generic [ref=e150]:
+              - text: CPM
+              - paragraph [ref=e151]: $2.794
+            - generic [ref=e153]:
+              - text: CTR
+              - paragraph [ref=e154]: 4.29%
+          - generic [ref=e155]:
+            - heading "Gasto vs Ingresos por Día" [level=3] [ref=e157]
+            - generic [ref=e160]:
+              - img [ref=e161]:
+                - generic [ref=e166]:
+                  - generic [ref=e168]: 14-feb
+                  - generic [ref=e170]: 15-feb
+                  - generic [ref=e172]: 16-feb
+                  - generic [ref=e174]: 17-feb
+                  - generic [ref=e176]: 18-feb
+                  - generic [ref=e178]: 19-feb
+                  - generic [ref=e180]: 20-feb
+                  - generic [ref=e182]: 21-feb
+                  - generic [ref=e184]: 22-feb
+                  - generic [ref=e186]: 04-mar
+                  - generic [ref=e188]: 05-mar
+                  - generic [ref=e190]: 06-mar
+                  - generic [ref=e192]: 07-mar
+                  - generic [ref=e194]: 08-mar
+                  - generic [ref=e196]: 09-mar
+                  - generic [ref=e198]: 10-mar
+                  - generic [ref=e200]: 11-mar
+                  - generic [ref=e202]: 12-mar
+                  - generic [ref=e204]: 13-mar
+                  - generic [ref=e206]: 14-mar
+                  - generic [ref=e208]: 15-mar
+                  - generic [ref=e210]: 16-mar
+                - generic [ref=e212]:
+                  - generic [ref=e214]: $0
+                  - generic [ref=e216]: $55.000
+                  - generic [ref=e218]: $110.000
+                  - generic [ref=e220]: $165.000
+                  - generic [ref=e222]: $220.000
+              - list [ref=e288]:
+                - listitem [ref=e289]:
+                  - img [ref=e290]
+                  - text: Gasto
+                - listitem [ref=e292]:
+                  - img [ref=e293]
+                  - text: Ingresos
+          - generic [ref=e295]:
+            - tablist [ref=e297]:
+              - tab "Campañas (2)" [selected] [ref=e298] [cursor=pointer]
+              - tab "Recomendaciones" [ref=e299] [cursor=pointer]
+              - tab "📅 Revisión Charlie" [ref=e300] [cursor=pointer]
+            - tabpanel "Campañas (2)" [ref=e301]:
+              - generic [ref=e302]:
+                - generic [ref=e306]:
+                  - generic [ref=e308]:
+                    - button [ref=e309] [cursor=pointer]:
+                      - img
+                    - img "meta" [ref=e310]
+                    - generic [ref=e311]:
+                      - heading "Pruebas CBO Marzo" [level=4] [ref=e312]
+                      - paragraph [ref=e313]:
+                        - text: meta
+                        - generic [ref=e314]: • Click para ver Ad Sets
+                      - text: 04-mar — 16-mar
+                  - generic [ref=e315]:
+                    - generic [ref=e316]:
+                      - paragraph [ref=e317]: Gasto
+                      - paragraph [ref=e318]: $304.000
+                    - generic [ref=e319]:
+                      - paragraph [ref=e320]: Ingresos (Atrib.)
+                      - paragraph [ref=e321]: $797.400
+                    - generic [ref=e322]:
+                      - paragraph [ref=e323]: ROAS
+                      - paragraph [ref=e324]: 2.62x
+                    - generic [ref=e325]:
+                      - paragraph [ref=e326]: Costo/Conv
+                      - paragraph [ref=e327]: $30.400
+                    - generic [ref=e328]:
+                      - paragraph [ref=e329]: CPC
+                      - paragraph [ref=e330]: $57
+                    - generic [ref=e331]:
+                      - paragraph [ref=e332]: CPM
+                      - paragraph [ref=e333]: $2.809
+                    - generic [ref=e334]:
+                      - paragraph [ref=e335]: CTR
+                      - paragraph [ref=e336]: 4.90%
+                    - generic [ref=e337]:
+                      - paragraph [ref=e338]: Conversiones
+                      - paragraph [ref=e339]: "10"
+                - generic [ref=e343]:
+                  - generic [ref=e345]:
+                    - button [ref=e346] [cursor=pointer]:
+                      - img
+                    - img "meta" [ref=e347]
+                    - generic [ref=e348]:
+                      - heading "TOFU" [level=4] [ref=e349]
+                      - paragraph [ref=e350]:
+                        - text: meta
+                        - generic [ref=e351]: • Click para ver Ad Sets
+                      - text: 14-feb — 22-feb
+                  - generic [ref=e352]:
+                    - generic [ref=e353]:
+                      - paragraph [ref=e354]: Gasto
+                      - paragraph [ref=e355]: $179.777
+                    - generic [ref=e356]:
+                      - paragraph [ref=e357]: Ingresos (Atrib.)
+                      - paragraph [ref=e358]: $54.000
+                    - generic [ref=e359]:
+                      - paragraph [ref=e360]: ROAS
+                      - paragraph [ref=e361]: 0.30x
+                    - generic [ref=e362]:
+                      - paragraph [ref=e363]: Costo/Conv
+                      - paragraph [ref=e364]: $179.777
+                    - generic [ref=e365]:
+                      - paragraph [ref=e366]: CPC
+                      - paragraph [ref=e367]: $85
+                    - generic [ref=e368]:
+                      - paragraph [ref=e369]: CPM
+                      - paragraph [ref=e370]: $2.768
+                    - generic [ref=e371]:
+                      - paragraph [ref=e372]: CTR
+                      - paragraph [ref=e373]: 3.27%
+                    - generic [ref=e374]:
+                      - paragraph [ref=e375]: Conversiones
+                      - paragraph [ref=e376]: "1"
+      - button [ref=e379] [cursor=pointer]:
+        - img
+      - generic [ref=e380]:
+        - button "Abrir asistente" [ref=e381] [cursor=pointer]:
+          - img "Chonga" [ref=e383]
+        - status "Disponible" [ref=e384]
+  - generic [ref=e385]: $0
+```

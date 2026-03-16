@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:4173';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://www.steve.cl';
 const EMAIL = 'patricio.correa@jardindeeva.cl';
 const PASSWORD = 'Jardin2026';
 
