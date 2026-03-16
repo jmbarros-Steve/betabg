@@ -1,0 +1,187 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - list
+    - region "Notifications alt+T"
+    - generic:
+      - banner:
+        - generic:
+          - generic:
+            - img
+            - generic:
+              - generic:
+                - paragraph: Patricio Correa
+              - paragraph: Jardin de Eva
+          - generic:
+            - generic: Portal Cliente
+            - button:
+              - img
+      - generic:
+        - generic:
+          - button:
+            - img
+            - text: Steve
+          - button:
+            - img
+            - text: Brief
+          - button:
+            - img
+            - text: Métricas
+          - button:
+            - img
+            - text: Conexiones
+          - button:
+            - img
+            - text: Configuración
+          - button [expanded]:
+            - text: Más
+            - img
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=4]: Setup del portal
+              - generic: 4/5
+              - progressbar
+            - generic:
+              - button:
+                - img
+              - button:
+                - img
+          - generic:
+            - button [disabled]:
+              - img
+              - generic: Conectar Shopify
+              - generic: (completado)
+            - button [disabled]:
+              - img
+              - generic: Conectar Meta
+              - generic: (completado)
+            - button:
+              - img
+              - generic: Conectar Google Ads
+              - generic: (pendiente)
+            - button [disabled]:
+              - img
+              - generic: Completar Brand Brief
+              - generic: (completado)
+            - button [disabled]:
+              - img
+              - generic: Configurar finanzas
+              - generic: (completado)
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - heading [level=2]: Mis Conexiones
+                - paragraph: Gestiona tus plataformas conectadas
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                        - generic:
+                          - paragraph: Shopify
+                          - paragraph: Jardin de Eva
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Activo
+                        - button:
+                          - img
+                          - text: Sincronizar
+                        - button:
+                          - img
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                        - generic:
+                          - paragraph: Meta Ads
+                          - paragraph: Jardin de Eva
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Activo
+                        - button:
+                          - img
+                          - text: Sincronizar
+                        - button:
+                          - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                        - generic:
+                          - paragraph: Error al cargar cuentas
+                          - paragraph: No se pudieron cargar las cuentas publicitarias
+                        - button:
+                          - img
+                          - text: Reintentar
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Klaviyo
+                          - paragraph: Jardin de Eva
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Activo
+                        - button:
+                          - img
+              - generic:
+                - generic:
+                  - heading [level=3]: Conectar Nueva Plataforma
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - paragraph: Google Ads
+                        - paragraph: Campañas de búsqueda y display
+                    - button:
+                      - img
+                      - text: Conectar Google
+      - generic:
+        - generic:
+          - button:
+            - img
+      - generic:
+        - button:
+          - generic:
+            - img
+        - status
+  - generic: "0"
+  - menu "Más" [active] [ref=e1]:
+    - menuitem "Shopify" [ref=e2]:
+      - img [ref=e3]
+      - text: Shopify
+    - menuitem "Campañas" [ref=e6]:
+      - img [ref=e7]
+      - text: Campañas
+    - menuitem "Deep Dive" [ref=e10]:
+      - img [ref=e11]
+      - text: Deep Dive
+    - menuitem "Estrategia" [ref=e14]:
+      - img [ref=e15]
+      - text: Estrategia
+    - menuitem "Meta Ads" [ref=e17]:
+      - img [ref=e18]
+      - text: Meta Ads
+    - menuitem "Google Ads" [ref=e20]:
+      - img [ref=e21]
+      - text: Google Ads
+    - menuitem "Klaviyo" [ref=e25]:
+      - img [ref=e26]
+      - text: Klaviyo
+    - menuitem "Steve Mail" [ref=e29]:
+      - img [ref=e30]
+      - text: Steve Mail
+```

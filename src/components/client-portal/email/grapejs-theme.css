@@ -262,6 +262,10 @@
 
 .gjs-block svg {
   fill: #a1a1aa;
+  width: 24px;
+  height: 24px;
+  max-width: 24px;
+  max-height: 24px;
 }
 
 .gjs-block:hover svg {

@@ -1,0 +1,272 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - list
+    - region "Notifications alt+T"
+    - generic:
+      - banner:
+        - generic:
+          - generic:
+            - img
+            - generic:
+              - generic:
+                - paragraph: Patricio Correa
+              - paragraph: Jardin de Eva
+          - generic:
+            - generic: Portal Cliente
+            - button:
+              - img
+      - generic:
+        - generic:
+          - button:
+            - img
+            - text: Steve
+          - button:
+            - img
+            - text: Brief
+          - button:
+            - img
+            - text: Métricas
+          - button:
+            - img
+            - text: Conexiones
+          - button:
+            - img
+            - text: Configuración
+          - button [expanded]:
+            - text: Más
+            - img
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=4]: Setup del portal
+              - generic: 4/5
+              - progressbar
+            - generic:
+              - button:
+                - img
+              - button:
+                - img
+          - generic:
+            - button [disabled]:
+              - img
+              - generic: Conectar Shopify
+              - generic: (completado)
+            - button [disabled]:
+              - img
+              - generic: Conectar Meta
+              - generic: (completado)
+            - button:
+              - img
+              - generic: Conectar Google Ads
+              - generic: (pendiente)
+            - button [disabled]:
+              - img
+              - generic: Completar Brand Brief
+              - generic: (completado)
+            - button [disabled]:
+              - img
+              - generic: Configurar finanzas
+              - generic: (completado)
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]:
+                    - img
+                    - text: Configuración Financiera
+                  - paragraph: Define tus márgenes, costos fijos y comisiones para calcular POAS y estado de resultados
+                - button:
+                  - img
+                  - text: Guardar
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=3]:
+                      - img
+                      - text: Configuración de Márgenes
+                    - paragraph: Define cómo calcular la rentabilidad de tus productos
+                  - generic:
+                    - generic:
+                      - text: Margen promedio global (%)
+                      - generic:
+                        - spinbutton: "50"
+                        - generic: "%"
+                      - paragraph: Se usa cuando no hay margen específico por producto
+                    - generic:
+                      - generic:
+                        - text: Importar costos de Shopify
+                        - paragraph: Usar el campo "Cost per item" de Shopify cuando esté disponible
+                      - switch
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Márgenes por SKU
+                      - generic:
+                        - textbox:
+                          - /placeholder: SKU
+                        - spinbutton
+                        - button:
+                          - img
+                - generic:
+                  - generic:
+                    - heading [level=3]:
+                      - img
+                      - text: Costos y Comisiones
+                      - generic: CLP
+                    - paragraph:
+                      - text: Ingresa tus costos en
+                      - strong: Pesos Chilenos (CLP)
+                      - text: . Los costos fijos se prorratean según el período seleccionado.
+                  - generic:
+                    - generic:
+                      - generic: Costos Fijos Mensuales
+                      - generic:
+                        - textbox:
+                          - /placeholder: "Nombre (ej: Shopify, Klaviyo, Apps...)"
+                          - text: Shopify
+                        - generic: $
+                        - textbox:
+                          - /placeholder: "0"
+                          - text: "50.000"
+                        - button:
+                          - img
+                      - generic:
+                        - textbox:
+                          - /placeholder: "Nombre (ej: Shopify, Klaviyo, Apps...)"
+                          - text: Klaviyo
+                        - generic: $
+                        - textbox:
+                          - /placeholder: "0"
+                          - text: "29.000"
+                        - button:
+                          - img
+                      - generic:
+                        - textbox:
+                          - /placeholder: "Nombre (ej: Shopify, Klaviyo, Apps...)"
+                          - text: Otros
+                        - generic: $
+                        - textbox:
+                          - /placeholder: "0"
+                          - text: "600.000"
+                        - button:
+                          - img
+                      - button:
+                        - img
+                        - text: Agregar costo fijo
+                      - generic:
+                        - generic: Total costos fijos
+                        - generic: $679.000 CLP/mes
+                    - generic:
+                      - text: Gasto Google Ads (manual)
+                      - generic:
+                        - generic: $
+                        - textbox:
+                          - /placeholder: "Ej: 50.000"
+                          - text: "0"
+                        - generic: CLP/mes
+                      - paragraph: Ingresa tu gasto mensual de Google Ads mientras no esté integrado
+                    - generic:
+                      - text: Costo por despacho
+                      - generic:
+                        - generic: $
+                        - textbox:
+                          - /placeholder: "Ej: 3.500"
+                          - text: "4.000"
+                        - generic: CLP/pedido
+                      - paragraph: Se multiplica por la cantidad de pedidos del período
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Comisión pasarela de pago (%)
+                      - generic:
+                        - spinbutton: "3.5"
+                        - generic: "%"
+                      - paragraph: Transbank 2.95% | Mercado Pago 3.49% + IVA | Flow 2.9%
+                    - generic:
+                      - text: Comisión Shopify sobre ventas (%)
+                      - generic:
+                        - spinbutton: "2"
+                        - generic: "%"
+                      - paragraph: Basic 2% | Shopify 1% | Advanced 0.6% (0% si usas Shopify Payments)
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - paragraph: Margen por defecto
+                      - paragraph: 50%
+                    - generic:
+                      - paragraph: Costos fijos totales
+                      - paragraph: $679.000 CLP/mes
+                    - generic:
+                      - paragraph: Google Ads (manual)
+                      - paragraph: $0 CLP/mes
+                    - generic:
+                      - paragraph: Comisión pasarela
+                      - paragraph: 3.5%
+                    - generic:
+                      - paragraph: Costo despacho
+                      - paragraph: $4.000 CLP
+                    - generic:
+                      - paragraph: Comisión Shopify
+                      - paragraph: 2%
+                    - generic:
+                      - paragraph: SKUs con margen específico
+                      - paragraph: "0"
+                    - generic:
+                      - paragraph: Moneda base
+                      - paragraph: 🇨🇱 CLP
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - heading [level=3]:
+                        - img
+                        - text: Productos de Shopify
+                      - paragraph: Importa tus productos para calcular márgenes reales basados en el costo de Shopify
+                    - button:
+                      - img
+                      - text: Cargar Productos
+                - generic:
+                  - generic:
+                    - img
+                    - paragraph: Haz clic en "Cargar Productos" para importar tu catálogo
+      - generic:
+        - generic:
+          - button:
+            - img
+      - generic:
+        - button:
+          - generic:
+            - img
+        - status
+  - generic: "0"
+  - menu "Más" [active] [ref=e1]:
+    - menuitem "Shopify" [ref=e2]:
+      - img [ref=e3]
+      - text: Shopify
+    - menuitem "Campañas" [ref=e6]:
+      - img [ref=e7]
+      - text: Campañas
+    - menuitem "Deep Dive" [ref=e10]:
+      - img [ref=e11]
+      - text: Deep Dive
+    - menuitem "Estrategia" [ref=e14]:
+      - img [ref=e15]
+      - text: Estrategia
+    - menuitem "Meta Ads" [ref=e17]:
+      - img [ref=e18]
+      - text: Meta Ads
+    - menuitem "Google Ads" [ref=e20]:
+      - img [ref=e21]
+      - text: Google Ads
+    - menuitem "Klaviyo" [ref=e25]:
+      - img [ref=e26]
+      - text: Klaviyo
+    - menuitem "Steve Mail" [ref=e29]:
+      - img [ref=e30]
+      - text: Steve Mail
+```

@@ -277,7 +277,7 @@ function CampaignRow({
         )}
 
         <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-          <span className="flex items-center gap-1" title="Gasto 30d"><DollarSign className="w-3 h-3" />{fmtCLP(campaign.spend_30d)}</span>
+          <span title="Gasto 30d">{fmtCLP(campaign.spend_30d)}</span>
           <span className={`font-medium ${campaign.roas >= 3 ? 'text-green-600' : campaign.roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`} title="ROAS">{fmtRoas(campaign.roas)}</span>
           <span title="CPA">{campaign.cpa > 0 ? fmtCLP(campaign.cpa) : '--'}</span>
           <span title="CTR">{fmtPct(campaign.ctr)}</span>
