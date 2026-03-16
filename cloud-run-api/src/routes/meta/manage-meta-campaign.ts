@@ -1358,6 +1358,8 @@ export async function manageMetaCampaign(c: Context) {
       if (data.status && data.status !== 'PAUSED') {
         console.log(`[manage-meta-campaign] Overriding status "${data.status}" → PAUSED (CRITERIO policy)`);
         data.status = 'PAUSED';
+      }
+    }
 
     // ── ESPEJO visual check for create actions ──
     if ((action === 'create' || action === 'create_322') && data) {

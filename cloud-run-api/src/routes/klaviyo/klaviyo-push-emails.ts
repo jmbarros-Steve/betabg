@@ -350,10 +350,10 @@ export async function klaviyoPushEmails(c: Context) {
       .select('client_id')
       .eq('id', connection_id)
       .single();
-    const shopId = connInfo?.client_id || 'unknown';
+    const espejoShopId = connInfo?.client_id || 'unknown';
 
     let brandInfo: { brand_name?: string; colors?: string } | null = null;
-    if (shopId !== 'unknown') {
+    if (espejoShopId !== 'unknown') {
       const { data: bi } = await serviceSupabase
         .from('brand_research')
         .select('brand_name, colors')
