@@ -34,6 +34,8 @@ import { editImageGemini } from './ai/edit-image-gemini.js';
 import { criterioMetaHandler } from './ai/criterio-meta.js';
 import { criterioEmail } from './ai/criterio-email.js';
 
+import { espejoHandler } from './ai/espejo.js';
+
 // Phase 2: Analytics
 import { syncCompetitorAds } from './analytics/sync-competitor-ads.js';
 import { deepDiveCompetitor } from './analytics/deep-dive-competitor.js';
@@ -163,6 +165,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/edit-image-gemini', authMiddleware, editImageGemini);
   app.post('/api/criterio-meta', authMiddleware, criterioMetaHandler);
   app.post('/api/criterio-email', authMiddleware, criterioEmail);
+
+  app.post('/api/espejo', authMiddleware, espejoHandler);
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
   app.post('/api/deep-dive-competitor', authMiddleware, deepDiveCompetitor);
   app.post('/api/fetch-campaign-adsets', authMiddleware, fetchCampaignAdsets);

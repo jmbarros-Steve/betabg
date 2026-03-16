@@ -2,6 +2,8 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioEmailEvaluate } from '../ai/criterio-email.js';
 
+import { espejoEmail } from '../ai/espejo.js';
+
 const KLAVIYO_REVISION = '2024-10-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
 
@@ -342,17 +344,62 @@ export async function klaviyoPushEmails(c: Context) {
     const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
     const results: Array<{ email_subject: string; template_id: string; campaign_id: string; status: string }> = [];
 
+    // Fetch client_id and brand info for ESPEJO evaluation
+    const { data: connInfo } = await serviceSupabase
+      .from('platform_connections')
+      .select('client_id')
+      .eq('id', connection_id)
+      .single();
+    const shopId = connInfo?.client_id || 'unknown';
+
+    let brandInfo: { brand_name?: string; colors?: string } | null = null;
+    if (shopId !== 'unknown') {
+      const { data: bi } = await serviceSupabase
+        .from('brand_research')
+        .select('brand_name, colors')
+        .eq('shop_id', shopId)
+        .maybeSingle();
+      brandInfo = bi;
+    }
+
     for (let i = 0; i < emails.length; i++) {
       const email = emails[i];
       const emailName = `${plan.name} - Email ${i + 1}: ${email.subject}`;
 
       console.log(`[${i + 1}/${emails.length}] Creating campaign: ${emailName}`);
 
-      // 1. Create template
+      // ── ESPEJO visual check ──
+      const emailHtml = generateEmailHtml(email);
+      try {
+        const espejoResult = await espejoEmail(
+          emailHtml,
+          shopId,
+          `klaviyo-plan-${plan_id}-email-${i}`,
+          brandInfo?.colors || '#000000',
+          brandInfo?.brand_name || plan.name || 'Brand'
+        );
+
+        if (!espejoResult.pass) {
+          console.log(`[klaviyo-push-emails] ESPEJO rejected email ${i + 1}: score=${espejoResult.score}`);
+          results.push({
+            email_subject: email.subject,
+            template_id: '',
+            campaign_id: '',
+            status: `espejo_rejected (score=${espejoResult.score}, issues: ${espejoResult.issues.join('; ')})`,
+          });
+          continue;
+        }
+        console.log(`[klaviyo-push-emails] ESPEJO approved email ${i + 1}: score=${espejoResult.score}`);
+      } catch (espejoErr: any) {
+        // ESPEJO failure should not block email push — log and continue
+        console.warn(`[klaviyo-push-emails] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
+      }
+
+      // 1. Create template (reuse emailHtml from ESPEJO check above)
       const templateId = await createTemplate(
         apiKey,
         emailName,
-        generateEmailHtml(email),
+        emailHtml,
         email.content,
       );
       console.log(`  Template created: ${templateId}`);
