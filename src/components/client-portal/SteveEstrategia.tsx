@@ -38,6 +38,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const initRef = useRef(false);
 
   const suggestedQuestions = [
     '¿Cómo están mis campañas de Meta este mes?',
@@ -47,6 +48,8 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   ];
 
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
     initializeConversation();
   }, [clientId]);
 

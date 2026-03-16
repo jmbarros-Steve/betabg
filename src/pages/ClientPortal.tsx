@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,13 @@ export default function ClientPortal() {
   const [loadingClient, setLoadingClient] = useState(false);
   const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
   const [defaultTabResolved, setDefaultTabResolved] = useState(false);
+  const userNavigatedRef = useRef(false);
+
+  // Wrapper for user-initiated tab navigation — prevents resolveDefaultTab from overriding
+  const handleUserNavigate = (tab: TabType) => {
+    userNavigatedRef.current = true;
+    setActiveTab(tab);
+  };
 
   // Track visited tabs so they stay mounted (preserves state like in-flight API calls)
   useEffect(() => {
@@ -69,7 +76,7 @@ export default function ClientPortal() {
   useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
-      if (tab) setActiveTab(tab as TabType);
+      if (tab) handleUserNavigate(tab as TabType);
     };
     window.addEventListener('steve:navigate-tab', handler);
     return () => window.removeEventListener('steve:navigate-tab', handler);
@@ -164,12 +171,17 @@ export default function ClientPortal() {
 
     async function resolveDefaultTab() {
       try {
+        // If user already clicked a tab before this async work finishes, don't override
+        if (userNavigatedRef.current) return;
+
         // Check if user has platform connections
         const { data: connections } = await supabase
           .from('platform_connections')
           .select('id')
           .eq('client_id', id)
           .limit(1);
+
+        if (userNavigatedRef.current) return;
 
         const hasConnections = connections && connections.length > 0;
 
@@ -185,6 +197,8 @@ export default function ClientPortal() {
             .eq('client_id', id)
             .limit(1);
 
+          if (userNavigatedRef.current) return;
+
           const hasBrief = brief && brief.length > 0;
 
           if (!hasBrief) {
@@ -199,8 +213,10 @@ export default function ClientPortal() {
         }
       } catch (e) {
         // On error, default to metrics
-        setActiveTab('metrics');
-        setVisitedTabs(new Set(['metrics']));
+        if (!userNavigatedRef.current) {
+          setActiveTab('metrics');
+          setVisitedTabs(new Set(['metrics']));
+        }
       } finally {
         setDefaultTabResolved(true);
       }
@@ -319,7 +335,7 @@ export default function ClientPortal() {
           {primaryTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleUserNavigate(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 activeTab === tab.id
                   ? 'bg-primary text-white shadow-md'
@@ -347,7 +363,7 @@ export default function ClientPortal() {
               {secondaryTabs.map((tab) => (
                 <DropdownMenuItem
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleUserNavigate(tab.id)}
                   className={`flex items-center gap-2 text-sm ${activeTab === tab.id ? 'bg-primary/10 text-primary' : ''}`}
                 >
                   <tab.icon className="w-4 h-4" />
@@ -360,7 +376,7 @@ export default function ClientPortal() {
 
         {/* Setup Progress Tracker */}
         {effectiveClientId && (
-          <SetupProgressTracker clientId={effectiveClientId} onNavigate={(tab) => setActiveTab(tab as TabType)} />
+          <SetupProgressTracker clientId={effectiveClientId} onNavigate={(tab) => handleUserNavigate(tab as TabType)} />
         )}
 
         {/* Content — tabs stay mounted once visited so in-flight requests complete */}
@@ -398,7 +414,7 @@ export default function ClientPortal() {
               <TabErrorBoundary tabName="Brief">
                 <BrandBriefView
                   clientId={effectiveClientId}
-                  onEditBrief={() => setActiveTab('steve')}
+                  onEditBrief={() => handleUserNavigate('steve')}
                 />
               </TabErrorBoundary>
             </div>
@@ -485,14 +501,14 @@ export default function ClientPortal() {
       {/* Onboarding Modal — disabled */}
 
       {/* Cmd+K Command Palette */}
-      <CommandPalette onNavigate={(tab) => setActiveTab(tab as TabType)} />
+      <CommandPalette onNavigate={(tab) => handleUserNavigate(tab as TabType)} />
 
       {/* Onboarding removed */}
 
       {/* Mobile Bottom Navigation */}
       <BottomNav
         activeTab={activeTab}
-        onNavigate={(tab) => setActiveTab(tab as TabType)}
+        onNavigate={(tab) => handleUserNavigate(tab as TabType)}
         secondaryTabs={[
           { id: 'brief', label: 'Brief', icon: <FileText className="w-5 h-5" /> },
           ...secondaryTabs.map((t) => ({
