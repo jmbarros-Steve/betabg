@@ -626,10 +626,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Automatizaciones</h3>
-          <p className="text-sm text-muted-foreground">Envia emails automaticamente segun el comportamiento del cliente</p>
+          <p className="text-sm text-muted-foreground">Envía emails automáticamente según el comportamiento del cliente</p>
         </div>
         <Button size="lg" onClick={() => setShowTriggerPicker(true)} className="gap-2">
-          <Plus className="w-5 h-5" /> Nueva Automatizacion
+          <Plus className="w-5 h-5" /> Nueva Automatización
         </Button>
       </div>
 
@@ -643,10 +643,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             </div>
             <h4 className="text-lg font-semibold mb-2">Automatiza tus emails</h4>
             <p className="text-muted-foreground max-w-md mb-6">
-              Las automatizaciones envian emails automaticamente cuando algo ocurre en tu tienda.
+              Las automatizaciones envían emails automáticamente cuando algo ocurre en tu tienda.
             </p>
             <Button size="lg" onClick={() => setShowTriggerPicker(true)} className="gap-2">
-              <Plus className="w-5 h-5" /> Crear automatizacion
+              <Plus className="w-5 h-5" /> Crear automatización
             </Button>
           </CardContent>
         </Card>
@@ -706,7 +706,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
 
       <Dialog open={showTriggerPicker} onOpenChange={setShowTriggerPicker}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Nueva Automatizacion</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Nueva Automatización</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground mb-4">Elige cuando se activara:</p>
           <div className="space-y-2">
             {Object.entries(TRIGGER_CONFIG).map(([key, config]) => {
