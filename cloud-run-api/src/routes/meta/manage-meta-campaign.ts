@@ -1382,16 +1382,11 @@ export async function manageMetaCampaign(c: Context) {
           );
 
           if (!espejoResult.pass) {
-            console.log(`[manage-meta-campaign] ESPEJO rejected ad image: score=${espejoResult.score}`);
-            return c.json({
-              error: 'ESPEJO rechazó la imagen del anuncio',
-              score: espejoResult.score,
-              issues: espejoResult.issues,
-              details: espejoResult.details,
-            }, 422);
+            // ESPEJO is advisory only — log warning but do NOT block campaign creation
+            console.warn(`[manage-meta-campaign] ESPEJO advisory: ad image score=${espejoResult.score}, issues=${JSON.stringify(espejoResult.issues)}`);
+          } else {
+            console.log(`[manage-meta-campaign] ESPEJO approved ad image: score=${espejoResult.score}`);
           }
-
-          console.log(`[manage-meta-campaign] ESPEJO approved ad image: score=${espejoResult.score}`);
         } catch (espejoErr: any) {
           // ESPEJO failure should not block campaign creation — log and continue
           console.warn(`[manage-meta-campaign] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);

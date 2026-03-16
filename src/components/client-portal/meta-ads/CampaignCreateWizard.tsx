@@ -2454,7 +2454,15 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle CRITERIO structured errors with proper message
+        if (typeof error === 'object' && (error as any)?.failed_rules) {
+          const e = error as any;
+          const topIssues = (e.failed_rules || []).slice(0, 3).map((r: any) => r.details || r.rule_id).join('; ');
+          throw new Error(`CRITERIO rechazó (score ${e.score}%): ${topIssues}`);
+        }
+        throw typeof error === 'string' ? new Error(error) : error;
+      }
 
       // Save creative to ad_creatives library
       try {
