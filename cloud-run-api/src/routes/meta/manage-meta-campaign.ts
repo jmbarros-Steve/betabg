@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { espejoAd } from '../ai/espejo.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -1305,6 +1306,44 @@ export async function manageMetaCampaign(c: Context) {
           console.log(`[manage-meta-campaign] Auto-resolved page_id: ${pageId}`);
         }
       } catch (_) { /* ignore */ }
+    }
+
+    // ── ESPEJO visual check for create actions ──
+    if ((action === 'create' || action === 'create_322') && data) {
+      const adImageUrl = data.image_url || data.images?.[0];
+      if (adImageUrl) {
+        try {
+          // Fetch brand info for ESPEJO evaluation
+          const { data: brandInfo } = await supabase
+            .from('brand_research')
+            .select('brand_name, colors')
+            .eq('shop_id', connection.client_id)
+            .maybeSingle();
+
+          const espejoResult = await espejoAd(
+            adImageUrl,
+            connection.client_id,
+            data.name || 'pre-create',
+            brandInfo?.colors || '#000000',
+            brandInfo?.brand_name || 'Brand'
+          );
+
+          if (!espejoResult.pass) {
+            console.log(`[manage-meta-campaign] ESPEJO rejected ad image: score=${espejoResult.score}`);
+            return c.json({
+              error: 'ESPEJO rechazó la imagen del anuncio',
+              score: espejoResult.score,
+              issues: espejoResult.issues,
+              details: espejoResult.details,
+            }, 422);
+          }
+
+          console.log(`[manage-meta-campaign] ESPEJO approved ad image: score=${espejoResult.score}`);
+        } catch (espejoErr: any) {
+          // ESPEJO failure should not block campaign creation — log and continue
+          console.warn(`[manage-meta-campaign] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
+        }
+      }
     }
 
     // Route to the appropriate action handler
