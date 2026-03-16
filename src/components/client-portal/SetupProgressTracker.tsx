@@ -26,9 +26,9 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
       const hasMeta = connections?.some(c => c.platform === "meta" && c.is_active) ?? false;
       const hasGoogle = connections?.some(c => c.platform === "google" && c.is_active) ?? false;
 
-      // Check brief
+      // Check brief (stored in brand_research table)
       const { data: briefs } = await supabase
-        .from("brand_briefs")
+        .from("brand_research")
         .select("id")
         .eq("client_id", clientId)
         .limit(1);

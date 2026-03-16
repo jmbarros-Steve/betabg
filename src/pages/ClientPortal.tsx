@@ -180,7 +180,7 @@ export default function ClientPortal() {
         } else {
           // Has connections: check if brief exists
           const { data: brief } = await supabase
-            .from('brand_briefs')
+            .from('brand_research')
             .select('id')
             .eq('client_id', id)
             .limit(1);
@@ -209,7 +209,7 @@ export default function ClientPortal() {
     resolveDefaultTab();
   }, [defaultTabResolved, roleLoading, authLoading, isAdminView, urlClientId, clientData?.id]);
 
-  // Fetch client logo
+  // Fetch client logo (validate URL before setting to avoid broken images)
   useEffect(() => {
     const id = isAdminView ? urlClientId : clientData?.id;
     if (!id) return;
@@ -219,7 +219,12 @@ export default function ClientPortal() {
       .eq('id', id)
       .single()
       .then(({ data }) => {
-        if (data?.logo_url) setClientLogoUrl(data.logo_url);
+        if (data?.logo_url) {
+          const img = new Image();
+          img.onload = () => setClientLogoUrl(data.logo_url);
+          img.onerror = () => { /* skip broken logo */ };
+          img.src = data.logo_url;
+        }
       });
   }, [clientData?.id, urlClientId, isAdminView]);
 
