@@ -120,14 +120,39 @@ test.describe('Steve Mail Editor v2 — QA Intensiva', () => {
     const gjsEditor = page.locator('.gjs-editor').first();
     await expect(gjsEditor).toBeVisible({ timeout: 10000 });
 
+    // Ensure blocks panel is open — click the blocks tab button if available
+    await page.evaluate(() => {
+      // GrapeJS views panel: click the blocks button to ensure panel is active
+      const blocksBtn = document.querySelector('.gjs-pn-btn[data-tooltip="Open Blocks"], .gjs-pn-btn.fa-th-large, [data-gjs-type="open-blocks"]') as HTMLElement;
+      if (blocksBtn) blocksBtn.click();
+      // Also expand all collapsed block categories
+      document.querySelectorAll('.gjs-block-category.gjs-block-category--closed, .gjs-block-category').forEach((cat) => {
+        const title = cat.querySelector('.gjs-title') as HTMLElement;
+        if (title && (cat as HTMLElement).classList.contains('gjs-block-category--closed')) {
+          title.click();
+        }
+      });
+    });
+    await page.waitForTimeout(1500);
+
     // Check block manager is visible
     const blocks = page.locator('.gjs-blocks-c, .gjs-block-categories').first();
     await expect(blocks).toBeVisible({ timeout: 5000 });
+
+    // Wait for at least one .gjs-block to appear (GrapeJS renders blocks async)
+    await page.waitForSelector('.gjs-block', { timeout: 8000 }).catch(() => {});
 
     // Check Steve custom blocks exist in DOM (4 custom + newsletter preset blocks)
     const steveBlocks = ['Productos', 'Descuento', 'Cuenta Regresiva', 'Boton Diseno'];
 
     const blockCheckResult = await page.evaluate((labels: string[]) => {
+      // Expand any collapsed categories first
+      document.querySelectorAll('.gjs-block-category').forEach((cat) => {
+        if ((cat as HTMLElement).style.display === 'none' || (cat as HTMLElement).classList.contains('gjs-block-category--closed')) {
+          const title = cat.querySelector('.gjs-title') as HTMLElement;
+          if (title) title.click();
+        }
+      });
       const allBlocks = Array.from(document.querySelectorAll('.gjs-block'));
       const allLabels = allBlocks.map(b => (b.textContent || '').trim());
       const found: string[] = [];
