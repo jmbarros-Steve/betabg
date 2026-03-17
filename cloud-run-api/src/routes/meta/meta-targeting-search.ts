@@ -93,7 +93,9 @@ export async function metaTargetingSearch(c: Context) {
       url.searchParams.set('type', 'adinterest');
       url.searchParams.set('limit', '15');
 
-      const response = await fetch(url.toString());
+      const response = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${decryptedToken}` },
+      });
       const data: any = await response.json();
 
       if (data?.data) {
@@ -120,7 +122,9 @@ export async function metaTargetingSearch(c: Context) {
         url.searchParams.set('location_types', JSON.stringify(['country', 'region', 'city']));
       }
 
-      const response = await fetch(url.toString());
+      const response = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${decryptedToken}` },
+      });
       const data: any = await response.json();
 
       if (data?.data) {
