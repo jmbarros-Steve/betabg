@@ -94,6 +94,7 @@ import { autoPostmortem } from './cron/auto-postmortem.js';
 import { restartService } from './cron/restart-service.js';
 import { fatigueDetector } from './cron/fatigue-detector.js';
 import { performanceEvaluator } from './cron/performance-evaluator.js';
+import { performanceTrackerMeta } from './cron/performance-tracker-meta.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
