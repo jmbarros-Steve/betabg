@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getCreativeContext } from '../../lib/creative-context.js';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -914,6 +915,17 @@ export async function steveChat(c: Context) {
       metricsContext = '\nMÉTRICAS: El cliente aún no tiene plataformas conectadas (Meta, Google, Shopify).\n';
     }
 
+    // D.4: Inject creative performance history when user asks about campaigns/ads
+    const wantsCreative = mensajeLower.includes('campaña') || mensajeLower.includes('campaign') ||
+      mensajeLower.includes('anuncio') || mensajeLower.includes('copy') ||
+      mensajeLower.includes('crear') || mensajeLower.includes('generar') ||
+      mensajeLower.includes('email') || mensajeLower.includes('ads');
+    let creativeHistoryCtx = '';
+    if (wantsCreative) {
+      const channel = mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' : 'meta';
+      creativeHistoryCtx = await getCreativeContext(client_id, channel);
+    }
+
     const estrategiaSystemPrompt = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el consultor estratégico del cliente.
 
 PERSONALIDAD:
@@ -940,7 +952,7 @@ ${briefSummary}
 ${researchContext ? `INVESTIGACIÓN DE MARCA:\n${researchContext}\n` : ''}
 ${metricsContext}
 ${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
-
+${creativeHistoryCtx}
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;

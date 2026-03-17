@@ -1,9 +1,10 @@
 import { Context } from 'hono';
+import { getCreativeContext } from '../../lib/creative-context.js';
 
 export async function generateMassCampaigns(c: Context) {
   try {
   const body = await c.req.json();
-  const { templateBlocks, campaign, shopUrl, colors, previousEmails, logoUrl, fontFamily } = body;
+  const { templateBlocks, campaign, shopUrl, colors, previousEmails, logoUrl, fontFamily, clientId } = body;
 
   console.log('Request received:', JSON.stringify({
     hasTemplateBlocks: !!templateBlocks,
@@ -33,6 +34,12 @@ export async function generateMassCampaigns(c: Context) {
   if (previousEmails) {
     signatureHint = `\nREFERENCIA DE TONO Y FIRMA (extraído de mails anteriores del cliente — úsalo como guía de estilo y firma):
 ${previousEmails.substring(0, 3000)}`;
+  }
+
+  // D.4: Inject creative performance history when clientId is available
+  let creativeHistoryHint = '';
+  if (clientId) {
+    creativeHistoryHint = await getCreativeContext(clientId, 'klaviyo');
   }
 
   const systemPrompt = `Eres Steve, copywriter experto en email marketing para e-commerce chileno.
@@ -84,7 +91,7 @@ URLS SHOPIFY:
 
 COLORES: primario ${primaryColor}, botón ${buttonColor}, texto botón ${buttonTextColor}
 ${signatureHint}
-
+${creativeHistoryHint}
 Responde SOLO con el array JSON de bloques. Sin explicación, sin markdown, sin backticks. Solo JSON puro.`;
 
   const userMessage = `Genera un email COMPLETO y ORIGINAL para esta campaña:
