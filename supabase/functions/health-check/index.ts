@@ -6,6 +6,76 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ── Squad assignment por endpoint ──
+function getSquadForEndpoint(name: string): string {
+  if (name.match(/meta|campaign|audience|pixel|social-inbox|competitor/)) return 'marketing';
+  if (name.match(/klaviyo|email|flow/)) return 'marketing';
+  if (name.match(/steve-chat|steve-strategy|generate-copy|analyze-brand/)) return 'producto';
+  if (name.match(/cloud-run|shopify-session|oauth/)) return 'infra';
+  if (name.match(/shopify|google/)) return 'marketing';
+  return 'producto';
+}
+
+// ── Task creation with deduplication (mirrors src/lib/task-creator.ts) ──
+async function createHealthTask(
+  supabase: any,
+  endpoint: string,
+  isSlow: boolean,
+  details: { status: number; time_ms: number; error: string | null }
+) {
+  const title = isSlow
+    ? `Endpoint lento: ${endpoint} (${details.time_ms}ms)`
+    : `Endpoint caído: ${endpoint}`;
+
+  // Dedup: don't create if pending/in_progress task with same title exists
+  const { data: existing } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('title', title)
+    .in('status', ['pending', 'in_progress'])
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    console.log(`[health-check] Task already exists for "${title}", skipping`);
+    return { created: false, reason: 'duplicate' };
+  }
+
+  const squad = getSquadForEndpoint(endpoint);
+  const description = isSlow
+    ? `OJOS detectó que el endpoint "${endpoint}" respondió en ${details.time_ms}ms (límite: 3000ms). HTTP ${details.status}.`
+    : `OJOS detectó que el endpoint "${endpoint}" está caído. HTTP ${details.status}. Error: ${details.error || 'N/A'}.`;
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      title,
+      description,
+      priority: isSlow ? 'high' : 'critical',
+      type: 'fix',
+      source: 'ojos',
+      assigned_squad: squad,
+      status: 'pending',
+      attempts: 0,
+      spec: {
+        endpoint,
+        http_status: details.status,
+        time_ms: details.time_ms,
+        error: details.error,
+        detected_at: new Date().toISOString(),
+      },
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`[health-check] Failed to create task for ${endpoint}:`, error.message);
+    return { created: false, reason: error.message };
+  }
+
+  console.log(`[health-check] Task created: ${title} → squad=${squad}`);
+  return { created: true, task_id: data.id };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -85,7 +155,7 @@ serve(async (req) => {
       })
     }
 
-    // Si hay fallos o endpoints lentos → guardar en qa_log
+    // Si hay fallos o endpoints lentos → guardar en qa_log + crear tasks
     if (failed.length > 0 || slow.length > 0) {
       for (const f of [...failed, ...slow]) {
         await supabase.from('qa_log').insert({
@@ -97,6 +167,13 @@ serve(async (req) => {
             time_ms: f.time_ms,
             error: f.error,
           },
+        })
+
+        // Crear task en tabla tasks para que CEREBRO lo asigne
+        await createHealthTask(supabase, f.name, f.ok, {
+          status: f.status,
+          time_ms: f.time_ms,
+          error: f.error,
         })
       }
 
