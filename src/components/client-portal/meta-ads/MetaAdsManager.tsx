@@ -345,10 +345,16 @@ function DashboardSection({ clientId }: { clientId: string }) {
       <Card className="border-dashed">
         <CardContent className="py-16 text-center">
           <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
+          <h3 className="text-lg font-semibold mb-2">Conecta Meta Ads para ver tu dashboard</h3>
           <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            Conecta tu cuenta de Meta Ads desde la pestaña de <strong>Conexiones</strong> para comenzar
-            a ver tus métricas y gestionar campañas.
+            Conecta tu cuenta de Meta Ads desde{' '}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('steve:navigate-tab', { detail: { tab: 'connections' } }))}
+              className="text-primary hover:underline font-semibold"
+            >
+              Conexiones
+            </button>{' '}
+            para ver métricas de gasto, ROAS y rendimiento de campañas.
           </p>
         </CardContent>
       </Card>
@@ -880,6 +886,41 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
     selectPortfolio,
   }), [selectedAssets, hierarchyLoading, portfolioSwitching, lastSyncAt, businessGroups, allPortfolios, selectPortfolio]);
 
+  // Contextual empty state content per tab
+  const getEmptyStateTitle = (key: SectionKey): string => {
+    const titles: Record<string, string> = {
+      'dashboard': 'Conecta Meta Ads para ver tu dashboard',
+      'tree-view': 'Conecta Meta Ads para ver tus campañas',
+      'create-wizard': 'Conecta Meta Ads para crear campañas',
+      'campaigns': 'Conecta Meta Ads para gestionar campañas',
+      'create-ad': 'Conecta Meta Ads para crear anuncios',
+      'audiences': 'Conecta Meta Ads para crear audiencias',
+      'analytics': 'Conecta Meta Ads para ver análisis',
+      'social-inbox': 'Conecta Meta Ads para tu bandeja social',
+      'rules': 'Conecta Meta Ads para crear reglas automáticas',
+      'drafts': 'Conecta Meta Ads para ver borradores',
+      'pixel': 'Configurar Meta Pixel',
+    };
+    return titles[key] || 'Conecta Meta Ads';
+  };
+
+  const getEmptyStateDescription = (key: SectionKey): string => {
+    const descriptions: Record<string, string> = {
+      'dashboard': 'Conecta tu cuenta de Meta Ads para ver métricas de gasto, ROAS, y rendimiento de tus campañas.',
+      'tree-view': 'Podrás ver todas tus campañas organizadas por estado, con métricas en tiempo real.',
+      'create-wizard': 'Crea campañas de conversión, tráfico o awareness directamente desde Steve.',
+      'campaigns': 'Gestiona campañas existentes: pausa, activa, edita presupuestos y segmentación.',
+      'create-ad': 'Diseña anuncios con IA: genera copys, imágenes y videos optimizados.',
+      'audiences': 'Crea audiencias personalizadas y lookalikes basadas en tus datos de clientes.',
+      'analytics': 'Análisis detallado de rendimiento con gráficos de tendencia y comparativas.',
+      'social-inbox': 'Responde mensajes de Facebook e Instagram desde un solo lugar.',
+      'rules': 'Automatiza acciones como pausar campañas con bajo ROAS o escalar las que funcionan.',
+      'drafts': 'Tus borradores de campañas y anuncios aparecerán aquí.',
+      'pixel': 'El Meta Pixel te permite rastrear conversiones en tu sitio web. Puedes configurarlo desde Meta Business Suite o pedirle a tu desarrollador que lo instale.',
+    };
+    return descriptions[key] || 'Conecta tu cuenta desde la pestaña de Conexiones.';
+  };
+
   // Render section (lazy mount pattern)
   const renderSection = (key: SectionKey) => {
     if (!visitedSections.has(key)) return null;
@@ -1010,7 +1051,13 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Sin conexión a Meta Ads</h3>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                  Conecta tu cuenta de Meta Ads desde la pestaña de <strong>Conexiones</strong>.
+                  Conecta tu cuenta de Meta Ads desde la pestaña de{' '}
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('steve:navigate-tab', { detail: { tab: 'connections' } }))}
+                    className="text-primary hover:underline font-semibold"
+                  >
+                    Conexiones
+                  </button>.
                 </p>
               </CardContent>
             </Card>
@@ -1141,7 +1188,45 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             <div key={`portfolio-${selectedAssets.adAccountId}`}>
               {NAV_ITEMS.map((item) => renderSection(item.key))}
             </div>
-          ) : null}
+          ) : (
+            /* No connection or no account selected — still render tabs that work without Meta */
+            <div>
+              {NAV_ITEMS.map((item) => {
+                const isActive = activeSection === item.key;
+                if (!visitedSections.has(item.key)) return null;
+                // Tabs that work without Meta connection
+                if (item.key === 'library' || item.key === 'competitors') {
+                  return (
+                    <div key={item.key} className={isActive ? 'block' : 'hidden'}>
+                      {item.key === 'library' && <AdCreativesLibrary clientId={clientId} />}
+                      {item.key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
+                    </div>
+                  );
+                }
+                // Contextual empty states for tabs that need Meta
+                if (!isActive) return null;
+                return (
+                  <Card key={item.key} className="border-dashed">
+                    <CardContent className="py-12 text-center">
+                      <item.icon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+                      <h3 className="text-base font-semibold mb-2">{getEmptyStateTitle(item.key)}</h3>
+                      <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                        {getEmptyStateDescription(item.key)}
+                      </p>
+                      {item.key !== 'pixel' && (
+                        <button
+                          onClick={() => window.dispatchEvent(new CustomEvent('steve:navigate-tab', { detail: { tab: 'connections' } }))}
+                          className="mt-3 text-sm text-primary hover:underline font-medium"
+                        >
+                          Ir a Conexiones
+                        </button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </main>
       </div>
     </MetaBusinessContext.Provider>
