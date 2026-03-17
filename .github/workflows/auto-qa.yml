@@ -58,29 +58,42 @@ jobs:
           FAILED_LIST=$(echo '${{ steps.health.outputs.response }}' | \
             jq -r '[.endpoints[] | select(.ok == false) | .name] | join(", ")' 2>/dev/null || echo "unknown")
 
-          curl -s -X POST \
-            "${SUPABASE_URL}/rest/v1/tasks" \
-            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d "$(jq -n \
-              --arg title "🚨 Auto-QA: ${{ steps.health.outputs.failed }} endpoints fallaron post-deploy" \
-              --arg desc "Commit: ${{ github.sha }}\nEndpoints caídos: ${FAILED_LIST}\n\nResultado completo del health-check adjunto en spec." \
-              --arg spec "${{ steps.health.outputs.response }}" \
-              '{
-                title: $title,
-                description: $desc,
-                priority: "critical",
-                type: "fix",
-                source: "ojos",
-                assigned_squad: "infra",
-                status: "pending",
-                attempts: 0,
-                spec: ($spec | fromjson? // {raw: $spec})
-              }')"
+          TITLE="Auto-QA: ${{ steps.health.outputs.failed }} endpoints fallaron post-deploy"
 
-          echo "✅ Task created in Supabase"
+          # Dedup: check if task with same title already exists in pending/in_progress
+          ENCODED_TITLE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${TITLE}'))")
+          EXISTING=$(curl -s \
+            "${SUPABASE_URL}/rest/v1/tasks?title=eq.${ENCODED_TITLE}&status=in.(pending,in_progress)&select=id" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+
+          if [ "$EXISTING" != "[]" ] && [ -n "$EXISTING" ]; then
+            echo "⏭️  Task already exists, skipping: $EXISTING"
+          else
+            curl -s -X POST \
+              "${SUPABASE_URL}/rest/v1/tasks" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              -d "$(jq -n \
+                --arg title "$TITLE" \
+                --arg desc "Commit: ${{ github.sha }}\nEndpoints caídos: ${FAILED_LIST}\n\nResultado completo del health-check adjunto en spec." \
+                --arg spec "${{ steps.health.outputs.response }}" \
+                '{
+                  title: $title,
+                  description: $desc,
+                  priority: "critical",
+                  type: "fix",
+                  source: "ojos",
+                  assigned_squad: "infra",
+                  status: "pending",
+                  attempts: 0,
+                  spec: ($spec | fromjson? // {raw: $spec})
+                }')"
+
+            echo "✅ Task created in Supabase"
+          fi
 
       - name: Fail workflow if endpoints down
         if: steps.health.outputs.failed != '0' && steps.health.outputs.failed != ''
@@ -221,44 +234,56 @@ jobs:
           if [ "$FAILURES" -gt 0 ]; then
             echo "🚨 Failed: $FAILED_TESTS"
 
-            # Build JSON payload first to debug
-            PAYLOAD=$(jq -n \
-              --arg title "QA: Smoke test — ${FAILURES} checks fallaron post-deploy" \
-              --arg desc "Commit: ${{ github.sha }}. Failed: ${FAILED_TESTS}. Triggered by push to main." \
-              --arg sha "${{ github.sha }}" \
-              '{
-                title: $title,
-                description: $desc,
-                priority: "alta",
-                type: "bug",
-                source: "ojos",
-                assigned_squad: "producto",
-                status: "pending",
-                attempts: 0,
-                spec: { commit: $sha, trigger: "auto-qa-smoke" }
-              }')
+            TITLE="QA: Smoke test — ${FAILURES} checks fallaron post-deploy"
 
-            echo "📦 Payload: $PAYLOAD"
-
-            TASK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              "${SUPABASE_URL}/rest/v1/tasks" \
+            # Dedup: check if task with same title already exists in pending/in_progress
+            ENCODED_TITLE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${TITLE}'))")
+            EXISTING=$(curl -s \
+              "${SUPABASE_URL}/rest/v1/tasks?title=eq.${ENCODED_TITLE}&status=in.(pending,in_progress)&select=id" \
               -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-              -H "Content-Type: application/json" \
-              -H "Prefer: return=representation" \
-              -d "$PAYLOAD")
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
 
-            TASK_HTTP=$(echo "$TASK_RESPONSE" | tail -1)
-            TASK_BODY=$(echo "$TASK_RESPONSE" | sed '$d')
-
-            echo "📡 Supabase response: HTTP $TASK_HTTP"
-            echo "$TASK_BODY" | jq '.[0].id // .' 2>/dev/null || echo "$TASK_BODY"
-
-            if [ "$TASK_HTTP" = "201" ]; then
-              echo "✅ Task created in Supabase"
+            if [ "$EXISTING" != "[]" ] && [ -n "$EXISTING" ]; then
+              echo "⏭️  Task already exists, skipping: $EXISTING"
             else
-              echo "❌ Failed to create task (HTTP $TASK_HTTP)"
-              echo "$TASK_BODY"
+              PAYLOAD=$(jq -n \
+                --arg title "$TITLE" \
+                --arg desc "Commit: ${{ github.sha }}. Failed: ${FAILED_TESTS}. Triggered by push to main." \
+                --arg sha "${{ github.sha }}" \
+                '{
+                  title: $title,
+                  description: $desc,
+                  priority: "alta",
+                  type: "bug",
+                  source: "ojos",
+                  assigned_squad: "producto",
+                  status: "pending",
+                  attempts: 0,
+                  spec: { commit: $sha, trigger: "auto-qa-smoke" }
+                }')
+
+              echo "📦 Payload: $PAYLOAD"
+
+              TASK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                "${SUPABASE_URL}/rest/v1/tasks" \
+                -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+                -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+                -H "Content-Type: application/json" \
+                -H "Prefer: return=representation" \
+                -d "$PAYLOAD")
+
+              TASK_HTTP=$(echo "$TASK_RESPONSE" | tail -1)
+              TASK_BODY=$(echo "$TASK_RESPONSE" | sed '$d')
+
+              echo "📡 Supabase response: HTTP $TASK_HTTP"
+              echo "$TASK_BODY" | jq '.[0].id // .' 2>/dev/null || echo "$TASK_BODY"
+
+              if [ "$TASK_HTTP" = "201" ]; then
+                echo "✅ Task created in Supabase"
+              else
+                echo "❌ Failed to create task (HTTP $TASK_HTTP)"
+                echo "$TASK_BODY"
+              fi
             fi
           fi
 

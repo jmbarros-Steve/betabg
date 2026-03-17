@@ -18,9 +18,22 @@ export async function callApi<T = any>(
   const { method = 'POST', body } = options;
 
   try {
-    const {
+    // getSession() returns cached token that may be expired.
+    // If expired, force a refresh before using it.
+    let {
       data: { session },
     } = await supabase.auth.getSession();
+
+    if (session?.expires_at) {
+      const now = Math.floor(Date.now() / 1000);
+      // Refresh if token expires within 60 seconds
+      if (session.expires_at - now < 60) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (refreshed?.session) {
+          session = refreshed.session;
+        }
+      }
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -40,6 +53,29 @@ export async function callApi<T = any>(
     });
 
     clearTimeout(timeoutId);
+
+    // On 401, try refreshing session once and retry
+    if (response.status === 401 && session?.access_token) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      if (refreshed?.session?.access_token) {
+        headers['Authorization'] = `Bearer ${refreshed.session.access_token}`;
+        const retryController = new AbortController();
+        const retryTimeout = setTimeout(() => retryController.abort(), 90000);
+        const retryResponse = await fetch(`${API_URL}/api/${functionName}`, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          signal: retryController.signal,
+        });
+        clearTimeout(retryTimeout);
+        if (retryResponse.ok) {
+          const data = await retryResponse.json();
+          return { data, error: null };
+        }
+        const retryError = await retryResponse.json().catch(() => ({}));
+        return { data: null, error: retryError.error || `Error ${retryResponse.status}` };
+      }
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
