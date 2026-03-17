@@ -16,22 +16,17 @@ export async function generateVideo(c: Context) {
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
-    // Check & deduct 10 credits
-    const { data: credits } = await supabase
-      .from('client_credits')
-      .select('id, creditos_disponibles, creditos_usados')
-      .eq('client_id', clientId)
-      .maybeSingle();
+    // Atomically deduct credits BEFORE generating (prevents race condition)
+    const { data: deductResult, error: deductError } = await supabase
+      .rpc('deduct_credits', { p_client_id: clientId, p_amount: VIDEO_CREDIT_COST });
 
-    if (!credits) {
+    if (deductError) {
       return c.json(
         { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
         402
       );
     }
-
-    const available = credits.creditos_disponibles ?? 0;
-    if (available < VIDEO_CREDIT_COST) {
+    if (!deductResult?.[0]?.success) {
       return c.json(
         { error: 'NO_CREDITS', message: `Se necesitan ${VIDEO_CREDIT_COST} créditos para generar un video` },
         402
@@ -83,14 +78,7 @@ export async function generateVideo(c: Context) {
       }).eq('id', creativeId);
     }
 
-    // Deduct credits atomically
-    const { data: deductResult, error: deductError } = await supabase
-      .rpc('deduct_credits', { p_client_id: clientId, p_amount: VIDEO_CREDIT_COST });
-
-    if (deductError || !deductResult?.[0]?.success) {
-      console.error('[generate-video] Atomic credit deduction failed:', deductError || deductResult);
-    }
-
+    // Log credit transaction (credits already deducted above)
     await supabase.from('credit_transactions').insert({
       client_id: clientId,
       accion: 'Generar video — Replicate Kling AI',
