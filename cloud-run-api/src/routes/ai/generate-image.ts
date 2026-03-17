@@ -30,26 +30,28 @@ export async function generateImage(c: Context) {
     return c.json({ error: 'No tienes acceso a este cliente' }, 403);
   }
 
-  // Check & deduct 2 credits
-  const { data: credits } = await supabase
-    .from('client_credits')
-    .select('id, creditos_disponibles, creditos_usados')
-    .eq('client_id', clientId)
-    .maybeSingle();
+  // Atomically deduct 2 credits BEFORE generating (prevents race condition)
+  const { data: deductResult, error: deductError } = await supabase
+    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 2 });
 
-  if (!credits) {
+  if (deductError) {
+    console.error('[generate-image] Credit deduction error:', deductError);
     return c.json(
       { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
       402
     );
   }
-  const available = credits.creditos_disponibles ?? 0;
-  if (available < 2) {
+  if (!deductResult?.[0]?.success) {
     return c.json(
       { error: 'NO_CREDITS', message: 'Se necesitan 2 créditos para generar una imagen' },
       402
     );
   }
+
+  // Helper to refund credits on generation failure
+  const refundCredits = async () => {
+    await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -2 }).catch(() => {});
+  };
 
   // Auto-fetch client reference photos if none provided
   // PRIORITY: Match product mentioned in the copy prompt to use its REAL Shopify photo
@@ -131,10 +133,11 @@ export async function generateImage(c: Context) {
   let imageBytes: Uint8Array | null = null;
 
   if (engine === 'imagen') {
-    // -- Gemini 2.0 Flash native image generation --
+    // -- Gemini 2.5 Flash native image generation --
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       console.error('[generate-image] GEMINI_API_KEY not configured');
+      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -185,6 +188,7 @@ export async function generateImage(c: Context) {
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
       console.error('[generate-image] Gemini Flash error:', geminiResponse.status, errText);
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -200,6 +204,7 @@ export async function generateImage(c: Context) {
 
     if (!imageBytes) {
       console.error('[generate-image] No image in Gemini response:', JSON.stringify(geminiResult).substring(0, 500));
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -208,6 +213,7 @@ export async function generateImage(c: Context) {
     const FAL_API_KEY = process.env.FAL_API_KEY;
     if (!FAL_API_KEY) {
       console.error('[generate-image] FAL_API_KEY not configured');
+      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -239,6 +245,7 @@ export async function generateImage(c: Context) {
     if (!falResponse.ok) {
       const errText = await falResponse.text();
       console.error('[generate-image] Fal.ai API error:', falResponse.status, errText);
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -246,6 +253,7 @@ export async function generateImage(c: Context) {
     imageUrl = falResult.images?.[0]?.url;
     if (!imageUrl) {
       console.error('[generate-image] No image returned from Fal.ai');
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -260,6 +268,7 @@ export async function generateImage(c: Context) {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
       console.error('[generate-image] OPENAI_API_KEY not configured');
+      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -285,6 +294,7 @@ export async function generateImage(c: Context) {
     if (!openaiResponse.ok) {
       const errText = await openaiResponse.text();
       console.error('[generate-image] OpenAI API error:', openaiResponse.status, errText);
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -303,6 +313,7 @@ export async function generateImage(c: Context) {
       imageBytes = new Uint8Array(arrayBuffer);
     } else {
       console.error('[generate-image] No image returned from OpenAI');
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
   }
@@ -325,6 +336,7 @@ export async function generateImage(c: Context) {
 
   if (storageErr) {
     console.error('[generate-image] Storage upload error:', storageErr);
+    await refundCredits();
     return c.json({ error: 'Error guardando la imagen.' }, 500);
   }
 
@@ -340,14 +352,8 @@ export async function generateImage(c: Context) {
     tipo: 'imagen',
   });
 
-  // Deduct credits atomically (prevents race condition with concurrent requests)
+  // Log credit transaction (credits already deducted above)
   const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
-  const { data: deductResult, error: deductError } = await supabase
-    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 2 });
-  if (deductError || !deductResult?.[0]?.success) {
-    console.error('[generate-image] Atomic credit deduction failed:', deductError || deductResult);
-  }
-
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
     accion: `Generar imagen — ${engineLabel}`,
@@ -358,6 +364,7 @@ export async function generateImage(c: Context) {
   return c.json({ asset_url: publicUrl });
   } catch (err: any) {
     console.error('[generate-image]', err);
+    await refundCredits();
     return c.json({ error: 'Error interno del servidor' }, 500);
   }
 }
