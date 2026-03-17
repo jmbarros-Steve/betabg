@@ -272,8 +272,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       }
 
       toast.success('Email generado con Steve AI');
-    } catch (err) {
-      toast.error('Error al generar el email. Inténtalo de nuevo.');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        toast.error('El servidor tardó demasiado. Inténtalo de nuevo.');
+      } else {
+        toast.error(`Error al generar el email: ${err?.message || 'Inténtalo de nuevo.'}`);
+      }
     } finally {
       setGenerating(false);
     }
