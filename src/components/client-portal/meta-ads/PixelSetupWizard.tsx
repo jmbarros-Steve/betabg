@@ -148,6 +148,8 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
   useEffect(() => {
     if (selectedPixel) {
       fetchEvents(selectedPixel.id);
+    } else {
+      setEvents([]);
     }
   }, [selectedPixel, fetchEvents]);
 
