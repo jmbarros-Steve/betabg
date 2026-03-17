@@ -6,10 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Paintbrush, Sparkles, RotateCcw } from 'lucide-react';
 import { callApi } from '@/lib/api';
-import type { SteveMailEditorRef } from './SteveMailEditor';
+import type { BlocksEditorRef } from './BlocksEditorWrapper';
 
 interface GlobalStylesPanelProps {
-  editorRef: React.RefObject<SteveMailEditorRef | null>;
+  editorRef: React.RefObject<BlocksEditorRef | null>;
   clientId: string;
 }
 

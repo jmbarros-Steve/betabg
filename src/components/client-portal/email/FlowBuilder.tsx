@@ -14,7 +14,7 @@ import {
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Settings2,
   Cake, Eye, Search,
 } from 'lucide-react';
-import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
+import { BlocksEditorWrapper, type BlocksEditorRef } from './BlocksEditorWrapper';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { FlowCanvas } from './FlowCanvas';
@@ -176,7 +176,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
-  const emailEditorRef = useRef<SteveMailEditorRef>(null);
+  const emailEditorRef = useRef<BlocksEditorRef>(null);
   const [, setEditorReady] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -396,7 +396,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         </div>
         <div className="flex-1 min-h-0 relative">
           <div className="absolute inset-0">
-            <SteveMailEditor
+            <BlocksEditorWrapper
               ref={emailEditorRef}
               onReady={() => {
                 setEditorReady(true);
