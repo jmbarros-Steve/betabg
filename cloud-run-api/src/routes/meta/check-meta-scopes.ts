@@ -42,7 +42,12 @@ export async function checkMetaScopes(c: Context) {
     const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
 
     if (!isOwner) {
-      return c.json({ error: 'Unauthorized' }, 403);
+      const { data: adminRole } = await supabase
+        .from('user_roles').select('role').eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      if (!adminRole) {
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
     }
 
     if (!connection.access_token_encrypted) {

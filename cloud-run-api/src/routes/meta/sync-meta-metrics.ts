@@ -171,13 +171,18 @@ export async function syncMetaMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection (admin via user_id OR client via client_user_id)
+    // Verify user owns this connection OR is admin
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
     const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
 
     if (!isOwner) {
-      console.error('Authorization failed:', { userId, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
-      return c.json({ error: 'Unauthorized' }, 403);
+      const { data: adminRole } = await supabase
+        .from('user_roles').select('role').eq('user_id', userId)
+        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      if (!adminRole) {
+        console.error('Authorization failed:', { userId, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
     }
 
     if (!connection.access_token_encrypted || !connection.account_id) {

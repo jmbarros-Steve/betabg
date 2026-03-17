@@ -352,17 +352,20 @@ export async function manageMetaAudiences(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection (admin via user_id OR client via client_user_id)
+    // Verify user owns this connection OR is admin
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
     const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
 
     if (!isOwner) {
-      console.error('[manage-meta-audiences] Authorization failed:', {
-        userId: user.id,
-        clientUserId: clientData.client_user_id,
-        adminId: clientData.user_id,
-      });
-      return c.json({ error: 'Unauthorized' }, 403);
+      const { data: adminRole } = await supabase
+        .from('user_roles').select('role').eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      if (!adminRole) {
+        console.error('[manage-meta-audiences] Authorization failed:', {
+          userId: user.id, clientUserId: clientData.client_user_id, adminId: clientData.user_id,
+        });
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
     }
 
     if (!connection.access_token_encrypted || !connection.account_id) {

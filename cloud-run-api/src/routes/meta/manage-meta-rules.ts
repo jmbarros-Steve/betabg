@@ -240,6 +240,29 @@ export async function manageMetaRules(c: Context) {
       return c.json({ error: `Invalid action: ${action}` }, 400);
     }
 
+    // Verify ownership OR admin
+    const { data: connCheck, error: connCheckErr } = await supabase
+      .from('platform_connections')
+      .select('id, clients!inner(user_id, client_user_id)')
+      .eq('id', connection_id)
+      .eq('client_id', client_id)
+      .single();
+
+    if (connCheckErr || !connCheck) {
+      return c.json({ error: 'Connection not found' }, 404);
+    }
+
+    const ownerData = connCheck.clients as unknown as { user_id: string; client_user_id: string | null };
+    const isRuleOwner = ownerData.user_id === user.id || ownerData.client_user_id === user.id;
+    if (!isRuleOwner) {
+      const { data: adminRole } = await supabase
+        .from('user_roles').select('role').eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      if (!adminRole) {
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
+    }
+
     console.log(`[manage-meta-rules] Action: ${action}, Client: ${client_id}, Connection: ${connection_id}`);
 
     // --- LIST ---
