@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  TrendingUp, 
-  ShoppingCart, 
-  Truck, 
-  DollarSign, 
+import {
+  TrendingUp,
+  ShoppingCart,
+  Truck,
+  DollarSign,
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
-  BarChart3
+  BarChart3,
+  AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,6 +51,19 @@ interface Connection {
   clients?: Client;
 }
 
+interface CriterioAlert {
+  id: string;
+  rule_id: string;
+  entity_type: string;
+  entity_id: string | null;
+  actual_value: string | null;
+  expected_value: string | null;
+  details: string | null;
+  evaluated_at: string;
+  evaluated_by: string | null;
+  criterio_rules?: { name: string; severity: string; category: string } | null;
+}
+
 type DateRangePreset = 'today' | 'yesterday' | 'last7days' | 'mtd' | 'last_month' | 'ytd' | 'custom';
 
 const IVA_FACTOR = 1.19;
@@ -77,6 +91,7 @@ export function ClientMetricsPanel() {
     from: Date | undefined;
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
+  const [criterioAlerts, setCriterioAlerts] = useState<CriterioAlert[]>([]);
 
   // Calculate date range based on preset
   const getDateRange = useMemo(() => {
@@ -109,6 +124,7 @@ export function ClientMetricsPanel() {
 
   useEffect(() => {
     fetchConnections();
+    fetchCriterioAlerts();
   }, []);
 
   useEffect(() => {
@@ -148,6 +164,19 @@ export function ClientMetricsPanel() {
 
     if (!error) {
       setMetrics(data || []);
+    }
+  };
+
+  const fetchCriterioAlerts = async () => {
+    const { data, error } = await supabase
+      .from('criterio_results')
+      .select('id, rule_id, entity_type, entity_id, actual_value, expected_value, details, evaluated_at, evaluated_by, criterio_rules(name, severity, category)')
+      .eq('passed', false)
+      .order('evaluated_at', { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setCriterioAlerts(data as CriterioAlert[]);
     }
   };
 
@@ -518,6 +547,69 @@ export function ClientMetricsPanel() {
           </CardContent>
         </Card>
       )}
+
+      {/* Últimas 5 alertas de CRITERIO */}
+      <Card className="border-red-500/20">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            Últimas Alertas de CRITERIO
+          </CardTitle>
+          <Badge variant="outline" className="text-xs text-red-600 border-red-300">
+            {criterioAlerts.length} alerta{criterioAlerts.length !== 1 ? 's' : ''}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          {criterioAlerts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Sin alertas recientes — todo en orden
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {criterioAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-100"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-slate-900 truncate">
+                        {alert.criterio_rules?.name || alert.rule_id}
+                      </span>
+                      {alert.criterio_rules?.severity && (
+                        <Badge
+                          variant="secondary"
+                          className={
+                            alert.criterio_rules.severity === 'critical'
+                              ? 'bg-red-100 text-red-700 text-xs'
+                              : alert.criterio_rules.severity === 'high'
+                              ? 'bg-orange-100 text-orange-700 text-xs'
+                              : 'bg-yellow-100 text-yellow-700 text-xs'
+                          }
+                        >
+                          {alert.criterio_rules.severity}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        {alert.entity_type}
+                      </Badge>
+                    </div>
+                    {alert.details && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {alert.details}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <span>{format(new Date(alert.evaluated_at), 'dd/MM HH:mm', { locale: es })}</span>
+                      {alert.evaluated_by && <span>por {alert.evaluated_by}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
