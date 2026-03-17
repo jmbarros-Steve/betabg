@@ -5,6 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
@@ -995,47 +1001,63 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         >
           <div className="flex items-center justify-end p-2">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => setSidebarCollapsed((prev) => !prev)}
+              onClick={(e) => { e.stopPropagation(); setSidebarCollapsed((prev) => !prev); }}
               aria-label={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
             >
               {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </Button>
           </div>
 
-          <nav className="flex-1 flex flex-col gap-0.5 px-2 pb-4" role="tablist">
-            {NAV_ITEMS.map((item) => {
-              const isActive = activeSection === item.key;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.key}
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => handleNavClick(item.key)}
-                  title={sidebarCollapsed ? item.label : undefined}
-                  className={`
-                    group flex items-center gap-2.5 rounded-lg px-2.5 py-2
-                    text-sm font-medium transition-colors duration-150
-                    outline-none focus-visible:ring-2 focus-visible:ring-ring
-                    ${isActive ? 'bg-blue-50 text-blue-700' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
-                    ${sidebarCollapsed ? 'justify-center' : ''}
-                  `}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-700' : 'text-muted-foreground group-hover:text-foreground'}`} />
-                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                </button>
-              );
-            })}
-          </nav>
+          <TooltipProvider delayDuration={200}>
+            <nav className="flex-1 flex flex-col gap-0.5 px-2 pb-4" role="tablist">
+              {NAV_ITEMS.map((item) => {
+                const isActive = activeSection === item.key;
+                const Icon = item.icon;
+                const btn = (
+                  <button
+                    key={item.key}
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => handleNavClick(item.key)}
+                    className={`
+                      group flex items-center gap-2.5 rounded-lg px-2.5 py-2
+                      text-sm font-medium transition-colors duration-150
+                      outline-none focus-visible:ring-2 focus-visible:ring-ring
+                      ${isActive ? 'bg-blue-50 text-blue-700' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                      ${sidebarCollapsed ? 'justify-center' : ''}
+                    `}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-700' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                  </button>
+                );
+                if (sidebarCollapsed) {
+                  return (
+                    <Tooltip key={item.key}>
+                      <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                      <TooltipContent side="right">{item.label}</TooltipContent>
+                    </Tooltip>
+                  );
+                }
+                return btn;
+              })}
+            </nav>
+          </TooltipProvider>
 
-          {!sidebarCollapsed && (
-            <div className="px-3 pb-3">
-              <div className="text-[10px] text-muted-foreground/20 text-center">Meta Ads Manager</div>
-            </div>
-          )}
+          <div className="px-3 pb-3 text-center">
+            <a
+              href="https://adsmanager.facebook.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
+            >
+              {sidebarCollapsed ? 'Meta' : 'Meta Ads Manager ↗'}
+            </a>
+          </div>
         </aside>
 
         {/* Main content */}
