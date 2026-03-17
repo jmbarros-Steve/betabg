@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
+import { BlocksEditorWrapper, type BlocksEditorRef } from './BlocksEditorWrapper';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,14 +18,14 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2, AlertTriangle,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, AlertTriangle,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
-import { GlobalStylesPanel } from './GlobalStylesPanel';
+// GlobalStylesPanel removed — replaced by BlocksEditor templateColors
 import { ABTestResultsPanel } from './ABTestResultsPanel';
 
 interface CampaignBuilderProps {
@@ -73,8 +73,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign> | null>(null);
   const [editorStep, setEditorStep] = useState<'setup' | 'design' | 'audience' | 'review'>('setup');
 
-  // GrapeJS editor
-  const emailEditorRef = useRef<SteveMailEditorRef>(null);
+  // Blocks editor
+  const emailEditorRef = useRef<BlocksEditorRef>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [designJson, setDesignJson] = useState<any>(null);
 
@@ -87,7 +87,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-  const [editorDevice, setEditorDevice] = useState<'Desktop' | 'Mobile'>('Desktop');
+  // Device toggle is now internal to BlocksEditorWrapper
 
   // A/B Testing (hidden behind advanced options)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -128,22 +128,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Concurrency: optimistic locking
   const lastKnownUpdatedAt = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!showEditor || !editorReady) { return; }
-    const editor = emailEditorRef.current?.getEditor();
-    if (!editor) return;
-    const markDirty = () => setIsDirty(true);
-    editor.on('component:add', markDirty);
-    editor.on('component:remove', markDirty);
-    editor.on('component:update', markDirty);
-    editor.on('style:change', markDirty);
-    return () => {
-      editor.off('component:add', markDirty);
-      editor.off('component:remove', markDirty);
-      editor.off('component:update', markDirty);
-      editor.off('style:change', markDirty);
-    };
-  }, [showEditor, editorReady]);
+  // Dirty tracking is handled via onChange callback on BlocksEditorWrapper
 
   useEffect(() => {
     if (!showEditor || !isDirty) return;
@@ -229,10 +214,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     if (!editorReady) return;
     if (designJson) {
       if (typeof designJson === 'string') {
-        // GrapeJS HTML template
+        // HTML template
         emailEditorRef.current?.loadDesign(designJson);
       } else {
-        // Unlayer design_json
+        // Structured design_json (blocks or legacy Unlayer)
         emailEditorRef.current?.loadDesign(editingCampaign?.html_content || '', designJson);
       }
     } else if (editingCampaign?.html_content) {
@@ -265,7 +250,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         html_content: html,
       }));
 
-      // Load HTML into GrapeJS editor
+      // Load HTML into blocks editor
       setDesignJson(null);
       if (editorReady) {
         emailEditorRef.current?.loadDesign(html);
@@ -311,7 +296,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     let htmlContent = editingCampaign.html_content || '';
     let savedDesign = designJson;
 
-    // If on design step or later, export from GrapeJS
+    // If on design step or later, export from blocks editor
     if (editorStep === 'design' || editorStep === 'audience' || editorStep === 'review') {
       const { html, design } = exportEditorHtml();
       htmlContent = html;
@@ -539,10 +524,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       // Also load immediately if editor is already ready
       if (editorReady && emailEditorRef.current) {
         if (typeof templateDesign === 'string') {
-          // GrapeJS HTML template — load as raw HTML
+          // HTML template — load as raw HTML
           emailEditorRef.current.loadDesign(templateDesign);
         } else {
-          // Unlayer design_json — load as project data
+          // Structured design_json — load as project data
           emailEditorRef.current.loadDesign('', templateDesign);
         }
       }
@@ -891,51 +876,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </div>
         )}
 
-        {/* Step 2: Design (GrapeJS) */}
+        {/* Step 2: Design (BlocksEditor) */}
         {editorStep === 'design' && (
           <>
-            {/* Editor toolbar: device toggle + undo/redo */}
+            {/* Editor toolbar */}
             <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-zinc-50 shrink-0">
-              <div className="flex items-center gap-1 border rounded-md p-0.5">
-                <Button
-                  size="sm"
-                  variant={editorDevice === 'Desktop' ? 'default' : 'ghost'}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => { setEditorDevice('Desktop'); emailEditorRef.current?.setDevice('Desktop'); }}
-                >
-                  <Monitor className="w-3.5 h-3.5 mr-1" /> Desktop
-                </Button>
-                <Button
-                  size="sm"
-                  variant={editorDevice === 'Mobile' ? 'default' : 'ghost'}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => { setEditorDevice('Mobile'); emailEditorRef.current?.setDevice('Mobile'); }}
-                >
-                  <Smartphone className="w-3.5 h-3.5 mr-1" /> Mobile
-                </Button>
-              </div>
-              <div className="w-px h-5 bg-zinc-200" />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => emailEditorRef.current?.undo()}
-                title="Deshacer"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => emailEditorRef.current?.redo()}
-                title="Rehacer"
-              >
-                <Redo2 className="w-3.5 h-3.5" />
-              </Button>
-              <div className="w-px h-5 bg-zinc-200" />
-              <GlobalStylesPanel editorRef={emailEditorRef} clientId={clientId} />
-              <div className="w-px h-5 bg-zinc-200" />
               <Button
                 size="sm"
                 variant="ghost"
@@ -967,13 +912,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
-            {/* GrapeJS editor */}
+            {/* Blocks editor */}
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
-                <SteveMailEditor
+                <BlocksEditorWrapper
                   ref={emailEditorRef}
                   onReady={() => setEditorReady(true)}
+                  onChange={() => setIsDirty(true)}
                   style={{ height: '100%' }}
+                  clientId={clientId}
                 />
               </div>
             </div>

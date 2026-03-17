@@ -1203,7 +1203,7 @@ const SYSTEM_TEMPLATES: SystemTemplate[] = [
       { u_row: 5, u_column: 7, u_content_text: 7, u_content_heading: 1, u_content_button: 1, u_content_image: 4, u_content_social: 1, u_content_divider: 0 }
     ),
   },
-  // --- GrapeJS HTML Templates (from emailTemplates.ts) ---
+  // --- HTML Templates (from emailTemplates.ts) ---
   ...emailTemplates.map((t) => {
     const categoryMap: Record<string, Exclude<TemplateCategory, 'todas'>> = {
       welcome: 'bienvenida',
@@ -1478,7 +1478,7 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
             {/* Render a visual representation of the template */}
             <div className="border rounded-lg overflow-hidden bg-zinc-100">
               {typeof previewTemplate?.design_json === 'string' ? (
-                /* GrapeJS HTML template — render directly */
+                /* HTML template — render directly */
                 <div
                   className="bg-white mx-auto"
                   style={{ maxWidth: 600 }}
