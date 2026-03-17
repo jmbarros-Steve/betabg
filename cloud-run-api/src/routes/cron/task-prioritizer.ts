@@ -78,8 +78,19 @@ export async function taskPrioritizer(c: Context) {
     return c.json({ error: 'Failed to fetch tasks' }, 500);
   }
 
+  if (pendingTasks.length === 0 && !isFrozen) {
+    // No pending tasks — check for idle agents and promote from backlog
+    const backlogResult = await promoteFromBacklog(supabase);
+    return c.json({
+      success: true,
+      message: 'No pending tasks — checked backlog',
+      frozen: isFrozen,
+      backlog: backlogResult,
+    });
+  }
+
   if (pendingTasks.length === 0) {
-    return c.json({ success: true, message: 'No pending tasks', frozen: isFrozen });
+    return c.json({ success: true, message: 'No pending tasks (frozen)', frozen: isFrozen });
   }
 
   // ─────────────────────────────────────────────
@@ -168,6 +179,14 @@ export async function taskPrioritizer(c: Context) {
     `${toProcess.length} to process, ${blocked.length} blocked, ${assigned} auto-assigned`
   );
 
+  // ─────────────────────────────────────────────
+  // 6. If few tasks remain, check backlog for promotions
+  // ─────────────────────────────────────────────
+  let backlogResult = null;
+  if (!isFrozen && toProcess.length < 3) {
+    backlogResult = await promoteFromBacklog(supabase);
+  }
+
   return c.json({
     success: true,
     processed_at: new Date().toISOString(),
@@ -177,5 +196,125 @@ export async function taskPrioritizer(c: Context) {
     to_process: toProcess.length,
     blocked: blocked.length,
     auto_assigned: assigned,
+    backlog: backlogResult,
   });
+}
+
+/**
+ * Check for idle agents (no in_progress tasks) and promote backlog items.
+ * An agent is idle if it has no tasks with status='in_progress'.
+ */
+async function promoteFromBacklog(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  // Find agents currently working (have in_progress tasks)
+  const { data: busyTasks } = await supabase
+    .from('tasks')
+    .select('assigned_agent, assigned_squad')
+    .eq('status', 'in_progress');
+
+  const busyAgents = new Set(
+    (busyTasks || [])
+      .map((t: { assigned_agent: string | null }) => t.assigned_agent)
+      .filter(Boolean)
+  );
+  const busySquads = new Set(
+    (busyTasks || [])
+      .map((t: { assigned_squad: string | null }) => t.assigned_squad)
+      .filter(Boolean)
+  );
+
+  // Also count pending tasks per squad to avoid overloading
+  const { data: pendingBySquad } = await supabase
+    .from('tasks')
+    .select('assigned_squad')
+    .eq('status', 'pending');
+
+  const pendingSquadCounts: Record<string, number> = {};
+  for (const t of pendingBySquad || []) {
+    const sq = (t as { assigned_squad: string | null }).assigned_squad;
+    if (sq) pendingSquadCounts[sq] = (pendingSquadCounts[sq] || 0) + 1;
+  }
+
+  // Find highest-priority queued backlog items
+  const { data: backlogItems } = await supabase
+    .from('backlog')
+    .select('*')
+    .eq('status', 'queued')
+    .order('priority', { ascending: true }) // critica first (alphabetical works: alta < baja < critica < media)
+    .limit(5);
+
+  if (!backlogItems || backlogItems.length === 0) {
+    return { promoted: 0, message: 'Backlog empty' };
+  }
+
+  // Sort by actual priority rank
+  const ranked = backlogItems.sort((a, b) => {
+    const ra = PRIORITY_RANK[a.priority] ?? 2;
+    const rb = PRIORITY_RANK[b.priority] ?? 2;
+    return ra - rb;
+  });
+
+  let promoted = 0;
+  const promotedItems: string[] = [];
+
+  for (const item of ranked) {
+    // Skip if the target squad already has 3+ pending tasks
+    if (item.assigned_squad && (pendingSquadCounts[item.assigned_squad] || 0) >= 3) {
+      continue;
+    }
+
+    // Skip if the specific agent is busy
+    if (item.assigned_agent && busyAgents.has(item.assigned_agent)) {
+      continue;
+    }
+
+    // Promote: create task from backlog item
+    const { data: newTask, error: insertError } = await supabase
+      .from('tasks')
+      .insert({
+        title: item.title,
+        description: `[Backlog] ${item.description || ''}`,
+        priority: item.priority,
+        type: item.type,
+        source: item.source || 'backlog',
+        assigned_squad: item.assigned_squad,
+        assigned_agent: item.assigned_agent,
+        status: 'pending',
+        attempts: 0,
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error(`[task-prioritizer] Failed to promote backlog item ${item.id}:`, insertError);
+      continue;
+    }
+
+    // Mark backlog item as promoted
+    await supabase
+      .from('backlog')
+      .update({
+        status: 'promoted',
+        promoted_to_task_id: newTask.id,
+        promoted_at: new Date().toISOString(),
+      })
+      .eq('id', item.id);
+
+    promoted++;
+    promotedItems.push(item.title);
+
+    // Track pending count to avoid over-promoting
+    if (item.assigned_squad) {
+      pendingSquadCounts[item.assigned_squad] = (pendingSquadCounts[item.assigned_squad] || 0) + 1;
+    }
+
+    // Max 2 promotions per run to avoid flooding
+    if (promoted >= 2) break;
+  }
+
+  if (promoted > 0) {
+    console.log(`[task-prioritizer] Promoted ${promoted} backlog items: ${promotedItems.join(', ')}`);
+  }
+
+  return { promoted, items: promotedItems };
 }
