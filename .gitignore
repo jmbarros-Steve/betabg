@@ -24,6 +24,11 @@ dist-ssr
 *.sw?
 .vercel
 
+# Skyvern jobs
+skyvern-jobs/logs/
+skyvern-jobs/node_modules/
+skyvern-jobs/config/.env
+
 # Temporary files
 qa-screenshots/
 qa-script*.ts

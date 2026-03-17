@@ -1,0 +1,16 @@
+{
+  "name": "skyvern-jobs",
+  "version": "1.0.0",
+  "description": "Automated QA, detective, and onboarding bots for Steve Ads",
+  "type": "module",
+  "scripts": {
+    "qa:daily": "tsx qa/qa-daily.ts",
+    "qa:smoke": "tsx qa/qa-smoke.ts",
+    "detective:api": "tsx detective-api/detective-api.ts",
+    "detective:visual": "tsx detective-visual/detective-visual.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "tsx": "^4.7.0"
+  }
+}
