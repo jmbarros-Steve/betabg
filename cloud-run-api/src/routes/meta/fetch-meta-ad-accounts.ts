@@ -103,7 +103,9 @@ export async function fetchMetaAdAccounts(c: Context) {
     const permissionsUrl = new URL('https://graph.facebook.com/v21.0/me/permissions');
     
 
-    const permissionsResponse = await fetch(permissionsUrl.toString());
+    const authHeaders = { Authorization: `Bearer ${decryptedToken}` };
+
+    const permissionsResponse = await fetch(permissionsUrl.toString(), { headers: authHeaders });
     const permissionsData: MetaPermissionsResponse = await permissionsResponse.json() as any;
 
     const grantedPermissions = (permissionsData.data || [])
@@ -134,7 +136,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     console.log('Fetching Meta ad accounts from Graph API (including Business Manager info)');
 
-    const metaResponse = await fetch(accountsUrl.toString());
+    const metaResponse = await fetch(accountsUrl.toString(), { headers: authHeaders });
 
     if (!metaResponse.ok) {
       const errorData: any = await metaResponse.json();
@@ -155,7 +157,7 @@ export async function fetchMetaAdAccounts(c: Context) {
     businessesUrl.searchParams.set('fields', 'id,name');
     businessesUrl.searchParams.set('limit', '50');
 
-    const businessesResponse = await fetch(businessesUrl.toString());
+    const businessesResponse = await fetch(businessesUrl.toString(), { headers: authHeaders });
     let businessAccounts: MetaAdAccount[] = [];
 
     if (businessesResponse.ok) {
@@ -169,7 +171,7 @@ export async function fetchMetaAdAccounts(c: Context) {
         businessAdAccountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
         businessAdAccountsUrl.searchParams.set('limit', '100');
 
-        const businessAdAccountsResponse = await fetch(businessAdAccountsUrl.toString());
+        const businessAdAccountsResponse = await fetch(businessAdAccountsUrl.toString(), { headers: authHeaders });
         if (businessAdAccountsResponse.ok) {
           const businessAdAccountsData: any = await businessAdAccountsResponse.json();
           console.log(`Found ${businessAdAccountsData.data?.length || 0} accounts in business: ${business.name}`);
