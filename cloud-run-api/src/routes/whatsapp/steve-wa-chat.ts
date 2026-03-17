@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { WA_SYSTEM_PROMPT, buildWAContext, getWAHistory } from '../../lib/steve-wa-brain.js';
 
-const STEVE_WA_NUMBER = process.env.STEVE_WA_NUMBER || '';
+const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
 /**
  * Steve WA Chat — Webhook handler for merchant → Steve WhatsApp messages.
@@ -32,11 +32,11 @@ export async function steveWAChat(c: Context) {
     // Extract clean phone number
     const phone = from.replace('whatsapp:', '').replace('+', '').trim();
 
-    // Identify merchant by phone
+    // Identify merchant by whatsapp_phone (with and without + prefix)
     const { data: client } = await supabase
       .from('clients')
-      .select('id, name, company, phone')
-      .or(`phone.eq.${phone},phone.eq.+${phone}`)
+      .select('id, name, company, whatsapp_phone')
+      .or(`whatsapp_phone.eq.${phone},whatsapp_phone.eq.+${phone},whatsapp_phone.eq.+56${phone.replace(/^56/, '')}`)
       .limit(1)
       .maybeSingle();
 
