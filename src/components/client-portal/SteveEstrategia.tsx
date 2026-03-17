@@ -37,7 +37,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   const [briefComplete, setBriefComplete] = useState<boolean | null>(null);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initRef = useRef(false);
 
@@ -55,19 +55,10 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }, [clientId]);
 
   useEffect(() => {
+    // Scroll to bottom when messages change using anchor div
     setTimeout(() => {
-      // ScrollArea Viewport is the actual scrollable element
-      const viewport = viewportRef.current;
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-        return;
-      }
-      // Fallback: find viewport inside ScrollArea root
-      const el = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
-    }, 100);
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
   }, [messages]);
 
   async function initializeConversation() {
@@ -354,6 +345,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
               </div>
             </div>
           )}
+          <div ref={chatEndRef} />
         </div>
       </ScrollArea>
 
