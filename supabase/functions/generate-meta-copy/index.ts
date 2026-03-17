@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { getCreativeContext } from '../_shared/creative-context.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -713,7 +714,10 @@ Deno.serve(async (req) => {
       const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
       const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledgeVar.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-      const prompt = `${bugSectionVar}${knowledgeSectionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
+      // D.4: Inject creative performance history
+      const creativeCtxVar = await getCreativeContext(supabase, clientId, 'meta');
+
+      const prompt = `${bugSectionVar}${knowledgeSectionVar}${creativeCtxVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
 
 DATOS DEL CLIENTE:
 - Brief: ${JSON.stringify(rawData, null, 2)}
@@ -779,7 +783,10 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
       const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-      const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
+      // D.4: Inject creative performance history
+      const creativeCtxBV = await getCreativeContext(supabase, clientId, 'meta');
+
+      const prompt = `${bugSectionBV}${knowledgeSectionBV}${creativeCtxBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
 
 Copy aprobado: ${JSON.stringify(variacionElegida)}
 Formato: ${adType}
@@ -1020,7 +1027,10 @@ las preferencias específicas de cada cliente cuando las conozco.
     const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
     const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nREGLAS APRENDIDAS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto.\n${kbKnowledgeLegacy.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
-    const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
+    // D.4: Inject creative performance history
+    const creativeCtxLegacy = await getCreativeContext(supabase, clientId, 'meta');
+
+    const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + creativeCtxLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt);
 
     console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 

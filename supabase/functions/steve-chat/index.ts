@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { getCreativeContext } from '../_shared/creative-context.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -812,6 +813,17 @@ Deno.serve(async (req) => {
         `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
       ).join('\n\n') || '';
 
+      // D.4: Inject creative performance history when user asks about campaigns/ads
+      const wantsCreative = mensajeLower.includes('campaña') || mensajeLower.includes('campaign') ||
+        mensajeLower.includes('anuncio') || mensajeLower.includes('copy') ||
+        mensajeLower.includes('crear') || mensajeLower.includes('generar') ||
+        mensajeLower.includes('email') || mensajeLower.includes('ads');
+      let creativeHistoryCtx = '';
+      if (wantsCreative) {
+        const ch = mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' : 'meta';
+        creativeHistoryCtx = await getCreativeContext(supabase, client_id, ch);
+      }
+
       const estrategiaSystemPrompt = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el consultor estratégico del cliente.
 
 PERSONALIDAD:
@@ -835,7 +847,7 @@ ${briefSummary}
 
 ${researchContext ? `INVESTIGACIÓN DE MARCA:\n${researchContext}\n` : ''}
 ${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
-
+${creativeHistoryCtx}
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables.`;
 
       const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
