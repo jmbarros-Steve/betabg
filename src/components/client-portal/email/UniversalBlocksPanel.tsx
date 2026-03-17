@@ -30,7 +30,7 @@ import {
   MousePointerClick,
   FileDown,
 } from 'lucide-react';
-import { type SteveMailEditorRef } from './SteveMailEditor';
+import { type BlocksEditorRef } from './BlocksEditorWrapper';
 
 interface UniversalBlock {
   id: string;
@@ -43,7 +43,7 @@ interface UniversalBlock {
 
 interface UniversalBlocksPanelProps {
   clientId: string;
-  editor: SteveMailEditorRef | null;
+  editor: BlocksEditorRef | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -109,13 +109,9 @@ export function UniversalBlocksPanel({
     }
   }, [isOpen, fetchBlocks]);
 
-  /** Get HTML from the currently selected GrapeJS component */
+  /** Get HTML from the current editor content (selection not supported in blocks editor) */
   const getSelectedHtml = (): string | null => {
-    const grapejsEditor = editor?.getEditor?.();
-    if (!grapejsEditor) return null;
-    const selected = grapejsEditor.getSelected();
-    if (!selected) return null;
-    return selected.toHTML();
+    return editor?.getSelectedHtml?.() ?? null;
   };
 
   const openSaveDialog = (source: SaveSource) => {

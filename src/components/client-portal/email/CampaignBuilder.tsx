@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { SteveMailEditor, type SteveMailEditorRef } from './SteveMailEditor';
+import { BlocksEditorWrapper, type BlocksEditorRef } from './BlocksEditorWrapper';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,14 +18,14 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, Undo2, Redo2, AlertTriangle,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, AlertTriangle,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
-import { GlobalStylesPanel } from './GlobalStylesPanel';
+// GlobalStylesPanel removed — replaced by BlocksEditor templateColors
 import { ABTestResultsPanel } from './ABTestResultsPanel';
 
 interface CampaignBuilderProps {
@@ -73,8 +73,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign> | null>(null);
   const [editorStep, setEditorStep] = useState<'setup' | 'design' | 'audience' | 'review'>('setup');
 
-  // GrapeJS editor
-  const emailEditorRef = useRef<SteveMailEditorRef>(null);
+  // Blocks editor
+  const emailEditorRef = useRef<BlocksEditorRef>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [designJson, setDesignJson] = useState<any>(null);
 
@@ -87,7 +87,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-  const [editorDevice, setEditorDevice] = useState<'Desktop' | 'Mobile'>('Desktop');
+  // Device toggle is now internal to BlocksEditorWrapper
 
   // A/B Testing (hidden behind advanced options)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -128,22 +128,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Concurrency: optimistic locking
   const lastKnownUpdatedAt = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!showEditor || !editorReady) { return; }
-    const editor = emailEditorRef.current?.getEditor();
-    if (!editor) return;
-    const markDirty = () => setIsDirty(true);
-    editor.on('component:add', markDirty);
-    editor.on('component:remove', markDirty);
-    editor.on('component:update', markDirty);
-    editor.on('style:change', markDirty);
-    return () => {
-      editor.off('component:add', markDirty);
-      editor.off('component:remove', markDirty);
-      editor.off('component:update', markDirty);
-      editor.off('style:change', markDirty);
-    };
-  }, [showEditor, editorReady]);
+  // Dirty tracking is handled via onChange callback on BlocksEditorWrapper
 
   useEffect(() => {
     if (!showEditor || !isDirty) return;
@@ -164,6 +149,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }, 3000);
     return () => clearInterval(interval);
   }, [showEditor, editorReady, editorStep]);
+
+  // CRITERIO pre-flight check
+  const [criterioLoading, setCriterioLoading] = useState(false);
+  const [criterioResult, setCriterioResult] = useState<{ can_publish: boolean; score: number; reason: string; failed_rules: Array<{ rule_id: string; severity: string; details: string }> } | null>(null);
 
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -225,10 +214,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     if (!editorReady) return;
     if (designJson) {
       if (typeof designJson === 'string') {
-        // GrapeJS HTML template
+        // HTML template
         emailEditorRef.current?.loadDesign(designJson);
       } else {
-        // Unlayer design_json
+        // Structured design_json (blocks or legacy Unlayer)
         emailEditorRef.current?.loadDesign(editingCampaign?.html_content || '', designJson);
       }
     } else if (editingCampaign?.html_content) {
@@ -261,15 +250,19 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         html_content: html,
       }));
 
-      // Load HTML into GrapeJS editor
+      // Load HTML into blocks editor
       setDesignJson(null);
       if (editorReady) {
         emailEditorRef.current?.loadDesign(html);
       }
 
       toast.success('Email generado con Steve AI');
-    } catch (err) {
-      toast.error('Error generando contenido');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        toast.error('El servidor tardó demasiado. Inténtalo de nuevo.');
+      } else {
+        toast.error(`Error al generar el email: ${err?.message || 'Inténtalo de nuevo.'}`);
+      }
     } finally {
       setGenerating(false);
     }
@@ -303,11 +296,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     let htmlContent = editingCampaign.html_content || '';
     let savedDesign = designJson;
 
-    // If on design step or later, export from GrapeJS
+    // If on design step or later, export from blocks editor
     if (editorStep === 'design' || editorStep === 'audience' || editorStep === 'review') {
       const { html, design } = exportEditorHtml();
       htmlContent = html;
       savedDesign = design;
+    }
+
+    // Validate content is not empty before saving
+    const strippedHtml = htmlContent.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+    if (!strippedHtml && !savedDesign) {
+      toast.error('El email está vacío. Diseña el contenido antes de guardar.');
+      return;
     }
 
     const action = editingCampaign.id ? 'update' : 'create';
@@ -354,9 +354,50 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const confirmSend = async () => {
+    // CRITERIO pre-flight check
+    setCriterioLoading(true);
+    setCriterioResult(null);
+    try {
+      const { html } = exportEditorHtml();
+      const { data: criterio, error: criterioError } = await callApi<any>('criterio-email', {
+        body: {
+          email_data: {
+            id: editingCampaign?.id,
+            subject: editingCampaign?.subject,
+            preview_text: editingCampaign?.preview_text,
+            html: html || editingCampaign?.html_content,
+            send_hour: sendMode === 'schedule' && scheduleDate ? new Date(scheduleDate).getHours() : new Date().getHours(),
+            timezone: 'America/Santiago',
+            segment_size: subscriberCount,
+            segment_excludes_unsubscribed: true,
+          },
+          shop_id: clientId,
+        },
+      });
+
+      if (criterioError) {
+        toast.error(`Error en CRITERIO: ${criterioError}`);
+        setCriterioLoading(false);
+        return;
+      }
+
+      if (criterio && !criterio.can_publish) {
+        setCriterioResult(criterio);
+        setCriterioLoading(false);
+        return;
+      }
+
+      setCriterioResult(criterio);
+    } catch {
+      toast.error('Error al evaluar CRITERIO');
+      setCriterioLoading(false);
+      return;
+    }
+    setCriterioLoading(false);
+
+    // CRITERIO passed — proceed with send/schedule
     if (sendMode === 'schedule') {
       if (!scheduleDate) { toast.error('Selecciona una fecha'); return; }
-      // Save first
       await handleSaveCampaign();
       if (!editingCampaign?.id) { toast.error('Guarda la campaña primero'); return; }
       const { error } = await callApi('manage-email-campaigns', {
@@ -483,10 +524,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       // Also load immediately if editor is already ready
       if (editorReady && emailEditorRef.current) {
         if (typeof templateDesign === 'string') {
-          // GrapeJS HTML template — load as raw HTML
+          // HTML template — load as raw HTML
           emailEditorRef.current.loadDesign(templateDesign);
         } else {
-          // Unlayer design_json — load as project data
+          // Structured design_json — load as project data
           emailEditorRef.current.loadDesign('', templateDesign);
         }
       }
@@ -835,51 +876,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </div>
         )}
 
-        {/* Step 2: Design (GrapeJS) */}
+        {/* Step 2: Design (BlocksEditor) */}
         {editorStep === 'design' && (
           <>
-            {/* Editor toolbar: device toggle + undo/redo */}
+            {/* Editor toolbar */}
             <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-zinc-50 shrink-0">
-              <div className="flex items-center gap-1 border rounded-md p-0.5">
-                <Button
-                  size="sm"
-                  variant={editorDevice === 'Desktop' ? 'default' : 'ghost'}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => { setEditorDevice('Desktop'); emailEditorRef.current?.setDevice('Desktop'); }}
-                >
-                  <Monitor className="w-3.5 h-3.5 mr-1" /> Desktop
-                </Button>
-                <Button
-                  size="sm"
-                  variant={editorDevice === 'Mobile' ? 'default' : 'ghost'}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => { setEditorDevice('Mobile'); emailEditorRef.current?.setDevice('Mobile'); }}
-                >
-                  <Smartphone className="w-3.5 h-3.5 mr-1" /> Mobile
-                </Button>
-              </div>
-              <div className="w-px h-5 bg-zinc-200" />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => emailEditorRef.current?.undo()}
-                title="Deshacer"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => emailEditorRef.current?.redo()}
-                title="Rehacer"
-              >
-                <Redo2 className="w-3.5 h-3.5" />
-              </Button>
-              <div className="w-px h-5 bg-zinc-200" />
-              <GlobalStylesPanel editorRef={emailEditorRef} clientId={clientId} />
-              <div className="w-px h-5 bg-zinc-200" />
               <Button
                 size="sm"
                 variant="ghost"
@@ -911,13 +912,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
-            {/* GrapeJS editor */}
+            {/* Blocks editor */}
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
-                <SteveMailEditor
+                <BlocksEditorWrapper
                   ref={emailEditorRef}
                   onReady={() => setEditorReady(true)}
+                  onChange={() => setIsDirty(true)}
                   style={{ height: '100%' }}
+                  clientId={clientId}
                 />
               </div>
             </div>
@@ -1218,48 +1221,98 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         )}
 
         {/* Unified Send/Schedule Dialog */}
-        <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <Dialog open={showSendDialog} onOpenChange={(open) => { setShowSendDialog(open); if (!open) { setCriterioResult(null); setCriterioLoading(false); } }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Enviar Campaña</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              <p className="text-sm text-muted-foreground">
-                Esta campaña se enviará a <span className="font-medium text-foreground">{subscriberCount} contactos</span>. Esta acción no se puede deshacer.
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant={sendMode === 'now' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => setSendMode('now')}
-                >
-                  <Send className="w-4 h-4 mr-1.5" /> Enviar ahora
-                </Button>
-                <Button
-                  variant={sendMode === 'schedule' ? 'default' : 'outline'}
-                  className="flex-1"
-                  onClick={() => setSendMode('schedule')}
-                >
-                  <CalendarClock className="w-4 h-4 mr-1.5" /> Programar
-                </Button>
-              </div>
-              {sendMode === 'schedule' && (
-                <div>
-                  <Label>Fecha y hora de envío</Label>
-                  <Input
-                    type="datetime-local"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                  />
+              {/* CRITERIO evaluation status */}
+              {criterioLoading && (
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  <div>
+                    <p className="font-medium text-blue-900">CRITERIO evaluando...</p>
+                    <p className="text-sm text-blue-700">Verificando reglas de calidad del email</p>
+                  </div>
                 </div>
+              )}
+
+              {criterioResult && !criterioResult.can_publish && (
+                <div className="p-4 rounded-lg bg-red-50 border border-red-200 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <p className="font-medium text-red-900">CRITERIO rechazó el email</p>
+                  </div>
+                  <p className="text-sm text-red-700">Score: {criterioResult.score}% — {criterioResult.reason}</p>
+                  {criterioResult.failed_rules?.length > 0 && (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {criterioResult.failed_rules.map((rule, i) => (
+                        <div key={i} className="text-xs p-2 rounded bg-red-100 text-red-800">
+                          <span className="font-medium">[{rule.severity}]</span> {rule.rule_id} — {rule.details || 'Regla no cumplida'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {criterioResult && criterioResult.can_publish && (
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                  <MailCheck className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-900">CRITERIO aprobado — Score {criterioResult.score}%</p>
+                    <p className="text-sm text-green-700">El email cumple las reglas de calidad</p>
+                  </div>
+                </div>
+              )}
+
+              {!criterioLoading && !criterioResult && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Esta campaña se enviará a <span className="font-medium text-foreground">{subscriberCount} contactos</span>. Esta acción no se puede deshacer.
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant={sendMode === 'now' ? 'default' : 'outline'}
+                      className="flex-1"
+                      onClick={() => setSendMode('now')}
+                    >
+                      <Send className="w-4 h-4 mr-1.5" /> Enviar ahora
+                    </Button>
+                    <Button
+                      variant={sendMode === 'schedule' ? 'default' : 'outline'}
+                      className="flex-1"
+                      onClick={() => setSendMode('schedule')}
+                    >
+                      <CalendarClock className="w-4 h-4 mr-1.5" /> Programar
+                    </Button>
+                  </div>
+                  {sendMode === 'schedule' && (
+                    <div>
+                      <Label>Fecha y hora de envío</Label>
+                      <Input
+                        type="datetime-local"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSendDialog(false)}>Cancelar</Button>
-              <Button onClick={confirmSend} disabled={sending}>
-                {sending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-                {sendMode === 'now' ? 'Confirmar Envío' : 'Programar Envío'}
-              </Button>
+              {criterioResult && !criterioResult.can_publish ? (
+                <Button variant="outline" onClick={() => { setCriterioResult(null); }}>
+                  Volver a intentar
+                </Button>
+              ) : (
+                <Button onClick={confirmSend} disabled={sending || criterioLoading}>
+                  {(sending || criterioLoading) && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                  {sendMode === 'now' ? 'Confirmar Envío' : 'Programar Envío'}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

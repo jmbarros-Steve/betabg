@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail, Unlink } from 'lucide-react';
-import { ClientOnboardingSteps } from './ClientOnboardingSteps';
 import { MetaAdAccountSelector } from './MetaAdAccountSelector';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -290,17 +289,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
   return (
     <div className="space-y-6">
-      {/* Onboarding Steps */}
-      <ClientOnboardingSteps
-        connections={connections}
-        onConnectMeta={handleConnectMeta}
-        onConnectShopify={handleConnectShopify}
-        onConnectGoogle={handleConnectGoogle}
-        isConnectingMeta={connectingMeta}
-        isConnectingShopify={false}
-        isConnectingGoogle={connectingGoogle}
-        isAdmin={isAdmin}
-      />
+      {/* Onboarding removed */}
 
       <div>
         <h2 className="text-2xl font-semibold mb-2">Mis Conexiones</h2>

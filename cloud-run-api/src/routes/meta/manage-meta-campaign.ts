@@ -1,5 +1,8 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { criterioMeta } from '../ai/criterio-meta.js';
+
+import { espejoAd } from '../ai/espejo.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -1305,6 +1308,90 @@ export async function manageMetaCampaign(c: Context) {
           console.log(`[manage-meta-campaign] Auto-resolved page_id: ${pageId}`);
         }
       } catch (_) { /* ignore */ }
+    }
+
+    // CRITERIO pre-flight check: evaluate campaign data before creating in Meta
+    if ((action === 'create' || action === 'create_322') && data) {
+      try {
+        const criterioResult = await criterioMeta(
+          {
+            primary_text: data.primary_text || (data.texts && data.texts[0]) || '',
+            headline: data.headline || (data.headlines && data.headlines[0]) || '',
+            description: data.description || (data.descriptions && data.descriptions[0]) || '',
+            targeting: data.targeting ? (typeof data.targeting === 'string' ? JSON.parse(data.targeting) : data.targeting) : undefined,
+            daily_budget: data.daily_budget,
+            placements: data.placements,
+            angle: data.angle,
+            theme: data.theme,
+            product_ids: data.product_ids,
+            creative_width: data.creative_width,
+            creative_height: data.creative_height,
+            creative_format: data.creative_format,
+            creative_ratio: data.creative_ratio,
+            budget_type: data.budget_type,
+            end_date: data.end_time,
+            currency: data.currency,
+            objective: data.objective,
+            monthly_revenue: data.monthly_revenue,
+          },
+          connection.client_id,
+          connection.client_id
+        );
+
+        if (!criterioResult.can_publish) {
+          console.log(`[manage-meta-campaign] CRITERIO rejected campaign: score=${criterioResult.score}, reason=${criterioResult.reason}`);
+          return c.json({
+            error: 'CRITERIO rechazó la campaña',
+            score: criterioResult.score,
+            reason: criterioResult.reason,
+            failed_rules: criterioResult.failed_rules,
+          }, 422);
+        }
+
+        console.log(`[manage-meta-campaign] CRITERIO approved: score=${criterioResult.score}%`);
+      } catch (criterioErr: any) {
+        // Fail-open: if CRITERIO errors, log and continue
+        console.error('[manage-meta-campaign] CRITERIO check failed (fail-open):', criterioErr?.message);
+      }
+
+      // Force PAUSED status — campaigns must be born PAUSED
+      if (data.status && data.status !== 'PAUSED') {
+        console.log(`[manage-meta-campaign] Overriding status "${data.status}" → PAUSED (CRITERIO policy)`);
+        data.status = 'PAUSED';
+      }
+    }
+
+    // ── ESPEJO visual check for create actions ──
+    if ((action === 'create' || action === 'create_322') && data) {
+      const adImageUrl = data.image_url || data.images?.[0];
+      if (adImageUrl) {
+        try {
+          // Fetch brand info for ESPEJO evaluation
+          const { data: brandInfo } = await supabase
+            .from('brand_research')
+            .select('brand_name, colors')
+            .eq('shop_id', connection.client_id)
+            .maybeSingle();
+
+          const espejoResult = await espejoAd(
+            adImageUrl,
+            connection.client_id,
+            data.name || 'pre-create',
+            brandInfo?.colors || '#000000',
+            brandInfo?.brand_name || 'Brand'
+          );
+
+          if (!espejoResult.pass) {
+            // ESPEJO is advisory only — log warning but do NOT block campaign creation
+            console.warn(`[manage-meta-campaign] ESPEJO advisory: ad image score=${espejoResult.score}, issues=${JSON.stringify(espejoResult.issues)}`);
+          } else {
+            console.log(`[manage-meta-campaign] ESPEJO approved ad image: score=${espejoResult.score}`);
+          }
+        } catch (espejoErr: any) {
+          // ESPEJO failure should not block campaign creation — log and continue
+          console.warn(`[manage-meta-campaign] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
+        }
+      }
     }
 
     // Route to the appropriate action handler

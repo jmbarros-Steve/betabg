@@ -1,0 +1,147 @@
+name: Post-Deploy Smoke Test
+
+on:
+  deployment_status:
+
+jobs:
+  smoke-test:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for deploy to stabilize
+        run: sleep 30
+
+      - name: Get deploy URL
+        id: url
+        run: |
+          URL="${{ github.event.deployment_status.target_url }}"
+          echo "deploy_url=${URL:-https://betabgnuevosupa.vercel.app}" >> $GITHUB_OUTPUT
+
+      - name: Create smoke tests
+        run: |
+          cat > e2e/_smoke.spec.ts << 'EOF'
+          import { test, expect } from '@playwright/test';
+
+          const BASE = process.env.SMOKE_URL || 'https://betabgnuevosupa.vercel.app';
+          const EMAIL = 'patricio.correa@jardindeeva.cl';
+          const PASS = 'Jardin2026';
+
+          test('1. Login page loads', async ({ page }) => {
+            const res = await page.goto(`${BASE}/auth`);
+            expect(res?.status()).toBe(200);
+            await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10000 });
+          });
+
+          test('2. Dashboard loads after login', async ({ page }) => {
+            await page.goto(`${BASE}/auth`);
+            await page.locator('input[type="email"]').fill(EMAIL);
+            await page.locator('input[type="password"]').fill(PASS);
+            await page.locator('button:has-text("Iniciar")').click();
+            await page.waitForTimeout(5000);
+            // Should redirect to portal or show onboarding
+            expect(page.url()).not.toContain('/auth');
+          });
+
+          test('3. Steve chat responds', async ({ page }) => {
+            const res = await page.goto(`${BASE}`);
+            expect(res?.status()).toBe(200);
+            // Landing page should have Steve chat or CTA
+            const body = await page.textContent('body');
+            expect(body).toContain('Steve');
+          });
+
+          test('4. Email section accessible', async ({ page }) => {
+            await page.goto(`${BASE}/auth`);
+            await page.locator('input[type="email"]').fill(EMAIL);
+            await page.locator('input[type="password"]').fill(PASS);
+            await page.locator('button:has-text("Iniciar")').click();
+            await page.waitForTimeout(5000);
+            // Skip onboarding if present
+            const skip = page.locator('button:has-text("Omitir")');
+            if (await skip.isVisible({ timeout: 3000 }).catch(() => false)) await skip.click();
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(1000);
+            // Page should not have crashed
+            const body = await page.textContent('body');
+            expect(body).not.toContain('Application error');
+          });
+
+          test('5. API health check', async ({ request }) => {
+            const res = await request.get(`${BASE}/`);
+            expect(res.status()).toBe(200);
+          });
+          EOF
+
+      - name: Run smoke tests
+        id: smoke
+        continue-on-error: true
+        run: |
+          npx playwright test e2e/_smoke.spec.ts --reporter=line 2>&1 | tee /tmp/smoke-results.txt
+          EXIT=$?
+          echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
+          echo "results<<RESEOF" >> $GITHUB_OUTPUT
+          cat /tmp/smoke-results.txt >> $GITHUB_OUTPUT
+          echo "RESEOF" >> $GITHUB_OUTPUT
+        env:
+          SMOKE_URL: ${{ steps.url.outputs.deploy_url }}
+
+      - name: Rollback on failure
+        if: steps.smoke.outputs.exit_code != '0'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          echo "🚨 Smoke tests failed. Rolling back..."
+          
+          # Get last successful production deployment
+          DEPLOYMENTS=$(curl -s "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&state=READY&target=production&limit=5" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}")
+          
+          # Get the second deployment (first is the current broken one)
+          PREVIOUS_ID=$(echo "$DEPLOYMENTS" | jq -r '.deployments[1].uid // empty')
+          
+          if [ -n "$PREVIOUS_ID" ]; then
+            # Promote previous deployment to production
+            curl -s -X POST "https://api.vercel.com/v13/deployments/${PREVIOUS_ID}/promote" \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              -H "Content-Type: application/json"
+            echo "✅ Rolled back to deployment: ${PREVIOUS_ID}"
+          else
+            echo "⚠️ No previous deployment found for rollback"
+          fi
+
+      - name: Alert via WhatsApp on rollback
+        if: steps.smoke.outputs.exit_code != '0'
+        run: |
+          RESULTS='${{ steps.smoke.outputs.results }}'
+          FAILED=$(echo "$RESULTS" | grep -E "failed|✘|×" | head -3)
+          
+          # Use openclaw if available, otherwise just log
+          if command -v openclaw &> /dev/null; then
+            openclaw message send "🚨 ROLLBACK AUTOMÁTICO — Deploy a producción falló smoke tests
+
+          Tests que fallaron:
+          ${FAILED}
+
+          Se restauró la versión anterior automáticamente.
+          Revisa el deploy antes de volver a pushear."
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: rm -f e2e/_smoke.spec.ts

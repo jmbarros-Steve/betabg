@@ -1,0 +1,147 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications (F8)":
+      - list
+    - region "Notifications alt+T"
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]:
+            - img "Steve Ads" [ref=e7]
+            - generic [ref=e9]:
+              - paragraph [ref=e11]: Patricio Correa
+              - paragraph [ref=e12]: Jardin de Eva
+          - generic [ref=e13]:
+            - generic [ref=e14]: Portal Cliente
+            - button [ref=e15] [cursor=pointer]:
+              - img
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - button "Steve" [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+            - text: Steve
+          - button "Brief" [ref=e22] [cursor=pointer]:
+            - img [ref=e23]
+            - text: Brief
+          - button "Métricas" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+            - text: Métricas
+          - button "Conexiones" [active] [ref=e29] [cursor=pointer]:
+            - img [ref=e30]
+            - text: Conexiones
+          - button "Configuración" [ref=e33] [cursor=pointer]:
+            - img [ref=e34]
+            - text: Configuración
+          - button "Más" [ref=e37] [cursor=pointer]:
+            - text: Más
+            - img [ref=e38]
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - heading "Setup del portal" [level=4] [ref=e43]
+              - generic [ref=e44]: 4/5
+              - 'progressbar "Setup del portal: 4 de 5 pasos completados" [ref=e45]'
+            - generic [ref=e47]:
+              - button "Colapsar pasos" [ref=e48] [cursor=pointer]:
+                - img [ref=e49]
+              - button "Cerrar progreso de setup" [ref=e51] [cursor=pointer]:
+                - img [ref=e52]
+          - generic [ref=e55]:
+            - button "Conectar Shopify (completado)" [disabled] [ref=e56]:
+              - img [ref=e57]
+              - generic [ref=e59]: Conectar Shopify
+              - generic [ref=e60]: (completado)
+            - button "Conectar Meta (completado)" [disabled] [ref=e61]:
+              - img [ref=e62]
+              - generic [ref=e64]: Conectar Meta
+              - generic [ref=e65]: (completado)
+            - button "Conectar Google Ads (pendiente)" [ref=e66] [cursor=pointer]:
+              - img [ref=e67]
+              - generic [ref=e69]: Conectar Google Ads
+              - generic [ref=e70]: (pendiente)
+            - button "Completar Brand Brief (completado)" [disabled] [ref=e71]:
+              - img [ref=e72]
+              - generic [ref=e74]: Completar Brand Brief
+              - generic [ref=e75]: (completado)
+            - button "Configurar finanzas (completado)" [disabled] [ref=e76]:
+              - img [ref=e77]
+              - generic [ref=e79]: Configurar finanzas
+              - generic [ref=e80]: (completado)
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - heading "Mis Conexiones" [level=2] [ref=e85]
+            - paragraph [ref=e86]: Gestiona tus plataformas conectadas
+          - generic [ref=e87]:
+            - generic [ref=e90]:
+              - generic [ref=e91]:
+                - img "Shopify" [ref=e92]
+                - generic [ref=e93]:
+                  - paragraph [ref=e94]: Shopify
+                  - paragraph [ref=e95]: Jardin de Eva
+              - generic [ref=e96]:
+                - generic [ref=e97]:
+                  - img [ref=e98]
+                  - text: Activo
+                - button "Sincronizar" [ref=e101] [cursor=pointer]:
+                  - img
+                  - text: Sincronizar
+                - button "Desconectar" [ref=e102] [cursor=pointer]:
+                  - img
+            - generic [ref=e103]:
+              - generic [ref=e105]:
+                - generic [ref=e106]:
+                  - img "Meta Ads" [ref=e107]
+                  - generic [ref=e108]:
+                    - paragraph [ref=e109]: Meta Ads
+                    - paragraph [ref=e110]: Jardin de Eva
+                - generic [ref=e111]:
+                  - generic [ref=e112]:
+                    - img [ref=e113]
+                    - text: Activo
+                  - button "Sincronizar" [ref=e116] [cursor=pointer]:
+                    - img
+                    - text: Sincronizar
+                  - button "Desconectar" [ref=e117] [cursor=pointer]:
+                    - img
+              - generic [ref=e120]:
+                - img [ref=e121]
+                - generic [ref=e123]:
+                  - paragraph [ref=e124]: Error al cargar cuentas
+                  - paragraph [ref=e125]: No se pudieron cargar las cuentas publicitarias
+                - button "Reintentar" [ref=e126] [cursor=pointer]:
+                  - img
+                  - text: Reintentar
+            - generic [ref=e129]:
+              - generic [ref=e130]:
+                - img [ref=e132]
+                - generic [ref=e135]:
+                  - paragraph [ref=e136]: Klaviyo
+                  - paragraph [ref=e137]: Jardin de Eva
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - img [ref=e140]
+                  - text: Activo
+                - button "Desconectar" [ref=e143] [cursor=pointer]:
+                  - img
+          - generic [ref=e144]:
+            - heading "Conectar Nueva Plataforma" [level=3] [ref=e146]
+            - generic [ref=e148]:
+              - generic [ref=e149]:
+                - img "Google Ads" [ref=e150]
+                - generic [ref=e151]:
+                  - paragraph [ref=e152]: Google Ads
+                  - paragraph [ref=e153]: Campañas de búsqueda y display
+              - button "Conectar Google" [ref=e154] [cursor=pointer]:
+                - img
+                - text: Conectar Google
+      - button [ref=e157] [cursor=pointer]:
+        - img
+      - generic [ref=e158]:
+        - button "Abrir asistente" [ref=e159] [cursor=pointer]:
+          - img "Chonga" [ref=e161]
+        - status "Disponible" [ref=e162]
+  - generic [ref=e163]: "0"
+```

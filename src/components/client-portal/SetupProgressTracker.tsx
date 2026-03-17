@@ -11,9 +11,12 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
   const [steps, setSteps] = useState<{ label: string; done: boolean; tab: string }[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!clientId) return;
+
+    let cancelled = false;
 
     const checkSetup = async () => {
       // Check connections
@@ -26,9 +29,9 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
       const hasMeta = connections?.some(c => c.platform === "meta" && c.is_active) ?? false;
       const hasGoogle = connections?.some(c => c.platform === "google" && c.is_active) ?? false;
 
-      // Check brief
+      // Check brief (stored in brand_research table)
       const { data: briefs } = await supabase
-        .from("brand_briefs")
+        .from("brand_research")
         .select("id")
         .eq("client_id", clientId)
         .limit(1);
@@ -42,13 +45,24 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
         .limit(1);
       const hasConfig = (config?.length ?? 0) > 0;
 
-      setSteps([
+      if (cancelled) return;
+
+      const newSteps = [
         { label: "Conectar Shopify", done: hasShopify, tab: "conexiones" },
         { label: "Conectar Meta", done: hasMeta, tab: "conexiones" },
         { label: "Conectar Google Ads", done: hasGoogle, tab: "conexiones" },
         { label: "Completar Brand Brief", done: hasBrief, tab: "steve" },
         { label: "Configurar finanzas", done: hasConfig, tab: "configuracion" },
-      ]);
+      ];
+
+      setSteps(newSteps);
+
+      // Debounce first render to avoid flash of stale state
+      if (!ready) {
+        setTimeout(() => {
+          if (!cancelled) setReady(true);
+        }, 500);
+      }
     };
 
     checkSetup();
@@ -56,14 +70,17 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
     // Listen for sync events to refresh
     const handler = () => checkSetup();
     window.addEventListener("bg:sync-complete", handler);
-    return () => window.removeEventListener("bg:sync-complete", handler);
-  }, [clientId]);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("bg:sync-complete", handler);
+    };
+  }, [clientId, ready]);
 
   const completedCount = steps.filter(s => s.done).length;
   const allDone = completedCount === steps.length;
 
-  // Don't show if all done or dismissed or no steps loaded
-  if (allDone || dismissed || steps.length === 0) return null;
+  // Don't show until data is loaded and debounce elapsed
+  if (!ready || allDone || dismissed || steps.length === 0) return null;
 
   return (
     <div className="mx-4 mb-4 border rounded-lg bg-card p-4">

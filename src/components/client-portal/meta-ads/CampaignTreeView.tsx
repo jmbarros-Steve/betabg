@@ -181,12 +181,12 @@ function AdSetRow({ adset, depth = 1, onAdClick }: { adset: AdSetNode; depth?: n
         <span className="text-sm font-medium truncate max-w-[220px]">{adset.name}</span>
         <StatusBadge status={adset.status} />
         <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-          <span title="Gasto">{fmtCLP(adset.spend)}</span>
-          <span title="ROAS" className={adset.roas >= 2 ? 'text-green-600 font-medium' : adset.roas >= 1 ? 'text-yellow-600' : 'text-red-500'}>{fmtRoas(adset.roas)}</span>
-          <span title="CPA">{cpa > 0 ? fmtCLP(cpa) : '--'}</span>
-          <span title="CTR">{fmtPct(adset.ctr)}</span>
-          <span title="Conv.">{fmtNum(adset.conversions)}</span>
-          <span title="Ads" className="flex items-center gap-1"><FileImage className="w-3 h-3" />{adset.ads.length}</span>
+          <span className="w-20 text-right" title="Gasto">{fmtCLP(adset.spend)}</span>
+          <span className={`w-14 text-right ${adset.roas >= 2 ? 'text-green-600 font-medium' : adset.roas >= 1 ? 'text-yellow-600' : 'text-red-500'}`} title="ROAS">{fmtRoas(adset.roas)}</span>
+          <span className="w-20 text-right" title="CPA">{cpa > 0 ? fmtCLP(cpa) : '--'}</span>
+          <span className="w-14 text-right" title="CTR">{fmtPct(adset.ctr)}</span>
+          <span className="w-14 text-right" title="Conv.">{fmtNum(adset.conversions)}</span>
+          <span className="w-16 text-right flex items-center justify-end gap-1" title="Ads"><FileImage className="w-3 h-3" />{adset.ads.length}</span>
         </span>
       </button>
       {expanded && adset.ads.map((ad) => (
@@ -277,12 +277,12 @@ function CampaignRow({
         )}
 
         <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-          <span className="flex items-center gap-1" title="Gasto 30d"><DollarSign className="w-3 h-3" />{fmtCLP(campaign.spend_30d)}</span>
-          <span className={`font-medium ${campaign.roas >= 3 ? 'text-green-600' : campaign.roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`} title="ROAS">{fmtRoas(campaign.roas)}</span>
-          <span title="CPA">{campaign.cpa > 0 ? fmtCLP(campaign.cpa) : '--'}</span>
-          <span title="CTR">{fmtPct(campaign.ctr)}</span>
-          <span title="Conv.">{fmtNum(campaign.conversions)}</span>
-          <span className="flex items-center gap-1 text-muted-foreground" title="Ad Sets"><Layers className="w-3 h-3" />{campaign.adset_count}</span>
+          <span className="w-20 text-right" title="Gasto 30d">{fmtCLP(campaign.spend_30d)}</span>
+          <span className={`w-14 text-right font-medium ${campaign.roas >= 3 ? 'text-green-600' : campaign.roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`} title="ROAS">{fmtRoas(campaign.roas)}</span>
+          <span className="w-20 text-right" title="CPA">{campaign.cpa > 0 ? fmtCLP(campaign.cpa) : '--'}</span>
+          <span className="w-14 text-right" title="CTR">{fmtPct(campaign.ctr)}</span>
+          <span className="w-14 text-right" title="Conv.">{fmtNum(campaign.conversions)}</span>
+          <span className="w-16 text-right flex items-center justify-end gap-1 text-muted-foreground" title="Ad Sets"><Layers className="w-3 h-3" />{campaign.adset_count}</span>
         </span>
       </button>
 
@@ -667,6 +667,21 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
         <span className="flex items-center gap-1"><FileImage className="w-3 h-3 text-pink-500" />Anuncio</span>
         <span className="ml-auto">Haz clic en una campaña para expandir su jerarquía</span>
       </div>
+
+      {/* Column headers */}
+      {filtered.length > 0 && (
+        <div className="flex items-center px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide border-b">
+          <span className="flex-1">Campaña</span>
+          <span className="flex items-center gap-4 shrink-0">
+            <span className="w-20 text-right">Gasto</span>
+            <span className="w-14 text-right">ROAS</span>
+            <span className="w-20 text-right">CPA</span>
+            <span className="w-14 text-right">CTR</span>
+            <span className="w-14 text-right">Conv.</span>
+            <span className="w-16 text-right">Ad Sets</span>
+          </span>
+        </div>
+      )}
 
       {/* Campaign tree */}
       {filtered.length === 0 ? (

@@ -1,6 +1,6 @@
 import { test, devices } from '@playwright/test';
 
-const BASE = process.env.TEST_BASE_URL || 'https://betabgnuevosupa.vercel.app';
+const BASE = process.env.TEST_BASE_URL || 'https://www.steve.cl';
 
 const DEVICE_LIST = [
   { name: 'iPhone 12', config: devices['iPhone 12'] },
@@ -17,42 +17,41 @@ const PAGES = [
 ];
 
 for (const device of DEVICE_LIST) {
-  test.describe(`${device.name}`, () => {
-    test.use(device.config);
+  for (const pg of PAGES) {
+    test(`${device.name} — ${pg.name} loads without errors`, async ({ browser }) => {
+      const context = await browser.newContext(device.config);
+      const page = await context.newPage();
+      const errors: string[] = [];
+      page.on('pageerror', e => errors.push(e.message));
 
-    for (const pg of PAGES) {
-      test(`${pg.name} loads without errors`, async ({ page }) => {
-        const errors: string[] = [];
-        page.on('pageerror', e => errors.push(e.message));
-        
-        await page.goto(`${BASE}${pg.path}`);
-        await page.waitForTimeout(3000);
-        
-        // Screenshot for evidence
-        await page.screenshot({ 
-          path: `logs/qa/screenshots/${device.name.replace(/\s/g, '_')}_${pg.name}.png`,
-          fullPage: true 
-        });
-        
-        // No JS errors
-        if (errors.length > 0) {
-          throw new Error(`JS errors on ${device.name}: ${errors.join(', ')}`);
-        }
+      await page.goto(`${BASE}${pg.path}`);
+      await page.waitForTimeout(3000);
 
-        // No broken layout indicators
-        const body = await page.textContent('body') || '';
-        if (body.includes('NaN') || body.includes('Infinity') || body.includes('undefined')) {
-          throw new Error(`Broken data on ${device.name}: found NaN/Infinity/undefined`);
-        }
-
-        // Check no horizontal overflow (broken layout)
-        const hasOverflow = await page.evaluate(() => {
-          return document.documentElement.scrollWidth > document.documentElement.clientWidth + 10;
-        });
-        if (hasOverflow) {
-          throw new Error(`Horizontal overflow on ${device.name} at ${pg.path} — layout broken`);
-        }
+      await page.screenshot({
+        path: `logs/qa/screenshots/${device.name.replace(/\s/g, '_')}_${pg.name}.png`,
+        fullPage: true,
       });
-    }
-  });
+
+      if (errors.length > 0) {
+        await context.close();
+        throw new Error(`JS errors on ${device.name}: ${errors.join(', ')}`);
+      }
+
+      const body = await page.textContent('body') || '';
+      if (body.includes('NaN') || body.includes('Infinity') || body.includes('undefined')) {
+        await context.close();
+        throw new Error(`Broken data on ${device.name}: found NaN/Infinity/undefined`);
+      }
+
+      const hasOverflow = await page.evaluate(() => {
+        return document.documentElement.scrollWidth > document.documentElement.clientWidth + 10;
+      });
+      if (hasOverflow) {
+        await context.close();
+        throw new Error(`Horizontal overflow on ${device.name} at ${pg.path} — layout broken`);
+      }
+
+      await context.close();
+    });
+  }
 }

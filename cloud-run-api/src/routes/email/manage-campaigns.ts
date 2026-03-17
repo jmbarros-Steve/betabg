@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
+import { espejoEmail } from '../ai/espejo.js';
 
 /**
  * Campaign management: CRUD + send + schedule.
@@ -142,6 +143,40 @@ export async function manageEmailCampaigns(c: Context) {
       }
       if (!['draft', 'scheduled'].includes(campaign.status)) {
         return c.json({ error: 'Campaign is not in a sendable state' }, 400);
+      }
+
+      // ── ESPEJO visual check for email HTML ──
+      if (campaign.html_content) {
+        try {
+          const { data: brandInfo } = await supabase
+            .from('brand_research')
+            .select('brand_name, colors')
+            .eq('shop_id', client_id)
+            .maybeSingle();
+
+          const espejoResult = await espejoEmail(
+            campaign.html_content,
+            client_id,
+            campaign_id,
+            brandInfo?.colors || '#000000',
+            brandInfo?.brand_name || 'Brand'
+          );
+
+          if (!espejoResult.pass) {
+            console.log(`[manage-campaigns] ESPEJO rejected email: score=${espejoResult.score}`);
+            return c.json({
+              error: 'ESPEJO rechazó el email',
+              score: espejoResult.score,
+              issues: espejoResult.issues,
+              details: espejoResult.details,
+            }, 422);
+          }
+
+          console.log(`[manage-campaigns] ESPEJO approved email: score=${espejoResult.score}`);
+        } catch (espejoErr: any) {
+          // ESPEJO failure should not block email sending — log and continue
+          console.warn(`[manage-campaigns] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
+        }
       }
 
       // Check for A/B test — create from request body if provided

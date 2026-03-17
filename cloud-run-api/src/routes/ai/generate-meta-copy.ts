@@ -532,9 +532,9 @@ FORMATO DE RESPUESTA
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
 {
   "headlines": [
-    "5 headlines potentes usando las fórmulas de Sabri + Russell",
-    "Cada uno con ángulo diferente: dolor, curiosidad, beneficio, controversia, transformación",
-    "Adaptados a la temperatura del tráfico (${funnelStage.toUpperCase()})"
+    "5 headlines potentes, cada uno usando un ÁNGULO CREATIVO DISTINTO del catálogo",
+    "Ángulos obligatorios a variar: urgencia, social proof, transformación, curiosidad, problema-solución",
+    "NUNCA repitas el mismo ángulo en dos headlines. Adaptados a ${funnelStage.toUpperCase()}"
   ],
   "primaryText": "Texto principal siguiendo Hook-Historia-Oferta. Para TOFU: 100-200 palabras enfocadas en el problema y educación. Para MOFU: 150-250 palabras con historia y credenciales. Para BOFU: 200-400 palabras con la oferta completa del Padrino.",
   "description": "Descripción de 1-2 líneas que refuerce el headline con intriga"${adType === 'video' ? `,
@@ -555,6 +555,24 @@ IMPORTANTE:
 - Responde SOLO con JSON, sin texto adicional
 - REGLA ANTI-ALUCINACIÓN: Todo el copy DEBE referirse EXCLUSIVAMENTE a los productos y marca del cliente listados arriba. Si no hay productos listados, usa la propuesta de valor y el nombre de la marca. NUNCA inventes productos, industrias ni temas genéricos. PROHIBIDO hablar de plantas, macetas, jardines, mascotas, comida u otros temas que no estén en los datos del cliente.`;
 }
+
+/**
+ * Catalog of creative angles to ensure variety across generations.
+ */
+const CREATIVE_ANGLES_CATALOG = [
+  'urgencia (escasez, tiempo limitado, últimas unidades)',
+  'social proof (testimonios, reseñas, "X personas ya lo tienen")',
+  'transformación (antes/después, cambio de vida, resultado visible)',
+  'curiosidad (pregunta intrigante, dato sorprendente, "lo que nadie te dice")',
+  'oferta irresistible (descuento, bundle, regalo incluido)',
+  'behind-the-scenes (proceso de creación, equipo, ingredientes)',
+  'problema-solución (dolor específico → producto como solución)',
+  'aspiracional (estilo de vida deseado, identidad, pertenencia)',
+  'datos/estadísticas (números concretos, resultados medibles, porcentajes)',
+  'storytelling personal (historia real, anécdota, momento de descubrimiento)',
+  'controversia/mito (romper creencia común, "por qué X no funciona")',
+  'comparación (vs alternativas, vs método antiguo, vs no hacer nada)',
+];
 
 /**
  * Fetch the last 10 copies generated for this client to prevent repetition.
@@ -578,6 +596,7 @@ async function buildAntiRepetitionContext(supabase: any, clientId: string): Prom
     .limit(5);
 
   const previousCopies: string[] = [];
+  const usedAngles: string[] = [];
 
   if (recentCreatives && recentCreatives.length > 0) {
     for (const c of recentCreatives) {
@@ -586,6 +605,7 @@ async function buildAntiRepetitionContext(supabase: any, clientId: string): Prom
         const angulo = c.angulo ? ` [ángulo: ${c.angulo}]` : '';
         previousCopies.push(parts.join(' | ') + angulo);
       }
+      if (c.angulo) usedAngles.push(c.angulo);
     }
   }
 
@@ -598,18 +618,50 @@ async function buildAntiRepetitionContext(supabase: any, clientId: string): Prom
     }
   }
 
-  if (previousCopies.length === 0) return '';
+  // Build the list of available (unused) angles
+  const recentUsedAnglesLower = usedAngles.slice(0, 5).map(a => a.toLowerCase());
+  const availableAngles = CREATIVE_ANGLES_CATALOG.filter(
+    angle => !recentUsedAnglesLower.some(used => angle.toLowerCase().includes(used.toLowerCase()) || used.toLowerCase().includes(angle.split(' ')[0].toLowerCase()))
+  );
 
-  return `
+  // Always return the angle variety section, even with no previous copies
+  let section = `
 ═══════════════════════════════════════════════════════════════════════════════
+🎨 VARIEDAD DE ÁNGULOS CREATIVOS — OBLIGATORIO
+═══════════════════════════════════════════════════════════════════════════════
+
+REGLA DE VARIEDAD: Cada headline y cada pieza de copy DEBE usar un ángulo creativo DIFERENTE. NUNCA repitas el mismo ángulo en la misma respuesta.
+
+CATÁLOGO DE ÁNGULOS CREATIVOS DISPONIBLES:
+${CREATIVE_ANGLES_CATALOG.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+
+NUNCA uses referencias a plantas, naturaleza muerta, macetas, jardines o elementos sin vida a menos que el producto sea ESPECÍFICAMENTE de jardinería.
+`;
+
+  if (previousCopies.length > 0) {
+    section += `
 ⛔ COPIES ANTERIORES — NO REPITAS ESTOS ÁNGULOS NI HOOKS
-═══════════════════════════════════════════════════════════════════════════════
-Los siguientes copies YA fueron generados para este cliente. PROHIBIDO repetir el mismo ángulo, hook, estructura o idea principal. Cada nuevo copy DEBE usar un enfoque DIFERENTE.
+Los siguientes copies YA fueron generados para este cliente. PROHIBIDO repetir el mismo ángulo, hook, estructura o idea principal:
 
 ${previousCopies.map((c, i) => `${i + 1}. ${c}`).join('\n')}
-
-INSTRUCCIÓN: Genera copies con ángulos FRESCOS que no se parezcan a los anteriores. Usa hooks diferentes, estructuras distintas, y perspectivas nuevas.
 `;
+  }
+
+  if (usedAngles.length > 0) {
+    section += `
+🚫 ÁNGULOS YA USADOS RECIENTEMENTE (NO usar estos):
+${[...new Set(usedAngles.slice(0, 5))].map(a => `- ${a}`).join('\n')}
+
+✅ PRIORIZA estos ángulos FRESCOS que NO se han usado:
+${availableAngles.slice(0, 5).map(a => `- ${a}`).join('\n')}
+`;
+  }
+
+  section += `
+INSTRUCCIÓN FINAL: Genera copies con ángulos FRESCOS y DISTINTOS entre sí. Usa hooks diferentes, estructuras distintas, y perspectivas nuevas. Cada headline debe atacar un ángulo diferente del catálogo.
+`;
+
+  return section;
 }
 
 export async function generateMetaCopy(c: Context) {
@@ -703,7 +755,7 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes.',
+        system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, naturaleza muerta, macetas, jardines, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).',
         messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
       }),
     });
@@ -786,7 +838,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. PROHIBIDO hablar de plantas, mascotas, comida u otros temas genéricos que no correspondan al negocio real del cliente.',
+        system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. PROHIBIDO hablar de plantas, naturaleza muerta, macetas, jardines, mascotas, comida u otros temas genéricos que no correspondan al negocio real del cliente. VARIEDAD: Cada variación DEBE usar un ángulo creativo DISTINTO (urgencia, social proof, transformación, curiosidad, problema-solución, aspiracional, datos, storytelling, etc.).',
         messages: [{ role: 'user', content: prompt }],
       }),
     });

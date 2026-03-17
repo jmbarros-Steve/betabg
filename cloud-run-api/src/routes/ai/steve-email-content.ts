@@ -193,6 +193,15 @@ export async function steveEmailContent(c: Context) {
   } catch (error: unknown) {
     console.error('Error in steve-email-content:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
+    if (message === 'ANTHROPIC_API_KEY not configured') {
+      return c.json({ error: 'AI service not configured. Contact support.' }, 503);
+    }
+    if (message.includes('Rate limit')) {
+      return c.json({ error: 'AI service busy. Try again in a moment.' }, 429);
+    }
+    if (message.includes('Failed to parse AI response')) {
+      return c.json({ error: 'AI generated an invalid response. Try again.' }, 502);
+    }
     return c.json({ error: message }, 500);
   }
 }

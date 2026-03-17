@@ -596,7 +596,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           ? `Campaña "${campaign.campaign_name}" reanudada`
           : `Campaña "${campaign.campaign_name}" pausada`,
       );
-    } catch {
+    } catch (err: any) {
+      toast.error(err?.message || "Error en la operación");
       // Error handled by toast
       toast.error('Error al cambiar estado de la campaña');
     } finally {
@@ -620,7 +621,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
       toast.success(`Campaña duplicada: "${campaign.campaign_name} (Copia)"`);
       await fetchCampaigns();
-    } catch {
+    } catch (err: any) {
+      toast.error(err?.message || "Error en la operación");
       // Error handled by toast
       toast.error('Error al duplicar la campaña');
     } finally {
@@ -649,7 +651,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         ),
       );
       toast.success(`Campaña "${campaign.campaign_name}" archivada`);
-    } catch {
+    } catch (err: any) {
+      toast.error(err?.message || "Error en la operación");
       // Error handled by toast
       toast.error('Error al archivar la campaña');
     } finally {
@@ -703,7 +706,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setCreateDialogOpen(false);
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
-    } catch {
+    } catch (err: any) {
+      toast.error(err?.message || "Error en la operación");
       // Error handled by toast
       toast.error('Error al crear la campaña');
     } finally {
@@ -743,7 +747,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setSelectedCampaign(null);
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
-    } catch {
+    } catch (err: any) {
+      toast.error(err?.message || "Error en la operación");
       // Error handled by toast
       toast.error('Error al actualizar la campaña');
     } finally {
@@ -789,7 +794,8 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         `Presupuesto actualizado a ${formatCLP(newBudget)}/día`,
       );
       setBudgetDialogOpen(false);
-    } catch {
+    } catch (err: any) {
+      toast.error(err?.message || "Error en la operación");
       // Error handled by toast
       toast.error('Error al ajustar presupuesto');
     } finally {

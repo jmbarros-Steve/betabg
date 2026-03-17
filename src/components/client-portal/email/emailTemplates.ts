@@ -1,6 +1,6 @@
 /**
  * Professional pre-built email templates for Steve Mail.
- * Each template is a full HTML string ready for GrapeJS.
+ * Each template is a full HTML string ready for the email editor.
  * 55 templates across 11 categories.
  */
 

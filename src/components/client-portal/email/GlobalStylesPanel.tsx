@@ -6,10 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Paintbrush, Sparkles, RotateCcw } from 'lucide-react';
 import { callApi } from '@/lib/api';
-import type { SteveMailEditorRef } from './SteveMailEditor';
+import type { BlocksEditorRef } from './BlocksEditorWrapper';
 
 interface GlobalStylesPanelProps {
-  editorRef: React.RefObject<SteveMailEditorRef | null>;
+  editorRef: React.RefObject<BlocksEditorRef | null>;
   clientId: string;
 }
 
@@ -100,7 +100,7 @@ export function GlobalStylesPanel({ editorRef, clientId }: GlobalStylesPanelProp
   // Auto-apply brand styles once when editor becomes ready and brand is loaded
   useEffect(() => {
     if (!brandLoaded || appliedOnce.current) return;
-    // Small delay to ensure GrapeJS editor is fully initialized
+    // Small delay to ensure editor is fully initialized
     const timer = setTimeout(() => {
       if (editorRef.current?.getEditor?.()) {
         applyStyles();

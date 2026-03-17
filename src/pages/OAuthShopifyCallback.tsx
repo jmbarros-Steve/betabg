@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
 import { useToast } from '@/hooks/use-toast';
 import { ShopifyWelcomeScreen } from '@/components/shopify/ShopifyWelcomeScreen';
-import { ShopifyOnboardingTour } from '@/components/client-portal/ShopifyOnboardingTour';
 
 type ConnectionStatus = 'loading' | 'success' | 'new_user' | 'tour' | 'error';
 
@@ -66,7 +65,7 @@ export default function OAuthShopifyCallback() {
               return;
             }
 
-            // Show onboarding tour for new users
+            // Shopify callback
             setStatus('tour');
           } catch (e: any) {
             setCredentials({ email, password: tempPass });
@@ -186,13 +185,9 @@ export default function OAuthShopifyCallback() {
   };
 
   if (status === 'tour') {
-    return (
-      <ShopifyOnboardingTour
-        storeName={storeName}
-        userEmail={userEmail}
-        onComplete={handleTourComplete}
-      />
-    );
+    // Onboarding removed — skip to portal
+    window.location.href = '/portal';
+    return null;
   }
 
   if (status === 'new_user' && credentials) {

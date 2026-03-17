@@ -6,7 +6,7 @@ export function initSentry() {
 
   Sentry.init({
     dsn,
-    environment: import.meta.env.MODE,
+    environment: 'production',
     integrations: [
       Sentry.browserTracingIntegration(),
       Sentry.replayIntegration({
@@ -14,7 +14,7 @@ export function initSentry() {
         blockAllMedia: false,
       }),
     ],
-    tracesSampleRate: 0.2,
+    tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
     beforeSend(event) {

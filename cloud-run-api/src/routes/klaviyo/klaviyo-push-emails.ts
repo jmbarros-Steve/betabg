@@ -1,5 +1,8 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { criterioEmailEvaluate } from '../ai/criterio-email.js';
+
+import { espejoEmail } from '../ai/espejo.js';
 
 const KLAVIYO_REVISION = '2024-10-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
@@ -301,10 +304,63 @@ export async function klaviyoPushEmails(c: Context) {
       return c.json({ error: 'Plan not found' }, 404);
     }
 
+    // CRITERIO pre-flight: evaluate each email before pushing
+    const rawEmailsForCheck = plan.emails;
+    const emailsForCheck: EmailStep[] = typeof rawEmailsForCheck === 'string' ? JSON.parse(rawEmailsForCheck) : rawEmailsForCheck as EmailStep[];
+
+    // Get shop_id from the plan's client connection
+    const { data: connData } = await serviceSupabase
+      .from('platform_connections')
+      .select('client_id, clients!inner(shop_id)')
+      .eq('id', connection_id)
+      .single();
+    const shopId = (connData as any)?.clients?.shop_id;
+
+    if (shopId) {
+      for (const emailToCheck of emailsForCheck) {
+        const criterioResult = await criterioEmailEvaluate({
+          subject: emailToCheck.subject,
+          preview_text: emailToCheck.previewText,
+          html: generateEmailHtml(emailToCheck),
+        }, shopId);
+
+        if (!criterioResult.can_publish) {
+          return c.json({
+            error: 'CRITERIO rechazó el email',
+            email_subject: emailToCheck.subject,
+            score: criterioResult.score,
+            reason: criterioResult.reason,
+            failed_rules: criterioResult.failed_rules,
+          }, 422);
+        }
+      }
+    }
+
+    // REGLA INQUEBRANTABLE: all Klaviyo emails born as DRAFT
+    const effectiveSendStrategy = 'draft';
+
     const apiKey = await decryptApiKey(connection_id);
     const rawEmails = plan.emails;
     const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
     const results: Array<{ email_subject: string; template_id: string; campaign_id: string; status: string }> = [];
+
+    // Fetch client_id and brand info for ESPEJO evaluation
+    const { data: connInfo } = await serviceSupabase
+      .from('platform_connections')
+      .select('client_id')
+      .eq('id', connection_id)
+      .single();
+    const espejoShopId = connInfo?.client_id || 'unknown';
+
+    let brandInfo: { brand_name?: string; colors?: string } | null = null;
+    if (espejoShopId !== 'unknown') {
+      const { data: bi } = await serviceSupabase
+        .from('brand_research')
+        .select('brand_name, colors')
+        .eq('shop_id', shopId)
+        .maybeSingle();
+      brandInfo = bi;
+    }
 
     for (let i = 0; i < emails.length; i++) {
       const email = emails[i];
@@ -312,11 +368,38 @@ export async function klaviyoPushEmails(c: Context) {
 
       console.log(`[${i + 1}/${emails.length}] Creating campaign: ${emailName}`);
 
-      // 1. Create template
+      // ── ESPEJO visual check ──
+      const emailHtml = generateEmailHtml(email);
+      try {
+        const espejoResult = await espejoEmail(
+          emailHtml,
+          shopId,
+          `klaviyo-plan-${plan_id}-email-${i}`,
+          brandInfo?.colors || '#000000',
+          brandInfo?.brand_name || plan.name || 'Brand'
+        );
+
+        if (!espejoResult.pass) {
+          console.log(`[klaviyo-push-emails] ESPEJO rejected email ${i + 1}: score=${espejoResult.score}`);
+          results.push({
+            email_subject: email.subject,
+            template_id: '',
+            campaign_id: '',
+            status: `espejo_rejected (score=${espejoResult.score}, issues: ${espejoResult.issues.join('; ')})`,
+          });
+          continue;
+        }
+        console.log(`[klaviyo-push-emails] ESPEJO approved email ${i + 1}: score=${espejoResult.score}`);
+      } catch (espejoErr: any) {
+        // ESPEJO failure should not block email push — log and continue
+        console.warn(`[klaviyo-push-emails] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
+      }
+
+      // 1. Create template (reuse emailHtml from ESPEJO check above)
       const templateId = await createTemplate(
         apiKey,
         emailName,
-        generateEmailHtml(email),
+        emailHtml,
         email.content,
       );
       console.log(`  Template created: ${templateId}`);
@@ -335,7 +418,7 @@ export async function klaviyoPushEmails(c: Context) {
         apiKey,
         emailName,
         list_id,
-        send_strategy || 'scheduled',
+        effectiveSendStrategy,
         emailScheduledAt,
       );
       const campaignId = campaign.id;
@@ -358,11 +441,11 @@ export async function klaviyoPushEmails(c: Context) {
       await updateCampaignMessage(apiKey, messageId, email.subject, email.previewText || '');
       console.log(`  Message updated with subject`);
 
-      // 7. Schedule/send based on strategy
-      if (send_strategy === 'draft') {
-        console.log(`  Campaign created as draft`);
+      // 7. All campaigns created as DRAFT (CRITERIO enforced)
+      if (effectiveSendStrategy === 'draft') {
+        console.log(`  Campaign created as draft (CRITERIO enforced)`);
         results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'draft' });
-      } else if (send_strategy === 'immediate' && i === 0) {
+      } else if (effectiveSendStrategy === 'immediate' && i === 0) {
         try {
           await sendCampaign(apiKey, campaignId);
           console.log(`  Campaign sent!`);

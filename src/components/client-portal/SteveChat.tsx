@@ -32,7 +32,9 @@ interface Message {
 // Strip system instruction annotations visible to user
 function cleanMessageForDisplay(content: string): string {
   // Remove "⚠️ FORMULARIO: ..." lines that are system instructions
+  // Remove <thinking>...</thinking> blocks from chain-of-thought models
   return content
+    .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
     .replace(/⚠️ FORMULARIO:[^\n]*/g, '')
     .replace(/Da \d+-\d+ ejemplos[^\n]*/g, '')
     .trim();

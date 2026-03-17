@@ -27,10 +27,12 @@ import ShopifyApp from "./pages/ShopifyApp";
 import ConnectShopify from "./pages/ConnectShopify";
 import GoogleAdsDesignDoc from "./pages/GoogleAdsDesignDoc";
 import NotFound from "./pages/NotFound";
+import { Sentry } from "./lib/sentry";
 
 const queryClient = new QueryClient();
 
 const App = () => (
+  <Sentry.ErrorBoundary fallback={<p>Algo salió mal. Recarga la página.</p>}>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
@@ -73,6 +75,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </Sentry.ErrorBoundary>
 );
 
 export default App;

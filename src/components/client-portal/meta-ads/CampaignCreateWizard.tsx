@@ -1290,7 +1290,7 @@ function CreativeFocusStep({
 // Ad Form (Multi-slot)
 // ---------------------------------------------------------------------------
 
-type MediaTab = 'upload' | 'ai-image' | 'ai-video' | 'gallery' | 'url';
+type MediaTab = 'upload' | 'ai-image' | 'ai-video' | 'gallery' | 'products' | 'url';
 type AspectRatio = '1:1' | '9:16' | '16:9';
 
 function AdFormMultiSlot({
@@ -1325,7 +1325,7 @@ function AdFormMultiSlot({
   selectedProduct: ShopifyProduct | null;
 }) {
   const [activeImageSlot, setActiveImageSlot] = useState(0);
-  const [mediaTab, setMediaTab] = useState<MediaTab>(productContext ? 'ai-image' : 'upload');
+  const [mediaTab, setMediaTab] = useState<MediaTab>(productContext ? 'products' : 'upload');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const [uploading, setUploading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -1334,7 +1334,36 @@ function AdFormMultiSlot({
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
+  const [loadingShopifyProducts, setLoadingShopifyProducts] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadShopifyProducts = useCallback(async () => {
+    setLoadingShopifyProducts(true);
+    try {
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'shopify')
+        .limit(1)
+        .single();
+      if (!conn?.id) { setLoadingShopifyProducts(false); return; }
+      const { data } = await callApi('fetch-shopify-products', { body: { connectionId: conn.id } });
+      if (data?.products) {
+        setShopifyProducts(data.products.slice(0, 30).map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          image: p.image?.src || p.images?.[0]?.src || p.variants?.[0]?.image_url || p.image || '',
+          price: Number(p.variants?.[0]?.price) || 0,
+          product_type: p.product_type || '',
+        })));
+      }
+    } catch { /* no shopify */ }
+    setLoadingShopifyProducts(false);
+  }, [clientId]);
+
+  useEffect(() => { if (mediaTab === 'products') loadShopifyProducts(); }, [mediaTab, loadShopifyProducts]);
 
   const loadGallery = useCallback(async () => {
     setLoadingGallery(true);
@@ -1447,6 +1476,7 @@ function AdFormMultiSlot({
 
   const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: React.ElementType }> = [
     { key: 'upload', label: 'Subir', icon: Upload },
+    { key: 'products', label: 'Productos', icon: ShoppingBag },
     { key: 'ai-image', label: 'IA Imagen', icon: Sparkles },
     { key: 'gallery', label: 'Galería', icon: ImageIcon },
     { key: 'url', label: 'URL', icon: LinkIcon },
@@ -1588,6 +1618,39 @@ function AdFormMultiSlot({
                 ))}
               </div>
             ) : <p className="text-xs text-muted-foreground text-center py-4">No hay recursos disponibles</p>}
+          </div>
+        )}
+
+        {mediaTab === 'products' && (
+          <div>
+            {loadingShopifyProducts ? (
+              <div className="grid grid-cols-3 gap-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="aspect-square rounded" />)}</div>
+            ) : shopifyProducts.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-[11px] text-muted-foreground">Haz clic en un producto para usar su foto real en el anuncio</p>
+                <div className="grid grid-cols-3 gap-2 max-h-[280px] overflow-y-auto">
+                  {shopifyProducts.filter(p => p.image).map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setImageAtSlot(p.image); toast.success(`Foto de "${p.title}" aplicada en imagen ${activeImageSlot + 1}`); }}
+                      className={`group relative rounded-lg border-2 overflow-hidden transition-all ${
+                        images[activeImageSlot] === p.image ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/30'
+                      }`}
+                    >
+                      <img src={p.image} alt={p.title} className="aspect-square w-full object-cover" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-1">
+                        <p className="text-[10px] text-white truncate font-medium">{p.title}</p>
+                        <p className="text-[9px] text-white/70">${p.price.toLocaleString('es-CL')}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                No se encontraron productos con fotos en Shopify. Conecta tu tienda o sube imágenes manualmente.
+              </p>
+            )}
           </div>
         )}
 
@@ -2391,7 +2454,15 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle CRITERIO structured errors with proper message
+        if (typeof error === 'object' && (error as any)?.failed_rules) {
+          const e = error as any;
+          const topIssues = (e.failed_rules || []).slice(0, 3).map((r: any) => r.details || r.rule_id).join('; ');
+          throw new Error(`CRITERIO rechazó (score ${e.score}%): ${topIssues}`);
+        }
+        throw typeof error === 'string' ? new Error(error) : error;
+      }
 
       // Save creative to ad_creatives library
       try {

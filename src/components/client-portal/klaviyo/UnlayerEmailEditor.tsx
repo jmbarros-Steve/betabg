@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { SteveMailEditor, type SteveMailEditorRef } from '../email/SteveMailEditor';
+import { BlocksEditorWrapper, type BlocksEditorRef } from '../email/BlocksEditorWrapper';
 
 export interface EditorEmail {
   subject: string;
@@ -20,7 +20,7 @@ interface UnlayerEmailEditorProps {
 }
 
 export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: UnlayerEmailEditorProps) {
-  const emailEditorRef = useRef<SteveMailEditorRef>(null);
+  const emailEditorRef = useRef<BlocksEditorRef>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [emails, setEmails] = useState<EditorEmail[]>(() =>
     initialEmails.map((e) => ({ ...e }))
@@ -168,10 +168,10 @@ export function UnlayerEmailEditor({ emails: initialEmails, onSave, onCancel }: 
         </div>
       </div>
 
-      {/* GrapeJS editor */}
+      {/* Blocks editor */}
       <div className="flex-1 min-h-0 relative">
         <div className="absolute inset-0">
-          <SteveMailEditor
+          <BlocksEditorWrapper
             ref={emailEditorRef}
             onReady={handleEditorReady}
             style={{ height: '100%' }}

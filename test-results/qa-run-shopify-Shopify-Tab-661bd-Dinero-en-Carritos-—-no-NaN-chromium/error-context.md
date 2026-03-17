@@ -1,0 +1,728 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications (F8)":
+      - list
+    - region "Notifications alt+T"
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]:
+            - img "Steve Ads" [ref=e7]
+            - generic [ref=e9]:
+              - paragraph [ref=e11]: Patricio Correa
+              - paragraph [ref=e12]: Jardin de Eva
+          - generic [ref=e13]:
+            - generic [ref=e14]: Portal Cliente
+            - button [ref=e15] [cursor=pointer]:
+              - img
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - button "Steve" [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+            - text: Steve
+          - button "Brief" [ref=e22] [cursor=pointer]:
+            - img [ref=e23]
+            - text: Brief
+          - button "Métricas" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+            - text: Métricas
+          - button "Conexiones" [ref=e29] [cursor=pointer]:
+            - img [ref=e30]
+            - text: Conexiones
+          - button "Configuración" [ref=e33] [cursor=pointer]:
+            - img [ref=e34]
+            - text: Configuración
+          - button "Shopify" [active] [ref=e37] [cursor=pointer]:
+            - text: Shopify
+            - img [ref=e38]
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - heading "Setup del portal" [level=4] [ref=e43]
+              - generic [ref=e44]: 4/5
+              - 'progressbar "Setup del portal: 4 de 5 pasos completados" [ref=e45]'
+            - generic [ref=e47]:
+              - button "Colapsar pasos" [ref=e48] [cursor=pointer]:
+                - img [ref=e49]
+              - button "Cerrar progreso de setup" [ref=e51] [cursor=pointer]:
+                - img [ref=e52]
+          - generic [ref=e55]:
+            - button "Conectar Shopify (completado)" [disabled] [ref=e56]:
+              - img [ref=e57]
+              - generic [ref=e59]: Conectar Shopify
+              - generic [ref=e60]: (completado)
+            - button "Conectar Meta (completado)" [disabled] [ref=e61]:
+              - img [ref=e62]
+              - generic [ref=e64]: Conectar Meta
+              - generic [ref=e65]: (completado)
+            - button "Conectar Google Ads (pendiente)" [ref=e66] [cursor=pointer]:
+              - img [ref=e67]
+              - generic [ref=e69]: Conectar Google Ads
+              - generic [ref=e70]: (pendiente)
+            - button "Completar Brand Brief (completado)" [disabled] [ref=e71]:
+              - img [ref=e72]
+              - generic [ref=e74]: Completar Brand Brief
+              - generic [ref=e75]: (completado)
+            - button "Configurar finanzas (completado)" [disabled] [ref=e76]:
+              - img [ref=e77]
+              - generic [ref=e79]: Configurar finanzas
+              - generic [ref=e80]: (completado)
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - paragraph [ref=e87]: Aquí ves ventas diarias, carritos abandonados, canales de venta y un análisis SEO rápido de tus productos.
+            - button [ref=e88] [cursor=pointer]:
+              - img [ref=e89]
+          - generic [ref=e92]:
+            - generic [ref=e93]:
+              - heading "Panel Shopify" [level=2] [ref=e94]
+              - paragraph [ref=e95]: Análisis completo de tu tienda
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - img [ref=e98]
+                - generic [ref=e100]:
+                  - button "7 días" [ref=e101] [cursor=pointer]
+                  - button "30 días" [ref=e102] [cursor=pointer]
+                  - button "90 días" [ref=e103] [cursor=pointer]
+                  - button "Este mes" [ref=e104] [cursor=pointer]
+                  - button "Año actual" [ref=e105] [cursor=pointer]
+                  - button "Personalizado" [ref=e106] [cursor=pointer]
+              - button "Actualizar datos" [ref=e107] [cursor=pointer]:
+                - img
+                - text: Actualizar
+          - generic [ref=e108]:
+            - generic [ref=e110]:
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - text: Ingresos del Período
+                  - img [ref=e113]
+                - img [ref=e117]
+              - paragraph [ref=e119]: $747.400
+            - generic [ref=e121]:
+              - generic [ref=e122]:
+                - generic [ref=e123]:
+                  - text: Pedidos
+                  - img [ref=e124]
+                - img [ref=e128]
+              - paragraph [ref=e132]: "10"
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - text: Ticket Promedio
+                  - img [ref=e137]
+                - img [ref=e141]
+              - paragraph [ref=e145]: $74.740
+            - generic [ref=e147]:
+              - generic [ref=e148]:
+                - generic [ref=e149]:
+                  - text: Dinero en Carritos
+                  - img [ref=e150]
+                - img [ref=e154]
+              - paragraph [ref=e156]: $571.500
+              - paragraph [ref=e157]: 11 carritos abandonados
+          - generic [ref=e158]:
+            - generic [ref=e159]:
+              - heading "Ventas por Día" [level=3] [ref=e161]:
+                - img [ref=e162]
+                - text: Ventas por Día
+              - generic [ref=e165]:
+                - img [ref=e168]:
+                  - generic [ref=e173]:
+                    - generic [ref=e175]: 02-19
+                    - generic [ref=e177]: 03-04
+                    - generic [ref=e179]: 03-05
+                    - generic [ref=e181]: 03-07
+                    - generic [ref=e183]: 03-08
+                    - generic [ref=e185]: 03-09
+                    - generic [ref=e187]: 03-10
+                    - generic [ref=e189]: 03-11
+                    - generic [ref=e191]: 03-14
+                  - generic [ref=e193]:
+                    - generic [ref=e195]: $0
+                    - generic [ref=e197]: $55K
+                    - generic [ref=e199]: $110K
+                    - generic [ref=e201]: $165K
+                    - generic [ref=e203]: $220K
+                  - generic [ref=e205]:
+                    - generic [ref=e207]: "0"
+                    - generic [ref=e209]: "0.5"
+                    - generic [ref=e211]: "1"
+                    - generic [ref=e213]: "1.5"
+                    - generic [ref=e215]: "2"
+                - generic [ref=e243]:
+                  - generic [ref=e246]: Ingresos
+                  - generic [ref=e249]: Pedidos
+            - generic [ref=e250]:
+              - heading "Carritos Abandonados por Día" [level=3] [ref=e252]:
+                - img [ref=e253]
+                - text: Carritos Abandonados por Día
+              - generic [ref=e257]:
+                - img [ref=e260]:
+                  - generic [ref=e265]:
+                    - generic [ref=e267]: 02-15
+                    - generic [ref=e269]: 02-16
+                    - generic [ref=e271]: 02-17
+                    - generic [ref=e273]: 02-19
+                    - generic [ref=e275]: 02-27
+                    - generic [ref=e277]: 03-04
+                    - generic [ref=e279]: 03-05
+                    - generic [ref=e281]: 03-06
+                    - generic [ref=e283]: 03-07
+                    - generic [ref=e285]: 03-12
+                  - generic [ref=e287]:
+                    - generic [ref=e289]: "0"
+                    - generic [ref=e291]: "0.5"
+                    - generic [ref=e293]: "1"
+                    - generic [ref=e295]: "1.5"
+                    - generic [ref=e297]: "2"
+                  - generic [ref=e299]:
+                    - generic [ref=e301]: $0
+                    - generic [ref=e303]: $30K
+                    - generic [ref=e305]: $60K
+                    - generic [ref=e307]: $90K
+                    - generic [ref=e309]: $120K
+                - generic [ref=e335]:
+                  - generic [ref=e338]: Carritos
+                  - generic [ref=e341]: Valor en Carritos
+          - generic [ref=e342]:
+            - generic [ref=e343]:
+              - heading "Rendimiento por Día de la Semana" [level=3] [ref=e344]:
+                - img [ref=e345]
+                - text: Rendimiento por Día de la Semana
+              - paragraph [ref=e347]:
+                - text: Promedio diario —
+                - generic [ref=e348]: "mejor: Miércoles"
+                - text: ·
+                - generic [ref=e349]: "más bajo: Lunes"
+            - generic [ref=e350]:
+              - generic [ref=e351]:
+                - generic [ref=e352]:
+                  - generic [ref=e353]: Dom
+                  - generic [ref=e357]:
+                    - generic [ref=e358]: $40.000
+                    - generic [ref=e359]: 1 pedidos/día
+                - generic [ref=e360]:
+                  - generic [ref=e361]: Lun
+                  - generic [ref=e365]:
+                    - generic [ref=e366]: $34.000
+                    - generic [ref=e367]: 1 pedidos/día
+                - generic [ref=e368]:
+                  - generic [ref=e369]: Mar
+                  - generic [ref=e373]:
+                    - generic [ref=e374]: $40.000
+                    - generic [ref=e375]: 1 pedidos/día
+                - generic [ref=e376]:
+                  - generic [ref=e377]: Mié
+                  - generic [ref=e381]:
+                    - generic [ref=e382]: $133.700
+                    - generic [ref=e383]: 1.5 pedidos/día
+                - generic [ref=e384]:
+                  - generic [ref=e385]: Jue
+                  - generic [ref=e389]:
+                    - generic [ref=e390]: $79.000
+                    - generic [ref=e391]: 1 pedidos/día
+                - generic [ref=e393]: Vie
+                - generic [ref=e397]:
+                  - generic [ref=e398]: Sáb
+                  - generic [ref=e402]:
+                    - generic [ref=e403]: $104.000
+                    - generic [ref=e404]: 1 pedidos/día
+              - paragraph [ref=e405]: Usa esta información para programar tus campañas en los días de mayor venta
+          - generic [ref=e406]:
+            - heading "Ventas por Canal" [level=3] [ref=e408]:
+              - img [ref=e409]
+              - text: Ventas por Canal
+            - generic [ref=e415]:
+              - generic [ref=e417]: Tienda Online
+              - generic [ref=e418]:
+                - generic [ref=e419]: 10 pedidos
+                - generic [ref=e420]: $747.400
+                - generic [ref=e421]: 100.0%
+          - generic [ref=e424]:
+            - generic [ref=e425]:
+              - heading "Top 10 Productos Vendidos" [level=3] [ref=e427]:
+                - img [ref=e428]
+                - text: Top 10 Productos Vendidos
+              - generic [ref=e433]:
+                - generic [ref=e435]:
+                  - generic [ref=e436]:
+                    - generic [ref=e437]: "1"
+                    - generic [ref=e438]:
+                      - paragraph [ref=e439]: Bugambilia enredadera altura 150 centímetros aprox. En bolsa
+                      - paragraph [ref=e440]: Fucsia
+                  - generic [ref=e441]:
+                    - paragraph [ref=e442]: 5 uds
+                    - paragraph [ref=e443]: $269.000 CLP
+                - generic [ref=e447]:
+                  - generic [ref=e448]:
+                    - generic [ref=e449]: "2"
+                    - generic [ref=e450]:
+                      - paragraph [ref=e451]: Bugambilia enredadera altura 150 centímetros aprox. En bolsa
+                      - paragraph [ref=e452]: Roja
+                  - generic [ref=e453]:
+                    - paragraph [ref=e454]: 3 uds
+                    - paragraph [ref=e455]: $125.000 CLP
+                - generic [ref=e459]:
+                  - generic [ref=e460]:
+                    - generic [ref=e461]: "3"
+                    - generic [ref=e462]:
+                      - paragraph [ref=e463]: Bugambilia enredadera altura 100 centímetros aprox. En Bolsa
+                      - paragraph [ref=e464]: Amarilla
+                  - generic [ref=e465]:
+                    - paragraph [ref=e466]: 2 uds
+                    - paragraph [ref=e467]: $70.000 CLP
+                - generic [ref=e471]:
+                  - generic [ref=e472]:
+                    - generic [ref=e473]: "4"
+                    - generic [ref=e474]:
+                      - paragraph [ref=e475]: Bugambilia enredadera altura 100 centímetros aprox. En Bolsa
+                      - paragraph [ref=e476]: Malva
+                  - generic [ref=e477]:
+                    - paragraph [ref=e478]: 2 uds
+                    - paragraph [ref=e479]: $70.000 CLP
+                - generic [ref=e483]:
+                  - generic [ref=e484]:
+                    - generic [ref=e485]: "5"
+                    - generic [ref=e486]:
+                      - paragraph [ref=e487]: Bugambilia enredadera altura 150 centímetros aprox. En bolsa
+                      - paragraph [ref=e488]: Lila
+                  - generic [ref=e489]:
+                    - paragraph [ref=e490]: 2 uds
+                    - paragraph [ref=e491]: $110.000 CLP
+                - generic [ref=e495]:
+                  - generic [ref=e496]:
+                    - generic [ref=e497]: "6"
+                    - generic [ref=e498]:
+                      - paragraph [ref=e499]: Coprosma Tequila Pie Alto Chico altura de 100 centímetros aprox., en macetero.
+                      - paragraph [ref=e500]: ID-50709712142614
+                  - generic [ref=e501]:
+                    - paragraph [ref=e502]: 1 uds
+                    - paragraph [ref=e503]: $29.000 CLP
+                - generic [ref=e507]:
+                  - generic [ref=e508]:
+                    - generic [ref=e509]: "7"
+                    - generic [ref=e510]:
+                      - paragraph [ref=e511]: Bugambilia Pie Alto altura de 70 centímetros aprox. En Macetero
+                      - paragraph [ref=e512]: Blanca
+                  - generic [ref=e513]:
+                    - paragraph [ref=e514]: 1 uds
+                    - paragraph [ref=e515]: $48.000 CLP
+                - generic [ref=e519]:
+                  - generic [ref=e520]:
+                    - generic [ref=e521]: "8"
+                    - generic [ref=e522]:
+                      - paragraph [ref=e523]: Bugambilia Bola altura de 100 centímetros aprox.
+                      - paragraph [ref=e524]: Rojo
+                  - generic [ref=e525]:
+                    - paragraph [ref=e526]: 1 uds
+                    - paragraph [ref=e527]: $49.000 CLP
+            - generic [ref=e530]:
+              - generic [ref=e532]:
+                - heading "Carritos Abandonados" [level=3] [ref=e533]:
+                  - img [ref=e534]
+                  - text: Carritos Abandonados
+                - generic [ref=e538]:
+                  - button "Todos (11)" [ref=e539] [cursor=pointer]
+                  - button "Sin contactar (11)" [ref=e540] [cursor=pointer]:
+                    - img
+                    - text: Sin contactar (11)
+                  - button "Contactados (0)" [ref=e541] [cursor=pointer]:
+                    - img
+                    - text: Contactados (0)
+              - generic [ref=e542]:
+                - generic [ref=e543]:
+                  - generic [ref=e544]:
+                    - img [ref=e545]
+                    - paragraph [ref=e547]: Dinero sobre la mesa
+                  - generic [ref=e548]:
+                    - generic [ref=e549]:
+                      - paragraph [ref=e550]: Valor sin contactar
+                      - paragraph [ref=e551]: $571.500
+                    - generic [ref=e552]:
+                      - paragraph [ref=e553]: Recuperable estimado (~12%)
+                      - paragraph [ref=e554]: $68.580
+                - generic [ref=e555]:
+                  - generic [ref=e556]:
+                    - paragraph [ref=e557]: Total carritos
+                    - paragraph [ref=e558]: "11"
+                  - generic [ref=e559]:
+                    - paragraph [ref=e560]: Valor total
+                    - paragraph [ref=e561]: $571.500
+                  - generic [ref=e562]:
+                    - paragraph [ref=e563]: Contactados
+                    - paragraph [ref=e564]: "0"
+                  - generic [ref=e565]:
+                    - paragraph [ref=e566]: Pendientes
+                    - paragraph [ref=e567]: "11"
+                - generic [ref=e568]:
+                  - generic [ref=e569]: "Ordenar:"
+                  - button "Más recientes" [ref=e570] [cursor=pointer]
+                  - button "Mayor valor" [ref=e571] [cursor=pointer]
+                - generic [ref=e572]:
+                  - generic [ref=e574]:
+                    - generic [ref=e575]:
+                      - button "Ver productos" [ref=e576] [cursor=pointer]:
+                        - img [ref=e577]
+                      - generic [ref=e579]:
+                        - generic [ref=e580]:
+                          - paragraph [ref=e581]: Odette Sanhueza Vergara
+                          - generic [ref=e582]: Pendiente
+                        - paragraph [ref=e583]: odette.sanhueza@gmail.com
+                        - paragraph [ref=e584]: "998446979"
+                        - paragraph [ref=e585]: 1 items • Abandonado 15-02-2026
+                    - generic [ref=e586]:
+                      - generic [ref=e587]:
+                        - paragraph [ref=e588]: $36.500
+                        - paragraph [ref=e589]: CLP
+                      - generic [ref=e590]:
+                        - button "Enviar WhatsApp" [ref=e591] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e592] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e593] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e594] [cursor=pointer]:
+                          - img
+                  - generic [ref=e596]:
+                    - generic [ref=e597]:
+                      - button "Ver productos" [ref=e598] [cursor=pointer]:
+                        - img [ref=e599]
+                      - generic [ref=e601]:
+                        - generic [ref=e602]:
+                          - paragraph [ref=e603]: Odette Sanhueza Vergara
+                          - generic [ref=e604]: Pendiente
+                        - paragraph [ref=e605]: odette.sanhueza@gmail.com
+                        - paragraph [ref=e606]: "998446979"
+                        - paragraph [ref=e607]: 1 items • Abandonado 15-02-2026
+                    - generic [ref=e608]:
+                      - generic [ref=e609]:
+                        - paragraph [ref=e610]: $36.500
+                        - paragraph [ref=e611]: CLP
+                      - generic [ref=e612]:
+                        - button "Enviar WhatsApp" [ref=e613] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e614] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e615] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e616] [cursor=pointer]:
+                          - img
+                  - generic [ref=e618]:
+                    - generic [ref=e619]:
+                      - button "Ver productos" [ref=e620] [cursor=pointer]:
+                        - img [ref=e621]
+                      - generic [ref=e623]:
+                        - generic [ref=e624]:
+                          - paragraph [ref=e625]: Anailik Angeloff
+                          - generic [ref=e626]: Pendiente
+                        - paragraph [ref=e627]: anailikangeloff@gmail.com
+                        - paragraph [ref=e628]: "941709136"
+                        - paragraph [ref=e629]: 1 items • Abandonado 16-02-2026
+                    - generic [ref=e630]:
+                      - generic [ref=e631]:
+                        - paragraph [ref=e632]: $36.500
+                        - paragraph [ref=e633]: CLP
+                      - generic [ref=e634]:
+                        - button "Enviar WhatsApp" [ref=e635] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e636] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e637] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e638] [cursor=pointer]:
+                          - img
+                  - generic [ref=e640]:
+                    - generic [ref=e641]:
+                      - button "Ver productos" [ref=e642] [cursor=pointer]:
+                        - img [ref=e643]
+                      - generic [ref=e645]:
+                        - generic [ref=e646]:
+                          - paragraph [ref=e647]: Mauricio Grez
+                          - generic [ref=e648]: Pendiente
+                        - paragraph [ref=e649]: maugrez@gmail.com
+                        - paragraph [ref=e650]: "995394279"
+                        - paragraph [ref=e651]: 2 items • Abandonado 18-02-2026
+                    - generic [ref=e652]:
+                      - generic [ref=e653]:
+                        - paragraph [ref=e654]: $104.000
+                        - paragraph [ref=e655]: CLP
+                      - generic [ref=e656]:
+                        - button "Enviar WhatsApp" [ref=e657] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e658] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e659] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e660] [cursor=pointer]:
+                          - img
+                  - generic [ref=e662]:
+                    - generic [ref=e663]:
+                      - button "Ver productos" [ref=e664] [cursor=pointer]:
+                        - img [ref=e665]
+                      - generic [ref=e667]:
+                        - generic [ref=e668]:
+                          - paragraph [ref=e669]: Alejandra Carrasco Gonzalez
+                          - generic [ref=e670]: Pendiente
+                        - paragraph
+                        - paragraph [ref=e671]: "+56941570762"
+                        - paragraph [ref=e672]: 1 items • Abandonado 19-02-2026
+                    - generic [ref=e673]:
+                      - generic [ref=e674]:
+                        - paragraph [ref=e675]: $54.000
+                        - paragraph [ref=e676]: CLP
+                      - generic [ref=e677]:
+                        - button "Enviar WhatsApp" [ref=e678] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e679] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e680] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e681] [cursor=pointer]:
+                          - img
+                  - generic [ref=e683]:
+                    - generic [ref=e684]:
+                      - button "Ver productos" [ref=e685] [cursor=pointer]:
+                        - img [ref=e686]
+                      - generic [ref=e688]:
+                        - generic [ref=e689]:
+                          - paragraph
+                          - generic [ref=e690]: Pendiente
+                        - paragraph [ref=e691]: benson.brendan@avelinor.com
+                        - paragraph [ref=e692]: 1 items • Abandonado 27-02-2026
+                    - generic [ref=e693]:
+                      - generic [ref=e694]:
+                        - paragraph [ref=e695]: $35.000
+                        - paragraph [ref=e696]: CLP
+                      - generic [ref=e697]:
+                        - button "Enviar email" [ref=e698] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e699] [cursor=pointer]:
+                          - img
+                  - generic [ref=e701]:
+                    - generic [ref=e702]:
+                      - button "Ver productos" [ref=e703] [cursor=pointer]:
+                        - img [ref=e704]
+                      - generic [ref=e706]:
+                        - generic [ref=e707]:
+                          - paragraph
+                          - generic [ref=e708]: Pendiente
+                        - paragraph
+                        - paragraph [ref=e709]: "+56931003647"
+                        - paragraph [ref=e710]: 1 items • Abandonado 04-03-2026
+                    - generic [ref=e711]:
+                      - generic [ref=e712]:
+                        - paragraph [ref=e713]: $35.000
+                        - paragraph [ref=e714]: CLP
+                      - generic [ref=e715]:
+                        - button "Enviar WhatsApp" [ref=e716] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e717] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e718] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e719] [cursor=pointer]:
+                          - img
+                  - generic [ref=e721]:
+                    - generic [ref=e722]:
+                      - button "Ver productos" [ref=e723] [cursor=pointer]:
+                        - img [ref=e724]
+                      - generic [ref=e726]:
+                        - generic [ref=e727]:
+                          - paragraph
+                          - generic [ref=e728]: Pendiente
+                        - paragraph [ref=e729]: cbustamantehenriquez@gmail.com
+                        - paragraph [ref=e730]: 1 items • Abandonado 06-03-2026
+                    - generic [ref=e731]:
+                      - generic [ref=e732]:
+                        - paragraph [ref=e733]: $60.000
+                        - paragraph [ref=e734]: CLP
+                      - generic [ref=e735]:
+                        - button "Enviar email" [ref=e736] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e737] [cursor=pointer]:
+                          - img
+                  - generic [ref=e739]:
+                    - generic [ref=e740]:
+                      - button "Ver productos" [ref=e741] [cursor=pointer]:
+                        - img [ref=e742]
+                      - generic [ref=e744]:
+                        - generic [ref=e745]:
+                          - paragraph [ref=e746]: Alejandra sagredo Perez
+                          - generic [ref=e747]: Pendiente
+                        - paragraph [ref=e748]: alesagredop@gmail.com
+                        - paragraph [ref=e749]: 1 items • Abandonado 06-03-2026
+                    - generic [ref=e750]:
+                      - generic [ref=e751]:
+                        - paragraph [ref=e752]: $90.000
+                        - paragraph [ref=e753]: CLP
+                      - generic [ref=e754]:
+                        - button "Enviar email" [ref=e755] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e756] [cursor=pointer]:
+                          - img
+                  - generic [ref=e758]:
+                    - generic [ref=e759]:
+                      - button "Ver productos" [ref=e760] [cursor=pointer]:
+                        - img [ref=e761]
+                      - generic [ref=e763]:
+                        - generic [ref=e764]:
+                          - paragraph [ref=e765]: Narda Rojas
+                          - generic [ref=e766]: Pendiente
+                        - paragraph [ref=e767]: nardar299@gmail.com
+                        - paragraph [ref=e768]: "+56979739578"
+                        - paragraph [ref=e769]: 1 items • Abandonado 07-03-2026
+                    - generic [ref=e770]:
+                      - generic [ref=e771]:
+                        - paragraph [ref=e772]: $35.000
+                        - paragraph [ref=e773]: CLP
+                      - generic [ref=e774]:
+                        - button "Enviar WhatsApp" [ref=e775] [cursor=pointer]:
+                          - img
+                        - button "Llamar (móvil) / Copiar número (desktop)" [ref=e776] [cursor=pointer]:
+                          - img
+                        - button "Enviar email" [ref=e777] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e778] [cursor=pointer]:
+                          - img
+                  - generic [ref=e780]:
+                    - generic [ref=e781]:
+                      - button "Ver productos" [ref=e782] [cursor=pointer]:
+                        - img [ref=e783]
+                      - generic [ref=e785]:
+                        - generic [ref=e786]:
+                          - paragraph
+                          - generic [ref=e787]: Pendiente
+                        - paragraph [ref=e788]: benson.brendan@avelinor.com
+                        - paragraph [ref=e789]: 1 items • Abandonado 12-03-2026
+                    - generic [ref=e790]:
+                      - generic [ref=e791]:
+                        - paragraph [ref=e792]: $49.000
+                        - paragraph [ref=e793]: CLP
+                      - generic [ref=e794]:
+                        - button "Enviar email" [ref=e795] [cursor=pointer]:
+                          - img
+                        - button "Marcar como contactado" [ref=e796] [cursor=pointer]:
+                          - img
+          - generic [ref=e797]:
+            - generic [ref=e798]:
+              - heading "UTMs con Más Ventas" [level=3] [ref=e799]:
+                - img [ref=e800]
+                - text: UTMs con Más Ventas
+              - paragraph [ref=e803]: Campañas de marketing rastreadas por parámetros UTM
+            - table [ref=e806]:
+              - rowgroup [ref=e807]:
+                - row "Fuente Medio Campaña Pedidos Ingresos" [ref=e808]:
+                  - columnheader "Fuente" [ref=e809]
+                  - columnheader "Medio" [ref=e810]
+                  - columnheader "Campaña" [ref=e811]
+                  - columnheader "Pedidos" [ref=e812]
+                  - columnheader "Ingresos" [ref=e813]
+              - rowgroup [ref=e814]:
+                - row "120244252788590285 120244252932540285 Pruebas CBO Marzo 4 $369.400" [ref=e815]:
+                  - cell "120244252788590285" [ref=e816]:
+                    - generic [ref=e817]: "120244252788590285"
+                  - cell "120244252932540285" [ref=e818]
+                  - cell "Pruebas CBO Marzo" [ref=e819]
+                  - cell "4" [ref=e820]
+                  - cell "$369.400" [ref=e821]
+                - row "120244252788590285 120244252788580285 Nueva campaña de Ventas 2 $144.000" [ref=e822]:
+                  - cell "120244252788590285" [ref=e823]:
+                    - generic [ref=e824]: "120244252788590285"
+                  - cell "120244252788580285" [ref=e825]
+                  - cell "Nueva campaña de Ventas" [ref=e826]
+                  - cell "2" [ref=e827]
+                  - cell "$144.000" [ref=e828]
+                - row "— paid 120243316289780285 2 $140.000" [ref=e829]:
+                  - cell "—" [ref=e830]:
+                    - generic [ref=e831]: —
+                  - cell "paid" [ref=e832]
+                  - cell "120243316289780285" [ref=e833]
+                  - cell "2" [ref=e834]
+                  - cell "$140.000" [ref=e835]
+          - generic [ref=e836]:
+            - generic [ref=e838]:
+              - generic [ref=e839]:
+                - heading "Análisis SEO Rápido" [level=3] [ref=e840]:
+                  - img [ref=e841]
+                  - text: Análisis SEO Rápido
+                - paragraph [ref=e844]: Análisis basado en 34 productos activos
+              - generic [ref=e846]:
+                - generic [ref=e847]: "69"
+                - generic [ref=e848]: / 100
+            - generic [ref=e850]:
+              - generic [ref=e852]:
+                - img [ref=e854]
+                - generic [ref=e858]:
+                  - generic [ref=e859]:
+                    - paragraph [ref=e860]: Productos sin imagen
+                    - generic [ref=e861]: 0/34
+                  - 'progressbar "Productos sin imagen: 100% completado" [ref=e862]'
+                  - paragraph [ref=e864]: 100% de productos OK
+              - generic [ref=e866]:
+                - img [ref=e868]
+                - generic [ref=e872]:
+                  - generic [ref=e873]:
+                    - paragraph [ref=e874]: Imágenes sin alt text
+                    - generic [ref=e875]: 34/34
+                  - 'progressbar "Imágenes sin alt text: 0% completado" [ref=e876]'
+                  - paragraph [ref=e877]: 0% de productos OK
+                  - generic [ref=e878]:
+                    - strong [ref=e879]: "Tip:"
+                    - text: Configura el alt text en Shopify > Productos > Imagen > Editar texto alternativo.
+                  - button "Ver productos (34)" [ref=e880] [cursor=pointer]:
+                    - img [ref=e881]
+                    - text: Ver productos (34)
+              - generic [ref=e884]:
+                - img [ref=e886]
+                - generic [ref=e888]:
+                  - generic [ref=e889]:
+                    - paragraph [ref=e890]: Títulos cortos (<20 chars)
+                    - generic [ref=e891]: 0/34
+                  - 'progressbar "Títulos cortos (<20 chars): 100% completado" [ref=e892]'
+                  - paragraph [ref=e894]: 100% de productos OK
+              - generic [ref=e896]:
+                - img [ref=e898]
+                - generic [ref=e901]:
+                  - generic [ref=e902]:
+                    - paragraph [ref=e903]: Descripciones vacías o muy cortas
+                    - generic [ref=e904]: 18/34
+                  - 'progressbar "Descripciones vacías o muy cortas: 47% completado" [ref=e905]'
+                  - paragraph [ref=e907]: 47% de productos OK
+                  - generic [ref=e908]:
+                    - strong [ref=e909]: "Tip:"
+                    - text: Las descripciones deben tener al menos 150 caracteres. Google indexa este contenido.
+                  - button "Ver productos (18)" [ref=e910] [cursor=pointer]:
+                    - img [ref=e911]
+                    - text: Ver productos (18)
+              - generic [ref=e914]:
+                - img [ref=e916]
+                - generic [ref=e919]:
+                  - generic [ref=e920]:
+                    - paragraph [ref=e921]: Descripciones mejorables (<150 chars)
+                    - generic [ref=e922]: 0/34
+                  - 'progressbar "Descripciones mejorables (<150 chars): 100% completado" [ref=e923]'
+                  - paragraph [ref=e925]: 100% de productos OK
+          - generic [ref=e926]:
+            - generic [ref=e928]:
+              - generic [ref=e929]:
+                - heading "Productos de Shopify" [level=3] [ref=e930]:
+                  - img [ref=e931]
+                  - text: Productos de Shopify
+                - paragraph [ref=e935]: Importa tus productos para calcular márgenes reales basados en el costo de Shopify
+              - button "Cargar Productos" [ref=e936] [cursor=pointer]:
+                - img
+                - text: Cargar Productos
+            - generic [ref=e938]:
+              - img [ref=e939]
+              - paragraph [ref=e943]: Haz clic en "Cargar Productos" para importar tu catálogo
+      - button [ref=e946] [cursor=pointer]:
+        - img
+      - generic [ref=e947]:
+        - button "Abrir asistente" [ref=e948] [cursor=pointer]:
+          - img "Chonga" [ref=e950]
+        - status "Disponible" [ref=e951]
+  - generic [ref=e952]: $30K
+```

@@ -58,30 +58,39 @@ export async function fetchMetaAdAccounts(c: Context) {
     console.log(`Fetching Meta ad accounts for connection: ${connection_id}`);
 
     // Fetch connection details and verify ownership
+    // Step 1: Get connection
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
-      .select(`
-        id,
-        platform,
-        access_token_encrypted,
-        client_id,
-        clients!inner(user_id, client_user_id)
-      `)
+      .select('id, platform, access_token_encrypted, client_id')
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
-      console.error('Connection fetch error:', connError);
+      console.error('Connection fetch error:', connError, '| connection_id:', connection_id);
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection
-    const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
+    // Step 2: Get client ownership info
+    const { data: clientData } = await supabase
+      .from('clients')
+      .select('user_id, client_user_id')
+      .eq('id', connection.client_id)
+      .maybeSingle();
 
-    if (!isOwner) {
-      console.error('Authorization failed:', { userId: user.id });
+    // Step 3: Verify ownership (admin bypasses)
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['admin', 'super_admin'])
+      .limit(1)
+      .maybeSingle();
+    const isAdmin = !!adminRole;
+    const isOwner = clientData?.user_id === user.id || clientData?.client_user_id === user.id;
+
+    if (!isAdmin && !isOwner) {
+      console.error('Authorization failed:', { userId: user.id, clientData });
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
@@ -101,7 +110,7 @@ export async function fetchMetaAdAccounts(c: Context) {
     // First, check token permissions
     console.log('Checking token permissions...');
     const permissionsUrl = new URL('https://graph.facebook.com/v21.0/me/permissions');
-    
+    permissionsUrl.searchParams.set('access_token', decryptedToken);
 
     const authHeaders = { Authorization: `Bearer ${decryptedToken}` };
 

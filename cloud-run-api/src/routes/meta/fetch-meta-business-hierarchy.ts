@@ -220,9 +220,18 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify ownership
+    // Verify ownership (admin can access any connection)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['admin', 'super_admin'])
+      .limit(1)
+      .maybeSingle();
+    const isAdmin = !!roleData;
+    const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
+    if (!isAdmin && !isOwner) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
