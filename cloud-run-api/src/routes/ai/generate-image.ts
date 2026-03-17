@@ -11,18 +11,28 @@ const DIVERSITY_STYLES = [
 ];
 
 export async function generateImage(c: Context) {
+  const supabase = getSupabaseAdmin();
+  let creditsDeducted = false;
+  let clientId: string | undefined;
+
+  // Helper to refund credits on generation failure (safe to call even if not yet deducted)
+  const refundCredits = async () => {
+    if (!creditsDeducted || !clientId) return;
+    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -IMAGE_CREDIT_COST });
+    if (refundErr) console.error('[generate-image] Credit refund failed:', refundErr);
+  };
+
   try {
+  const body = await c.req.json();
+  clientId = body.clientId;
   const {
-    clientId,
     creativeId,
     promptGeneracion,
     fotoBaseUrl,
     formato,
     rechazoTexto,
     engine = 'imagen',
-  } = await c.req.json();
-
-  const supabase = getSupabaseAdmin();
+  } = body;
 
   // Verify the authenticated user owns this client
   const user = c.get('user');
@@ -56,12 +66,7 @@ export async function generateImage(c: Context) {
       402
     );
   }
-
-  // Helper to refund credits on generation failure
-  const refundCredits = async () => {
-    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -IMAGE_CREDIT_COST });
-    if (refundErr) console.error('[generate-image] Credit refund failed:', refundErr);
-  };
+  creditsDeducted = true;
 
   // Auto-fetch client reference photos if none provided
   // PRIORITY: Match product mentioned in the copy prompt to use its REAL Shopify photo
