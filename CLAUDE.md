@@ -110,6 +110,16 @@ cd ~/steve && git pull
 - Nicolás W15 — SOLO ESPEJO + holdout tests (evaluación visual)
 - Tomás W7 — SOLO CEREBRO (orquestador, mantenimiento base)
 
+## QA Automático cada 6 horas (OpenClaw)
+- Cron ID: `da9cd3b2-cf7d-4f8b-bfa0-1dd19e0c9f5a`
+- Nombre: `qa-automatico-6h`
+- Horario: `0 9,15,21,3 * * *` (America/Santiago) — 9am, 3pm, 9pm, 3am
+- Sesión: main
+- Acción: QA full regression en https://www.steve.cl
+- Login: patricio.correa@jardindeeva.cl / Jardin2026
+- Reportes: .gstack/qa-reports/ con fecha y hora
+- Si hay bugs high/critical → crear tasks automáticamente
+
 ## REGLA OBLIGATORIA: Bug → Task automático
 Cuando cualquier agente encuentra un bug (severity: critical, major, high):
 1. Insertar INMEDIATAMENTE en tabla tasks de Supabase:
