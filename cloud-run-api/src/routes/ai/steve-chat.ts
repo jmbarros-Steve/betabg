@@ -648,6 +648,58 @@ const BRAND_BRIEF_QUESTIONS = getBrandBriefQuestions();
 const SYSTEM_PROMPT = getSystemPrompt();
 const BRIEF_TEMPLATE = getBriefTemplate();
 
+/**
+ * Sanitize messages for Anthropic API:
+ * 1. Ensure alternating user/assistant roles (merge consecutive same-role)
+ * 2. Ensure the array ends with a user message
+ * 3. Ensure the array starts with a user message
+ */
+function sanitizeMessagesForAnthropic(
+  msgs: Array<{ role: string; content: string }>,
+  fallbackUserMessage?: string,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  // Filter to only user/assistant roles
+  const filtered = msgs
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+  if (filtered.length === 0) {
+    return [{ role: 'user', content: fallbackUserMessage || 'Hola' }];
+  }
+
+  // Merge consecutive same-role messages
+  const merged: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  for (const msg of filtered) {
+    if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
+      merged[merged.length - 1].content += '\n\n' + msg.content;
+    } else {
+      merged.push({ ...msg });
+    }
+  }
+
+  // Ensure starts with user message
+  if (merged[0].role !== 'user') {
+    merged.unshift({ role: 'user', content: fallbackUserMessage || 'Hola' });
+  }
+
+  // Ensure ends with user message
+  if (merged[merged.length - 1].role !== 'user') {
+    if (fallbackUserMessage) {
+      merged.push({ role: 'user', content: fallbackUserMessage });
+    } else {
+      // Remove trailing assistant messages
+      while (merged.length > 0 && merged[merged.length - 1].role !== 'user') {
+        merged.pop();
+      }
+      if (merged.length === 0) {
+        merged.push({ role: 'user', content: 'Hola' });
+      }
+    }
+  }
+
+  return merged;
+}
+
 export async function steveChat(c: Context) {
   const supabase = getSupabaseAdmin();
 
@@ -894,10 +946,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
-    const aiMessages = recentMessages.map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }));
+    const aiMessages = sanitizeMessagesForAnthropic(recentMessages, message);
 
     // Truncate system prompt if too large (avoid Anthropic context overflow)
     const maxSystemLen = 12000;
@@ -1031,7 +1080,10 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
     const postBriefSystem = SYSTEM_PROMPT + `\n\nEl brief de marca de este cliente YA ESTÁ COMPLETO. No hagas más preguntas del brief. Responde como un consultor amigable que puede ayudar con preguntas generales de marketing, estrategia, o cualquier duda. Si el cliente pregunta por su brief, dile que ya está listo y que puede verlo en la pestaña "Brief de Marca".`;
-    const chatMsgs = messages!.filter(m => m.role !== 'system').map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    const chatMsgs = sanitizeMessagesForAnthropic(
+      messages!.filter(m => m.role !== 'system'),
+      message,
+    );
 
     const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1040,7 +1092,8 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     });
 
     if (!aiResp.ok) {
-      console.error('Post-brief AI error:', aiResp.status);
+      const errText = await aiResp.text().catch(() => '');
+      console.error('Post-brief AI error:', aiResp.status, errText);
       return c.json({ error: 'AI service error' }, 502);
     }
 
@@ -1256,7 +1309,10 @@ REGLAS ABSOLUTAS:
 
   // Convert messages: Anthropic uses system separately, not in messages array
   const systemMessage = chatMessages.find(m => m.role === 'system')?.content || '';
-  const userMessages_anthropic = chatMessages.filter(m => m.role !== 'system');
+  const userMessages_anthropic = sanitizeMessagesForAnthropic(
+    chatMessages.filter(m => m.role !== 'system'),
+    message,
+  );
 
   const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
