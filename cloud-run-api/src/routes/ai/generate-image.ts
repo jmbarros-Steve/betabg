@@ -1,6 +1,15 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+const IMAGE_CREDIT_COST = 2;
+const DIVERSITY_STYLES = [
+  'Vary the model ethnicity, age, and appearance for each generation.',
+  'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
+  'Alternate between close-up portrait, medium shot, and environmental portrait.',
+  'Mix lighting styles: golden hour, studio softbox, natural window light, overcast diffused.',
+  'Vary compositions: rule of thirds, centered, off-center with negative space.',
+];
+
 export async function generateImage(c: Context) {
   try {
   const {
@@ -30,9 +39,9 @@ export async function generateImage(c: Context) {
     return c.json({ error: 'No tienes acceso a este cliente' }, 403);
   }
 
-  // Atomically deduct 2 credits BEFORE generating (prevents race condition)
+  // Atomically deduct credits BEFORE generating (prevents race condition)
   const { data: deductResult, error: deductError } = await supabase
-    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 2 });
+    .rpc('deduct_credits', { p_client_id: clientId, p_amount: IMAGE_CREDIT_COST });
 
   if (deductError) {
     console.error('[generate-image] Credit deduction error:', deductError);
@@ -43,14 +52,14 @@ export async function generateImage(c: Context) {
   }
   if (!deductResult?.[0]?.success) {
     return c.json(
-      { error: 'NO_CREDITS', message: 'Se necesitan 2 créditos para generar una imagen' },
+      { error: 'NO_CREDITS', message: `Se necesitan ${IMAGE_CREDIT_COST} créditos para generar una imagen` },
       402
     );
   }
 
   // Helper to refund credits on generation failure
   const refundCredits = async () => {
-    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -2 });
+    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -IMAGE_CREDIT_COST });
     if (refundErr) console.error('[generate-image] Credit refund failed:', refundErr);
   };
 
@@ -119,14 +128,7 @@ export async function generateImage(c: Context) {
     : promptGeneracion;
 
   // Add diversity instruction to avoid repetitive outputs
-  const diversityStyles = [
-    'Vary the model ethnicity, age, and appearance for each generation.',
-    'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
-    'Alternate between close-up portrait, medium shot, and environmental portrait.',
-    'Mix lighting styles: golden hour, studio softbox, natural window light, overcast diffused.',
-    'Vary compositions: rule of thirds, centered, off-center with negative space.',
-  ];
-  const randomDiversity = diversityStyles[Math.floor(Math.random() * diversityStyles.length)];
+  const randomDiversity = DIVERSITY_STYLES[Math.floor(Math.random() * DIVERSITY_STYLES.length)];
 
   const promptFinal = `${promptBase}. ${randomDiversity}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
@@ -358,7 +360,7 @@ export async function generateImage(c: Context) {
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
     accion: `Generar imagen — ${engineLabel}`,
-    creditos_usados: 2,
+    creditos_usados: IMAGE_CREDIT_COST,
     costo_real_usd: engine === 'imagen' ? 0.02 : engine === 'flux' ? 0.05 : 0.04,
   });
 

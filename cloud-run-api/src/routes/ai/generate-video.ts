@@ -1,6 +1,9 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+const VIDEO_CREDIT_COST = 10;
+const VIDEO_USD_COST = 0.50;
+
 export async function generateVideo(c: Context) {
   try {
     const { clientId, creativeId, promptGeneracion, fotoBaseUrl } = await c.req.json();
@@ -28,9 +31,9 @@ export async function generateVideo(c: Context) {
     }
 
     const available = credits.creditos_disponibles ?? 0;
-    if (available < 10) {
+    if (available < VIDEO_CREDIT_COST) {
       return c.json(
-        { error: 'NO_CREDITS', message: 'Se necesitan 10 créditos para generar un video' },
+        { error: 'NO_CREDITS', message: `Se necesitan ${VIDEO_CREDIT_COST} créditos para generar un video` },
         402
       );
     }
@@ -82,7 +85,7 @@ export async function generateVideo(c: Context) {
 
     // Deduct credits atomically
     const { data: deductResult, error: deductError } = await supabase
-      .rpc('deduct_credits', { p_client_id: clientId, p_amount: 10 });
+      .rpc('deduct_credits', { p_client_id: clientId, p_amount: VIDEO_CREDIT_COST });
 
     if (deductError || !deductResult?.[0]?.success) {
       console.error('[generate-video] Atomic credit deduction failed:', deductError || deductResult);
@@ -91,8 +94,8 @@ export async function generateVideo(c: Context) {
     await supabase.from('credit_transactions').insert({
       client_id: clientId,
       accion: 'Generar video — Replicate Kling AI',
-      creditos_usados: 10,
-      costo_real_usd: 0.50,
+      creditos_usados: VIDEO_CREDIT_COST,
+      costo_real_usd: VIDEO_USD_COST,
     });
 
     return c.json({ prediction_id: prediction.id, status: 'generando' });
