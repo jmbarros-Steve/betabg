@@ -2,26 +2,20 @@
 Onboarding Shopify — Crea custom app + extrae token via Skyvern API real.
 
 Skyvern corre en localhost:8000. Usa la API REST:
-  POST /v1/credentials          — guarda creds de forma segura
-  POST /v1/browser_sessions     — crea sesion persistente
-  POST /v1/run/tasks/login      — login con credential_id
-  POST /v1/run/tasks            — task de navegacion (crear app, scopes, token)
-  POST /v1/credentials/totp     — push 2FA code al task activo
-  GET  /v1/runs/{run_id}        — poll status
-  POST /v1/credentials/{id}/delete — borrar creds despues de usar
+  POST /v1/browser_sessions                     — crea sesion con browser persistente
+  POST /v1/run/tasks                            — task con prompt + data_extraction_schema
+  GET  /v1/runs/{run_id}                        — poll status
+  GET  /v1/runs/{run_id}/artifacts              — obtener screenshots/datos extra
+  POST /v1/browser_sessions/{id}/close          — cerrar sesion
 
-Flujo:
-  1. Guardar credenciales en Skyvern (temporal)
-  2. Crear browser session
-  3. Login en Shopify Admin via /v1/run/tasks/login
-  4. Task: navegar a Settings > Apps > Develop apps > Create app > Scopes > Install > Extract token
-  5. Guardar token en platform_connections (encriptado)
-  6. Borrar credenciales de Skyvern
-  7. Trigger sync de productos
+Auth: header x-api-key en todas las llamadas.
+
+Estrategia: Skyvern self-hosted no tiene Bitwarden configurado, asi que las
+credenciales van en el prompt del task (SSL local, nunca salen de la VM).
+El task hace login + crea app + extrae token en una sola corrida.
 
 RESTRICCIONES INQUEBRANTABLES:
-  - Credenciales se borran de Skyvern al terminar (exito o error)
-  - NUNCA se loguean (print, sentry, screenshots)
+  - Credenciales NUNCA se loguean por este script (solo van en el prompt a Skyvern)
   - Max 2 reintentos de login
   - Merchant NUNCA ve un browser
 """
@@ -30,17 +24,20 @@ import asyncio
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 import httpx
-from supabase import create_client
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
 
 SKYVERN_URL = os.environ.get("SKYVERN_API_URL", "http://localhost:8000")
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+SKYVERN_API_KEY = os.environ.get("SKYVERN_API_KEY", "")
 
-# Steve API (Cloud Run) for triggering syncs
-STEVE_API_URL = os.environ.get("STEVE_API_URL", "https://steve-api-1011041513672.us-central1.run.app")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 TERMINAL_STATUSES = {"completed", "failed", "terminated", "timed_out", "canceled"}
 
@@ -54,92 +51,78 @@ SHOPIFY_SCOPES = [
 ]
 
 
-def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-
 # ---------------------------------------------------------------------------
-# Job status helpers (DB updates for frontend polling)
+# Skyvern HTTP helpers
 # ---------------------------------------------------------------------------
 
-async def update_job(job_id: str, **fields):
-    sb = get_supabase()
-    sb.table("onboarding_jobs").update(fields).eq("id", job_id).execute()
+def _headers() -> dict:
+    h = {"Content-Type": "application/json"}
+    if SKYVERN_API_KEY:
+        h["x-api-key"] = SKYVERN_API_KEY
+    return h
 
-
-async def set_pending_2fa(job_id: str):
-    """Signal frontend that 2FA code is needed."""
-    sb = get_supabase()
-    sb.table("onboarding_jobs").update({
-        "shopify_step": "Esperando codigo de verificacion...",
-        "pending_input": json.dumps({"type": "2fa", "platform": "shopify"}),
-    }).eq("id", job_id).execute()
-
-
-async def wait_for_merchant_input(job_id: str, timeout_seconds: int = 300) -> str:
-    """Poll DB until merchant submits 2FA code via frontend."""
-    sb = get_supabase()
-    elapsed = 0
-    while elapsed < timeout_seconds:
-        result = sb.table("onboarding_jobs").select("merchant_input").eq("id", job_id).single().execute()
-        value = result.data.get("merchant_input") if result.data else None
-        if value:
-            sb.table("onboarding_jobs").update({
-                "merchant_input": None,
-                "pending_input": None,
-            }).eq("id", job_id).execute()
-            return value
-        await asyncio.sleep(2)
-        elapsed += 2
-    raise TimeoutError(f"Merchant no respondio en {timeout_seconds}s")
-
-
-# ---------------------------------------------------------------------------
-# Skyvern API helpers
-# ---------------------------------------------------------------------------
 
 async def skyvern_post(client: httpx.AsyncClient, path: str, body: dict) -> dict:
-    resp = await client.post(f"{SKYVERN_URL}{path}", json=body)
+    resp = await client.post(f"{SKYVERN_URL}{path}", json=body, headers=_headers())
+    if resp.status_code >= 400:
+        print(f"  [skyvern] POST {path} -> {resp.status_code}: {resp.text[:300]}")
     resp.raise_for_status()
     return resp.json()
 
 
 async def skyvern_get(client: httpx.AsyncClient, path: str) -> dict:
-    resp = await client.get(f"{SKYVERN_URL}{path}")
+    resp = await client.get(f"{SKYVERN_URL}{path}", headers=_headers())
     resp.raise_for_status()
     return resp.json()
 
 
-async def skyvern_delete(client: httpx.AsyncClient, path: str) -> None:
-    resp = await client.post(f"{SKYVERN_URL}{path}")
-    # Don't raise — best effort cleanup
-
-
-async def poll_run(client: httpx.AsyncClient, run_id: str, timeout: int = 180) -> dict:
-    """Poll a Skyvern run until terminal status."""
+async def poll_run(client: httpx.AsyncClient, run_id: str, timeout: int = 300) -> dict:
+    """Poll GET /v1/runs/{run_id} until terminal status."""
     elapsed = 0
+    last_status = ""
     while elapsed < timeout:
-        await asyncio.sleep(3)
-        elapsed += 3
+        await asyncio.sleep(5)
+        elapsed += 5
         run = await skyvern_get(client, f"/v1/runs/{run_id}")
-        if run.get("status") in TERMINAL_STATUSES:
+        status = run.get("status", "")
+        if status != last_status:
+            steps = run.get("step_count", "?")
+            print(f"  [{run_id[:12]}] status={status}  steps={steps}  ({elapsed}s)")
+            last_status = status
+        if status in TERMINAL_STATUSES:
             return run
-    raise TimeoutError(f"Skyvern run {run_id} no termino en {timeout}s")
+    raise TimeoutError(f"Skyvern run {run_id} timed out after {timeout}s")
 
 
 # ---------------------------------------------------------------------------
-# Token storage
+# Supabase helpers (optional — test mode if not configured)
 # ---------------------------------------------------------------------------
+
+def _get_supabase():
+    if not SUPABASE_URL:
+        return None
+    from supabase import create_client
+    return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+
+async def update_job(job_id: str, **fields):
+    sb = _get_supabase()
+    if sb and job_id != "test":
+        sb.table("onboarding_jobs").update(fields).eq("id", job_id).execute()
+    step = fields.get("shopify_step", "")
+    if step:
+        print(f"  [job] {step}")
+
 
 async def save_shopify_token(client_id: str, shop_domain: str, token: str):
-    """Encrypt and store Shopify token in platform_connections."""
-    sb = get_supabase()
+    sb = _get_supabase()
+    if not sb:
+        print(f"  [save] DRY-RUN — token OK ({len(token)} chars), not saving (no Supabase)")
+        return
 
-    # Encrypt via DB function
     enc_result = sb.rpc("encrypt_platform_token", {"raw_token": token}).execute()
     encrypted = enc_result.data
 
-    # Upsert connection
     existing = (
         sb.table("platform_connections")
         .select("id")
@@ -162,25 +145,50 @@ async def save_shopify_token(client_id: str, shop_domain: str, token: str):
     else:
         sb.table("platform_connections").insert(row).execute()
 
-
-async def trigger_shopify_sync(client_id: str, shop_domain: str):
-    """Trigger initial product/order sync via Steve API."""
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            await client.post(
-                f"{STEVE_API_URL}/api/sync-shopify-metrics",
-                headers={
-                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={"client_id": client_id, "shop_domain": shop_domain},
-            )
-    except Exception:
-        pass  # Sync will happen on next cron cycle
+    print(f"  [save] Token guardado en platform_connections para {shop_domain}")
 
 
 # ---------------------------------------------------------------------------
-# Main Shopify onboarding flow
+# Token extraction
+# ---------------------------------------------------------------------------
+
+def _extract_token(output) -> str | None:
+    """Try every possible way to get shpat_ from Skyvern output."""
+    if not output:
+        return None
+
+    if isinstance(output, dict):
+        for key in ("admin_api_access_token", "token", "access_token"):
+            val = output.get(key, "")
+            if isinstance(val, str) and val.startswith("shpat_"):
+                return val.strip()
+        for val in output.values():
+            result = _extract_token(val)
+            if result:
+                return result
+
+    if isinstance(output, str):
+        try:
+            parsed = json.loads(output)
+            return _extract_token(parsed)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        if "shpat_" in output:
+            for part in output.replace('"', " ").replace("'", " ").replace(",", " ").split():
+                if part.startswith("shpat_") and len(part) > 20:
+                    return part.strip()
+
+    if isinstance(output, list):
+        for item in output:
+            result = _extract_token(item)
+            if result:
+                return result
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Main onboarding flow
 # ---------------------------------------------------------------------------
 
 async def onboard_shopify(
@@ -191,266 +199,217 @@ async def onboard_shopify(
     password: str,
 ):
     """
-    Full Shopify onboarding:
-      1. Store creds in Skyvern
-      2. Create browser session
-      3. Login
-      4. Navigate: Settings > Apps > Develop apps > Create "Steve Ads" > Scopes > Install
-      5. Extract shpat_ token
-      6. Save to platform_connections
-      7. Cleanup creds from Skyvern
+    Full Shopify onboarding via Skyvern API:
+      1. Create browser session
+      2. Single task: login + create app + scopes + install + extract token
+      3. Save token to platform_connections
+      4. Cleanup: close browser session
     """
-    credential_id: str | None = None
     browser_session_id: str | None = None
+    t0 = time.time()
 
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=90) as client:
         try:
-            # ----- Step 1: Store credentials in Skyvern (temporary) -----
-            await update_job(job_id, shopify_status="running", shopify_step="Preparando...")
-            cred_resp = await skyvern_post(client, "/v1/credentials", {
-                "name": f"shopify-onboard-{job_id[:8]}",
-                "credential_type": "password",
-                "credential": {
-                    "username": email,
-                    "password": password,
-                },
-            })
-            credential_id = cred_resp.get("credential_id") or cred_resp.get("id")
+            # ============================================
+            # STEP 1: Create browser session
+            # ============================================
+            await update_job(job_id, shopify_status="running", shopify_step="Preparando browser...")
 
-            # ----- Step 2: Create browser session -----
             session_resp = await skyvern_post(client, "/v1/browser_sessions", {
-                "timeout": 300,
+                "timeout": 360,
             })
-            browser_session_id = session_resp.get("browser_session_id") or session_resp.get("id")
+            browser_session_id = session_resp.get("browser_session_id")
+            print(f"  [browser] Session {browser_session_id}")
 
-            # ----- Step 3: Login to Shopify Admin -----
-            await update_job(job_id, shopify_step="Iniciando sesion en Shopify...")
+            # ============================================
+            # STEP 2: Login + create app + extract token
+            # ============================================
+            await update_job(job_id, shopify_step="Conectando con Shopify...")
+
+            scopes_csv = ", ".join(SHOPIFY_SCOPES)
             login_url = f"https://{shop_domain}/admin"
 
-            login_resp = await skyvern_post(client, "/v1/run/tasks/login", {
-                "url": login_url,
-                "credential_id": credential_id,
-                "credential_type": "credential_id",
-                "browser_session_id": browser_session_id,
-                "totp_identifier": f"shopify-2fa-{job_id[:8]}",
-                "prompt": (
-                    "Log in to the Shopify admin panel. "
-                    "Fill the email field and password field, then click the Log In button. "
-                    "If a verification code / 2FA input appears, wait for the code to be provided."
-                ),
-            })
-            login_run_id = login_resp.get("run_id")
+            # Build the mega-prompt: login + navigate + create app + scopes + install + extract
+            prompt = f"""Go to {login_url} and complete ALL of these steps in order:
 
-            # Poll login — check if it needs 2FA
-            login_result = None
-            login_elapsed = 0
-            while login_elapsed < 120:
-                await asyncio.sleep(3)
-                login_elapsed += 3
-                login_result = await skyvern_get(client, f"/v1/runs/{login_run_id}")
-                status = login_result.get("status", "")
+PHASE 1 — LOGIN:
+1. You will see the Shopify login page. Enter this email: {email}
+2. Enter this password: {password}
+3. Click "Log in".
+4. If there is a CAPTCHA, solve it.
+5. If there is a "device confirmation" or extra verification step, complete it.
+6. Wait until you see the Shopify admin dashboard.
 
-                if status in TERMINAL_STATUSES:
-                    break
+PHASE 2 — NAVIGATE TO APP DEVELOPMENT:
+7. Click "Settings" in the bottom-left sidebar menu.
+8. Click "Apps and sales channels".
+9. Look for and click "Develop apps" (may also say "Develop apps for your store").
+10. IF you see a button "Allow custom app development", click it, then click "Allow custom app development" again in the confirmation dialog.
 
-                # If still running, check if it's stuck on 2FA
-                # Skyvern will signal via failure_reason or keep running waiting for TOTP
-                if status == "running" and login_elapsed > 20:
-                    # After 20s of running, assume 2FA is needed — ask merchant
-                    await set_pending_2fa(job_id)
-                    code = await wait_for_merchant_input(job_id, timeout_seconds=180)
+PHASE 3 — CREATE THE APP:
+11. Click "Create an app" button.
+12. In the "App name" input field, type: Steve Ads
+13. Click "Create app" to confirm.
 
-                    # Push 2FA code to Skyvern
-                    await skyvern_post(client, "/v1/credentials/totp", {
-                        "totp_identifier": f"shopify-2fa-{job_id[:8]}",
-                        "content": code,
-                    })
-                    await update_job(job_id, shopify_step="Verificando codigo...")
+PHASE 4 — CONFIGURE API SCOPES:
+14. Click "Configure Admin API scopes".
+15. You will see a long list of API scope checkboxes. You need to check EACH of these scopes:
+    {scopes_csv}
+    - Use the search box at the top of the scopes section to search for each scope name
+    - Make sure the checkbox next to each scope is CHECKED
+16. After checking all scopes, scroll down and click "Save".
 
-                    # Continue polling
-                    login_result = await poll_run(client, login_run_id, timeout=60)
-                    break
+PHASE 5 — INSTALL:
+17. Click the "Install app" button (usually near the top right).
+18. A confirmation dialog will appear. Click "Install" to confirm.
 
-            if not login_result or login_result.get("status") != "completed":
-                failure = login_result.get("failure_reason", "Login fallo") if login_result else "Timeout"
-                raise Exception(f"Login Shopify fallo: {failure}")
+PHASE 6 — EXTRACT TOKEN:
+19. After installation, you will see the "Admin API access token" section.
+20. IMPORTANT: If there is a "Reveal token once" link/button, you MUST click it.
+21. The token is a long string starting with "shpat_".
+22. Extract and return the COMPLETE token string.
 
-            # ----- Step 4: Create custom app + configure scopes + install -----
-            await update_job(job_id, shopify_step="Creando app Steve Ads...")
-
-            scopes_list = ", ".join(SHOPIFY_SCOPES)
-            nav_prompt = f"""You are logged into the Shopify admin at {login_url}.
-
-Navigate step by step:
-
-1. Click "Settings" in the bottom-left sidebar.
-2. Click "Apps and sales channels".
-3. Click "Develop apps" (or "Develop apps for your store").
-4. If you see a button "Allow custom app development", click it and confirm in the dialog.
-5. Click "Create an app" (or "Create a custom app").
-6. In the app name field, type "Steve Ads". Click "Create app".
-7. Click "Configure Admin API scopes".
-8. In the scopes list, search for and check EACH of these scopes: {scopes_list}
-   For each scope, find it in the list and check its checkbox.
-9. Click "Save" to save the scopes.
-10. Click "Install app" (the button at the top).
-11. In the confirmation dialog, click "Install".
-12. You should now see the Admin API access token. It starts with "shpat_".
-    If there is a "Reveal token once" button, click it to reveal the token.
-
-IMPORTANT: After install, the token is shown ONLY ONCE. Make sure to extract it."""
-
-            extraction_schema = {
-                "type": "object",
-                "properties": {
-                    "admin_api_access_token": {
-                        "type": "string",
-                        "description": "The Shopify Admin API access token, starts with 'shpat_'",
-                    },
-                },
-            }
+CRITICAL NOTES:
+- The Admin API access token is shown ONLY ONCE after installation. Do not navigate away before extracting it.
+- If an app named "Steve Ads" already exists, click on it instead of creating a new one, go to API credentials, and extract the existing token.
+- Do NOT modify or delete any existing apps or settings."""
 
             task_resp = await skyvern_post(client, "/v1/run/tasks", {
                 "url": login_url,
-                "prompt": nav_prompt,
+                "prompt": prompt,
                 "engine": "skyvern-2.0",
                 "browser_session_id": browser_session_id,
-                "data_extraction_schema": extraction_schema,
-                "max_steps": 40,
-                "error_code_mapping": {
-                    "SCOPE_NOT_FOUND": "Could not find the scope checkbox",
-                    "APP_ALREADY_EXISTS": "An app named Steve Ads already exists",
+                "max_steps": 60,
+                "data_extraction_schema": {
+                    "type": "object",
+                    "properties": {
+                        "admin_api_access_token": {
+                            "type": "string",
+                            "description": (
+                                "The Shopify Admin API access token. "
+                                "It starts with 'shpat_' and is a long alphanumeric string. "
+                                "Extract the COMPLETE token without truncation."
+                            ),
+                        },
+                    },
                 },
             })
-            task_run_id = task_resp.get("run_id")
 
-            await update_job(job_id, shopify_step="Configurando permisos de la app...")
+            run_id = task_resp.get("run_id")
+            print(f"  [task] Run {run_id}")
 
-            task_result = await poll_run(client, task_run_id, timeout=180)
+            await update_job(job_id, shopify_step="Configurando Shopify (esto tarda ~60s)...")
+
+            task_result = await poll_run(client, run_id, timeout=360)
 
             if task_result.get("status") != "completed":
-                failure = task_result.get("failure_reason", "Task fallo")
+                failure = task_result.get("failure_reason") or "unknown error"
+                errors = task_result.get("errors") or []
+                error_detail = f"{failure}"
+                if errors:
+                    error_detail += f" | errors: {json.dumps(errors)[:200]}"
+                raise Exception(f"Task fallo: {error_detail}")
 
-                # If app already exists, try to just get the token
-                if "APP_ALREADY_EXISTS" in str(failure):
-                    await update_job(job_id, shopify_step="App ya existe, buscando token...")
-                    retry_resp = await skyvern_post(client, "/v1/run/tasks", {
-                        "url": login_url,
-                        "prompt": (
-                            "Navigate to Settings > Apps and sales channels > Develop apps. "
-                            "Click on the app named 'Steve Ads'. "
-                            "Go to the API credentials tab. "
-                            "If the Admin API access token is visible, extract it. "
-                            "If you see 'Reveal token once', click it."
-                        ),
-                        "engine": "skyvern-2.0",
-                        "browser_session_id": browser_session_id,
-                        "data_extraction_schema": extraction_schema,
-                        "max_steps": 15,
-                    })
-                    task_result = await poll_run(client, retry_resp["run_id"], timeout=90)
-                    if task_result.get("status") != "completed":
-                        raise Exception(f"No se pudo extraer token de app existente: {task_result.get('failure_reason')}")
-                else:
-                    raise Exception(f"Creacion de app fallo: {failure}")
-
-            # ----- Step 5: Extract token from output -----
+            # ============================================
+            # STEP 3: Extract token from output
+            # ============================================
             await update_job(job_id, shopify_step="Extrayendo token...")
-            output = task_result.get("output", {})
-            token = None
 
-            if isinstance(output, dict):
-                token = output.get("admin_api_access_token")
-            if not token and isinstance(output, str):
-                # Try to parse JSON from output
-                try:
-                    parsed = json.loads(output)
-                    token = parsed.get("admin_api_access_token")
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            if not token and isinstance(output, str) and "shpat_" in output:
-                # Brute force extract
-                for part in output.replace('"', " ").replace("'", " ").split():
-                    if part.startswith("shpat_"):
-                        token = part
-                        break
+            output = task_result.get("output")
+            print(f"  [output] type={type(output).__name__} raw={str(output)[:200]}")
 
-            if not token or "shpat_" not in token:
+            token = _extract_token(output)
+
+            if not token:
                 raise Exception(
-                    "No se pudo extraer el token de Shopify (shpat_). "
-                    "El token solo se muestra una vez despues de instalar la app."
+                    "No se pudo extraer el token (shpat_). "
+                    "Shopify lo muestra solo UNA VEZ despues de instalar. "
+                    f"Output: {str(output)[:300]}"
                 )
 
-            # Clean token (remove quotes, whitespace)
             token = token.strip().strip("'\"")
+            elapsed = time.time() - t0
+            print(f"  [token] {token[:12]}...{token[-4:]} ({len(token)} chars) en {elapsed:.0f}s")
 
-            # ----- Step 6: Save token -----
+            # ============================================
+            # STEP 4: Save token
+            # ============================================
             await update_job(job_id, shopify_step="Guardando conexion...")
             await save_shopify_token(client_id, shop_domain, token)
-
-            # ----- Step 7: Trigger sync -----
-            await update_job(job_id, shopify_step="Sincronizando productos...")
-            await trigger_shopify_sync(client_id, shop_domain)
 
             await update_job(
                 job_id,
                 shopify_status="completed",
                 shopify_step="Conectado",
             )
-            print(f"[onboarding-shopify] OK — client={client_id}, shop={shop_domain}")
+            print(f"\n[onboarding-shopify] OK — {shop_domain} en {time.time() - t0:.0f}s")
 
         except Exception as e:
-            error_msg = str(e)[:150]
+            error_msg = str(e)[:200]
             await update_job(
                 job_id,
                 shopify_status="failed",
                 shopify_step=f"Error: {error_msg}",
             )
-            print(f"[onboarding-shopify] FAIL — client={client_id}: {error_msg}")
+            print(f"\n[onboarding-shopify] FAIL — {error_msg}")
             raise
 
         finally:
-            # RESTRICCION #1: Borrar credenciales de Skyvern — SIEMPRE
-            if credential_id:
-                try:
-                    await skyvern_delete(client, f"/v1/credentials/{credential_id}/delete")
-                except Exception:
-                    pass
-
             # Close browser session
             if browser_session_id:
                 try:
-                    await skyvern_post(client, f"/v1/browser_sessions/{browser_session_id}/close", {})
+                    await skyvern_post(
+                        client,
+                        f"/v1/browser_sessions/{browser_session_id}/close",
+                        {},
+                    )
+                    print(f"  [cleanup] Browser session {browser_session_id} closed")
                 except Exception:
                     pass
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point (for testing / cron / manual)
+# CLI
 # ---------------------------------------------------------------------------
 
 async def main():
     """
     Usage:
-      python onboarding_shopify.py <job_id> <client_id> <shop_domain> <email> <password>
+      python onboarding_shopify.py <shop_domain> <email> <password> [job_id] [client_id]
 
-    In production, called by the onboarding orchestrator or Cloud Run endpoint.
-    For testing, pass args directly.
+    Test mode (no job_id): prints results, no DB writes.
+
+    Required env:
+      SKYVERN_API_KEY  — from Skyvern self-hosted (run POST /api/v1/internal/auth/repair to get it)
+
+    Optional env:
+      SKYVERN_API_URL             — default http://localhost:8000
+      SUPABASE_URL                — if set, saves token to DB
+      SUPABASE_SERVICE_ROLE_KEY   — required if SUPABASE_URL is set
     """
-    if len(sys.argv) < 6:
-        print("Usage: python onboarding_shopify.py <job_id> <client_id> <shop_domain> <email> <password>")
-        print("  job_id: UUID from onboarding_jobs table")
-        print("  client_id: UUID from clients table")
-        print("  shop_domain: e.g. mi-tienda.myshopify.com")
-        print("  email: Shopify admin email")
-        print("  password: Shopify admin password")
+    if len(sys.argv) < 4:
+        print("Usage: python onboarding_shopify.py <shop_domain> <email> <password> [job_id] [client_id]")
+        print()
+        print("Example:")
+        print("  export SKYVERN_API_KEY='ey...'")
+        print("  python onboarding_shopify.py raicesdelalma.myshopify.com user@email.com 'password'")
         sys.exit(1)
 
-    job_id = sys.argv[1]
-    client_id = sys.argv[2]
-    shop_domain = sys.argv[3]
-    email = sys.argv[4]
-    password = sys.argv[5]
+    shop_domain = sys.argv[1]
+    email = sys.argv[2]
+    password = sys.argv[3]
+    job_id = sys.argv[4] if len(sys.argv) > 4 else "test"
+    client_id = sys.argv[5] if len(sys.argv) > 5 else "test"
+
+    if not SKYVERN_API_KEY:
+        print("ERROR: SKYVERN_API_KEY not set.")
+        print("Get it with: curl -X POST http://localhost:8000/api/v1/internal/auth/repair")
+        sys.exit(1)
+
+    print(f"[onboarding-shopify] shop={shop_domain}")
+    print(f"  Skyvern: {SKYVERN_URL}")
+    print(f"  DB: {'configured' if SUPABASE_URL else 'test mode (no DB)'}")
+    print()
 
     await onboard_shopify(job_id, client_id, shop_domain, email, password)
 
