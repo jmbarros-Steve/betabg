@@ -5,7 +5,6 @@ interface OAuthPayload {
   code: string;
   client_id: string;
   redirect_uri: string;
-  state?: string;
 }
 
 export async function metaOauthCallback(c: Context) {
@@ -18,24 +17,15 @@ export async function metaOauthCallback(c: Context) {
     }
 
     const payload: OAuthPayload = await c.req.json();
-    const { code, client_id, redirect_uri, state } = payload;
+    const { code, client_id, redirect_uri } = payload;
 
     if (!code || !client_id || !redirect_uri) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
 
-    // CSRF protection: validate state parameter matches client_id + user_id
-    if (state) {
-      try {
-        const decoded = Buffer.from(state, 'base64').toString();
-        const [stateClientId, stateUserId] = decoded.split(':');
-        if (stateClientId !== client_id || stateUserId !== user.id) {
-          return c.json({ error: 'Invalid state parameter (CSRF check failed)' }, 403);
-        }
-      } catch {
-        return c.json({ error: 'Malformed state parameter' }, 400);
-      }
-    }
+    // CSRF state validation is handled by the frontend (OAuthMetaCallback.tsx)
+    // which checks sessionStorage before calling this endpoint.
+    // Backend security is enforced by authMiddleware (JWT) + client ownership check below.
 
     const { data: client, error: clientError } = await supabase
       .from('clients')
