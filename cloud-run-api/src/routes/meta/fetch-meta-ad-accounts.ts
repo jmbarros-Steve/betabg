@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { canRequest, recordSuccess, recordFailure } from '../../lib/circuit-breaker.js';
 
 // ---------------------------------------------------------------------------
 // In-memory cache (5 min TTL)
@@ -139,6 +140,11 @@ export async function fetchMetaAdAccounts(c: Context) {
       return c.json({ error: 'Failed to decrypt token' }, 500);
     }
 
+    // Circuit breaker check — don't call Meta if circuit is open
+    if (!canRequest('meta-graph-api')) {
+      return c.json({ error: 'Meta API temporarily unavailable (rate limited). Try again in 1 minute.' }, 503);
+    }
+
     // First, check token permissions
     console.log('Checking token permissions...');
     const permissionsUrl = new URL('https://graph.facebook.com/v21.0/me/permissions');
@@ -146,6 +152,18 @@ export async function fetchMetaAdAccounts(c: Context) {
     const authHeaders = { Authorization: `Bearer ${decryptedToken}` };
 
     const permissionsResponse = await fetch(permissionsUrl.toString(), { headers: authHeaders });
+
+    if (!permissionsResponse.ok) {
+      const errBody: any = await permissionsResponse.json().catch(() => ({}));
+      const errCode = errBody?.error?.code;
+      if (errCode === 4 || errCode === 80004 || errCode === 32 || permissionsResponse.status === 429) {
+        recordFailure('meta-graph-api', `permissions: code ${errCode}, HTTP ${permissionsResponse.status}`);
+        return c.json({ error: 'Meta API rate limited. Try again in 1 minute.' }, 503);
+      }
+    } else {
+      recordSuccess('meta-graph-api');
+    }
+
     const permissionsData: MetaPermissionsResponse = await permissionsResponse.json() as any;
 
     const grantedPermissions = (permissionsData.data || [])

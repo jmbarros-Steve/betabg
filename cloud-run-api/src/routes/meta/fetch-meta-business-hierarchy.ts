@@ -1,8 +1,10 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { canRequest, recordSuccess, recordFailure } from '../../lib/circuit-breaker.js';
 
 const META_API_VERSION = 'v21.0';
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
+const CIRCUIT_SERVICE = 'meta-graph-api';
 
 // ---------------------------------------------------------------------------
 // In-memory cache (5 min TTL) — avoids hammering Meta Graph API on every
@@ -80,28 +82,41 @@ interface BusinessGroup {
 // ---------------------------------------------------------------------------
 
 async function metaGet(endpoint: string, token: string, params: Record<string, string> = {}): Promise<any> {
+  if (!canRequest(CIRCUIT_SERVICE)) {
+    console.warn(`[hierarchy] Circuit open, skipping ${endpoint}`);
+    return null;
+  }
   const url = new URL(`${META_BASE}${endpoint}`);
-  
+
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const err: any = await res.json().catch(() => ({}));
+    const errCode = err?.error?.code;
+    if (errCode === 4 || errCode === 80004 || errCode === 32 || res.status === 429 || res.status >= 500) {
+      recordFailure(CIRCUIT_SERVICE, `${endpoint}: code ${errCode}, HTTP ${res.status}`);
+    }
     console.error(`Meta API error on ${endpoint}:`, err);
     return null;
   }
+  recordSuccess(CIRCUIT_SERVICE);
   return res.json();
 }
 
 /** Paginate through all results for a list endpoint */
 async function metaGetAll(endpoint: string, token: string, params: Record<string, string> = {}): Promise<any[]> {
+  if (!canRequest(CIRCUIT_SERVICE)) {
+    console.warn(`[hierarchy] Circuit open, skipping ${endpoint}`);
+    return [];
+  }
   const results: any[] = [];
   let url: string | null = null;
 
   // First request
   const firstUrl = new URL(`${META_BASE}${endpoint}`);
-  
+
   firstUrl.searchParams.set('limit', '200');
   for (const [k, v] of Object.entries(params)) {
     firstUrl.searchParams.set(k, v);
@@ -109,8 +124,17 @@ async function metaGetAll(endpoint: string, token: string, params: Record<string
   url = firstUrl.toString();
 
   while (url) {
+    if (!canRequest(CIRCUIT_SERVICE)) break;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) break;
+    if (!res.ok) {
+      const err: any = await res.json().catch(() => ({}));
+      const errCode = err?.error?.code;
+      if (errCode === 4 || errCode === 80004 || errCode === 32 || res.status === 429 || res.status >= 500) {
+        recordFailure(CIRCUIT_SERVICE, `${endpoint}: code ${errCode}, HTTP ${res.status}`);
+      }
+      break;
+    }
+    recordSuccess(CIRCUIT_SERVICE);
     const data: any = await res.json();
     if (data.data) results.push(...data.data);
     url = data.paging?.next || null;
@@ -280,6 +304,11 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
     if (decryptError || !token) {
       console.error('[fetch-meta-business-hierarchy] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
       return c.json({ error: 'Failed to decrypt token' }, 500);
+    }
+
+    // Circuit breaker check — don't call Meta if circuit is open
+    if (!canRequest(CIRCUIT_SERVICE)) {
+      return c.json({ error: 'Meta API temporarily unavailable (rate limited). Try again in 1 minute.' }, 503);
     }
 
     console.log('Fetching business hierarchy...');

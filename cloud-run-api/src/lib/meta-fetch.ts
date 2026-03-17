@@ -2,10 +2,14 @@
  * Shared Meta Graph API fetch utility.
  * Uses Authorization: Bearer header instead of access_token query param
  * to prevent token leakage in server logs, proxy logs, and stack traces.
+ * Protected by circuit breaker to avoid hammering Meta during rate limits.
  */
+
+import { canRequest, recordSuccess, recordFailure } from './circuit-breaker.js';
 
 const META_API_VERSION = 'v21.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+const CIRCUIT_SERVICE = 'meta-graph-api';
 
 export interface MetaFetchOptions {
   method?: 'GET' | 'POST' | 'DELETE';
@@ -63,8 +67,41 @@ export async function metaApiFetch(
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   fetchOptions.signal = controller.signal;
 
+  // Circuit breaker check
+  if (!canRequest(CIRCUIT_SERVICE)) {
+    clearTimeout(timeoutId);
+    return new Response(
+      JSON.stringify({ error: { message: 'Circuit breaker open — Meta API temporarily blocked', code: 'CIRCUIT_OPEN' } }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
   try {
-    return await fetch(url.toString(), fetchOptions);
+    const res = await fetch(url.toString(), fetchOptions);
+
+    // Rate limit (code 4, 80004) or server errors → record failure
+    if (res.status === 429 || res.status >= 500) {
+      recordFailure(CIRCUIT_SERVICE, `HTTP ${res.status}`);
+    } else if (res.status === 403) {
+      // Check if it's a rate limit (code 4) vs auth error
+      const cloned = res.clone();
+      const body: any = await cloned.json().catch(() => ({}));
+      const errCode = body?.error?.code;
+      if (errCode === 4 || errCode === 80004 || errCode === 32) {
+        recordFailure(CIRCUIT_SERVICE, `Meta error code ${errCode}: ${body?.error?.message || ''}`);
+      }
+      // Auth errors (code 190 etc.) don't trip the circuit
+    } else if (res.ok) {
+      recordSuccess(CIRCUIT_SERVICE);
+    }
+
+    return res;
+  } catch (err: any) {
+    // Network errors trip the circuit
+    if (err.name !== 'AbortError') {
+      recordFailure(CIRCUIT_SERVICE, err.message);
+    }
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
