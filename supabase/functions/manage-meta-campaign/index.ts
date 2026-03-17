@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const META_API_BASE = 'https://graph.facebook.com/v18.0';
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
 type Action = 'create' | 'create_creative' | 'create_ad' | 'create_full' | 'create_322_test' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
 

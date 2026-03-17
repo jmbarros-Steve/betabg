@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const META_API_BASE = 'https://graph.facebook.com/v18.0';
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
 async function metaApiRequest(
   endpoint: string,

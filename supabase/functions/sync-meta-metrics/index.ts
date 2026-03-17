@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name`;
+    const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name`;
     const accountInfoResponse = await fetch(accountInfoUrl, {
       headers: { Authorization: `Bearer ${decryptedToken}` },
     });
@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
       'purchase_roas'
     ].join(',');
 
-    const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adAccountId}/insights`);
+    const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/insights`);
     insightsUrl.searchParams.set('fields', fields);
     insightsUrl.searchParams.set('time_range', JSON.stringify({
       since: formatDate(startDate),
