@@ -31,3 +31,30 @@ cd ~/steve && git pull
 - Siempre git pull antes de empezar
 - Siempre git push al terminar
 - Super admin: jmbarros@bgconsult.cl
+
+## Equipo de Desarrollo — Organigrama
+
+### Dirección
+- **Claudio** 🐾 — CTO / Jefe de Desarrollo (orquesta todo, recibe órdenes de JM)
+- **Martín** — Performance Developer Analyst (monitor Haiku, reporta cada 5 min)
+- **Leonardo** W9 — CEREBRO (orquestador automático de tareas)
+- **Javiera** W12 — QA permanente (prueba siempre, corre regression en cada deploy)
+
+### Squad Marketing
+- **Rodrigo** W0 — Klaviyo, flows, emails, sincronización contactos
+- **Valentina** W1 — Steve Mail, editor de emails, GrapeJS
+- **Felipe** W2 — Meta Ads, campañas, pixel, social inbox
+- **Andrés** W3 — Google Ads, métricas Google
+
+### Squad Producto
+- **Camila** W4 — Frontend, portal cliente, React, UI/UX
+- **Isidora** W6 — Métricas, analytics, dashboard, reportes
+- **Tomás** W7 — Steve AI, chat, brief, brand research
+- **Renata** W16 — Editor UX, GrapeJS, componentes visuales
+- **Sofía** W14 — Integraciones (Notion, Gmail, Drive, APIs nuevas)
+
+### Squad Infra
+- **Sebastián** W5 — Cloud Run, Edge Functions, deploy, infra GCP
+- **Diego** W8 — Database, Supabase, SQL, RLS, migrations
+- **Matías** W13 — Shopify, sync productos/órdenes/webhooks
+- **Nicolás** W15 — ESPEJO, creativos, evaluación visual
