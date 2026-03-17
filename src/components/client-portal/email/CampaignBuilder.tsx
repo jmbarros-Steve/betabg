@@ -480,7 +480,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       name: '',
       subject: '',
       preview_text: '',
-      from_name: '',
+      from_name: brandInfo.store_name || brandInfo.brand_name || '',
       from_email: '',
       html_content: '',
       audience_filter: {},
@@ -754,7 +754,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     <Input
                       value={editingCampaign?.from_name || ''}
                       onChange={(e) => setEditingCampaign(prev => ({ ...prev, from_name: e.target.value }))}
-                      placeholder="Tu Tienda"
+                      placeholder={brandInfo.store_name || brandInfo.brand_name || 'Tu Tienda'}
                     />
                   </div>
                   <div>

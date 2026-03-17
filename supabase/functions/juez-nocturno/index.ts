@@ -363,6 +363,38 @@ serve(async (req) => {
           detected_by: 'juez_nocturno',
           status: 'open'
         })
+
+        // 6b. Create task for Paula (W19) to fix hallucinations
+        const failedDetail = failed.map(f =>
+          `- [${f.question_id}] "${f.question}" → score ${f.score}/10: ${f.reason}`
+        ).join('\n')
+
+        const taskTitle = `Steve alucinó: ${failed.length} respuestas con score bajo (${client.name})`
+
+        // Deduplicate: skip if identical task already pending
+        const { data: existingTask } = await supabase
+          .from('tasks')
+          .select('id')
+          .eq('title', taskTitle)
+          .in('status', ['pending', 'in_progress'])
+          .limit(1)
+
+        if (!existingTask || existingTask.length === 0) {
+          await supabase.from('tasks').insert({
+            shop_id: client.id,
+            title: taskTitle,
+            description: `JUEZ nocturno detectó ${failed.length} respuestas con score < 7 (promedio: ${avgScore.toFixed(1)}/10).\n\nPreguntas fallidas:\n${failedDetail}\n\nAlucinaciones: ${hallucinations.length}`,
+            priority: 'critica',
+            type: 'bug',
+            source: 'juez',
+            assigned_squad: 'producto',
+            assigned_agent: 'W19-Paula',
+            status: 'pending',
+            attempts: 0,
+            created_at: new Date().toISOString(),
+          })
+          console.log(`[juez-nocturno] Created task for ${client.name}: ${failed.length} failed questions`)
+        }
       }
 
       const summary = {

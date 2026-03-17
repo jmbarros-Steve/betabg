@@ -899,6 +899,12 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       content: m.content,
     }));
 
+    // Truncate system prompt if too large (avoid Anthropic context overflow)
+    const maxSystemLen = 12000;
+    const truncatedSystem = estrategiaSystemPrompt.length > maxSystemLen
+      ? estrategiaSystemPrompt.slice(0, maxSystemLen) + '\n\n[...contexto truncado por límite de tamaño]'
+      : estrategiaSystemPrompt;
+
     const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -907,18 +913,18 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
-        system: estrategiaSystemPrompt,
+        system: truncatedSystem,
         messages: aiMessages,
       }),
     });
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
+      const errorText = await aiResponse.text().catch(() => '');
       console.error('AI API error (estrategia):', aiResponse.status, errorText);
       if (aiResponse.status === 429) return c.json({ error: 'Rate limit' }, 429);
-      return c.json({ error: 'AI service error' }, 502);
+      return c.json({ error: `AI service error (${aiResponse.status})`, details: errorText.slice(0, 200) }, 502);
     }
 
     const aiData: any = await aiResponse.json();

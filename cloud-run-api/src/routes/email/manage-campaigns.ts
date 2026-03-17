@@ -494,8 +494,18 @@ export async function manageEmailCampaigns(c: Context) {
 
       if (!client) return c.json({ error: 'Client not found' }, 404);
 
+      // Fetch store_name from platform_connections for sender defaults
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('store_name')
+        .eq('client_id', client_id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
       return c.json({
         brand_name: client.name || '',
+        store_name: conn?.store_name || client.name || '',
         brand_logo: client.logo_url || '',
         brand_color: client.brand_color || '#18181b',
         brand_secondary_color: client.brand_secondary_color || '#6366f1',
