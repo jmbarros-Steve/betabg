@@ -271,10 +271,15 @@ export async function previewFlowEmails(c: Context) {
     }
 
     // Decrypt API key
+    if (!connection.api_key_encrypted) {
+      console.error('[preview-flow-emails] No encrypted API key for connection:', connection.id);
+      return c.json({ error: 'No encrypted API key found for this connection' }, 500);
+    }
     const { data: apiKey, error: decryptError } = await serviceClient
       .rpc('decrypt_platform_token', { encrypted_token: connection.api_key_encrypted });
 
     if (decryptError || !apiKey) {
+      console.error('[preview-flow-emails] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
       return c.json({ error: 'Token decryption failed' }, 500);
     }
 

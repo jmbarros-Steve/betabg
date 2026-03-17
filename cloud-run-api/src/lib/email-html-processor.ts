@@ -562,13 +562,17 @@ async function createDiscountCode(params: CreateDiscountParams): Promise<string 
   }
 
   // Decrypt access token
-  const { data: tokenData } = await supabase.rpc(
+  if (!connection.access_token_encrypted) {
+    console.error('[createDiscountCode] No encrypted token for connection, client:', params.clientId);
+    return null;
+  }
+  const { data: tokenData, error: decryptError } = await supabase.rpc(
     'decrypt_platform_token',
     { encrypted_token: connection.access_token_encrypted }
   );
 
-  if (!tokenData) {
-    console.error('[createDiscountCode] Failed to decrypt access token');
+  if (decryptError || !tokenData) {
+    console.error('[createDiscountCode] Failed to decrypt access token:', decryptError?.message, decryptError?.code);
     return null;
   }
 

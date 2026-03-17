@@ -241,10 +241,15 @@ export async function syncKlaviyoMetrics(c: Context) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
+    if (!connection.api_key_encrypted) {
+      console.error('[sync-klaviyo-metrics] No encrypted API key for connection:', connection.id);
+      return c.json({ error: 'No encrypted API key found for this connection' }, 500);
+    }
     const { data: apiKey, error: decryptError } = await serviceClient
       .rpc('decrypt_platform_token', { encrypted_token: connection.api_key_encrypted });
 
     if (decryptError || !apiKey) {
+      console.error('[sync-klaviyo-metrics] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
       return c.json({ error: 'Token decryption failed' }, 500);
     }
 

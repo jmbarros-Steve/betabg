@@ -11,7 +11,7 @@ const API_BASE_URL = () =>
 async function getShopifyCredentials(supabase: any, clientId: string) {
   const { data, error } = await supabase
     .from('platform_connections')
-    .select('shop_domain, access_token, encrypted_access_token')
+    .select('shop_domain, access_token, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
@@ -23,9 +23,9 @@ async function getShopifyCredentials(supabase: any, clientId: string) {
 
   // Decrypt access token if needed
   let accessToken = data.access_token;
-  if (data.encrypted_access_token) {
-    const { data: decrypted } = await supabase.rpc('decrypt_token', {
-      encrypted_token: data.encrypted_access_token,
+  if (data.access_token_encrypted) {
+    const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
+      encrypted_token: data.access_token_encrypted,
     });
     if (decrypted) accessToken = decrypted;
   }

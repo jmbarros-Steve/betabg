@@ -76,9 +76,16 @@ export async function uploadKlaviyoDrafts(c: Context) {
       }
     }
 
-    const { data: apiKeyData } = await supabase.rpc('decrypt_platform_token', {
+    if (!conn.api_key_encrypted) {
+      console.error('[upload-klaviyo-drafts] No encrypted API key for connection:', connectionId);
+      return c.json({ error: 'No encrypted API key found for this connection' }, 500);
+    }
+    const { data: apiKeyData, error: decryptError } = await supabase.rpc('decrypt_platform_token', {
       encrypted_token: conn.api_key_encrypted
     });
+    if (decryptError) {
+      console.error('[upload-klaviyo-drafts] decrypt_platform_token failed:', decryptError.message, decryptError.code);
+    }
     const apiKey = apiKeyData as string;
     if (!apiKey) throw new Error('No API key found for Klaviyo connection');
     console.log('Klaviyo API key found, length:', apiKey.length);

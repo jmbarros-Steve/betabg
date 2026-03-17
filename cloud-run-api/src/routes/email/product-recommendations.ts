@@ -93,7 +93,7 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
   // Get Shopify credentials
   const { data: connection } = await supabase
     .from('platform_connections')
-    .select('shop_domain, access_token, encrypted_access_token')
+    .select('shop_domain, access_token, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
@@ -105,9 +105,9 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
 
   // Decrypt access token if needed
   let accessToken = connection.access_token;
-  if (connection.encrypted_access_token) {
+  if (connection.access_token_encrypted) {
     const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
-      encrypted_token: connection.encrypted_access_token,
+      encrypted_token: connection.access_token_encrypted,
     });
     if (decrypted) accessToken = decrypted;
   }
@@ -355,7 +355,7 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
   // Get Shopify credentials
   const { data: connection } = await supabase
     .from('platform_connections')
-    .select('shop_domain, access_token, encrypted_access_token')
+    .select('shop_domain, access_token, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
@@ -364,9 +364,9 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
   if (!connection?.shop_domain) return [];
 
   let accessToken = connection.access_token;
-  if (connection.encrypted_access_token) {
+  if (connection.access_token_encrypted) {
     const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
-      encrypted_token: connection.encrypted_access_token,
+      encrypted_token: connection.access_token_encrypted,
     });
     if (decrypted) accessToken = decrypted;
   }

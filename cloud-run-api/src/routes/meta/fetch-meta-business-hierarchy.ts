@@ -270,10 +270,15 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
     }
 
     // Decrypt token
+    if (!connection.access_token_encrypted) {
+      console.error('[fetch-meta-business-hierarchy] No encrypted token for connection:', connection.id);
+      return c.json({ error: 'No encrypted token found for this connection' }, 500);
+    }
     const { data: token, error: decryptError } = await supabase
       .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
 
     if (decryptError || !token) {
+      console.error('[fetch-meta-business-hierarchy] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
       return c.json({ error: 'Failed to decrypt token' }, 500);
     }
 
