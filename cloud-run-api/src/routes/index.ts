@@ -91,6 +91,7 @@ import { autoRuleGenerator } from './cron/auto-rule-generator.js';
 import { weeklyReport } from './cron/weekly-report.js';
 import { rootCauseAnalysis } from './cron/root-cause-analysis.js';
 import { autoPostmortem } from './cron/auto-postmortem.js';
+import { restartService } from './cron/restart-service.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -310,4 +311,5 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/weekly-report', weeklyReport); // No JWT — uses X-Cron-Secret, weekly: 0 8 * * 5 (Fri 8am)
   app.post('/api/cron/root-cause-analysis', rootCauseAnalysis); // No JWT — uses X-Cron-Secret, weekly: 0 2 * * 0 (Sun 2am)
   app.post('/api/cron/auto-postmortem', autoPostmortem); // No JWT — uses X-Cron-Secret, on-demand when critical task completes
+  app.post('/api/cron/restart-service', restartService); // No JWT — uses X-Cron-Secret, called by OJOS health-check
 }

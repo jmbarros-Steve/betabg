@@ -187,6 +187,47 @@ serve(async (req) => {
         })
       }
 
+      // ── Auto-restart: check for 2+ consecutive failures per endpoint ──
+      for (const f of failed) {
+        try {
+          // Query last 2 criterio_results for this endpoint (most recent first)
+          const { data: recentChecks } = await supabase
+            .from('criterio_results')
+            .select('passed, created_at')
+            .eq('rule_id', `HEALTH-${f.name.toUpperCase()}`)
+            .eq('entity_type', 'endpoint_health')
+            .order('created_at', { ascending: false })
+            .limit(2)
+
+          // If both of the last 2 checks failed → trigger restart
+          const consecutiveFails = recentChecks
+            && recentChecks.length >= 2
+            && recentChecks.every((r: { passed: boolean }) => !r.passed)
+
+          if (consecutiveFails) {
+            console.log(`[health-check] 2+ consecutive failures for ${f.name} — triggering auto-restart`)
+            try {
+              await fetch(`${CLOUD_RUN_URL}/api/cron/restart-service`, {
+                method: 'POST',
+                headers: {
+                  'X-Cron-Secret': SUPABASE_SERVICE_ROLE_KEY,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  endpoint: f.name,
+                  reason: `2+ consecutive health-check failures. Last error: ${f.error}`,
+                }),
+                signal: AbortSignal.timeout(10000),
+              })
+            } catch (restartErr: any) {
+              console.error(`[health-check] Auto-restart failed for ${f.name}:`, restartErr.message)
+            }
+          }
+        } catch (checkErr: any) {
+          console.error(`[health-check] Error checking consecutive failures for ${f.name}:`, checkErr.message)
+        }
+      }
+
       // Intentar enviar alerta via send-whatsapp si existe
       if (failed.length > 0) {
         try {
