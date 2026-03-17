@@ -37,6 +37,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   const [briefComplete, setBriefComplete] = useState<boolean | null>(null);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initRef = useRef(false);
 
@@ -54,13 +55,19 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }, [clientId]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 100);
-    }
+    setTimeout(() => {
+      // ScrollArea Viewport is the actual scrollable element
+      const viewport = viewportRef.current;
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+        return;
+      }
+      // Fallback: find viewport inside ScrollArea root
+      const el = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }, 100);
   }, [messages]);
 
   async function initializeConversation() {
@@ -142,20 +149,34 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
           mode: 'estrategia',
         },
       });
-      if (error) throw error;
 
-      if (data?.conversation_id && !conversationId) {
+      if (error) throw error;
+      if (!data) throw new Error('No data returned from API');
+
+      if (data.conversation_id && !conversationId) {
         setConversationId(data.conversation_id);
       }
 
-      if (data?.message) {
+      // Accept message from response — handle both string and empty cases
+      const responseText = data.message || data.text || data.response;
+      if (responseText) {
         const assistantMsg: Message = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: data.message,
+          content: String(responseText),
           created_at: new Date().toISOString(),
         };
         setMessages(prev => [...prev, assistantMsg]);
+      } else {
+        // Backend returned 200 but no message content — show as error bubble
+        console.warn('[SteveEstrategia] API returned OK but no message:', JSON.stringify(data).slice(0, 300));
+        const fallbackMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '⚠️ Steve procesó tu mensaje pero no generó respuesta. Intenta de nuevo.',
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, fallbackMsg]);
       }
     } catch (error: any) {
       // Show error as assistant message instead of silently removing user message
@@ -248,7 +269,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>
         <div className="space-y-5">
           {messages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center h-full py-10 text-center">
