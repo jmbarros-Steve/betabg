@@ -1,5 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getCreativeContext } from '../../lib/creative-context.js';
+import { detectAngle } from '../../lib/angle-detector.js';
 
 interface GenerateRequest {
   clientId: string;
@@ -745,6 +747,9 @@ export async function generateMetaCopy(c: Context) {
     // Anti-repetition: fetch recent copies to avoid repeating angles
     const antiRepetition = await buildAntiRepetitionContext(supabase, cId);
 
+    // D.4: Inject creative performance history
+    const creativeCtx = await getCreativeContext(cId, 'meta');
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -756,11 +761,26 @@ export async function generateMetaCopy(c: Context) {
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, naturaleza muerta, macetas, jardines, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).',
-        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
+        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
       }),
     });
     const aiData: any = await resp.json();
     const text = aiData?.content?.[0]?.text || '';
+
+    // D.6: Save to creative_history with detected angle
+    if (text) {
+      try {
+        const angle = await detectAngle(text);
+        await supabase.from('creative_history').insert({
+          client_id: resolvedClientId,
+          channel: 'meta',
+          entity_type: 'meta_copy',
+          angle,
+          copy_text: text.substring(0, 2000),
+        });
+      } catch (chErr) { console.error('[generate-meta-copy] creative_history insert error:', chErr); }
+    }
+
     return c.json({ copy: text, text });
   }
 
@@ -809,7 +829,10 @@ Productos: ${JSON.stringify(brandResearchVar.product_details || 'N/A')}\n` : '';
     // Anti-repetition: fetch recent copies to avoid repeating angles
     const antiRepetitionVar = await buildAntiRepetitionContext(supabase, clientId);
 
-    const prompt = `${bugSectionVar}${knowledgeSectionVar}${antiRepetitionVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
+    // D.4: Inject creative performance history
+    const creativeCtxVar = await getCreativeContext(clientId, 'meta');
+
+    const prompt = `${bugSectionVar}${knowledgeSectionVar}${antiRepetitionVar}${creativeCtxVar}Eres un experto en copywriting de performance marketing con metodología Sabri Suby + Russell Brunson.
 REGLA CRÍTICA: El copy debe ser 100% específico para los productos y marca del cliente. USA los nombres reales de sus productos, sus precios reales, su propuesta de valor real. NUNCA inventes un negocio ficticio ni uses temas genéricos.
 ${brandContextVar}${shopifyContextVar}
 DATOS DEL CLIENTE:
@@ -887,7 +910,10 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const brandContextBV = brandResearchBV ? `\nMarca: ${brandResearchBV.brand_name || 'N/A'}\nIndustria: ${brandResearchBV.industry || 'N/A'}\nProductos: ${JSON.stringify(brandResearchBV.product_details || 'N/A')}\n` : '';
     const clientNameBV = clientInfoBV?.name || clientInfoBV?.company || '';
 
-    const prompt = `${bugSectionBV}${knowledgeSectionBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
+    // D.4: Inject creative performance history
+    const creativeCtxBV = await getCreativeContext(clientId, 'meta');
+
+    const prompt = `${bugSectionBV}${knowledgeSectionBV}${creativeCtxBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
 Cliente: ${clientNameBV}
 ${brandContextBV}${shopifyContextBV}
 Copy aprobado: ${JSON.stringify(variacionElegida)}
@@ -1126,7 +1152,10 @@ ${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLoca
   // Anti-repetition: fetch recent copies to avoid repeating angles
   const antiRepetitionLegacy = await buildAntiRepetitionContext(supabase, clientId);
 
-  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + antiRepetitionLegacy + clientHeaderLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
+  // D.4: Inject creative performance history
+  const creativeCtxLegacy = await getCreativeContext(clientId, 'meta');
+
+  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + antiRepetitionLegacy + creativeCtxLegacy + clientHeaderLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
 
   console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 
@@ -1207,6 +1236,20 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
   }
 
   console.log('Successfully generated copy with Sabri + Russell methodology');
+
+  // D.6: Save to creative_history with detected angle
+  try {
+    const copyForAngle = parsedContent?.headline || parsedContent?.primary_text || JSON.stringify(parsedContent).substring(0, 300);
+    const angle = body.angulo || await detectAngle(copyForAngle);
+    await supabase.from('creative_history').insert({
+      client_id: resolvedClientId,
+      channel: 'meta',
+      entity_type: 'meta_copy',
+      angle,
+      copy_text: copyForAngle.substring(0, 2000),
+      product_name: parsedContent?.product_name || null,
+    });
+  } catch (chErr) { console.error('[generate-meta-copy] creative_history insert error:', chErr); }
 
   return c.json(parsedContent);
   } catch (err: any) {

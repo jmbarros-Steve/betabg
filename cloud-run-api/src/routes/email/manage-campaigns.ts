@@ -4,6 +4,7 @@ import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
 import { espejoEmail } from '../ai/espejo.js';
+import { detectAngle } from '../../lib/angle-detector.js';
 
 /**
  * Campaign management: CRUD + send + schedule.
@@ -73,6 +74,23 @@ export async function manageEmailCampaigns(c: Context) {
         .single();
 
       if (error) return c.json({ error: error.message }, 500);
+
+      // D.6: Save to creative_history with detected angle
+      if (data) {
+        try {
+          const copyForAngle = subject || name || '';
+          const angle = await detectAngle(copyForAngle);
+          await supabase.from('creative_history').insert({
+            client_id,
+            channel: 'email',
+            entity_type: 'email_campaign',
+            entity_id: data.id,
+            angle,
+            copy_text: copyForAngle.substring(0, 2000),
+          });
+        } catch (chErr) { console.error('[manage-campaigns] creative_history insert error:', chErr); }
+      }
+
       return c.json({ success: true, campaign: data });
     }
 
@@ -420,6 +438,15 @@ export async function manageEmailCampaigns(c: Context) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', campaign_id);
+
+      // D.6: Update creative_history with send metadata
+      try {
+        await supabase
+          .from('creative_history')
+          .update({ sent_count: sentCount })
+          .eq('entity_id', campaign_id)
+          .eq('entity_type', 'email_campaign');
+      } catch (chErr) { console.error('[manage-campaigns] creative_history send update error:', chErr); }
 
       return c.json({
         success: true,
