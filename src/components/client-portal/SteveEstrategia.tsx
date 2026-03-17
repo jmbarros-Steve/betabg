@@ -192,7 +192,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }
 
   return (
-    <Card className="h-[800px] flex flex-col bg-card border border-border rounded-2xl overflow-hidden relative z-0">
+    <Card className="h-[calc(100vh-10rem)] min-h-[500px] max-h-[800px] flex flex-col bg-card border border-border rounded-2xl overflow-hidden relative">
       {/* Header */}
       <CardHeader className="border-b flex-shrink-0 pb-3">
         <div className="flex items-center gap-3">

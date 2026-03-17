@@ -283,7 +283,7 @@ export default function ClientPortal() {
     <div className="min-h-screen bg-background">
       <OfflineBanner />
       {/* Header */}
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40">
         <div className="container px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {isAdminView && (

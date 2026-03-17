@@ -193,7 +193,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         const { data } = await callApi<any>('manage-email-campaigns', {
           body: { action: 'get_client_brand', client_id: clientId },
         });
-        if (data) setBrandInfo(data);
+        if (data) {
+          setBrandInfo(data);
+          // Prefill from_name/from_email on the editing campaign if still empty
+          const storeName = data.store_name || data.brand_name || '';
+          setEditingCampaign(prev => {
+            if (!prev || prev.from_name) return prev;
+            return { ...prev, from_name: storeName };
+          });
+        }
       } catch { /* Brand info is optional */ }
     })();
   }, [clientId]);
@@ -754,7 +762,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     <Input
                       value={editingCampaign?.from_name || ''}
                       onChange={(e) => setEditingCampaign(prev => ({ ...prev, from_name: e.target.value }))}
-                      placeholder={brandInfo.store_name || brandInfo.brand_name || 'Tu Tienda'}
+                      placeholder="Nombre de tu tienda o marca"
                     />
                   </div>
                   <div>

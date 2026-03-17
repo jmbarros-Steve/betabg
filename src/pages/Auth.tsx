@@ -40,6 +40,7 @@ export default function Auth() {
   const [resetSent, setResetSent] = useState(false);
   const [resetDone, setResetDone] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const { signIn, signUp, signOut, user, loading: authLoading } = useAuth();
   const { isAdmin, isClient, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
@@ -136,16 +137,17 @@ export default function Auth() {
     }
 
     setLoading(true);
-    
+    setLoginError(null);
+
     try {
       if (mode === 'login') {
         const { error } = await signIn(email.trim(), password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Credenciales incorrectas. Verifica tu email y contraseña.');
-          } else {
-            toast.error(error.message);
-          }
+          const msg = error.message.includes('Invalid login credentials')
+            ? 'Credenciales incorrectas. Verifica tu email y contraseña.'
+            : error.message;
+          setLoginError(msg);
+          toast.error(msg);
         } else {
           toast.success('Sesión iniciada. Redirigiendo...');
         }
@@ -377,7 +379,7 @@ export default function Auth() {
                       type="email"
                       placeholder="tu@email.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); setLoginError(null); }}
                       className="pl-11"
                       required
                     />
@@ -393,7 +395,7 @@ export default function Auth() {
                       type="password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => { setPassword(e.target.value); setLoginError(null); }}
                       className="pl-11"
                       required
                     />
@@ -415,6 +417,12 @@ export default function Auth() {
                     >
                       ¿Olvidaste tu contraseña?
                     </button>
+                  </div>
+                )}
+
+                {loginError && mode === 'login' && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {loginError}
                   </div>
                 )}
 
