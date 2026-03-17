@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const META_API_BASE = 'https://graph.facebook.com/v18.0';
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
 async function metaApiRequest(
   endpoint: string,
@@ -16,19 +16,25 @@ async function metaApiRequest(
   const url = new URL(`${META_API_BASE}/${endpoint}`);
   const fetchOptions: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
 
+  (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+
   if (method === 'GET') {
-    url.searchParams.set('access_token', accessToken);
     if (body) {
       for (const [key, value] of Object.entries(body)) {
         url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
     }
   } else {
-    fetchOptions.body = JSON.stringify({ ...body, access_token: accessToken });
+    fetchOptions.body = JSON.stringify(body || {});
   }
 
   const response = await fetch(url.toString(), fetchOptions);
-  const responseData = await response.json();
+  let responseData: any;
+  try {
+    responseData = await response.json();
+  } catch {
+    return { ok: false, error: `Meta API non-JSON response (${response.status})` };
+  }
 
   if (!response.ok) {
     const errorMessage = responseData?.error?.message || 'Unknown Meta API error';
@@ -126,7 +132,7 @@ Deno.serve(async (req) => {
       .from('clients')
       .select('id, user_id, client_user_id')
       .eq('id', client_id)
-      .single();
+      .maybeSingle();
 
     if (!client || (client.user_id !== user.id && client.client_user_id !== user.id)) {
       return new Response(
@@ -172,7 +178,7 @@ Deno.serve(async (req) => {
       .from('platform_connections')
       .select('access_token_encrypted, account_id')
       .eq('id', connection_id)
-      .single();
+      .maybeSingle();
 
     let accessToken: string | null = null;
     if (connection?.access_token_encrypted) {
@@ -221,10 +227,15 @@ Deno.serve(async (req) => {
               if (adsetsResult.ok && adsetsResult.data?.data) {
                 const pct = (ruleAction.percentage || 20) / 100;
                 const multiplier = ruleAction.type === 'INCREASE_BUDGET' ? (1 + pct) : (1 - pct);
-                for (const adset of adsetsResult.data.data) {
+                for (let i = 0; i < adsetsResult.data.data.length; i++) {
+                  const adset = adsetsResult.data.data[i];
                   if (adset.daily_budget) {
                     const newBudget = Math.round(Number(adset.daily_budget) * multiplier);
                     await metaApiRequest(adset.id, accessToken, 'POST', { daily_budget: newBudget });
+                    // Rate limiting: 200ms delay between API calls
+                    if (i < adsetsResult.data.data.length - 1) {
+                      await new Promise(r => setTimeout(r, 200));
+                    }
                   }
                 }
                 actionExecuted = true;
@@ -238,8 +249,11 @@ Deno.serve(async (req) => {
               const adsetsResult = await metaApiRequest(`${campaign.campaign_id}/adsets`, accessToken, 'GET', { fields: 'id', limit: '100' });
               if (adsetsResult.ok && adsetsResult.data?.data) {
                 const budgetCents = Math.round(ruleAction.amount * 100);
-                for (const adset of adsetsResult.data.data) {
-                  await metaApiRequest(adset.id, accessToken, 'POST', { daily_budget: budgetCents });
+                for (let i = 0; i < adsetsResult.data.data.length; i++) {
+                  await metaApiRequest(adsetsResult.data.data[i].id, accessToken, 'POST', { daily_budget: budgetCents });
+                  if (i < adsetsResult.data.data.length - 1) {
+                    await new Promise(r => setTimeout(r, 200));
+                  }
                 }
                 actionExecuted = true;
                 details += ` → Budget scaled to ${ruleAction.amount}`;

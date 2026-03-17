@@ -1,6 +1,15 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+const IMAGE_CREDIT_COST = 2;
+const DIVERSITY_STYLES = [
+  'Vary the model ethnicity, age, and appearance for each generation.',
+  'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
+  'Alternate between close-up portrait, medium shot, and environmental portrait.',
+  'Mix lighting styles: golden hour, studio softbox, natural window light, overcast diffused.',
+  'Vary compositions: rule of thirds, centered, off-center with negative space.',
+];
+
 export async function generateImage(c: Context) {
   try {
   const {
@@ -30,26 +39,29 @@ export async function generateImage(c: Context) {
     return c.json({ error: 'No tienes acceso a este cliente' }, 403);
   }
 
-  // Check & deduct 2 credits
-  const { data: credits } = await supabase
-    .from('client_credits')
-    .select('id, creditos_disponibles, creditos_usados')
-    .eq('client_id', clientId)
-    .maybeSingle();
+  // Atomically deduct credits BEFORE generating (prevents race condition)
+  const { data: deductResult, error: deductError } = await supabase
+    .rpc('deduct_credits', { p_client_id: clientId, p_amount: IMAGE_CREDIT_COST });
 
-  if (!credits) {
+  if (deductError) {
+    console.error('[generate-image] Credit deduction error:', deductError);
     return c.json(
       { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
       402
     );
   }
-  const available = credits.creditos_disponibles ?? 0;
-  if (available < 2) {
+  if (!deductResult?.[0]?.success) {
     return c.json(
-      { error: 'NO_CREDITS', message: 'Se necesitan 2 créditos para generar una imagen' },
+      { error: 'NO_CREDITS', message: `Se necesitan ${IMAGE_CREDIT_COST} créditos para generar una imagen` },
       402
     );
   }
+
+  // Helper to refund credits on generation failure
+  const refundCredits = async () => {
+    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -IMAGE_CREDIT_COST });
+    if (refundErr) console.error('[generate-image] Credit refund failed:', refundErr);
+  };
 
   // Auto-fetch client reference photos if none provided
   // PRIORITY: Match product mentioned in the copy prompt to use its REAL Shopify photo
@@ -116,14 +128,7 @@ export async function generateImage(c: Context) {
     : promptGeneracion;
 
   // Add diversity instruction to avoid repetitive outputs
-  const diversityStyles = [
-    'Vary the model ethnicity, age, and appearance for each generation.',
-    'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
-    'Alternate between close-up portrait, medium shot, and environmental portrait.',
-    'Mix lighting styles: golden hour, studio softbox, natural window light, overcast diffused.',
-    'Vary compositions: rule of thirds, centered, off-center with negative space.',
-  ];
-  const randomDiversity = diversityStyles[Math.floor(Math.random() * diversityStyles.length)];
+  const randomDiversity = DIVERSITY_STYLES[Math.floor(Math.random() * DIVERSITY_STYLES.length)];
 
   const promptFinal = `${promptBase}. ${randomDiversity}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
@@ -131,10 +136,11 @@ export async function generateImage(c: Context) {
   let imageBytes: Uint8Array | null = null;
 
   if (engine === 'imagen') {
-    // -- Gemini 2.0 Flash native image generation --
+    // -- Gemini 2.5 Flash native image generation --
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       console.error('[generate-image] GEMINI_API_KEY not configured');
+      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -185,6 +191,7 @@ export async function generateImage(c: Context) {
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
       console.error('[generate-image] Gemini Flash error:', geminiResponse.status, errText);
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -200,6 +207,7 @@ export async function generateImage(c: Context) {
 
     if (!imageBytes) {
       console.error('[generate-image] No image in Gemini response:', JSON.stringify(geminiResult).substring(0, 500));
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -208,6 +216,7 @@ export async function generateImage(c: Context) {
     const FAL_API_KEY = process.env.FAL_API_KEY;
     if (!FAL_API_KEY) {
       console.error('[generate-image] FAL_API_KEY not configured');
+      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -239,6 +248,7 @@ export async function generateImage(c: Context) {
     if (!falResponse.ok) {
       const errText = await falResponse.text();
       console.error('[generate-image] Fal.ai API error:', falResponse.status, errText);
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -246,6 +256,7 @@ export async function generateImage(c: Context) {
     imageUrl = falResult.images?.[0]?.url;
     if (!imageUrl) {
       console.error('[generate-image] No image returned from Fal.ai');
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -260,6 +271,7 @@ export async function generateImage(c: Context) {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
       console.error('[generate-image] OPENAI_API_KEY not configured');
+      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -285,6 +297,7 @@ export async function generateImage(c: Context) {
     if (!openaiResponse.ok) {
       const errText = await openaiResponse.text();
       console.error('[generate-image] OpenAI API error:', openaiResponse.status, errText);
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -303,6 +316,7 @@ export async function generateImage(c: Context) {
       imageBytes = new Uint8Array(arrayBuffer);
     } else {
       console.error('[generate-image] No image returned from OpenAI');
+      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
   }
@@ -325,6 +339,7 @@ export async function generateImage(c: Context) {
 
   if (storageErr) {
     console.error('[generate-image] Storage upload error:', storageErr);
+    await refundCredits();
     return c.json({ error: 'Error guardando la imagen.' }, 500);
   }
 
@@ -340,24 +355,19 @@ export async function generateImage(c: Context) {
     tipo: 'imagen',
   });
 
-  // Deduct credits atomically (prevents race condition with concurrent requests)
+  // Log credit transaction (credits already deducted above)
   const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
-  const { data: deductResult, error: deductError } = await supabase
-    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 2 });
-  if (deductError || !deductResult?.[0]?.success) {
-    console.error('[generate-image] Atomic credit deduction failed:', deductError || deductResult);
-  }
-
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
     accion: `Generar imagen — ${engineLabel}`,
-    creditos_usados: 2,
+    creditos_usados: IMAGE_CREDIT_COST,
     costo_real_usd: engine === 'imagen' ? 0.02 : engine === 'flux' ? 0.05 : 0.04,
   });
 
   return c.json({ asset_url: publicUrl });
   } catch (err: any) {
     console.error('[generate-image]', err);
+    await refundCredits();
     return c.json({ error: 'Error interno del servidor' }, 500);
   }
 }

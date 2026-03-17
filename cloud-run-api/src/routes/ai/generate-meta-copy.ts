@@ -703,8 +703,8 @@ export async function generateMetaCopy(c: Context) {
 
     // Fetch client brief, knowledge base, and brand research
     const [{ data: briefData }, { data: brandResearch }, { data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
-      supabase.from('buyer_personas').select('*').eq('client_id', cId).eq('is_complete', true).order('created_at', { ascending: false }).limit(1).single(),
-      supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', cId).order('created_at', { ascending: false }).limit(1).single(),
+      supabase.from('buyer_personas').select('*').eq('client_id', cId).eq('is_complete', true).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', cId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
       supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).limit(10),
     ]);
@@ -777,7 +777,7 @@ export async function generateMetaCopy(c: Context) {
   if (mode === 'variaciones') {
     const { data: briefData } = await supabase
       .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
-      .order('created_at', { ascending: false }).limit(1).single();
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
 
     const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
@@ -789,7 +789,7 @@ export async function generateMetaCopy(c: Context) {
     const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledgeVar.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
     const [{ data: brandResearchVar }, { data: shopifyProductsVar }, { data: clientInfoVar }] = await Promise.all([
-      supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).single(),
+      supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
       supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
     ]);
@@ -850,15 +850,20 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const aiData: any = await aiResp.json();
     const raw = aiData.content?.[0]?.text || '';
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
-    return c.json(parsed);
+    try {
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
+      return c.json(parsed);
+    } catch (e: any) {
+      console.error('[generate-meta-copy] JSON parse error (variaciones):', e.message, 'raw:', raw.slice(0, 500));
+      return c.json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 1000) }, 500);
+    }
   }
 
   // ── BRIEF VISUAL MODE ─────────────────────────────────────────────────────
   if (mode === 'brief_visual') {
     const { data: briefData } = await supabase
       .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
-      .order('created_at', { ascending: false }).limit(1).single();
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
 
     const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
@@ -871,7 +876,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
 
     const [{ data: shopifyProductsBV }, { data: brandResearchBV }, { data: clientInfoBV }] = await Promise.all([
       supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
-      supabase.from('brand_research').select('brand_name, industry, value_proposition, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).single(),
+      supabase.from('brand_research').select('brand_name, industry, value_proposition, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
     ]);
 
@@ -916,8 +921,13 @@ ${adType === 'static'
     const aiData: any = await aiResp.json();
     const raw = aiData.content?.[0]?.text || '';
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
-    return c.json(parsed);
+    try {
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
+      return c.json(parsed);
+    } catch (e: any) {
+      console.error('[generate-meta-copy] JSON parse error (brief_visual):', e.message, 'raw:', raw.slice(0, 500));
+      return c.json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 1000) }, 500);
+    }
   }
 
   // ── LEGACY MODE ──────────────────────────────────────────────────────────
@@ -1082,7 +1092,7 @@ las preferencias específicas de cada cliente cuando las conozco.
   const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }, { data: brandResearchLegacy }, { data: shopifyProductsLegacy }, { data: clientInfoLegacy }] = await Promise.all([
     supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
     supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
-    supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).single(),
+    supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
     supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
   ]);

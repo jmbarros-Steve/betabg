@@ -14,15 +14,23 @@ const FALLBACK_RATES: Record<string, number> = {
   GBP: 0.79,
 };
 
+let cachedRates: Record<string, number> | null = null;
+
 async function getExchangeRates(): Promise<Record<string, number>> {
+  if (cachedRates) return cachedRates;
   try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(EXCHANGE_RATE_API_URL, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!response.ok) throw new Error(`API returned ${response.status}`);
     const data = await response.json();
     console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    return data.rates;
+    cachedRates = data.rates;
+    return cachedRates!;
   } catch (error) {
     console.error('Failed to fetch exchange rates, using fallback:', error);
+    cachedRates = FALLBACK_RATES;
     return FALLBACK_RATES;
   }
 }
@@ -229,9 +237,9 @@ Deno.serve(async (req) => {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name`;
+    const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name`;
     const accountInfoResponse = await fetch(accountInfoUrl, {
-      headers: { 'Authorization': `Bearer ${decryptedToken}` },
+      headers: { Authorization: `Bearer ${decryptedToken}` },
     });
     let accountCurrency = 'USD'; // Default to USD
 
@@ -259,8 +267,7 @@ Deno.serve(async (req) => {
       'purchase_roas'
     ].join(',');
 
-    const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adAccountId}/insights`);
-    insightsUrl.searchParams.set('access_token', decryptedToken);
+    const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/insights`);
     insightsUrl.searchParams.set('fields', fields);
     insightsUrl.searchParams.set('time_range', JSON.stringify({
       since: formatDate(startDate),
@@ -271,7 +278,9 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching Meta insights for account ${adAccountId}`);
 
-    const metaResponse = await fetch(insightsUrl.toString());
+    const metaResponse = await fetch(insightsUrl.toString(), {
+      headers: { Authorization: `Bearer ${decryptedToken}` },
+    });
     
     if (!metaResponse.ok) {
       const errorData = await metaResponse.json();

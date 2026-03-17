@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const META_API_BASE = 'https://graph.facebook.com/v18.0';
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
 type Action = 'create' | 'create_creative' | 'create_ad' | 'create_full' | 'create_322_test' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive';
 
@@ -30,16 +30,16 @@ async function metaApiRequest(
     headers: { 'Content-Type': 'application/json' },
   };
 
+  (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+
   if (method === 'GET') {
-    url.searchParams.set('access_token', accessToken);
     if (body) {
       for (const [key, value] of Object.entries(body)) {
         url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
     }
   } else {
-    // POST / DELETE - send access_token in body
-    fetchOptions.body = JSON.stringify({ ...body, access_token: accessToken });
+    fetchOptions.body = JSON.stringify(body || {});
   }
 
   const response = await fetch(url.toString(), fetchOptions);
