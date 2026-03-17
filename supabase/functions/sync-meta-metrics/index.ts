@@ -229,8 +229,10 @@ Deno.serve(async (req) => {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name&access_token=${decryptedToken}`;
-    const accountInfoResponse = await fetch(accountInfoUrl);
+    const accountInfoUrl = `https://graph.facebook.com/v18.0/${adAccountId}?fields=currency,timezone_name`;
+    const accountInfoResponse = await fetch(accountInfoUrl, {
+      headers: { Authorization: `Bearer ${decryptedToken}` },
+    });
     let accountCurrency = 'USD'; // Default to USD
 
     if (accountInfoResponse.ok) {
@@ -258,7 +260,6 @@ Deno.serve(async (req) => {
     ].join(',');
 
     const insightsUrl = new URL(`https://graph.facebook.com/v18.0/${adAccountId}/insights`);
-    insightsUrl.searchParams.set('access_token', decryptedToken);
     insightsUrl.searchParams.set('fields', fields);
     insightsUrl.searchParams.set('time_range', JSON.stringify({
       since: formatDate(startDate),
@@ -269,7 +270,9 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching Meta insights for account ${adAccountId}`);
 
-    const metaResponse = await fetch(insightsUrl.toString());
+    const metaResponse = await fetch(insightsUrl.toString(), {
+      headers: { Authorization: `Bearer ${decryptedToken}` },
+    });
     
     if (!metaResponse.ok) {
       const errorData = await metaResponse.json();

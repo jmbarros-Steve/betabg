@@ -16,15 +16,16 @@ async function metaApiRequest(
   const url = new URL(`${META_API_BASE}/${endpoint}`);
   const fetchOptions: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
 
+  (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+
   if (method === 'GET') {
-    url.searchParams.set('access_token', accessToken);
     if (body) {
       for (const [key, value] of Object.entries(body)) {
         url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
     }
   } else {
-    fetchOptions.body = JSON.stringify({ ...body, access_token: accessToken });
+    fetchOptions.body = JSON.stringify(body || {});
   }
 
   const response = await fetch(url.toString(), fetchOptions);
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
       .from('clients')
       .select('id, user_id, client_user_id')
       .eq('id', client_id)
-      .single();
+      .maybeSingle();
 
     if (!client || (client.user_id !== user.id && client.client_user_id !== user.id)) {
       return new Response(
@@ -172,7 +173,7 @@ Deno.serve(async (req) => {
       .from('platform_connections')
       .select('access_token_encrypted, account_id')
       .eq('id', connection_id)
-      .single();
+      .maybeSingle();
 
     let accessToken: string | null = null;
     if (connection?.access_token_encrypted) {
