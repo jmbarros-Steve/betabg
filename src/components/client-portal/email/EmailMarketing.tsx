@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Users, Send, GitBranch, BarChart3, FileText, Settings } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Users, Send, GitBranch, BarChart3, FileText, Globe } from 'lucide-react';
 import { SubscribersList } from './SubscribersList';
 import { CampaignBuilder } from './CampaignBuilder';
 import { FlowBuilder } from './FlowBuilder';
@@ -24,21 +24,20 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
           <h2 className="text-2xl font-bold tracking-tight">Steve Mail</h2>
           <p className="text-muted-foreground">Email marketing para tu tienda</p>
         </div>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" title="Configuración de dominio">
-              <Settings className="w-4 h-4" />
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Globe className="w-4 h-4 mr-1.5" />
+              Configurar dominio
             </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Configuración</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4">
-              <DomainSetup clientId={clientId} />
-            </div>
-          </SheetContent>
-        </Sheet>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Configuracion de dominio</DialogTitle>
+            </DialogHeader>
+            <DomainSetup clientId={clientId} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -46,8 +45,8 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
           <TabsTrigger value="campaigns" className="flex items-center gap-1.5 text-xs flex-1">
             <Send className="w-3.5 h-3.5" />
             <div className="flex flex-col items-start">
-              <span>Campañas</span>
-              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Envía emails a tu audiencia</span>
+              <span>Campanas</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Envia emails a tu audiencia</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="subscribers" className="flex items-center gap-1.5 text-xs flex-1">
@@ -61,7 +60,7 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
             <GitBranch className="w-3.5 h-3.5" />
             <div className="flex flex-col items-start">
               <span>Automatizaciones</span>
-              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Emails automáticos</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Emails automaticos</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="forms" className="flex items-center gap-1.5 text-xs flex-1">
@@ -75,7 +74,7 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
             <BarChart3 className="w-3.5 h-3.5" />
             <div className="flex flex-col items-start">
               <span>Rendimiento</span>
-              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Métricas y resultados</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Metricas y resultados</span>
             </div>
           </TabsTrigger>
         </TabsList>

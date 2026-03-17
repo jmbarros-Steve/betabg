@@ -10,13 +10,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Label } from '@/components/ui/label';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Users, Plus, Search, Download, Loader2, ShoppingBag, MoreVertical } from 'lucide-react';
+import { Users, Plus, Search, Download, Loader2, ShoppingBag, MoreVertical, List, Filter } from 'lucide-react';
+import { ListsManager } from './ListsManager';
 
 interface SubscribersListProps {
   clientId: string;
 }
 
 export function SubscribersList({ clientId }: SubscribersListProps) {
+  const [subView, setSubView] = useState<'contacts' | 'lists'>('contacts');
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -136,6 +138,36 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
 
   return (
     <div className="space-y-5">
+      {/* Sub-navigation: Contactos | Listas y Segmentos */}
+      <div className="flex gap-1 border-b">
+        <button
+          onClick={() => setSubView('contacts')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subView === 'contacts'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 inline mr-1.5" />
+          Todos los contactos
+        </button>
+        <button
+          onClick={() => setSubView('lists')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subView === 'lists'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Filter className="w-3.5 h-3.5 inline mr-1.5" />
+          Listas y Segmentos
+        </button>
+      </div>
+
+      {subView === 'lists' ? (
+        <ListsManager clientId={clientId} />
+      ) : (
+      <>
       {/* Stats cards */}
       <div className="grid grid-cols-3 gap-4">
         <Card>
@@ -310,6 +342,8 @@ export function SubscribersList({ clientId }: SubscribersListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </div>
   );
 }

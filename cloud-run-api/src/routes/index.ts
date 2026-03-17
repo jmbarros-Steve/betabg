@@ -156,6 +156,7 @@ import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-a
 import { smartSendTime } from './email/smart-send-time.js';
 import { emailSendQueue } from './email/send-queue.js';
 import { emailListCleanup } from './email/list-cleanup.js';
+import { manageEmailLists } from './email/manage-email-lists.js';
 
 /**
  * Registers all API routes on the Hono app.
@@ -275,6 +276,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/manage-email-campaigns', authMiddleware, manageEmailCampaigns);
   app.post('/api/manage-email-flows', authMiddleware, manageEmailFlows);
   app.post('/api/query-email-subscribers', authMiddleware, queryEmailSubscribers);
+  app.post('/api/manage-email-lists', authMiddleware, manageEmailLists);
   app.post('/api/verify-email-domain', authMiddleware, verifyEmailDomain);
   app.post('/api/email-campaign-analytics', authMiddleware, emailCampaignAnalytics);
   app.post('/api/generate-steve-mail-content', authMiddleware, generateSteveMailContent);
