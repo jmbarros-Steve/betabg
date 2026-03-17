@@ -50,7 +50,8 @@ export async function generateImage(c: Context) {
 
   // Helper to refund credits on generation failure
   const refundCredits = async () => {
-    await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -2 }).catch(() => {});
+    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -2 });
+    if (refundErr) console.error('[generate-image] Credit refund failed:', refundErr);
   };
 
   // Auto-fetch client reference photos if none provided

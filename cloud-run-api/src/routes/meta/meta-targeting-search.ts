@@ -96,6 +96,11 @@ export async function metaTargetingSearch(c: Context) {
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${decryptedToken}` },
       });
+      if (!response.ok) {
+        const errData: any = await response.json().catch(() => ({}));
+        console.error('[meta-targeting-search] interests error:', response.status, errData);
+        return c.json({ error: errData?.error?.message || 'Meta API error', results: [] }, 502);
+      }
       const data: any = await response.json();
 
       if (data?.data) {
@@ -125,6 +130,11 @@ export async function metaTargetingSearch(c: Context) {
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${decryptedToken}` },
       });
+      if (!response.ok) {
+        const errData: any = await response.json().catch(() => ({}));
+        console.error('[meta-targeting-search] locations error:', response.status, errData);
+        return c.json({ error: errData?.error?.message || 'Meta API error', results: [] }, 502);
+      }
       const data: any = await response.json();
 
       if (data?.data) {
