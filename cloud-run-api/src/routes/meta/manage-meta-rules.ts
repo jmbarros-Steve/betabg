@@ -400,19 +400,26 @@ export async function manageMetaRules(c: Context) {
       let totalExecuted = 0;
       const results: any[] = [];
 
+      // Pre-fetch all metrics for this connection (avoid N+1 queries per rule)
+      const metricsCache = new Map<string, any[]>();
+
       for (const rule of activeRules) {
         const condition = rule.condition as any;
         const { since, until } = getDateRangeForWindow(condition.timeWindow);
+        const cacheKey = `${since}_${until}`;
 
-        // Fetch campaign metrics for the time window
-        const { data: metrics, error: metricsError } = await supabase
-          .from('campaign_metrics')
-          .select('*')
-          .eq('connection_id', connection_id)
-          .gte('metric_date', since)
-          .lte('metric_date', until);
-
-        if (metricsError || !metrics?.length) continue;
+        let metrics = metricsCache.get(cacheKey);
+        if (!metrics) {
+          const { data: fetched, error: metricsError } = await supabase
+            .from('campaign_metrics')
+            .select('*')
+            .eq('connection_id', connection_id)
+            .gte('metric_date', since)
+            .lte('metric_date', until);
+          if (metricsError || !fetched?.length) continue;
+          metrics = fetched;
+          metricsCache.set(cacheKey, metrics);
+        }
 
         // Group metrics by campaign
         const campaignGroups = new Map<string, { name: string; rows: any[] }>();
@@ -440,11 +447,13 @@ export async function manageMetaRules(c: Context) {
         }
 
         // Evaluate and execute for each campaign
+        let ruleTriggered = false;
         for (const campaignId of campaignIds) {
           const group = campaignGroups.get(campaignId)!;
           const metricValue = aggregateMetric(group.rows, condition.metric);
 
           if (evaluateCondition(metricValue, condition.operator, condition.value, condition.valueTo)) {
+            ruleTriggered = true;
             const execResult = await executeRuleAction(
               rule, campaignId, group.name, metricValue,
               decryptedToken, accountId, supabase
@@ -467,14 +476,16 @@ export async function manageMetaRules(c: Context) {
           }
         }
 
-        // Update rule metadata
-        await supabase
-          .from('meta_automated_rules')
-          .update({
-            last_triggered_at: new Date().toISOString(),
-            trigger_count: (rule.trigger_count || 0) + 1,
-          })
-          .eq('id', rule.id);
+        // Only update trigger metadata when the rule actually fired
+        if (ruleTriggered) {
+          await supabase
+            .from('meta_automated_rules')
+            .update({
+              last_triggered_at: new Date().toISOString(),
+              trigger_count: (rule.trigger_count || 0) + 1,
+            })
+            .eq('id', rule.id);
+        }
       }
 
       return c.json({ success: true, executed: totalExecuted, results });
