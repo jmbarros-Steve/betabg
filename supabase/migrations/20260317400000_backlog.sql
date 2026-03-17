@@ -39,5 +39,7 @@ INSERT INTO backlog (title, description, priority, type, assigned_squad, source,
   ('Mejorar prompts de Steve para respuestas más cortas', 'Steve a veces da respuestas de 500+ palabras cuando el merchant pregunta algo simple. Ajustar system prompt.', 'media', 'mejora', 'producto', 'manual', '{"steve-ai","ux"}'),
   ('Dashboard mobile: ajustar KPI cards a 1 columna', 'En móvil las KPI cards se ven apretadas en 2 columnas. Cambiar a 1 columna bajo 640px.', 'baja', 'mejora', 'producto', 'manual', '{"frontend","mobile"}'),
   ('Agregar rate limiter a endpoints públicos', 'Los endpoints públicos (signup forms, tracking) no tienen rate limit. Agregar middleware.', 'alta', 'seguridad', 'infra', 'manual', '{"security","api"}'),
-  ('Limpiar creative_history sin métricas después de 90 días', 'creative_history crece sin límite. Agregar cleanup cron para entries > 90 días sin measured_at.', 'baja', 'mejora', 'infra', 'manual', '{"database","maintenance"}')
+  ('Limpiar creative_history sin métricas después de 90 días', 'creative_history crece sin límite. Agregar cleanup cron para entries > 90 días sin measured_at.', 'baja', 'mejora', 'infra', 'manual', '{"database","maintenance"}'),
+  ('Error toast global para respuestas 502/500', 'Cuando el backend devuelve 502 o 500 el usuario no ve nada. Agregar toast de error con retry en el interceptor de fetch.', 'alta', 'mejora', 'producto', 'manual', '{"frontend","ux"}'),
+  ('Notificación de campañas Meta con gasto sin conversiones', 'Alertar cuando una campaña lleva >$50.000 CLP de spend sin ninguna conversión en 48hrs. Crear task automática para pausar.', 'media', 'feature', 'marketing', 'manual', '{"meta","alerts"}')
 ON CONFLICT DO NOTHING;
