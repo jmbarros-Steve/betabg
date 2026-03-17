@@ -80,6 +80,7 @@ import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 
 // Cron
 import { syncAllMetrics } from './cron/sync-all-metrics.js';
+import { apiChangelogWatcher } from './cron/api-changelog-watcher.js';
 
 // Phase 4: Auth
 import { selfSignup } from './auth/self-signup.js';
@@ -282,4 +283,5 @@ export function registerRoutes(app: Hono) {
   // Cron / Scheduled Jobs
   // ============================================================
   app.post('/api/cron/sync-all-metrics', syncAllMetrics); // No JWT — uses X-Cron-Secret
+  app.post('/api/cron/api-changelog-watcher', apiChangelogWatcher); // No JWT — uses X-Cron-Secret, daily 7am
 }
