@@ -86,6 +86,9 @@ import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 import { syncAllMetrics } from './cron/sync-all-metrics.js';
 import { errorBudgetCalculator } from './cron/error-budget-calculator.js';
 import { reconciliation } from './cron/reconciliation.js';
+import { ruleCalibrator } from './cron/rule-calibrator.js';
+import { autoRuleGenerator } from './cron/auto-rule-generator.js';
+import { weeklyReport } from './cron/weekly-report.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -300,4 +303,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/error-budget-calculator', errorBudgetCalculator); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
   app.post('/api/cron/reconciliation', reconciliation); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
   app.post('/api/cron/competitor-spy', competitorSpy); // No JWT — uses X-Cron-Secret, weekly: 0 6 * * 1 (Mon 6am Chile)
+  app.post('/api/cron/rule-calibrator', ruleCalibrator); // No JWT — uses X-Cron-Secret, weekly: 0 3 * * 0 (Sun 3am)
+  app.post('/api/cron/auto-rule-generator', autoRuleGenerator); // No JWT — uses X-Cron-Secret, on-demand from qa_log
+  app.post('/api/cron/weekly-report', weeklyReport); // No JWT — uses X-Cron-Secret, weekly: 0 8 * * 5 (Fri 8am)
 }
