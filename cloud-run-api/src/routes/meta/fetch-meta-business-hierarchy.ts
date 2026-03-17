@@ -256,7 +256,7 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
           const accs = await metaGetAll('/me/adaccounts', token, { fields: 'id' });
           const allPixels: PixelInfo[] = [];
           for (const acc of accs.slice(0, 5)) {
-            const px = await metaGetAll(`/${acc.id}/adspixels`, token, { fields: 'id,name' }).catch(() => []);
+            const px = await metaGetAll(`/${acc.id}/adspixels`, token, { fields: 'id,name' }).catch(e => { console.warn(`[hierarchy] Pixel fetch failed for ${acc.id}:`, e.message); return []; });
             allPixels.push(...px);
           }
           // Deduplicate by id
@@ -308,7 +308,7 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       // Also try to fetch pages the user manages (some pages may not be "owned" but "assigned")
       const clientPages = await metaGetAll(`/${biz.id}/client_pages`, token, {
         fields: 'id,name,category,instagram_business_account{id,name,username}',
-      }).catch(() => []);
+      }).catch(e => { console.warn(`[hierarchy] Client pages fetch failed for ${biz.id}:`, e.message); return []; });
 
       // Merge pages (deduplicate)
       const pageMap = new Map<string, PageInfo>();
