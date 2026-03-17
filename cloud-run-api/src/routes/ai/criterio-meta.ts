@@ -331,6 +331,39 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
     });
   }
 
+  // 8. Create task if rejected
+  if (!evalResult.can_publish) {
+    const failedSummary = (evalResult.failed_rules || [])
+      .slice(0, 10)
+      .map((r) => `• [${r.severity}] ${r.rule_id}: ${r.details || 'Failed'}`)
+      .join('\n');
+
+    await supabase.from('tasks').insert({
+      shop_id: shopId,
+      title: `CRITERIO rechazó Meta campaign: score ${evalResult.score}%`,
+      description: [
+        `Copy: "${(campaignData.primary_text || '').substring(0, 80)}..."`,
+        `Score: ${evalResult.score}% | Blockers: ${evalResult.blockers} | Failed: ${evalResult.failed}`,
+        '',
+        'Reglas fallidas:',
+        failedSummary || '(sin detalle)',
+      ].join('\n'),
+      priority: evalResult.blockers > 0 ? 'critical' : 'high',
+      type: 'fix',
+      source: 'criterio',
+      assigned_squad: 'meta',
+      spec: {
+        entity_type: 'meta_campaign',
+        entity_id: campaignData.id || null,
+        score: evalResult.score,
+        blockers: evalResult.blockers,
+        failed_rules: evalResult.failed_rules,
+      },
+    }).then(({ error }) => {
+      if (error) console.error('[criterio-meta] Failed to create task:', error.message);
+    });
+  }
+
   console.log(`[criterio-meta] Score: ${evalResult.score}%, can_publish: ${evalResult.can_publish}, failed: ${evalResult.failed}`);
   return evalResult;
 }

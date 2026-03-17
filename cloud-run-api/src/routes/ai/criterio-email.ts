@@ -264,6 +264,39 @@ async function criterioEmailEvaluate(emailData: EmailData, shopId: string): Prom
     });
   }
 
+  // 6. Create task if rejected
+  if (!evalResponse.can_publish) {
+    const failedSummary = (evalResponse.failed_rules || [])
+      .slice(0, 10)
+      .map((r: any) => `• [${r.severity}] ${r.rule_id}: ${r.details || r.actual_value || 'Failed'}`)
+      .join('\n');
+
+    await supabase.from('tasks').insert({
+      shop_id: shopId,
+      title: `CRITERIO rechazó email: score ${evalResponse.score ?? 0}%`,
+      description: [
+        `Subject: "${emailData.subject || '(sin subject)'}"`,
+        `Score: ${evalResponse.score ?? 0}% | Blockers: ${evalResponse.blockers ?? 0} | Failed: ${evalResponse.failed ?? 0}`,
+        '',
+        'Reglas fallidas:',
+        failedSummary || '(sin detalle)',
+      ].join('\n'),
+      priority: (evalResponse.blockers ?? 0) > 0 ? 'critical' : 'high',
+      type: 'fix',
+      source: 'criterio',
+      assigned_squad: 'email',
+      spec: {
+        entity_type: 'email_campaign',
+        entity_id: emailData.id || null,
+        score: evalResponse.score,
+        blockers: evalResponse.blockers,
+        failed_rules: evalResponse.failed_rules,
+      },
+    }).then(({ error }) => {
+      if (error) console.error('[criterio-email] Failed to create task:', error.message);
+    });
+  }
+
   return evalResponse;
 }
 
