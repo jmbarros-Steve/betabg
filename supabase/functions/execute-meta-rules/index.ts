@@ -29,7 +29,12 @@ async function metaApiRequest(
   }
 
   const response = await fetch(url.toString(), fetchOptions);
-  const responseData = await response.json();
+  let responseData: any;
+  try {
+    responseData = await response.json();
+  } catch {
+    return { ok: false, error: `Meta API non-JSON response (${response.status})` };
+  }
 
   if (!response.ok) {
     const errorMessage = responseData?.error?.message || 'Unknown Meta API error';

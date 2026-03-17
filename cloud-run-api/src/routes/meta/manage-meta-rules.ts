@@ -263,7 +263,7 @@ export async function manageMetaRules(c: Context) {
         .order('executed_at', { ascending: false })
         .limit(50);
 
-      return c.json({ rules: rules || [], logs: logs || [] });
+      return c.json({ success: true, rules: rules || [], logs: logs || [] });
     }
 
     // --- CREATE ---
