@@ -128,6 +128,12 @@ Cada vez que se haga `gcloud run deploy steve-api`, verificar que estas env vars
 - `GEMINI_API_KEY`
 - `SENTRY_DSN`
 
+### Pendiente: Twilio (WhatsApp)
+Cuando lleguen las credenciales, agregar a Cloud Run:
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_PHONE_NUMBER`
+
 Si alguna falta después del deploy, correr:
 ```bash
 gcloud run services update steve-api --region us-central1 --project steveapp-agency \

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,11 +32,12 @@ import { CommandPalette } from '@/components/client-portal/CommandPalette';
 import { BottomNav } from '@/components/client-portal/BottomNav';
 import { OfflineBanner } from '@/components/client-portal/OfflineBanner';
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
+import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'google' | 'klaviyo' | 'email' | 'config';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits';
 interface ClientInfo {
   id: string;
   name: string;
@@ -275,6 +276,7 @@ export default function ClientPortal() {
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
     { id: 'email', label: 'Steve Mail', icon: MailCheck },
+    { id: 'wa_credits', label: 'WhatsApp', icon: MessageSquare },
   ] as const;
 
   const tabs = [...primaryTabs, ...secondaryTabs] as const;
@@ -482,6 +484,15 @@ export default function ClientPortal() {
             <div className={activeTab !== 'config' ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Configuración">
                 <FinancialConfigPanel clientId={effectiveClientId} />
+              </TabErrorBoundary>
+            </div>
+          )}
+          {visitedTabs.has('wa_credits') && effectiveClientId && (
+            <div className={activeTab !== 'wa_credits' ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="WhatsApp">
+                <div className="max-w-5xl mx-auto">
+                  <WhatsAppHub clientId={effectiveClientId} />
+                </div>
               </TabErrorBoundary>
             </div>
           )}
