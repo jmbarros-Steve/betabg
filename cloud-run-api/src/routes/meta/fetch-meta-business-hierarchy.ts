@@ -299,29 +299,37 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
     for (const biz of businesses) {
       console.log(`Fetching assets for business: ${biz.name} (${biz.id})`);
 
-      // Fetch in parallel
-      const [adAccounts, pages, pixels] = await Promise.all([
+      // Fetch in parallel — owned assets + client (agency-managed) assets
+      const [ownedAdAccounts, clientAdAccounts, ownedPages, clientPages, pixels] = await Promise.all([
         metaGetAll(`/${biz.id}/owned_ad_accounts`, token, {
           fields: 'id,account_id,name,account_status,currency,timezone_name',
         }),
+        metaGetAll(`/${biz.id}/client_ad_accounts`, token, {
+          fields: 'id,account_id,name,account_status,currency,timezone_name',
+        }).catch(e => { console.warn(`[hierarchy] Client ad accounts fetch failed for ${biz.id}:`, e.message); return []; }),
         metaGetAll(`/${biz.id}/owned_pages`, token, {
           fields: 'id,name,category,instagram_business_account{id,name,username}',
         }),
+        metaGetAll(`/${biz.id}/client_pages`, token, {
+          fields: 'id,name,category,instagram_business_account{id,name,username}',
+        }).catch(e => { console.warn(`[hierarchy] Client pages fetch failed for ${biz.id}:`, e.message); return []; }),
         metaGetAll(`/${biz.id}/owned_pixels`, token, {
           fields: 'id,name',
         }),
       ]);
 
-      console.log(`  Ad accounts: ${adAccounts.length}, Pages: ${pages.length}, Pixels: ${pixels.length}`);
+      // Merge ad accounts (deduplicate by account_id)
+      const adAccountMap = new Map<string, AdAccount>();
+      for (const acc of [...ownedAdAccounts, ...clientAdAccounts]) {
+        if (!adAccountMap.has(acc.account_id)) adAccountMap.set(acc.account_id, acc);
+      }
+      const adAccounts = Array.from(adAccountMap.values());
 
-      // Also try to fetch pages the user manages (some pages may not be "owned" but "assigned")
-      const clientPages = await metaGetAll(`/${biz.id}/client_pages`, token, {
-        fields: 'id,name,category,instagram_business_account{id,name,username}',
-      }).catch(e => { console.warn(`[hierarchy] Client pages fetch failed for ${biz.id}:`, e.message); return []; });
+      console.log(`  Ad accounts: ${adAccounts.length} (${ownedAdAccounts.length} owned + ${clientAdAccounts.length} client), Pages: ${ownedPages.length}+${clientPages.length}, Pixels: ${pixels.length}`);
 
       // Merge pages (deduplicate)
       const pageMap = new Map<string, PageInfo>();
-      for (const p of [...pages, ...clientPages]) {
+      for (const p of [...ownedPages, ...clientPages]) {
         if (!pageMap.has(p.id)) pageMap.set(p.id, p);
       }
       const allPages = Array.from(pageMap.values());
