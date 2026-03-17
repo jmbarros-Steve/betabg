@@ -102,3 +102,163 @@ jobs:
           echo "| Slow (>3s) | ${{ steps.health.outputs.slow }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+  smoke-qa:
+    needs: health-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      SITE_URL: https://www.steve.cl
+      SUPABASE_URL: https://zpswjccsxjtnhetkkqde.supabase.co
+
+    steps:
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: Smoke test — Login
+        id: login
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${SUPABASE_URL}/auth/v1/token?grant_type=password" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"patricio.correa@jardindeeva.cl","password":"Jardin2026"}')
+
+          if [ "$STATUS" = "200" ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Login OK (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Login FAILED (HTTP $STATUS)"
+          fi
+
+      - name: Smoke test — Dashboard loads
+        id: dashboard
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/portal")
+          if [ "$STATUS" = "200" ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Dashboard loads (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Dashboard FAILED (HTTP $STATUS)"
+          fi
+
+      - name: Smoke test — Estrategia chat endpoint
+        id: estrategia
+        run: |
+          # Get auth token
+          TOKEN=$(curl -s \
+            "${SUPABASE_URL}/auth/v1/token?grant_type=password" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"patricio.correa@jardindeeva.cl","password":"Jardin2026"}' \
+            | jq -r '.access_token // empty')
+
+          if [ -z "$TOKEN" ]; then
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Estrategia: Could not get auth token"
+            exit 0
+          fi
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "https://steve-api-850416724643.us-central1.run.app/api/steve-chat" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"message":"test","shopId":"9432e754-ad5a-4115-904c-d048de1d0e1e"}')
+
+          if [ "$STATUS" = "200" ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Estrategia chat OK (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Estrategia chat FAILED (HTTP $STATUS)"
+          fi
+
+      - name: Smoke test — Steve Mail editor loads
+        id: stevemail
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL/portal")
+          # Check that the Steve Mail JS bundle is served
+          BUNDLE=$(curl -s "$SITE_URL/portal" | grep -c "assets/index" || true)
+          if [ "$STATUS" = "200" ] && [ "$BUNDLE" -gt 0 ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Steve Mail editor loads (bundle present)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Steve Mail editor FAILED (HTTP $STATUS, bundle=$BUNDLE)"
+          fi
+
+      - name: Count failures and create task
+        id: results
+        run: |
+          FAILURES=0
+          FAILED_TESTS=""
+
+          if [ "${{ steps.login.outputs.result }}" = "fail" ]; then
+            FAILURES=$((FAILURES + 1))
+            FAILED_TESTS="${FAILED_TESTS}Login, "
+          fi
+          if [ "${{ steps.dashboard.outputs.result }}" = "fail" ]; then
+            FAILURES=$((FAILURES + 1))
+            FAILED_TESTS="${FAILED_TESTS}Dashboard, "
+          fi
+          if [ "${{ steps.estrategia.outputs.result }}" = "fail" ]; then
+            FAILURES=$((FAILURES + 1))
+            FAILED_TESTS="${FAILED_TESTS}Estrategia chat, "
+          fi
+          if [ "${{ steps.stevemail.outputs.result }}" = "fail" ]; then
+            FAILURES=$((FAILURES + 1))
+            FAILED_TESTS="${FAILED_TESTS}Steve Mail, "
+          fi
+
+          FAILED_TESTS=$(echo "$FAILED_TESTS" | sed 's/, $//')
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+          echo "📊 Smoke QA: $((4 - FAILURES))/4 passed, $FAILURES failed"
+
+          if [ "$FAILURES" -gt 0 ]; then
+            echo "🚨 Failed: $FAILED_TESTS"
+
+            curl -s -X POST \
+              "${SUPABASE_URL}/rest/v1/tasks" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              -d "$(jq -n \
+                --arg title "QA: Smoke test — ${FAILURES} checks fallaron post-deploy" \
+                --arg desc "Commit: ${{ github.sha }}\nFailed: ${FAILED_TESTS}\n\nTriggered by push to main." \
+                '{
+                  title: $title,
+                  description: $desc,
+                  priority: "alta",
+                  type: "bug",
+                  source: "ojos",
+                  assigned_squad: "producto",
+                  status: "pending"
+                }')"
+
+            echo "✅ Task created in Supabase"
+          fi
+
+      - name: Fail if smoke tests failed
+        if: steps.results.outputs.failures != '0'
+        run: |
+          echo "❌ ${{ steps.results.outputs.failures }} smoke tests failed: ${{ steps.results.outputs.failed_tests }}"
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Smoke QA Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Login | ${{ steps.login.outputs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dashboard | ${{ steps.dashboard.outputs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Estrategia chat | ${{ steps.estrategia.outputs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Steve Mail | ${{ steps.stevemail.outputs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
