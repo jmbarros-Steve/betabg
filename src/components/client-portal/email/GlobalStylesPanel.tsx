@@ -100,7 +100,7 @@ export function GlobalStylesPanel({ editorRef, clientId }: GlobalStylesPanelProp
   // Auto-apply brand styles once when editor becomes ready and brand is loaded
   useEffect(() => {
     if (!brandLoaded || appliedOnce.current) return;
-    // Small delay to ensure GrapeJS editor is fully initialized
+    // Small delay to ensure editor is fully initialized
     const timer = setTimeout(() => {
       if (editorRef.current?.getEditor?.()) {
         applyStyles();
