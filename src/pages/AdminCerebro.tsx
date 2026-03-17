@@ -85,6 +85,8 @@ export default function AdminCerebro() {
   const [allTasks, setAllTasks] = useState<TaskRow[]>([]);
   const [openErrors, setOpenErrors] = useState<QaLogRow[]>([]);
   const [slos, setSlos] = useState<SloRow[]>([]);
+  const [lastQaScore, setLastQaScore] = useState<number | null>(null);
+  const [lastQaDate, setLastQaDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -113,7 +115,7 @@ export default function AdminCerebro() {
 
   async function fetchAll() {
     setLoading(true);
-    await Promise.all([fetchTasks(), fetchErrors(), fetchSlos()]);
+    await Promise.all([fetchTasks(), fetchErrors(), fetchSlos(), fetchLastQaScore()]);
     setLoading(false);
   }
 
@@ -131,7 +133,7 @@ export default function AdminCerebro() {
       .select('id, check_type, status, details, checked_at')
       .eq('status', 'fail')
       .order('checked_at', { ascending: false })
-      .limit(15);
+      .limit(5);
     setOpenErrors((data || []) as QaLogRow[]);
   }
 
@@ -140,6 +142,35 @@ export default function AdminCerebro() {
       .select('id, name, current_success_rate, error_budget_remaining, status');
     setSlos((data || []) as SloRow[]);
   }
+
+  async function fetchLastQaScore() {
+    const { data } = await supabase.from('qa_log')
+      .select('details, checked_at')
+      .eq('check_type', 'weekly_report')
+      .order('checked_at', { ascending: false })
+      .limit(1);
+    if (data && data.length > 0) {
+      const details = data[0].details as any;
+      const score = details?.qa_scorecard?.errors_this_week != null
+        ? Math.max(0, 100 - (details.qa_scorecard.errors_this_week * 5))
+        : null;
+      setLastQaScore(score);
+      setLastQaDate(data[0].checked_at);
+    }
+  }
+
+  // Active agents: squads with in_progress tasks
+  const activeAgents = useMemo(() => {
+    const agentMap: Record<string, number> = {};
+    for (const t of allTasks) {
+      if (t.status === 'in_progress' && t.assigned_squad) {
+        agentMap[t.assigned_squad] = (agentMap[t.assigned_squad] || 0) + 1;
+      }
+    }
+    return Object.entries(agentMap)
+      .map(([squad, count]) => ({ squad, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [allTasks]);
 
   // Filtered tasks
   const filteredTasks = useMemo(() => {
@@ -326,6 +357,44 @@ export default function AdminCerebro() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* QA Score + Active Agents */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className={lastQaScore !== null && lastQaScore < 60 ? 'border-red-300 bg-red-50' : lastQaScore !== null && lastQaScore < 80 ? 'border-yellow-300 bg-yellow-50' : ''}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Último QA Score</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                {lastQaScore !== null ? `${lastQaScore}/100` : 'N/A'}
+              </div>
+              {lastQaDate && (
+                <p className="text-xs text-muted-foreground mt-1">{formatDate(lastQaDate)}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <Activity className="w-4 h-4 text-blue-600" /> Agentes Activos ({activeAgents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activeAgents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin agentes trabajando</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {activeAgents.map((a) => (
+                    <Badge key={a.squad} variant="outline" className="text-sm">
+                      {a.squad} <span className="ml-1 font-bold text-blue-600">{a.count}</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Task counts summary */}
