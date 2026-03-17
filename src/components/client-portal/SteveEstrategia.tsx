@@ -127,6 +127,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }
 
   async function sendMessage(messageText: string) {
+    console.log('[EST] sendMessage called, text:', messageText?.slice(0, 50), 'isLoading:', isLoading);
     if (!messageText.trim() || isLoading) return;
     const userMessage = messageText.trim();
     setInput('');
@@ -137,10 +138,15 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       content: userMessage,
       created_at: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, tempUserMsg]);
+    console.log('[EST] Adding user message to state, id:', tempUserMsg.id);
+    setMessages(prev => {
+      console.log('[EST] setMessages(user): prev.length=', prev.length, '→ new length=', prev.length + 1);
+      return [...prev, tempUserMsg];
+    });
     setIsLoading(true);
 
     try {
+      console.log('[EST] Calling callApi steve-chat, clientId:', clientId, 'convId:', conversationId);
       const { data, error } = await callApi('steve-chat', {
         body: {
           client_id: clientId,
@@ -149,16 +155,19 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
           mode: 'estrategia',
         },
       });
+      console.log('[EST] callApi returned — error:', error, 'data keys:', data ? Object.keys(data) : 'null', 'data.message length:', data?.message?.length);
 
       if (error) throw error;
       if (!data) throw new Error('No data returned from API');
 
       if (data.conversation_id && !conversationId) {
+        console.log('[EST] Setting conversationId:', data.conversation_id);
         setConversationId(data.conversation_id);
       }
 
       // Accept message from response — handle both string and empty cases
       const responseText = data.message || data.text || data.response;
+      console.log('[EST] responseText type:', typeof responseText, 'length:', responseText?.length, 'first 80:', String(responseText || '').slice(0, 80));
       if (responseText) {
         const assistantMsg: Message = {
           id: crypto.randomUUID(),
@@ -166,10 +175,13 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
           content: String(responseText),
           created_at: new Date().toISOString(),
         };
-        setMessages(prev => [...prev, assistantMsg]);
+        console.log('[EST] Adding assistant message to state, id:', assistantMsg.id);
+        setMessages(prev => {
+          console.log('[EST] setMessages(assistant): prev.length=', prev.length, '→ new length=', prev.length + 1);
+          return [...prev, assistantMsg];
+        });
       } else {
-        // Backend returned 200 but no message content — show as error bubble
-        console.warn('[SteveEstrategia] API returned OK but no message:', JSON.stringify(data).slice(0, 300));
+        console.warn('[EST] API returned OK but no message. Full data:', JSON.stringify(data).slice(0, 500));
         const fallbackMsg: Message = {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -179,7 +191,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
         setMessages(prev => [...prev, fallbackMsg]);
       }
     } catch (error: any) {
-      // Show error as assistant message instead of silently removing user message
+      console.error('[EST] CATCH — error:', error, 'type:', typeof error, 'message:', error?.message);
       const errorText = error?.status === 429
         ? '⚠️ Demasiadas solicitudes. Espera un momento e intenta de nuevo.'
         : `⚠️ Error al procesar tu mensaje. Intenta de nuevo. ${typeof error === 'string' ? `(${error.slice(0, 100)})` : ''}`;
@@ -191,6 +203,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
+      console.log('[EST] FINALLY — setting isLoading=false');
       setIsLoading(false);
       inputRef.current?.focus();
     }
@@ -200,6 +213,8 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     e.preventDefault();
     sendMessage(input);
   }
+
+  console.log('[EST] RENDER — messages.length:', messages.length, 'isLoading:', isLoading, 'isInitializing:', isInitializing, 'conversationId:', conversationId);
 
   if (isInitializing) {
     return (
