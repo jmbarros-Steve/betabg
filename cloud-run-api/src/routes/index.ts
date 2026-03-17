@@ -96,6 +96,7 @@ import { fatigueDetector } from './cron/fatigue-detector.js';
 import { performanceEvaluator } from './cron/performance-evaluator.js';
 import { performanceTrackerMeta } from './cron/performance-tracker-meta.js';
 import { taskPrioritizer } from './cron/task-prioritizer.js';
+import { taskCompleted } from './cron/task-completed.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -320,4 +321,5 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/performance-evaluator', performanceEvaluator); // No JWT — uses X-Cron-Secret, daily: 0 10 * * * (10am)
   app.post('/api/cron/performance-tracker-meta', performanceTrackerMeta); // No JWT — uses X-Cron-Secret, daily: 0 8 * * * (8am)
   app.post('/api/cron/task-prioritizer', taskPrioritizer); // No JWT — uses X-Cron-Secret, hourly: 0 */1 * * *
+  app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
 }
