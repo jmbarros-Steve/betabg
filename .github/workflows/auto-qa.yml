@@ -1,0 +1,104 @@
+name: Auto QA — Post-Deploy Health Check
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      SUPABASE_URL: https://zpswjccsxjtnhetkkqde.supabase.co
+      CLOUD_RUN_URL: https://steve-api-850416724643.us-central1.run.app
+
+    steps:
+      - name: Wait for Vercel deploy
+        run: sleep 60
+
+      - name: Call health-check edge function
+        id: health
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "${SUPABASE_URL}/functions/v1/health-check" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "response<<RESEOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "RESEOF" >> $GITHUB_OUTPUT
+
+          # Parse failed count
+          FAILED=$(echo "$BODY" | jq -r '.failed // 0')
+          SLOW=$(echo "$BODY" | jq -r '.slow // 0')
+          TOTAL=$(echo "$BODY" | jq -r '.total // 0')
+          OK_COUNT=$(echo "$BODY" | jq -r '.ok // 0')
+
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "slow=$SLOW" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "ok_count=$OK_COUNT" >> $GITHUB_OUTPUT
+
+          echo "📊 Health check: $OK_COUNT/$TOTAL OK, $FAILED failed, $SLOW slow"
+
+          # Show per-endpoint results
+          echo "$BODY" | jq -r '.endpoints[] | "  \(if .ok then "✅" else "❌" end) \(.name): HTTP \(.status) (\(.time_ms)ms)"' 2>/dev/null || true
+
+      - name: Create task for failed endpoints
+        if: steps.health.outputs.failed != '0' && steps.health.outputs.failed != ''
+        run: |
+          echo "🚨 ${{ steps.health.outputs.failed }} endpoints failed — creating task..."
+
+          # Extract failed endpoint names
+          FAILED_LIST=$(echo '${{ steps.health.outputs.response }}' | \
+            jq -r '[.endpoints[] | select(.ok == false) | .name] | join(", ")' 2>/dev/null || echo "unknown")
+
+          curl -s -X POST \
+            "${SUPABASE_URL}/rest/v1/tasks" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "$(jq -n \
+              --arg title "🚨 Auto-QA: ${{ steps.health.outputs.failed }} endpoints fallaron post-deploy" \
+              --arg desc "Commit: ${{ github.sha }}\nEndpoints caídos: ${FAILED_LIST}\n\nResultado completo del health-check adjunto en spec." \
+              --arg spec "${{ steps.health.outputs.response }}" \
+              '{
+                title: $title,
+                description: $desc,
+                priority: "critical",
+                type: "fix",
+                source: "ojos",
+                assigned_squad: "infra",
+                status: "pending",
+                attempts: 0,
+                spec: ($spec | fromjson? // {raw: $spec})
+              }')"
+
+          echo "✅ Task created in Supabase"
+
+      - name: Fail workflow if endpoints down
+        if: steps.health.outputs.failed != '0' && steps.health.outputs.failed != ''
+        run: |
+          echo "❌ ${{ steps.health.outputs.failed }} critical endpoints failed after deploy"
+          echo '${{ steps.health.outputs.response }}' | jq '.endpoints[] | select(.ok == false)' 2>/dev/null || true
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Auto QA Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total endpoints | ${{ steps.health.outputs.total }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| OK | ${{ steps.health.outputs.ok_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failed | ${{ steps.health.outputs.failed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Slow (>3s) | ${{ steps.health.outputs.slow }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

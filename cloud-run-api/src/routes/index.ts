@@ -89,6 +89,7 @@ import { reconciliation } from './cron/reconciliation.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
+import { competitorSpy } from './triggers/competitor-spy.js';
 
 // Phase 4: Auth
 import { selfSignup } from './auth/self-signup.js';
@@ -298,4 +299,5 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/changelog-watcher', apiChangelogWatcher); // No JWT — uses X-Cron-Secret, daily 0 7 * * *
   app.post('/api/cron/error-budget-calculator', errorBudgetCalculator); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
   app.post('/api/cron/reconciliation', reconciliation); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
+  app.post('/api/cron/competitor-spy', competitorSpy); // No JWT — uses X-Cron-Secret, weekly: 0 6 * * 1 (Mon 6am Chile)
 }
