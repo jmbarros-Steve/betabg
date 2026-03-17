@@ -27,6 +27,7 @@ import ShopifyApp from "./pages/ShopifyApp";
 import ConnectShopify from "./pages/ConnectShopify";
 import GoogleAdsDesignDoc from "./pages/GoogleAdsDesignDoc";
 import AdminCerebro from "./pages/AdminCerebro";
+import AdminSkyvern from "./pages/AdminSkyvern";
 import NotFound from "./pages/NotFound";
 import { Sentry } from "./lib/sentry";
 
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/connect-shopify" element={<ConnectShopify />} />
             <Route path="/google-ads-design-doc" element={<GoogleAdsDesignDoc />} />
             <Route path="/admin/cerebro" element={<AdminCerebro />} />
+            <Route path="/admin/skyvern" element={<AdminSkyvern />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

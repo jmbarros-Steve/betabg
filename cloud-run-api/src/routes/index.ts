@@ -16,6 +16,7 @@ import { generateGoogleCopy } from './utilities/generate-google-copy.js';
 import { generateCampaignRecommendations } from './utilities/generate-campaign-recommendations.js';
 import { processQueueItem } from './utilities/process-queue-item.js';
 import { processTranscription } from './utilities/process-transcription.js';
+import { onboardingBot } from './utilities/onboarding-bot.js';
 
 // Phase 2: AI
 import { steveChat } from './ai/steve-chat.js';
@@ -97,6 +98,7 @@ import { performanceEvaluator } from './cron/performance-evaluator.js';
 import { performanceTrackerMeta } from './cron/performance-tracker-meta.js';
 import { taskPrioritizer } from './cron/task-prioritizer.js';
 import { taskCompleted } from './cron/task-completed.js';
+import { detectiveVisual } from './cron/detective-visual.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -164,6 +166,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/generate-campaign-recommendations', authMiddleware, generateCampaignRecommendations);
   app.post('/api/process-queue-item', authMiddleware, processQueueItem);
   app.post('/api/process-transcription', authMiddleware, processTranscription);
+  app.post('/api/onboarding-bot', authMiddleware, onboardingBot);
 
   // ============================================================
   // Phase 2: AI & Analytics
@@ -322,4 +325,5 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/performance-tracker-meta', performanceTrackerMeta); // No JWT — uses X-Cron-Secret, daily: 0 8 * * * (8am)
   app.post('/api/cron/task-prioritizer', taskPrioritizer); // No JWT — uses X-Cron-Secret, hourly: 0 */1 * * *
   app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
+  app.post('/api/cron/detective-visual', detectiveVisual); // No JWT — uses X-Cron-Secret, every 2h: 0 8,10,12,14,16,18,20 * * *
 }
