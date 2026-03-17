@@ -83,6 +83,10 @@ import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
 import { manageMetaRules } from './meta/manage-meta-rules.js';
 import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 
+// WhatsApp
+import { setupMerchantHandler } from './whatsapp/setup-merchant.js';
+import { waStatusCallback } from './whatsapp/status-callback.js';
+
 // Cron
 import { syncAllMetrics } from './cron/sync-all-metrics.js';
 import { errorBudgetCalculator } from './cron/error-budget-calculator.js';
@@ -100,6 +104,9 @@ import { taskPrioritizer } from './cron/task-prioritizer.js';
 import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
 import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
+
+// WhatsApp
+import { steveWAChat } from './whatsapp/steve-wa-chat.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -306,6 +313,17 @@ export function registerRoutes(app: Hono) {
   app.post('/api/email-smart-send-time', authMiddleware, smartSendTime);
   app.post('/api/email-send-queue', authMiddleware, emailSendQueue);
   app.post('/api/email-list-cleanup', authMiddleware, emailListCleanup);
+
+  // ============================================================
+  // WhatsApp
+  // ============================================================
+  app.post('/api/whatsapp/setup-merchant', authMiddleware, setupMerchantHandler);
+  app.post('/api/whatsapp/status-callback', waStatusCallback); // No JWT — called by Twilio
+
+  // ============================================================
+  // WhatsApp Webhooks (no JWT — Twilio sends form-encoded)
+  // ============================================================
+  app.post('/api/whatsapp/steve-wa-chat', steveWAChat); // Twilio webhook: merchant → Steve
 
   // ============================================================
   // Cron / Scheduled Jobs
