@@ -158,13 +158,17 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
         setMessages(prev => [...prev, assistantMsg]);
       }
     } catch (error: any) {
-      // Estrategia message error handled via toast
-      if (error?.status === 429) {
-        toast.error('Demasiadas solicitudes. Espera un momento.');
-      } else {
-        toast.error('Error al enviar mensaje');
-      }
-      setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
+      // Show error as assistant message instead of silently removing user message
+      const errorText = error?.status === 429
+        ? '⚠️ Demasiadas solicitudes. Espera un momento e intenta de nuevo.'
+        : `⚠️ Error al procesar tu mensaje. Intenta de nuevo. ${typeof error === 'string' ? `(${error.slice(0, 100)})` : ''}`;
+      const errorMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: errorText,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();

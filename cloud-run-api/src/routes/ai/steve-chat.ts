@@ -743,6 +743,7 @@ export async function steveChat(c: Context) {
   // ESTRATEGIA MODE -- Free-form strategic consulting chat
   // ===================================================================
   if (mode === 'estrategia') {
+   try {
     let estrategiaConvId = conversation_id;
 
     // Create or reuse conversation
@@ -922,8 +923,12 @@ export async function steveChat(c: Context) {
       mensajeLower.includes('email') || mensajeLower.includes('ads');
     let creativeHistoryCtx = '';
     if (wantsCreative) {
-      const channel = mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' : 'meta';
-      creativeHistoryCtx = await getCreativeContext(client_id, channel);
+      try {
+        const channel = mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' : 'meta';
+        creativeHistoryCtx = await getCreativeContext(client_id, channel);
+      } catch (ctxErr) {
+        console.error('[steve-chat] getCreativeContext failed (non-blocking):', ctxErr);
+      }
     }
 
     const estrategiaSystemPrompt = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el consultor estratégico del cliente.
@@ -1005,6 +1010,13 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       conversation_id: estrategiaConvId,
       message: assistantMsg,
     });
+   } catch (estrategiaErr: any) {
+    console.error('[steve-chat] Estrategia unhandled error:', estrategiaErr);
+    return c.json({
+      error: 'Error en chat de estrategia',
+      details: estrategiaErr?.message?.slice(0, 200) || 'Unknown error',
+    }, 500);
+   }
   }
 
   // ===================================================================

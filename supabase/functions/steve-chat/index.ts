@@ -820,8 +820,12 @@ Deno.serve(async (req) => {
         mensajeLower.includes('email') || mensajeLower.includes('ads');
       let creativeHistoryCtx = '';
       if (wantsCreative) {
-        const ch = mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' : 'meta';
-        creativeHistoryCtx = await getCreativeContext(supabase, client_id, ch);
+        try {
+          const ch = mensajeLower.includes('email') || mensajeLower.includes('klaviyo') ? 'klaviyo' : 'meta';
+          creativeHistoryCtx = await getCreativeContext(supabase, client_id, ch);
+        } catch (ctxErr) {
+          console.error('[steve-chat] getCreativeContext failed (non-blocking):', ctxErr);
+        }
       }
 
       const estrategiaSystemPrompt = `Eres Steve, un Bulldog Francés con un doctorado en Performance Marketing de la Universidad de Perros de Stanford. Eres el consultor estratégico del cliente.
