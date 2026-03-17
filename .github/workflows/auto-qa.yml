@@ -221,26 +221,45 @@ jobs:
           if [ "$FAILURES" -gt 0 ]; then
             echo "🚨 Failed: $FAILED_TESTS"
 
-            curl -s -X POST \
+            # Build JSON payload first to debug
+            PAYLOAD=$(jq -n \
+              --arg title "QA: Smoke test — ${FAILURES} checks fallaron post-deploy" \
+              --arg desc "Commit: ${{ github.sha }}. Failed: ${FAILED_TESTS}. Triggered by push to main." \
+              --arg sha "${{ github.sha }}" \
+              '{
+                title: $title,
+                description: $desc,
+                priority: "alta",
+                type: "bug",
+                source: "ojos",
+                assigned_squad: "producto",
+                status: "pending",
+                attempts: 0,
+                spec: { commit: $sha, trigger: "auto-qa-smoke" }
+              }')
+
+            echo "📦 Payload: $PAYLOAD"
+
+            TASK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               "${SUPABASE_URL}/rest/v1/tasks" \
               -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
               -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
               -H "Content-Type: application/json" \
-              -H "Prefer: return=minimal" \
-              -d "$(jq -n \
-                --arg title "QA: Smoke test — ${FAILURES} checks fallaron post-deploy" \
-                --arg desc "Commit: ${{ github.sha }}\nFailed: ${FAILED_TESTS}\n\nTriggered by push to main." \
-                '{
-                  title: $title,
-                  description: $desc,
-                  priority: "alta",
-                  type: "bug",
-                  source: "ojos",
-                  assigned_squad: "producto",
-                  status: "pending"
-                }')"
+              -H "Prefer: return=representation" \
+              -d "$PAYLOAD")
 
-            echo "✅ Task created in Supabase"
+            TASK_HTTP=$(echo "$TASK_RESPONSE" | tail -1)
+            TASK_BODY=$(echo "$TASK_RESPONSE" | sed '$d')
+
+            echo "📡 Supabase response: HTTP $TASK_HTTP"
+            echo "$TASK_BODY" | jq '.[0].id // .' 2>/dev/null || echo "$TASK_BODY"
+
+            if [ "$TASK_HTTP" = "201" ]; then
+              echo "✅ Task created in Supabase"
+            else
+              echo "❌ Failed to create task (HTTP $TASK_HTTP)"
+              echo "$TASK_BODY"
+            fi
           fi
 
       - name: Fail if smoke tests failed
