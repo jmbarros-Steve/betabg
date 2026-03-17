@@ -25,16 +25,16 @@ async function metaApiRequest(
     headers: { 'Content-Type': 'application/json' },
   };
 
+  (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+
   if (method === 'GET') {
-        (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
     if (body) {
       for (const [key, value] of Object.entries(body)) {
         url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
     }
   } else {
-    // POST / DELETE - send access_token in body
-    fetchOptions.body = JSON.stringify({ ...body, access_token: accessToken });
+    fetchOptions.body = JSON.stringify(body || {});
   }
 
   const response = await fetch(url.toString(), fetchOptions);

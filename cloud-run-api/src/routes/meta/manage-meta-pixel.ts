@@ -24,7 +24,9 @@ async function metaApiRequest(
     }
   }
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   const responseData: any = await response.json();
 
   if (!response.ok) {
