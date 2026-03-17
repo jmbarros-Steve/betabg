@@ -1,6 +1,29 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+// ---------------------------------------------------------------------------
+// In-memory cache (5 min TTL)
+// ---------------------------------------------------------------------------
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const adAccountsCache = new Map<string, { data: any; ts: number }>();
+
+function getCached(connectionId: string): any | null {
+  const entry = adAccountsCache.get(connectionId);
+  if (entry && Date.now() - entry.ts < CACHE_TTL_MS) {
+    return entry.data;
+  }
+  if (entry) adAccountsCache.delete(connectionId);
+  return null;
+}
+
+function setCache(connectionId: string, data: any): void {
+  adAccountsCache.set(connectionId, { data, ts: Date.now() });
+  if (adAccountsCache.size > 100) {
+    const oldest = adAccountsCache.keys().next().value;
+    if (oldest) adAccountsCache.delete(oldest);
+  }
+}
+
 interface MetaBusiness {
   id: string;
   name: string;
@@ -49,10 +72,19 @@ export async function fetchMetaAdAccounts(c: Context) {
     }
 
     // Get connection_id from request
-    const { connection_id } = await c.req.json();
+    const { connection_id, force_refresh } = await c.req.json();
 
     if (!connection_id) {
       return c.json({ error: 'Missing connection_id' }, 400);
+    }
+
+    // Return cached data if available (< 5 min old)
+    if (!force_refresh) {
+      const cached = getCached(connection_id);
+      if (cached) {
+        console.log(`[ad-accounts] Cache hit for ${connection_id}`);
+        return c.json(cached);
+      }
     }
 
     console.log(`Fetching Meta ad accounts for connection: ${connection_id}`);
@@ -245,13 +277,15 @@ export async function fetchMetaAdAccounts(c: Context) {
       groupedAccounts[groupName].push(acc);
     }
 
-    return c.json({
+    const result = {
       success: true,
       accounts: activeAccounts,
       grouped: groupedAccounts,
       total: activeAccounts.length,
       permissions: grantedPermissions
-    }, 200);
+    };
+    setCache(connection_id, result);
+    return c.json(result, 200);
 
   } catch (error) {
     console.error('Fetch accounts error:', error);

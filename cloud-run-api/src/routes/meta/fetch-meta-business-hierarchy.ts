@@ -5,6 +5,31 @@ const META_API_VERSION = 'v21.0';
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
 // ---------------------------------------------------------------------------
+// In-memory cache (5 min TTL) — avoids hammering Meta Graph API on every
+// dashboard load. Cache is per connection_id.
+// ---------------------------------------------------------------------------
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const hierarchyCache = new Map<string, { data: any; ts: number }>();
+
+function getCached(connectionId: string): any | null {
+  const entry = hierarchyCache.get(connectionId);
+  if (entry && Date.now() - entry.ts < CACHE_TTL_MS) {
+    return entry.data;
+  }
+  if (entry) hierarchyCache.delete(connectionId);
+  return null;
+}
+
+function setCache(connectionId: string, data: any): void {
+  hierarchyCache.set(connectionId, { data, ts: Date.now() });
+  // Evict old entries to prevent memory leak (keep max 100)
+  if (hierarchyCache.size > 100) {
+    const oldest = hierarchyCache.keys().next().value;
+    if (oldest) hierarchyCache.delete(oldest);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -203,9 +228,18 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const { connection_id } = await c.req.json();
+    const { connection_id, force_refresh } = await c.req.json();
     if (!connection_id) {
       return c.json({ error: 'Missing connection_id' }, 400);
+    }
+
+    // Return cached data if available (< 5 min old)
+    if (!force_refresh) {
+      const cached = getCached(connection_id);
+      if (cached) {
+        console.log(`[hierarchy] Cache hit for ${connection_id}`);
+        return c.json(cached);
+      }
     }
 
     // Fetch connection
@@ -282,14 +316,16 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
         directPixels,
       );
 
-      return c.json({
+      const personalResult = {
         success: true,
         businesses: [],
         groups: personalPortfolios.length > 0
           ? [{ business_id: 'personal', business_name: 'Cuenta Personal', portfolios: personalPortfolios }]
           : [],
         all_portfolios: personalPortfolios,
-      });
+      };
+      setCache(connection_id, personalResult);
+      return c.json(personalResult);
     }
 
     // 2. For each business, fetch ad accounts, pages, IG accounts, pixels
@@ -348,12 +384,14 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
 
     console.log(`Total portfolios: ${allPortfolios.length} across ${groups.length} businesses`);
 
-    return c.json({
+    const result = {
       success: true,
       businesses: businesses.map((b: any) => ({ id: b.id, name: b.name })),
       groups,
       all_portfolios: allPortfolios,
-    });
+    };
+    setCache(connection_id, result);
+    return c.json(result);
   } catch (error) {
     console.error('Hierarchy error:', error);
     return c.json(
