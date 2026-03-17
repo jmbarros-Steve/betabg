@@ -53,7 +53,7 @@ export default function AdPreviewMockup({
       {/* Page header */}
       <div className="flex items-center gap-2 px-3 py-2">
         {pageImageUrl ? (
-          <img src={pageImageUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+          <img src={pageImageUrl} alt="Página" className="w-8 h-8 rounded-full object-cover" />
         ) : (
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
             {pageName.slice(0, 2).toUpperCase()}

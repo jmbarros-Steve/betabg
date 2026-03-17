@@ -381,6 +381,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
       toast.success('Anuncio actualizado correctamente');
       setEditingAdId(null);
       setAdEditData(null);
+      fetchCampaigns();
     } catch (err) {
       // Ad update error handled via toast
       toast.error('Error al actualizar anuncio');

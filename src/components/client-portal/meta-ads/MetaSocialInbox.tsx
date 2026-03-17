@@ -270,8 +270,8 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
               page_id: selectedPageId,
               conversation_id: conv.id,
             },
-          }).catch(() => {
-            // Silently ignore — local state is already updated
+          }).catch((err) => {
+            console.warn('[MetaSocialInbox] mark_read failed:', err);
           });
         }
       }

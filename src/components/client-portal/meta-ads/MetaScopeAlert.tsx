@@ -194,7 +194,7 @@ export default function MetaScopeAlert({ clientId, requiredFeature, compact }: M
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {tokenExpired
-                ? 'Tu token ha expirado. Reconecta para seguir usando esta funcion.'
+                ? 'Tu token ha expirado. Reconecta para seguir usando esta función.'
                 : relevantFeature
                   ? `Para usar ${relevantFeature.label}, necesitas los permisos: ${relevantFeature.missingScopes.join(', ')}. Reconecta Meta Ads para obtenerlos.`
                   : 'Algunas funciones necesitan permisos adicionales. Reconecta para activarlas.'}

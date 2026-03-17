@@ -321,7 +321,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
       if (error) throw new Error(typeof error === 'string' ? error : 'Error de sincronización');
       toast.success('Métricas sincronizadas');
       await fetchCampaigns();
-      await fetchAdsetMetrics();
+      // fetchAdsetMetrics auto-triggers via useEffect when selectedCampaignId changes
     } catch (err: any) {
       toast.error(err.message || 'Error al sincronizar');
     } finally {

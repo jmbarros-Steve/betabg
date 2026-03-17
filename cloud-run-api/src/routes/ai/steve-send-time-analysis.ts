@@ -16,7 +16,7 @@ function makePostHeaders(apiKey: string) {
     'Authorization': `Klaviyo-API-Key ${apiKey}`,
     'accept': 'application/json',
     'content-type': 'application/json',
-    'revision': '2025-01-15',
+    'revision': KLAVIYO_REVISION,
   };
 }
 

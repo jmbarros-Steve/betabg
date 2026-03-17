@@ -29,16 +29,16 @@ async function metaApiRequest(
     headers: { 'Content-Type': 'application/json' },
   };
 
+  (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+
   if (method === 'GET') {
-        (fetchOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
     if (body) {
       for (const [key, value] of Object.entries(body)) {
         url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
     }
   } else {
-    // POST / DELETE - send access_token in body
-    fetchOptions.body = JSON.stringify({ ...body, access_token: accessToken });
+    fetchOptions.body = JSON.stringify(body || {});
   }
 
   const response = await fetch(url.toString(), fetchOptions);
@@ -52,7 +52,7 @@ async function metaApiRequest(
     if (!response.ok) {
       return { ok: false, error: `Meta API error (${response.status}): ${responseText.slice(0, 200)}` };
     }
-    return { ok: true, data: {} };
+    return { ok: false, error: `Meta API error (${response.status}): non-JSON response` };
   }
 
   if (!response.ok) {
@@ -784,7 +784,7 @@ async function handleUpdateBudget(
     if (updateResult.ok) {
       updatedAdsets.push(adset.id);
     } else {
-      failedAdsets.push({ id: adset.id, error: updateResult.error || 'Unknown error' });
+      failedAdsets.push({ id: adset.id, error: updateResult.error || `Meta API error updating adset ${adset.id}` });
     }
   }
 

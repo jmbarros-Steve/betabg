@@ -1261,7 +1261,7 @@ function CreativeFocusStep({
                     }`}
                   >
                     {p.image ? (
-                      <img src={p.image} alt="" className="w-14 h-14 rounded object-cover shrink-0" />
+                      <img src={p.image} alt="Producto" className="w-14 h-14 rounded object-cover shrink-0" />
                     ) : (
                       <div className="w-14 h-14 rounded bg-muted flex items-center justify-center shrink-0">
                         <ShoppingBag className="w-5 h-5 text-muted-foreground" />
@@ -1530,7 +1530,7 @@ function AdFormMultiSlot({
               }`}
             >
               {img ? (
-                <img src={img} alt="" className="w-full h-full object-cover" />
+                <img src={img} alt="Vista previa" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted">
                   <ImageIcon className="w-4 h-4 text-muted-foreground" />
@@ -1613,7 +1613,7 @@ function AdFormMultiSlot({
               <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
                 {galleryAssets.map((a) => (
                   <button key={a.id} onClick={() => { setImageAtSlot(a.url); toast.success(`Imagen ${activeImageSlot + 1} seleccionada`); }} className={`aspect-square rounded overflow-hidden border-2 transition-all ${images[activeImageSlot] === a.url ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}`}>
-                    <img src={a.url} alt="" className="w-full h-full object-cover" />
+                    <img src={a.url} alt="Vista previa" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -1789,7 +1789,7 @@ function PreviewPanel({
                 }`}
               >
                 {img ? (
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={img} alt="Vista previa" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
                     <ImageIcon className="w-3 h-3 text-muted-foreground" />

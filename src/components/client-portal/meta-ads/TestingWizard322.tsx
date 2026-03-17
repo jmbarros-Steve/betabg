@@ -493,7 +493,8 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
           toast.success('Copies generados por Steve');
         }
       } catch {
-        setCopies([raw.slice(0, 200), '']);
+        setCopies([raw.slice(0, 125), '']);
+        toast.info('No se pudo parsear la respuesta de IA. Edita manualmente.');
       }
     } catch {
       toast.error('Error generando copies');
@@ -522,7 +523,8 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
           toast.success('Headlines generados por Steve');
         }
       } catch {
-        setHeadlines([raw.slice(0, 80), '']);
+        setHeadlines([raw.slice(0, 40), '']);
+        toast.info('No se pudo parsear la respuesta de IA. Edita manualmente.');
       }
     } catch {
       toast.error('Error generando headlines');
@@ -617,9 +619,9 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
   const canProceed = () => {
     switch (step) {
       case 'config': return true;
-      case 'images': return images.some((i) => i.trim());
-      case 'copies': return copies.some((c) => c.trim());
-      case 'headlines': return headlines.some((h) => h.trim());
+      case 'images': return images.filter((i) => i.trim()).length >= 3;
+      case 'copies': return copies.filter((c) => c.trim()).length >= 2;
+      case 'headlines': return headlines.filter((h) => h.trim()).length >= 2;
       default: return true;
     }
   };
