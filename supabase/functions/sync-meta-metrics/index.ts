@@ -14,15 +14,23 @@ const FALLBACK_RATES: Record<string, number> = {
   GBP: 0.79,
 };
 
+let cachedRates: Record<string, number> | null = null;
+
 async function getExchangeRates(): Promise<Record<string, number>> {
+  if (cachedRates) return cachedRates;
   try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(EXCHANGE_RATE_API_URL, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!response.ok) throw new Error(`API returned ${response.status}`);
     const data = await response.json();
     console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    return data.rates;
+    cachedRates = data.rates;
+    return cachedRates!;
   } catch (error) {
     console.error('Failed to fetch exchange rates, using fallback:', error);
+    cachedRates = FALLBACK_RATES;
     return FALLBACK_RATES;
   }
 }
