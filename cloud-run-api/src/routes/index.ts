@@ -83,6 +83,10 @@ import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 
 // Cron
 import { syncAllMetrics } from './cron/sync-all-metrics.js';
+import { errorBudgetCalculator } from './cron/error-budget-calculator.js';
+
+// Triggers
+import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
 
 // Phase 4: Auth
 import { selfSignup } from './auth/self-signup.js';
@@ -288,4 +292,6 @@ export function registerRoutes(app: Hono) {
   // Cron / Scheduled Jobs
   // ============================================================
   app.post('/api/cron/sync-all-metrics', syncAllMetrics); // No JWT — uses X-Cron-Secret
+  app.post('/api/cron/changelog-watcher', apiChangelogWatcher); // No JWT — uses X-Cron-Secret, daily 0 7 * * *
+  app.post('/api/cron/error-budget-calculator', errorBudgetCalculator); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
 }

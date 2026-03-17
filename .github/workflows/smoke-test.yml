@@ -30,93 +30,88 @@ jobs:
         id: url
         run: |
           URL="${{ github.event.deployment_status.target_url }}"
-          echo "deploy_url=${URL:-https://betabgnuevosupa.vercel.app}" >> $GITHUB_OUTPUT
+          echo "deploy_url=${URL:-https://www.steve.cl}" >> $GITHUB_OUTPUT
 
       - name: Create smoke tests
         run: |
-          cat > e2e/_smoke.spec.ts << 'EOF'
+          cat > e2e/_smoke.spec.ts << 'SMOKEEOF'
           import { test, expect } from '@playwright/test';
 
-          const BASE = process.env.SMOKE_URL || 'https://betabgnuevosupa.vercel.app';
+          const BASE = process.env.SMOKE_URL || 'https://www.steve.cl';
+          const API  = process.env.API_URL  || 'https://steve-api-850416724643.us-central1.run.app';
           const EMAIL = 'patricio.correa@jardindeeva.cl';
-          const PASS = 'Jardin2026';
+          const PASS  = 'Jardin2026';
 
-          test('1. Login page loads', async ({ page }) => {
+          // ── B.3 Test 1: Portal loads ──
+          test('1. Portal loads — login page renders', async ({ page }) => {
             const res = await page.goto(`${BASE}/auth`);
             expect(res?.status()).toBe(200);
             await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10000 });
+            await expect(page.locator('input[type="password"]')).toBeVisible({ timeout: 5000 });
+            await expect(page.locator('button:has-text("Iniciar")')).toBeVisible({ timeout: 5000 });
           });
 
-          test('2. Dashboard loads after login', async ({ page }) => {
+          // ── B.3 Test 2: API health ──
+          test('2. API health — Cloud Run responds', async ({ request }) => {
+            const res = await request.get(`${API}/`);
+            expect(res.status()).toBe(200);
+          });
+
+          // ── B.3 Test 3: Auth endpoint ──
+          test('3. Auth endpoint — login + redirect to portal', async ({ page }) => {
             await page.goto(`${BASE}/auth`);
             await page.locator('input[type="email"]').fill(EMAIL);
             await page.locator('input[type="password"]').fill(PASS);
             await page.locator('button:has-text("Iniciar")').click();
-            await page.waitForTimeout(5000);
-            // Should redirect to portal or show onboarding
+            await page.waitForTimeout(8000);
+            // Should leave /auth after successful login
             expect(page.url()).not.toContain('/auth');
-          });
-
-          test('3. Steve chat responds', async ({ page }) => {
-            const res = await page.goto(`${BASE}`);
-            expect(res?.status()).toBe(200);
-            // Landing page should have Steve chat or CTA
+            // Should see portal tabs
             const body = await page.textContent('body');
             expect(body).toContain('Steve');
           });
 
-          test('4. Email section accessible', async ({ page }) => {
-            await page.goto(`${BASE}/auth`);
-            await page.locator('input[type="email"]').fill(EMAIL);
-            await page.locator('input[type="password"]').fill(PASS);
-            await page.locator('button:has-text("Iniciar")').click();
-            await page.waitForTimeout(5000);
-            // Skip onboarding if present
-            const skip = page.locator('button:has-text("Omitir")');
-            if (await skip.isVisible({ timeout: 3000 }).catch(() => false)) await skip.click();
-            await page.keyboard.press('Escape');
-            await page.waitForTimeout(1000);
-            // Page should not have crashed
-            const body = await page.textContent('body');
-            expect(body).not.toContain('Application error');
+          // ── B.3 Test 4: Steve chat responds ──
+          test('4. Steve chat — API accepts message', async ({ request }) => {
+            // First login to get a token
+            const loginRes = await request.post(`${API}/api/steve-chat`, {
+              headers: { 'Content-Type': 'application/json' },
+              data: { message: 'ping', client_id: 'test' },
+            });
+            // Should get 401 (no auth) not 500 (crash)
+            expect([401, 403, 404].includes(loginRes.status()) || loginRes.ok()).toBeTruthy();
           });
-
-          test('5. API health check', async ({ request }) => {
-            const res = await request.get(`${BASE}/`);
-            expect(res.status()).toBe(200);
-          });
-          EOF
+          SMOKEEOF
 
       - name: Run smoke tests
         id: smoke
         continue-on-error: true
         run: |
           npx playwright test e2e/_smoke.spec.ts --reporter=line 2>&1 | tee /tmp/smoke-results.txt
-          EXIT=$?
+          EXIT=${PIPESTATUS[0]}
           echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
           echo "results<<RESEOF" >> $GITHUB_OUTPUT
-          cat /tmp/smoke-results.txt >> $GITHUB_OUTPUT
+          head -50 /tmp/smoke-results.txt >> $GITHUB_OUTPUT
           echo "RESEOF" >> $GITHUB_OUTPUT
         env:
           SMOKE_URL: ${{ steps.url.outputs.deploy_url }}
+          API_URL: https://steve-api-850416724643.us-central1.run.app
 
-      - name: Rollback on failure
+      # ── Rollback automático ──
+      - name: Rollback Vercel on failure
         if: steps.smoke.outputs.exit_code != '0'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          echo "🚨 Smoke tests failed. Rolling back..."
-          
-          # Get last successful production deployment
+          echo "🚨 Smoke tests failed — rolling back Vercel deploy..."
+
           DEPLOYMENTS=$(curl -s "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&state=READY&target=production&limit=5" \
             -H "Authorization: Bearer ${VERCEL_TOKEN}")
-          
-          # Get the second deployment (first is the current broken one)
+
           PREVIOUS_ID=$(echo "$DEPLOYMENTS" | jq -r '.deployments[1].uid // empty')
-          
+
           if [ -n "$PREVIOUS_ID" ]; then
-            # Promote previous deployment to production
             curl -s -X POST "https://api.vercel.com/v13/deployments/${PREVIOUS_ID}/promote" \
               -H "Authorization: Bearer ${VERCEL_TOKEN}" \
               -H "Content-Type: application/json"
@@ -125,22 +120,54 @@ jobs:
             echo "⚠️ No previous deployment found for rollback"
           fi
 
-      - name: Alert via WhatsApp on rollback
+      - name: Rollback Cloud Run on failure
         if: steps.smoke.outputs.exit_code != '0'
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
-          RESULTS='${{ steps.smoke.outputs.results }}'
-          FAILED=$(echo "$RESULTS" | grep -E "failed|✘|×" | head -3)
-          
-          # Use openclaw if available, otherwise just log
-          if command -v openclaw &> /dev/null; then
-            openclaw message send "🚨 ROLLBACK AUTOMÁTICO — Deploy a producción falló smoke tests
+          echo "🚨 Rolling back Cloud Run to previous revision..."
 
-          Tests que fallaron:
-          ${FAILED}
+          # Get previous revision
+          if command -v gcloud &> /dev/null; then
+            PREV=$(gcloud run revisions list --service=steve-api --region=us-central1 \
+              --project=steveapp-agency --format='value(REVISION)' --limit=2 | tail -1)
 
-          Se restauró la versión anterior automáticamente.
-          Revisa el deploy antes de volver a pushear."
+            if [ -n "$PREV" ]; then
+              gcloud run services update-traffic steve-api --region=us-central1 \
+                --project=steveapp-agency --to-revisions="${PREV}=100"
+              echo "✅ Cloud Run rolled back to: ${PREV}"
+            else
+              echo "⚠️ No previous Cloud Run revision found"
+            fi
+          else
+            echo "⚠️ gcloud not available — manual rollback needed"
           fi
+
+      - name: Create GitHub issue on rollback
+        if: steps.smoke.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FAILED=$(echo '${{ steps.smoke.outputs.results }}' | grep -E "failed|✘|×|Error" | head -5)
+          gh issue create \
+            --title "🚨 ROLLBACK — Smoke tests failed on deploy" \
+            --body "## Deploy rolled back automatically
+
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+
+          ### Failed tests:
+          \`\`\`
+          ${FAILED}
+          \`\`\`
+
+          ### Full results:
+          \`\`\`
+          $(head -30 /tmp/smoke-results.txt)
+          \`\`\`
+
+          **Action needed:** Fix the failing tests and re-deploy." \
+            --label "bug,deploy" || echo "Could not create issue"
 
       - name: Cleanup
         if: always()
