@@ -110,6 +110,8 @@ import { steveWAChat } from './whatsapp/steve-wa-chat.js';
 import { merchantWAWebhook } from './whatsapp/merchant-wa.js';
 import { waSendMessage } from './whatsapp/send-message.js';
 import { waSendCampaign } from './whatsapp/send-campaign.js';
+import { shopifyCheckoutWebhook } from './whatsapp/shopify-checkout-webhook.js';
+import { abandonedCartWA } from './whatsapp/abandoned-cart-wa.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -330,6 +332,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/whatsapp/merchant-wa/:clientId', merchantWAWebhook); // Twilio webhook: customer → merchant store
   app.post('/api/whatsapp/send-message', authMiddleware, waSendMessage); // Portal: merchant sends manual reply
   app.post('/api/whatsapp/send-campaign', authMiddleware, waSendCampaign); // Portal: send bulk WA campaign
+  app.post('/api/whatsapp/shopify-checkout-webhook', shopifyCheckoutWebhook); // No JWT — Shopify HMAC
+  app.post('/api/cron/abandoned-cart-wa', abandonedCartWA); // No JWT — X-Cron-Secret, hourly: 0 * * * *
 
   // ============================================================
   // Cron / Scheduled Jobs
