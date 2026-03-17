@@ -93,3 +93,72 @@ cd ~/skyvern && sudo docker compose down
 # Iniciar todo
 cd ~/skyvern && sudo docker compose up -d
 ```
+
+---
+
+## WhatsApp — Carrito Abandonado (Flujo Completo)
+
+Flujo automático: cliente abandona carrito en Shopify → 1hr después recibe WhatsApp recordatorio vía el número del merchant.
+
+### Arquitectura
+
+```
+Shopify (checkouts/create webhook)
+  │
+  ▼
+POST /api/whatsapp/shopify-checkout-webhook
+  │  Identifica merchant por shop_domain
+  │  Extrae teléfono, productos, URL del carrito
+  │  Guarda en shopify_abandoned_checkouts
+  │
+  ▼
+Cron cada hora: POST /api/cron/abandoned-cart-wa
+  │  Busca checkouts 1-24hrs old, no completados, no recordados
+  │  Para cada uno:
+  │    ├─ ¿Merchant tiene wa_automations.trigger_type='abandoned_cart' activa? → sino skip
+  │    ├─ ¿Merchant tiene wa_credits.balance >= 1? → sino skip
+  │    ├─ ¿Merchant tiene wa_twilio_accounts activa? → sino skip
+  │    │
+  │    ▼
+  │  Construye mensaje desde template:
+  │    {{customer_name}}, {{product_name}}, {{total_price}}, {{cart_url}}, {{store_name}}
+  │    │
+  │    ▼
+  │  Envía vía Twilio sub-account del merchant
+  │    whatsapp:{merchant_number} → whatsapp:{customer_phone}
+  │    │
+  │    ▼
+  │  Descuenta 1 crédito (wa_credits) + registra transacción (wa_credit_transactions)
+  │  Guarda en wa_messages (channel='merchant_wa', template='abandoned_cart')
+  │  Marca checkout como wa_reminder_sent=true
+  │
+  ▼
+Cliente recibe WhatsApp con link al carrito
+  Si compra → Shopify orders/create webhook marca order_completed=true
+```
+
+### Tablas involucradas
+
+| Tabla | Rol |
+|-------|-----|
+| `shopify_abandoned_checkouts` | Almacena checkouts pendientes con teléfono, productos, URL |
+| `wa_automations` | Config del merchant: template, trigger_type, is_active |
+| `wa_credits` | Balance de créditos WA del merchant |
+| `wa_credit_transactions` | Historial de consumo de créditos |
+| `wa_twilio_accounts` | Sub-account Twilio del merchant (SID, token, número) |
+| `wa_messages` | Historial de todos los mensajes WA enviados |
+
+### Archivos
+
+| Archivo | Función |
+|---------|---------|
+| `cloud-run-api/src/routes/whatsapp/shopify-checkout-webhook.ts` | Webhook receptor de Shopify |
+| `cloud-run-api/src/routes/whatsapp/abandoned-cart-wa.ts` | Cron horario que envía recordatorios |
+| `supabase/migrations/20260317800000_shopify_abandoned_checkouts.sql` | Tabla + índice |
+
+### Configuración requerida
+
+1. **Shopify**: configurar webhook `checkouts/create` → `https://steve-api-850416724643.us-central1.run.app/api/whatsapp/shopify-checkout-webhook`
+2. **Cloud Scheduler**: cron `0 * * * *` → `POST /api/cron/abandoned-cart-wa` con header `X-Cron-Secret`
+3. **Merchant**: crear automation en portal WA con trigger `abandoned_cart` y template personalizado
+4. **Créditos**: merchant debe tener balance > 0 en `wa_credits`
