@@ -27,9 +27,12 @@ const app = new Hono();
 app.use('*', corsMiddleware);
 app.onError(errorHandler);
 
-// Health check
+// Health check (both / and /health for compatibility)
+app.get('/', (c) =>
+  c.json({ status: 'ok', service: 'steve-api', timestamp: new Date().toISOString() })
+);
 app.get('/health', (c) =>
-  c.json({ status: 'ok', version: '2026-03-10-diag', timestamp: new Date().toISOString() })
+  c.json({ status: 'ok', service: 'steve-api', timestamp: new Date().toISOString() })
 );
 
 // Register all API routes
