@@ -20,12 +20,28 @@ export function WASetup({ clientId, onSetupComplete }: Props) {
 
     try {
       // Call backend to create Twilio sub-account + buy number
+      // Get business name from supabase
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: clientInfo } = await supabase
+        .from('clients')
+        .select('name, company')
+        .eq('id', clientId)
+        .single();
+
+      const businessName = clientInfo?.company || clientInfo?.name || 'Mi Tienda';
+
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token || '';
+
       const response = await fetch(
-        `${import.meta.env.VITE_CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/whatsapp/setup`,
+        `${import.meta.env.VITE_CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/whatsapp/setup-merchant`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ client_id: clientId }),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action: 'provision', client_id: clientId, business_name: businessName }),
         }
       );
 

@@ -97,11 +97,17 @@ export function WAInbox({ clientId }: Props) {
     setSending(true);
 
     try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token || '';
+
       const response = await fetch(
         `${import.meta.env.VITE_CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/whatsapp/send-message`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify({
             client_id: clientId,
             to_phone: selectedConv.contact_phone,
