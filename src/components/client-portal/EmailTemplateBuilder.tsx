@@ -83,6 +83,19 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
   const [converting, setConverting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState('');
+
+  // Fetch client name for footer preview
+  useEffect(() => {
+    supabase
+      .from('clients')
+      .select('name, company')
+      .eq('id', clientId)
+      .single()
+      .then(({ data }) => {
+        if (data) setClientName(data.company || data.name || '');
+      });
+  }, [clientId]);
 
   // Form state
   const [form, setForm] = useState({
@@ -396,7 +409,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
     }
   };
 
-  const previewHtml = generatePreview(form);
+  const previewHtml = generatePreview(form, clientName);
 
   // LIST VIEW
   if (!isNew) {
@@ -900,9 +913,9 @@ function generatePreview(form: {
   primary_color: string; secondary_color: string; accent_color: string;
   button_color: string; button_text_color: string; font_family: string;
   logo_url: string | null; header_html: string; footer_html: string;
-}): string {
+}, storeName?: string): string {
   const header = form.header_html.trim() || DEFAULT_HEADER(form.logo_url, form.primary_color);
-  const footer = form.footer_html.trim() || DEFAULT_FOOTER('Tu Tienda');
+  const footer = form.footer_html.trim() || DEFAULT_FOOTER(storeName || 'Tu Marca');
 
   return `
 <!DOCTYPE html>

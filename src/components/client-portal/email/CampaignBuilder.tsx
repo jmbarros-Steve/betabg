@@ -195,11 +195,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         });
         if (data) {
           setBrandInfo(data);
-          // Prefill from_name/from_email on the editing campaign if still empty
-          const storeName = data.store_name || data.brand_name || '';
+          // Prefill from_name on the editing campaign if still empty
+          const storeName = data.store_name || data.brand_name || data.name || '';
           setEditingCampaign(prev => {
-            if (!prev || prev.from_name) return prev;
-            return { ...prev, from_name: storeName };
+            if (!prev) return prev;
+            const updates: Record<string, string> = {};
+            if (!prev.from_name && storeName) updates.from_name = storeName;
+            return Object.keys(updates).length ? { ...prev, ...updates } : prev;
           });
         }
       } catch { /* Brand info is optional */ }
@@ -488,7 +490,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       name: '',
       subject: '',
       preview_text: '',
-      from_name: brandInfo.store_name || brandInfo.brand_name || '',
+      from_name: brandInfo.store_name || brandInfo.brand_name || brandInfo.name || '',
       from_email: '',
       html_content: '',
       audience_filter: {},
