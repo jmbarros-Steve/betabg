@@ -34,6 +34,7 @@ import { editImageGemini } from './ai/edit-image-gemini.js';
 import { criterioMetaHandler } from './ai/criterio-meta.js';
 import { criterioEmail } from './ai/criterio-email.js';
 
+import { creativePreview } from './ai/creative-preview.js';
 import { espejoHandler } from './ai/espejo.js';
 
 // Phase 2: Analytics
@@ -171,6 +172,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/criterio-meta', authMiddleware, criterioMetaHandler);
   app.post('/api/criterio-email', authMiddleware, criterioEmail);
 
+  app.post('/api/creative-preview', authMiddleware, creativePreview);
   app.post('/api/espejo', authMiddleware, espejoHandler);
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
   app.post('/api/deep-dive-competitor', authMiddleware, deepDiveCompetitor);
