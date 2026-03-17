@@ -75,7 +75,7 @@ export async function manageEmailCampaigns(c: Context) {
 
       if (error) return c.json({ error: error.message }, 500);
 
-      // D.6: Save to creative_history with detected angle
+      // D.6: Save to creative_history with detected angle + scores placeholder
       if (data) {
         try {
           const copyForAngle = subject || name || '';
@@ -83,10 +83,14 @@ export async function manageEmailCampaigns(c: Context) {
           await supabase.from('creative_history').insert({
             client_id,
             channel: 'email',
+            type: 'email_campaign',
+            angle,
+            content_summary: copyForAngle.substring(0, 200),
+            copy_text: copyForAngle.substring(0, 2000),
             entity_type: 'email_campaign',
             entity_id: data.id,
-            angle,
-            copy_text: copyForAngle.substring(0, 2000),
+            criterio_score: null,
+            espejo_score: null,
           });
         } catch (chErr) { console.error('[manage-campaigns] creative_history insert error:', chErr); }
       }

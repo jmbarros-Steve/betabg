@@ -767,16 +767,20 @@ export async function generateMetaCopy(c: Context) {
     const aiData: any = await resp.json();
     const text = aiData?.content?.[0]?.text || '';
 
-    // D.6: Save to creative_history with detected angle
+    // D.6: Save to creative_history with detected angle + scores placeholder
     if (text) {
       try {
         const angle = await detectAngle(text);
         await supabase.from('creative_history').insert({
           client_id: resolvedClientId,
           channel: 'meta',
-          entity_type: 'meta_copy',
+          type: 'meta_copy',
           angle,
+          content_summary: text.substring(0, 200),
           copy_text: text.substring(0, 2000),
+          entity_type: 'meta_copy',
+          criterio_score: null,
+          espejo_score: null,
         });
       } catch (chErr) { console.error('[generate-meta-copy] creative_history insert error:', chErr); }
     }
@@ -1237,17 +1241,21 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
 
   console.log('Successfully generated copy with Sabri + Russell methodology');
 
-  // D.6: Save to creative_history with detected angle
+  // D.6: Save to creative_history with detected angle + scores placeholder
   try {
     const copyForAngle = parsedContent?.headline || parsedContent?.primary_text || JSON.stringify(parsedContent).substring(0, 300);
     const angle = body.angulo || await detectAngle(copyForAngle);
     await supabase.from('creative_history').insert({
       client_id: resolvedClientId,
       channel: 'meta',
-      entity_type: 'meta_copy',
+      type: 'meta_copy',
       angle,
+      content_summary: copyForAngle.substring(0, 200),
       copy_text: copyForAngle.substring(0, 2000),
+      entity_type: 'meta_copy',
       product_name: parsedContent?.product_name || null,
+      criterio_score: null,
+      espejo_score: null,
     });
   } catch (chErr) { console.error('[generate-meta-copy] creative_history insert error:', chErr); }
 

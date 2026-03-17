@@ -251,17 +251,29 @@ async function criterioEmailEvaluate(emailData: EmailData, shopId: string): Prom
     },
   ).then(r => r.json()) as CriterioResult;
 
-  // 5. Save to creative_history if approved
-  if (evalResponse.can_publish) {
-    await supabase.from('creative_history').insert({
-      shop_id: shopId,
-      channel: 'email',
-      type: 'campaign',
-      angle: emailData.angle || 'unknown',
-      theme: emailData.theme || null,
-      content_summary: emailData.subject,
-      cqs_score: evalResponse.score,
-    });
+  // 5. Save criterio_score to creative_history (update existing or insert new)
+  {
+    const { data: updated } = await supabase
+      .from('creative_history')
+      .update({ cqs_score: evalResponse.score, criterio_score: evalResponse.score })
+      .eq('channel', 'email')
+      .is('criterio_score', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .select('id');
+
+    if (!updated || updated.length === 0) {
+      await supabase.from('creative_history').insert({
+        shop_id: shopId,
+        channel: 'email',
+        type: 'campaign',
+        angle: emailData.angle || 'unknown',
+        theme: emailData.theme || null,
+        content_summary: emailData.subject,
+        cqs_score: evalResponse.score,
+        criterio_score: evalResponse.score,
+      });
+    }
   }
 
   // 6. Create task if rejected

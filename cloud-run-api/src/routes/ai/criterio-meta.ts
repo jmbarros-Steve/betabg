@@ -318,17 +318,33 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
 
   const evalResult = (await evalResponse.json()) as CriterioResponse;
 
-  // 7. Save to creative_history if approved
-  if (evalResult.can_publish && clientId) {
-    await supabase.from('creative_history').insert({
-      client_id: clientId,
-      channel: 'meta',
-      type: campaignData.type || 'ad',
-      angle: campaignData.angle || 'unknown',
-      theme: campaignData.theme || null,
-      content_summary: (campaignData.primary_text || '').substring(0, 200),
-      cqs_score: evalResult.score,
-    });
+  // 7. Save criterio_score to creative_history (update existing or insert new)
+  if (clientId) {
+    const copyText = (campaignData.primary_text || '').substring(0, 200);
+    // Try to update an existing record first (created by generate-meta-copy)
+    const { data: updated } = await supabase
+      .from('creative_history')
+      .update({ cqs_score: evalResult.score, criterio_score: evalResult.score })
+      .eq('client_id', clientId)
+      .eq('channel', 'meta')
+      .is('criterio_score', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .select('id');
+
+    // If no record to update, insert a new one
+    if (!updated || updated.length === 0) {
+      await supabase.from('creative_history').insert({
+        client_id: clientId,
+        channel: 'meta',
+        type: campaignData.type || 'ad',
+        angle: campaignData.angle || 'unknown',
+        theme: campaignData.theme || null,
+        content_summary: copyText,
+        cqs_score: evalResult.score,
+        criterio_score: evalResult.score,
+      });
+    }
   }
 
   // 8. Create task if rejected
