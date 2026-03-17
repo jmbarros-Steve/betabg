@@ -135,6 +135,12 @@ gcloud run services update steve-api --region us-central1 --project steveapp-age
 ```
 Los valores están en el Secret Manager del proyecto o en el historial de deploys anteriores.
 
+### Verificación automática (OpenClaw)
+- Cron ID: `dd801d66-325e-4ddb-b7d4-2835be4f341f`
+- Nombre: `verify-cloud-run-env`
+- Cada 30 minutos corre `scripts/verify-cloud-run-env.sh`
+- Si falta alguna env var → inserta task crítica en Supabase
+
 ## REGLA OBLIGATORIA: Bug → Task automático
 Cuando cualquier agente encuentra un bug (severity: critical, major, high):
 1. Insertar INMEDIATAMENTE en tabla tasks de Supabase:
