@@ -107,6 +107,9 @@ import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
+import { merchantWAWebhook } from './whatsapp/merchant-wa.js';
+import { waSendMessage } from './whatsapp/send-message.js';
+import { waSendCampaign } from './whatsapp/send-campaign.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -324,6 +327,9 @@ export function registerRoutes(app: Hono) {
   // WhatsApp Webhooks (no JWT — Twilio sends form-encoded)
   // ============================================================
   app.post('/api/whatsapp/steve-wa-chat', steveWAChat); // Twilio webhook: merchant → Steve
+  app.post('/api/whatsapp/merchant-wa/:clientId', merchantWAWebhook); // Twilio webhook: customer → merchant store
+  app.post('/api/whatsapp/send-message', authMiddleware, waSendMessage); // Portal: merchant sends manual reply
+  app.post('/api/whatsapp/send-campaign', authMiddleware, waSendCampaign); // Portal: send bulk WA campaign
 
   // ============================================================
   // Cron / Scheduled Jobs
