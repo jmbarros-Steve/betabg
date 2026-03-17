@@ -101,7 +101,7 @@ export default function ReviewStep(props: ReviewStepProps) {
     { label: 'URL de destino', ok: !!destinationUrl.trim(), step: 'Anuncio' },
     { label: 'Presupuesto definido', ok: !!budget || !!existingAdsetId, step: 'Ad Set' },
     { label: 'Audiencia definida', ok: !!audienceDesc.trim() || !!existingAdsetId, step: 'Ad Set' },
-    { label: 'Nombre de campana', ok: !!campaignLabel?.trim(), step: 'Campana' },
+    { label: 'Nombre de campaña', ok: !!campaignLabel?.trim(), step: 'Campana' },
   ];
   const allPassed = checks.every((c) => c.ok);
   const failedChecks = checks.filter((c) => !c.ok);
@@ -115,7 +115,7 @@ export default function ReviewStep(props: ReviewStepProps) {
             <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />
             <div>
               <p className="text-sm font-bold text-green-800">Todo listo para publicar</p>
-              <p className="text-xs text-green-700">Tu campana se creara en PAUSA. No se gastara dinero hasta que la actives en Meta.</p>
+              <p className="text-xs text-green-700">Tu campaña se creará en PAUSA. No se gastará dinero hasta que la actives en Meta.</p>
             </div>
           </CardContent>
         </Card>
@@ -145,8 +145,8 @@ export default function ReviewStep(props: ReviewStepProps) {
         <CardContent className="py-3 flex items-start gap-3">
           <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
           <div className="text-sm text-blue-800">
-            <span className="font-semibold">Tu campana se creara en PAUSA en Meta.</span>{' '}
-            Esto te permite revisarla antes de activarla. No se gastara dinero hasta que la actives manualmente.
+            <span className="font-semibold">Tu campaña se creará en PAUSA en Meta.</span>{' '}
+            Esto te permite revisarla antes de activarla. No se gastará dinero hasta que la actives manualmente.
           </div>
         </CardContent>
       </Card>
@@ -184,7 +184,7 @@ export default function ReviewStep(props: ReviewStepProps) {
             <>
               <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0" />
               <span className="text-sm text-yellow-800">
-                Sin fecha de inicio definida — la campana comenzara al activarla
+                Sin fecha de inicio definida — la campaña comenzará al activarla
               </span>
             </>
           )}
@@ -213,7 +213,7 @@ export default function ReviewStep(props: ReviewStepProps) {
         <CardContent className="py-3 space-y-2">
           <div className="flex items-center gap-2">
             <Megaphone className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold">Campana</span>
+            <span className="text-sm font-semibold">Campaña</span>
             {existingCampaignId && <Badge variant="outline" className="text-[9px]">Existente</Badge>}
             {!existingCampaignId && <Badge variant="outline" className="text-[9px] border-green-500/30 text-green-700">Nueva</Badge>}
           </div>
@@ -366,11 +366,11 @@ export default function ReviewStep(props: ReviewStepProps) {
               className="w-full bg-green-600 hover:bg-green-700 text-white text-base font-bold py-6 disabled:opacity-50"
             >
               {submitting ? (
-                <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Creando campana en Meta...</>
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Creando campaña en Meta...</>
               ) : !allPassed ? (
                 <>Completa los datos faltantes para publicar</>
               ) : (
-                <><Rocket className="w-5 h-5 mr-2" />Publicar Campana en Meta</>
+                <><Rocket className="w-5 h-5 mr-2" />Publicar Campaña en Meta</>
               )}
             </Button>
           )}
