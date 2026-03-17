@@ -1331,6 +1331,9 @@ export async function manageMetaCampaign(c: Context) {
             currency: data.currency,
             objective: data.objective,
             monthly_revenue: data.monthly_revenue,
+            product_name: data.product_name,
+            image_url: data.image_url,
+            shopify_product_id: data.shopify_product_id,
           },
           connection.client_id,
           connection.client_id

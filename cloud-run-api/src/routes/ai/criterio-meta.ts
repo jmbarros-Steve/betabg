@@ -272,7 +272,7 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
   if (campaignData.product_ids && campaignData.product_ids.length > 0) {
     const { data: prods } = await supabase
       .from('shopify_products')
-      .select('title, price, inventory')
+      .select('id, title, price, inventory, image_url')
       .in('id', campaignData.product_ids);
     products = prods || [];
   }
@@ -320,6 +320,7 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
 
   // 7. Save to creative_history if approved
   if (evalResult.can_publish && clientId) {
+    const primaryProduct = products[0] || null;
     await supabase.from('creative_history').insert({
       client_id: clientId,
       channel: 'meta',
@@ -328,6 +329,9 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
       theme: campaignData.theme || null,
       content_summary: (campaignData.primary_text || '').substring(0, 200),
       cqs_score: evalResult.score,
+      product_name: campaignData.product_name || primaryProduct?.title || null,
+      image_url: campaignData.image_url || primaryProduct?.image_url || null,
+      shopify_product_id: campaignData.shopify_product_id || primaryProduct?.id || null,
     });
   }
 
