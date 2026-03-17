@@ -1177,7 +1177,9 @@ export async function analyzeBrandStrategy(c: Context) {
           { onConflict: 'client_id,research_type' }
         );
       }
-    } catch (_) {}
+    } catch (statusErr) {
+      console.error('[analyze-brand-strategy] Failed to save error status:', statusErr);
+    }
     return c.json({ error: 'Internal server error' }, 500);
   }
 }

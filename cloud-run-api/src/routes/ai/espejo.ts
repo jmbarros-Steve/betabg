@@ -76,7 +76,8 @@ function parseVisionResponse(visionResponse: any): any {
     const text = visionResponse.content?.[0]?.text || '';
     const cleaned = text.replace(/```json|```/g, '').trim();
     return JSON.parse(cleaned);
-  } catch {
+  } catch (parseErr) {
+    console.error('[espejo] Error parsing Claude Vision response:', parseErr);
     return { overall: 0, issues: ['Error parsing Claude Vision response'], pass: false };
   }
 }

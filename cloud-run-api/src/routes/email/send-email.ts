@@ -44,7 +44,8 @@ export function verifyUnsubscribeToken(token: string): { subscriberId: string; c
       .digest('hex');
     if (providedHmac !== expectedHmac) return null;
     return { subscriberId, clientId };
-  } catch {
+  } catch (err) {
+    console.error('[send-email] verifyUnsubscribeToken failed:', err);
     return null;
   }
 }
