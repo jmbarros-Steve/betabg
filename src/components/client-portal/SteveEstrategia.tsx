@@ -55,10 +55,17 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }, [clientId]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change using anchor div
+    // Scroll to bottom when messages change
+    // ScrollArea (Radix) creates an internal viewport — scrollIntoView doesn't
+    // reach it reliably, so we scroll the viewport div directly.
     setTimeout(() => {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
+      const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      } else {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   }, [messages]);
 
   async function initializeConversation() {
