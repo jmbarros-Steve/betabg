@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
@@ -56,8 +56,8 @@ export default function OAuthMetaCallback() {
       }
 
       try {
-        // Call edge function to exchange code for token and store connection
-        const { data, error: fnError } = await supabase.functions.invoke('meta-oauth-callback', {
+        // Call Cloud Run API to exchange code for token and store connection
+        const { data, error: apiError } = await callApi('meta-oauth-callback', {
           body: {
             code,
             client_id: clientId,
@@ -65,13 +65,13 @@ export default function OAuthMetaCallback() {
           },
         });
 
-        if (fnError) throw fnError;
+        if (apiError) throw new Error(apiError);
 
         if (data?.error) {
           throw new Error(data.error);
         }
 
-        // Tokens are saved in DB by the edge function at this point
+        // Tokens are saved in DB by Cloud Run at this point
         setStatus('success');
         sessionStorage.removeItem('meta_oauth_client_id');
         sessionStorage.removeItem('meta_oauth_state');
