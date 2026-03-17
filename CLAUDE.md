@@ -120,6 +120,21 @@ cd ~/steve && git pull
 - Reportes: .gstack/qa-reports/ con fecha y hora
 - Si hay bugs high/critical → insertar en tabla tasks automáticamente
 
+## ADVERTENCIA: Variables de entorno en Cloud Run
+Cada vez que se haga `gcloud run deploy steve-api`, verificar que estas env vars estén configuradas:
+- `META_APP_ID`
+- `META_APP_SECRET`
+- `APIFY_TOKEN`
+- `GEMINI_API_KEY`
+- `SENTRY_DSN`
+
+Si alguna falta después del deploy, correr:
+```bash
+gcloud run services update steve-api --region us-central1 --project steveapp-agency \
+  --set-env-vars META_APP_ID=<valor>,META_APP_SECRET=<valor>,APIFY_TOKEN=<valor>,GEMINI_API_KEY=<valor>,SENTRY_DSN=<valor>
+```
+Los valores están en el Secret Manager del proyecto o en el historial de deploys anteriores.
+
 ## REGLA OBLIGATORIA: Bug → Task automático
 Cuando cualquier agente encuentra un bug (severity: critical, major, high):
 1. Insertar INMEDIATAMENTE en tabla tasks de Supabase:
