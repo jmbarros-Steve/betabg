@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { createTask } from '../../lib/task-creator.js';
 
 // ─── Claude Vision prompts ───────────────────────────────────────────────────
 
@@ -137,6 +138,23 @@ export async function espejoEmail(
 
   console.log(`[espejo] Email result: score=${evalResult.overall}, pass=${passed}, issues=${evalResult.issues?.length || 0}`);
 
+  // Create task when ESPEJO rejects
+  if (!passed) {
+    try {
+      await createTask({
+        shop_id: shopId,
+        title: `ESPEJO rechazó email: score ${evalResult.overall || 0}/10`,
+        description: `Evaluación visual de email (entity: ${entityId}) falló.\n\nProblemas detectados:\n${(evalResult.issues || []).map((i: string) => `- ${i}`).join('\n')}\n\nDetalles: mobile=${evalResult.mobile}, layout=${evalResult.layout}, brand=${evalResult.brand}, cta=${evalResult.cta}, products=${evalResult.products}`,
+        priority: 'alta',
+        type: 'mejora',
+        source: 'espejo',
+        assigned_squad: 'marketing',
+      });
+    } catch (taskErr) {
+      console.error('[espejo] Error creating task for rejected email:', taskErr);
+    }
+  }
+
   return {
     pass: passed,
     score: evalResult.overall || 0,
@@ -187,6 +205,23 @@ export async function espejoAd(
   const passed = await saveEspejoResult(shopId, 'ad_image', entityId, evalResult);
 
   console.log(`[espejo] Ad result: score=${evalResult.overall}, pass=${passed}, issues=${evalResult.issues?.length || 0}`);
+
+  // Create task when ESPEJO rejects
+  if (!passed) {
+    try {
+      await createTask({
+        shop_id: shopId,
+        title: `ESPEJO rechazó ad_image: score ${evalResult.overall || 0}/10`,
+        description: `Evaluación visual de imagen publicitaria (entity: ${entityId}) falló.\n\nProblemas detectados:\n${(evalResult.issues || []).map((i: string) => `- ${i}`).join('\n')}\n\nDetalles: resolution=${evalResult.resolution}, text=${evalResult.text}, product=${evalResult.product}, logo=${evalResult.logo}, brand=${evalResult.brand}, composition=${evalResult.composition}`,
+        priority: 'alta',
+        type: 'mejora',
+        source: 'espejo',
+        assigned_squad: 'marketing',
+      });
+    } catch (taskErr) {
+      console.error('[espejo] Error creating task for rejected ad:', taskErr);
+    }
+  }
 
   return {
     pass: passed,
