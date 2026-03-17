@@ -227,10 +227,15 @@ Deno.serve(async (req) => {
               if (adsetsResult.ok && adsetsResult.data?.data) {
                 const pct = (ruleAction.percentage || 20) / 100;
                 const multiplier = ruleAction.type === 'INCREASE_BUDGET' ? (1 + pct) : (1 - pct);
-                for (const adset of adsetsResult.data.data) {
+                for (let i = 0; i < adsetsResult.data.data.length; i++) {
+                  const adset = adsetsResult.data.data[i];
                   if (adset.daily_budget) {
                     const newBudget = Math.round(Number(adset.daily_budget) * multiplier);
                     await metaApiRequest(adset.id, accessToken, 'POST', { daily_budget: newBudget });
+                    // Rate limiting: 200ms delay between API calls
+                    if (i < adsetsResult.data.data.length - 1) {
+                      await new Promise(r => setTimeout(r, 200));
+                    }
                   }
                 }
                 actionExecuted = true;
@@ -244,8 +249,11 @@ Deno.serve(async (req) => {
               const adsetsResult = await metaApiRequest(`${campaign.campaign_id}/adsets`, accessToken, 'GET', { fields: 'id', limit: '100' });
               if (adsetsResult.ok && adsetsResult.data?.data) {
                 const budgetCents = Math.round(ruleAction.amount * 100);
-                for (const adset of adsetsResult.data.data) {
-                  await metaApiRequest(adset.id, accessToken, 'POST', { daily_budget: budgetCents });
+                for (let i = 0; i < adsetsResult.data.data.length; i++) {
+                  await metaApiRequest(adsetsResult.data.data[i].id, accessToken, 'POST', { daily_budget: budgetCents });
+                  if (i < adsetsResult.data.data.length - 1) {
+                    await new Promise(r => setTimeout(r, 200));
+                  }
                 }
                 actionExecuted = true;
                 details += ` → Budget scaled to ${ruleAction.amount}`;

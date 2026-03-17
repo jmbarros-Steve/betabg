@@ -781,7 +781,7 @@ async function handleUpdateBudget(
     if (updateResult.ok) {
       updatedAdsets.push(adset.id);
     } else {
-      failedAdsets.push({ id: adset.id, error: updateResult.error || 'Unknown error' });
+      failedAdsets.push({ id: adset.id, error: updateResult.error || `Meta API error updating adset ${adset.id}` });
     }
   }
 
