@@ -85,21 +85,31 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const CLOUD_RUN_URL = Deno.env.get('CLOUD_RUN_URL') || 'https://steve-api-ixfpqrtuiq-uc.a.run.app'
+    const CLOUD_RUN_URL = Deno.env.get('CLOUD_RUN_URL') || 'https://steve-api-850416724643.us-central1.run.app'
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Endpoints críticos: Supabase Edge Functions + Cloud Run API
+    // Endpoints críticos: Cloud Run API (activo) + frontend
+    // NOTA: Las Edge Functions de Supabase son dead code — todo el tráfico real va por Cloud Run
     const endpoints = [
-      { name: 'steve-chat', url: `${SUPABASE_URL}/functions/v1/steve-chat`, method: 'POST', body: { message: 'ping', shop_id: 'health-check' } },
-      { name: 'fetch-shopify-products', url: `${SUPABASE_URL}/functions/v1/fetch-shopify-products`, method: 'POST', body: { shop_id: 'health-check' } },
-      { name: 'fetch-shopify-analytics', url: `${SUPABASE_URL}/functions/v1/fetch-shopify-analytics`, method: 'POST', body: { shop_id: 'health-check' } },
-      { name: 'sync-shopify-metrics', url: `${SUPABASE_URL}/functions/v1/sync-shopify-metrics`, method: 'POST', body: {} },
-      { name: 'generate-mass-campaigns', url: `${SUPABASE_URL}/functions/v1/generate-mass-campaigns`, method: 'POST', body: {} },
-      { name: 'klaviyo-push-emails', url: `${SUPABASE_URL}/functions/v1/klaviyo-push-emails`, method: 'POST', body: {} },
-      { name: 'meta-oauth-callback', url: `${SUPABASE_URL}/functions/v1/meta-oauth-callback`, method: 'GET' },
-      { name: 'evaluate-rules', url: `${SUPABASE_URL}/functions/v1/evaluate-rules`, method: 'POST', body: { get_rules: true, organ: 'OJOS' } },
-      { name: 'cloud-run-api', url: `${CLOUD_RUN_URL}/api/steve-chat`, method: 'POST', body: { message: 'ping', shop_id: 'health-check' } },
+      // Cloud Run — Core AI
+      { name: 'steve-chat', url: `${CLOUD_RUN_URL}/api/steve-chat`, method: 'POST', body: { message: 'ping', client_id: 'health-check' } },
+      // Cloud Run — Shopify
+      { name: 'fetch-shopify-analytics', url: `${CLOUD_RUN_URL}/api/fetch-shopify-analytics`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'fetch-shopify-products', url: `${CLOUD_RUN_URL}/api/fetch-shopify-products`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'sync-shopify-metrics', url: `${CLOUD_RUN_URL}/api/sync-shopify-metrics`, method: 'POST', body: { client_id: 'health-check' } },
+      // Cloud Run — Meta
+      { name: 'sync-meta-metrics', url: `${CLOUD_RUN_URL}/api/sync-meta-metrics`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'check-meta-scopes', url: `${CLOUD_RUN_URL}/api/check-meta-scopes`, method: 'POST', body: { client_id: 'health-check' } },
+      // Cloud Run — Klaviyo
+      { name: 'klaviyo-push-emails', url: `${CLOUD_RUN_URL}/api/klaviyo-push-emails`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'sync-klaviyo-metrics', url: `${CLOUD_RUN_URL}/api/sync-klaviyo-metrics`, method: 'POST', body: { client_id: 'health-check' } },
+      // Cloud Run — Email
+      { name: 'steve-email-content', url: `${CLOUD_RUN_URL}/api/steve-email-content`, method: 'POST', body: { client_id: 'health-check' } },
+      // Frontend
+      { name: 'frontend', url: 'https://www.steve.cl', method: 'GET' },
+      // Cloud Run — root health
+      { name: 'cloud-run-root', url: `${CLOUD_RUN_URL}/`, method: 'GET' },
     ]
 
     const results = []
