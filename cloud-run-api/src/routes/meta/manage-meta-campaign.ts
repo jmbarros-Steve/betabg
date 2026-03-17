@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioMeta } from '../ai/criterio-meta.js';
 
 import { espejoAd } from '../ai/espejo.js';
+import { detectAngle } from '../../lib/angle-detector.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -1310,6 +1311,10 @@ export async function manageMetaCampaign(c: Context) {
       } catch (_) { /* ignore */ }
     }
 
+    // D.6: Track scores for creative_history
+    let _criterioScore: number | null = null;
+    let _espejoScore: number | null = null;
+
     // CRITERIO pre-flight check: evaluate campaign data before creating in Meta
     if ((action === 'create' || action === 'create_322') && data) {
       try {
@@ -1349,6 +1354,7 @@ export async function manageMetaCampaign(c: Context) {
         }
 
         console.log(`[manage-meta-campaign] CRITERIO approved: score=${criterioResult.score}%`);
+        _criterioScore = criterioResult.score;
       } catch (criterioErr: any) {
         // Fail-open: if CRITERIO errors, log and continue
         console.error('[manage-meta-campaign] CRITERIO check failed (fail-open):', criterioErr?.message);
@@ -1387,6 +1393,7 @@ export async function manageMetaCampaign(c: Context) {
           } else {
             console.log(`[manage-meta-campaign] ESPEJO approved ad image: score=${espejoResult.score}`);
           }
+          _espejoScore = espejoResult.score;
         } catch (espejoErr: any) {
           // ESPEJO failure should not block campaign creation — log and continue
           console.warn(`[manage-meta-campaign] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
@@ -1448,6 +1455,32 @@ export async function manageMetaCampaign(c: Context) {
 
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
+    }
+
+    // D.6: Save to creative_history on successful create/create_322
+    if ((action === 'create' || action === 'create_322') && result.status === 200 && result.body?.success) {
+      try {
+        const copyText = data?.primary_text || (data?.texts && data.texts[0]) || data?.name || '';
+        const angle = data?.angle || await detectAngle(copyText);
+        await supabase.from('creative_history').insert({
+          client_id: connection.client_id,
+          channel: 'meta',
+          type: 'meta_campaign',
+          angle,
+          content_summary: copyText.substring(0, 200),
+          copy_text: copyText.substring(0, 2000),
+          entity_type: 'meta_campaign',
+          entity_id: result.body.campaign_id,
+          meta_campaign_id: result.body.campaign_id,
+          product_name: data?.product_name || null,
+          image_url: data?.image_url || data?.images?.[0] || null,
+          cqs_score: _criterioScore,
+          criterio_score: _criterioScore,
+          espejo_score: _espejoScore,
+        });
+      } catch (chErr) {
+        console.error('[manage-meta-campaign] creative_history insert error:', chErr);
+      }
     }
 
     return c.json(result.body, result.status as any);

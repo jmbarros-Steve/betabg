@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioEmailEvaluate } from '../ai/criterio-email.js';
+import { detectAngle } from '../../lib/angle-detector.js';
 
 export async function uploadKlaviyoDrafts(c: Context) {
   try {
@@ -57,6 +58,8 @@ export async function uploadKlaviyoDrafts(c: Context) {
       .eq('id', connectionId)
       .single();
     const shopId = (connClient as any)?.clients?.shop_id;
+    const clientId = (connClient as any)?.client_id;
+    let _criterioScore: number | null = null;
 
     if (shopId) {
       const criterioResult = await criterioEmailEvaluate({
@@ -64,6 +67,8 @@ export async function uploadKlaviyoDrafts(c: Context) {
         preview_text: campaign.previewText || '',
         html: campaign.html || '',
       }, shopId);
+
+      _criterioScore = criterioResult.score;
 
       if (!criterioResult.can_publish) {
         return c.json({
@@ -206,6 +211,29 @@ export async function uploadKlaviyoDrafts(c: Context) {
       }
     }
     console.log(`Campaign created as draft: ${campaignId}`);
+
+    // D.6: Save to creative_history with angle + criterio_score
+    if (clientId) {
+      try {
+        const copyForAngle = campaign.subject || campaign.name || '';
+        const angle = await detectAngle(copyForAngle);
+        await supabase.from('creative_history').insert({
+          client_id: clientId,
+          channel: 'klaviyo',
+          type: 'email_campaign',
+          angle,
+          content_summary: copyForAngle.substring(0, 200),
+          copy_text: copyForAngle.substring(0, 2000),
+          entity_type: 'email_campaign',
+          entity_id: campaignId,
+          cqs_score: _criterioScore,
+          criterio_score: _criterioScore,
+          espejo_score: null,
+        });
+      } catch (chErr) {
+        console.error('[upload-klaviyo-drafts] creative_history insert error:', chErr);
+      }
+    }
 
     return c.json({
       success: true,
