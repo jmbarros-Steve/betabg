@@ -100,7 +100,7 @@ export default function ReviewStep(props: ReviewStepProps) {
     { label: 'Titulo / headline', ok: allHeadlines.some((h) => h.trim()), step: 'Anuncio' },
     { label: 'URL de destino', ok: !!destinationUrl.trim(), step: 'Anuncio' },
     { label: 'Presupuesto definido', ok: !!budget || !!existingAdsetId, step: 'Ad Set' },
-    { label: 'Audiencia definida', ok: !!audienceDesc.trim() || !!existingAdsetId, step: 'Ad Set' },
+    { label: 'Audiencia', ok: true, step: 'Ad Set' }, // Optional — broad targeting if empty
     { label: 'Nombre de campana', ok: !!campaignLabel?.trim(), step: 'Campana' },
   ];
   const allPassed = checks.every((c) => c.ok);
@@ -244,10 +244,10 @@ export default function ReviewStep(props: ReviewStepProps) {
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             <span className="text-muted-foreground">Nombre:</span>
             <span className="font-medium truncate">{adsetLabel || '—'}</span>
-            {!existingAdsetId && audienceDesc && (
+            {!existingAdsetId && (
               <>
                 <span className="text-muted-foreground">Audiencia:</span>
-                <span className="font-medium truncate">{audienceDesc}</span>
+                <span className="font-medium truncate">{audienceDesc || 'Broad targeting (Meta optimiza)'}</span>
               </>
             )}
           </div>
