@@ -84,6 +84,36 @@ export async function emailFlowWebhooks(c: Context) {
  * We wait before enrolling because the customer might complete the purchase.
  */
 async function handleCheckoutCreated(supabase: any, clientId: string, payload: any) {
+  // WA abandoned cart: save checkout for WhatsApp reminder cron (abandoned-cart-wa.ts)
+  const customerPhone = payload.phone
+    || payload.shipping_address?.phone
+    || payload.billing_address?.phone
+    || payload.customer?.phone;
+  if (customerPhone) {
+    try {
+      const cleanPhone = customerPhone.replace(/[\s\-()]/g, '');
+      const lineItems = (payload.line_items || []).slice(0, 5).map((item: any) => ({
+        title: item.title, price: item.price, quantity: item.quantity, image_url: item.image_url || null,
+      }));
+      await supabase.from('shopify_abandoned_checkouts').upsert({
+        client_id: clientId,
+        checkout_id: String(payload.id || payload.token),
+        customer_phone: cleanPhone,
+        customer_name: payload.shipping_address?.name || payload.billing_address?.name
+          || (payload.customer?.first_name ? `${payload.customer.first_name} ${payload.customer.last_name || ''}`.trim() : null),
+        customer_email: payload.email || null,
+        line_items: lineItems,
+        total_price: parseFloat(payload.total_price || '0'),
+        currency: payload.currency || 'CLP',
+        abandoned_checkout_url: payload.abandoned_checkout_url || null,
+        wa_reminder_sent: false,
+        order_completed: false,
+      }, { onConflict: 'client_id,checkout_id' });
+    } catch (waErr) {
+      console.error('[flow-webhooks] WA abandoned checkout save error (non-blocking):', waErr);
+    }
+  }
+
   const email = payload.email?.toLowerCase();
   if (!email) {
     console.log('Checkout webhook: no email, skipping');
@@ -243,8 +273,21 @@ async function handleCustomerCreated(supabase: any, clientId: string, payload: a
 
 /**
  * Handle orders/create — trigger post-purchase flow + cancel abandoned cart flows.
+ * Also marks WA abandoned checkouts as completed so the cron doesn't send reminders.
  */
 async function handleOrderCreated(supabase: any, clientId: string, payload: any) {
+  // WA: mark any matching abandoned checkouts as completed
+  const checkoutId = payload.checkout_id || payload.checkout_token;
+  if (checkoutId) {
+    try {
+      await supabase.from('shopify_abandoned_checkouts')
+        .update({ order_completed: true })
+        .eq('client_id', clientId)
+        .eq('checkout_id', String(checkoutId));
+    } catch (waErr) {
+      console.error('[flow-webhooks] WA checkout completion update error (non-blocking):', waErr);
+    }
+  }
   const email = payload.email?.toLowerCase();
   if (!email) return;
 
