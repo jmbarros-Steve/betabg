@@ -42,6 +42,7 @@ export default function BlockConfigPanel({ block, onChange, assets, clientId }: 
     case 'split': return <SplitConfig p={p} set={set} />;
     case 'columns': return <ColumnsConfig p={p} set={set} />;
     case 'section': return <SectionConfig p={p} set={set} />;
+    case 'footer': return <FooterConfig p={p} set={set} />;
     default: return <GenericConfig block={block} p={p} set={set} />;
   }
 }
@@ -1167,6 +1168,77 @@ function GenericConfig({ block, p, set }: { block: EmailBlock; p: any; set: (k: 
         rows={10}
         className="font-mono text-xs mt-1.5"
       />
+    </div>
+  );
+}
+
+// ═══ Footer / Unsubscribe ═══
+
+function FooterConfig({ p, set }: ConfigProps) {
+  return (
+    <div className="space-y-3">
+      <SectionTitle>Contenido</SectionTitle>
+      <div>
+        <Label className="text-xs font-medium">Nombre de la empresa</Label>
+        <Input value={p.companyName || ''} onChange={e => set('companyName', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="{{ empresa }}" />
+      </div>
+      <div>
+        <Label className="text-xs font-medium">Dirección física (CAN-SPAM)</Label>
+        <Input value={p.companyAddress || ''} onChange={e => set('companyAddress', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="Calle 123, Santiago, Chile" />
+      </div>
+      <div>
+        <Label className="text-xs font-medium">Texto de desuscripción</Label>
+        <Input value={p.unsubscribeText || ''} onChange={e => set('unsubscribeText', e.target.value)} className="h-9 text-sm mt-1.5" />
+      </div>
+      <div>
+        <Label className="text-xs font-medium">Texto del link</Label>
+        <Input value={p.unsubscribeLinkText || ''} onChange={e => set('unsubscribeLinkText', e.target.value)} className="h-9 text-sm mt-1.5" />
+      </div>
+      <div>
+        <Label className="text-xs font-medium">Texto adicional (opcional)</Label>
+        <Textarea value={p.extraText || ''} onChange={e => set('extraText', e.target.value)} rows={2} className="text-sm mt-1.5" placeholder="© 2026 Mi Empresa. Todos los derechos reservados." />
+      </div>
+
+      <Separator />
+      <SectionTitle>Estilo</SectionTitle>
+      <ColorField label="Color de fondo" value={p.bgColor || '#f4f4f5'} onChange={v => set('bgColor', v)} />
+      <ColorField label="Color de texto" value={p.textColor || '#71717a'} onChange={v => set('textColor', v)} />
+      <div>
+        <Label className="text-xs font-medium">Tamaño de fuente (px)</Label>
+        <Select value={String(p.fontSize || 12)} onValueChange={v => set('fontSize', Number(v))}>
+          <SelectTrigger className="h-9 text-sm mt-1.5"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10px</SelectItem>
+            <SelectItem value="11">11px</SelectItem>
+            <SelectItem value="12">12px</SelectItem>
+            <SelectItem value="13">13px</SelectItem>
+            <SelectItem value="14">14px</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+      <SectionTitle>Redes sociales</SectionTitle>
+      <div className="flex items-center gap-2">
+        <Checkbox checked={!!p.showSocialLinks} onCheckedChange={v => set('showSocialLinks', !!v)} />
+        <Label className="text-xs">Mostrar links de redes</Label>
+      </div>
+      {p.showSocialLinks && (
+        <div className="space-y-2 mt-2">
+          <div>
+            <Label className="text-xs font-medium">Facebook</Label>
+            <Input value={p.facebook || ''} onChange={e => set('facebook', e.target.value)} className="h-8 text-xs mt-1" placeholder="https://facebook.com/..." />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Instagram</Label>
+            <Input value={p.instagram || ''} onChange={e => set('instagram', e.target.value)} className="h-8 text-xs mt-1" placeholder="https://instagram.com/..." />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">TikTok</Label>
+            <Input value={p.tiktok || ''} onChange={e => set('tiktok', e.target.value)} className="h-8 text-xs mt-1" placeholder="https://tiktok.com/@..." />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

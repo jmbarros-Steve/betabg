@@ -19,7 +19,8 @@ export type BlockType =
   | 'html'
   | 'columns'
   | 'section'
-  | 'product_grid';
+  | 'product_grid'
+  | 'footer';
 
 export interface EmailBlock {
   id: string;
@@ -153,6 +154,20 @@ export const BLOCK_DEFAULTS: Record<BlockType, Record<string, any>> = {
     showButton: true,
     buttonText: 'Comprar',
   },
+  footer: {
+    companyName: '{{ empresa }}',
+    companyAddress: '',
+    unsubscribeText: 'Si no deseas recibir más correos, puedes',
+    unsubscribeLinkText: 'cancelar tu suscripción aquí',
+    extraText: '',
+    bgColor: '#f4f4f5',
+    textColor: '#71717a',
+    fontSize: 12,
+    showSocialLinks: false,
+    facebook: '',
+    instagram: '',
+    tiktok: '',
+  },
   section: {
     bgColor: '#f9fafb',
     paddingTop: 20,
@@ -191,6 +206,7 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   { type: 'video', label: 'Vídeo', icon: 'video', category: 'blocks' },
   { type: 'html', label: 'HTML', icon: 'html', category: 'blocks' },
   { type: 'product_grid', label: 'Productos', icon: 'product_grid', category: 'blocks' },
+  { type: 'footer', label: 'Footer / Unsub', icon: 'footer', category: 'blocks' },
   // Design section
   { type: 'columns', label: 'Columnas', icon: 'columns', category: 'design' },
   { type: 'section', label: 'Sección', icon: 'section', category: 'design' },

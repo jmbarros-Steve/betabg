@@ -238,6 +238,36 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
       return `<div style="background:${p.bgColor || '#f9fafb'};padding:${p.paddingTop || 20}px ${p.paddingRight || 20}px ${p.paddingBottom || 20}px ${p.paddingLeft || 20}px;${p.borderWidth ? `border:${p.borderWidth}px solid ${p.borderColor || '#ddd'};` : ''}${p.borderRadius ? `border-radius:${p.borderRadius}px;` : ''}">${inner || '<p style="color:#ccc;text-align:center;font-size:12px;">Arrastra bloques aquí</p>'}</div>`;
     }
 
+    case 'footer': {
+      const bgColor = p.bgColor || '#f4f4f5';
+      const textColor = p.textColor || '#71717a';
+      const fontSize = p.fontSize || 12;
+      const company = p.companyName || '';
+      const address = p.companyAddress || '';
+      const unsubText = p.unsubscribeText || 'Si no deseas recibir más correos, puedes';
+      const unsubLink = p.unsubscribeLinkText || 'cancelar tu suscripción aquí';
+      const extra = p.extraText || '';
+      // {{unsubscribe_url}} is replaced at send-time by template-engine
+      const unsubUrl = '{{ unsubscribe_url }}';
+      let socialHtml = '';
+      if (p.showSocialLinks) {
+        const links: string[] = [];
+        if (p.facebook) links.push(`<a href="${p.facebook}" style="color:${textColor};text-decoration:none;margin:0 6px;" target="_blank">Facebook</a>`);
+        if (p.instagram) links.push(`<a href="${p.instagram}" style="color:${textColor};text-decoration:none;margin:0 6px;" target="_blank">Instagram</a>`);
+        if (p.tiktok) links.push(`<a href="${p.tiktok}" style="color:${textColor};text-decoration:none;margin:0 6px;" target="_blank">TikTok</a>`);
+        if (links.length > 0) {
+          socialHtml = `<p style="margin:0 0 10px;font-size:${fontSize}px;color:${textColor};text-align:center;">${links.join(' | ')}</p>`;
+        }
+      }
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background-color:${bgColor};"><tr><td style="padding:24px 20px;text-align:center;font-family:Arial,Helvetica,sans-serif;">` +
+        (company ? `<p style="margin:0 0 4px;font-size:${fontSize}px;color:${textColor};font-weight:600;">${company}</p>` : '') +
+        (address ? `<p style="margin:0 0 10px;font-size:${fontSize}px;color:${textColor};">${address}</p>` : '') +
+        socialHtml +
+        `<p style="margin:0 0 4px;font-size:${fontSize}px;color:${textColor};">${unsubText} <a href="${unsubUrl}" style="color:${textColor};text-decoration:underline;">${unsubLink}</a>.</p>` +
+        (extra ? `<p style="margin:8px 0 0;font-size:${fontSize - 1}px;color:${textColor};">${extra}</p>` : '') +
+        `</td></tr></table>`;
+    }
+
     default:
       return `<div style="padding:10px;color:#999;">[Bloque: ${block.type}]</div>`;
   }

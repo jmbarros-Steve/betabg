@@ -207,7 +207,9 @@ export async function emailFlowExecute(c: Context) {
 
   const fromDomain = domain?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
   const fromEmail = currentStep.from_email || `noreply@${fromDomain}`;
-  const fromName = currentStep.from_name || 'Steve';
+  // Use merchant's business name as sender, not generic "Steve"
+  const { data: flowClient } = await supabase.from('clients').select('name, company').eq('id', enrollment.client_id).maybeSingle();
+  const fromName = currentStep.from_name || flowClient?.company || flowClient?.name || 'Steve';
 
   let htmlContent = currentStep.html_content || '';
   let subject = currentStep.subject || '';

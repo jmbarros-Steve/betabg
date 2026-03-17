@@ -101,8 +101,8 @@ function addUnsubscribeFooter(html: string, subscriberId: string, clientId: stri
   const unsubUrl = `${API_BASE_URL()}/api/email-unsubscribe?token=${token}`;
   const footer = `
     <div style="text-align:center;padding:20px 0 10px;font-size:12px;color:#999;font-family:Arial,sans-serif;">
-      <p style="margin:0;">You received this email because you subscribed to our mailing list.</p>
-      <p style="margin:5px 0 0;"><a href="${unsubUrl}" style="color:#999;text-decoration:underline;">Unsubscribe</a></p>
+      <p style="margin:0;">Recibiste este correo porque estás suscrito a nuestra lista.</p>
+      <p style="margin:5px 0 0;"><a href="${unsubUrl}" style="color:#999;text-decoration:underline;">Cancelar suscripción</a></p>
     </div>`;
   if (html.includes('</body>')) {
     return html.replace('</body>', `${footer}</body>`);

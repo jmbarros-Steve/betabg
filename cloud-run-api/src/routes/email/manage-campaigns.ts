@@ -247,9 +247,11 @@ export async function manageEmailCampaigns(c: Context) {
         .update({ total_recipients: subscribers.length })
         .eq('id', campaign_id);
 
-      // Determine from email
+      // Determine from email — use merchant's business name, not generic "Steve"
       const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;
-      const fromName = campaign.from_name || 'Steve';
+      // brandClient is loaded below, but we need fromName before that, so load merchant name here
+      const { data: senderClient } = await supabase.from('clients').select('name, company').eq('id', client_id).maybeSingle();
+      const fromName = campaign.from_name || senderClient?.company || senderClient?.name || 'Steve';
 
       // Product recommendations are now processed per-subscriber in processEmailHtml
       const recConfig = campaign.recommendation_config || null;

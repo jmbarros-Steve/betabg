@@ -7,7 +7,7 @@ import {
   ChevronUp, ChevronDown, Copy, Trash2, X, Type, Image, MousePointerClick,
   Heading, Minus, Share2, MoveVertical, ShoppingBag, Ticket, Table2, Star,
   Play, Code2, Columns3, SquareDashedBottom, SplitSquareHorizontal, Layers,
-  Eye, Monitor, Smartphone, MousePointer2,
+  Eye, Monitor, Smartphone, MousePointer2, MailMinus,
 } from 'lucide-react';
 import { BLOCK_DEFINITIONS, createBlock, type EmailBlock, type BlockType, type BlockDefinition } from './blockTypes';
 import { renderBlockToHtml } from './blockRenderer';
@@ -32,6 +32,8 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   html: <Code2 className="w-5 h-5" />,
   columns: <Columns3 className="w-5 h-5" />,
   section: <SquareDashedBottom className="w-5 h-5" />,
+  footer: <MailMinus className="w-5 h-5" />,
+  product_grid: <ShoppingBag className="w-5 h-5" />,
 };
 
 const ICON_MAP_SM: Record<string, React.ReactNode> = {
@@ -52,6 +54,8 @@ const ICON_MAP_SM: Record<string, React.ReactNode> = {
   html: <Code2 className="w-3.5 h-3.5" />,
   columns: <Columns3 className="w-3.5 h-3.5" />,
   section: <SquareDashedBottom className="w-3.5 h-3.5" />,
+  footer: <MailMinus className="w-3.5 h-3.5" />,
+  product_grid: <ShoppingBag className="w-3.5 h-3.5" />,
 };
 
 interface EmailBlockEditorProps {
