@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState, useCallback, useEffect } from 'react';
+import { forwardRef, useImperativeHandle, useState, useCallback, useEffect, useRef } from 'react';
 import EmailBlockEditor from '../email-blocks/EmailBlockEditor';
 import { renderBlockToHtml } from '../email-blocks/blockRenderer';
 import { type EmailBlock } from '../email-blocks/blockTypes';
@@ -55,6 +55,8 @@ interface BlocksEditorWrapperProps {
 const BlocksEditorWrapper = forwardRef<BlocksEditorRef, BlocksEditorWrapperProps>(
   ({ onReady, onChange, style, clientId }, ref) => {
     const [blocks, setBlocks] = useState<EmailBlock[]>([]);
+    const blocksRef = useRef<EmailBlock[]>(blocks);
+    blocksRef.current = blocks;
 
     useEffect(() => {
       const timer = setTimeout(() => onReady?.(), 100);
@@ -140,7 +142,7 @@ const BlocksEditorWrapper = forwardRef<BlocksEditorRef, BlocksEditorWrapperProps
       },
 
       getHtml(): string {
-        return renderFullHtml(blocks);
+        return renderFullHtml(blocksRef.current);
       },
 
       getSelectedHtml(): string | null {
@@ -148,7 +150,7 @@ const BlocksEditorWrapper = forwardRef<BlocksEditorRef, BlocksEditorWrapperProps
       },
 
       getProjectData(): any {
-        return { blocks };
+        return { blocks: blocksRef.current };
       },
 
       addComponents(html: string) {
