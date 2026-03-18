@@ -39,13 +39,23 @@ async function createSubAccount(businessName: string) {
   const client = getTwilioMasterClient();
   const friendlyName = `steve-ads-${businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
 
-  const subAccount = await client.api.accounts.create({ friendlyName });
-  console.log(`[wa-setup] Created sub-account ${subAccount.sid} for "${businessName}"`);
-
-  return {
-    sid: subAccount.sid,
-    authToken: subAccount.authToken,
-  };
+  try {
+    const subAccount = await client.api.accounts.create({ friendlyName });
+    console.log(`[wa-setup] Created sub-account ${subAccount.sid} for "${businessName}"`);
+    return {
+      sid: subAccount.sid,
+      authToken: subAccount.authToken,
+    };
+  } catch (err: any) {
+    // Trial accounts can't create sub-accounts
+    if (err.code === 20003 || err.message?.includes('upgrade') || err.message?.includes('trial')) {
+      throw new Error(
+        'La cuenta Twilio es Trial y no puede crear sub-cuentas. ' +
+        'Acción requerida: Ir a twilio.com/console → Billing → Upgrade para activar la cuenta completa.'
+      );
+    }
+    throw err;
+  }
 }
 
 // ─── Buy a Chilean mobile number in the sub-account ────────────────────────
@@ -53,21 +63,41 @@ async function createSubAccount(businessName: string) {
 async function buyChileanNumber(subAccountSid: string, subAuthToken: string, businessName: string) {
   const subClient = getTwilioSubClient(subAccountSid, subAuthToken);
 
-  // Search for available Chilean mobile numbers
-  const available = await subClient.availablePhoneNumbers('CL').mobile.list({ limit: 5 });
+  // Try mobile first, then local — wrapped in try/catch because
+  // CL may not have a mobile endpoint at all (Twilio 20404)
+  let available: any[] = [];
+  let numberType = 'mobile';
+
+  try {
+    available = await subClient.availablePhoneNumbers('CL').mobile.list({ limit: 5 });
+  } catch (e: any) {
+    console.log(`[wa-setup] No mobile numbers for CL (${e.message}), trying local...`);
+  }
 
   if (available.length === 0) {
-    // Fallback: try local numbers
-    const localAvailable = await subClient.availablePhoneNumbers('CL').local.list({ limit: 5 });
-    if (localAvailable.length === 0) {
-      throw new Error('No hay números chilenos disponibles en Twilio. Contacta soporte.');
+    numberType = 'local';
+    try {
+      available = await subClient.availablePhoneNumbers('CL').local.list({ limit: 5 });
+    } catch (e: any) {
+      console.log(`[wa-setup] No local numbers for CL either (${e.message}), trying US...`);
     }
-    const number = await subClient.incomingPhoneNumbers.create({
-      phoneNumber: localAvailable[0].phoneNumber,
-      friendlyName: businessName,
-    });
-    console.log(`[wa-setup] Bought local number ${number.phoneNumber} (${number.sid})`);
-    return { phoneNumber: number.phoneNumber, phoneNumberSid: number.sid };
+  }
+
+  // Final fallback: US number (WhatsApp works with any country)
+  if (available.length === 0) {
+    numberType = 'us-local';
+    try {
+      available = await subClient.availablePhoneNumbers('US').local.list({
+        limit: 5,
+        smsEnabled: true,
+      });
+    } catch (e: any) {
+      throw new Error('No hay números disponibles en Twilio (CL mobile, CL local, US). Verifica que la cuenta Twilio esté activa y tenga billing configurado.');
+    }
+  }
+
+  if (available.length === 0) {
+    throw new Error('No hay números disponibles. Verifica billing en Twilio Console.');
   }
 
   const number = await subClient.incomingPhoneNumbers.create({
@@ -75,7 +105,7 @@ async function buyChileanNumber(subAccountSid: string, subAuthToken: string, bus
     friendlyName: businessName,
   });
 
-  console.log(`[wa-setup] Bought mobile number ${number.phoneNumber} (${number.sid})`);
+  console.log(`[wa-setup] Bought ${numberType} number ${number.phoneNumber} (${number.sid})`);
   return { phoneNumber: number.phoneNumber, phoneNumberSid: number.sid };
 }
 
