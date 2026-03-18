@@ -169,6 +169,9 @@ async function handleCreate(
     texts,
     headlines,
     descriptions,
+    // DPA / Catalog fields
+    product_catalog_id,
+    product_set_id,
   } = data;
 
   // Step 1: Use existing campaign or create new one
@@ -262,8 +265,15 @@ async function handleCreate(
       adsetPayload.targeting = JSON.stringify(targetingObj);
     }
 
-    // For conversion-optimized ad sets, Meta requires a promoted_object with pixel_id
-    if (optimization_goal === 'OFFSITE_CONVERSIONS') {
+    // For DPA/Catalog campaigns, use product_catalog_id + product_set_id as promoted_object
+    if (product_catalog_id && product_set_id) {
+      adsetPayload.promoted_object = JSON.stringify({
+        product_catalog_id,
+        product_set_id,
+      });
+      console.log(`[manage-meta-campaign] DPA promoted_object: catalog=${product_catalog_id}, set=${product_set_id}`);
+    } else if (optimization_goal === 'OFFSITE_CONVERSIONS') {
+      // For conversion-optimized ad sets, Meta requires a promoted_object with pixel_id
       try {
         const pixelResult = await metaApiRequest(`act_${accountId}/adspixels`, accessToken, 'GET', { fields: 'id,name', limit: '1' });
         if (pixelResult.ok && pixelResult.data?.data?.[0]?.id) {
@@ -355,6 +365,89 @@ async function handleCreate(
   // Step 3: Create ad creative + ad if creative data is provided
   let adId: string | null = null;
   let creativeId: string | null = null;
+
+  // ---- DPA / Catalog: template creative with dynamic product fields ----
+  if (adSetId && product_catalog_id && product_set_id && pageId) {
+    console.log(`[manage-meta-campaign] Creating DPA template creative for catalog=${product_catalog_id}`);
+
+    const templateData: Record<string, any> = {
+      message: { text: primary_text || (texts && texts[0]) || '{{product.name}}' },
+      name: { text: headline || (headlines && headlines[0]) || '{{product.name}}' },
+      link: { text: destination_url || '{{product.url}}' },
+      description: { text: description || (descriptions && descriptions[0]) || '{{product.price}}' },
+      call_to_action: { type: cta || 'SHOP_NOW' },
+    };
+
+    const dpaStorySpec: Record<string, any> = {
+      page_id: pageId,
+      template_data: templateData,
+    };
+    if (igActorId) dpaStorySpec.instagram_actor_id = igActorId;
+
+    const dpaCreativePayload: Record<string, any> = {
+      name: `${name} - DPA Creative`,
+      object_story_spec: JSON.stringify(dpaStorySpec),
+      product_set_id,
+    };
+
+    const dpaResult = await createCreativeWithRetry(dpaCreativePayload);
+
+    if (!dpaResult.ok) {
+      console.error(`[manage-meta-campaign] DPA creative creation failed: ${dpaResult.error}`);
+      return {
+        body: {
+          success: true,
+          partial: true,
+          campaign_id: campaignId,
+          adset_id: adSetId,
+          creative_error: dpaResult.error,
+          message: 'Campaign + ad set created but DPA creative failed',
+        },
+        status: 207,
+      };
+    }
+
+    creativeId = dpaResult.data.id;
+    console.log(`[manage-meta-campaign] DPA creative created: ${creativeId}`);
+
+    const adPayload = {
+      name: `${name} - DPA Ad`,
+      adset_id: adSetId,
+      creative: JSON.stringify({ creative_id: creativeId }),
+      status,
+    };
+
+    const adResult = await metaApiRequest(`act_${accountId}/ads`, accessToken, 'POST', adPayload);
+
+    if (!adResult.ok) {
+      return {
+        body: {
+          success: true,
+          partial: true,
+          campaign_id: campaignId,
+          adset_id: adSetId,
+          creative_id: creativeId,
+          ad_error: adResult.error,
+          message: 'Campaign + ad set + DPA creative created but ad creation failed',
+        },
+        status: 207,
+      };
+    }
+
+    adId = adResult.data.id;
+    console.log(`[manage-meta-campaign] DPA ad created: ${adId}`);
+
+    return {
+      body: {
+        success: true,
+        campaign_id: campaignId,
+        adset_id: adSetId,
+        creative_id: creativeId,
+        ad_id: adId,
+      },
+      status: 200,
+    };
+  }
 
   // Resolve arrays (multi-slot) or single values (backward compat)
   const allImages: string[] = (imageUrls && imageUrls.length > 0) ? imageUrls : (image_url ? [image_url] : []);

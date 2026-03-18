@@ -1,0 +1,112 @@
+import { Context } from 'hono';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
+
+const META_API_BASE = 'https://graph.facebook.com/v21.0';
+
+export async function metaCatalogs(c: Context) {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader) {
+      return c.json({ error: 'Missing authorization header' }, 401);
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { connection_id } = body;
+
+    if (!connection_id) {
+      return c.json({ error: 'Missing connection_id' }, 400);
+    }
+
+    const { data: connection, error: connError } = await supabase
+      .from('platform_connections')
+      .select(`
+        id, platform, account_id, access_token_encrypted, client_id,
+        clients!inner(user_id, client_user_id)
+      `)
+      .eq('id', connection_id)
+      .eq('platform', 'meta')
+      .single();
+
+    if (connError || !connection) {
+      return c.json({ error: 'Connection not found' }, 404);
+    }
+
+    const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
+    const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
+
+    if (!isOwner) {
+      const { data: adminRole } = await supabase
+        .from('user_roles').select('role').eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      if (!adminRole) {
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
+    }
+
+    if (!connection.access_token_encrypted || !connection.account_id) {
+      return c.json({ error: 'Missing Meta credentials' }, 400);
+    }
+
+    const { data: decryptedToken, error: decryptError } = await supabase
+      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
+
+    if (decryptError || !decryptedToken) {
+      return c.json({ error: 'Failed to decrypt access token' }, 500);
+    }
+
+    const accountId = connection.account_id.replace(/^act_/, '');
+
+    const catalogsUrl = new URL(`${META_API_BASE}/act_${accountId}/product_catalogs`);
+    catalogsUrl.searchParams.set('fields', 'id,name,product_count');
+    catalogsUrl.searchParams.set('limit', '50');
+
+    const catalogsRes = await fetch(catalogsUrl.toString(), {
+      headers: { Authorization: `Bearer ${decryptedToken}` },
+    });
+    const catalogsData: any = await catalogsRes.json();
+
+    if (!catalogsRes.ok) {
+      const msg = catalogsData?.error?.message || 'Failed to fetch catalogs';
+      console.error('[meta-catalogs] Error fetching catalogs:', msg);
+      return c.json({ error: msg }, 502);
+    }
+
+    const catalogs = catalogsData?.data || [];
+
+    const catalogsWithSets = await Promise.all(
+      catalogs.map(async (catalog: any) => {
+        try {
+          const setsUrl = new URL(`${META_API_BASE}/${catalog.id}/product_sets`);
+          setsUrl.searchParams.set('fields', 'id,name,product_count');
+          setsUrl.searchParams.set('limit', '100');
+
+          const setsRes = await fetch(setsUrl.toString(), {
+            headers: { Authorization: `Bearer ${decryptedToken}` },
+          });
+          const setsData: any = await setsRes.json();
+
+          return {
+            ...catalog,
+            product_sets: setsRes.ok ? (setsData?.data || []) : [],
+          };
+        } catch {
+          return { ...catalog, product_sets: [] };
+        }
+      })
+    );
+
+    return c.json({ catalogs: catalogsWithSets });
+  } catch (err: any) {
+    console.error('[meta-catalogs] Unexpected error:', err);
+    return c.json({ error: err?.message || 'Internal server error' }, 500);
+  }
+}

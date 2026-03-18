@@ -1883,6 +1883,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [targetExcludeInterests, setTargetExcludeInterests] = useState<Array<{ id: string; name: string }>>([]);
   const [targetLocations, setTargetLocations] = useState<Array<{ key: string; name: string; type: string; country_name: string }>>([]);
 
+  // DPA / Catalog fields
+  const [catalogs, setCatalogs] = useState<Array<{ id: string; name: string; product_count: number; product_sets: Array<{ id: string; name: string; product_count: number }> }>>([]);
+  const [catalogsLoading, setCatalogsLoading] = useState(false);
+  const [productCatalogId, setProductCatalogId] = useState('');
+  const [productSetId, setProductSetId] = useState('');
+
   // Funnel stage
   const [funnelStage, setFunnelStage] = useState<'tofu' | 'mofu' | 'bofu'>('tofu');
 
@@ -1934,6 +1940,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       return next;
     });
   }, [adSetFormat]);
+
+  // Load catalogs when objective is CATALOG
+  useEffect(() => {
+    if (objective !== 'CATALOG' || !ctxConnectionId || catalogs.length > 0) return;
+    setCatalogsLoading(true);
+    callApi('meta-catalogs', { body: { connection_id: ctxConnectionId } })
+      .then(({ data, error }) => {
+        if (data?.catalogs) setCatalogs(data.catalogs);
+        if (error) toast.error('No se pudieron cargar los catálogos de productos');
+      })
+      .finally(() => setCatalogsLoading(false));
+  }, [objective, ctxConnectionId]);
 
   // Auto-generate campaign name: [Marca]-[OBJ]-[Audiencia]-[MesAño]
   const generateCampaignName = useCallback(() => {
@@ -2068,13 +2086,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         }
       }
       // Check for creative issues (stay on current ad-creative step)
-      const creativeIssues: string[] = [];
-      if (!images.some(Boolean)) creativeIssues.push('Agrega al menos 1 imagen para el anuncio');
-      if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) creativeIssues.push('Genera o escribe el copy (texto + título)');
-      if (!destinationUrl.trim()) creativeIssues.push('Agrega la URL de destino');
-      if (creativeIssues.length > 0) {
-        creativeIssues.forEach((msg) => toast.error(msg));
-        return;
+      const isCatalog = objective === 'CATALOG' && !!productCatalogId && !!productSetId;
+      if (!isCatalog) {
+        const creativeIssues: string[] = [];
+        if (!images.some(Boolean)) creativeIssues.push('Agrega al menos 1 imagen para el anuncio');
+        if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) creativeIssues.push('Genera o escribe el copy (texto + título)');
+        if (!destinationUrl.trim()) creativeIssues.push('Agrega la URL de destino');
+        if (creativeIssues.length > 0) {
+          creativeIssues.forEach((msg) => toast.error(msg));
+          return;
+        }
       }
     }
 
@@ -2093,6 +2114,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       case 'select-adset':
         return !!existingAdsetId || (createNewAdset && !!adsetName.trim());
       case 'campaign-config':
+        if (objective === 'CATALOG') return !!campName.trim() && !!productCatalogId && !!productSetId;
         return !!campName.trim();
       case 'adset-config':
         return !!adsetName.trim() && (budgetType !== 'ABO' || !!adsetBudget);
@@ -2378,7 +2400,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         return;
       }
 
-      if (!images.some(Boolean)) {
+      const isCatalogSubmit = objective === 'CATALOG' && !!productCatalogId && !!productSetId;
+      if (!isCatalogSubmit && !images.some(Boolean)) {
         toast.error('Agrega al menos 1 imagen para el anuncio');
         setSubmitting(false);
         return;
@@ -2431,6 +2454,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       }
       if (existingAdsetId) {
         submitData.adset_id = existingAdsetId;
+      }
+
+      if (objective === 'CATALOG' && productCatalogId && productSetId) {
+        submitData.product_catalog_id = productCatalogId;
+        submitData.product_set_id = productSetId;
       }
 
       // Budget + targeting (required by Meta for new ad sets)
@@ -2695,15 +2723,71 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
               {/* CAMPAIGN CONFIG step (Flow A only) */}
               {currentStep === 'campaign-config' && (
-                <CampaignForm
-                  name={campName} setName={setCampName}
-                  onNameEdited={() => setCampNameEdited(true)}
-                  onSuggestName={() => { setCampNameEdited(false); return generateCampaignName(); }}
-                  budgetType={budgetType} setBudgetType={setBudgetType}
-                  objective={objective} setObjective={setObjective}
-                  dailyBudget={campBudget} setDailyBudget={setCampBudget}
-                  startDate={startDate} setStartDate={setStartDate}
-                />
+                <>
+                  <CampaignForm
+                    name={campName} setName={setCampName}
+                    onNameEdited={() => setCampNameEdited(true)}
+                    onSuggestName={() => { setCampNameEdited(false); return generateCampaignName(); }}
+                    budgetType={budgetType} setBudgetType={setBudgetType}
+                    objective={objective} setObjective={setObjective}
+                    dailyBudget={campBudget} setDailyBudget={setCampBudget}
+                    startDate={startDate} setStartDate={setStartDate}
+                  />
+                  {objective === 'CATALOG' && (
+                    <div className="space-y-4 mt-5 p-4 rounded-lg border border-primary/20 bg-primary/5">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="h-4 w-4 text-primary" />
+                        <Label className="font-semibold">Catálogo de productos (DPA)</Label>
+                      </div>
+                      {catalogsLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Cargando catálogos...
+                        </div>
+                      ) : catalogs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No se encontraron catálogos de productos en esta cuenta de Meta. Asegurate de tener un catálogo configurado en Commerce Manager.</p>
+                      ) : (
+                        <>
+                          <div>
+                            <Label className="text-xs">Catálogo</Label>
+                            <Select value={productCatalogId} onValueChange={(v) => { setProductCatalogId(v); setProductSetId(''); }}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecciona un catálogo" /></SelectTrigger>
+                              <SelectContent>
+                                {catalogs.map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.id}>
+                                    {cat.name} ({cat.product_count} productos)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {productCatalogId && (() => {
+                            const selectedCatalog = catalogs.find((c) => c.id === productCatalogId);
+                            const sets = selectedCatalog?.product_sets || [];
+                            return sets.length > 0 ? (
+                              <div>
+                                <Label className="text-xs">Set de productos</Label>
+                                <Select value={productSetId} onValueChange={setProductSetId}>
+                                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecciona un set" /></SelectTrigger>
+                                  <SelectContent>
+                                    {sets.map((s) => (
+                                      <SelectItem key={s.id} value={s.id}>
+                                        {s.name} ({s.product_count} productos)
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground mt-1">Meta mostrará automáticamente los productos más relevantes a cada persona.</p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Este catálogo no tiene sets de productos configurados.</p>
+                            );
+                          })()}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* ADSET CONFIG step (Flow A and B) */}
