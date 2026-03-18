@@ -87,7 +87,7 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
       }));
   }, [overview]);
 
-  // Industry benchmarks (ecommerce averages from Mailchimp/Klaviyo reports)
+  // Industry benchmarks (ecommerce averages from industry reports 2025)
   const BENCHMARKS = {
     open_rate: 20.0,
     click_rate: 2.5,
@@ -413,7 +413,7 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
               })}
             </div>
             <p className="text-xs text-muted-foreground mt-4 pt-2 border-t">
-              Benchmarks basados en promedios de ecommerce (Mailchimp/Klaviyo 2025)
+              Benchmarks basados en promedios de ecommerce (industria 2025)
             </p>
           </CardContent>
         </Card>
