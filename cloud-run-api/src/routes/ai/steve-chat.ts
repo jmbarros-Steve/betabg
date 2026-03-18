@@ -703,14 +703,21 @@ function sanitizeMessagesForAnthropic(
 }
 
 export async function steveChat(c: Context) {
+  const requestStart = Date.now();
+  const timelog = (label: string) => console.log(`[steve-chat][timing] ${label}: ${Date.now() - requestStart}ms`);
+
   const supabase = getSupabaseAdmin();
 
+  // Auth: support both JWT users and internal service calls
   const user = c.get('user');
-  if (!user) {
+  const isInternal = c.get('isInternal') === true;
+  if (!user && !isInternal) {
+    timelog('auth-rejected');
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
   const { client_id, conversation_id, message, mode } = await c.req.json();
+  timelog('body-parsed');
 
   if (!client_id) {
     return c.json({ error: 'Missing client_id' }, 400);
@@ -722,27 +729,32 @@ export async function steveChat(c: Context) {
     return c.json({ error: `Rate limited. Retry in ${rl.retryAfter} seconds.` }, 429);
   }
 
-  const { data: client, error: clientError } = await supabase
-    .from('clients')
-    .select('id, client_user_id, user_id')
-    .eq('id', client_id)
-    .single();
+  // Parallelize: client lookup + role check are independent
+  const userId = user?.id;
+  const [{ data: client, error: clientError }, { data: roleRow }] = await Promise.all([
+    supabase
+      .from('clients')
+      .select('id, client_user_id, user_id')
+      .eq('id', client_id)
+      .single(),
+    userId
+      ? supabase
+          .from('user_roles')
+          .select('is_super_admin')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  timelog('auth-queries');
 
   if (clientError || !client) {
     return c.json({ error: 'Client not found' }, 404);
   }
 
-  // Check if user is a super admin (can access any client's chat)
-  const { data: roleRow } = await supabase
-    .from('user_roles')
-    .select('is_super_admin')
-    .eq('user_id', user.id)
-    .eq('role', 'admin')
-    .maybeSingle();
+  const isSuperAdmin = isInternal || roleRow?.is_super_admin === true;
 
-  const isSuperAdmin = roleRow?.is_super_admin === true;
-
-  if (!isSuperAdmin && client.client_user_id !== user.id && client.user_id !== user.id) {
+  if (!isSuperAdmin && client.client_user_id !== userId && client.user_id !== userId) {
     return c.json({ error: 'Access denied' }, 403);
   }
 
@@ -784,45 +796,15 @@ export async function steveChat(c: Context) {
       return c.json({ conversation_id: estrategiaConvId });
     }
 
-    // Insert user message
+    // Insert user message (fire-and-forget -- we fetch messages after insert)
     await supabase.from('steve_messages').insert({
       conversation_id: estrategiaConvId,
       role: 'user',
       content: message,
     });
+    timelog('estrategia-msg-insert');
 
-    // Fetch last 20 messages for context window management
-    const { data: convMessages } = await supabase
-      .from('steve_messages')
-      .select('role, content')
-      .eq('conversation_id', estrategiaConvId)
-      .order('created_at', { ascending: true })
-      .limit(40);
-
-    const recentMessages = (convMessages || []).slice(-20);
-
-    // Load client brief (persona_data)
-    const { data: persona } = await supabase
-      .from('buyer_personas')
-      .select('persona_data, is_complete')
-      .eq('client_id', client_id)
-      .maybeSingle();
-
-    const briefSummary = persona?.persona_data
-      ? JSON.stringify(persona.persona_data)
-      : 'Brief no completado aún.';
-
-    // Load brand research
-    const { data: research } = await supabase
-      .from('brand_research')
-      .select('research_type, research_data')
-      .eq('client_id', client_id);
-
-    const researchContext = research?.map((r: { research_type: string; research_data: any }) =>
-      `### ${r.research_type}\n${JSON.stringify(r.research_data).slice(0, 2000)}`
-    ).join('\n\n') || '';
-
-    // Load knowledge base (same pattern as brief mode)
+    // Determine knowledge category (no DB needed)
     const mensajeLower = (message || '').toLowerCase();
     const categoriaRelevante =
       mensajeLower.includes('meta') || mensajeLower.includes('anuncio') || mensajeLower.includes('campaña') ? 'meta_ads' :
@@ -833,20 +815,7 @@ export async function steveChat(c: Context) {
       mensajeLower.includes('shopify') || mensajeLower.includes('tienda') ? 'shopify' :
       'brief';
 
-    const { data: knowledge } = await supabase
-      .from('steve_knowledge')
-      .select('categoria, titulo, contenido')
-      .in('categoria', [categoriaRelevante, 'brief'])
-      .eq('activo', true)
-      .order('orden', { ascending: true })
-      .limit(8);
-
-    const knowledgeCtx = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
-      `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
-    ).join('\n\n') || '';
-
-    // Load real metrics from platform_metrics + campaign_metrics
-    // Use consistent date ranges for ALL sources
+    // Date computations (no I/O)
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0];
@@ -854,25 +823,71 @@ export async function steveChat(c: Context) {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString().split('T')[0];
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000).toISOString().split('T')[0];
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 86400000).toISOString().split('T')[0];
-
-    // Week boundaries (Monday-based)
-    const dayOfWeek = now.getDay() || 7; // 1=Mon .. 7=Sun
+    const dayOfWeek = now.getDay() || 7;
     const thisMonday = new Date(now.getTime() - (dayOfWeek - 1) * 86400000).toISOString().split('T')[0];
     const lastMonday = new Date(now.getTime() - (dayOfWeek + 6) * 86400000).toISOString().split('T')[0];
     const lastSunday = new Date(now.getTime() - dayOfWeek * 86400000).toISOString().split('T')[0];
-
-    // Month boundaries
     const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthStart = lastMonthDate.toISOString().split('T')[0];
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
 
-    // Get client's connections grouped by platform
-    const { data: connections } = await supabase
-      .from('platform_connections')
-      .select('id, platform')
-      .eq('client_id', client_id)
-      .eq('is_active', true);
+    // PARALLELIZED: 5 independent queries that all depend only on client_id / conversation_id
+    const [
+      { data: convMessages },
+      { data: persona },
+      { data: research },
+      { data: knowledge },
+      { data: connections },
+    ] = await Promise.all([
+      // 1. Fetch last messages for context
+      supabase
+        .from('steve_messages')
+        .select('role, content')
+        .eq('conversation_id', estrategiaConvId)
+        .order('created_at', { ascending: true })
+        .limit(40),
+      // 2. Load client brief (persona_data)
+      supabase
+        .from('buyer_personas')
+        .select('persona_data, is_complete')
+        .eq('client_id', client_id)
+        .maybeSingle(),
+      // 3. Load brand research
+      supabase
+        .from('brand_research')
+        .select('research_type, research_data')
+        .eq('client_id', client_id),
+      // 4. Load knowledge base
+      supabase
+        .from('steve_knowledge')
+        .select('categoria, titulo, contenido')
+        .in('categoria', [categoriaRelevante, 'brief'])
+        .eq('activo', true)
+        .order('orden', { ascending: true })
+        .limit(8),
+      // 5. Get client's connections grouped by platform
+      supabase
+        .from('platform_connections')
+        .select('id, platform')
+        .eq('client_id', client_id)
+        .eq('is_active', true),
+    ]);
+    timelog('estrategia-parallel-queries');
+
+    const recentMessages = (convMessages || []).slice(-20);
+
+    const briefSummary = persona?.persona_data
+      ? JSON.stringify(persona.persona_data)
+      : 'Brief no completado aún.';
+
+    const researchContext = research?.map((r: { research_type: string; research_data: any }) =>
+      `### ${r.research_type}\n${JSON.stringify(r.research_data).slice(0, 2000)}`
+    ).join('\n\n') || '';
+
+    const knowledgeCtx = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
+      `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
+    ).join('\n\n') || '';
 
     const connIds = (connections || []).map((c: { id: string }) => c.id);
     const shopifyConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'shopify').map((c: { id: string }) => c.id);
@@ -882,23 +897,24 @@ export async function steveChat(c: Context) {
     let metricsContext = '';
 
     if (connIds.length > 0) {
-      // Fetch ALL platform_metrics for 90 days (for period comparisons)
-      const { data: platformMetrics } = await supabase
-        .from('platform_metrics')
-        .select('metric_type, metric_value, metric_date, currency, connection_id')
-        .in('connection_id', connIds)
-        .gte('metric_date', ninetyDaysAgo)
-        .order('metric_date', { ascending: false })
-        .limit(1000);
-
-      // Fetch campaign_metrics (Meta/Google) for 90 days
-      const { data: campaignMetrics } = await supabase
-        .from('campaign_metrics')
-        .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date, connection_id')
-        .in('connection_id', connIds)
-        .gte('metric_date', ninetyDaysAgo)
-        .order('metric_date', { ascending: false })
-        .limit(1000);
+      // PARALLELIZED: platform_metrics + campaign_metrics are independent
+      const [{ data: platformMetrics }, { data: campaignMetrics }] = await Promise.all([
+        supabase
+          .from('platform_metrics')
+          .select('metric_type, metric_value, metric_date, currency, connection_id')
+          .in('connection_id', connIds)
+          .gte('metric_date', ninetyDaysAgo)
+          .order('metric_date', { ascending: false })
+          .limit(1000),
+        supabase
+          .from('campaign_metrics')
+          .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date, connection_id')
+          .in('connection_id', connIds)
+          .gte('metric_date', ninetyDaysAgo)
+          .order('metric_date', { ascending: false })
+          .limit(1000),
+      ]);
+      timelog('estrategia-metrics-queries');
 
       // Helper: aggregate metrics for a date range and optional connection filter
       function aggregateMetrics(
@@ -1150,6 +1166,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       ? estrategiaSystemPrompt.slice(0, maxSystemLen) + '\n\n[...contexto truncado por límite de tamaño]'
       : estrategiaSystemPrompt;
 
+    timelog('estrategia-pre-anthropic');
     const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1164,6 +1181,8 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
         messages: aiMessages,
       }),
     });
+
+    timelog('estrategia-post-anthropic');
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text().catch(() => '');
@@ -1183,7 +1202,8 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       content: assistantMsg,
     });
 
-    console.log(`Steve estrategia: conversation ${estrategiaConvId}, client ${client_id}`);
+    timelog('estrategia-complete');
+    console.log(`Steve estrategia: conversation ${estrategiaConvId}, client ${client_id}, total ${Date.now() - requestStart}ms`);
 
     return c.json({
       conversation_id: estrategiaConvId,
@@ -1242,6 +1262,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
   }
 
   // CRITICAL: If last turn was a rejection, we're in "retry" mode -- same question, don't advance
+  // Fetch convRow before inserting (needs current state)
   const { data: convRow } = await supabase
     .from('steve_conversations')
     .select('pending_question_index')
@@ -1255,26 +1276,28 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     role: 'user',
     content: message,
   });
+  timelog('brief-msg-insert');
 
-  const { data: messages, error: msgError } = await supabase
-    .from('steve_messages')
-    .select('role, content')
-    .eq('conversation_id', activeConversationId)
-    .order('created_at', { ascending: true });
+  // PARALLELIZED: messages fetch + buyer_personas are independent after insert
+  const [{ data: messages, error: msgError }, { data: existingPersona }] = await Promise.all([
+    supabase
+      .from('steve_messages')
+      .select('role, content')
+      .eq('conversation_id', activeConversationId)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('buyer_personas')
+      .select('persona_data')
+      .eq('client_id', client_id)
+      .maybeSingle(),
+  ]);
+  timelog('brief-parallel-queries');
 
   if (msgError) {
     return c.json({ error: 'Failed to fetch messages' }, 500);
   }
 
   const userMessages = messages?.filter(m => m.role === 'user') || [];
-
-  // BUG 4 FIX: Use stored answered_count as source of truth.
-  // This prevents clarification messages from advancing the question counter.
-  const { data: existingPersona } = await supabase
-    .from('buyer_personas')
-    .select('persona_data')
-    .eq('client_id', client_id)
-    .maybeSingle();
   const dbAnsweredCount: number | null = (existingPersona?.persona_data as any)?.answered_count ?? null;
 
   // -- GUARD: If the brief is already complete, respond as free-chat Steve (no brief logic) --
@@ -1500,6 +1523,7 @@ REGLAS ABSOLUTAS:
     ];
   }
 
+  timelog('brief-pre-anthropic');
   console.log(`Steve chat: conversation ${activeConversationId}, questionIndex ${currentQuestionIndex}${isRetryMode ? ' (retry)' : ''}, messages: ${chatMessages.length}/${BRAND_BRIEF_QUESTIONS.length}`);
 
   // Q16 uses Sonnet for a quick acceptance response (no full brief generation here).
@@ -1531,6 +1555,8 @@ REGLAS ABSOLUTAS:
       messages: userMessages_anthropic,
     }),
   });
+
+  timelog('brief-post-anthropic');
 
   if (!aiResponse.ok) {
     const errorText = await aiResponse.text();
@@ -1729,6 +1755,8 @@ REGLAS ABSOLUTAS:
   const returnAnswered = finalAnswered;
   const nextQuestionIndex = isComplete ? BRAND_BRIEF_QUESTIONS.length - 1 : Math.min(returnAnswered, BRAND_BRIEF_QUESTIONS.length - 1);
   const nextQ = !isComplete ? BRAND_BRIEF_QUESTIONS[nextQuestionIndex] : null;
+
+  timelog('brief-complete');
 
   return c.json({
     conversation_id: activeConversationId,
