@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useState, useCallback, useEffect } fro
 import EmailBlockEditor from '../email-blocks/EmailBlockEditor';
 import { renderBlockToHtml } from '../email-blocks/blockRenderer';
 import { type EmailBlock } from '../email-blocks/blockTypes';
+import { htmlToBlocks } from '../email-blocks/htmlToBlocks';
 import DOMPurify from 'dompurify';
 
 /** Sanitize HTML for email output — strip scripts, event handlers, iframes */
@@ -121,12 +122,18 @@ const BlocksEditorWrapper = forwardRef<BlocksEditorRef, BlocksEditorWrapperProps
         if (projectData?.blocks && Array.isArray(projectData.blocks)) {
           setBlocks(projectData.blocks);
         } else if (html && html.trim()) {
-          // Legacy HTML content — wrap in a single html block
-          setBlocks([{
-            id: crypto.randomUUID(),
-            type: 'html',
-            props: { code: html },
-          }]);
+          // Parse legacy HTML into structured blocks
+          try {
+            const parsed = htmlToBlocks(html);
+            setBlocks(parsed);
+          } catch (err) {
+            console.error('[BlocksEditor] HTML parse failed, falling back to html block:', err);
+            setBlocks([{
+              id: crypto.randomUUID(),
+              type: 'html',
+              props: { code: html },
+            }]);
+          }
         } else {
           setBlocks([]);
         }
