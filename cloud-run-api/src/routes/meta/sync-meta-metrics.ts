@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { checkRateLimit } from '../../lib/rate-limiter.js';
 
 // Currency conversion utilities
 const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -151,6 +152,12 @@ export async function syncMetaMetrics(c: Context) {
 
     if (!connection_id) {
       return c.json({ error: 'Missing connection_id' }, 400);
+    }
+
+    // Rate limit: 10 requests/minute per connection
+    const rl = checkRateLimit(connection_id, 'sync-meta-metrics');
+    if (!rl.allowed) {
+      return c.json({ error: `Rate limited. Retry in ${rl.retryAfter} seconds.` }, 429);
     }
 
     console.log(`Syncing Meta metrics for connection: ${connection_id}`);

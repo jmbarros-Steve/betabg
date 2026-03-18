@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -31,13 +31,22 @@ import { EmailMarketing } from '@/components/client-portal/email/EmailMarketing'
 import { CommandPalette } from '@/components/client-portal/CommandPalette';
 import { BottomNav } from '@/components/client-portal/BottomNav';
 import { OfflineBanner } from '@/components/client-portal/OfflineBanner';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
 import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
+import { IGMetricsDashboard } from '@/components/client-portal/instagram/IGMetricsDashboard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'instagram' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits';
 interface ClientInfo {
   id: string;
   name: string;
@@ -273,6 +282,7 @@ export default function ClientPortal() {
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
     { id: 'estrategia', label: 'Estrategia', icon: Lightbulb },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
+    { id: 'instagram', label: 'Instagram', icon: Instagram },
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
     { id: 'email', label: 'Steve Mail', icon: MailCheck },
@@ -331,7 +341,31 @@ export default function ClientPortal() {
         </div>
       </header>
 
-      <div className="container px-6 py-8 pb-20 md:pb-8">
+      {/* Breadcrumb — hidden on mobile */}
+      <div className="hidden sm:block container px-6 pt-3 pb-0">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink
+                href="#"
+                onClick={(e) => { e.preventDefault(); handleUserNavigate('steve'); }}
+                className="flex items-center gap-1 text-xs"
+              >
+                <Home className="w-3.5 h-3.5" />
+                Home
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-xs">
+                {tabs.find(t => t.id === activeTab)?.label || activeTab}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
+
+      <div className="container px-6 py-8 pb-20 md:pb-8 pt-4 sm:pt-6">
         {/* Tabs — hidden on mobile where BottomNav is used */}
         <div className="hidden md:flex gap-2 mb-8 overflow-x-auto pb-2 relative z-10">
           {primaryTabs.map((tab) => (

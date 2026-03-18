@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getCreativeContext } from '../../lib/creative-context.js';
+import { checkRateLimit } from '../../lib/rate-limiter.js';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -713,6 +714,12 @@ export async function steveChat(c: Context) {
 
   if (!client_id) {
     return c.json({ error: 'Missing client_id' }, 400);
+  }
+
+  // Rate limit: 10 requests/minute per client
+  const rl = checkRateLimit(client_id, 'steve-chat');
+  if (!rl.allowed) {
+    return c.json({ error: `Rate limited. Retry in ${rl.retryAfter} seconds.` }, 429);
   }
 
   const { data: client, error: clientError } = await supabase

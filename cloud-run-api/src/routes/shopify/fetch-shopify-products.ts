@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { checkRateLimit } from '../../lib/rate-limiter.js';
 
 export async function fetchShopifyProducts(c: Context) {
   console.log('[fetch-shopify-products] Request received:', c.req.method);
@@ -53,6 +54,12 @@ export async function fetchShopifyProducts(c: Context) {
 
     if (connError || !connection) {
       return c.json({ error: 'Connection not found' }, 404);
+    }
+
+    // Rate limit: 10 requests/minute per connection
+    const rl = checkRateLimit(connectionId, 'fetch-shopify-products');
+    if (!rl.allowed) {
+      return c.json({ error: `Rate limited. Retry in ${rl.retryAfter} seconds.` }, 429);
     }
 
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };

@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getCreativeContext } from '../../lib/creative-context.js';
 import { detectAngle } from '../../lib/angle-detector.js';
+import { checkRateLimit } from '../../lib/rate-limiter.js';
 
 interface GenerateRequest {
   clientId: string;
@@ -682,6 +683,12 @@ export async function generateMetaCopy(c: Context) {
   const resolvedClientId = body.client_id || body.clientId;
   if (!resolvedClientId) {
     return c.json({ error: 'Missing client_id or clientId' }, 400);
+  }
+
+  // Rate limit: 10 requests/minute per client
+  const rl = checkRateLimit(resolvedClientId, 'generate-meta-copy');
+  if (!rl.allowed) {
+    return c.json({ error: `Rate limited. Retry in ${rl.retryAfter} seconds.` }, 429);
   }
 
   // Verify the authenticated user owns this client
