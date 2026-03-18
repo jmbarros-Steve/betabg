@@ -66,12 +66,15 @@ export async function syncAllMetrics(c: Context) {
           continue;
       }
 
-      // Internal call using service-level auth (cron secret as bearer)
+      // Internal call: pass service role key so authMiddleware allows it
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
       const response = await fetch(`${baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Cron-Secret': cronSecret,
+          'Authorization': `Bearer ${serviceKey}`,
+          'X-Internal-Key': serviceKey,
+          'X-Cron-Secret': cronSecret!,
         },
         body: JSON.stringify(body),
       });
