@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
+import { createTask } from '../../lib/task-creator.js';
 
 /**
  * Reconciliation Cron — Fase 6 paso B.6
@@ -379,6 +380,42 @@ export async function reconciliation(c: Context) {
     const { error: crErr } = await supabase.from('criterio_results').insert(criterioRows);
     if (crErr) {
       console.error('[reconciliation] Failed to write criterio_results:', crErr.message);
+    }
+
+    // Create tasks for critical diffs
+    for (const ch of criticals) {
+      try {
+        await createTask({
+          title: `RECONCILIACION: ${ch.check} — ${ch.details.message || 'fallo critico'}`,
+          description: `Reconciliacion detectó fallo en ${ch.check}.\n\n${JSON.stringify(ch.details, null, 2).slice(0, 1000)}`,
+          priority: 'critica',
+          type: 'bug',
+          source: 'ojos',
+        });
+      } catch (taskErr: any) {
+        console.error(`[reconciliation] Failed to create task for ${ch.check}:`, taskErr.message);
+      }
+    }
+  }
+
+  // Create tasks for warnings with high impact (>10 items affected)
+  const highImpactWarns = checks.filter(ch => {
+    if (ch.status !== 'warn') return false;
+    const d = ch.details;
+    const count = d.drifts?.length || d.phantoms?.length || d.tokens?.length || d.tables?.reduce((s: number, t: any) => s + t.count, 0) || 0;
+    return count >= 10;
+  });
+  for (const ch of highImpactWarns) {
+    try {
+      await createTask({
+        title: `RECONCILIACION: ${ch.check} — ${ch.details.message || 'alerta alta'}`,
+        description: `Reconciliacion detectó alerta de alto impacto en ${ch.check}.\n\n${JSON.stringify(ch.details, null, 2).slice(0, 1000)}`,
+        priority: 'alta',
+        type: 'bug',
+        source: 'ojos',
+      });
+    } catch (taskErr: any) {
+      console.error(`[reconciliation] Failed to create warn task for ${ch.check}:`, taskErr.message);
     }
   }
 

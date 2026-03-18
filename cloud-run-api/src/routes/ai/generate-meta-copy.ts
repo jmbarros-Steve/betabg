@@ -480,7 +480,7 @@ function buildSystemPrompt(briefData: any, adType: string, funnelStage: keyof ty
 █  REGLA #0 — ANTI-ALUCINACIÓN (MÁXIMA PRIORIDAD)                           █
 ███████████████████████████████████████████████████████████████████████████████
 - NUNCA inventes productos, marcas, industrias o temas que NO aparezcan en el contexto de este prompt.
-- NUNCA hables de plantas, macetas, jardines, mascotas, comida u otros temas genéricos a menos que sean los productos REALES del cliente.
+- NUNCA hables de temas que no sean los productos REALES del cliente.
 - Si no hay suficientes datos del cliente, usa SOLO lo que sí tienes (productos de Shopify, propuesta de valor, nombre de marca).
 - Todo el copy DEBE referirse a los productos y la marca REALES del cliente que aparecen abajo.
 - Si generas copy sobre un tema que NO está en los datos del cliente, estás fallando.
@@ -555,7 +555,7 @@ IMPORTANTE:
 - SIGUE las fórmulas de headlines según temperatura
 - Para ${funnelStage.toUpperCase()}: ${funnel.goal}
 - Responde SOLO con JSON, sin texto adicional
-- REGLA ANTI-ALUCINACIÓN: Todo el copy DEBE referirse EXCLUSIVAMENTE a los productos y marca del cliente listados arriba. Si no hay productos listados, usa la propuesta de valor y el nombre de la marca. NUNCA inventes productos, industrias ni temas genéricos. PROHIBIDO hablar de plantas, macetas, jardines, mascotas, comida u otros temas que no estén en los datos del cliente.`;
+- REGLA ANTI-ALUCINACIÓN: Todo el copy DEBE referirse EXCLUSIVAMENTE a los productos y marca del cliente listados arriba. Si no hay productos listados, usa la propuesta de valor y el nombre de la marca. NUNCA inventes productos, industrias ni temas que no estén en los datos del cliente.`;
 }
 
 /**
@@ -637,7 +637,7 @@ REGLA DE VARIEDAD: Cada headline y cada pieza de copy DEBE usar un ángulo creat
 CATÁLOGO DE ÁNGULOS CREATIVOS DISPONIBLES:
 ${CREATIVE_ANGLES_CATALOG.map((a, i) => `${i + 1}. ${a}`).join('\n')}
 
-NUNCA uses referencias a plantas, naturaleza muerta, macetas, jardines o elementos sin vida a menos que el producto sea ESPECÍFICAMENTE de jardinería.
+NUNCA uses referencias a temas, productos o industrias que no correspondan al negocio del cliente.
 `;
 
   if (previousCopies.length > 0) {
@@ -707,7 +707,7 @@ export async function generateMetaCopy(c: Context) {
     const [{ data: briefData }, { data: brandResearch }, { data: kbBugs }, { data: kbKnowledge }] = await Promise.all([
       supabase.from('buyer_personas').select('*').eq('client_id', cId).eq('is_complete', true).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', cId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
+      supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
       supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).limit(10),
     ]);
 
@@ -760,8 +760,8 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas genéricos. PROHIBIDO hablar de plantas, naturaleza muerta, macetas, jardines, mascotas, comida u otros temas que no correspondan al negocio real del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).',
-        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA CRÍTICA: TODO el copy DEBE ser 100% específico para esta marca y sus productos reales. NUNCA inventes productos, industrias o temas genéricos. Si no tienes suficiente contexto, usa los productos de Shopify y la propuesta de valor de la marca. PROHIBIDO hablar de plantas, mascotas, comida u otros temas que no sean del cliente.\n\n${body.instruction}` }],
+        system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas que no estén en los datos del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).',
+        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA ANTI-ALUCINACIÓN: SOLO escribe sobre los productos y marca listados arriba. NO inventes productos ni temas que no aparezcan en los datos del cliente.\n\n${body.instruction}` }],
       }),
     });
     const aiData: any = await resp.json();
@@ -806,10 +806,10 @@ export async function generateMetaCopy(c: Context) {
     const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
     const [{ data: kbBugsVar }, { data: kbKnowledgeVar }] = await Promise.all([
-      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
+      supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
       supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
     ]);
-    const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+    const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}${b.ejemplo_bueno ? `\nBIEN: ${b.ejemplo_bueno}` : ''}`).join('\n\n')}\n` : '';
     const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledgeVar.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
     const [{ data: brandResearchVar }, { data: shopifyProductsVar }, { data: clientInfoVar }] = await Promise.all([
@@ -865,7 +865,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. PROHIBIDO hablar de plantas, naturaleza muerta, macetas, jardines, mascotas, comida u otros temas genéricos que no correspondan al negocio real del cliente. VARIEDAD: Cada variación DEBE usar un ángulo creativo DISTINTO (urgencia, social proof, transformación, curiosidad, problema-solución, aspiracional, datos, storytelling, etc.).',
+        system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. NO hables de temas que no correspondan al negocio real del cliente. VARIEDAD: Cada variación DEBE usar un ángulo creativo DISTINTO (urgencia, social proof, transformación, curiosidad, problema-solución, aspiracional, datos, storytelling, etc.).',
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -895,10 +895,10 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
     const [{ data: kbBugsBV }, { data: kbKnowledgeBV }] = await Promise.all([
-      supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'anuncios').eq('activo', true),
+      supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'anuncios').eq('activo', true),
       supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['anuncios', 'meta_ads']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(15),
     ]);
-    const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+    const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}${b.ejemplo_bueno ? `\nBIEN: ${b.ejemplo_bueno}` : ''}`).join('\n\n')}\n` : '';
     const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
     const [{ data: shopifyProductsBV }, { data: brandResearchBV }, { data: clientInfoBV }] = await Promise.all([
@@ -976,10 +976,10 @@ ${adType === 'static'
     return c.json({ error: 'No completed brand brief found. Please complete the brief with Steve first.' }, 404);
   }
 
-  // Dual-layer learning
+  // Dual-layer learning (global = aggregate stats only, no raw text to prevent cross-client contamination)
   const { data: globalFeedback } = await supabase
     .from('steve_feedback')
-    .select('rating, feedback_text, content_type')
+    .select('rating, content_type')
     .eq('content_type', 'meta_copy')
     .order('created_at', { ascending: false })
     .limit(50);
@@ -996,24 +996,15 @@ ${adType === 'static'
 
   if (globalFeedback && globalFeedback.length > 0) {
     const globalAvgRating = globalFeedback.reduce((sum, f) => sum + (f.rating || 0), 0) / globalFeedback.length;
-    const globalNegative = globalFeedback.filter(f => (f.rating || 0) <= 2 && f.feedback_text);
-    const globalPositive = globalFeedback.filter(f => (f.rating || 0) >= 4 && f.feedback_text);
+    const globalPositiveCount = globalFeedback.filter(f => (f.rating || 0) >= 4).length;
+    const globalNegativeCount = globalFeedback.filter(f => (f.rating || 0) <= 2).length;
 
     learningContext += `
 ═══════════════════════════════════════════════════════════════════════════════
-🧠 STEVE'S GLOBAL LEARNING (Patrones de ${globalFeedback.length} generaciones)
+🧠 STEVE'S GLOBAL LEARNING (${globalFeedback.length} generaciones)
 ═══════════════════════════════════════════════════════════════════════════════
 Rating promedio global: ${globalAvgRating.toFixed(1)}/5
-
-${globalPositive.length > 0 ? `
-✅ PATRONES QUE FUNCIONAN (aprendido de múltiples clientes):
-${globalPositive.slice(0, 5).map(f => `- "${f.feedback_text}"`).join('\n')}
-` : ''}
-
-${globalNegative.length > 0 ? `
-⚠️ PATRONES A EVITAR (errores comunes detectados):
-${globalNegative.slice(0, 5).map(f => `- "${f.feedback_text}"`).join('\n')}
-` : ''}
+Copies bien evaluados: ${globalPositiveCount} | Copies mal evaluados: ${globalNegativeCount}
 `;
   }
 
@@ -1120,13 +1111,13 @@ las preferencias específicas de cada cliente cuando las conozco.
   };
 
   const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }, { data: brandResearchLegacy }, { data: shopifyProductsLegacy }, { data: clientInfoLegacy }] = await Promise.all([
-    supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
+    supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
     supabase.from('steve_knowledge').select('titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
     supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
     supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
   ]);
-  const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
+  const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}${b.ejemplo_bueno ? `\nBIEN: ${b.ejemplo_bueno}` : ''}`).join('\n\n')}\n` : '';
   const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nREGLAS APRENDIDAS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto.\n${kbKnowledgeLegacy.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
   const brandContextLegacy = brandResearchLegacy ? `
@@ -1200,7 +1191,7 @@ ELEMENTOS CLAVE DEL BRIEF A USAR:
 
 ${learningContext}
 
-RECORDATORIO FINAL: El copy DEBE ser 100% sobre los productos y marca del cliente. PROHIBIDO inventar productos o usar temas genéricos como plantas, mascotas, comida, etc. Si no corresponden al negocio real.
+RECORDATORIO FINAL: El copy DEBE ser 100% sobre los productos y marca del cliente. PROHIBIDO inventar productos o usar temas que no correspondan al negocio real.
 
 Genera copies que VENDAN siguiendo las metodologías combinadas y las preferencias aprendidas del cliente.`
         },
