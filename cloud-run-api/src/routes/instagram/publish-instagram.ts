@@ -1,0 +1,505 @@
+/**
+ * Instagram Content Publishing API
+ *
+ * Actions:
+ *   publish        — Publish immediately (IMAGE, CAROUSEL, REELS)
+ *   schedule       — Save to instagram_scheduled_posts for future publish
+ *   list           — List posts for a client
+ *   update         — Update a scheduled post
+ *   delete         — Delete a draft/scheduled post
+ *   generate_caption — AI-generate caption + hashtags from brief
+ *   cron_publish   — Called by cron to publish scheduled posts (no JWT, uses X-Cron-Secret)
+ *
+ * Instagram Graph API flow:
+ *   1. POST /{ig-user-id}/media  → creation container (image_url + caption)
+ *   2. POST /{ig-user-id}/media_publish → publish the container
+ *   For CAROUSEL: create child containers first, then parent container, then publish
+ *   For REELS: use video_url instead of image_url
+ */
+
+import { Context } from 'hono';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
+
+const GRAPH_API = 'https://graph.facebook.com/v21.0';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function getMetaToken(supabase: any, clientId: string): Promise<{ token: string; igUserId: string } | null> {
+  // Get meta connection
+  const { data: conn } = await supabase
+    .from('platform_connections')
+    .select('id, access_token_encrypted, metadata')
+    .eq('client_id', clientId)
+    .eq('platform', 'meta')
+    .eq('is_active', true)
+    .single();
+
+  if (!conn?.access_token_encrypted) return null;
+
+  const { data: token } = await supabase.rpc('decrypt_platform_token', {
+    encrypted_token: conn.access_token_encrypted,
+  });
+
+  if (!token) return null;
+
+  // Get IG user ID from metadata or fetch it
+  let igUserId = (conn.metadata as any)?.ig_user_id;
+
+  if (!igUserId) {
+    // Fetch from API: get pages, then IG business account
+    const pagesResp = await fetch(`${GRAPH_API}/me/accounts?access_token=${token}&fields=id,instagram_business_account`);
+    if (pagesResp.ok) {
+      const pages: any = await pagesResp.json();
+      for (const page of pages.data || []) {
+        if (page.instagram_business_account?.id) {
+          igUserId = page.instagram_business_account.id;
+          // Save for future use
+          await supabase
+            .from('platform_connections')
+            .update({ metadata: { ...(conn.metadata || {}), ig_user_id: igUserId } })
+            .eq('id', conn.id);
+          break;
+        }
+      }
+    }
+  }
+
+  if (!igUserId) return null;
+  return { token, igUserId };
+}
+
+async function createImageContainer(token: string, igUserId: string, imageUrl: string, caption: string): Promise<string> {
+  const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image_url: imageUrl,
+      caption,
+      access_token: token,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Container creation failed: ${resp.status} — ${err.substring(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  return data.id;
+}
+
+async function createReelsContainer(token: string, igUserId: string, videoUrl: string, caption: string): Promise<string> {
+  const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      media_type: 'REELS',
+      video_url: videoUrl,
+      caption,
+      access_token: token,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Reels container failed: ${resp.status} — ${err.substring(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  return data.id;
+}
+
+async function createCarouselContainer(token: string, igUserId: string, imageUrls: string[], caption: string): Promise<string> {
+  // 1. Create child containers (no caption)
+  const childIds: string[] = [];
+  for (const url of imageUrls.slice(0, 10)) {
+    const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_url: url,
+        is_carousel_item: true,
+        access_token: token,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`Carousel child failed: ${resp.status} — ${err.substring(0, 200)}`);
+    }
+    const data: any = await resp.json();
+    childIds.push(data.id);
+  }
+
+  // 2. Create parent container
+  const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      media_type: 'CAROUSEL',
+      children: childIds,
+      caption,
+      access_token: token,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Carousel parent failed: ${resp.status} — ${err.substring(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  return data.id;
+}
+
+async function publishContainer(token: string, igUserId: string, creationId: string): Promise<{ mediaId: string; permalink: string }> {
+  const resp = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      creation_id: creationId,
+      access_token: token,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Publish failed: ${resp.status} — ${err.substring(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  const mediaId = data.id;
+
+  // Get permalink
+  let permalink = '';
+  try {
+    const infoResp = await fetch(`${GRAPH_API}/${mediaId}?fields=permalink&access_token=${token}`);
+    if (infoResp.ok) {
+      const info: any = await infoResp.json();
+      permalink = info.permalink || '';
+    }
+  } catch { /* non-fatal */ }
+
+  return { mediaId, permalink };
+}
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
+
+export async function publishInstagram(c: Context) {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const supabase = getSupabaseAdmin();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { action, client_id } = body;
+
+    if (!client_id) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+
+    switch (action) {
+      // ─── PUBLISH NOW ────────────────────────────────────────
+      case 'publish': {
+        const { media_type = 'IMAGE', image_url, image_urls, video_url, caption = '', hashtags = [] } = body;
+
+        const meta = await getMetaToken(supabase, client_id);
+        if (!meta) {
+          return c.json({ error: 'Meta connection not found or no Instagram Business account linked' }, 400);
+        }
+
+        const fullCaption = hashtags.length > 0
+          ? `${caption}\n\n${hashtags.map((h: string) => h.startsWith('#') ? h : `#${h}`).join(' ')}`
+          : caption;
+
+        let creationId: string;
+
+        if (media_type === 'CAROUSEL' && image_urls?.length > 1) {
+          creationId = await createCarouselContainer(meta.token, meta.igUserId, image_urls, fullCaption);
+        } else if (media_type === 'REELS' && video_url) {
+          creationId = await createReelsContainer(meta.token, meta.igUserId, video_url, fullCaption);
+        } else {
+          const url = image_url || image_urls?.[0];
+          if (!url) return c.json({ error: 'image_url is required' }, 400);
+          creationId = await createImageContainer(meta.token, meta.igUserId, url, fullCaption);
+        }
+
+        // For reels, wait a bit for processing
+        if (media_type === 'REELS') {
+          await new Promise(r => setTimeout(r, 5000));
+        }
+
+        const { mediaId, permalink } = await publishContainer(meta.token, meta.igUserId, creationId);
+
+        // Save record
+        await supabase.from('instagram_scheduled_posts').insert({
+          client_id,
+          ig_user_id: meta.igUserId,
+          media_type,
+          image_url: image_url || image_urls?.[0],
+          image_urls: image_urls || (image_url ? [image_url] : null),
+          video_url,
+          caption,
+          hashtags,
+          status: 'published',
+          published_at: new Date().toISOString(),
+          creation_id: creationId,
+          media_id: mediaId,
+          permalink,
+        });
+
+        return c.json({ success: true, media_id: mediaId, permalink });
+      }
+
+      // ─── SCHEDULE ───────────────────────────────────────────
+      case 'schedule': {
+        const { media_type = 'IMAGE', image_url, image_urls, video_url, caption = '', hashtags = [], scheduled_at } = body;
+
+        if (!scheduled_at) {
+          return c.json({ error: 'scheduled_at is required (ISO 8601)' }, 400);
+        }
+
+        const { data: post, error: insertErr } = await supabase
+          .from('instagram_scheduled_posts')
+          .insert({
+            client_id,
+            media_type,
+            image_url: image_url || image_urls?.[0],
+            image_urls: image_urls || (image_url ? [image_url] : null),
+            video_url,
+            caption,
+            hashtags,
+            status: 'scheduled',
+            scheduled_at,
+          })
+          .select('id')
+          .single();
+
+        if (insertErr) {
+          return c.json({ error: insertErr.message }, 500);
+        }
+
+        return c.json({ success: true, post_id: post.id, scheduled_at });
+      }
+
+      // ─── LIST ───────────────────────────────────────────────
+      case 'list': {
+        const { status: filterStatus, limit = 50 } = body;
+
+        let query = supabase
+          .from('instagram_scheduled_posts')
+          .select('*')
+          .eq('client_id', client_id)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (filterStatus) {
+          query = query.eq('status', filterStatus);
+        }
+
+        const { data: posts, error: listErr } = await query;
+        if (listErr) {
+          return c.json({ error: listErr.message }, 500);
+        }
+
+        return c.json({ posts });
+      }
+
+      // ─── UPDATE ─────────────────────────────────────────────
+      case 'update': {
+        const { post_id, caption, hashtags, scheduled_at, image_url, image_urls, video_url } = body;
+        if (!post_id) return c.json({ error: 'post_id is required' }, 400);
+
+        const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (caption !== undefined) updates.caption = caption;
+        if (hashtags !== undefined) updates.hashtags = hashtags;
+        if (scheduled_at !== undefined) updates.scheduled_at = scheduled_at;
+        if (image_url !== undefined) updates.image_url = image_url;
+        if (image_urls !== undefined) updates.image_urls = image_urls;
+        if (video_url !== undefined) updates.video_url = video_url;
+
+        const { error: updateErr } = await supabase
+          .from('instagram_scheduled_posts')
+          .update(updates)
+          .eq('id', post_id)
+          .eq('client_id', client_id)
+          .in('status', ['draft', 'scheduled']);
+
+        if (updateErr) {
+          return c.json({ error: updateErr.message }, 500);
+        }
+
+        return c.json({ success: true });
+      }
+
+      // ─── DELETE ─────────────────────────────────────────────
+      case 'delete': {
+        const { post_id } = body;
+        if (!post_id) return c.json({ error: 'post_id is required' }, 400);
+
+        const { error: delErr } = await supabase
+          .from('instagram_scheduled_posts')
+          .delete()
+          .eq('id', post_id)
+          .eq('client_id', client_id)
+          .in('status', ['draft', 'scheduled']);
+
+        if (delErr) {
+          return c.json({ error: delErr.message }, 500);
+        }
+
+        return c.json({ success: true });
+      }
+
+      // ─── GENERATE CAPTION + HASHTAGS ────────────────────────
+      case 'generate_caption': {
+        const { topic, tone, product_name } = body;
+
+        // Fetch brand brief
+        const { data: brief } = await supabase
+          .from('brand_research')
+          .select('brand_name, tone_of_voice, target_audience, brand_values, industry')
+          .eq('client_id', client_id)
+          .single();
+
+        const brandName = brief?.brand_name || 'the brand';
+        const toneVoice = tone || brief?.tone_of_voice || 'profesional y cercano';
+        const audience = brief?.target_audience || 'general audience';
+        const industry = brief?.industry || '';
+
+        const prompt = `Generate an Instagram caption and hashtags for ${brandName}.
+Topic: ${topic || 'general brand post'}
+${product_name ? `Product: ${product_name}` : ''}
+Tone: ${toneVoice}
+Target audience: ${audience}
+${industry ? `Industry: ${industry}` : ''}
+
+Return ONLY a JSON object:
+{"caption": "the caption text (max 2200 chars, use line breaks, include CTA)", "hashtags": ["hashtag1", "hashtag2", ...up to 20 relevant hashtags without #]}`;
+
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (!anthropicKey) {
+          return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
+        }
+
+        const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+
+        if (!aiResp.ok) {
+          return c.json({ error: 'AI generation failed' }, 500);
+        }
+
+        const aiData: any = await aiResp.json();
+        const text = aiData.content?.[0]?.text || '';
+
+        try {
+          const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+          return c.json({
+            caption: parsed.caption || '',
+            hashtags: parsed.hashtags || [],
+          });
+        } catch {
+          return c.json({ caption: text, hashtags: [] });
+        }
+      }
+
+      default:
+        return c.json({ error: `Unknown action: ${action}` }, 400);
+    }
+  } catch (err: any) {
+    console.error('publish-instagram error:', err.message);
+    return c.json({ error: err.message }, 500);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CRON: Publish scheduled posts (no JWT, uses X-Cron-Secret)
+// ---------------------------------------------------------------------------
+
+export async function cronPublishInstagram(c: Context) {
+  const cronSecret = c.req.header('X-Cron-Secret') || '';
+  if (cronSecret !== process.env.CRON_SECRET) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const supabase = getSupabaseAdmin();
+  const now = new Date().toISOString();
+
+  // Find posts that are due
+  const { data: duePosts } = await supabase
+    .from('instagram_scheduled_posts')
+    .select('*')
+    .eq('status', 'scheduled')
+    .lte('scheduled_at', now)
+    .limit(20);
+
+  if (!duePosts?.length) {
+    return c.json({ published: 0 });
+  }
+
+  let published = 0;
+  const errors: string[] = [];
+
+  for (const post of duePosts) {
+    try {
+      await supabase.from('instagram_scheduled_posts')
+        .update({ status: 'publishing' })
+        .eq('id', post.id);
+
+      const meta = await getMetaToken(supabase, post.client_id);
+      if (!meta) throw new Error('No Meta/IG connection');
+
+      const fullCaption = post.hashtags?.length > 0
+        ? `${post.caption}\n\n${post.hashtags.map((h: string) => h.startsWith('#') ? h : `#${h}`).join(' ')}`
+        : post.caption;
+
+      let creationId: string;
+
+      if (post.media_type === 'CAROUSEL' && post.image_urls?.length > 1) {
+        creationId = await createCarouselContainer(meta.token, meta.igUserId, post.image_urls, fullCaption);
+      } else if (post.media_type === 'REELS' && post.video_url) {
+        creationId = await createReelsContainer(meta.token, meta.igUserId, post.video_url, fullCaption);
+        await new Promise(r => setTimeout(r, 5000));
+      } else {
+        const url = post.image_url || post.image_urls?.[0];
+        if (!url) throw new Error('No image URL');
+        creationId = await createImageContainer(meta.token, meta.igUserId, url, fullCaption);
+      }
+
+      const { mediaId, permalink } = await publishContainer(meta.token, meta.igUserId, creationId);
+
+      await supabase.from('instagram_scheduled_posts').update({
+        status: 'published',
+        published_at: new Date().toISOString(),
+        creation_id: creationId,
+        media_id: mediaId,
+        permalink,
+        ig_user_id: meta.igUserId,
+      }).eq('id', post.id);
+
+      published++;
+    } catch (err: any) {
+      errors.push(`Post ${post.id}: ${err.message}`);
+      await supabase.from('instagram_scheduled_posts').update({
+        status: 'failed',
+        error: err.message?.substring(0, 500),
+      }).eq('id', post.id);
+    }
+  }
+
+  return c.json({ published, errors: errors.length > 0 ? errors : undefined });
+}

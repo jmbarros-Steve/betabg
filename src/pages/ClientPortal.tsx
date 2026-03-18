@@ -42,6 +42,7 @@ import {
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
 import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
 import { IGMetricsDashboard } from '@/components/client-portal/instagram/IGMetricsDashboard';
+import { InstagramHub } from '@/components/client-portal/InstagramHub';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
@@ -510,6 +511,15 @@ export default function ClientPortal() {
               <TabErrorBoundary tabName="Steve Mail">
                 <div className="max-w-5xl mx-auto">
                   <EmailMarketing clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
+            </div>
+          )}
+          {visitedTabs.has('instagram') && effectiveClientId && (
+            <div className={activeTab !== 'instagram' ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="Instagram">
+                <div className="max-w-5xl mx-auto">
+                  <InstagramHub clientId={effectiveClientId} />
                 </div>
               </TabErrorBoundary>
             </div>
