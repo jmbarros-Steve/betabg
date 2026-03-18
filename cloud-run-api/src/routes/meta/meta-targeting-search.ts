@@ -83,6 +83,7 @@ export async function metaTargetingSearch(c: Context) {
       .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
 
     if (decryptError || !decryptedToken) {
+      console.error('[meta-targeting-search] Token decryption error:', decryptError);
       return c.json({ error: 'Failed to decrypt access token' }, 500);
     }
 

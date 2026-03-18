@@ -128,6 +128,7 @@ export async function metaApiJson<T = any>(
     if (err.name === 'AbortError') {
       return { ok: false, error: { message: 'Request timeout' }, status: 408 };
     }
+    console.error('[metaApiJson] ERROR:', err.message, err.stack);
     return { ok: false, error: { message: err.message }, status: 500 };
   }
 }

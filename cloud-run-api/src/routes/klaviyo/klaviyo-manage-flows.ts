@@ -114,6 +114,7 @@ export async function klaviyoManageFlows(c: Context) {
       .rpc('decrypt_platform_token', { encrypted_token: connection.api_key_encrypted });
 
     if (decryptError || !apiKey) {
+      console.error('[klaviyo-manage-flows] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
       return c.json({ error: 'Token decryption failed' }, 500);
     }
 

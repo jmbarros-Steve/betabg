@@ -109,6 +109,7 @@ export async function klaviyoSmartFormat(c: Context) {
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) {
+      console.error('[klaviyo-smart-format] ANTHROPIC_API_KEY not configured');
       return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
     }
 

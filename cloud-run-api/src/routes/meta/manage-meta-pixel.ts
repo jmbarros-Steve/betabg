@@ -187,6 +187,7 @@ export async function manageMetaPixel(c: Context) {
       .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
 
     if (decryptError || !decryptedToken) {
+      console.error('[manage-meta-pixel] Token decryption error:', decryptError);
       return c.json({ error: 'Failed to decrypt access token' }, 500);
     }
 
