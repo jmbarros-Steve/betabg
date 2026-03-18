@@ -505,6 +505,30 @@ export async function shopifyOauthCallback(c: Context) {
     // Register webhooks
     await registerWebhooks(c, shopDomain, accessToken);
 
+    // Trigger immediate metrics sync (non-blocking)
+    const selfUrl = process.env.SELF_URL;
+    const cronSecret = process.env.CRON_SECRET;
+    if (selfUrl && cronSecret) {
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      const connQuery = existingConnection
+        ? { connectionId: existingConnection.id }
+        : { shop: normalizedShopDomain };
+      fetch(`${selfUrl}/api/sync-shopify-metrics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceKey}`,
+          'X-Internal-Key': serviceKey,
+          'X-Cron-Secret': cronSecret,
+        },
+        body: JSON.stringify(connQuery),
+      }).then(res => {
+        console.log(`[shopify-oauth] Auto-sync triggered: ${res.status}`);
+      }).catch(err => {
+        console.warn('[shopify-oauth] Auto-sync failed (non-blocking):', err.message);
+      });
+    }
+
     // Redirect back to frontend
     if (isDirectRedirect) {
       const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);

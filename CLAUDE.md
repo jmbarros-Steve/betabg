@@ -110,6 +110,13 @@ cd ~/steve && git pull
 - Nicolás W15 — SOLO ESPEJO + holdout tests (evaluación visual)
 - Tomás W7 — SOLO CEREBRO (orquestador, mantenimiento base)
 
+## Sync Métricas cada 6 horas (OpenClaw)
+- Cron ID: `0293cfb4-9790-4921-a0dc-3cc1b9f0aa56`
+- Nombre: `sync-all-metrics-6h`
+- Cada 6 horas sincroniza métricas de Shopify, Meta, Google, Klaviyo
+- Llama POST /api/cron/sync-all-metrics con X-Cron-Secret
+- También se triggerea automáticamente al reconectar Shopify o Meta (OAuth callback)
+
 ## QA Automático cada 4 horas (OpenClaw)
 - Cron ID: `fb005468-3ddb-4e5e-a3c9-f19cb880063f`
 - Nombre: `qa-automatico-4h`
