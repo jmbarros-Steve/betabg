@@ -1034,6 +1034,30 @@ export async function steveChat(c: Context) {
             return `  - "${name}" [${d.status}]: $${Math.round(d.spend).toLocaleString()} gasto, $${Math.round(d.revenue).toLocaleString()} revenue, ROAS ${roas}x, CTR ${ctr}%, ${d.conversions} conv`;
           }).join('\n');
         if (campaignLines) metricsContext += `\nCAMPAÑAS (30 días, por gasto):\n${campaignLines}\n`;
+
+        // Daily Meta/Google ads breakdown (last 14 days) — impressions, clicks, CTR, CPC, spend
+        const adsDailyRows: { date: string; spend: number; impressions: number; clicks: number; conversions: number; revenue: number }[] = [];
+        for (const m of (campaignMetrics || [])) {
+          if (m.metric_date < fourteenDaysAgo) continue;
+          let row = adsDailyRows.find(r => r.date === m.metric_date);
+          if (!row) { row = { date: m.metric_date, spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0 }; adsDailyRows.push(row); }
+          row.spend += Number(m.spend) || 0;
+          row.impressions += Number(m.impressions) || 0;
+          row.clicks += Number(m.clicks) || 0;
+          row.conversions += Number(m.conversions) || 0;
+          row.revenue += Number(m.conversion_value) || 0;
+        }
+        adsDailyRows.sort((a, b) => a.date.localeCompare(b.date));
+        if (adsDailyRows.length > 0) {
+          const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+          metricsContext += `\nDESGLOSE DIARIO Ads (últimos 14 días):\n`;
+          for (const d of adsDailyRows) {
+            const dayName = dayNames[new Date(d.date + 'T12:00:00').getDay()];
+            const ctr = d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(2) : '0';
+            const cpc = d.clicks > 0 ? Math.round(d.spend / d.clicks) : 0;
+            metricsContext += `  ${d.date} (${dayName}): $${Math.round(d.spend).toLocaleString()} gasto, ${d.impressions.toLocaleString()} imp, ${d.clicks} clicks, CTR ${ctr}%, CPC $${cpc.toLocaleString()}, ${d.conversions} conv\n`;
+          }
+        }
       }
 
       // === CROSS-PLATFORM ROAS ===
