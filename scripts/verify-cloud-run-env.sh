@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export PATH="/home/jmbarros/google-cloud-sdk/bin:$PATH"
 # verify-cloud-run-env.sh — Verifica que las env vars críticas estén en Cloud Run
 # Uso: ./scripts/verify-cloud-run-env.sh
 # No contiene secrets — solo verifica existencia.
