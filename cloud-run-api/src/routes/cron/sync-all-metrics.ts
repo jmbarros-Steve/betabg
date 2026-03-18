@@ -24,6 +24,7 @@ export async function syncAllMetrics(c: Context) {
   const { data: connections, error: fetchErr } = await supabase
     .from('platform_connections')
     .select('id, platform, account_id, access_token_encrypted, store_url, client_id')
+    .eq('is_active', true)
     .not('access_token_encrypted', 'is', null);
 
   if (fetchErr || !connections) {

@@ -167,6 +167,27 @@ export async function metaOauthCallback(c: Context) {
 
     console.log('Connection saved successfully');
 
+    // Trigger immediate metrics sync for this connection
+    const selfUrl = process.env.SELF_URL;
+    const cronSecret = process.env.CRON_SECRET;
+    if (selfUrl && cronSecret && connectionResult.data?.id) {
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      fetch(`${selfUrl}/api/sync-meta-metrics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceKey}`,
+          'X-Internal-Key': serviceKey,
+          'X-Cron-Secret': cronSecret,
+        },
+        body: JSON.stringify({ connection_id: connectionResult.data.id }),
+      }).then(res => {
+        console.log(`[meta-oauth] Auto-sync triggered: ${res.status}`);
+      }).catch(err => {
+        console.warn('[meta-oauth] Auto-sync failed (non-blocking):', err.message);
+      });
+    }
+
     const allAccounts = adAccounts.map((a: any) => ({
       id: a.id.replace('act_', ''),
       name: a.name,
