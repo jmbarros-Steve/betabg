@@ -15,6 +15,7 @@ import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPane
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
 import { ShopifyOrdersPanel } from './ShopifyOrdersPanel';
 import { ShopifyDiscountsPanel } from './ShopifyDiscountsPanel';
+import { ShopifyCustomersPanel } from './ShopifyCustomersPanel';
 import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { Coachmark } from '@/components/client-portal/Coachmark';
 
@@ -454,6 +455,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
       {/* Productos de Shopify */}
       <ShopifyProductsPanel clientId={clientId} />
+
+      {/* Clientes */}
+      <ShopifyCustomersPanel clientId={clientId} />
     </div>
   );
 }
