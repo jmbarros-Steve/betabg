@@ -22,10 +22,12 @@ CREATE INDEX IF NOT EXISTS idx_backlog_priority ON backlog(priority);
 
 ALTER TABLE backlog ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Service role full access backlog" ON backlog;
 CREATE POLICY "Service role full access backlog"
   ON backlog FOR ALL
   USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "Authenticated read backlog" ON backlog;
 CREATE POLICY "Authenticated read backlog"
   ON backlog FOR SELECT
   USING (auth.role() = 'authenticated');

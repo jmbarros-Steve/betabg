@@ -29,5 +29,11 @@ ALTER TABLE email_lists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_list_members ENABLE ROW LEVEL SECURITY;
 
 -- Service role has full access (API handles auth)
-CREATE POLICY "service_role_email_lists" ON email_lists FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_email_list_members" ON email_list_members FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_email_lists" ON email_lists;
+DROP POLICY IF EXISTS "service_role_email_lists" ON email_lists;
+CREATE POLICY "service_role_email_lists"
+  ON email_lists FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "service_role_email_list_members" ON email_list_members;
+DROP POLICY IF EXISTS "service_role_email_list_members" ON email_list_members;
+CREATE POLICY "service_role_email_list_members"
+  ON email_list_members FOR ALL TO service_role USING (true) WITH CHECK (true);

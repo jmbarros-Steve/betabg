@@ -21,11 +21,15 @@ CREATE INDEX IF NOT EXISTS idx_email_lists_client ON email_lists(client_id, acti
 ALTER TABLE email_lists ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Service role full access email_lists" ON email_lists;
-CREATE POLICY "Service role full access email_lists" ON email_lists
+DROP POLICY IF EXISTS "Service role full access email_lists" ON email_lists;
+CREATE POLICY "Service role full access email_lists"
+  ON email_lists
   FOR ALL USING (auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS "Users read own email_lists" ON email_lists;
-CREATE POLICY "Users read own email_lists" ON email_lists
+DROP POLICY IF EXISTS "Users read own email_lists" ON email_lists;
+CREATE POLICY "Users read own email_lists"
+  ON email_lists
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM clients

@@ -10,15 +10,18 @@ CREATE TABLE IF NOT EXISTS wa_credits (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_wa_credits_shop ON wa_credits(shop_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_wa_credits_type ON wa_credits(type, shop_id);
+-- Note: wa_credits table already has proper indexes from 20260317100003_whatsapp_tables.sql
 
 ALTER TABLE wa_credits ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Service role full access wa_credits" ON wa_credits;
-CREATE POLICY "Service role full access wa_credits" ON wa_credits
+DROP POLICY IF EXISTS "Service role full access wa_credits" ON wa_credits;
+CREATE POLICY "Service role full access wa_credits"
+  ON wa_credits
   FOR ALL USING (auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS "Shop read own wa_credits" ON wa_credits;
-CREATE POLICY "Shop read own wa_credits" ON wa_credits
+DROP POLICY IF EXISTS "Shop read own wa_credits" ON wa_credits;
+CREATE POLICY "Shop read own wa_credits"
+  ON wa_credits
   FOR SELECT USING (true);

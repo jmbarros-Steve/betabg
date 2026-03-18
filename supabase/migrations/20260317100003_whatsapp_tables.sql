@@ -127,7 +127,15 @@ ALTER TABLE wa_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wa_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wa_automations ENABLE ROW LEVEL SECURITY;
 
--- Service role full access
+-- Service role full access (drop first to be idempotent)
+DROP POLICY IF EXISTS "Service role full access wa_twilio_accounts" ON wa_twilio_accounts;
+DROP POLICY IF EXISTS "Service role full access wa_credits" ON wa_credits;
+DROP POLICY IF EXISTS "Service role full access wa_credit_transactions" ON wa_credit_transactions;
+DROP POLICY IF EXISTS "Service role full access wa_messages" ON wa_messages;
+DROP POLICY IF EXISTS "Service role full access wa_conversations" ON wa_conversations;
+DROP POLICY IF EXISTS "Service role full access wa_campaigns" ON wa_campaigns;
+DROP POLICY IF EXISTS "Service role full access wa_automations" ON wa_automations;
+
 CREATE POLICY "Service role full access wa_twilio_accounts" ON wa_twilio_accounts FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access wa_credits" ON wa_credits FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access wa_credit_transactions" ON wa_credit_transactions FOR ALL USING (auth.role() = 'service_role');
@@ -137,6 +145,14 @@ CREATE POLICY "Service role full access wa_campaigns" ON wa_campaigns FOR ALL US
 CREATE POLICY "Service role full access wa_automations" ON wa_automations FOR ALL USING (auth.role() = 'service_role');
 
 -- Users can read their own data
+DROP POLICY IF EXISTS "Users read own wa_twilio_accounts" ON wa_twilio_accounts;
+DROP POLICY IF EXISTS "Users read own wa_credits" ON wa_credits;
+DROP POLICY IF EXISTS "Users read own wa_credit_transactions" ON wa_credit_transactions;
+DROP POLICY IF EXISTS "Users read own wa_messages" ON wa_messages;
+DROP POLICY IF EXISTS "Users read own wa_conversations" ON wa_conversations;
+DROP POLICY IF EXISTS "Users read own wa_campaigns" ON wa_campaigns;
+DROP POLICY IF EXISTS "Users read own wa_automations" ON wa_automations;
+
 CREATE POLICY "Users read own wa_twilio_accounts" ON wa_twilio_accounts FOR SELECT USING (true);
 CREATE POLICY "Users read own wa_credits" ON wa_credits FOR SELECT USING (true);
 CREATE POLICY "Users read own wa_credit_transactions" ON wa_credit_transactions FOR SELECT USING (true);
