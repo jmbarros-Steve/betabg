@@ -156,9 +156,9 @@ export async function syncShopifyMetrics(c: Context) {
       return results;
     }
 
-    // Fetch orders from Shopify (last 30 days)
+    // Fetch orders from Shopify (last 90 days — enables period comparisons)
     const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 90);
 
     const shopifyUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${thirtyDaysAgo.toISOString()}&limit=250`;
 

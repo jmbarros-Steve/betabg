@@ -846,6 +846,19 @@ export async function steveChat(c: Context) {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0];
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString().split('T')[0];
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000).toISOString().split('T')[0];
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 86400000).toISOString().split('T')[0];
+
+    // Week boundaries (Monday-based)
+    const dayOfWeek = now.getDay() || 7; // 1=Mon .. 7=Sun
+    const thisMonday = new Date(now.getTime() - (dayOfWeek - 1) * 86400000).toISOString().split('T')[0];
+    const lastMonday = new Date(now.getTime() - (dayOfWeek + 6) * 86400000).toISOString().split('T')[0];
+    const lastSunday = new Date(now.getTime() - dayOfWeek * 86400000).toISOString().split('T')[0];
+
+    // Month boundaries
+    const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthStart = lastMonthDate.toISOString().split('T')[0];
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
 
     // Get client's connections grouped by platform
     const { data: connections } = await supabase
@@ -862,23 +875,23 @@ export async function steveChat(c: Context) {
     let metricsContext = '';
 
     if (connIds.length > 0) {
-      // Fetch ALL platform_metrics for 60 days (for period comparisons)
+      // Fetch ALL platform_metrics for 90 days (for period comparisons)
       const { data: platformMetrics } = await supabase
         .from('platform_metrics')
         .select('metric_type, metric_value, metric_date, currency, connection_id')
         .in('connection_id', connIds)
-        .gte('metric_date', sixtyDaysAgo)
+        .gte('metric_date', ninetyDaysAgo)
         .order('metric_date', { ascending: false })
-        .limit(500);
+        .limit(1000);
 
-      // Fetch campaign_metrics (Meta/Google) for 60 days
+      // Fetch campaign_metrics (Meta/Google) for 90 days
       const { data: campaignMetrics } = await supabase
         .from('campaign_metrics')
         .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date, connection_id')
         .in('connection_id', connIds)
-        .gte('metric_date', sixtyDaysAgo)
+        .gte('metric_date', ninetyDaysAgo)
         .order('metric_date', { ascending: false })
-        .limit(500);
+        .limit(1000);
 
       // Helper: aggregate metrics for a date range and optional connection filter
       function aggregateMetrics(
@@ -943,6 +956,52 @@ export async function steveChat(c: Context) {
         metricsContext += `- vs 30 días anteriores: ${pctChange30}% ${Number(pctChange30) > 0 ? '📈' : Number(pctChange30) < 0 ? '📉' : '➡️'}\n`;
         metricsContext += `- Últimos 7 días: $${rev7.toLocaleString()} CLP en ${ord7} pedidos\n`;
         metricsContext += `- vs 7 días anteriores: ${pctChange7}% ${Number(pctChange7) > 0 ? '📈' : Number(pctChange7) < 0 ? '📉' : '➡️'}\n`;
+
+        // Week comparison (this week Mon-today vs last week Mon-Sun)
+        const thisWeek = aggregateMetrics(platformMetrics, thisMonday, today, shopifyConnIds);
+        const lastWeek = aggregateMetrics(platformMetrics, lastMonday, lastSunday, shopifyConnIds);
+        const twRev = Math.round(thisWeek.revenue || 0);
+        const lwRev = Math.round(lastWeek.revenue || 0);
+        const twOrd = Math.round(thisWeek.orders || 0);
+        const lwOrd = Math.round(lastWeek.orders || 0);
+        if (twRev > 0 || lwRev > 0) {
+          const weekPct = lwRev > 0 ? ((twRev - lwRev) / lwRev * 100).toFixed(1) : 'N/A';
+          metricsContext += `- Esta semana (${thisMonday} a hoy): $${twRev.toLocaleString()} CLP, ${twOrd} pedidos\n`;
+          metricsContext += `- Semana anterior (${lastMonday} a ${lastSunday}): $${lwRev.toLocaleString()} CLP, ${lwOrd} pedidos (${weekPct}%)\n`;
+        }
+
+        // Month comparison (this month vs last month)
+        const thisMonth = aggregateMetrics(platformMetrics, thisMonthStart, today, shopifyConnIds);
+        const lastMonth = aggregateMetrics(platformMetrics, lastMonthStart, lastMonthEnd, shopifyConnIds);
+        const tmRev = Math.round(thisMonth.revenue || 0);
+        const lmRev = Math.round(lastMonth.revenue || 0);
+        const tmOrd = Math.round(thisMonth.orders || 0);
+        const lmOrd = Math.round(lastMonth.orders || 0);
+        if (tmRev > 0 || lmRev > 0) {
+          const monthPct = lmRev > 0 ? ((tmRev - lmRev) / lmRev * 100).toFixed(1) : 'N/A';
+          metricsContext += `- Este mes (desde ${thisMonthStart}): $${tmRev.toLocaleString()} CLP, ${tmOrd} pedidos\n`;
+          metricsContext += `- Mes anterior: $${lmRev.toLocaleString()} CLP, ${lmOrd} pedidos (${monthPct}%)\n`;
+        }
+
+        // Daily breakdown (last 14 days) — enables Steve to answer "how was Monday?"
+        const dailyRows: { date: string; rev: number; ord: number }[] = [];
+        for (const m of (platformMetrics || [])) {
+          if (!shopifyConnIds.includes(m.connection_id)) continue;
+          if (m.metric_date < fourteenDaysAgo) continue;
+          let row = dailyRows.find(r => r.date === m.metric_date);
+          if (!row) { row = { date: m.metric_date, rev: 0, ord: 0 }; dailyRows.push(row); }
+          if (m.metric_type === 'revenue') row.rev += Number(m.metric_value) || 0;
+          if (m.metric_type === 'orders') row.ord += Number(m.metric_value) || 0;
+        }
+        dailyRows.sort((a, b) => a.date.localeCompare(b.date));
+        if (dailyRows.length > 0) {
+          const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+          metricsContext += `\nDESGLOSE DIARIO Shopify (últimos 14 días):\n`;
+          for (const d of dailyRows) {
+            const dayName = dayNames[new Date(d.date + 'T12:00:00').getDay()];
+            metricsContext += `  ${d.date} (${dayName}): $${Math.round(d.rev).toLocaleString()} CLP, ${Math.round(d.ord)} pedidos\n`;
+          }
+        }
       }
 
       // === META/GOOGLE ADS METRICS (same 30-day period) ===
@@ -1024,15 +1083,17 @@ ROL: Consultor estratégico libre. El cliente puede preguntarte CUALQUIER COSA s
 
 IMPORTANTE — MÉTRICAS Y DATOS:
 1. Tienes acceso a las métricas REALES del cliente. ÚSALAS. Cita números concretos.
-2. TODOS los datos de Shopify y Meta/Google usan el MISMO período (30 días). Puedes comparar directamente.
-3. Tienes datos de 30 días actuales Y 30 días anteriores para comparar tendencias.
+2. TODOS los datos de Shopify y Meta/Google usan el MISMO período. Puedes comparar directamente.
+3. Tienes datos de 90 días: 30d actuales, 30d anteriores, y 30d más para contexto.
 4. Tienes datos de 7 días actuales Y 7 días anteriores para análisis de corto plazo.
-5. SIEMPRE menciona el período cuando des números: "en los últimos 30 días", "esta semana vs la anterior", etc.
-6. Si el usuario pide comparar períodos, usa los datos de 30d vs 30d anteriores o 7d vs 7d anteriores.
-7. NUNCA digas "no tengo acceso" ni "no puedo ver tus métricas". SÍ tienes los datos — están abajo.
-8. Si un dato específico NO está disponible, di exactamente qué falta y por qué (ej: "no tengo datos de Google Ads porque no está conectado").
-9. Da respuestas CONCRETAS con números. Nada de respuestas vacías o evasivas.
-10. El ROAS cruzado (Shopify revenue / Ad spend) es la métrica más importante — úsala.
+5. Tienes ESTA SEMANA vs SEMANA ANTERIOR y ESTE MES vs MES ANTERIOR con números exactos.
+6. Tienes un DESGLOSE DIARIO de los últimos 14 días — úsalo para responder preguntas como "cómo fue el lunes", "qué día vendimos más", "tendencia de esta semana día a día".
+7. SIEMPRE menciona el período cuando des números: "en los últimos 30 días", "esta semana vs la anterior", etc.
+8. Si el usuario pide comparar períodos, usa los datos disponibles: semana, mes, 7d, 30d. Sé específico con las fechas.
+9. NUNCA digas "no tengo acceso" ni "no puedo ver tus métricas". SÍ tienes los datos — están abajo.
+10. Si un dato específico NO está disponible, di exactamente qué falta y por qué (ej: "no tengo datos de Google Ads porque no está conectado").
+11. Da respuestas CONCRETAS con números. Nada de respuestas vacías o evasivas.
+12. El ROAS cruzado (Shopify revenue / Ad spend) es la métrica más importante — úsala.
 
 NO eres un cuestionario. NO hagas preguntas estructuradas. Simplemente conversa y asesora.
 
