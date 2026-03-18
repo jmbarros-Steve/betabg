@@ -14,6 +14,7 @@ import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
 import { ShopifyOrdersPanel } from './ShopifyOrdersPanel';
+import { ShopifyDiscountsPanel } from './ShopifyDiscountsPanel';
 import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { Coachmark } from '@/components/client-portal/Coachmark';
 
@@ -447,6 +448,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
       {/* Pedidos recientes */}
       <ShopifyOrdersPanel clientId={clientId} />
+
+      {/* Descuentos activos */}
+      <ShopifyDiscountsPanel clientId={clientId} />
 
       {/* Productos de Shopify */}
       <ShopifyProductsPanel clientId={clientId} />

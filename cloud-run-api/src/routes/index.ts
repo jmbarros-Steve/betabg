@@ -52,6 +52,9 @@ import { fetchShopifyCollections } from './shopify/fetch-shopify-collections.js'
 import { createShopifyDiscount } from './shopify/create-shopify-discount.js';
 import { shopifySessionValidate } from './shopify/shopify-session-validate.js';
 import { syncShopifyMetrics } from './shopify/sync-shopify-metrics.js';
+import { fetchShopifyDiscounts } from './shopify/fetch-shopify-discounts.js';
+import { fetchShopifyCustomers } from './shopify/fetch-shopify-customers.js';
+import { updateShopifyProduct } from './shopify/update-shopify-product.js';
 
 // Phase 3: Google
 import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
@@ -247,7 +250,10 @@ export function registerRoutes(app: Hono) {
   app.post('/api/create-shopify-discount', authMiddleware, createShopifyDiscount);
   app.post('/api/shopify-session-validate', shopifySessionValidate); // Uses Shopify session token, no JWT
   app.post('/api/sync-shopify-metrics', authMiddleware, syncShopifyMetrics);
+  app.post('/api/fetch-shopify-discounts', authMiddleware, fetchShopifyDiscounts);
   app.post('/api/store-shopify-credentials', authMiddleware, storeShopifyCredentials);
+  app.post('/api/fetch-shopify-customers', authMiddleware, fetchShopifyCustomers);
+  app.post('/api/update-shopify-product', authMiddleware, updateShopifyProduct);
 
   // ============================================================
   // Phase 3: Platform Integrations (Google + Other)
