@@ -27,6 +27,7 @@ import { steveBulkAnalyze } from './ai/steve-bulk-analyze.js';
 import { generateMetaCopy } from './ai/generate-meta-copy.js';
 import { generateImage } from './ai/generate-image.js';
 import { generateVideo } from './ai/generate-video.js';
+import { generateVideoScript } from './ai/generate-video-script.js';
 import { generateMassCampaigns } from './ai/generate-mass-campaigns.js';
 import { analyzeBrand } from './ai/analyze-brand.js';
 import { analyzeBrandResearch } from './ai/analyze-brand-research.js';
@@ -73,6 +74,9 @@ import { klaviyoSmartFormat } from './klaviyo/klaviyo-smart-format.js';
 import { syncKlaviyoMetrics } from './klaviyo/sync-klaviyo-metrics.js';
 import { previewFlowEmails } from './klaviyo/preview-flow-emails.js';
 
+// Phase 3: Instagram
+import { publishInstagram, cronPublishInstagram } from './instagram/publish-instagram.js';
+
 // Phase 3: Meta
 import { checkMetaScopes } from './meta/check-meta-scopes.js';
 import { fetchMetaAdAccounts } from './meta/fetch-meta-ad-accounts.js';
@@ -85,6 +89,10 @@ import { metaDataDeletion } from './meta/meta-data-deletion.js';
 import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
 import { manageMetaRules } from './meta/manage-meta-rules.js';
 import { metaTargetingSearch } from './meta/meta-targeting-search.js';
+import { detectAudienceOverlap } from './meta/detect-audience-overlap.js';
+
+// Instagram
+import { fetchInstagramInsights } from './instagram/fetch-instagram-insights.js';
 
 // WhatsApp
 import { setupMerchantHandler } from './whatsapp/setup-merchant.js';
@@ -160,6 +168,7 @@ import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-a
 import { smartSendTime } from './email/smart-send-time.js';
 import { emailSendQueue } from './email/send-queue.js';
 import { emailListCleanup } from './email/list-cleanup.js';
+import { uploadEmailImage } from './email/upload-email-image.js';
 import { manageEmailLists } from './email/manage-email-lists.js';
 
 /**
@@ -240,6 +249,18 @@ export function registerRoutes(app: Hono) {
   app.post('/api/sync-meta-metrics', authMiddleware, syncMetaMetrics);
   app.post('/api/manage-meta-rules', authMiddleware, manageMetaRules);
   app.post('/api/meta-targeting-search', authMiddleware, metaTargetingSearch);
+  app.post('/api/detect-audience-overlap', authMiddleware, detectAudienceOverlap);
+
+  // ============================================================
+  // Phase 3: Platform Integrations (Instagram)
+  // ============================================================
+  app.post('/api/publish-instagram', authMiddleware, publishInstagram);
+  app.post('/api/cron/publish-instagram', cronPublishInstagram); // No JWT — uses X-Cron-Secret
+
+  // ============================================================
+  // Phase 3: Platform Integrations (Instagram)
+  // ============================================================
+  app.post('/api/fetch-instagram-insights', authMiddleware, fetchInstagramInsights);
 
   // ============================================================
   // Phase 3: Platform Integrations (Shopify)
@@ -287,6 +308,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/verify-email-domain', authMiddleware, verifyEmailDomain);
   app.post('/api/email-campaign-analytics', authMiddleware, emailCampaignAnalytics);
   app.post('/api/generate-steve-mail-content', authMiddleware, generateSteveMailContent);
+  app.post('/api/upload-email-image', authMiddleware, uploadEmailImage);
 
   // Product recommendations (auth required)
   app.post('/api/email-product-recommendations', authMiddleware, productRecommendations);
@@ -354,7 +376,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/competitor-spy', competitorSpy); // No JWT — uses X-Cron-Secret, weekly: 0 6 * * 1 (Mon 6am Chile)
   app.post('/api/cron/rule-calibrator', ruleCalibrator); // No JWT — uses X-Cron-Secret, weekly: 0 3 * * 0 (Sun 3am)
   app.post('/api/cron/auto-rule-generator', autoRuleGenerator); // No JWT — uses X-Cron-Secret, on-demand from qa_log
-  app.post('/api/cron/weekly-report', weeklyReport); // No JWT — uses X-Cron-Secret, weekly: 0 8 * * 5 (Fri 8am)
+  app.post('/api/cron/weekly-report', weeklyReport); // No JWT — uses X-Cron-Secret, weekly: 0 11 * * 1 (Mon 11am UTC = 8am Chile)
   app.post('/api/cron/root-cause-analysis', rootCauseAnalysis); // No JWT — uses X-Cron-Secret, weekly: 0 2 * * 0 (Sun 2am)
   app.post('/api/cron/auto-postmortem', autoPostmortem); // No JWT — uses X-Cron-Secret, on-demand when critical task completes
   app.post('/api/cron/restart-service', restartService); // No JWT — uses X-Cron-Secret, called by OJOS health-check

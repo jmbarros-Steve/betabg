@@ -1,15 +1,155 @@
 import { Context } from 'hono';
+import { Resend } from 'resend';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 /**
- * Weekly Report — Paso C.7 (QA Scorecard) + Paso D.7 (Mejora Continua)
- * Generates a weekly summary with:
- * - QA Scorecard: errors, MTTR, autofix rate, self-healed tests, new rules, repeated errors
- * - Mejora Continua: creative performance scores, trend vs last week
+ * Weekly Report — Merchant-facing + QA Scorecard
+ * Generates a weekly summary per merchant with:
+ * - Merchant report: sales, top campaign, CPA trend, recommended action
+ * - QA Scorecard: errors, MTTR, autofix rate
+ * - Mejora Continua: creative performance scores
  *
- * Cron: 0 8 * * 5 (Friday 8am)
+ * Sends report via Resend email to each merchant.
+ *
+ * Cron: 0 11 * * 1 (Monday 11am UTC = 8am Chile)
  * Auth: X-Cron-Secret header
  */
+
+let resend: Resend | null = null;
+function getResend(): Resend {
+  if (!resend) resend = new Resend(process.env.RESEND_API_KEY!);
+  return resend;
+}
+
+function formatCLP(value: number): string {
+  return '$' + Math.round(value).toLocaleString('es-CL');
+}
+
+function getWeekLabel(): string {
+  const now = new Date();
+  const day = now.getDate();
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${day} de ${months[now.getMonth()]}`;
+}
+
+// ─── Merchant report HTML ────────────────────────────────────────────────────
+
+function buildMerchantEmailHtml(params: {
+  brandName: string;
+  weekLabel: string;
+  totalSales: number;
+  lastWeekSales: number;
+  topCampaignName: string | null;
+  topCampaignSpend: number;
+  topCampaignResults: number;
+  cpaThisWeek: number | null;
+  cpaLastWeek: number | null;
+  recommendedAction: string;
+}): string {
+  const {
+    brandName, weekLabel, totalSales, lastWeekSales,
+    topCampaignName, topCampaignSpend, topCampaignResults,
+    cpaThisWeek, cpaLastWeek, recommendedAction,
+  } = params;
+
+  const salesDelta = lastWeekSales > 0
+    ? Math.round(((totalSales - lastWeekSales) / lastWeekSales) * 100)
+    : 0;
+  const salesTrendIcon = salesDelta >= 0 ? '📈' : '📉';
+  const salesTrendColor = salesDelta >= 0 ? '#16a34a' : '#dc2626';
+
+  const cpaDelta = cpaThisWeek && cpaLastWeek && cpaLastWeek > 0
+    ? Math.round(((cpaThisWeek - cpaLastWeek) / cpaLastWeek) * 100)
+    : null;
+  const cpaTrendIcon = cpaDelta !== null ? (cpaDelta <= 0 ? '✅' : '⚠️') : '';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reporte Semanal Steve Ads</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:600px;">
+
+<!-- Header -->
+<tr><td style="background:linear-gradient(135deg,#1e293b,#334155);padding:32px 24px;text-align:center;">
+  <h1 style="color:#ffffff;margin:0;font-size:22px;">📊 Reporte Semanal</h1>
+  <p style="color:#94a3b8;margin:8px 0 0;font-size:14px;">${brandName} — Semana del ${weekLabel}</p>
+</td></tr>
+
+<!-- Sales KPI -->
+<tr><td style="padding:24px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;width:50%;">
+      <p style="margin:0;color:#64748b;font-size:12px;text-transform:uppercase;">Ventas Totales</p>
+      <p style="margin:8px 0 4px;font-size:28px;font-weight:bold;color:#0f172a;">${formatCLP(totalSales)}</p>
+      <p style="margin:0;font-size:13px;color:${salesTrendColor};">${salesTrendIcon} ${salesDelta >= 0 ? '+' : ''}${salesDelta}% vs semana anterior</p>
+    </td>
+    <td style="width:16px;"></td>
+    <td style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;width:50%;">
+      <p style="margin:0;color:#64748b;font-size:12px;text-transform:uppercase;">CPA Promedio</p>
+      <p style="margin:8px 0 4px;font-size:28px;font-weight:bold;color:#0f172a;">${cpaThisWeek ? formatCLP(cpaThisWeek) : 'N/A'}</p>
+      <p style="margin:0;font-size:13px;color:#64748b;">${cpaTrendIcon} ${cpaDelta !== null ? `${cpaDelta <= 0 ? '' : '+'}${cpaDelta}% vs anterior` : 'Sin datos previos'}</p>
+    </td>
+  </tr>
+  </table>
+</td></tr>
+
+<!-- Top Campaign -->
+<tr><td style="padding:0 24px 24px;">
+  <div style="background:#eff6ff;border-radius:8px;padding:16px;border-left:4px solid #3b82f6;">
+    <p style="margin:0;color:#1e40af;font-size:12px;text-transform:uppercase;font-weight:bold;">🏆 Top Campaña</p>
+    <p style="margin:8px 0 4px;font-size:16px;font-weight:bold;color:#0f172a;">${topCampaignName || 'Sin campañas esta semana'}</p>
+    ${topCampaignName ? `<p style="margin:0;color:#475569;font-size:13px;">Inversión: ${formatCLP(topCampaignSpend)} · ${topCampaignResults} resultado${topCampaignResults !== 1 ? 's' : ''}</p>` : ''}
+  </div>
+</td></tr>
+
+<!-- Recommended Action -->
+<tr><td style="padding:0 24px 32px;">
+  <div style="background:#f0fdf4;border-radius:8px;padding:16px;border-left:4px solid #22c55e;">
+    <p style="margin:0;color:#15803d;font-size:12px;text-transform:uppercase;font-weight:bold;">🎯 Siguiente Acción Recomendada</p>
+    <p style="margin:8px 0 0;font-size:14px;color:#0f172a;">${recommendedAction}</p>
+  </div>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="background:#f8fafc;padding:20px 24px;text-align:center;border-top:1px solid #e2e8f0;">
+  <p style="margin:0;color:#94a3b8;font-size:12px;">Generado por Steve Ads · <a href="https://www.steve.cl" style="color:#3b82f6;text-decoration:none;">www.steve.cl</a></p>
+</td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+// ─── Generate recommended action ────────────────────────────────────────────
+
+function generateRecommendedAction(params: {
+  salesDelta: number;
+  cpaThisWeek: number | null;
+  cpaLastWeek: number | null;
+  topCampaignName: string | null;
+  creativeScore: number | null;
+}): string {
+  const { salesDelta, cpaThisWeek, cpaLastWeek, topCampaignName, creativeScore } = params;
+
+  if (cpaThisWeek && cpaLastWeek && cpaThisWeek > cpaLastWeek * 1.2) {
+    return 'Tu CPA subió más de un 20%. Revisa las audiencias de tus campañas activas y considera refrescar los creativos.';
+  }
+  if (salesDelta < -10) {
+    return 'Las ventas bajaron esta semana. Considera lanzar una campaña de retargeting para recuperar compradores que visitaron tu tienda.';
+  }
+  if (creativeScore && creativeScore < 50) {
+    return 'El score promedio de tus creativos está bajo. Prueba nuevos ángulos creativos y formatos de imagen.';
+  }
+  if (topCampaignName && salesDelta > 10) {
+    return `¡Gran semana! Tu campaña "${topCampaignName}" está funcionando bien. Considera aumentar su presupuesto un 20%.`;
+  }
+  return 'Mantén el ritmo actual. Revisa tus campañas activas y asegúrate de que todas tengan creativos frescos.';
+}
+
+// ─── Main handler ───────────────────────────────────────────────────────────
 
 export async function weeklyReport(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -23,18 +163,165 @@ export async function weeklyReport(c: Context) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
   const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
+  const weekLabel = getWeekLabel();
 
   // ─────────────────────────────────────────────
-  // C.7 — QA SCORECARD
+  // MERCHANT REPORTS — per-client sales + email
   // ─────────────────────────────────────────────
 
-  // This week's errors
+  // Get all active clients with their users
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, name, user_id')
+    .eq('active', true);
+
+  const merchantResults: Array<{ client_id: string; name: string; email_sent: boolean; error?: string }> = [];
+
+  for (const client of clients || []) {
+    try {
+      // Get merchant email
+      const { data: userData } = await supabase.auth.admin.getUserById(client.user_id);
+      const merchantEmail = userData?.user?.email;
+      if (!merchantEmail) {
+        merchantResults.push({ client_id: client.id, name: client.name, email_sent: false, error: 'no email' });
+        continue;
+      }
+
+      // This week's campaign metrics
+      const { data: thisWeekMetrics } = await supabase
+        .from('campaign_metrics')
+        .select('campaign_name, spend, results, cpa, date')
+        .eq('client_id', client.id)
+        .gte('date', weekAgo.split('T')[0]);
+
+      // Last week's campaign metrics
+      const { data: lastWeekMetrics } = await supabase
+        .from('campaign_metrics')
+        .select('spend, results, cpa')
+        .eq('client_id', client.id)
+        .gte('date', twoWeeksAgo.split('T')[0])
+        .lt('date', weekAgo.split('T')[0]);
+
+      // Shopify revenue this week
+      const { data: shopifyThisWeek } = await supabase
+        .from('shopify_metrics')
+        .select('total_sales')
+        .eq('client_id', client.id)
+        .gte('date', weekAgo.split('T')[0]);
+
+      const { data: shopifyLastWeek } = await supabase
+        .from('shopify_metrics')
+        .select('total_sales')
+        .eq('client_id', client.id)
+        .gte('date', twoWeeksAgo.split('T')[0])
+        .lt('date', weekAgo.split('T')[0]);
+
+      const totalSales = (shopifyThisWeek || []).reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
+      const lastWeekSales = (shopifyLastWeek || []).reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
+
+      // Top campaign by results
+      const campaignTotals: Record<string, { spend: number; results: number; cpa: number[] }> = {};
+      for (const m of thisWeekMetrics || []) {
+        const key = (m as any).campaign_name || 'Unknown';
+        if (!campaignTotals[key]) campaignTotals[key] = { spend: 0, results: 0, cpa: [] };
+        campaignTotals[key].spend += (m as any).spend || 0;
+        campaignTotals[key].results += (m as any).results || 0;
+        if ((m as any).cpa) campaignTotals[key].cpa.push((m as any).cpa);
+      }
+
+      const topCampaign = Object.entries(campaignTotals).sort((a, b) => b[1].results - a[1].results)[0];
+      const topCampaignName = topCampaign?.[0] || null;
+      const topCampaignSpend = topCampaign?.[1]?.spend || 0;
+      const topCampaignResults = topCampaign?.[1]?.results || 0;
+
+      // Average CPA
+      const allCpas = (thisWeekMetrics || []).filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
+      const cpaThisWeek = allCpas.length > 0 ? allCpas.reduce((a: number, b: number) => a + b, 0) / allCpas.length : null;
+
+      const lastCpas = (lastWeekMetrics || []).filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
+      const cpaLastWeek = lastCpas.length > 0 ? lastCpas.reduce((a: number, b: number) => a + b, 0) / lastCpas.length : null;
+
+      // Creative score
+      const { data: creativeData } = await supabase
+        .from('creative_history')
+        .select('performance_score')
+        .eq('shop_id', client.id)
+        .not('performance_score', 'is', null)
+        .gte('measured_at', weekAgo);
+
+      const creativeScore = creativeData && creativeData.length > 0
+        ? Math.round((creativeData as any[]).reduce((s, c) => s + c.performance_score, 0) / creativeData.length)
+        : null;
+
+      const salesDelta = lastWeekSales > 0 ? Math.round(((totalSales - lastWeekSales) / lastWeekSales) * 100) : 0;
+
+      const recommendedAction = generateRecommendedAction({
+        salesDelta,
+        cpaThisWeek,
+        cpaLastWeek,
+        topCampaignName,
+        creativeScore,
+      });
+
+      // Build and send email
+      const htmlEmail = buildMerchantEmailHtml({
+        brandName: client.name,
+        weekLabel,
+        totalSales,
+        lastWeekSales,
+        topCampaignName,
+        topCampaignSpend,
+        topCampaignResults,
+        cpaThisWeek,
+        cpaLastWeek,
+        recommendedAction,
+      });
+
+      const fromDomain = process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
+
+      await getResend().emails.send({
+        from: `Steve Ads <reportes@${fromDomain}>`,
+        to: [merchantEmail],
+        subject: `📊 Tu reporte semanal de Steve Ads — semana del ${weekLabel}`,
+        html: htmlEmail,
+      });
+
+      console.log(`[weekly-report] Email sent to ${merchantEmail} for ${client.name}`);
+
+      // Save merchant report to qa_log for dashboard display
+      await supabase.from('qa_log').insert({
+        check_type: 'weekly_merchant_report',
+        status: 'pass',
+        details: {
+          client_id: client.id,
+          report_date: now.toISOString().split('T')[0],
+          total_sales: totalSales,
+          last_week_sales: lastWeekSales,
+          sales_delta_pct: salesDelta,
+          top_campaign: topCampaignName,
+          cpa_this_week: cpaThisWeek,
+          cpa_last_week: cpaLastWeek,
+          creative_score: creativeScore,
+          recommended_action: recommendedAction,
+        },
+      });
+
+      merchantResults.push({ client_id: client.id, name: client.name, email_sent: true });
+    } catch (err: any) {
+      console.error(`[weekly-report] Error for client ${client.name}:`, err?.message);
+      merchantResults.push({ client_id: client.id, name: client.name, email_sent: false, error: err?.message });
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // C.7 — QA SCORECARD (internal)
+  // ─────────────────────────────────────────────
+
   const { data: thisWeekErrors } = await supabase
     .from('qa_log')
     .select('*')
     .gte('checked_at', weekAgo);
 
-  // Last week's errors (for trend)
   const { data: lastWeekErrors } = await supabase
     .from('qa_log')
     .select('*')
@@ -43,93 +330,55 @@ export async function weeklyReport(c: Context) {
 
   const thisWeekCount = thisWeekErrors?.length || 0;
   const lastWeekCount = lastWeekErrors?.length || 0;
-  const errorTrend = thisWeekCount < lastWeekCount
-    ? 'bajando'
-    : thisWeekCount > lastWeekCount
-      ? 'subiendo'
-      : 'estable';
+  const errorTrend = thisWeekCount < lastWeekCount ? 'bajando' : thisWeekCount > lastWeekCount ? 'subiendo' : 'estable';
 
-  // Auto-fixed count
-  const autoFixed = (thisWeekErrors || []).filter(
-    (e: { status: string }) => e.status === 'auto_fixed'
-  ).length;
-  const autofixRate = thisWeekCount > 0
-    ? Math.round((autoFixed / thisWeekCount) * 100)
-    : 0;
+  const autoFixed = (thisWeekErrors || []).filter((e: any) => e.status === 'auto_fixed').length;
+  const autofixRate = thisWeekCount > 0 ? Math.round((autoFixed / thisWeekCount) * 100) : 0;
 
-  // Self-healed tests
-  const selfHealed = (thisWeekErrors || []).filter(
-    (e: { check_type: string }) => e.check_type === 'test_self_healed'
-  ).length;
+  const selfHealed = (thisWeekErrors || []).filter((e: any) => e.check_type === 'test_self_healed').length;
 
-  // New CRITERIO rules created this week
   const { data: newRulesData } = await supabase
     .from('criterio_rules')
     .select('id')
     .gte('created_at', weekAgo);
   const newRules = newRulesData?.length || 0;
 
-  // Repeated errors (check_type appearing 2+ times with status fail)
-  const failErrors = (thisWeekErrors || []).filter(
-    (e: { status: string }) => e.status === 'fail'
-  );
+  const failErrors = (thisWeekErrors || []).filter((e: any) => e.status === 'fail');
   const errorCounts: Record<string, number> = {};
   for (const e of failErrors) {
-    const key = (e as { check_type: string }).check_type;
+    const key = (e as any).check_type;
     errorCounts[key] = (errorCounts[key] || 0) + 1;
   }
   const repeatedErrors = Object.values(errorCounts).filter((c) => c >= 2).length;
 
-  // MTTR: average time between fail and auto_fixed/pass for same check_type
-  // Simplified: count fail entries that later got an auto_fixed within the week
-  const failEntries = (thisWeekErrors || []).filter(
-    (e: { status: string }) => e.status === 'fail'
-  );
-  const fixedEntries = (thisWeekErrors || []).filter(
-    (e: { status: string }) => e.status === 'auto_fixed'
-  );
-
+  // MTTR
+  const fixedEntries = (thisWeekErrors || []).filter((e: any) => e.status === 'auto_fixed');
   let mttrMinutes: number | null = null;
-  if (failEntries.length > 0 && fixedEntries.length > 0) {
+  if (failErrors.length > 0 && fixedEntries.length > 0) {
     const mttrSamples: number[] = [];
-    for (const fail of failEntries) {
-      const f = fail as { check_type: string; checked_at: string };
-      const matchingFix = fixedEntries.find(
-        (fix: any) =>
-          fix.check_type === f.check_type &&
-          new Date(fix.checked_at).getTime() > new Date(f.checked_at).getTime()
+    for (const fail of failErrors) {
+      const f = fail as any;
+      const matchingFix = fixedEntries.find((fix: any) =>
+        fix.check_type === f.check_type && new Date(fix.checked_at).getTime() > new Date(f.checked_at).getTime()
       );
       if (matchingFix) {
-        const diff =
-          new Date((matchingFix as { checked_at: string }).checked_at).getTime() -
-          new Date(f.checked_at).getTime();
-        mttrSamples.push(diff / 60000); // minutes
+        const diff = new Date((matchingFix as any).checked_at).getTime() - new Date(f.checked_at).getTime();
+        mttrSamples.push(diff / 60000);
       }
     }
     if (mttrSamples.length > 0) {
-      mttrMinutes = Math.round(
-        mttrSamples.reduce((a, b) => a + b, 0) / mttrSamples.length
-      );
+      mttrMinutes = Math.round(mttrSamples.reduce((a, b) => a + b, 0) / mttrSamples.length);
     }
   }
 
   const qaScorecard = {
-    errors_this_week: thisWeekCount,
-    errors_last_week: lastWeekCount,
-    error_trend: errorTrend,
-    mttr_minutes: mttrMinutes,
-    autofix_rate_pct: autofixRate,
-    auto_fixed_count: autoFixed,
-    self_healed_tests: selfHealed,
-    new_rules: newRules,
-    repeated_errors: repeatedErrors,
+    errors_this_week: thisWeekCount, errors_last_week: lastWeekCount, error_trend: errorTrend,
+    mttr_minutes: mttrMinutes, autofix_rate_pct: autofixRate, auto_fixed_count: autoFixed,
+    self_healed_tests: selfHealed, new_rules: newRules, repeated_errors: repeatedErrors,
   };
 
-  // ─────────────────────────────────────────────
-  // D.7 — MEJORA CONTINUA
-  // ─────────────────────────────────────────────
+  // ─── Mejora Continua ──────────────────────────
 
-  // Creatives measured this week
   const { data: weekCreatives } = await supabase
     .from('creative_history')
     .select('performance_score, performance_verdict')
@@ -138,22 +387,12 @@ export async function weeklyReport(c: Context) {
 
   const creativeCount = weekCreatives?.length || 0;
   const avgScore = creativeCount > 0
-    ? Math.round(
-        (weekCreatives as { performance_score: number }[]).reduce(
-          (s, c) => s + c.performance_score,
-          0
-        ) / creativeCount
-      )
+    ? Math.round((weekCreatives as any[]).reduce((s, c) => s + c.performance_score, 0) / creativeCount)
     : null;
 
-  const buenos = (weekCreatives || []).filter(
-    (c: { performance_verdict: string }) => c.performance_verdict === 'bueno'
-  ).length;
-  const malos = (weekCreatives || []).filter(
-    (c: { performance_verdict: string }) => c.performance_verdict === 'malo'
-  ).length;
+  const buenos = (weekCreatives || []).filter((c: any) => c.performance_verdict === 'bueno').length;
+  const malos = (weekCreatives || []).filter((c: any) => c.performance_verdict === 'malo').length;
 
-  // Last week's creatives (for trend)
   const { data: lastWeekCreatives } = await supabase
     .from('creative_history')
     .select('performance_score')
@@ -161,65 +400,44 @@ export async function weeklyReport(c: Context) {
     .gte('measured_at', twoWeeksAgo)
     .lt('measured_at', weekAgo);
 
-  const lastCreativeCount = lastWeekCreatives?.length || 0;
-  const lastAvgScore = lastCreativeCount > 0
-    ? Math.round(
-        (lastWeekCreatives as { performance_score: number }[]).reduce(
-          (s, c) => s + c.performance_score,
-          0
-        ) / lastCreativeCount
-      )
+  const lastAvgScore = lastWeekCreatives && lastWeekCreatives.length > 0
+    ? Math.round((lastWeekCreatives as any[]).reduce((s, c) => s + c.performance_score, 0) / lastWeekCreatives.length)
     : null;
 
-  const scoreTrend =
-    avgScore !== null && lastAvgScore !== null
-      ? avgScore > lastAvgScore
-        ? 'mejorando'
-        : avgScore < lastAvgScore
-          ? 'empeorando'
-          : 'estable'
-      : null;
+  const scoreTrend = avgScore !== null && lastAvgScore !== null
+    ? avgScore > lastAvgScore ? 'mejorando' : avgScore < lastAvgScore ? 'empeorando' : 'estable'
+    : null;
 
-  // Fatigue detections this week
   const { data: fatigueData } = await supabase
     .from('qa_log')
     .select('id')
     .eq('check_type', 'creative_fatigue')
     .gte('checked_at', weekAgo);
-  const fatigueCount = fatigueData?.length || 0;
 
   const mejoraContinua = {
-    creatives_measured: creativeCount,
-    avg_score: avgScore,
-    last_week_avg_score: lastAvgScore,
-    score_trend: scoreTrend,
-    buenos,
-    malos,
-    fatigue_detected: fatigueCount,
+    creatives_measured: creativeCount, avg_score: avgScore, last_week_avg_score: lastAvgScore,
+    score_trend: scoreTrend, buenos, malos, fatigue_detected: fatigueData?.length || 0,
   };
 
-  // ─────────────────────────────────────────────
-  // SAVE REPORT
-  // ─────────────────────────────────────────────
+  // ─── Save internal report ─────────────────────
 
   const reportDate = now.toISOString().split('T')[0];
 
   await supabase.from('qa_log').insert({
     check_type: 'weekly_report',
     status: 'pass',
-    details: {
-      report_date: reportDate,
-      qa_scorecard: qaScorecard,
-      mejora_continua: mejoraContinua,
-    },
+    details: { report_date: reportDate, qa_scorecard: qaScorecard, mejora_continua: mejoraContinua },
   });
 
-  console.log(`[weekly-report] QA Scorecard: ${thisWeekCount} errors (${errorTrend}), MTTR: ${mttrMinutes ?? 'N/A'}min, autofix: ${autofixRate}%`);
-  console.log(`[weekly-report] Mejora Continua: ${creativeCount} creatives, avg score: ${avgScore ?? 'N/A'}/100, trend: ${scoreTrend ?? 'N/A'}`);
+  const emailsSent = merchantResults.filter((r) => r.email_sent).length;
+  console.log(`[weekly-report] Done: ${emailsSent}/${merchantResults.length} merchant emails sent`);
+  console.log(`[weekly-report] QA Scorecard: ${thisWeekCount} errors (${errorTrend}), autofix: ${autofixRate}%`);
 
   return c.json({
     success: true,
     report_date: reportDate,
+    merchant_emails_sent: emailsSent,
+    merchant_results: merchantResults,
     qa_scorecard: qaScorecard,
     mejora_continua: mejoraContinua,
   });
