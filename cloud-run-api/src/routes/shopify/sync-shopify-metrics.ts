@@ -31,8 +31,10 @@ export async function syncShopifyMetrics(c: Context) {
     let userId: string | null = null;
     let shopDomain: string | null = null;
 
-    if (isCron) {
-      console.log('[sync-shopify] Cron-triggered sync');
+    // Accept internal calls (from sync-all-metrics cron via authMiddleware)
+    const isInternal = c.get('isInternal');
+    if (isCron || isInternal) {
+      console.log('[sync-shopify] Cron/internal-triggered sync');
     } else if (shopifySessionToken) {
       // Embedded Shopify app - validate Session Token
       console.log('[sync-shopify] Validating Shopify Session Token...');
@@ -88,7 +90,7 @@ export async function syncShopifyMetrics(c: Context) {
 
     // Authorization check: verify user owns the client that owns this connection
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
-    const isOwner = isCron || clientData.user_id === userId || clientData.client_user_id === userId;
+    const isOwner = isCron || isInternal || clientData.user_id === userId || clientData.client_user_id === userId;
 
     if (!isOwner) {
       console.error('User does not own this connection');
@@ -100,7 +102,7 @@ export async function syncShopifyMetrics(c: Context) {
     }
 
     // Rate limiting: check last sync time (minimum 5 minutes between syncs, skip for cron)
-    if (!isCron && connection.last_sync_at) {
+    if (!isCron && !isInternal && connection.last_sync_at) {
       const lastSync = new Date(connection.last_sync_at);
       const minInterval = 5 * 60 * 1000; // 5 minutes
       if (Date.now() - lastSync.getTime() < minInterval) {
