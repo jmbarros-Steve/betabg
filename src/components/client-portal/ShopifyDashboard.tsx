@@ -13,6 +13,7 @@ import { AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianG
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
+import { ShopifyOrdersPanel } from './ShopifyOrdersPanel';
 import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { Coachmark } from '@/components/client-portal/Coachmark';
 
@@ -443,6 +444,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
       {/* SEO Quick Analysis */}
       <SeoAnalysisCard products={seoProducts} />
+
+      {/* Pedidos recientes */}
+      <ShopifyOrdersPanel clientId={clientId} />
 
       {/* Productos de Shopify */}
       <ShopifyProductsPanel clientId={clientId} />

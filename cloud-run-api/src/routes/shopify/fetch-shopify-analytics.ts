@@ -400,7 +400,31 @@ export async function fetchShopifyAnalytics(c: Context) {
 
     console.log(`[fetch-shopify-analytics] Done: ${topSkus.length} SKUs, ${abandonedCarts.length} carts, ${salesByChannel.length} channels, ${utmPerformance.length} UTMs, ${uniqueCustomers} customers, ${cohorts.length} cohorts, revenue=${summary.totalRevenue}`);
 
-    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary, funnelData });
+    // Include raw orders (limited to 50 most recent) for the orders panel
+    const recentOrders = orders
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 50)
+      .map((o: any) => ({
+        id: o.id,
+        order_number: o.order_number,
+        created_at: o.created_at,
+        total_price: o.total_price,
+        currency: o.currency,
+        financial_status: o.financial_status,
+        source_name: o.source_name,
+        customer: o.customer ? {
+          first_name: o.customer.first_name,
+          last_name: o.customer.last_name,
+          email: o.customer.email,
+        } : null,
+        line_items: (o.line_items || []).map((li: any) => ({
+          title: li.title,
+          quantity: li.quantity,
+          price: li.price,
+        })),
+      }));
+
+    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary, funnelData, rawOrders: recentOrders });
 
   } catch (error: any) {
     console.error('[fetch-shopify-analytics] Error:', error);
