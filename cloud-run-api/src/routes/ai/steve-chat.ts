@@ -839,9 +839,15 @@ export async function steveChat(c: Context) {
     ).join('\n\n') || '';
 
     // Load real metrics from platform_metrics + campaign_metrics
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Use consistent date ranges for ALL sources
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0];
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString().split('T')[0];
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000).toISOString().split('T')[0];
 
-    // Get client's connections
+    // Get client's connections grouped by platform
     const { data: connections } = await supabase
       .from('platform_connections')
       .select('id, platform')
@@ -849,64 +855,135 @@ export async function steveChat(c: Context) {
       .eq('is_active', true);
 
     const connIds = (connections || []).map((c: { id: string }) => c.id);
+    const shopifyConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'shopify').map((c: { id: string }) => c.id);
+    const metaConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'meta').map((c: { id: string }) => c.id);
+    const googleConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'google_ads').map((c: { id: string }) => c.id);
 
     let metricsContext = '';
 
     if (connIds.length > 0) {
-      // Fetch platform_metrics (Shopify revenue, Meta spend, etc.)
+      // Fetch ALL platform_metrics for 60 days (for period comparisons)
       const { data: platformMetrics } = await supabase
         .from('platform_metrics')
-        .select('metric_type, metric_value, metric_date, currency')
+        .select('metric_type, metric_value, metric_date, currency, connection_id')
         .in('connection_id', connIds)
-        .gte('metric_date', thirtyDaysAgo)
+        .gte('metric_date', sixtyDaysAgo)
         .order('metric_date', { ascending: false })
-        .limit(200);
+        .limit(500);
 
-      // Fetch campaign_metrics (Meta/Google campaigns)
+      // Fetch campaign_metrics (Meta/Google) for 60 days
       const { data: campaignMetrics } = await supabase
         .from('campaign_metrics')
-        .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date')
+        .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date, connection_id')
         .in('connection_id', connIds)
-        .gte('metric_date', thirtyDaysAgo)
+        .gte('metric_date', sixtyDaysAgo)
         .order('metric_date', { ascending: false })
-        .limit(200);
+        .limit(500);
 
-      // Aggregate platform metrics by type
-      if (platformMetrics && platformMetrics.length > 0) {
-        const byType: Record<string, { total: number; count: number; currency: string | null }> = {};
-        for (const m of platformMetrics) {
-          if (!byType[m.metric_type]) {
-            byType[m.metric_type] = { total: 0, count: 0, currency: m.currency };
-          }
-          byType[m.metric_type].total += Number(m.metric_value) || 0;
-          byType[m.metric_type].count += 1;
+      // Helper: aggregate metrics for a date range and optional connection filter
+      function aggregateMetrics(
+        data: typeof platformMetrics,
+        dateFrom: string,
+        dateTo: string,
+        connFilter?: string[]
+      ) {
+        const byType: Record<string, number> = {};
+        for (const m of (data || [])) {
+          if (m.metric_date < dateFrom || m.metric_date > dateTo) continue;
+          if (connFilter && !connFilter.includes(m.connection_id)) continue;
+          byType[m.metric_type] = (byType[m.metric_type] || 0) + (Number(m.metric_value) || 0);
         }
-        const metricLines = Object.entries(byType).map(([type, data]) =>
-          `- ${type}: ${Math.round(data.total).toLocaleString()} ${data.currency || ''} (${data.count} registros, últimos 30 días)`
-        ).join('\n');
-        metricsContext += `\nMÉTRICAS DE PLATAFORMA (últimos 30 días, datos reales de la DB):\n${metricLines}\n`;
+        return byType;
       }
 
-      // Aggregate campaign metrics
-      if (campaignMetrics && campaignMetrics.length > 0) {
+      function aggregateCampaigns(
+        data: typeof campaignMetrics,
+        dateFrom: string,
+        dateTo: string
+      ) {
+        let spend = 0, impressions = 0, clicks = 0, conversions = 0, revenue = 0;
         const byCampaign: Record<string, { spend: number; impressions: number; clicks: number; conversions: number; revenue: number; status: string }> = {};
-        for (const m of campaignMetrics) {
+        for (const m of (data || [])) {
+          if (m.metric_date < dateFrom || m.metric_date > dateTo) continue;
+          spend += Number(m.spend) || 0;
+          impressions += Number(m.impressions) || 0;
+          clicks += Number(m.clicks) || 0;
+          conversions += Number(m.conversions) || 0;
+          revenue += Number(m.conversion_value) || 0;
           const name = m.campaign_name || 'Sin nombre';
-          if (!byCampaign[name]) {
-            byCampaign[name] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0, status: m.campaign_status || 'UNKNOWN' };
-          }
+          if (!byCampaign[name]) byCampaign[name] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0, status: m.campaign_status || 'UNKNOWN' };
           byCampaign[name].spend += Number(m.spend) || 0;
           byCampaign[name].impressions += Number(m.impressions) || 0;
           byCampaign[name].clicks += Number(m.clicks) || 0;
           byCampaign[name].conversions += Number(m.conversions) || 0;
           byCampaign[name].revenue += Number(m.conversion_value) || 0;
         }
-        const campaignLines = Object.entries(byCampaign).slice(0, 10).map(([name, d]) => {
-          const roas = d.spend > 0 ? (d.revenue / d.spend).toFixed(2) : 'N/A';
-          const ctr = d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(2) : 'N/A';
-          return `- "${name}" [${d.status}]: Gasto $${Math.round(d.spend).toLocaleString()}, Revenue $${Math.round(d.revenue).toLocaleString()}, ROAS ${roas}x, CTR ${ctr}%, ${d.conversions} conversiones`;
-        }).join('\n');
-        metricsContext += `\nCAMPAÑAS ACTIVAS (datos reales de Meta/Google, últimos 30 días):\n${campaignLines}\n`;
+        return { totals: { spend, impressions, clicks, conversions, revenue }, byCampaign };
+      }
+
+      // === SHOPIFY METRICS (same 30-day period) ===
+      const shopify30d = aggregateMetrics(platformMetrics, thirtyDaysAgo, today, shopifyConnIds);
+      const shopifyPrev30d = aggregateMetrics(platformMetrics, sixtyDaysAgo, thirtyDaysAgo, shopifyConnIds);
+      const shopify7d = aggregateMetrics(platformMetrics, sevenDaysAgo, today, shopifyConnIds);
+      const shopifyPrev7d = aggregateMetrics(platformMetrics, fourteenDaysAgo, sevenDaysAgo, shopifyConnIds);
+
+      if (Object.keys(shopify30d).length > 0) {
+        const rev30 = Math.round(shopify30d.revenue || shopify30d.gross_revenue || 0);
+        const ord30 = Math.round(shopify30d.orders || shopify30d.orders_count || 0);
+        const revPrev30 = Math.round(shopifyPrev30d.revenue || shopifyPrev30d.gross_revenue || 0);
+        const rev7 = Math.round(shopify7d.revenue || shopify7d.gross_revenue || 0);
+        const ord7 = Math.round(shopify7d.orders || shopify7d.orders_count || 0);
+        const revPrev7 = Math.round(shopifyPrev7d.revenue || shopifyPrev7d.gross_revenue || 0);
+        const pctChange30 = revPrev30 > 0 ? ((rev30 - revPrev30) / revPrev30 * 100).toFixed(1) : 'N/A';
+        const pctChange7 = revPrev7 > 0 ? ((rev7 - revPrev7) / revPrev7 * 100).toFixed(1) : 'N/A';
+        const ticket30 = ord30 > 0 ? Math.round(rev30 / ord30) : 0;
+
+        metricsContext += `\n📦 SHOPIFY — VENTAS (período: ${thirtyDaysAgo} a ${today}):\n`;
+        metricsContext += `- Últimos 30 días: $${rev30.toLocaleString()} CLP en ${ord30} pedidos (ticket promedio: $${ticket30.toLocaleString()})\n`;
+        metricsContext += `- vs 30 días anteriores: ${pctChange30}% ${Number(pctChange30) > 0 ? '📈' : Number(pctChange30) < 0 ? '📉' : '➡️'}\n`;
+        metricsContext += `- Últimos 7 días: $${rev7.toLocaleString()} CLP en ${ord7} pedidos\n`;
+        metricsContext += `- vs 7 días anteriores: ${pctChange7}% ${Number(pctChange7) > 0 ? '📈' : Number(pctChange7) < 0 ? '📉' : '➡️'}\n`;
+      }
+
+      // === META/GOOGLE ADS METRICS (same 30-day period) ===
+      const ads30d = aggregateCampaigns(campaignMetrics, thirtyDaysAgo, today);
+      const adsPrev30d = aggregateCampaigns(campaignMetrics, sixtyDaysAgo, thirtyDaysAgo);
+      const ads7d = aggregateCampaigns(campaignMetrics, sevenDaysAgo, today);
+      const adsPrev7d = aggregateCampaigns(campaignMetrics, fourteenDaysAgo, sevenDaysAgo);
+
+      if (ads30d.totals.spend > 0 || Object.keys(ads30d.byCampaign).length > 0) {
+        const s30 = ads30d.totals;
+        const sPrev = adsPrev30d.totals;
+        const s7 = ads7d.totals;
+        const s7prev = adsPrev7d.totals;
+        const roas30 = s30.spend > 0 ? (s30.revenue / s30.spend).toFixed(2) : 'N/A';
+        const ctr30 = s30.impressions > 0 ? ((s30.clicks / s30.impressions) * 100).toFixed(2) : 'N/A';
+        const spendChange = sPrev.spend > 0 ? ((s30.spend - sPrev.spend) / sPrev.spend * 100).toFixed(1) : 'N/A';
+
+        metricsContext += `\n📣 META/GOOGLE ADS (período: ${thirtyDaysAgo} a ${today}):\n`;
+        metricsContext += `- Últimos 30 días: Gasto $${Math.round(s30.spend).toLocaleString()}, Revenue ads $${Math.round(s30.revenue).toLocaleString()}, ROAS ${roas30}x, CTR ${ctr30}%, ${s30.conversions} conversiones\n`;
+        metricsContext += `- vs 30 días anteriores: gasto ${spendChange}%\n`;
+        metricsContext += `- Últimos 7 días: Gasto $${Math.round(s7.spend).toLocaleString()}, Revenue $${Math.round(s7.revenue).toLocaleString()}, ${s7.conversions} conversiones\n`;
+
+        // Per-campaign breakdown (top 10 by spend, 30-day)
+        const campaignLines = Object.entries(ads30d.byCampaign)
+          .sort(([, a], [, b]) => b.spend - a.spend)
+          .slice(0, 10)
+          .map(([name, d]) => {
+            const roas = d.spend > 0 ? (d.revenue / d.spend).toFixed(2) : 'N/A';
+            const ctr = d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(2) : 'N/A';
+            return `  - "${name}" [${d.status}]: $${Math.round(d.spend).toLocaleString()} gasto, $${Math.round(d.revenue).toLocaleString()} revenue, ROAS ${roas}x, CTR ${ctr}%, ${d.conversions} conv`;
+          }).join('\n');
+        if (campaignLines) metricsContext += `\nCAMPAÑAS (30 días, por gasto):\n${campaignLines}\n`;
+      }
+
+      // === CROSS-PLATFORM ROAS ===
+      const shopifyRev30 = Math.round(shopify30d.revenue || shopify30d.gross_revenue || 0);
+      const totalAdSpend30 = Math.round(ads30d.totals.spend);
+      if (shopifyRev30 > 0 && totalAdSpend30 > 0) {
+        const crossRoas = (shopifyRev30 / totalAdSpend30).toFixed(2);
+        metricsContext += `\n🎯 ROAS CRUZADO (Shopify revenue / Ad spend, mismos 30 días):\n`;
+        metricsContext += `- Revenue Shopify: $${shopifyRev30.toLocaleString()} CLP / Gasto Ads: $${totalAdSpend30.toLocaleString()} = ROAS ${crossRoas}x\n`;
       }
 
       if (!metricsContext) {
@@ -945,7 +1022,17 @@ PERSONALIDAD:
 
 ROL: Consultor estratégico libre. El cliente puede preguntarte CUALQUIER COSA sobre marketing, estrategia, competencia, posicionamiento, pricing, campañas, copywriting, SEO, etc. Responde con profundidad y datos concretos basándote en el brief, la investigación del cliente Y LOS DATOS REALES DE SUS MÉTRICAS.
 
-IMPORTANTE: Tienes acceso a las métricas reales del cliente desde su base de datos. ÚSALAS para dar recomendaciones basadas en datos. Si el cliente pregunta por sus campañas, ROAS, spend, etc., responde con los números reales que tienes abajo. NUNCA digas "no tengo acceso a Meta" o "no puedo ver tus métricas" — SÍ tienes los datos.
+IMPORTANTE — MÉTRICAS Y DATOS:
+1. Tienes acceso a las métricas REALES del cliente. ÚSALAS. Cita números concretos.
+2. TODOS los datos de Shopify y Meta/Google usan el MISMO período (30 días). Puedes comparar directamente.
+3. Tienes datos de 30 días actuales Y 30 días anteriores para comparar tendencias.
+4. Tienes datos de 7 días actuales Y 7 días anteriores para análisis de corto plazo.
+5. SIEMPRE menciona el período cuando des números: "en los últimos 30 días", "esta semana vs la anterior", etc.
+6. Si el usuario pide comparar períodos, usa los datos de 30d vs 30d anteriores o 7d vs 7d anteriores.
+7. NUNCA digas "no tengo acceso" ni "no puedo ver tus métricas". SÍ tienes los datos — están abajo.
+8. Si un dato específico NO está disponible, di exactamente qué falta y por qué (ej: "no tengo datos de Google Ads porque no está conectado").
+9. Da respuestas CONCRETAS con números. Nada de respuestas vacías o evasivas.
+10. El ROAS cruzado (Shopify revenue / Ad spend) es la métrica más importante — úsala.
 
 NO eres un cuestionario. NO hagas preguntas estructuradas. Simplemente conversa y asesora.
 
