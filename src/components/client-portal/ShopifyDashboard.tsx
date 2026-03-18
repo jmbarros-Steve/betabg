@@ -17,6 +17,7 @@ import { ShopifyOrdersPanel } from './ShopifyOrdersPanel';
 import { ShopifyDiscountsPanel } from './ShopifyDiscountsPanel';
 import { ShopifyCustomersPanel } from './ShopifyCustomersPanel';
 import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
+import { WeeklyReportCard } from '../dashboard/WeeklyReportCard';
 import { Coachmark } from '@/components/client-portal/Coachmark';
 
 interface ShopifyDashboardProps {
@@ -215,6 +216,10 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   return (
     <div className="space-y-6">
       <Coachmark id="shopify_intro" message="Aquí ves ventas diarias, carritos abandonados, canales de venta y un análisis SEO rápido de tus productos." />
+
+      {/* Reporte Semanal */}
+      <WeeklyReportCard clientId={clientId} />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

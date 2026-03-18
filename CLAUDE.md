@@ -117,6 +117,13 @@ cd ~/steve && git pull
 - Llama POST /api/cron/sync-all-metrics con X-Cron-Secret
 - También se triggerea automáticamente al reconectar Shopify o Meta (OAuth callback)
 
+## Reporte Semanal lunes 8am Chile (OpenClaw)
+- Cron ID: `df73d262-bc8a-4bcf-a7b7-1f908b510750`
+- Nombre: `weekly-report-monday`
+- Lunes 11:00 UTC (8am Chile) → POST /api/cron/weekly-report
+- Envía email a cada merchant via Resend con ventas, top campaña, CPA, acción recomendada
+- Guarda reporte en qa_log como weekly_merchant_report para el dashboard
+
 ## QA Automático cada 4 horas (OpenClaw)
 - Cron ID: `fb005468-3ddb-4e5e-a3c9-f19cb880063f`
 - Nombre: `qa-automatico-4h`
