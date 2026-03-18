@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
-type Action = 'create_custom' | 'create_lookalike' | 'delete' | 'list';
+type Action = 'create_custom' | 'create_lookalike' | 'create_retargeting' | 'delete' | 'list';
 
 interface RequestBody {
   action: Action;
@@ -294,6 +294,144 @@ async function handleDelete(
   return { body: { success: true, audience_id }, status: 200 };
 }
 
+// --- Retargeting handler (AddToCart without Purchase) ---
+
+async function handleCreateRetargeting(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const {
+    name,
+    retargeting_type = 'abandoned_cart', // 'abandoned_cart' | 'viewed_not_purchased' | 'all_visitors'
+    retention_days = 30,
+    pixel_id,
+    description = '',
+  } = data;
+
+  if (!name) return { body: { error: 'Missing required field: name' }, status: 400 };
+  if (!pixel_id) return { body: { error: 'Missing required field: pixel_id' }, status: 400 };
+
+  // Build rule based on retargeting type
+  let rule: any;
+
+  switch (retargeting_type) {
+    case 'abandoned_cart':
+      // People who added to cart but did NOT purchase in the last N days
+      rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ type: 'pixel', id: pixel_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'AddToCart' }],
+            },
+          }],
+        },
+        exclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ type: 'pixel', id: pixel_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }],
+            },
+          }],
+        },
+      };
+      break;
+
+    case 'viewed_not_purchased':
+      // People who viewed content but did NOT purchase
+      rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ type: 'pixel', id: pixel_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'ViewContent' }],
+            },
+          }],
+        },
+        exclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ type: 'pixel', id: pixel_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }],
+            },
+          }],
+        },
+      };
+      break;
+
+    case 'all_visitors':
+      // All website visitors in the last N days
+      rule = {
+        inclusions: {
+          operator: 'or',
+          rules: [{
+            event_sources: [{ type: 'pixel', id: pixel_id }],
+            retention_seconds: retention_days * 86400,
+          }],
+        },
+      };
+      break;
+
+    default:
+      return { body: { error: `Unknown retargeting_type: ${retargeting_type}` }, status: 400 };
+  }
+
+  const retargetingLabels: Record<string, string> = {
+    abandoned_cart: 'Carrito abandonado (AddToCart sin Purchase)',
+    viewed_not_purchased: 'Vio productos sin comprar (ViewContent sin Purchase)',
+    all_visitors: 'Todos los visitantes del sitio',
+  };
+
+  const fullDescription = description || retargetingLabels[retargeting_type] || retargeting_type;
+
+  console.log(`[manage-meta-audiences] Creating retargeting audience "${name}" (${retargeting_type}, ${retention_days}d) for account ${accountId}`);
+
+  const result = await metaApiRequest(
+    `act_${accountId}/customaudiences`,
+    accessToken,
+    'POST',
+    {
+      name,
+      subtype: 'WEBSITE',
+      description: fullDescription,
+      rule: JSON.stringify(rule),
+      pixel_id,
+      retention_days,
+    }
+  );
+
+  if (!result.ok) {
+    return { body: { error: 'Failed to create retargeting audience', details: result.error }, status: 502 };
+  }
+
+  console.log(`[manage-meta-audiences] Retargeting audience created: ${result.data.id}`);
+
+  return {
+    body: {
+      success: true,
+      audience_id: result.data.id,
+      name,
+      retargeting_type,
+      retention_days,
+      description: fullDescription,
+    },
+    status: 200,
+  };
+}
+
 // --- Main handler ---
 
 export async function manageMetaAudiences(c: Context) {
@@ -325,7 +463,7 @@ export async function manageMetaAudiences(c: Context) {
       return c.json({ error: 'Missing required field: connection_id' }, 400);
     }
 
-    const validActions: Action[] = ['create_custom', 'create_lookalike', 'delete', 'list'];
+    const validActions: Action[] = ['create_custom', 'create_lookalike', 'create_retargeting', 'delete', 'list'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }, 400);
     }
@@ -394,6 +532,10 @@ export async function manageMetaAudiences(c: Context) {
 
       case 'create_lookalike':
         result = await handleCreateLookalike(accountId, decryptedToken, data || {});
+        break;
+
+      case 'create_retargeting':
+        result = await handleCreateRetargeting(accountId, decryptedToken, data || {});
         break;
 
       case 'list':

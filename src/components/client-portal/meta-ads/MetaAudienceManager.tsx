@@ -351,6 +351,36 @@ function AudienceSuggestions({
     }
 
     all.push({
+      id: 'retargeting-abandoned-cart',
+      title: 'Carrito abandonado (Retargeting)',
+      description: 'Personas que agregaron productos al carrito pero NO compraron en los últimos 30 días.',
+      source: 'WEBSITE',
+      icon: ShoppingCart,
+      prefill: {
+        name: 'Retargeting - Carrito Abandonado 30d',
+        description: 'AddToCart sin Purchase en los últimos 30 días.',
+        source: 'WEBSITE',
+        retargeting_type: 'abandoned_cart',
+        retention_days: 30,
+      },
+    });
+
+    all.push({
+      id: 'retargeting-viewed-not-purchased',
+      title: 'Vio productos sin comprar',
+      description: 'Personas que vieron productos pero no compraron en los últimos 14 días.',
+      source: 'WEBSITE',
+      icon: Eye,
+      prefill: {
+        name: 'Retargeting - Vio Productos 14d',
+        description: 'ViewContent sin Purchase en los últimos 14 días.',
+        source: 'WEBSITE',
+        retargeting_type: 'viewed_not_purchased',
+        retention_days: 14,
+      },
+    });
+
+    all.push({
       id: 'video-viewers',
       title: 'Viewers de videos (75%+)',
       description: 'Personas que vieron al menos el 75% de tus videos en Facebook e Instagram.',
@@ -1330,9 +1360,17 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         data.retention_days = customForm.app_activity_days;
       }
 
+      // Use create_retargeting action if retargeting_type is set (from prefill)
+      const isRetargeting = !!(customForm as any).retargeting_type;
+      if (isRetargeting) {
+        data.retargeting_type = (customForm as any).retargeting_type;
+        data.pixel_id = pixelId;
+        data.retention_days = customForm.retention_days || (customForm as any).retention_days || 30;
+      }
+
       const { data: responseData, error } = await callApi('manage-meta-audiences', {
         body: {
-          action: 'create_custom',
+          action: isRetargeting ? 'create_retargeting' : 'create_custom',
           connection_id: metaConnectionId,
           data,
         },
