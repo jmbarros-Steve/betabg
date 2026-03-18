@@ -12,19 +12,24 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
  */
 
 interface ApifyAd {
-  id: string;
-  pageId: string;
-  pageName: string;
-  adCreationTime?: string;
-  adDeliveryStartTime?: string;
-  adDeliveryStopTime?: string;
-  adText?: string;
-  linkUrl?: string;
-  mediaType?: string;
-  impressionsLowerBound?: number;
-  impressionsUpperBound?: number;
-  spendLowerBound?: number;
-  spendUpperBound?: number;
+  ad_archive_id: string;
+  page_id: string;
+  start_date: number; // unix timestamp
+  end_date: number;   // unix timestamp or 0
+  snapshot: {
+    page_name: string;
+    page_id: string;
+    body?: { markup?: { __html: string } };
+    cta_text?: string;
+    caption?: string;
+    link_url?: string;
+    cards?: Array<{
+      body?: string;
+      title?: string;
+      link_url?: string;
+      cta_text?: string;
+    }>;
+  };
 }
 
 interface AdInsight {
@@ -35,15 +40,25 @@ interface AdInsight {
 }
 
 async function runApifyActor(token: string): Promise<ApifyAd[]> {
+  // Use curious_coder/facebook-ads-library-scraper — reliable scraper with rich output
+  // Search multiple ecommerce-related queries in Chile
+  const queries = [
+    'tienda online chile',
+    'ofertas ropa chile',
+    'ecommerce envio gratis',
+  ];
+  const startUrls = queries.map(q => ({
+    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(q)}`,
+  }));
+
   const resp = await fetch(
-    `https://api.apify.com/v2/acts/apify~facebook-ads-library/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
+    `https://api.apify.com/v2/acts/curious_coder~facebook-ads-library-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        countryCode: 'CL',
-        searchQuery: 'ecommerce marketing chile',
-        maxItems: 50,
+        urls: startUrls,
+        maxAds: 50,
       }),
     },
   );
@@ -53,34 +68,58 @@ async function runApifyActor(token: string): Promise<ApifyAd[]> {
     throw new Error(`Apify returned ${resp.status}: ${text.substring(0, 300)}`);
   }
 
-  return resp.json() as Promise<ApifyAd[]>;
+  const items: any[] = await resp.json();
+  // Filter out error items
+  return items.filter((item: any) => item.ad_archive_id && item.snapshot) as ApifyAd[];
+}
+
+function extractAdText(ad: ApifyAd): string {
+  // Try body markup first
+  const bodyHtml = ad.snapshot?.body?.markup?.__html;
+  if (bodyHtml) {
+    return bodyHtml.replace(/<[^>]*>/g, '').trim();
+  }
+  // Try first card body
+  const firstCard = ad.snapshot?.cards?.[0];
+  if (firstCard?.body) return firstCard.body;
+  return '';
+}
+
+function extractLinkUrl(ad: ApifyAd): string | null {
+  const firstCard = ad.snapshot?.cards?.[0];
+  return firstCard?.link_url || ad.snapshot?.caption || null;
 }
 
 function filterLongRunningAds(ads: ApifyAd[], minDays: number): AdInsight[] {
   const now = Date.now();
   const results: AdInsight[] = [];
+  const seen = new Set<string>(); // deduplicate by ad_archive_id
 
   for (const ad of ads) {
-    const startDate = ad.adDeliveryStartTime || ad.adCreationTime;
-    if (!startDate || !ad.adText) continue;
+    if (seen.has(ad.ad_archive_id)) continue;
+    seen.add(ad.ad_archive_id);
 
-    const start = new Date(startDate).getTime();
-    if (isNaN(start)) continue;
+    const adText = extractAdText(ad);
+    if (!adText) continue;
 
-    // If ad has a stop time and it's in the past, skip (no longer running)
-    if (ad.adDeliveryStopTime) {
-      const stop = new Date(ad.adDeliveryStopTime).getTime();
-      if (!isNaN(stop) && stop < now) continue;
+    // start_date is unix timestamp (seconds)
+    const startMs = ad.start_date * 1000;
+    if (!startMs || isNaN(startMs)) continue;
+
+    // If ad has end_date > 0 and it's in the past, skip
+    if (ad.end_date && ad.end_date > 0) {
+      const endMs = ad.end_date * 1000;
+      if (endMs < now) continue;
     }
 
-    const daysActive = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    const daysActive = Math.floor((now - startMs) / (1000 * 60 * 60 * 24));
     if (daysActive < minDays) continue;
 
     results.push({
-      pageName: ad.pageName || 'Unknown',
+      pageName: ad.snapshot?.page_name || 'Unknown',
       daysActive,
-      adText: ad.adText.substring(0, 500),
-      linkUrl: ad.linkUrl || null,
+      adText: adText.substring(0, 500),
+      linkUrl: extractLinkUrl(ad),
     });
   }
 
@@ -178,7 +217,7 @@ export async function competitorSpy(c: Context) {
 
   try {
     // Step 1: Fetch ads from Apify
-    console.log('[competitor-spy] Running Apify facebook-ads-library actor...');
+    console.log('[competitor-spy] Running Apify facebook-ads-library-scraper actor...');
     const rawAds = await runApifyActor(apifyToken);
     console.log(`[competitor-spy] Got ${rawAds.length} raw ads`);
 
