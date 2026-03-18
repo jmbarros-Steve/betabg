@@ -20,9 +20,9 @@ serve(async (req) => {
     // Obtener clientes activos con Shopify conectado
     const { data: connections, error: connError } = await supabase
       .from('platform_connections')
-      .select('id, client_id, shop_domain, access_token, platform_type')
-      .eq('platform_type', 'shopify')
-      .eq('active', true)
+      .select('id, client_id, shop_domain, access_token_encrypted, platform')
+      .eq('platform', 'shopify')
+      .eq('is_active', true)
 
     if (connError) throw connError
     if (!connections?.length) {
@@ -34,15 +34,15 @@ serve(async (req) => {
     const report: any[] = []
 
     for (const conn of connections) {
-      // Desencriptar token via RPC si existe, sino usar access_token directo
-      let shopifyToken = conn.access_token
+      // Desencriptar token via RPC
+      let shopifyToken = conn.access_token_encrypted
       try {
         const { data: decrypted } = await supabase.rpc('decrypt_platform_token', {
-          encrypted_token: conn.access_token,
+          encrypted_token: conn.access_token_encrypted,
         })
         if (decrypted) shopifyToken = decrypted
       } catch {
-        // Si no existe la función RPC, usar token directo
+        // Si no existe la función RPC, usar token encriptado directamente (fallback)
       }
 
       // Obtener métricas de Steve (últimos 7 días)
