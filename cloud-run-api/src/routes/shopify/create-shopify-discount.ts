@@ -11,6 +11,7 @@ interface DiscountRequest {
   startsAt?: string;
   endsAt?: string;
   title?: string;
+  currencyCode?: string;
 }
 
 export async function createShopifyDiscount(c: Context) {
@@ -24,7 +25,8 @@ export async function createShopifyDiscount(c: Context) {
       usageLimit,
       startsAt,
       endsAt,
-      title
+      title,
+      currencyCode = 'CLP',
     } = await c.req.json() as DiscountRequest;
 
     if (!clientId || !code || !discountType) {
@@ -100,6 +102,8 @@ export async function createShopifyDiscount(c: Context) {
         },
       };
 
+      console.log(`[create-shopify-discount] Creating free_shipping discount "${code}" for ${shopDomain}`);
+
       const res = await fetch(`https://${shopDomain}/admin/api/2024-01/graphql.json`, {
         method: 'POST',
         headers: { 'X-Shopify-Access-Token': tokenData, 'Content-Type': 'application/json' },
@@ -108,18 +112,26 @@ export async function createShopifyDiscount(c: Context) {
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('Shopify free shipping API error:', errorText);
-        throw new Error('Error al crear descuento de envio gratis en Shopify');
+        console.error('[create-shopify-discount] Shopify free shipping API error:', res.status, errorText);
+        throw new Error(`Shopify API error ${res.status}: ${errorText.substring(0, 200)}`);
       }
 
       const result: any = await res.json();
+
+      if (result.errors) {
+        console.error('[create-shopify-discount] GraphQL errors:', JSON.stringify(result.errors));
+        return c.json({ error: result.errors[0]?.message || 'GraphQL error', details: result.errors }, 400);
+      }
+
       if (result.data?.discountCodeFreeShippingCreate?.userErrors?.length > 0) {
         const errors = result.data.discountCodeFreeShippingCreate.userErrors;
-        console.error('Shopify free shipping errors:', errors);
-        return c.json({ error: errors[0].message }, 400);
+        console.error('[create-shopify-discount] Free shipping user errors:', JSON.stringify(errors));
+        return c.json({ error: errors[0].message, details: errors }, 400);
       }
 
       const node = result.data?.discountCodeFreeShippingCreate?.codeDiscountNode;
+      console.log(`[create-shopify-discount] Created free shipping discount: ${node?.id}`);
+
       return c.json({
         success: true,
         discountId: node?.id,
@@ -149,11 +161,11 @@ export async function createShopifyDiscount(c: Context) {
 
     const customerGets = discountType === 'percentage'
       ? { value: { percentage: discountValue / 100 }, items: { all: true } }
-      : { value: { discountAmount: { amount: discountValue, appliesOnEachItem: false } }, items: { all: true } };
+      : { value: { discountAmount: { amount: String(discountValue), currencyCode } }, items: { all: true } };
 
     let minimumRequirement = null;
     if (minimumPurchase && minimumPurchase > 0) {
-      minimumRequirement = { subtotal: { greaterThanOrEqualToSubtotal: minimumPurchase } };
+      minimumRequirement = { subtotal: { greaterThanOrEqualToSubtotal: String(minimumPurchase) } };
     }
 
     const variables = {
@@ -171,6 +183,8 @@ export async function createShopifyDiscount(c: Context) {
       },
     };
 
+    console.log(`[create-shopify-discount] Creating ${discountType} discount "${code}" for ${shopDomain}`);
+
     const shopifyResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/graphql.json`, {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': tokenData, 'Content-Type': 'application/json' },
@@ -179,19 +193,25 @@ export async function createShopifyDiscount(c: Context) {
 
     if (!shopifyResponse.ok) {
       const errorText = await shopifyResponse.text();
-      console.error('Shopify API error:', errorText);
-      throw new Error('Error al crear descuento en Shopify');
+      console.error('[create-shopify-discount] Shopify API error:', shopifyResponse.status, errorText);
+      throw new Error(`Shopify API error ${shopifyResponse.status}: ${errorText.substring(0, 200)}`);
     }
 
     const result: any = await shopifyResponse.json();
 
+    if (result.errors) {
+      console.error('[create-shopify-discount] GraphQL errors:', JSON.stringify(result.errors));
+      return c.json({ error: result.errors[0]?.message || 'GraphQL error', details: result.errors }, 400);
+    }
+
     if (result.data?.discountCodeBasicCreate?.userErrors?.length > 0) {
       const errors = result.data.discountCodeBasicCreate.userErrors;
-      console.error('Shopify discount errors:', errors);
-      return c.json({ error: errors[0].message }, 400);
+      console.error('[create-shopify-discount] User errors:', JSON.stringify(errors));
+      return c.json({ error: errors[0].message, details: errors }, 400);
     }
 
     const discountNode = result.data?.discountCodeBasicCreate?.codeDiscountNode;
+    console.log(`[create-shopify-discount] Created discount: ${discountNode?.id}`);
 
     return c.json({
       success: true,
