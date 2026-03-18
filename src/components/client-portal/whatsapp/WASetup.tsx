@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageCircle, Phone, Check, Loader2 } from 'lucide-react';
+import { MessageCircle, Phone, Check, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -11,16 +11,16 @@ interface Props {
 
 export function WASetup({ clientId, onSetupComplete }: Props) {
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'intro' | 'configuring' | 'done'>('intro');
+  const [step, setStep] = useState<'intro' | 'configuring' | 'error' | 'done'>('intro');
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleActivate() {
     setLoading(true);
     setStep('configuring');
+    setErrorMessage(null);
 
     try {
-      // Call backend to create Twilio sub-account + buy number
-      // Get business name from supabase
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: clientInfo } = await supabase
         .from('clients')
@@ -46,16 +46,20 @@ export function WASetup({ clientId, onSetupComplete }: Props) {
       );
 
       if (!response.ok) {
-        throw new Error('Error al configurar WhatsApp');
+        const errorData = await response.json().catch(() => null);
+        const detail = errorData?.details || errorData?.error || `Error del servidor (${response.status})`;
+        throw new Error(detail);
       }
 
       const data = await response.json();
       setPhoneNumber(data.phone_number);
       setStep('done');
       toast.success('WhatsApp activado correctamente');
-    } catch (err) {
-      toast.error('Error al activar WhatsApp. Contacta soporte.');
-      setStep('intro');
+    } catch (err: any) {
+      const msg = err?.message || 'Error desconocido al activar WhatsApp';
+      setErrorMessage(msg);
+      setStep('error');
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -77,6 +81,44 @@ export function WASetup({ clientId, onSetupComplete }: Props) {
         <Button onClick={onSetupComplete} className="bg-green-600 hover:bg-green-700">
           Ir al Inbox
         </Button>
+      </div>
+    );
+  }
+
+  if (step === 'error') {
+    return (
+      <div className="max-w-lg mx-auto py-12">
+        <Card className="border-red-200">
+          <CardContent className="pt-8 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
+              <AlertTriangle className="h-10 w-10 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-red-700">Error al activar WhatsApp</h2>
+            <p className="text-gray-600 mb-4">No pudimos completar la activacion. Detalle del error:</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm text-red-800 font-mono break-words">{errorMessage}</p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <Button
+                onClick={handleActivate}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reintentar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setStep('intro')}
+              >
+                Volver
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400 mt-4">
+              Si el problema persiste, contacta a soporte en jmbarros@bgconsult.cl
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
