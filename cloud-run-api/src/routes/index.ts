@@ -90,6 +90,7 @@ import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
 import { manageMetaRules } from './meta/manage-meta-rules.js';
 import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 import { detectAudienceOverlap } from './meta/detect-audience-overlap.js';
+import { syncKlaviyoToMetaAudience } from './meta/sync-klaviyo-to-meta-audience.js';
 
 // Instagram
 import { fetchInstagramInsights } from './instagram/fetch-instagram-insights.js';
@@ -206,6 +207,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/generate-meta-copy', authMiddleware, generateMetaCopy);
   app.post('/api/generate-image', authMiddleware, generateImage);
   app.post('/api/generate-video', authMiddleware, generateVideo);
+  app.post('/api/generate-video-script', authMiddleware, generateVideoScript);
   app.post('/api/generate-mass-campaigns', authMiddleware, generateMassCampaigns);
   app.post('/api/analyze-brand', authMiddleware, analyzeBrand);
   app.post('/api/analyze-brand-research', authMiddleware, analyzeBrandResearch);
@@ -250,16 +252,13 @@ export function registerRoutes(app: Hono) {
   app.post('/api/manage-meta-rules', authMiddleware, manageMetaRules);
   app.post('/api/meta-targeting-search', authMiddleware, metaTargetingSearch);
   app.post('/api/detect-audience-overlap', authMiddleware, detectAudienceOverlap);
+  app.post('/api/sync-klaviyo-to-meta-audience', authMiddleware, syncKlaviyoToMetaAudience);
 
   // ============================================================
   // Phase 3: Platform Integrations (Instagram)
   // ============================================================
   app.post('/api/publish-instagram', authMiddleware, publishInstagram);
   app.post('/api/cron/publish-instagram', cronPublishInstagram); // No JWT — uses X-Cron-Secret
-
-  // ============================================================
-  // Phase 3: Platform Integrations (Instagram)
-  // ============================================================
   app.post('/api/fetch-instagram-insights', authMiddleware, fetchInstagramInsights);
 
   // ============================================================
