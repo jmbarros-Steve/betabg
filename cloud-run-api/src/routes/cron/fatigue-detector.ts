@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
+import { sendAlertEmail } from '../../lib/send-alert-email.js';
 
 /**
  * Fatigue Detector — Paso D.5
@@ -169,6 +170,22 @@ export async function fatigueDetector(c: Context) {
             source: 'ojos',
             status: 'pending',
           });
+        }
+
+        // Email alert to merchant
+        if (shopId) {
+          await sendAlertEmail(
+            shopId,
+            `⚠️ Fatiga de creative: ${campaign.name}`,
+            `<h2>Fatiga de creative detectada</h2>
+<p>La campaña <strong>${campaign.name}</strong> muestra señales de fatiga:</p>
+<ul>
+  <li>CTR bajó <strong>${ctrDropPct}%</strong> en los últimos 3 días</li>
+  <li>Frequency: <strong>${lastFrequency.toFixed(1)}</strong> (tu audiencia ve el mismo anuncio demasiadas veces)</li>
+</ul>
+<p><strong>Sugerencia:</strong> Rotar el creative con ángulo "${suggestedAngle}" que ha tenido mejor rendimiento histórico.</p>
+<p>— Steve Ads</p>`
+          );
         }
 
         // Log to qa_log

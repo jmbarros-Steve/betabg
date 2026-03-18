@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { createTask } from '../../lib/task-creator.js';
+import { sendAlertEmail } from '../../lib/send-alert-email.js';
 
 /**
  * Performance Evaluator — Paso D.2
@@ -109,10 +110,11 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
 
       evaluated++;
 
-      // If verdict is 'malo', create improvement task
+      // If verdict is 'malo', create improvement task + email merchant
       if (creative.performance_verdict === 'malo') {
+        const shopId = creative.shop_id || creative.client_id;
         const result = await createTask({
-          shop_id: creative.shop_id || creative.client_id,
+          shop_id: shopId,
           title: `Campaña ${creative.channel} con score ${creative.performance_score}/100`,
           description: `${creative.theme || creative.content_summary || 'Producto'}: ${reason}\nÁngulo: ${creative.angle || 'N/A'}\nSugerencia: probar ángulo distinto.`,
           priority: 'media',
@@ -120,6 +122,20 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
           source: 'criterio',
         });
         if (result.created) tasksCreated++;
+
+        // Email alert to merchant
+        if (shopId) {
+          await sendAlertEmail(
+            shopId,
+            `📊 Campaña ${creative.channel} con bajo rendimiento (${creative.performance_score}/100)`,
+            `<h2>Rendimiento bajo detectado</h2>
+<p>Tu campaña de <strong>${creative.channel}</strong> obtuvo un score de <strong>${creative.performance_score}/100</strong>.</p>
+<p><strong>Análisis:</strong> ${reason}</p>
+<p><strong>Ángulo usado:</strong> ${creative.angle || 'No especificado'}</p>
+<p><strong>Sugerencia:</strong> Probar un ángulo distinto para mejorar el rendimiento.</p>
+<p>— Steve Ads</p>`
+          );
+        }
       }
     } catch (error) {
       console.error(`[perf-evaluator] Error evaluating creative ${creative.id}:`, error);
