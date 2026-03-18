@@ -628,11 +628,11 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
   const mode = p.productMode || 'fixed';
 
   const dynamicTypes = [
-    { key: 'catalog_feed', label: '📋 Feed del catálogo (recomendado)', desc: 'Klaviyo elige productos del catálogo para cada persona', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{% if item.metadata.__variant_compare_at_price and item.metadata.__variant_compare_at_price != item.metadata.__variant_price %}{{ item.metadata.__variant_compare_at_price|floatformat:0 }}{% endif %}{{ item.metadata.__variant_price|floatformat:0 }}', link: '{{ item.url }}' } },
+    { key: 'catalog_feed', label: '📋 Feed del catálogo (recomendado)', desc: 'Steve elige productos del catálogo para cada persona', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{% if item.metadata.__variant_compare_at_price and item.metadata.__variant_compare_at_price != item.metadata.__variant_price %}{{ item.metadata.__variant_compare_at_price|floatformat:0 }}{% endif %}{{ item.metadata.__variant_price|floatformat:0 }}', link: '{{ item.url }}' } },
     { key: 'last_viewed', label: '👁️ Último producto visto', desc: 'El último producto que visitó en tu tienda', vars: { name: '{{ event.extra.title }}', imageUrl: '{{ event.extra.image_url }}', price: '{{ event.extra.price }}', link: '{{ event.extra.url }}' } },
     { key: 'cart_item', label: '🛒 Producto del carrito abandonado', desc: 'Productos que dejó en el carrito', vars: { name: '{{ item.product.title }}', imageUrl: '{{ item.product.image }}', price: '{{ item.product.price|floatformat:0 }}', link: '{{ item.product.url }}' } },
-    { key: 'recommended', label: '⭐ Recomendado por Klaviyo', desc: 'Klaviyo recomienda según historial del cliente', vars: { name: '{{ recommended_products.0.title }}', imageUrl: '{{ recommended_products.0.image }}', price: '{{ recommended_products.0.price }}', link: '{{ recommended_products.0.url }}' } },
-    { key: 'collection_dynamic', label: '📁 Colección dinámica', desc: 'Productos de una colección específica, Klaviyo los rota', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{{ item.metadata.__variant_price|floatformat:0 }}', link: '{{ item.url }}' } },
+    { key: 'recommended', label: '⭐ Recomendado por Steve', desc: 'Steve recomienda según historial del cliente', vars: { name: '{{ recommended_products.0.title }}', imageUrl: '{{ recommended_products.0.image }}', price: '{{ recommended_products.0.price }}', link: '{{ recommended_products.0.url }}' } },
+    { key: 'collection_dynamic', label: '📁 Colección dinámica', desc: 'Productos de una colección específica, Steve los personaliza', vars: { name: '{{ item.title|safe }}', imageUrl: '{{ item.image }}', price: '{{ item.metadata.__variant_price|floatformat:0 }}', link: '{{ item.url }}' } },
   ];
 
   return (
@@ -699,7 +699,7 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
         </TabsContent>
 
         <TabsContent value="dynamic" className="mt-4 space-y-3">
-          <p className="text-xs text-muted-foreground">Klaviyo insertará el producto automáticamente al enviar el email.</p>
+          <p className="text-xs text-muted-foreground">El producto se insertará automáticamente al enviar el email.</p>
           <div className="space-y-2">
             {dynamicTypes.map(opt => (
               <button
@@ -773,7 +773,7 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
 
           <div className="flex items-start gap-2 p-2.5 bg-accent/50 rounded-lg text-[11px] text-accent-foreground">
             <span>💡</span>
-            <span>Klaviyo resolverá estas variables con los datos reales del cliente al enviar.</span>
+            <span>Steve resolverá estas variables con los datos reales del cliente al enviar.</span>
           </div>
 
           <div><Label className="text-xs font-medium">Texto del botón</Label><Input value={p.buttonText || 'Comprar ahora'} onChange={e => set('buttonText', e.target.value)} className="h-9 text-sm mt-1.5" /></div>
@@ -835,14 +835,55 @@ function ProductConfig({ p, set, clientId }: { p: any; set: (k: string, v: any) 
 // ═══════════════════════════════
 
 function CouponConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) {
+  const discountMode = p.discountMode || 'manual';
   const discountUrl = `{{shop_url}}/discount/${p.code || 'CÓDIGO'}`;
 
   return (
     <div className="space-y-4">
       <SectionTitle>Cupón de descuento</SectionTitle>
+
       <div>
-        <Label className="text-xs font-medium">Código del cupón</Label>
-        <Input value={p.code || ''} onChange={e => set('code', e.target.value.toUpperCase())} className="h-10 text-sm font-mono font-bold mt-1.5 tracking-widest" placeholder="VERANO20" />
+        <Label className="text-xs font-medium">Modo de descuento</Label>
+        <div className="flex gap-1 mt-1.5">
+          <Button variant={discountMode === 'manual' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('discountMode', 'manual')}>
+            Código manual
+          </Button>
+          <Button variant={discountMode === 'shopify_create' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('discountMode', 'shopify_create')}>
+            Crear en Shopify
+          </Button>
+        </div>
+      </div>
+
+      {discountMode === 'shopify_create' && (
+        <>
+          <div>
+            <Label className="text-xs font-medium">Tipo de descuento</Label>
+            <div className="flex gap-1 mt-1.5">
+              <Button variant={(p.discountType || 'percentage') === 'percentage' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('discountType', 'percentage')}>% Porcentaje</Button>
+              <Button variant={p.discountType === 'fixed_amount' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('discountType', 'fixed_amount')}>$ Monto fijo</Button>
+              <Button variant={p.discountType === 'free_shipping' ? 'default' : 'outline'} size="sm" className="flex-1 h-8 text-xs" onClick={() => set('discountType', 'free_shipping')}>Envio gratis</Button>
+            </div>
+          </div>
+          {p.discountType !== 'free_shipping' && (
+            <div>
+              <Label className="text-xs font-medium">Valor del descuento</Label>
+              <Input type="number" value={p.discountValue || ''} onChange={e => set('discountValue', e.target.value)} className="h-9 text-sm mt-1.5" placeholder={p.discountType === 'fixed_amount' ? '5000' : '20'} />
+            </div>
+          )}
+          <div>
+            <Label className="text-xs font-medium">Dias de validez (opcional)</Label>
+            <Input type="number" value={p.expirationDays || ''} onChange={e => set('expirationDays', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="7" />
+          </div>
+          <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-[11px] text-blue-700 dark:text-blue-300">
+            <span>🔄</span>
+            <span>Steve creará un código único por suscriptor en Shopify al enviar el email. Cada persona recibe un código diferente.</span>
+          </div>
+        </>
+      )}
+
+      <div>
+        <Label className="text-xs font-medium">{discountMode === 'shopify_create' ? 'Prefijo del código (se genera automáticamente)' : 'Código del cupón'}</Label>
+        <Input value={p.code || ''} onChange={e => set('code', e.target.value.toUpperCase())} className="h-10 text-sm font-mono font-bold mt-1.5 tracking-widest" placeholder={discountMode === 'shopify_create' ? 'STEVE' : 'VERANO20'} />
       </div>
       <div>
         <Label className="text-xs font-medium">Descripción</Label>
@@ -853,10 +894,12 @@ function CouponConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) 
         <Label className="text-xs font-medium">Texto del botón</Label>
         <Input value={p.buttonText || 'Usar cupón'} onChange={e => set('buttonText', e.target.value)} className="h-9 text-sm mt-1.5" />
       </div>
-      <div>
-        <Label className="text-xs font-medium">Vencimiento (opcional)</Label>
-        <Input type="date" value={p.expiresAt || ''} onChange={e => set('expiresAt', e.target.value)} className="h-9 text-sm mt-1.5" />
-      </div>
+      {discountMode === 'manual' && (
+        <div>
+          <Label className="text-xs font-medium">Vencimiento (opcional)</Label>
+          <Input type="date" value={p.expiresAt || ''} onChange={e => set('expiresAt', e.target.value)} className="h-9 text-sm mt-1.5" />
+        </div>
+      )}
 
       <div className="p-3 bg-muted/50 rounded-lg border border-dashed space-y-1">
         <p className="text-[11px] font-semibold text-muted-foreground">🔗 URL de descuento automático:</p>

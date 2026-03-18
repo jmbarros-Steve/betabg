@@ -79,7 +79,7 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
           </div>`;
         }
         
-        // Multiple dynamic products - generate Klaviyo loop
+        // Multiple dynamic products - generate dynamic loop
         const widthPct = isVertical ? '100' : Math.floor(100 / count);
         const productCell = `<td style="width:${widthPct}%;vertical-align:top;padding:8px;text-align:center;">
             ${p.showImage !== false ? `<img src="${p.imageUrl || '{{ item.image }}'}" alt="" style="max-width:100%;border-radius:8px;margin-bottom:8px;" />` : ''}
@@ -136,7 +136,11 @@ export function renderBlockToHtml(block: EmailBlock, templateColors?: {
 
     case 'coupon': {
       const discountUrl = `{{shop_url}}/discount/${p.code || 'CÓDIGO'}`;
-      return `<div style="border:2px dashed #ccc;border-radius:8px;padding:24px;text-align:center;background:#f9fafb;font-family:${font};">
+      const discountMode = p.discountMode || 'manual';
+      const discountType = p.discountType || 'percentage';
+      const discountValue = p.discountValue || '';
+      const expirationDays = p.expirationDays || '';
+      return `<div data-steve-discount="true" data-discount-mode="${discountMode}" data-discount-type="${discountType}" data-discount-value="${discountValue}" data-discount-code="${p.code || 'CÓDIGO'}" data-expiration-days="${expirationDays}" style="border:2px dashed #ccc;border-radius:8px;padding:24px;text-align:center;background:#f9fafb;font-family:${font};">
         <p style="margin:0 0 8px;font-size:13px;color:#666;">${p.description || ''}</p>
         <p style="margin:0 0 12px;font-size:28px;font-weight:800;color:#111;letter-spacing:3px;">${p.code || 'CÓDIGO'}</p>
         ${p.expiresAt ? `<p style="margin:0 0 12px;font-size:12px;color:#999;">Válido hasta: ${p.expiresAt}</p>` : ''}

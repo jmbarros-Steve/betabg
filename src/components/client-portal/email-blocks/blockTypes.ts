@@ -1,5 +1,5 @@
 // Block type definitions for the Email Block Editor
-// Each block type maps to a Klaviyo-compatible email block
+// Each block type maps to a Steve Mail email block
 
 export type BlockType =
   | 'text'

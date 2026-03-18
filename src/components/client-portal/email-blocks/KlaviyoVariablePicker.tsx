@@ -11,7 +11,7 @@ interface VariableGroup {
 
 const VARIABLE_GROUPS: VariableGroup[] = [
   {
-    label: '👤 Perfil (Klaviyo)',
+    label: '👤 Perfil del Suscriptor',
     variables: [
       { key: '{{ first_name }}', label: 'Nombre' },
       { key: '{{ last_name }}', label: 'Apellido' },
@@ -67,12 +67,13 @@ export const PRODUCT_DYNAMIC_VARIABLES = {
   ],
 };
 
-interface KlaviyoVariablePickerProps {
+interface VariablePickerProps {
   onSelect: (variable: string) => void;
   compact?: boolean;
 }
 
-export default function KlaviyoVariablePicker({ onSelect, compact }: KlaviyoVariablePickerProps) {
+/** @deprecated Renamed — use default import. Kept for backwards compat. */
+export default function KlaviyoVariablePicker({ onSelect, compact }: VariablePickerProps) {
   const [open, setOpen] = useState(false);
 
   return (

@@ -184,7 +184,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
   const blockDefs = BLOCK_DEFINITIONS.filter(d => d.category === 'blocks');
   const designDefs = BLOCK_DEFINITIONS.filter(d => d.category === 'design');
 
-  // Reusable function to replace ALL Klaviyo variables with real Shopify data
+  // Reusable function to replace ALL template variables with real Shopify data for preview
   const replaceKlaviyoVariables = useCallback((text: string): string => {
     if (!text || typeof text !== 'string') return text;
     let result = text;
@@ -242,7 +242,7 @@ export default function EmailBlockEditor({ blocks: rawBlocks, onChange, template
       result = result.replace(/\{\{[\s]*recommended_products\.\d+\.url[\s]*\}\}/gi, () => '#');
     }
 
-    // Strip remaining Klaviyo block tags
+    // Strip remaining template block tags
     result = result.replace(/\{%[^%]*%\}/g, '');
 
     return result;
@@ -553,7 +553,7 @@ function ProductBlockPreview({ block, previewProducts = [], blockIndex = 0 }: { 
         </div>
         {!isFixedWithVars && (
           <p className="text-xs text-purple-400 text-center mt-2">
-            {hasRealProducts ? '⚠️ Preview de ejemplo — Klaviyo mostrará productos personalizados al enviar' : 'Klaviyo insertará productos reales al enviar'}
+            {hasRealProducts ? '⚠️ Preview de ejemplo — Steve mostrará productos personalizados al enviar' : 'Steve insertará productos reales al enviar'}
           </p>
         )}
       </div>
