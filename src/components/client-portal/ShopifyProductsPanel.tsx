@@ -4,10 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Package, RefreshCw, AlertTriangle, TrendingUp, ImageOff } from 'lucide-react';
+import { Package, RefreshCw, AlertTriangle, TrendingUp, ImageOff, Pencil, Save, Loader2 } from 'lucide-react';
 
 interface ShopifyProductsPanelProps {
   clientId: string;
@@ -20,6 +22,7 @@ interface ProductVariant {
   price: number;
   cost: number | null;
   inventory_quantity: number | null;
+  inventory_item_id: number | null;
 }
 
 interface ShopifyProduct {
@@ -37,6 +40,54 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
   const [loading, setLoading] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
+
+  // Edit modal state
+  const [editProduct, setEditProduct] = useState<ShopifyProduct | null>(null);
+  const [editVariantIndex, setEditVariantIndex] = useState(0);
+  const [editTitle, setEditTitle] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editStock, setEditStock] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const openEditModal = (product: ShopifyProduct, variantIdx: number) => {
+    setEditProduct(product);
+    setEditVariantIndex(variantIdx);
+    setEditTitle(product.title);
+    setEditPrice(String(product.variants[variantIdx].price));
+    setEditStock(product.variants[variantIdx].inventory_quantity !== null ? String(product.variants[variantIdx].inventory_quantity) : '');
+  };
+
+  const saveProductEdit = async () => {
+    if (!editProduct || !connectionId) return;
+    setSaving(true);
+    const variant = editProduct.variants[editVariantIndex];
+    try {
+      const body: Record<string, any> = {
+        connectionId,
+        productId: editProduct.id,
+        variant_id: variant.id,
+      };
+      if (editTitle !== editProduct.title) body.title = editTitle;
+      if (editPrice !== String(variant.price)) body.price = parseFloat(editPrice);
+      if (variant.inventory_quantity !== null && editStock !== String(variant.inventory_quantity) && variant.inventory_item_id) {
+        body.inventory_quantity = parseInt(editStock, 10);
+        body.inventory_item_id = variant.inventory_item_id;
+      }
+
+      const { data, error } = await callApi('update-shopify-product', { body });
+      if (error) {
+        toast.error('Error al actualizar: ' + error);
+        return;
+      }
+      toast.success('Producto actualizado');
+      setEditProduct(null);
+      fetchProducts();
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     checkShopifyConnection();
@@ -185,6 +236,7 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
                     <TableHead className="text-right">Costo</TableHead>
                     <TableHead className="text-right">Margen</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -254,6 +306,17 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
                           <TableCell className="text-right text-sm">
                             {variant.inventory_quantity !== null ? variant.inventory_quantity : '—'}
                           </TableCell>
+                          <TableCell className="p-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => openEditModal(product, vi)}
+                              title="Editar producto"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })
@@ -264,6 +327,69 @@ export function ShopifyProductsPanel({ clientId }: ShopifyProductsPanelProps) {
           </>
         )}
       </CardContent>
+
+      {/* Edit Product Modal */}
+      <Dialog open={!!editProduct} onOpenChange={open => !open && setEditProduct(null)}>
+        <DialogContent className="max-w-md">
+          {editProduct && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Pencil className="h-4 w-4" />
+                  Editar Producto
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Nombre del producto</label>
+                  <Input
+                    value={editTitle}
+                    onChange={e => setEditTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">
+                    Precio {editProduct.variants.length > 1 ? `(${editProduct.variants[editVariantIndex].title})` : ''}
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={editPrice}
+                    onChange={e => setEditPrice(e.target.value)}
+                  />
+                </div>
+                {editProduct.variants[editVariantIndex].inventory_quantity !== null && (
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Stock {editProduct.variants.length > 1 ? `(${editProduct.variants[editVariantIndex].title})` : ''}
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editStock}
+                      onChange={e => setEditStock(e.target.value)}
+                    />
+                  </div>
+                )}
+                <Button
+                  className="w-full"
+                  onClick={saveProductEdit}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  {saving ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

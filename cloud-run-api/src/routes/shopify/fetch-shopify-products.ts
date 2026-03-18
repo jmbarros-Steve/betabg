@@ -165,6 +165,7 @@ export async function fetchShopifyProducts(c: Context) {
         price: parseFloat(v.price) || 0,
         cost: costMap.get(v.inventory_item_id) ?? null,
         inventory_quantity: v.inventory_quantity ?? null,
+        inventory_item_id: v.inventory_item_id ?? null,
       })),
     }));
 
