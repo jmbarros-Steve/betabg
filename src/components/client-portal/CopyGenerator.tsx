@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Loader2, Sparkles, Image as ImageIcon, Video, ArrowLeft, ArrowRight,
   RotateCcw, CheckCircle, ThumbsDown, RefreshCw, Edit, Wand2,
-  Coins, AlertCircle, Download, Play, Target, Settings
+  Coins, AlertCircle, Download, Play, Target, Settings, FileText, Copy, Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,6 +32,15 @@ interface GeneratedVariaciones { explicacion: string; variaciones: Variacion[]; 
 interface ClientAsset { id: string; url: string; nombre: string; tipo: string; created_at: string; }
 interface BriefVisual { tipo: string; [key: string]: unknown; }
 interface Credits { creditos_disponibles: number; creditos_usados: number; plan: string; }
+
+interface VideoScriptScene { texto: string; visual: string; duracion_segundos: number; }
+interface VideoScript {
+  titulo: string; duracion: string; funnel: string;
+  hook: { texto: string; visual: string; duracion_segundos: number };
+  body: VideoScriptScene[];
+  cta: { texto: string; visual: string; duracion_segundos: number };
+  musica_sugerida: string; notas_produccion: string;
+}
 
 // Smart renderer for brief visual fields — handles objects like texto_overlay, colores, escenas
 const renderBriefField = (key: string, val: unknown): React.ReactNode => {
@@ -116,6 +125,11 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
   const [selectedFotoUrl, setSelectedFotoUrl] = useState<string | null>(null);
   const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
 
+  // Script generation state
+  const [generatingScript, setGeneratingScript] = useState(false);
+  const [generatedScript, setGeneratedScript] = useState<VideoScript | null>(null);
+  const [scriptDuracion, setScriptDuracion] = useState<'15s' | '30s' | '60s'>('30s');
+
   // Generation state
   const [generatingImage, setGeneratingImage] = useState(false);
   const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
@@ -149,6 +163,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
     setGeneratedVariaciones(null); setSelectedVariacion(null); setBriefVisual(null);
     setSelectedFotoUrl(null); setSavedCreativeId(null);
     setGeneratedAssetUrl(null); setVideoPollingId(null); setVideoProgress('');
+    setGeneratedScript(null);
   };
 
   const efectiveAngulo = showCustomAngulo && customAngulo.trim() ? customAngulo.trim() : angulo;
@@ -300,6 +315,64 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
       toast.error('Error iniciando generación de video');
       setGeneratingVideo(false);
     }
+  };
+
+  const handleGenerateScript = async () => {
+    if (!funnel) return;
+    if ((credits?.creditos_disponibles ?? 0) < 1 && credits?.plan !== 'free_beta') {
+      toast.error('Sin créditos disponibles');
+      return;
+    }
+    setGeneratingScript(true);
+    setGeneratedScript(null);
+    try {
+      const { data, error } = await callApi('generate-video-script', {
+        body: {
+          clientId, duracion: scriptDuracion, funnel,
+          angulo: efectiveAngulo || undefined,
+          instrucciones: instrucciones.trim() || undefined,
+          variacionTexto: selectedVariacion ? `${selectedVariacion.titulo}\n${selectedVariacion.texto_principal}\n${selectedVariacion.cta}` : undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.error === 'NO_CREDITS') { toast.error('Sin créditos para generar script'); return; }
+      if (data?.script) {
+        setGeneratedScript(data.script);
+        await fetchCredits();
+        toast.success('Script de video generado');
+      }
+    } catch {
+      toast.error('Error al generar script de video');
+    } finally {
+      setGeneratingScript(false);
+    }
+  };
+
+  const copyScriptToClipboard = () => {
+    if (!generatedScript) return;
+    const text = [
+      `SCRIPT: ${generatedScript.titulo} (${generatedScript.duracion})`,
+      '',
+      `HOOK (${generatedScript.hook.duracion_segundos}s):`,
+      `  Texto: ${generatedScript.hook.texto}`,
+      `  Visual: ${generatedScript.hook.visual}`,
+      '',
+      'BODY:',
+      ...generatedScript.body.map((s, i) => [
+        `  Escena ${i + 1} (${s.duracion_segundos}s):`,
+        `    Texto: ${s.texto}`,
+        `    Visual: ${s.visual}`,
+      ]).flat(),
+      '',
+      `CTA (${generatedScript.cta.duracion_segundos}s):`,
+      `  Texto: ${generatedScript.cta.texto}`,
+      `  Visual: ${generatedScript.cta.visual}`,
+      '',
+      `Música: ${generatedScript.musica_sugerida}`,
+      `Notas: ${generatedScript.notas_produccion}`,
+    ].join('\n');
+    navigator.clipboard.writeText(text);
+    toast.success('Script copiado al portapapeles');
   };
 
   const startVideoPolling = useCallback(async (predictionId: string) => {
@@ -729,6 +802,72 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                                     <span>La generación tarda ~60 segundos. Puedes seguir navegando.</span>
                                   </div>
                                 )}
+                              </div>
+                            )}
+
+                            {/* Script de Video */}
+                            <div className="pt-3 border-t border-border">
+                              <p className="text-sm font-medium mb-2">Script de Video</p>
+                              <div className="flex gap-2 mb-2">
+                                {(['15s', '30s', '60s'] as const).map(d => (
+                                  <button key={d} type="button" onClick={() => setScriptDuracion(d)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${scriptDuracion === d ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary/50'}`}>
+                                    <Clock className="w-3 h-3 inline mr-1" />{d}
+                                  </button>
+                                ))}
+                              </div>
+                              <Button variant="outline" className="w-full" disabled={generatingScript} onClick={handleGenerateScript}>
+                                {generatingScript ? (
+                                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Generando script...</>
+                                ) : (
+                                  <><FileText className="w-4 h-4 mr-2" />Generar Script — 1 crédito</>
+                                )}
+                              </Button>
+                            </div>
+
+                            {/* Script result */}
+                            {generatedScript && (
+                              <div className="mt-3 space-y-3 p-4 rounded-lg border border-primary/20 bg-primary/5">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-bold">{generatedScript.titulo}</h4>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline">{generatedScript.duracion}</Badge>
+                                    <button onClick={copyScriptToClipboard} className="text-muted-foreground hover:text-foreground transition-colors">
+                                      <Copy className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                                    <p className="text-xs font-bold text-red-700 uppercase mb-1">Hook ({generatedScript.hook.duracion_segundos}s)</p>
+                                    <p className="text-sm font-medium">{generatedScript.hook.texto}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{generatedScript.hook.visual}</p>
+                                  </div>
+
+                                  {generatedScript.body.map((scene, i) => (
+                                    <div key={i} className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                                      <p className="text-xs font-bold text-blue-700 uppercase mb-1">Escena {i + 1} ({scene.duracion_segundos}s)</p>
+                                      <p className="text-sm">{scene.texto}</p>
+                                      <p className="text-xs text-muted-foreground mt-1">{scene.visual}</p>
+                                    </div>
+                                  ))}
+
+                                  <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                                    <p className="text-xs font-bold text-green-700 uppercase mb-1">CTA ({generatedScript.cta.duracion_segundos}s)</p>
+                                    <p className="text-sm font-medium">{generatedScript.cta.texto}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{generatedScript.cta.visual}</p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div className="p-2 rounded bg-muted"><span className="font-medium">Música:</span> {generatedScript.musica_sugerida}</div>
+                                  <div className="p-2 rounded bg-muted"><span className="font-medium">Notas:</span> {generatedScript.notas_produccion}</div>
+                                </div>
+
+                                <Button variant="outline" size="sm" className="w-full" onClick={handleGenerateScript} disabled={generatingScript}>
+                                  <RefreshCw className={`w-3 h-3 mr-1 ${generatingScript ? 'animate-spin' : ''}`} />Regenerar Script
+                                </Button>
                               </div>
                             )}
                           </div>
