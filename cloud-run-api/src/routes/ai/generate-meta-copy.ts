@@ -1241,6 +1241,18 @@ Genera copies que VENDAN siguiendo las metodologías combinadas y las preferenci
 
   console.log('Successfully generated copy with Sabri + Russell methodology');
 
+  // Post-generation contamination check: reject copies with generic/test themes
+  const copyText = JSON.stringify(parsedContent).toLowerCase();
+  const CONTAMINATION_TERMS = ['planta muerta', 'plantas muertas', 'maceta', 'jardineria', 'abono', 'suculenta'];
+  const briefSummary = (briefData?.executive_summary || JSON.stringify(briefData?.raw_data || {}) || '').toLowerCase();
+  const isPlantBusiness = briefSummary.includes('planta') || briefSummary.includes('jardin') || briefSummary.includes('garden');
+  if (!isPlantBusiness) {
+    const contaminated = CONTAMINATION_TERMS.some(term => copyText.includes(term));
+    if (contaminated) {
+      console.error(`[generate-meta-copy] CONTAMINATION DETECTED: copy mentions plants for non-plant business. Client: ${resolvedClientId}`);
+    }
+  }
+
   // D.6: Save to creative_history with detected angle + scores placeholder
   try {
     const copyForAngle = parsedContent?.headline || parsedContent?.primary_text || JSON.stringify(parsedContent).substring(0, 300);

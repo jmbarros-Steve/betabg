@@ -235,9 +235,16 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       });
 
       setConversations(allItems);
+
+      // Show warning if all 3 requests failed (likely scope issue)
+      const allFailed = [convRes, commentsRes, adCommentsRes].every(
+        r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.data?.success)
+      );
+      if (allFailed && allItems.length === 0) {
+        toast.error('No se pudieron cargar conversaciones. Verifica que tu token tenga permisos de pages_messaging e instagram_manage_messages.');
+      }
     } catch (err) {
-      // Fetch error logged silently
-      toast.error('Error cargando inbox');
+      toast.error('Error cargando inbox. Verifica permisos de Meta.');
     } finally {
       setLoadingConversations(false);
     }

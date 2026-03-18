@@ -135,7 +135,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
   const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatingVideo, setGeneratingVideo] = useState(false);
-  const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
+  const [imageEngine, setImageEngine] = useState<'imagen' | 'flux'>('imagen');
   const [generatedAssetUrls, setGeneratedAssetUrls] = useState<string[]>([]);
   const [videoProgress, setVideoProgress] = useState('');
 
@@ -1092,8 +1092,8 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setImageEngine('gpt4o')}
-                        className={`p-3 rounded-lg border text-left transition-all ${imageEngine === 'gpt4o' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:border-muted-foreground/40'}`}
+                        onClick={() => setImageEngine('imagen')}
+                        className={`p-3 rounded-lg border text-left transition-all ${imageEngine === 'imagen' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:border-muted-foreground/40'}`}
                       >
                         <p className="text-sm font-semibold">🎨 Anuncio Diseñado</p>
                         <p className="text-xs text-muted-foreground">Composición publicitaria, espacio para texto, layouts</p>
