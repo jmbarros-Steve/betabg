@@ -443,6 +443,14 @@ export function SteveChat({ clientId }: SteveChatProps) {
     setMessages(prev => [...prev, tempUserMsg]);
     setIsLoading(true);
 
+    // Safety timeout: force-unlock UI if callApi hangs (network drop, tab suspension)
+    const safetyTimer = setTimeout(() => {
+      console.warn('[CHAT] SAFETY TIMEOUT — force-unlocking UI after 100s');
+      setIsLoading(false);
+      toast.error('La solicitud tardó demasiado. Intenta de nuevo.');
+      inputRef.current?.focus();
+    }, 100_000);
+
     try {
       const { data, error } = await callApi('steve-chat', {
         body: {
@@ -499,17 +507,23 @@ export function SteveChat({ clientId }: SteveChatProps) {
           triggerAnalysisChain(clientId);
         }
       }
-    } catch (error: any) {
-      // Message send error handled via toast
-      if (error?.status === 429) {
+    } catch (err: any) {
+      const errStr = typeof err === 'string' ? err : (err?.message || '');
+      const is429 = err?.status === 429 || errStr.includes('429');
+      const is5xx = /\b50[0-9]\b/.test(errStr);
+
+      if (is429) {
         toast.error('Demasiadas solicitudes, espera un momento');
-      } else if (error?.status === 402) {
+      } else if (err?.status === 402) {
         toast.error('Steve no disponible, intenta en unos minutos');
+      } else if (is5xx) {
+        toast.error('Servidor temporalmente fuera de servicio. Intenta de nuevo.');
       } else {
-        toast.error('Error al enviar mensaje');
+        toast.error('Error al enviar mensaje. Revisa tu conexión.');
       }
       setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
     } finally {
+      clearTimeout(safetyTimer);
       setIsLoading(false);
       inputRef.current?.focus();
     }

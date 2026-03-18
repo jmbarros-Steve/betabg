@@ -143,6 +143,20 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     });
     setIsLoading(true);
 
+    // Safety timeout: if callApi hangs (network drop, browser tab suspension),
+    // force-unlock the UI after 100s so the user can retry without reloading.
+    const safetyTimer = setTimeout(() => {
+      console.warn('[EST] SAFETY TIMEOUT — force-unlocking UI after 100s');
+      setIsLoading(false);
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '⚠️ La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.',
+        created_at: new Date().toISOString(),
+      }]);
+      inputRef.current?.focus();
+    }, 100_000);
+
     try {
       console.log('[EST] Calling callApi steve-chat, clientId:', clientId, 'convId:', conversationId);
       const { data, error } = await callApi('steve-chat', {
@@ -188,11 +202,24 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
         };
         setMessages(prev => [...prev, fallbackMsg]);
       }
-    } catch (error: any) {
-      console.error('[EST] CATCH — error:', error, 'type:', typeof error, 'message:', error?.message);
-      const errorText = error?.status === 429
-        ? '⚠️ Demasiadas solicitudes. Espera un momento e intenta de nuevo.'
-        : `⚠️ Error al procesar tu mensaje. Intenta de nuevo. ${typeof error === 'string' ? `(${error.slice(0, 100)})` : ''}`;
+    } catch (err: any) {
+      console.error('[EST] CATCH — error:', err, 'type:', typeof err, 'message:', err?.message);
+      const errStr = typeof err === 'string' ? err : (err?.message || '');
+      const is429 = err?.status === 429 || errStr.includes('429');
+      const is5xx = /\b50[0-9]\b/.test(errStr);
+      const isNetwork = errStr.includes('fetch') || errStr.includes('network') || errStr.includes('Failed to fetch') || errStr.includes('aborted');
+
+      let errorText: string;
+      if (is429) {
+        errorText = '⚠️ Demasiadas solicitudes. Espera un momento e intenta de nuevo.';
+      } else if (is5xx) {
+        errorText = '⚠️ El servidor está temporalmente fuera de servicio. Intenta de nuevo en unos segundos.';
+      } else if (isNetwork) {
+        errorText = '⚠️ Error de conexión. Revisa tu internet e intenta de nuevo.';
+      } else {
+        errorText = `⚠️ Error al procesar tu mensaje. Intenta de nuevo.${errStr ? ` (${errStr.slice(0, 120)})` : ''}`;
+      }
+
       const errorMsg: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -201,6 +228,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
+      clearTimeout(safetyTimer);
       console.log('[EST] FINALLY — setting isLoading=false');
       setIsLoading(false);
       inputRef.current?.focus();
