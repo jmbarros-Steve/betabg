@@ -283,25 +283,43 @@ function LevelSelector({ level, setLevel, onStart }: { level: StartLevel; setLev
 
 function CampaignForm({
   name, setName,
+  onNameEdited,
+  onSuggestName,
   budgetType, setBudgetType,
   objective, setObjective,
   dailyBudget, setDailyBudget,
   startDate, setStartDate,
 }: {
   name: string; setName: (v: string) => void;
+  onNameEdited?: () => void;
+  onSuggestName?: () => string;
   budgetType: BudgetType; setBudgetType: (v: BudgetType) => void;
   objective: Objective; setObjective: (v: Objective) => void;
   dailyBudget: string; setDailyBudget: (v: string) => void;
   startDate: string; setStartDate: (v: string) => void;
 }) {
-  const today = new Date().toISOString().split('T')[0];
-
   return (
     <div className="space-y-5">
       <div>
         <Label>Nombre de la campaña</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`Mi Campaña - ${today}`} className="mt-1" />
-        <p className="text-xs text-muted-foreground mt-1">Steve sugiere: [Marca] - [Tipo] - [Fecha]</p>
+        <div className="flex gap-2 mt-1">
+          <Input
+            value={name}
+            onChange={(e) => { setName(e.target.value); onNameEdited?.(); }}
+            placeholder="Ej: JardinEva-CONV-Lookalike-Mar26"
+            className="flex-1"
+          />
+          {onSuggestName && (
+            <button
+              type="button"
+              onClick={() => setName(onSuggestName())}
+              className="px-3 py-2 text-xs font-medium rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+            >
+              Sugerir nombre
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">Formato: [Marca]-[Objetivo]-[Audiencia]-[Fecha]</p>
       </div>
 
       <div>
@@ -1834,11 +1852,21 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   // Campaign fields
   const [campName, setCampName] = useState('');
+  const [campNameEdited, setCampNameEdited] = useState(false);
   const [budgetType, setBudgetType] = useState<BudgetType>('ABO');
   const [objective, setObjective] = useState<Objective>('CONVERSIONS');
   const [campBudget, setCampBudget] = useState('');
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(tomorrow);
+
+  // Client name for auto-naming
+  const [clientBrandName, setClientBrandName] = useState('');
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('clients').select('name').eq('id', clientId).single();
+      if (data?.name) setClientBrandName(data.name.split(' ')[0]); // First word as short brand name
+    })();
+  }, [clientId]);
 
   // Ad Set fields
   const [adsetName, setAdsetName] = useState('');
@@ -1907,18 +1935,28 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     });
   }, [adSetFormat]);
 
-  // Auto-generate campaign name from objective/funnel/angle
-  useEffect(() => {
-    if (campName && campName !== '') return; // Don't overwrite user edits
+  // Auto-generate campaign name: [Marca]-[OBJ]-[Audiencia]-[MesAño]
+  const generateCampaignName = useCallback(() => {
     const parts: string[] = [];
-    const objLabel = OBJECTIVES.find(o => o.value === objective)?.label || '';
-    if (objLabel) parts.push(objLabel);
-    if (funnelStage) parts.push(funnelStage.toUpperCase());
-    if (selectedAngle) parts.push(selectedAngle);
-    const today = new Date().toISOString().split('T')[0];
-    parts.push(today);
-    setCampName(parts.join(' — '));
-  }, [objective, funnelStage, selectedAngle]);
+    if (clientBrandName) parts.push(clientBrandName);
+    const objShort: Record<string, string> = { CONVERSIONS: 'CONV', TRAFFIC: 'TRAF', AWARENESS: 'AWR', ENGAGEMENT: 'ENG', CATALOG: 'CATL' };
+    parts.push(objShort[objective] || objective);
+    // Audience shorthand
+    const audLower = audienceDesc.toLowerCase();
+    if (audLower.includes('lookalike') || audLower.includes('similar')) parts.push('LAL');
+    else if (audLower.includes('retarg') || audLower.includes('remarketing') || audLower.includes('custom')) parts.push('RTG');
+    else if (audienceDesc.trim()) parts.push(audienceDesc.substring(0, 15).replace(/\s+/g, ''));
+    else if (funnelStage) parts.push(funnelStage.toUpperCase());
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const now = new Date();
+    parts.push(`${months[now.getMonth()]}${String(now.getFullYear()).slice(-2)}`);
+    return parts.join('-');
+  }, [clientBrandName, objective, audienceDesc, funnelStage]);
+
+  useEffect(() => {
+    if (campNameEdited) return; // Don't overwrite manual edits
+    setCampName(generateCampaignName());
+  }, [objective, funnelStage, audienceDesc, clientBrandName, generateCampaignName, campNameEdited]);
 
   // Auto-load CPA from brief (buyer_personas)
   useEffect(() => {
@@ -2599,6 +2637,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                       <CardContent className="pt-4">
                         <CampaignForm
                           name={campName} setName={setCampName}
+                          onNameEdited={() => setCampNameEdited(true)}
+                          onSuggestName={() => { setCampNameEdited(false); return generateCampaignName(); }}
                           budgetType={budgetType} setBudgetType={setBudgetType}
                           objective={objective} setObjective={setObjective}
                           dailyBudget={campBudget} setDailyBudget={setCampBudget}
@@ -2657,6 +2697,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               {currentStep === 'campaign-config' && (
                 <CampaignForm
                   name={campName} setName={setCampName}
+                  onNameEdited={() => setCampNameEdited(true)}
+                  onSuggestName={() => { setCampNameEdited(false); return generateCampaignName(); }}
                   budgetType={budgetType} setBudgetType={setBudgetType}
                   objective={objective} setObjective={setObjective}
                   dailyBudget={campBudget} setDailyBudget={setCampBudget}
