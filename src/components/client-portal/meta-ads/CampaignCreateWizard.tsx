@@ -289,6 +289,7 @@ function CampaignForm({
   objective, setObjective,
   dailyBudget, setDailyBudget,
   startDate, setStartDate,
+  cpaTarget,
 }: {
   name: string; setName: (v: string) => void;
   onNameEdited?: () => void;
@@ -297,7 +298,10 @@ function CampaignForm({
   objective: Objective; setObjective: (v: Objective) => void;
   dailyBudget: string; setDailyBudget: (v: string) => void;
   startDate: string; setStartDate: (v: string) => void;
+  cpaTarget?: string;
 }) {
+  const cboCpa = Number(cpaTarget) || 0;
+  const cboRecommended = cboCpa > 0 ? Math.round((cboCpa * 10) / 7) : 0;
   return (
     <div className="space-y-5">
       <div>
@@ -364,8 +368,27 @@ function CampaignForm({
       {budgetType === 'CBO' && (
         <div>
           <Label>Presupuesto diario (CLP)</Label>
-          <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="50000" className="mt-1" />
-          <p className="text-xs text-muted-foreground mt-1">Meta distribuirá este presupuesto entre los Ad Sets automáticamente.</p>
+          <div className="flex gap-2 mt-1">
+            <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="50000" className="flex-1" />
+            {cboRecommended > 0 && dailyBudget !== String(cboRecommended) && (
+              <button
+                type="button"
+                onClick={() => setDailyBudget(String(cboRecommended))}
+                className="px-3 py-2 text-xs font-medium rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+              >
+                Aplicar ${cboRecommended.toLocaleString('es-CL')}/día
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Meta distribuirá este presupuesto entre los Ad Sets automáticamente.
+            {cboRecommended > 0 && (
+              <span className="block mt-0.5">Recomendado: CPA ${cboCpa.toLocaleString('es-CL')} × 10 ÷ 7 = <span className="font-medium text-primary">${cboRecommended.toLocaleString('es-CL')}/día</span></span>
+            )}
+            {!cboRecommended && (
+              <span className="block mt-0.5">Fórmula Tichner: CPA × 10 ÷ 7 = presupuesto/día.</span>
+            )}
+          </p>
         </div>
       )}
 
@@ -1063,7 +1086,28 @@ function AdSetForm({
 
           <div>
             <Label>Presupuesto diario del Ad Set (CLP)</Label>
-            <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="mt-1" />
+            <div className="flex gap-2 mt-1">
+              <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="flex-1" />
+              {recommendedBudget > 0 && dailyBudget !== String(recommendedBudget) && (
+                <button
+                  type="button"
+                  onClick={() => setDailyBudget(String(recommendedBudget))}
+                  className="px-3 py-2 text-xs font-medium rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+                >
+                  Aplicar ${recommendedBudget.toLocaleString('es-CL')}/día
+                </button>
+              )}
+            </div>
+            {recommendedBudget > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Recomendado: CPA ${cpa.toLocaleString('es-CL')} × 10 ÷ 7 = <span className="font-medium text-primary">${recommendedBudget.toLocaleString('es-CL')}/día</span>
+              </p>
+            )}
+            {!recommendedBudget && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Fórmula Tichner: CPA × 10 ÷ 7 = presupuesto/día. Ingresa tu CPA arriba para calcular.
+              </p>
+            )}
           </div>
         </>
       )}
@@ -2671,6 +2715,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           objective={objective} setObjective={setObjective}
                           dailyBudget={campBudget} setDailyBudget={setCampBudget}
                           startDate={startDate} setStartDate={setStartDate}
+                          cpaTarget={cpaTarget}
                         />
                       </CardContent>
                     </Card>
@@ -2732,6 +2777,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     objective={objective} setObjective={setObjective}
                     dailyBudget={campBudget} setDailyBudget={setCampBudget}
                     startDate={startDate} setStartDate={setStartDate}
+                    cpaTarget={cpaTarget}
                   />
                   {objective === 'CATALOG' && (
                     <div className="space-y-4 mt-5 p-4 rounded-lg border border-primary/20 bg-primary/5">
