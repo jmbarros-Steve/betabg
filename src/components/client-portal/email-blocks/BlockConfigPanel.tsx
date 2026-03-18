@@ -143,12 +143,72 @@ function TextConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) {
 // ═══════════════════════════════
 
 function ImageConfig({ p, set, assets }: { p: any; set: (k: string, v: any) => void; assets?: any[] }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen no puede superar 5MB');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Formato no soportado. Usa JPG, PNG o WebP');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Sesión expirada');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${apiUrl}/api/upload-email-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (result.success && result.url) {
+        set('src', result.url);
+      } else {
+        alert(result.error || 'Error al subir imagen');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Error al subir imagen');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }, [set]);
+
   return (
     <div className="space-y-4">
       <SectionTitle>Imagen</SectionTitle>
       <div>
         <Label className="text-xs font-medium">URL de la imagen</Label>
         <Input value={p.src || ''} onChange={e => set('src', e.target.value)} placeholder="https://..." className="h-9 text-sm mt-1.5" />
+      </div>
+      <div>
+        <label className="cursor-pointer">
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+          <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm transition-colors ${uploading ? 'opacity-50 cursor-wait bg-muted' : 'hover:bg-accent cursor-pointer border-dashed'}`}>
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="text-base">📁</span>}
+            {uploading ? 'Subiendo...' : 'Subir imagen desde tu PC'}
+          </div>
+        </label>
+        <p className="text-[11px] text-muted-foreground mt-1">JPG, PNG o WebP. Máximo 5MB.</p>
       </div>
       {assets && assets.length > 0 && (
         <div>

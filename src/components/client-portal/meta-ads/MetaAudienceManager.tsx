@@ -1003,6 +1003,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   const [metaConnectionId, setMetaConnectionId] = useState<string | null>(null);
   const [hasShopify, setHasShopify] = useState(false);
   const [hasKlaviyo, setHasKlaviyo] = useState(false);
+  const [klaviyoConnectionId, setKlaviyoConnectionId] = useState<string | null>(null);
   const [shopDomain, setShopDomain] = useState<string | null>(null);
 
   // Dialogs
@@ -1163,6 +1164,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       setMetaConnectionId(ctxConnectionId);
       setHasShopify(shopifyConns.length > 0);
       setHasKlaviyo(klaviyoConns.length > 0);
+      setKlaviyoConnectionId(klaviyoConns.length > 0 ? klaviyoConns[0].id : null);
       setShopDomain(clientData?.shop_domain || null);
 
       if (!ctxConnectionId) {
@@ -1247,6 +1249,40 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     }
 
     setFormSubmitting(true);
+
+    // Special handling for Klaviyo sync — uses dedicated endpoint
+    if (customForm.source === 'CUSTOMER_LIST' && customForm.customer_list_source === 'KLAVIYO') {
+      try {
+        if (!klaviyoConnectionId) {
+          toast.error('No se encontró conexión de Klaviyo activa');
+          setFormSubmitting(false);
+          return;
+        }
+
+        const { data: responseData, error } = await callApi('sync-klaviyo-to-meta-audience', {
+          body: {
+            klaviyo_connection_id: klaviyoConnectionId,
+            meta_connection_id: metaConnectionId,
+            audience_name: customForm.name.trim(),
+          },
+        });
+
+        if (error) {
+          toast.error(`Error al sincronizar desde Klaviyo: ${typeof error === 'string' ? error : (error as any)?.message || 'Error desconocido'}`);
+        } else if (responseData?.success) {
+          toast.success(`Audiencia creada con ${responseData.profiles_uploaded} contactos de Klaviyo`);
+          if (metaConnectionId) await syncAudiencesFromMeta(metaConnectionId, true);
+          setCreateCustomOpen(false);
+          setCustomForm({ ...EMPTY_CUSTOM_FORM });
+        }
+      } catch (err: any) {
+        toast.error('Error al sincronizar desde Klaviyo');
+      } finally {
+        setFormSubmitting(false);
+      }
+      return;
+    }
+
     try {
       // Build the nested data payload matching the edge function's expected format
       const data: Record<string, unknown> = {
