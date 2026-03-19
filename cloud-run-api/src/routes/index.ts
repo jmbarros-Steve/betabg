@@ -92,6 +92,7 @@ import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 import { detectAudienceOverlap } from './meta/detect-audience-overlap.js';
 import { syncKlaviyoToMetaAudience } from './meta/sync-klaviyo-to-meta-audience.js';
 import { metaCatalogs } from './meta/meta-catalogs.js';
+import { metaAdsetAction } from './meta/meta-adset-action.js';
 
 // Instagram
 import { fetchInstagramInsights } from './instagram/fetch-instagram-insights.js';
@@ -255,6 +256,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/detect-audience-overlap', authMiddleware, detectAudienceOverlap);
   app.post('/api/sync-klaviyo-to-meta-audience', authMiddleware, syncKlaviyoToMetaAudience);
   app.post('/api/meta-catalogs', authMiddleware, metaCatalogs);
+  app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
 
   // ============================================================
   // Phase 3: Platform Integrations (Instagram)
