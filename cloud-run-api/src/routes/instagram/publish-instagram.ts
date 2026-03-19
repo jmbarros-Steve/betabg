@@ -358,27 +358,71 @@ export async function publishInstagram(c: Context) {
       case 'generate_caption': {
         const { topic, tone, product_name } = body;
 
-        // Fetch brand brief
-        const { data: brief } = await supabase
-          .from('brand_research')
-          .select('brand_name, tone_of_voice, target_audience, brand_values, industry')
-          .eq('client_id', client_id)
-          .single();
+        // Fetch brand brief from brand_research + buyer_personas + client info
+        const [{ data: brief }, { data: persona }, { data: clientInfo }] = await Promise.all([
+          supabase
+            .from('brand_research')
+            .select('brand_name, industry, target_audience, value_proposition, brand_voice, product_details')
+            .eq('client_id', client_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('buyer_personas')
+            .select('persona_data')
+            .eq('client_id', client_id)
+            .eq('is_complete', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('clients')
+            .select('name, company, shop_domain')
+            .eq('id', client_id)
+            .maybeSingle(),
+        ]);
 
-        const brandName = brief?.brand_name || 'the brand';
-        const toneVoice = tone || brief?.tone_of_voice || 'profesional y cercano';
-        const audience = brief?.target_audience || 'general audience';
+        const brandName = brief?.brand_name || clientInfo?.company || clientInfo?.name || 'la marca';
+        const toneVoice = tone || brief?.brand_voice || 'profesional y cercano';
+        const audience = brief?.target_audience || 'audiencia general';
         const industry = brief?.industry || '';
+        const valueProp = brief?.value_proposition || '';
+        const productDetails = brief?.product_details || '';
 
-        const prompt = `Generate an Instagram caption and hashtags for ${brandName}.
-Topic: ${topic || 'general brand post'}
-${product_name ? `Product: ${product_name}` : ''}
-Tone: ${toneVoice}
-Target audience: ${audience}
-${industry ? `Industry: ${industry}` : ''}
+        // Extract persona insights if available
+        const personaData = persona?.persona_data as any;
+        const personaCtx = personaData
+          ? `Buyer persona: ${personaData.nombre || ''} — ${personaData.edad || ''}, ${personaData.ocupacion || ''}. Intereses: ${(personaData.intereses || []).join(', ')}. Dolor principal: ${personaData.dolor_principal || ''}.`
+          : '';
+
+        const prompt = `Genera un caption para Instagram y hashtags para la marca "${brandName}".
+
+BRIEF DE MARCA:
+- Nombre: ${brandName}
+${industry ? `- Industria: ${industry}` : ''}
+${valueProp ? `- Propuesta de valor: ${valueProp}` : ''}
+${productDetails ? `- Productos: ${productDetails}` : ''}
+- Tono de voz: ${toneVoice}
+- Audiencia objetivo: ${audience}
+${personaCtx ? `- ${personaCtx}` : ''}
+
+CONTENIDO:
+- Tema: ${topic || 'post general de la marca'}
+${product_name ? `- Producto destacado: ${product_name}` : ''}
+
+INSTRUCCIONES:
+1. Caption en español chileno, máximo 2200 caracteres.
+2. Incluir line breaks para legibilidad.
+3. Incluir un CTA claro al final (antes de los hashtags).
+4. El caption debe reflejar el tono de voz y valores de la marca.
+
+HASHTAGS (20-30 total):
+- 10 hashtags de nicho (específicos de la industria/producto)
+- 10 hashtags de ubicación (Chile, Santiago, LATAM, ciudades relevantes)
+- 5-10 hashtags populares (tendencias generales con alto alcance)
 
 Return ONLY a JSON object:
-{"caption": "the caption text (max 2200 chars, use line breaks, include CTA)", "hashtags": ["hashtag1", "hashtag2", ...up to 20 relevant hashtags without #]}`;
+{"caption": "el caption aquí", "hashtags": ["hashtag1", "hashtag2", ...sin el símbolo #]}`;
 
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
         if (!anthropicKey) {
@@ -394,7 +438,7 @@ Return ONLY a JSON object:
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 1000,
+            max_tokens: 1500,
             messages: [{ role: 'user', content: prompt }],
           }),
         });
