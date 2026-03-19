@@ -62,79 +62,6 @@ const CAMPAIGN_TYPES = [
 
 const GMAIL_CLIP_LIMIT = 102 * 1024;
 
-function SaveTemplateModal({
-  open,
-  onClose,
-  onSave,
-  saving,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (name: string) => void | Promise<void>;
-  saving: boolean;
-}) {
-  const [name, setName] = useState('');
-
-  if (!open) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-lg w-full max-w-md p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-semibold">Guardar como Plantilla</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-3 py-2">
-          <div>
-            <label className="text-sm">Nombre de la plantilla</label>
-            <input
-              placeholder="Ej: Mi plantilla de bienvenida"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
-            />
-          </div>
-          <p className="text-xs text-gray-500">
-            La plantilla quedará guardada y disponible en tu galería para reutilizarla en futuras campañas.
-          </p>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border rounded text-sm"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => onSave(name)}
-            disabled={saving || !name.trim()}
-            className="px-4 py-2 bg-blue-500 text-white rounded text-sm disabled:opacity-50"
-          >
-            {saving ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
 export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -778,7 +705,68 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                   <Blocks className="w-4 h-4 mr-1" /> Bloques
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => { console.log('[DEBUG] Save Template clicked'); setShowSaveTemplate(true); }}>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const existing = document.getElementById('save-template-overlay');
+                  if (existing) existing.remove();
+  
+                  const overlay = document.createElement('div');
+                  overlay.id = 'save-template-overlay';
+                  overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+                  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  
+                  overlay.innerHTML = `
+                    <div style="background:white;padding:20px;border-radius:12px;width:400px;max-width:90vw;" onclick="event.stopPropagation()">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="font-weight:600;font-size:16px;">Guardar como Plantilla</h3>
+                        <button id="stp-close" style="border:none;background:none;font-size:18px;cursor:pointer;color:#666;">✕</button>
+                      </div>
+                      <div style="margin-bottom:12px;">
+                        <label style="font-size:14px;display:block;margin-bottom:4px;">Nombre de la plantilla</label>
+                        <input id="stp-name" placeholder="Ej: Mi plantilla de bienvenida" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;" />
+                      </div>
+                      <p style="font-size:12px;color:#888;margin-bottom:16px;">La plantilla quedará guardada y disponible en tu galería para reutilizarla en futuras campañas.</p>
+                      <div style="display:flex;justify-content:flex-end;gap:8px;">
+                        <button id="stp-cancel" style="padding:8px 16px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;font-size:14px;">Cancelar</button>
+                        <button id="stp-save" style="padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Guardar</button>
+                      </div>
+                    </div>
+                  `;
+  
+                  document.body.appendChild(overlay);
+  
+                  document.getElementById('stp-close')!.onclick = () => overlay.remove();
+                  document.getElementById('stp-cancel')!.onclick = () => overlay.remove();
+                  document.getElementById('stp-save')!.onclick = async () => {
+                    const name = (document.getElementById('stp-name') as HTMLInputElement).value.trim();
+                    if (!name) { alert('Ingresa un nombre'); return; }
+                    const btn = document.getElementById('stp-save')!;
+                    btn.textContent = 'Guardando...';
+                    btn.setAttribute('disabled', 'true');
+                    setSaveTemplateName(name);
+                    try {
+                      const { html, design } = exportEditorHtml();
+                      const { error } = await callApi('email-templates', {
+                        body: {
+                          action: 'create',
+                          client_id: clientId,
+                          name,
+                          description: 'Plantilla guardada desde campaña',
+                          category: 'custom',
+                          design_json: design,
+                          html_preview: html,
+                        },
+                      });
+                      if (error) throw new Error(String(error));
+                      overlay.remove();
+                      toast.success('Plantilla guardada');
+                    } catch (err: any) {
+                      console.error('[SteveMail] Save template failed:', err);
+                      toast.error('Error al guardar: ' + (err.message || err));
+                      btn.textContent = 'Guardar';
+                      btn.removeAttribute('disabled');
+                    }
+                  };
+                }}>
                   <Save className="w-4 h-4 mr-1" /> Guardar Plantilla
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => {
@@ -1619,16 +1607,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         document.body
       )}
 
-      {/* Save as Template Overlay (manual, fixed) */}
-      <SaveTemplateModal
-        open={showSaveTemplate}
-        onClose={() => setShowSaveTemplate(false)}
-        onSave={async (name) => {
-          setSaveTemplateName(name);
-          await handleSaveAsTemplate();
-        }}
-        saving={savingTemplate}
-      />
+      {/* (Save template modal removed: handled with DOM overlay) */}
     </>
   );
 }
