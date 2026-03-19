@@ -5,6 +5,11 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 // Klaviyo Context Types & Loader
 // ═══════════════════════════════════════════════════════════════
 
+function truncateContext(text: string, max = 4000): string {
+  if (!text || text.length <= max) return text;
+  return text.substring(0, max) + '\n[Contexto truncado]';
+}
+
 interface KlaviyoContext {
   briefSection: string;
   bugSection: string;
@@ -60,7 +65,7 @@ async function loadKlaviyoContext(supabase: any, clientId: string): Promise<Klav
   let brandTone = '';
   let brandName = '';
   if (personaData?.is_complete && personaData?.persona_data) {
-    briefSection = JSON.stringify(personaData.persona_data, null, 2);
+    briefSection = truncateContext(JSON.stringify(personaData.persona_data, null, 2), 4000);
     const pd = personaData.persona_data as any;
     brandTone = pd.tono_marca || pd.tone || pd.brand_tone || '';
     brandName = pd.nombre_marca || pd.brand_name || pd.nombre_negocio || '';
@@ -68,12 +73,12 @@ async function loadKlaviyoContext(supabase: any, clientId: string): Promise<Klav
 
   // Bugs section
   const bugSection = bugsData && bugsData.length > 0
-    ? `\nERRORES CRITICOS QUE DEBES EVITAR EN KLAVIYO:\n${bugsData.map((b: any) => `\u274C ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n`
+    ? truncateContext(`\nERRORES CRITICOS QUE DEBES EVITAR EN KLAVIYO:\n${bugsData.map((b: any) => `\u274C ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n`, 2000)
     : '';
 
   // Knowledge section
   const knowledgeSection = knowledgeData && knowledgeData.length > 0
-    ? `\nCONOCIMIENTO BASE KLAVIYO:\n${knowledgeData.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`
+    ? truncateContext(`\nCONOCIMIENTO BASE KLAVIYO:\n${knowledgeData.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n`, 3000)
     : '';
 
   // Learning context (dual-layer: global + client)
@@ -109,7 +114,7 @@ ${clientNegative.length > 0 ? `\n\u26D4 LO QUE RECHAZA:\n${clientNegative.map((f
 `;
   }
 
-  return { briefSection, bugSection, knowledgeSection, learningContext, brandTone, brandName };
+  return { briefSection, bugSection, knowledgeSection, learningContext: truncateContext(learningContext, 2000), brandTone, brandName };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -247,7 +252,7 @@ async function handleGenerateCopy(body: any, ctx: KlaviyoContext): Promise<any> 
 
   const userMessage = `Genera el contenido completo de un email de tipo "${campaignType}" para la marca "${effectiveBrand}".
 Subject line: "${subject}"
-${products ? `Productos: ${JSON.stringify(products)}` : ''}
+${products ? `Productos: ${truncateContext(JSON.stringify(products), 1500)}` : ''}
 ${effectiveTone ? `Tono: ${effectiveTone}` : ''}
 ${instructions ? `Instrucciones adicionales: ${instructions}` : ''}
 

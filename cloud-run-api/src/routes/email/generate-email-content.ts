@@ -1,6 +1,11 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+function truncateContext(text: string, max = 4000): string {
+  if (!text || text.length <= max) return text;
+  return text.substring(0, max) + '\n[Contexto truncado]';
+}
+
 /**
  * Steve Mail AI — Generate email content using Claude.
  * Works directly with client_id (no Klaviyo dependency).
@@ -80,7 +85,7 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
   let brandTone = '';
 
   if (persona?.is_complete && persona?.persona_data) {
-    briefSection = JSON.stringify(persona.persona_data, null, 2);
+    briefSection = truncateContext(JSON.stringify(persona.persona_data, null, 2), 4000);
     const pd = persona.persona_data as any;
     brandTone = pd.tono_marca || pd.tone || pd.brand_tone || '';
     brandName = pd.nombre_marca || pd.brand_name || pd.nombre_negocio || brandName;
@@ -102,7 +107,7 @@ ${ctx.briefSection}
 
 NOMBRE DE MARCA: ${ctx.brandName}
 ${ctx.brandTone ? `TONO: ${ctx.brandTone}` : ''}
-${ctx.products.length > 0 ? `PRODUCTOS: ${ctx.products.slice(0, 10).map((p: any) => p.title).join(', ')}` : ''}
+${ctx.products.length > 0 ? `PRODUCTOS: ${truncateContext(ctx.products.slice(0, 10).map((p: any) => p.title).join(', '), 500)}` : ''}
 
 REGLAS:
 - Siempre en espanol
@@ -120,7 +125,7 @@ async function handleGenerateCampaignHtml(body: any, ctx: BrandContext) {
   const prompt = `Genera un email HTML completo para una campana de tipo "${campaign_type || 'promotional'}" de "${ctx.brandName}".
 ${subject ? `Subject: "${subject}"` : 'Genera tambien un subject line.'}
 ${instructions ? `Instrucciones: ${instructions}` : ''}
-${selectedProducts.length > 0 ? `Productos a destacar: ${JSON.stringify(selectedProducts)}` : ''}
+${selectedProducts.length > 0 ? `Productos a destacar: ${truncateContext(JSON.stringify(selectedProducts), 1500)}` : ''}
 
 Genera HTML completo (DOCTYPE, head con media queries, body con tabla responsive).
 El HTML debe:
