@@ -62,6 +62,79 @@ const CAMPAIGN_TYPES = [
 
 const GMAIL_CLIP_LIMIT = 102 * 1024;
 
+function SaveTemplateModal({
+  open,
+  onClose,
+  onSave,
+  saving,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (name: string) => void | Promise<void>;
+  saving: boolean;
+}) {
+  const [name, setName] = useState('');
+
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg w-full max-w-md p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold">Guardar como Plantilla</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-3 py-2">
+          <div>
+            <label className="text-sm">Nombre de la plantilla</label>
+            <input
+              placeholder="Ej: Mi plantilla de bienvenida"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            La plantilla quedará guardada y disponible en tu galería para reutilizarla en futuras campañas.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border rounded text-sm"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(name)}
+            disabled={saving || !name.trim()}
+            className="px-4 py-2 bg-blue-500 text-white rounded text-sm disabled:opacity-50"
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1547,65 +1620,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       )}
 
       {/* Save as Template Overlay (manual, fixed) */}
-      {(() => {
-        if (showSaveTemplate) {
-          console.log('[DEBUG] Rendering save template portal');
-          return createPortal(
-            <div
-              className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
-              onClick={() => setShowSaveTemplate(false)}
-            >
-              <div
-                className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-auto p-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-semibold">Guardar como Plantilla</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowSaveTemplate(false)}
-                    className="text-gray-500 hover:text-gray-800"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="space-y-3 py-2">
-                  <div>
-                    <Label className="text-sm">Nombre de la plantilla</Label>
-                    <Input
-                      placeholder="Ej: Mi plantilla de bienvenida"
-                      value={saveTemplateName}
-                      onChange={(e) => setSaveTemplateName(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
-                  </p>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
-                    {savingTemplate ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-1" />
-                    )}
-                    Guardar
-                  </Button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          );
-        }
-
-        return null;
-      })()}
+      <SaveTemplateModal
+        open={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+        onSave={async (name) => {
+          setSaveTemplateName(name);
+          await handleSaveAsTemplate();
+        }}
+        saving={savingTemplate}
+      />
     </>
   );
 }
