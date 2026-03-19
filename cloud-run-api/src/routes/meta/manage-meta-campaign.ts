@@ -183,6 +183,7 @@ async function handleCreate(
     }
 
     console.log(`[manage-meta-campaign] Creating campaign "${name}" for account ${accountId}`);
+    console.log(`[BUG-2] Creando campaña:`, { name, adAccountId: accountId, hasToken: !!accessToken, tokenPrefix: accessToken?.substring(0, 15) });
 
     const campaignResult = await metaApiRequest(
       `act_${accountId}/campaigns`,
@@ -198,6 +199,8 @@ async function handleCreate(
         is_adset_budget_sharing_enabled: false,
       }
     );
+
+    console.log(`[BUG-2] Meta campaign response:`, { ok: campaignResult.ok, hasData: !!campaignResult.data, error: campaignResult.error, campaignId: campaignResult.data?.id });
 
     if (!campaignResult.ok) {
       return { body: { error: 'Failed to create campaign', details: campaignResult.error }, status: 502 };
@@ -1116,6 +1119,7 @@ async function handleCreate322(
 
   // Step 1: Create campaign (ABO)
   console.log(`[manage-meta-campaign] create_322: Creating campaign "${name}" with ${combinations.length} combinations`);
+  console.log(`[BUG-2] create_322 Creando campaña:`, { name: `${name} [ABO]`, adAccountId: accountId, hasToken: !!accessToken, tokenPrefix: accessToken?.substring(0, 15) });
 
   const campaignResult = await metaApiRequest(
     `act_${accountId}/campaigns`,
@@ -1123,6 +1127,8 @@ async function handleCreate322(
     'POST',
     { name: `${name} [ABO]`, objective, status, special_ad_categories: [] }
   );
+
+  console.log(`[BUG-2] create_322 Meta response:`, { ok: campaignResult.ok, hasData: !!campaignResult.data, error: campaignResult.error, campaignId: campaignResult.data?.id });
 
   if (!campaignResult.ok) {
     return { body: { error: 'Failed to create campaign', details: campaignResult.error }, status: 502 };
