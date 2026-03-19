@@ -51,15 +51,6 @@ export async function metaOauthCallback(c: Context) {
 
     // Exchange code for short-lived token (POST body keeps secret out of URL/logs)
     console.log('Exchanging code for token...');
-    console.log('[meta-oauth] Exchange params:', {
-      client_id: metaAppId,
-      client_id_length: metaAppId.length,
-      client_id_trimmed: metaAppId.trim(),
-      has_whitespace: metaAppId !== metaAppId.trim(),
-      redirect_uri: redirect_uri,
-      secret_prefix: metaAppSecret.substring(0, 4) + '...',
-      code_length: code.length,
-    });
     const tokenResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -71,8 +62,6 @@ export async function metaOauthCallback(c: Context) {
       }),
     });
     const tokenData = await tokenResponse.json() as any;
-    console.log('[meta-oauth] Meta response status:', tokenResponse.status);
-    console.log('[meta-oauth] Meta response body:', JSON.stringify(tokenData));
 
     if (tokenData.error) {
       console.error('Meta token error:', tokenData.error);
@@ -80,7 +69,6 @@ export async function metaOauthCallback(c: Context) {
     }
 
     const accessToken = tokenData.access_token;
-    console.log('Access token obtained');
 
     // Exchange for long-lived token (POST body keeps secret out of URL/logs)
     const longLivedResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
