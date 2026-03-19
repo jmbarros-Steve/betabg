@@ -176,3 +176,7 @@
 [data-radix-portal] {
   z-index: 999999 !important;
 }
+
+[role="dialog"] {
+  z-index: 999999 !important;
+}
