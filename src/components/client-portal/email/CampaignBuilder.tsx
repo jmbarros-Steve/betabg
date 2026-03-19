@@ -1405,7 +1405,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </Dialog>
       </div>
     );
-  );
 
   // =============== CAMPAIGN LIST VIEW ===============
   return (
