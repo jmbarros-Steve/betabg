@@ -935,7 +935,7 @@ Fotos disponibles: ${(assetUrls || []).join(', ')}
 
 ${adType === 'static'
   ? `Responde SOLO en JSON sin markdown:
-{"tipo":"imagen","concepto":"...","plano_principal":"...","texto_overlay":"...","estilo_fotografico":"lifestyle/ugc/editorial/clean","iluminacion":"...","colores":"...","foto_recomendada":"URL de la foto más adecuada o null si no hay","instruccion_foto":"usarla tal cual / cambiar fondo / agregar texto / animar","prompt_generacion":"prompt detallado en inglés para Fal.ai Flux Pro"}`
+{"tipo":"imagen","concepto":"...","plano_principal":"...","texto_overlay":"...","estilo_fotografico":"lifestyle/ugc/editorial/clean","iluminacion":"...","colores":"...","foto_recomendada":"URL de la foto más adecuada o null si no hay","instruccion_foto":"usarla tal cual / cambiar fondo / agregar texto / animar","prompt_generacion":"prompt detallado en inglés para Gemini"}`
   : `Responde SOLO en JSON sin markdown:
 {"tipo":"video","duracion":"15s","escena_1":{"tiempo":"0-3s","descripcion":"...","texto_overlay":"..."},"escena_2":{"tiempo":"3-12s","descripcion":"...","texto_overlay":"..."},"escena_3":{"tiempo":"12-15s","descripcion":"...","texto_overlay":"..."},"musica_sugerida":"...","tono":"...","foto_recomendada":"URL de la foto más adecuada o null si no hay","instruccion_foto":"animar / usar como base / cambiar fondo","prompt_generacion":"prompt detallado en inglés para Kling AI"}`
 }`;

@@ -4,10 +4,10 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 const PREVIEW_CREDIT_COST = 1;
 
 /** Aspect-ratio / size mappings per engine */
-const FORMAT_CONFIG: Record<string, { geminiHint: string; falSize: string; openaiSize: string }> = {
-  feed:  { geminiHint: '1:1 square (1080×1080)',  falSize: 'square_hd',      openaiSize: '1024x1024' },
-  story: { geminiHint: '9:16 vertical (1080×1920)', falSize: 'portrait_16_9', openaiSize: '1024x1792' },
-  landscape: { geminiHint: '16:9 horizontal (1920×1080)', falSize: 'landscape_16_9', openaiSize: '1792x1024' },
+const FORMAT_CONFIG: Record<string, { geminiHint: string }> = {
+  feed: { geminiHint: '1:1 square (1080×1080)' },
+  story: { geminiHint: '9:16 vertical (1080×1920)' },
+  landscape: { geminiHint: '16:9 horizontal (1920×1080)' },
 };
 
 /**
@@ -119,7 +119,7 @@ export async function creativePreview(c: Context) {
 
     let imageBytes: Uint8Array | null = null;
 
-    if (engine === 'imagen' || engine === 'gemini') {
+    {
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (!GEMINI_API_KEY) { await refundCredits(); return c.json({ error: 'GEMINI_API_KEY not configured' }, 500); }
 
@@ -167,72 +167,6 @@ export async function creativePreview(c: Context) {
           break;
         }
       }
-
-    } else if (engine === 'flux') {
-      const FAL_API_KEY = process.env.FAL_API_KEY;
-      if (!FAL_API_KEY) { await refundCredits(); return c.json({ error: 'FAL_API_KEY not configured' }, 500); }
-
-      const falBody: Record<string, unknown> = {
-        prompt: adPrompt,
-        num_images: 1,
-        image_size: fmt.falSize,
-        enable_safety_checker: true,
-      };
-      if (productPhotoUrl) {
-        falBody.image_url = productPhotoUrl;
-        falBody.image_prompt_strength = 0.35;
-      }
-
-      const resp = await fetch('https://fal.run/fal-ai/flux-pro/v1.1-ultra', {
-        method: 'POST',
-        headers: { Authorization: `Key ${FAL_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(falBody),
-      });
-
-      if (!resp.ok) {
-        console.error('[creative-preview] Flux error:', resp.status, await resp.text());
-        await refundCredits();
-        return c.json({ error: 'Error generando preview. Intenta de nuevo.' }, 500);
-      }
-
-      const falResult: any = await resp.json();
-      const imgUrl = falResult.images?.[0]?.url;
-      if (!imgUrl) { await refundCredits(); return c.json({ error: 'Error generando preview.' }, 500); }
-
-      const imgResp = await fetch(imgUrl);
-      imageBytes = new Uint8Array(await imgResp.arrayBuffer());
-
-    } else {
-      // GPT-Image-1
-      const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-      if (!OPENAI_API_KEY) { await refundCredits(); return c.json({ error: 'OPENAI_API_KEY not configured' }, 500); }
-
-      const resp = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-image-1',
-          prompt: adPrompt,
-          n: 1,
-          size: fmt.openaiSize,
-          quality: 'medium',
-        }),
-      });
-
-      if (!resp.ok) {
-        console.error('[creative-preview] OpenAI error:', resp.status, await resp.text());
-        await refundCredits();
-        return c.json({ error: 'Error generando preview. Intenta de nuevo.' }, 500);
-      }
-
-      const result: any = await resp.json();
-      const item = result.data?.[0];
-      if (item?.b64_json) {
-        imageBytes = new Uint8Array(Buffer.from(item.b64_json, 'base64'));
-      } else if (item?.url) {
-        const imgResp = await fetch(item.url);
-        imageBytes = new Uint8Array(await imgResp.arrayBuffer());
-      }
     }
 
     if (!imageBytes) {
@@ -259,13 +193,12 @@ export async function creativePreview(c: Context) {
       .getPublicUrl(path);
 
     // Log transaction
-    const engineLabel = engine === 'imagen' || engine === 'gemini' ? 'Gemini Flash' :
-                        engine === 'flux' ? 'Flux Pro' : 'GPT-Image-1';
+    const engineLabel = 'Gemini Flash';
     await supabase.from('credit_transactions').insert({
       client_id: clientId,
       accion: `Preview creativo — ${engineLabel}`,
       creditos_usados: PREVIEW_CREDIT_COST,
-      costo_real_usd: engine === 'flux' ? 0.05 : engine === 'gpt' ? 0.03 : 0.02,
+      costo_real_usd: 0.02,
     });
 
     return c.json({ preview_url: publicUrl });

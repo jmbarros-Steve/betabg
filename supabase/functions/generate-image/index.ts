@@ -47,102 +47,70 @@ serve(async (req) => {
 
     const promptFinal = `${promptBase}, shot on Canon EOS R5, 85mm f/1.4 lens, natural window lighting, editorial style`;
 
-    let imageUrl: string | null = null;
     let imageBytes: Uint8Array | null = null;
 
-    if (engine === 'flux') {
-      // ── Flux (Fal.ai) path ──
-      const FAL_API_KEY = Deno.env.get('FAL_API_KEY');
-      if (!FAL_API_KEY) throw new Error('FAL_API_KEY not configured');
+    // Gemini only (no Fal/OpenAI fallbacks)
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
 
-      const imageSize = formato === 'story' ? 'portrait_4_3' :
-                        formato === 'feed' ? 'landscape_16_9' :
-                        'square_hd';
+    const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    };
 
-      const falBody: Record<string, unknown> = {
-        prompt: promptFinal,
-        num_images: 1,
-        image_size: imageSize,
-        enable_safety_checker: true,
-      };
+    const base64ToBytes = (b64: string): Uint8Array => {
+      const binaryStr = atob(b64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+      return bytes;
+    };
 
-      if (fotoBaseUrl) {
-        falBody.image_url = fotoBaseUrl;
-        falBody.image_prompt_strength = 0.3;
-      }
+    const parts: any[] = [];
 
-      const falResponse = await fetch('https://fal.run/fal-ai/flux-pro/v1.1-ultra', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Key ${FAL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(falBody),
-      });
-
-      if (!falResponse.ok) {
-        const errText = await falResponse.text();
-        throw new Error(`Fal.ai API error: ${falResponse.status} - ${errText}`);
-      }
-
-      const falResult = await falResponse.json();
-      imageUrl = falResult.images?.[0]?.url;
-      if (!imageUrl) throw new Error('No image returned from Fal.ai');
-
-      // Download image
-      const imageResp = await fetch(imageUrl);
-      const imageBlob = await imageResp.blob();
-      const arrayBuffer = await imageBlob.arrayBuffer();
-      imageBytes = new Uint8Array(arrayBuffer);
-
-    } else {
-      // ── GPT-4o (OpenAI) path ──
-      const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-      if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
-
-      const gptSize = formato === 'story' ? '1024x1536' :
-                      formato === 'feed' ? '1536x1024' :
-                      '1024x1024';
-
-      const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-image-1',
-          prompt: promptFinal,
-          n: 1,
-          size: gptSize,
-          quality: 'high',
-        }),
-      });
-
-      if (!openaiResponse.ok) {
-        const errText = await openaiResponse.text();
-        throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errText}`);
-      }
-
-      const openaiResult = await openaiResponse.json();
-      const item = openaiResult.data?.[0];
-
-      if (item?.b64_json) {
-        // Decode base64 to bytes
-        const binaryStr = atob(item.b64_json);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-          bytes[i] = binaryStr.charCodeAt(i);
-        }
-        imageBytes = bytes;
-      } else if (item?.url) {
-        imageUrl = item.url;
-        const imageResp = await fetch(imageUrl);
-        const imageBlob = await imageResp.blob();
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        imageBytes = new Uint8Array(arrayBuffer);
+    if (fotoBaseUrl) {
+      const refResp = await fetch(fotoBaseUrl);
+      if (!refResp.ok) {
+        parts.push({ text: promptFinal });
       } else {
-        throw new Error('No image returned from OpenAI');
+        const refBuffer = await refResp.arrayBuffer();
+        const refB64 = arrayBufferToBase64(refBuffer);
+        const mimeType = refResp.headers.get('content-type') || 'image/jpeg';
+
+        parts.push({ inlineData: { mimeType, data: refB64 } });
+        parts.push({
+          text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this. Place this exact real product into the advertising scene described below.\n\n${promptFinal}`,
+        });
+      }
+    } else {
+      parts.push({ text: promptFinal });
+    }
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseModalities: ['IMAGE'] },
+        }),
+      }
+    );
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      throw new Error(`Gemini API error: ${geminiResponse.status} - ${errText}`);
+    }
+
+    const geminiResult: any = await geminiResponse.json();
+    const responseParts = geminiResult.candidates?.[0]?.content?.parts || [];
+
+    for (const part of responseParts) {
+      if (part.inlineData?.data) {
+        imageBytes = base64ToBytes(part.inlineData.data);
+        break;
       }
     }
 
@@ -174,7 +142,7 @@ serve(async (req) => {
     });
 
     // Deduct credits
-    const engineLabel = engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
+    const engineLabel = 'Gemini Flash';
     await supabase.from('client_credits').update({
       creditos_disponibles: (credits?.creditos_disponibles || 99999) - 2,
       creditos_usados: (credits?.creditos_usados || 0) + 2,
@@ -184,7 +152,7 @@ serve(async (req) => {
       client_id: clientId,
       accion: `Generar imagen — ${engineLabel}`,
       creditos_usados: 2,
-      costo_real_usd: engine === 'flux' ? 0.05 : 0.04,
+      costo_real_usd: 0.02,
     });
 
     return new Response(JSON.stringify({ asset_url: publicUrl }), {

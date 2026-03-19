@@ -122,7 +122,7 @@ ${formato === 'video' ? `Responde en JSON para VIDEO:
   "colores": "...",
   "foto_recomendada": "URL de la foto más adecuada y por qué (o 'Sin foto disponible')",
   "instruccion_foto": "usarla tal cual / cambiar fondo / agregar texto / animar",
-  "prompt_generacion": "prompt detallado en inglés para Fal.ai Flux Pro"
+  "prompt_generacion": "prompt detallado en inglés para Gemini"
 }`}
 
 IMPORTANTE para prompt_generacion (seguir OBLIGATORIAMENTE):
