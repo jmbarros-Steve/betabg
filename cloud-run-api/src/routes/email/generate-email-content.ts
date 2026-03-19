@@ -220,6 +220,7 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
+  if (systemPrompt.length > 12000) systemPrompt = systemPrompt.substring(0, 12000);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
