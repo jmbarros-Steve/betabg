@@ -1776,18 +1776,26 @@ function AdFormMultiSlot({
         ))}
       </div>
 
-      {/* CTA + URL */}
+      {/* URL de destino (prominent) + CTA */}
       <div className="space-y-4">
+        <div>
+          <Label className="flex items-center gap-1">URL de destino <span className="text-red-500">*</span></Label>
+          <Input
+            value={destinationUrl}
+            onChange={(e) => setDestinationUrl(e.target.value)}
+            placeholder="https://tu-tienda.cl/producto (requerido)"
+            className={`mt-1 ${!destinationUrl.trim() ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
+          />
+          {!destinationUrl.trim() && (
+            <p className="text-xs text-red-500 mt-1">La URL de destino es obligatoria para publicar el anuncio.</p>
+          )}
+        </div>
         <div>
           <Label>Botón CTA</Label>
           <Select value={cta} onValueChange={(v) => setCta(v)}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>{CTA_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
           </Select>
-        </div>
-        <div>
-          <Label>URL de destino</Label>
-          <Input value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://tu-tienda.com" className="mt-1" />
         </div>
       </div>
 
