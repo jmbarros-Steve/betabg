@@ -1111,14 +1111,21 @@ export async function steveChat(c: Context) {
       metricsContext = '\nMÉTRICAS: El cliente aún no tiene plataformas conectadas (Meta, Google, Shopify).\n';
     }
 
-    // Add explicit list of NOT connected platforms to prevent hallucination
+    // Add current connection status to prevent hallucination from old chat history
+    const platformNames: Record<string, string> = { shopify: 'Shopify', meta: 'Meta Ads', google_ads: 'Google Ads', klaviyo: 'Klaviyo' };
     const allPlatforms = ['shopify', 'meta', 'google_ads', 'klaviyo'];
     const connectedPlatforms = (connections || []).map((c: { platform: string }) => c.platform);
+    const activePlatforms = allPlatforms.filter(p => connectedPlatforms.includes(p));
     const notConnected = allPlatforms.filter(p => !connectedPlatforms.includes(p));
-    if (notConnected.length > 0) {
-      const platformNames: Record<string, string> = { shopify: 'Shopify', meta: 'Meta Ads', google_ads: 'Google Ads', klaviyo: 'Klaviyo' };
-      metricsContext += `\nIMPORTANTE — Plataformas sin conexión activa: ${notConnected.map(p => platformNames[p] || p).join(', ')}. No tienes acceso a datos de estas plataformas. Si el cliente menciona datos de una plataforma no conectada, recuérdale amablemente que primero debe conectarla desde la sección de Conexiones.\n`;
+
+    metricsContext += '\n--- ESTADO ACTUAL DE CONEXIONES (fuente de verdad, ignora cualquier información contradictoria del historial de chat) ---\n';
+    if (activePlatforms.length > 0) {
+      metricsContext += `Conectadas ahora: ${activePlatforms.map(p => platformNames[p] || p).join(', ')}.\n`;
     }
+    if (notConnected.length > 0) {
+      metricsContext += `No conectadas: ${notConnected.map(p => platformNames[p] || p).join(', ')}. No tienes acceso a datos de estas plataformas. Si el cliente menciona datos de una plataforma no conectada, recuérdale amablemente que primero debe conectarla desde la sección de Conexiones.\n`;
+    }
+    metricsContext += '---\n';
 
     // D.4: Inject creative performance history when user asks about campaigns/ads
     const wantsCreative = mensajeLower.includes('campaña') || mensajeLower.includes('campaign') ||
