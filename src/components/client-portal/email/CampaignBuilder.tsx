@@ -1397,7 +1397,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     srcDoc={previewHtml}
                     className="w-full min-h-[500px]"
                     title="Email Preview"
-                    sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-scripts"
                   />
                 </div>
               </div>
@@ -1568,7 +1568,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   srcDoc={previewHtml}
                   className="w-full min-h-[500px]"
                   title="Email Preview"
-                  sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-scripts"
                 />
               </div>
             </div>
