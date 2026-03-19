@@ -1190,11 +1190,12 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
 
     // Truncate system prompt if too large (avoid Anthropic context overflow)
     const maxSystemLen = 12000;
-    const truncatedSystem = estrategiaSystemPrompt.length > maxSystemLen
+    let truncatedSystem = estrategiaSystemPrompt.length > maxSystemLen
       ? estrategiaSystemPrompt.slice(0, maxSystemLen) + '\n\n[...contexto truncado por límite de tamaño]'
       : estrategiaSystemPrompt;
 
     timelog('estrategia-pre-anthropic');
+    if (truncatedSystem.length > 12000) truncatedSystem = truncatedSystem.substring(0, 12000);
     const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1333,12 +1334,13 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
-    const postBriefSystem = SYSTEM_PROMPT + `\n\nEl brief de marca de este cliente YA ESTÁ COMPLETO. No hagas más preguntas del brief. Responde como un consultor amigable que puede ayudar con preguntas generales de marketing, estrategia, o cualquier duda. Si el cliente pregunta por su brief, dile que ya está listo y que puede verlo en la pestaña "Brief de Marca".`;
+    let postBriefSystem = SYSTEM_PROMPT + `\n\nEl brief de marca de este cliente YA ESTÁ COMPLETO. No hagas más preguntas del brief. Responde como un consultor amigable que puede ayudar con preguntas generales de marketing, estrategia, o cualquier duda. Si el cliente pregunta por su brief, dile que ya está listo y que puede verlo en la pestaña "Brief de Marca".`;
     const chatMsgs = truncateMessages(sanitizeMessagesForAnthropic(
       messages!.filter(m => m.role !== 'system'),
       message,
     ));
 
+    if (postBriefSystem.length > 12000) postBriefSystem = postBriefSystem.substring(0, 12000);
     const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
@@ -1563,12 +1565,13 @@ REGLAS ABSOLUTAS:
   if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
   // Convert messages: Anthropic uses system separately, not in messages array
-  const systemMessage = chatMessages.find(m => m.role === 'system')?.content || '';
+  let systemMessage = chatMessages.find(m => m.role === 'system')?.content || '';
   const userMessages_anthropic = truncateMessages(sanitizeMessagesForAnthropic(
     chatMessages.filter(m => m.role !== 'system'),
     message,
   ));
 
+  if (systemMessage.length > 12000) systemMessage = systemMessage.substring(0, 12000);
   const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
