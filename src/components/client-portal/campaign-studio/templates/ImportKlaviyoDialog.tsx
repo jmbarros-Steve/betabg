@@ -420,7 +420,7 @@ export default function ImportKlaviyoDialog({
                       ref={iframeRef}
                       title="Vista previa"
                       className="w-full h-full border-0"
-                      sandbox="allow-same-origin"
+                      sandbox="allow-same-origin allow-scripts"
                     />
                   </div>
                 </div>

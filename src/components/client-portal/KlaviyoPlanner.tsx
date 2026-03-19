@@ -1113,7 +1113,7 @@ function PushToKlaviyoDialog({
                     <iframe
                       srcDoc={generatePreviewHtml(currentEmail)}
                       className="w-full border-0"
-                      sandbox="allow-same-origin"
+                      sandbox="allow-same-origin allow-scripts"
                       title={`Preview email ${previewIndex + 1}`}
                       style={{ height: '350px', minHeight: '200px' }}
                     />
@@ -1599,7 +1599,7 @@ function EmailStepCard({ email, index, isFirst, flowType, onUpdate, onRemove }: 
                   <iframe
                     srcDoc={smartHtml}
                     className="w-full min-h-[200px] border-0"
-                    sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-scripts"
                     title="Email preview"
                     style={{ height: '300px' }}
                   />

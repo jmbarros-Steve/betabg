@@ -446,7 +446,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
                               srcDoc={t.html}
                               className="w-[600px] h-[600px] origin-top-left pointer-events-none"
                               style={{ transform: 'scale(0.42)', transformOrigin: 'top left' }}
-                              sandbox="allow-same-origin"
+                              sandbox="allow-same-origin allow-scripts"
                               title={t.name}
                             />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
@@ -500,7 +500,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
                       srcDoc={previewFullTemplate.html}
                       className="w-full border-0"
                       style={{ minHeight: '600px', height: '80vh' }}
-                      sandbox="allow-same-origin"
+                      sandbox="allow-same-origin allow-scripts"
                       title="Preview completo"
                     />
                   </div>
@@ -845,7 +845,7 @@ export default function EmailTemplateBuilder({ clientId }: EmailTemplateBuilderP
                   srcDoc={form.base_html}
                   className="w-full border-0"
                   style={{ minHeight: '500px' }}
-                  sandbox="allow-same-origin"
+                  sandbox="allow-same-origin allow-scripts"
                   title="Preview plantilla importada"
                 />
               ) : (

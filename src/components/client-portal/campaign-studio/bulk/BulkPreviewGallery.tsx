@@ -100,7 +100,7 @@ export function BulkPreviewGallery({ campaigns }: BulkPreviewGalleryProps) {
                 height: '100%',
                 maxWidth: '100%',
               }}
-              sandbox="allow-same-origin"
+              sandbox="allow-same-origin allow-scripts"
             />
           ) : (
             <div className="text-sm text-muted-foreground">Selecciona una campaña para previsualizar</div>

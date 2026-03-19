@@ -258,7 +258,7 @@ export function ClickHeatmapPanel({ campaignId, clientId, htmlContent }: ClickHe
                   title="Email heatmap"
                   className="w-full border-0"
                   style={{ minHeight: 500, height: 600 }}
-                  sandbox="allow-same-origin"
+                  sandbox="allow-same-origin allow-scripts"
                 />
               </div>
 

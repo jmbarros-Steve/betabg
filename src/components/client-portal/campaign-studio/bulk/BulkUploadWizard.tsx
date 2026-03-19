@@ -1295,7 +1295,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
                                     title={`Preview ${email.itemName}`}
                                     className="w-full border-0 pointer-events-none"
                                     style={{ transform: 'scale(0.3)', transformOrigin: 'top left', width: '333%', height: '333%' }}
-                                    sandbox="allow-same-origin"
+                                    sandbox="allow-same-origin allow-scripts"
                                   />
                                 </div>
                               )}
@@ -1534,7 +1534,7 @@ export function BulkUploadWizard({ clientId, brand, open, onClose, onCreated }: 
                                   title={`Preview ${email.itemName}`}
                                   className="border-0 bg-white rounded shadow-sm"
                                   style={{ width: '600px', height: '500px', maxWidth: '100%' }}
-                                  sandbox="allow-same-origin"
+                                  sandbox="allow-same-origin allow-scripts"
                                 />
                               </div>
                             )}

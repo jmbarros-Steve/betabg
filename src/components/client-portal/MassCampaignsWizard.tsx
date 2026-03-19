@@ -632,7 +632,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
                             srcDoc={renderBlocksToHtml(t.content_blocks, t)}
                             className="w-[600px] h-[600px] origin-top-left pointer-events-none"
                             style={{ transform: 'scale(0.35)', transformOrigin: 'top left' }}
-                            sandbox="allow-same-origin"
+                            sandbox="allow-same-origin allow-scripts"
                             title={t.name}
                           />
                         </div>
@@ -888,7 +888,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
                             <iframe
                               srcDoc={renderBlocksToHtml(c.blocks, selectedTemplate)}
                               className="w-full h-[200px] pointer-events-none"
-                              sandbox="allow-same-origin"
+                              sandbox="allow-same-origin allow-scripts"
                               title={c.name}
                             />
                           </div>
@@ -1021,7 +1021,7 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
                 srcDoc={renderBlocksToHtml(previewCampaign.blocks, selectedTemplate)}
                 className="w-[600px] mx-auto bg-white shadow-lg"
                 style={{ minHeight: '600px' }}
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-scripts"
                 title={previewCampaign.name}
               />
             </div>

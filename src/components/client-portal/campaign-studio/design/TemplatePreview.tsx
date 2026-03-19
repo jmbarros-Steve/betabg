@@ -201,7 +201,7 @@ export function TemplatePreview({
           <iframe
             srcDoc={html}
             className="w-full border-0"
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts"
             title="Template preview"
             style={{ minHeight: 700, height: 'auto', display: 'block' }}
           />

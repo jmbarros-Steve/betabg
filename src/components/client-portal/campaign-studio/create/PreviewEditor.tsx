@@ -115,7 +115,7 @@ export function PreviewEditor({
             ref={iframeRef}
             srcDoc={htmlContent}
             className="w-full border-0"
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts"
             title="Email preview"
             style={{ height: '500px', minHeight: '400px' }}
           />
