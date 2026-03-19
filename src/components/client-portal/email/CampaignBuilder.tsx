@@ -1547,58 +1547,65 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       )}
 
       {/* Save as Template Overlay (manual, fixed) */}
-      {showSaveTemplate && createPortal(
-        <div
-          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
-          onClick={() => setShowSaveTemplate(false)}
-        >
-          <div
-            className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-auto p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-semibold">Guardar como Plantilla</h3>
-              <button
-                type="button"
-                onClick={() => setShowSaveTemplate(false)}
-                className="text-gray-500 hover:text-gray-800"
+      {(() => {
+        if (showSaveTemplate) {
+          console.log('[DEBUG] Rendering save template portal');
+          return createPortal(
+            <div
+              className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
+              onClick={() => setShowSaveTemplate(false)}
+            >
+              <div
+                className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-auto p-4"
+                onClick={(e) => e.stopPropagation()}
               >
-                ✕
-              </button>
-            </div>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-semibold">Guardar como Plantilla</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveTemplate(false)}
+                    className="text-gray-500 hover:text-gray-800"
+                  >
+                    ✕
+                  </button>
+                </div>
 
-            <div className="space-y-3 py-2">
-              <div>
-                <Label className="text-sm">Nombre de la plantilla</Label>
-                <Input
-                  placeholder="Ej: Mi plantilla de bienvenida"
-                  value={saveTemplateName}
-                  onChange={(e) => setSaveTemplateName(e.target.value)}
-                  className="mt-1"
-                />
+                <div className="space-y-3 py-2">
+                  <div>
+                    <Label className="text-sm">Nombre de la plantilla</Label>
+                    <Input
+                      placeholder="Ej: Mi plantilla de bienvenida"
+                      value={saveTemplateName}
+                      onChange={(e) => setSaveTemplateName(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+                    {savingTemplate ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-1" />
+                    )}
+                    Guardar
+                  </Button>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
-              </p>
-            </div>
+            </div>,
+            document.body
+          );
+        }
 
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
-                {savingTemplate ? (
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-1" />
-                )}
-                Guardar
-              </Button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+        return null;
+      })()}
     </>
   );
 }
