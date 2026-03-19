@@ -137,7 +137,6 @@ export async function generateImage(c: Context) {
 
   const promptFinal = `${promptBase}. ${randomDiversity}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
-  let imageUrl: string | null = null;
   let imageBytes: Uint8Array | null = null;
 
   if (engine === 'imagen') {
@@ -216,111 +215,59 @@ export async function generateImage(c: Context) {
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
-  } else if (engine === 'flux') {
-    // -- Flux (Fal.ai) path --
-    const FAL_API_KEY = process.env.FAL_API_KEY;
-    if (!FAL_API_KEY) {
-      console.error('[generate-image] FAL_API_KEY not configured');
-      await refundCredits();
-      return c.json({ error: 'Error interno del servidor' }, 500);
-    }
-
-    const imageSize = formato === 'story' ? 'portrait_16_9' :
-                      formato === 'feed' ? 'square_hd' :
-                      'square_hd';
-
-    const falBody: Record<string, unknown> = {
-      prompt: promptFinal,
-      num_images: 1,
-      image_size: imageSize,
-      enable_safety_checker: true,
-    };
-
-    if (effectiveFotoBase) {
-      falBody.image_url = effectiveFotoBase;
-      falBody.image_prompt_strength = 0.3;
-    }
-
-    const falResponse = await fetch('https://fal.run/fal-ai/flux-pro/v1.1-ultra', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Key ${FAL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(falBody),
-    });
-
-    if (!falResponse.ok) {
-      const errText = await falResponse.text();
-      console.error('[generate-image] Fal.ai API error:', falResponse.status, errText);
-      await refundCredits();
-      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
-    }
-
-    const falResult: any = await falResponse.json();
-    imageUrl = falResult.images?.[0]?.url;
-    if (!imageUrl) {
-      console.error('[generate-image] No image returned from Fal.ai');
-      await refundCredits();
-      return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
-    }
-
-    // Download image
-    const imageResp = await fetch(imageUrl);
-    const imageBlob = await imageResp.blob();
-    const arrayBuffer = await imageBlob.arrayBuffer();
-    imageBytes = new Uint8Array(arrayBuffer);
-
   } else {
-    // -- GPT-4o (OpenAI) path --
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      console.error('[generate-image] OPENAI_API_KEY not configured');
+    // All engines now route to Gemini (BUG 4+12a: removed OpenAI/Fal.ai)
+    console.log(`[generate-image] Engine '${engine}' requested, routing to Gemini`);
+
+    const GEMINI_API_KEY_FALLBACK = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY_FALLBACK) {
       await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
-    const gptSize = formato === 'story' ? '1024x1792' :
-                    formato === 'feed' ? '1024x1024' :
-                    '1024x1024';
+    const fallbackParts: Array<Record<string, any>> = [];
+    if (effectiveFotoBase) {
+      try {
+        const refResp = await fetch(effectiveFotoBase);
+        if (refResp.ok) {
+          const refBuf = await refResp.arrayBuffer();
+          const refB64 = Buffer.from(refBuf).toString('base64');
+          const mime = refResp.headers.get('content-type') || 'image/jpeg';
+          fallbackParts.push({ inlineData: { mimeType: mime, data: refB64 } });
+          fallbackParts.push({ text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this. Place this exact real product into the advertising scene described below.\n\n${promptFinal}` });
+        } else {
+          fallbackParts.push({ text: promptFinal });
+        }
+      } catch { fallbackParts.push({ text: promptFinal }); }
+    } else {
+      fallbackParts.push({ text: promptFinal });
+    }
 
-    const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: promptFinal,
-        n: 1,
-        size: gptSize,
-        quality: 'high',
-      }),
-    });
+    const fbResp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY_FALLBACK}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: fallbackParts }], generationConfig: { responseModalities: ['IMAGE'] } }),
+      }
+    );
 
-    if (!openaiResponse.ok) {
-      const errText = await openaiResponse.text();
-      console.error('[generate-image] OpenAI API error:', openaiResponse.status, errText);
+    if (!fbResp.ok) {
+      console.error('[generate-image] Gemini fallback error:', fbResp.status);
       await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
-    const openaiResult: any = await openaiResponse.json();
-    const item = openaiResult.data?.[0];
+    const fbResult: any = await fbResp.json();
+    for (const part of (fbResult.candidates?.[0]?.content?.parts || [])) {
+      if (part.inlineData?.data) {
+        imageBytes = new Uint8Array(Buffer.from(part.inlineData.data, 'base64'));
+        break;
+      }
+    }
 
-    if (item?.b64_json) {
-      // Decode base64 to bytes
-      const buffer = Buffer.from(item.b64_json, 'base64');
-      imageBytes = new Uint8Array(buffer);
-    } else if (item?.url) {
-      imageUrl = item.url;
-      const imageResp = await fetch(imageUrl!);
-      const imageBlob = await imageResp.blob();
-      const arrayBuffer = await imageBlob.arrayBuffer();
-      imageBytes = new Uint8Array(arrayBuffer);
-    } else {
-      console.error('[generate-image] No image returned from OpenAI');
+    if (!imageBytes) {
+      console.error('[generate-image] No image in Gemini fallback response');
       await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
@@ -361,12 +308,11 @@ export async function generateImage(c: Context) {
   });
 
   // Log credit transaction (credits already deducted above)
-  const engineLabel = engine === 'imagen' ? 'Gemini 2.0 Flash' : engine === 'flux' ? 'Fal.ai Flux Pro v1.1 Ultra' : 'OpenAI GPT-4o (gpt-image-1)';
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
-    accion: `Generar imagen — ${engineLabel}`,
+    accion: 'Generar imagen — Gemini',
     creditos_usados: IMAGE_CREDIT_COST,
-    costo_real_usd: engine === 'imagen' ? 0.02 : engine === 'flux' ? 0.05 : 0.04,
+    costo_real_usd: 0.02,
   });
 
   return c.json({ asset_url: publicUrl });

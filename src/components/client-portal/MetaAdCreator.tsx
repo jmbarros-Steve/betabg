@@ -135,7 +135,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
   const [savedCreativeId, setSavedCreativeId] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatingVideo, setGeneratingVideo] = useState(false);
-  const [imageEngine, setImageEngine] = useState<'imagen' | 'flux'>('imagen');
+  const imageEngine = 'imagen'; // All image generation uses Gemini
   const [generatedAssetUrls, setGeneratedAssetUrls] = useState<string[]>([]);
   const [videoProgress, setVideoProgress] = useState('');
 
@@ -1088,25 +1088,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
                     <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-sm text-green-700 dark:text-green-300">
                       ✅ Creativo guardado. Ahora genera el visual.
                     </div>
-                    {/* Engine selector */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setImageEngine('imagen')}
-                        className={`p-3 rounded-lg border text-left transition-all ${imageEngine === 'imagen' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:border-muted-foreground/40'}`}
-                      >
-                        <p className="text-sm font-semibold">🎨 Anuncio Diseñado</p>
-                        <p className="text-xs text-muted-foreground">Composición publicitaria, espacio para texto, layouts</p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImageEngine('flux')}
-                        className={`p-3 rounded-lg border text-left transition-all ${imageEngine === 'flux' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:border-muted-foreground/40'}`}
-                      >
-                        <p className="text-sm font-semibold">📸 Foto Realista</p>
-                        <p className="text-xs text-muted-foreground">Fotos lifestyle, UGC, retratos ultra-realistas</p>
-                      </button>
-                    </div>
+                    {/* Image generation powered by Gemini */}
                     <div className="grid grid-cols-2 gap-3">
                       <Button onClick={handleGenerateImage} disabled={generatingImage || generatingVideo}>
                         {generatingImage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ImageIcon className="w-4 h-4 mr-2" />}

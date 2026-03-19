@@ -132,7 +132,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
 
   // Generation state
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [imageEngine, setImageEngine] = useState<'gpt4o' | 'flux'>('gpt4o');
+  const imageEngine = 'imagen'; // All image generation uses Gemini
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoPollingId, setVideoPollingId] = useState<string | null>(null);
   const videoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -756,25 +756,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                         {!generatedAssetUrl && (
                           <div className="space-y-3">
                             <p className="text-sm font-medium">🚀 Generar creativo con IA</p>
-                            {/* Engine selector */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setImageEngine('gpt4o')}
-                                className={`p-3 rounded-lg border text-left transition-all ${imageEngine === 'gpt4o' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:border-muted-foreground/40'}`}
-                              >
-                                <p className="text-sm font-semibold">🎨 Anuncio Diseñado</p>
-                                <p className="text-xs text-muted-foreground">Composición publicitaria, espacio para texto, layouts de anuncio</p>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setImageEngine('flux')}
-                                className={`p-3 rounded-lg border text-left transition-all ${imageEngine === 'flux' ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:border-muted-foreground/40'}`}
-                              >
-                                <p className="text-sm font-semibold">📸 Foto Realista</p>
-                                <p className="text-xs text-muted-foreground">Fotos lifestyle, UGC, retratos ultra-realistas</p>
-                              </button>
-                            </div>
+                            {/* Image generation powered by Gemini */}
                             {briefVisual.tipo !== 'video' ? (
                               <Button
                                 className="w-full"

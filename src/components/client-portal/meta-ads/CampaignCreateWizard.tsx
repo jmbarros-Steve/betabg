@@ -1392,7 +1392,7 @@ function AdFormMultiSlot({
   const [uploading, setUploading] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(productContext || '');
-  const [imageEngine, setImageEngine] = useState<'imagen' | 'gpt4o' | 'flux'>('imagen');
+  const imageEngine = 'imagen'; // All image generation uses Gemini
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -1653,14 +1653,6 @@ function AdFormMultiSlot({
           <div className="space-y-2">
             <Textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder={`Describe la imagen ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}...`} rows={2} />
             <div className="flex gap-2">
-              <Select value={imageEngine} onValueChange={(v: 'imagen' | 'gpt4o' | 'flux') => setImageEngine(v)}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="imagen">Imagen 4 (2 cred)</SelectItem>
-                  <SelectItem value="gpt4o">GPT-4o (2 cred)</SelectItem>
-                  <SelectItem value="flux">Flux Pro (2 cred)</SelectItem>
-                </SelectContent>
-              </Select>
               <Button onClick={handleGenerateImage} disabled={generatingImage} className="flex-1">
                 {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando...</> : <><Sparkles className="w-3 h-3 mr-1" />{aiPrompt.trim() ? 'Generar' : 'Auto-generar'}</>}
               </Button>

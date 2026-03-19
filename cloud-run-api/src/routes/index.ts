@@ -44,8 +44,6 @@ import { syncCompetitorAds } from './analytics/sync-competitor-ads.js';
 import { deepDiveCompetitor } from './analytics/deep-dive-competitor.js';
 import { fetchCampaignAdsets } from './analytics/fetch-campaign-adsets.js';
 import { syncCampaignMetrics } from './analytics/sync-campaign-metrics.js';
-import { metaAdsetAction } from './analytics/meta-adset-action.js';
-
 // Phase 3: Shopify
 import { fetchShopifyAnalytics } from './shopify/fetch-shopify-analytics.js';
 import { fetchShopifyProducts } from './shopify/fetch-shopify-products.js';
@@ -223,7 +221,6 @@ export function registerRoutes(app: Hono) {
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
   app.post('/api/deep-dive-competitor', authMiddleware, deepDiveCompetitor);
   app.post('/api/fetch-campaign-adsets', authMiddleware, fetchCampaignAdsets);
-  app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
   app.post('/api/sync-campaign-metrics', authMiddleware, syncCampaignMetrics);
 
   // ============================================================
