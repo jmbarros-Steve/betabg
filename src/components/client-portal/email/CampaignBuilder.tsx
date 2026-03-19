@@ -706,14 +706,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                   <Blocks className="w-4 h-4 mr-1" /> Bloques
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => {
-                  console.log('[DEBUG] Save Template clicked');
-                  try {
-                    setShowSaveTemplate(true);
-                  } catch (err) {
-                    console.error('[DEBUG] Save Template error:', err);
-                  }
-                }}>
+                <Button variant="outline" size="sm" onClick={() => { console.log('[DEBUG] Save Template clicked'); setShowSaveTemplate(true); }}>
                   <Save className="w-4 h-4 mr-1" /> Guardar Plantilla
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => {
