@@ -41,7 +41,7 @@ export default function DynamicSteveTip({ clientId, stepKey, context, fallback }
 
       const { data, error } = await callApi('steve-chat', {
         body: {
-          clientId,
+          client_id: clientId,
           messages: [{ role: 'user', content: fullPrompt }],
           mode: 'quick',
         },
