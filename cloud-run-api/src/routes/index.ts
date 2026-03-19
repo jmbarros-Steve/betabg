@@ -383,7 +383,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/fatigue-detector', fatigueDetector); // No JWT — uses X-Cron-Secret, daily: 0 11 * * * (11am)
   app.post('/api/cron/performance-evaluator', performanceEvaluator); // No JWT — uses X-Cron-Secret, daily: 0 10 * * * (10am)
   app.post('/api/cron/performance-tracker-meta', performanceTrackerMeta); // No JWT — uses X-Cron-Secret, daily: 0 8 * * * (8am)
-  app.post('/api/cron/execute-meta-rules', executeMetaRulesCron); // No JWT — hourly: 0 * * * * (every hour)
+  app.post('/api/cron/execute-meta-rules', executeMetaRulesCron); // No JWT — daily: 0 9 * * * (once per day)
   app.post('/api/cron/task-prioritizer', taskPrioritizer); // No JWT — uses X-Cron-Secret, hourly: 0 */1 * * *
   app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
   app.post('/api/cron/detective-visual', detectiveVisual); // No JWT — uses X-Cron-Secret, every 2h: 0 8,10,12,14,16,18,20 * * *
