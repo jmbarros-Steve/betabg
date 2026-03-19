@@ -321,25 +321,33 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
 
     const action = editingCampaign.id ? 'update' : 'create';
-    const { data, error } = await callApi<any>('manage-email-campaigns', {
-      body: {
-        action,
-        client_id: clientId,
-        campaign_id: editingCampaign.id,
-        name: editingCampaign.name,
-        subject: editingCampaign.subject,
-        preview_text: editingCampaign.preview_text,
-        from_name: editingCampaign.from_name,
-        from_email: editingCampaign.from_email,
-        html_content: htmlContent,
-        design_json: savedDesign,
-        audience_filter: editingCampaign.audience_filter || {},
-        recommendation_config: recEnabled ? { type: recType, count: recCount } : null,
-        expected_updated_at: lastKnownUpdatedAt.current,
-      },
-    });
-
-    if (error) { toast.error(error); return; }
+    let data: any = null;
+    try {
+      const res = await callApi<any>('manage-email-campaigns', {
+        body: {
+          action,
+          client_id: clientId,
+          campaign_id: editingCampaign.id,
+          name: editingCampaign.name,
+          subject: editingCampaign.subject,
+          preview_text: editingCampaign.preview_text,
+          from_name: editingCampaign.from_name,
+          from_email: editingCampaign.from_email,
+          html_content: htmlContent,
+          design_json: savedDesign,
+          audience_filter: editingCampaign.audience_filter || {},
+          recommendation_config: recEnabled ? { type: recType, count: recCount } : null,
+          expected_updated_at: lastKnownUpdatedAt.current,
+        },
+      });
+      data = res.data;
+      const { error } = res;
+      if (error) { toast.error(error); return; }
+    } catch (err: any) {
+      console.error('[SteveMail] handleSaveCampaign callApi failed:', err);
+      toast.error('Error al guardar la campaña. Inténtalo de nuevo.');
+      return;
+    }
 
     // Handle concurrency conflict
     if (data?.conflict) {
@@ -568,6 +576,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       setShowSaveTemplate(false);
       setSaveTemplateName('');
     } catch (err: any) {
+      console.error('[SteveMail] handleSaveAsTemplate failed:', err);
       toast.error('Error al guardar plantilla: ' + (err.message || err));
     } finally {
       setSavingTemplate(false);
@@ -696,13 +705,27 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
                   <Blocks className="w-4 h-4 mr-1" /> Bloques
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowSaveTemplate(true)}>
+                <Button variant="outline" size="sm" onClick={() => {
+                  console.log('[DEBUG] Save Template clicked');
+                  try {
+                    setShowSaveTemplate(true);
+                  } catch (err) {
+                    console.error('[DEBUG] Save Template error:', err);
+                  }
+                }}>
                   <Save className="w-4 h-4 mr-1" /> Guardar Plantilla
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => {
-                  const { html } = exportEditorHtml();
-                  setPreviewHtml(replaceMergeTagsForPreview(html));
-                  setShowPreview(true);
+                  console.log('[DEBUG] Preview clicked');
+                  try {
+                    const { html } = exportEditorHtml();
+                    console.log('[DEBUG] Preview html length:', html?.length);
+                    setPreviewHtml(replaceMergeTagsForPreview(html));
+                    setShowPreview(true);
+                    console.log('[DEBUG] showPreview set to true');
+                  } catch (err) {
+                    console.error('[DEBUG] Preview error:', err);
+                  }
                 }}>
                   <Eye className="w-4 h-4 mr-1" /> Vista previa
                 </Button>
@@ -1327,42 +1350,59 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </DialogContent>
         </Dialog>
 
-        {/* Preview Dialog (from design step) */}
-        <Dialog open={showPreview} onOpenChange={setShowPreview}>
-          <DialogContent className="max-w-3xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Vista previa del Email</DialogTitle>
-            </DialogHeader>
-            <div className="flex items-center gap-2 mb-3">
-              <Button
-                variant={previewDevice === 'desktop' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPreviewDevice('desktop')}
-              >
-                <Monitor className="w-4 h-4 mr-1" /> Desktop
-              </Button>
-              <Button
-                variant={previewDevice === 'mobile' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setPreviewDevice('mobile')}
-              >
-                <Smartphone className="w-4 h-4 mr-1" /> Mobile
-              </Button>
-            </div>
-            <div className="flex justify-center">
-              <div className={`border rounded-lg overflow-hidden bg-white transition-all ${
-                previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'
-              }`}>
-                <iframe
-                  srcDoc={previewHtml}
-                  className="w-full min-h-[500px]"
-                  title="Email Preview"
-                  sandbox="allow-same-origin allow-scripts"
-                />
+        {/* Preview Overlay (manual, fixed) */}
+        {showPreview && (
+          <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
+            onClick={() => setShowPreview(false)}
+          >
+            <div
+              className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-auto p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold">Vista previa</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(false)}
+                  className="text-gray-500 hover:text-gray-800"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <Button
+                  variant={previewDevice === 'desktop' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPreviewDevice('desktop')}
+                >
+                  <Monitor className="w-4 h-4 mr-1" /> Desktop
+                </Button>
+                <Button
+                  variant={previewDevice === 'mobile' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPreviewDevice('mobile')}
+                >
+                  <Smartphone className="w-4 h-4 mr-1" /> Mobile
+                </Button>
+              </div>
+              <div className="flex justify-center">
+                <div
+                  className={`border rounded-lg overflow-hidden bg-white transition-all ${
+                    previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'
+                  }`}
+                >
+                  <iframe
+                    srcDoc={previewHtml}
+                    className="w-full min-h-[500px]"
+                    title="Email Preview"
+                    sandbox="allow-same-origin"
+                  />
+                </div>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        )}
       </div>
     );
   }
@@ -1480,42 +1520,59 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </div>
       )}
 
-      {/* Quick Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Vista previa del Email</DialogTitle>
-          </DialogHeader>
-          <div className="flex items-center gap-2 mb-3">
-            <Button
-              variant={previewDevice === 'desktop' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setPreviewDevice('desktop')}
-            >
-              <Monitor className="w-4 h-4 mr-1" /> Desktop
-            </Button>
-            <Button
-              variant={previewDevice === 'mobile' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setPreviewDevice('mobile')}
-            >
-              <Smartphone className="w-4 h-4 mr-1" /> Mobile
-            </Button>
-          </div>
-          <div className="flex justify-center">
-            <div className={`border rounded-lg overflow-hidden bg-white transition-all ${
-              previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'
-            }`}>
-              <iframe
-                srcDoc={previewHtml}
-                className="w-full min-h-[500px]"
-                title="Email Preview"
-                sandbox="allow-same-origin allow-scripts"
-              />
+      {/* Quick Preview Overlay (manual, fixed) */}
+      {showPreview && (
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
+          onClick={() => setShowPreview(false)}
+        >
+          <div
+            className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-auto p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold">Vista previa</h3>
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex items-center gap-2 mb-3">
+              <Button
+                variant={previewDevice === 'desktop' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPreviewDevice('desktop')}
+              >
+                <Monitor className="w-4 h-4 mr-1" /> Desktop
+              </Button>
+              <Button
+                variant={previewDevice === 'mobile' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setPreviewDevice('mobile')}
+              >
+                <Smartphone className="w-4 h-4 mr-1" /> Mobile
+              </Button>
+            </div>
+            <div className="flex justify-center">
+              <div
+                className={`border rounded-lg overflow-hidden bg-white transition-all ${
+                  previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'
+                }`}
+              >
+                <iframe
+                  srcDoc={previewHtml}
+                  className="w-full min-h-[500px]"
+                  title="Email Preview"
+                  sandbox="allow-same-origin"
+                />
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
@@ -1538,35 +1595,58 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Save as Template Dialog */}
-      <Dialog open={showSaveTemplate} onOpenChange={setShowSaveTemplate}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Guardar como Plantilla</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label className="text-sm">Nombre de la plantilla</Label>
-              <Input
-                placeholder="Ej: Mi plantilla de bienvenida"
-                value={saveTemplateName}
-                onChange={(e) => setSaveTemplateName(e.target.value)}
-                className="mt-1"
-              />
+      {/* Save as Template Overlay (manual, fixed) */}
+      {showSaveTemplate && (
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
+          onClick={() => setShowSaveTemplate(false)}
+        >
+          <div
+            className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-auto p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold">Guardar como Plantilla</h3>
+              <button
+                type="button"
+                onClick={() => setShowSaveTemplate(false)}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                ✕
+              </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
-            </p>
+
+            <div className="space-y-3 py-2">
+              <div>
+                <Label className="text-sm">Nombre de la plantilla</Label>
+                <Input
+                  placeholder="Ej: Mi plantilla de bienvenida"
+                  value={saveTemplateName}
+                  onChange={(e) => setSaveTemplateName(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                La plantilla quedara guardada y disponible en tu galeria para reutilizarla en futuras campañas.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
+                {savingTemplate ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-1" />
+                )}
+                Guardar
+              </Button>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>Cancelar</Button>
-            <Button onClick={handleSaveAsTemplate} disabled={savingTemplate}>
-              {savingTemplate ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              Guardar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* A/B Test Results Panel */}
       <ABTestResultsPanel
