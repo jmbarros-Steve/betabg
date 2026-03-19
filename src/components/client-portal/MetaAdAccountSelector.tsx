@@ -171,7 +171,7 @@ export function MetaAdAccountSelector({
 
     sessionStorage.setItem('meta_oauth_client_id', connectionId);
     
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&auth_type=rerequest`;
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&auth_type=rerequest`;
 
     window.location.href = authUrl;
   }

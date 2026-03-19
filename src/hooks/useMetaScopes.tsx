@@ -160,7 +160,7 @@ export function useMetaScopes(clientId: string) {
     const redirectUri = `${window.location.origin}/oauth/meta/callback`;
     const scopes = ALL_REQUIRED_SCOPES.join(',');
     sessionStorage.setItem('meta_oauth_client_id', clientId);
-    return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}&auth_type=rerequest`;
+    return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}&auth_type=rerequest`;
   }, [clientId]);
 
   const reconnect = useCallback(() => {
