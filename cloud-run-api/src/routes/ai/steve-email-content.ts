@@ -10,6 +10,24 @@ function truncateContext(text: string, max = 4000): string {
   return text.substring(0, max) + '\n[Contexto truncado]';
 }
 
+// Truncate system prompt to avoid Anthropic context overflow / 502s.
+// Preserves both the beginning and the end of the prompt.
+function truncateSystemPrompt(text: string, maxSystemLen = 12000): string {
+  if (!text || text.length <= maxSystemLen) return text;
+
+  const marker = '\n\n[...contexto truncado por límite de tamaño]\n\n';
+  const markerLen = marker.length;
+  const available = maxSystemLen - markerLen;
+
+  // Fallback safety: if maxSystemLen is too small, return a hard slice.
+  if (available <= 0) return text.slice(0, maxSystemLen);
+
+  const startLen = Math.floor(available / 2);
+  const endLen = available - startLen;
+
+  return text.slice(0, startLen) + marker + text.slice(text.length - endLen);
+}
+
 interface KlaviyoContext {
   briefSection: string;
   bugSection: string;
@@ -537,6 +555,9 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
+  // Prevent very large briefs/system prompts from causing Anthropic failures.
+  const truncatedSystemPrompt = truncateSystemPrompt(systemPrompt, 12000);
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -547,7 +568,7 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4000,
-      system: systemPrompt,
+      system: truncatedSystemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
   });
