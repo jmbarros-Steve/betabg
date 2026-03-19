@@ -702,6 +702,18 @@ function sanitizeMessagesForAnthropic(
   return merged;
 }
 
+/**
+ * Truncate message array to avoid 400 errors from oversized payloads.
+ * Keeps last 20 messages, then trims oldest until under 180KB.
+ */
+function truncateMessages(msgs: Array<{ role: 'user' | 'assistant'; content: string }>) {
+  let recent = msgs.slice(-20);
+  while (JSON.stringify(recent).length > 180000 && recent.length > 4) {
+    recent = [recent[0], ...recent.slice(2)];
+  }
+  return recent;
+}
+
 export async function steveChat(c: Context) {
   const requestStart = Date.now();
   const timelog = (label: string) => console.log(`[steve-chat][timing] ${label}: ${Date.now() - requestStart}ms`);
@@ -1158,7 +1170,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
-    const aiMessages = sanitizeMessagesForAnthropic(recentMessages, message);
+    const aiMessages = truncateMessages(sanitizeMessagesForAnthropic(recentMessages, message));
 
     // Truncate system prompt if too large (avoid Anthropic context overflow)
     const maxSystemLen = 12000;
@@ -1306,10 +1318,10 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     if (!ANTHROPIC_API_KEY) return c.json({ error: 'AI service not configured' }, 500);
 
     const postBriefSystem = SYSTEM_PROMPT + `\n\nEl brief de marca de este cliente YA ESTÁ COMPLETO. No hagas más preguntas del brief. Responde como un consultor amigable que puede ayudar con preguntas generales de marketing, estrategia, o cualquier duda. Si el cliente pregunta por su brief, dile que ya está listo y que puede verlo en la pestaña "Brief de Marca".`;
-    const chatMsgs = sanitizeMessagesForAnthropic(
+    const chatMsgs = truncateMessages(sanitizeMessagesForAnthropic(
       messages!.filter(m => m.role !== 'system'),
       message,
-    );
+    ));
 
     const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1536,10 +1548,10 @@ REGLAS ABSOLUTAS:
 
   // Convert messages: Anthropic uses system separately, not in messages array
   const systemMessage = chatMessages.find(m => m.role === 'system')?.content || '';
-  const userMessages_anthropic = sanitizeMessagesForAnthropic(
+  const userMessages_anthropic = truncateMessages(sanitizeMessagesForAnthropic(
     chatMessages.filter(m => m.role !== 'system'),
     message,
-  );
+  ));
 
   const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
