@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { BlocksEditorWrapper, type BlocksEditorRef } from './BlocksEditorWrapper';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1351,7 +1352,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </Dialog>
 
         {/* Preview Overlay (manual, fixed) */}
-        {showPreview && (
+        {showPreview && createPortal(
           <div
             className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
             onClick={() => setShowPreview(false)}
@@ -1401,7 +1402,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     );
@@ -1521,7 +1523,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       )}
 
       {/* Quick Preview Overlay (manual, fixed) */}
-      {showPreview && (
+      {showPreview && createPortal(
         <div
           className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
           onClick={() => setShowPreview(false)}
@@ -1571,7 +1573,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation */}
@@ -1596,7 +1599,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       </AlertDialog>
 
       {/* Save as Template Overlay (manual, fixed) */}
-      {showSaveTemplate && (
+      {showSaveTemplate && createPortal(
         <div
           className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
           onClick={() => setShowSaveTemplate(false)}
@@ -1645,7 +1648,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* A/B Test Results Panel */}
