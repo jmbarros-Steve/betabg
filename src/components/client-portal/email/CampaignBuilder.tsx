@@ -654,9 +654,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   // =============== FULLSCREEN EDITOR ===============
-  if (showEditor) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-background flex flex-col">
+  const editorView = (
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0 overflow-x-auto">
           <div className="flex items-center gap-3">
@@ -1343,69 +1342,16 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Preview Overlay (manual, fixed) */}
-        {showPreview && createPortal(
-          <div
-            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
-            onClick={() => setShowPreview(false)}
-          >
-            <div
-              className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-auto p-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-semibold">Vista previa</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowPreview(false)}
-                  className="text-gray-500 hover:text-gray-800"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex items-center gap-2 mb-3">
-                <Button
-                  variant={previewDevice === 'desktop' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setPreviewDevice('desktop')}
-                >
-                  <Monitor className="w-4 h-4 mr-1" /> Desktop
-                </Button>
-                <Button
-                  variant={previewDevice === 'mobile' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setPreviewDevice('mobile')}
-                >
-                  <Smartphone className="w-4 h-4 mr-1" /> Mobile
-                </Button>
-              </div>
-              <div className="flex justify-center">
-                <div
-                  className={`border rounded-lg overflow-hidden bg-white transition-all ${
-                    previewDevice === 'mobile' ? 'w-[375px]' : 'w-full'
-                  }`}
-                >
-                  <iframe
-                    srcDoc={previewHtml}
-                    className="w-full min-h-[500px]"
-                    title="Email Preview"
-                    sandbox="allow-same-origin allow-scripts"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
       </div>
     );
-  }
+  );
 
   // =============== CAMPAIGN LIST VIEW ===============
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <>
+      {showEditor ? editorView : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Campañas de Email</h3>
           <p className="text-sm text-muted-foreground">Crea y envía campañas a tus contactos</p>
@@ -1515,6 +1461,36 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </div>
       )}
 
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar campaña</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará la campaña permanentemente. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* A/B Test Results Panel */}
+      <ABTestResultsPanel
+        campaignId={abResultsCampaignId || ''}
+        clientId={clientId}
+        isOpen={!!abResultsCampaignId}
+        onClose={() => setAbResultsCampaignId(null)}
+      />
+    </div>
+      )}
       {/* Quick Preview Overlay (manual, fixed) */}
       {showPreview && createPortal(
         <div
@@ -1561,7 +1537,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   srcDoc={previewHtml}
                   className="w-full min-h-[500px]"
                   title="Email Preview"
-                    sandbox="allow-same-origin allow-scripts"
+                  sandbox="allow-same-origin allow-scripts"
                 />
               </div>
             </div>
@@ -1569,27 +1545,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </div>,
         document.body
       )}
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar campaña</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción eliminará la campaña permanentemente. No se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Save as Template Overlay (manual, fixed) */}
       {showSaveTemplate && createPortal(
@@ -1644,14 +1599,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </div>,
         document.body
       )}
-
-      {/* A/B Test Results Panel */}
-      <ABTestResultsPanel
-        campaignId={abResultsCampaignId || ''}
-        clientId={clientId}
-        isOpen={!!abResultsCampaignId}
-        onClose={() => setAbResultsCampaignId(null)}
-      />
-    </div>
+    </>
   );
 }
