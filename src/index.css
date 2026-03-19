@@ -172,3 +172,7 @@
     background-clip: text;
   }
 }
+
+[data-radix-portal] {
+  z-index: 999999 !important;
+}

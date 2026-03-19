@@ -1333,8 +1333,8 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
   return (
     <>
       {/* Main Gallery Dialog */}
-      <Dialog open={isOpen && !previewTemplate} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0">
+      <Dialog className="[&>div]:z-[999999]" open={isOpen && !previewTemplate} onOpenChange={(open) => { if (!open) onClose(); }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0" style={{ zIndex: 999999 }}>
           <DialogHeader className="px-6 pt-6 pb-0">
             <DialogTitle className="text-xl font-bold">Galeria de Plantillas</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
@@ -1463,8 +1463,8 @@ export function EmailTemplateGallery({ clientId, onSelect, onClose, isOpen }: Em
       </Dialog>
 
       {/* Preview Modal */}
-      <Dialog open={!!previewTemplate} onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+      <Dialog className="[&>div]:z-[999999]" open={!!previewTemplate} onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0" style={{ zIndex: 999999 }}>
           <DialogHeader className="px-6 pt-6 pb-0">
             <DialogTitle className="text-lg font-bold">
               {previewTemplate?.name}
