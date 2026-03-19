@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 /**
  * Changelog Watcher — Fase 5 A.4
- * Scrapes Meta, Klaviyo, and Shopify changelogs daily via Firecrawl.
+ * Scrapes Meta, Klaviyo, and Shopify changelogs daily via Apify.
  * If breaking changes are detected, creates a task in the tasks table.
  *
  * Cron: 0 7 * * * (daily at 7am UTC)
@@ -51,28 +51,35 @@ interface ChangelogEntry {
   matchedKeywords: string[];
 }
 
-async function scrapeChangelog(url: string, apiKey: string): Promise<string> {
+async function scrapeChangelog(url: string): Promise<string> {
+  const apifyToken = process.env.APIFY_TOKEN;
+  if (!apifyToken) {
+    console.error('[changelog-watcher] APIFY_TOKEN not configured');
+    return '';
+  }
+
   try {
-    const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url,
-        formats: ['markdown'],
-        onlyMainContent: true,
-      }),
-    });
+    // Run website-content-crawler actor synchronously
+    const resp = await fetch(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url }],
+          maxCrawlPages: 1,
+          outputFormats: ['markdown'],
+        }),
+      }
+    );
 
     if (!resp.ok) {
-      console.error(`[changelog-watcher] Firecrawl error for ${url}: ${resp.status}`);
+      console.error(`[changelog-watcher] Apify error for ${url}: ${resp.status}`);
       return '';
     }
 
-    const data: any = await resp.json();
-    return data?.data?.markdown || data?.markdown || '';
+    const items: any[] = await resp.json();
+    return items?.[0]?.text || items?.[0]?.markdown || '';
   } catch (e) {
     console.error(`[changelog-watcher] Scrape failed for ${url}:`, e);
     return '';
@@ -130,9 +137,9 @@ export async function apiChangelogWatcher(c: Context) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
-  if (!firecrawlApiKey) {
-    return c.json({ error: 'FIRECRAWL_API_KEY not configured' }, 500);
+  const apifyToken = process.env.APIFY_TOKEN;
+  if (!apifyToken) {
+    return c.json({ error: 'APIFY_TOKEN not configured' }, 500);
   }
 
   const supabase = getSupabaseAdmin();
@@ -163,7 +170,7 @@ export async function apiChangelogWatcher(c: Context) {
   // Scrape all changelogs
   for (const source of CHANGELOG_SOURCES) {
     console.log(`[changelog-watcher] Scraping ${source.name}...`);
-    const markdown = await scrapeChangelog(source.url, firecrawlApiKey);
+    const markdown = await scrapeChangelog(source.url);
 
     if (!markdown) {
       errors.push(`Failed to scrape ${source.platform}`);

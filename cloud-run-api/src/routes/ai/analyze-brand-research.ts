@@ -5,7 +5,7 @@ export async function analyzeBrandResearch(c: Context) {
   try {
   const supabase = getSupabaseAdmin();
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+  const apifyToken = process.env.APIFY_TOKEN;
 
   const authHeader = c.req.header('Authorization');
   if (!authHeader) {
@@ -54,15 +54,22 @@ export async function analyzeBrandResearch(c: Context) {
   }
 
   async function scrapeUrl(url: string): Promise<string> {
-    if (!firecrawlApiKey) return '';
+    if (!apifyToken) return '';
     try {
-      const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true }),
-      });
-      const data: any = await resp.json();
-      return data?.data?.markdown || data?.markdown || '';
+      const resp = await fetch(
+        `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startUrls: [{ url }],
+            maxCrawlPages: 1,
+            outputFormats: ['markdown'],
+          }),
+        }
+      );
+      const items: any = await resp.json();
+      return items?.[0]?.text || items?.[0]?.markdown || '';
     } catch (e) {
       console.error('Scrape error for', url, e);
       return '';

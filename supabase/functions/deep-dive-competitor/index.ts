@@ -195,11 +195,11 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+    const apifyToken = Deno.env.get('APIFY_TOKEN');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (!firecrawlKey) {
-      return new Response(JSON.stringify({ error: 'Firecrawl not configured' }),
+    if (!apifyToken) {
+      return new Response(JSON.stringify({ error: 'Apify not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -243,31 +243,31 @@ Deno.serve(async (req) => {
 
     console.log(`[deep-dive] Scraping: ${url}`);
 
-    // Scrape with Firecrawl - get both HTML and markdown
-    const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url,
-        formats: ['markdown', 'html'],
-        onlyMainContent: false, // We need full HTML for script detection
-        waitFor: 3000, // Wait for JS to load tracking scripts
-      }),
-    });
+    // Scrape with Apify - get markdown content
+    const scrapeResponse = await fetch(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url }],
+          maxCrawlPages: 1,
+          outputFormats: ['markdown'],
+        }),
+      }
+    );
 
     if (!scrapeResponse.ok) {
       const errData = await scrapeResponse.json();
-      console.error('[deep-dive] Firecrawl error:', errData);
+      console.error('[deep-dive] Apify error:', errData);
       return new Response(JSON.stringify({ error: 'Failed to scrape store', details: errData.error || 'Unknown' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const scrapeData = await scrapeResponse.json();
-    const html = scrapeData.data?.html || scrapeData.html || '';
-    const markdown = scrapeData.data?.markdown || scrapeData.markdown || '';
+    const items = await scrapeResponse.json();
+    const markdown = items?.[0]?.text || items?.[0]?.markdown || '';
+    // Apify website-content-crawler returns HTML in the html field when available
+    const html = items?.[0]?.html || '';
 
     if (!html && !markdown) {
       return new Response(JSON.stringify({ error: 'No content extracted from URL' }),

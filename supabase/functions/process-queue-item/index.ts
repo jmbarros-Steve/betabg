@@ -55,20 +55,24 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
     }
   } catch {}
 
-  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-  if (FIRECRAWL_API_KEY) {
-    const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${videoId}`, formats: ['markdown'] }),
-    });
+  const APIFY_TOKEN = Deno.env.get('APIFY_TOKEN');
+  if (APIFY_TOKEN) {
+    const apifyRes = await fetch(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(APIFY_TOKEN)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url: `https://www.youtube.com/watch?v=${videoId}` }],
+          maxCrawlPages: 1,
+          outputFormats: ['markdown'],
+        }),
+      }
+    );
 
-    if (fcRes.ok) {
-      const fcData = await fcRes.json();
-      const markdown = fcData.data?.markdown;
+    if (apifyRes.ok) {
+      const items = await apifyRes.json();
+      const markdown = items?.[0]?.text || items?.[0]?.markdown || '';
       if (markdown && markdown.length > 200) return markdown;
     }
   }
@@ -77,20 +81,24 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
 }
 
 async function extractUrlContent(url: string): Promise<string> {
-  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-  if (FIRECRAWL_API_KEY) {
-    const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url, formats: ['markdown'] }),
-    });
+  const APIFY_TOKEN = Deno.env.get('APIFY_TOKEN');
+  if (APIFY_TOKEN) {
+    const apifyRes = await fetch(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(APIFY_TOKEN)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url }],
+          maxCrawlPages: 1,
+          outputFormats: ['markdown'],
+        }),
+      }
+    );
 
-    if (fcRes.ok) {
-      const fcData = await fcRes.json();
-      const markdown = fcData.data?.markdown;
+    if (apifyRes.ok) {
+      const items = await apifyRes.json();
+      const markdown = items?.[0]?.text || items?.[0]?.markdown || '';
       if (markdown && markdown.length > 100) return markdown;
     }
   }

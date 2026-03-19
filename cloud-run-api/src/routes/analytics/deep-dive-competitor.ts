@@ -186,10 +186,10 @@ function extractPageMeta(html: string): DeepDiveResult['page_meta'] {
 export async function deepDiveCompetitor(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
-    const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+    const apifyToken = process.env.APIFY_TOKEN;
 
-    if (!firecrawlKey) {
-      return c.json({ error: 'Firecrawl not configured' }, 500);
+    if (!apifyToken) {
+      return c.json({ error: 'Apify not configured' }, 500);
     }
 
     // Auth — user is set by authMiddleware
@@ -223,30 +223,30 @@ export async function deepDiveCompetitor(c: Context) {
 
     console.log(`[deep-dive] Scraping: ${url}`);
 
-    // Scrape with Firecrawl - get both HTML and markdown
-    const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url,
-        formats: ['markdown', 'html'],
-        onlyMainContent: false, // We need full HTML for script detection
-        waitFor: 3000, // Wait for JS to load tracking scripts
-      }),
-    });
+    // Scrape with Apify - get markdown content
+    const scrapeResponse = await fetch(
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url }],
+          maxCrawlPages: 1,
+          outputFormats: ['markdown'],
+        }),
+      }
+    );
 
     if (!scrapeResponse.ok) {
       const errData: any = await scrapeResponse.json();
-      console.error('[deep-dive] Firecrawl error:', errData);
+      console.error('[deep-dive] Apify error:', errData);
       return c.json({ error: 'Failed to scrape store', details: errData.error || 'Unknown' }, 502);
     }
 
-    const scrapeData: any = await scrapeResponse.json();
-    const html = scrapeData.data?.html || scrapeData.html || '';
-    const markdown = scrapeData.data?.markdown || scrapeData.markdown || '';
+    const items: any = await scrapeResponse.json();
+    const markdown = items?.[0]?.text || items?.[0]?.markdown || '';
+    // Apify website-content-crawler returns HTML in the html field when available
+    const html = items?.[0]?.html || '';
 
     if (!html && !markdown) {
       return c.json({ error: 'No content extracted from URL' }, 422);
