@@ -68,9 +68,9 @@ async function runApifyActor(token: string): Promise<ApifyAd[]> {
     throw new Error(`Apify returned ${resp.status}: ${text.substring(0, 300)}`);
   }
 
-  const items = (await resp.json()) as any[];
+  const items = (await resp.json()) as any;
   // Filter out error items
-  return items.filter((item: any) => item.ad_archive_id && item.snapshot) as ApifyAd[];
+  return (items || []).filter((item: any) => item.ad_archive_id && item.snapshot) as ApifyAd[];
 }
 
 function extractAdText(ad: ApifyAd): string {
