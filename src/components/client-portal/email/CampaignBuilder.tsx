@@ -653,6 +653,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     cancelled: { label: 'Cancelada', color: 'bg-red-100 text-red-800' },
   };
 
+  // Render template gallery as portal OUTSIDE any conditional returns
+  const templateGalleryPortal = showTemplateGallery ? createPortal(
+    <EmailTemplateGallery
+      clientId={clientId}
+      isOpen={showTemplateGallery}
+      onClose={() => setShowTemplateGallery(false)}
+      onSelect={handleTemplateSelect}
+    />,
+    document.body
+  ) : null;
+
   // =============== FULLSCREEN EDITOR ===============
   const editorView = (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col">
@@ -1011,17 +1022,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 />
               </div>
             </div>
-
-            {/* Template Gallery */}
-            {showTemplateGallery && createPortal(
-              <EmailTemplateGallery
-                clientId={clientId}
-                isOpen={showTemplateGallery}
-                onClose={() => setShowTemplateGallery(false)}
-                onSelect={handleTemplateSelect}
-              />,
-              document.body
-            )}
 
             {/* Universal Blocks Panel */}
             <UniversalBlocksPanel
@@ -1608,6 +1608,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         </div>,
         document.body
       )}
+
+      {templateGalleryPortal}
 
       {/* (Save template modal removed: handled with DOM overlay) */}
     </>
