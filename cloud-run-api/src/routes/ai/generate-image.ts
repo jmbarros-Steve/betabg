@@ -12,15 +12,7 @@ const DIVERSITY_STYLES = [
 
 export async function generateImage(c: Context) {
   const supabase = getSupabaseAdmin();
-  let creditsDeducted = false;
   let clientId: string | undefined;
-
-  // Helper to refund credits on generation failure (safe to call even if not yet deducted)
-  const refundCredits = async () => {
-    if (!creditsDeducted || !clientId) return;
-    const { error: refundErr } = await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -IMAGE_CREDIT_COST });
-    if (refundErr) console.error('[generate-image] Credit refund failed:', refundErr);
-  };
 
   try {
   const body = await c.req.json();
@@ -49,24 +41,7 @@ export async function generateImage(c: Context) {
     return c.json({ error: 'No tienes acceso a este cliente' }, 403);
   }
 
-  // Atomically deduct credits BEFORE generating (prevents race condition)
-  const { data: deductResult, error: deductError } = await supabase
-    .rpc('deduct_credits', { p_client_id: clientId, p_amount: IMAGE_CREDIT_COST });
-
-  if (deductError) {
-    console.error('[generate-image] Credit deduction error:', deductError);
-    return c.json(
-      { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
-      402
-    );
-  }
-  if (!deductResult?.[0]?.success) {
-    return c.json(
-      { error: 'NO_CREDITS', message: `Se necesitan ${IMAGE_CREDIT_COST} créditos para generar una imagen` },
-      402
-    );
-  }
-  creditsDeducted = true;
+  // TODO: Re-enable credit system when billing is ready
 
   // Auto-fetch client reference photos if none provided
   // PRIORITY: Match product mentioned in the copy prompt to use its REAL Shopify photo
@@ -144,7 +119,6 @@ export async function generateImage(c: Context) {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       console.error('[generate-image] GEMINI_API_KEY not configured');
-      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -195,7 +169,6 @@ export async function generateImage(c: Context) {
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
       console.error('[generate-image] Gemini Flash error:', geminiResponse.status, errText);
-      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -211,7 +184,6 @@ export async function generateImage(c: Context) {
 
     if (!imageBytes) {
       console.error('[generate-image] No image in Gemini response:', JSON.stringify(geminiResult).substring(0, 500));
-      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -221,7 +193,6 @@ export async function generateImage(c: Context) {
 
     const GEMINI_API_KEY_FALLBACK = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY_FALLBACK) {
-      await refundCredits();
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
@@ -254,7 +225,6 @@ export async function generateImage(c: Context) {
 
     if (!fbResp.ok) {
       console.error('[generate-image] Gemini fallback error:', fbResp.status);
-      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
 
@@ -268,7 +238,6 @@ export async function generateImage(c: Context) {
 
     if (!imageBytes) {
       console.error('[generate-image] No image in Gemini fallback response');
-      await refundCredits();
       return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
     }
   }
@@ -291,7 +260,6 @@ export async function generateImage(c: Context) {
 
   if (storageErr) {
     console.error('[generate-image] Storage upload error:', storageErr);
-    await refundCredits();
     return c.json({ error: 'Error guardando la imagen.' }, 500);
   }
 
@@ -318,7 +286,6 @@ export async function generateImage(c: Context) {
   return c.json({ asset_url: publicUrl });
   } catch (err: any) {
     console.error('[generate-image]', err);
-    await refundCredits();
     return c.json({ error: 'Error interno del servidor' }, 500);
   }
 }
