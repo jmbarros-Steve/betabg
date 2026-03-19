@@ -1013,12 +1013,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             </div>
 
             {/* Template Gallery */}
-            <EmailTemplateGallery
-              clientId={clientId}
-              isOpen={showTemplateGallery}
-              onClose={() => setShowTemplateGallery(false)}
-              onSelect={handleTemplateSelect}
-            />
+            {showTemplateGallery && createPortal(
+              <EmailTemplateGallery
+                clientId={clientId}
+                isOpen={showTemplateGallery}
+                onClose={() => setShowTemplateGallery(false)}
+                onSelect={handleTemplateSelect}
+              />,
+              document.body
+            )}
 
             {/* Universal Blocks Panel */}
             <UniversalBlocksPanel
