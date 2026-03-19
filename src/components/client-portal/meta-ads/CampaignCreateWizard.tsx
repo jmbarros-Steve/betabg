@@ -2556,13 +2556,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         submitData.start_time = startDate;
       }
 
-      const { error } = await callApi('manage-meta-campaign', {
+      const response = await callApi('manage-meta-campaign', {
         body: {
           action: 'create',
           connection_id: ctxConnectionId,
           data: submitData,
         },
       });
+
+      const error = response.error;
+      const data = response.data as any;
 
       if (error) {
         // Handle CRITERIO structured errors with proper message
@@ -2598,7 +2601,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         // Non-critical: creative library save failed silently
       }
 
-      toast.success('Campaña creada como pausada en Meta. Activa cuando estés listo.');
+      if (data?.partial === true) {
+        const errors = [data.adset_error, data.creative_error, data.ad_error].filter(Boolean);
+        const errorMsg = errors.join('. ') || 'Error parcial al crear la campaña';
+        toast.warning(`Campaña creada pero incompleta: ${errorMsg}`);
+      } else {
+        toast.success('Campaña creada como pausada en Meta. Activa cuando estés listo.');
+      }
       onComplete?.();
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : err?.message || 'Error desconocido';
