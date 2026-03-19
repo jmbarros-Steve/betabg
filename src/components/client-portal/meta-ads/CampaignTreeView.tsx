@@ -157,6 +157,57 @@ function ClassificationBadge({ roas, cpa, ctr, cpaTarget }: { roas: number; cpa:
 }
 
 // ---------------------------------------------------------------------------
+// Charlie — Ad Set Advisor
+// ---------------------------------------------------------------------------
+
+type CharlieVerdict = 'ESCALAR' | 'MANTENER' | 'OBSERVAR' | 'APAGAR' | 'SIN DATOS';
+
+function getCharlieAdvice(roas: number, ctr: number, hasData: boolean): { verdict: CharlieVerdict; emoji: string; color: string; bg: string } {
+  if (!hasData || (roas === 0 && ctr === 0)) return { verdict: 'SIN DATOS', emoji: '🔍', color: 'text-slate-500', bg: 'bg-slate-100' };
+  if (roas > 3 && ctr > 1.5) return { verdict: 'ESCALAR', emoji: '🚀', color: 'text-green-700', bg: 'bg-green-100' };
+  if (roas > 2) return { verdict: 'MANTENER', emoji: '✅', color: 'text-blue-700', bg: 'bg-blue-100' };
+  if (roas > 1) return { verdict: 'OBSERVAR', emoji: '⚠️', color: 'text-yellow-700', bg: 'bg-yellow-100' };
+  return { verdict: 'APAGAR', emoji: '🛑', color: 'text-red-700', bg: 'bg-red-100' };
+}
+
+function CharlieSummaryPanel({ campaigns }: { campaigns: CampaignNode[] }) {
+  const allAdsets: AdSetNode[] = campaigns.flatMap(c => c.adsets || []);
+  if (allAdsets.length === 0) return null;
+
+  const counts: Record<CharlieVerdict, number> = { ESCALAR: 0, MANTENER: 0, OBSERVAR: 0, APAGAR: 0, 'SIN DATOS': 0 };
+  for (const a of allAdsets) {
+    const hasData = a.spend > 0 || a.impressions > 0;
+    const advice = getCharlieAdvice(a.roas, a.ctr, hasData);
+    counts[advice.verdict]++;
+  }
+
+  const items: Array<{ verdict: CharlieVerdict; emoji: string; color: string; bg: string; count: number }> = [
+    { verdict: 'ESCALAR', emoji: '🚀', color: 'text-green-700', bg: 'bg-green-100', count: counts.ESCALAR },
+    { verdict: 'MANTENER', emoji: '✅', color: 'text-blue-700', bg: 'bg-blue-100', count: counts.MANTENER },
+    { verdict: 'OBSERVAR', emoji: '⚠️', color: 'text-yellow-700', bg: 'bg-yellow-100', count: counts.OBSERVAR },
+    { verdict: 'APAGAR', emoji: '🛑', color: 'text-red-700', bg: 'bg-red-100', count: counts.APAGAR },
+  ].filter(i => i.count > 0);
+
+  return (
+    <Card className="border-primary/20 bg-primary/[0.02]">
+      <CardContent className="py-3 px-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold">🐶 Charlie dice:</span>
+          {items.map(i => (
+            <span key={i.verdict} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${i.bg} ${i.color}`}>
+              {i.emoji} {i.count} {i.verdict}
+            </span>
+          ))}
+          <span className="text-xs text-muted-foreground ml-auto">
+            {allAdsets.length} ad sets analizados
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Ad Set Row (level 2)
 // ---------------------------------------------------------------------------
 
@@ -201,6 +252,15 @@ function AdSetRow({ adset, depth = 1, onAdClick, connectionId, onStatusChange }:
         <FolderOpen className="w-3.5 h-3.5 text-orange-500 shrink-0" />
         <span className="text-sm font-medium truncate max-w-[220px]">{adset.name}</span>
         <StatusBadge status={adset.status} />
+        {(() => {
+          const hasData = adset.spend > 0 || adset.impressions > 0;
+          const charlie = getCharlieAdvice(adset.roas, adset.ctr, hasData);
+          return (
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${charlie.bg} ${charlie.color} shrink-0`}>
+              {charlie.emoji} {charlie.verdict}
+            </span>
+          );
+        })()}
         {connectionId && (
           <button
             onClick={handleToggleAdSetStatus}
@@ -713,6 +773,9 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
           </span>
         </div>
       )}
+
+      {/* Charlie summary panel */}
+      <CharlieSummaryPanel campaigns={campaigns} />
 
       {/* Campaign tree */}
       {filtered.length === 0 ? (
