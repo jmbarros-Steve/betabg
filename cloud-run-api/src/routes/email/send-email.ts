@@ -198,7 +198,14 @@ export async function sendSingleEmail(params: {
 
     return { success: true, messageId, eventId };
   } catch (err: any) {
-    console.error('Resend send error:', err);
+    console.error('[BUG-7] ERROR envío email:', {
+      message: err.message,
+      statusCode: err.statusCode || err.status,
+      name: err.name,
+      response: err.response?.body || err.response || null,
+      from: params.fromEmail,
+      to: params.to,
+    });
     // Update event to reflect failure
     await supabase
       .from('email_events')

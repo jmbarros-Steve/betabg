@@ -203,7 +203,7 @@ export async function emailFlowExecute(c: Context) {
     .eq('client_id', enrollment.client_id)
     .eq('status', 'verified')
     .limit(1)
-    .single();
+    .maybeSingle();
 
   const fromDomain = domain?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
   const fromEmail = currentStep.from_email || `noreply@${fromDomain}`;
