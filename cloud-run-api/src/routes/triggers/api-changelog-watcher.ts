@@ -78,7 +78,7 @@ async function scrapeChangelog(url: string): Promise<string> {
       return '';
     }
 
-    const items: any[] = await resp.json();
+    const items = (await resp.json()) as any[];
     return items?.[0]?.text || items?.[0]?.markdown || '';
   } catch (e) {
     console.error(`[changelog-watcher] Scrape failed for ${url}:`, e);
