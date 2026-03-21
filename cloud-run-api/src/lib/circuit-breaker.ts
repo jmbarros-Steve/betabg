@@ -14,8 +14,8 @@ interface CircuitEntry {
   openedAt: number;
 }
 
-const FAILURE_THRESHOLD = 3;
-const RECOVERY_TIMEOUT_MS = 60_000; // 60s before trying half_open
+const FAILURE_THRESHOLD = 10;
+const RECOVERY_TIMEOUT_MS = 15_000; // 15s before trying half_open
 
 const circuits = new Map<string, CircuitEntry>();
 
