@@ -17,6 +17,7 @@ import { generateCampaignRecommendations } from './utilities/generate-campaign-r
 import { processQueueItem } from './utilities/process-queue-item.js';
 import { processTranscription } from './utilities/process-transcription.js';
 import { onboardingBot } from './utilities/onboarding-bot.js';
+import { checkClientConnections } from './utilities/check-client-connections.js';
 
 // Phase 2: AI
 import { steveChat } from './ai/steve-chat.js';
@@ -201,6 +202,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/process-queue-item', authMiddleware, processQueueItem);
   app.post('/api/process-transcription', authMiddleware, processTranscription);
   app.post('/api/onboarding-bot', authMiddleware, onboardingBot);
+  app.post('/api/check-client-connections', authMiddleware, checkClientConnections);
 
   // ============================================================
   // Phase 2: AI & Analytics

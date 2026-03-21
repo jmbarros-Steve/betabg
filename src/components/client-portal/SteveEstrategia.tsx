@@ -79,14 +79,11 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
         .maybeSingle();
       setBriefComplete(persona?.is_complete ?? false);
 
-      // Check platform connections for metrics availability
-      const { data: connections } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('is_active', true)
-        .limit(1);
-      setHasConnections(!!connections && connections.length > 0);
+      // Check platform connections via Cloud Run (bypasses RLS)
+      const { data: connData } = await callApi('check-client-connections', {
+        body: { client_id: clientId },
+      });
+      setHasConnections(connData?.connected === true);
 
       // Find existing estrategia conversation
       const { data: existingConvs, error: convError } = await supabase
