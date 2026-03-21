@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
-  Loader2, Search, ShoppingBag, Star, ShoppingCart, Package, Check,
+  Loader2, Search, ShoppingBag, Star, ShoppingCart, Package, Check, X,
   Zap, TrendingUp, RotateCcw, Eye, Bell,
 } from 'lucide-react';
 
@@ -344,15 +344,30 @@ export function ProductBlockPanel({ clientId, isOpen, onClose, onInsert }: Produ
     </div>
   );
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
             <ShoppingBag className="w-5 h-5" />
             Insertar Productos
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-sm opacity-70 hover:opacity-100 text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
         {/* Shared config row */}
         <div className="flex items-center gap-4 pb-3 border-b flex-wrap">
@@ -489,7 +504,8 @@ export function ProductBlockPanel({ clientId, isOpen, onClose, onInsert }: Produ
             )}
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>,
+    document.body
   );
 }

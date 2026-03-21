@@ -241,7 +241,9 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
         if (!editor) return;
         const wrapper = editor.getWrapper();
         if (!wrapper) return;
-        wrapper.append(`<mj-raw>${html}</mj-raw>`);
+        wrapper.append(
+          `<mj-section><mj-column><mj-raw>${html}</mj-raw></mj-column></mj-section>`
+        );
       },
     }));
 
