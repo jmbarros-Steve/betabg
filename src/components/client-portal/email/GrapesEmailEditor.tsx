@@ -295,7 +295,7 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       project: {
         type: 'email',
         default: {
-          pages: [{ name: 'Email', component: '<mj-body></mj-body>' }],
+          pages: [{ name: 'Email', component: '<mjml><mj-body></mj-body></mjml>' }],
         },
       },
       storage: {
