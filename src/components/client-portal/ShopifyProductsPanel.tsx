@@ -27,6 +27,7 @@ interface ShopifyProductsPanelProps {
   clientId: string;
   allSkuSales?: SkuSale[];
   connectionId?: string | null;
+  initialProducts?: ShopifyProduct[];
 }
 
 interface ProductVariant {
@@ -83,7 +84,7 @@ function getSuggestedPrice(variant: ProductVariant, salesData: SkuSale | undefin
   return null;
 }
 
-export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId: externalConnectionId }: ShopifyProductsPanelProps) {
+export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId: externalConnectionId, initialProducts }: ShopifyProductsPanelProps) {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(externalConnectionId || null);
@@ -223,12 +224,12 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
     }
   };
 
-  // Auto-load products when connectionId is available
+  // Use initialProducts from dashboard if available (avoids duplicate API call)
   useEffect(() => {
-    if (connectionId && products.length === 0 && !loading) {
-      fetchProducts();
+    if (initialProducts && initialProducts.length > 0 && products.length === 0) {
+      setProducts(initialProducts as ShopifyProduct[]);
     }
-  }, [connectionId]);
+  }, [initialProducts]);
 
   useEffect(() => {
     if (!externalConnectionId) checkShopifyConnection();

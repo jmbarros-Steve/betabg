@@ -479,7 +479,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       <ShopifyDiscountsPanel clientId={clientId} connectionId={connectionId} discountPerformance={discountPerformance} />
 
       {/* Productos de Shopify */}
-      <ShopifyProductsPanel clientId={clientId} allSkuSales={allSkuSales} connectionId={connectionId} />
+      <ShopifyProductsPanel clientId={clientId} allSkuSales={allSkuSales} connectionId={connectionId} initialProducts={seoProducts} />
 
       {/* Clientes */}
       <ShopifyCustomersPanel clientId={clientId} />
