@@ -216,7 +216,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
         return;
       }
       setCrossSellData(data?.crossSell || {});
-      toast.success(`Cross-sell calculado (${data?.ordersAnalyzed || 0} pedidos analizados)`);
+      toast.success(`Combos frecuentes calculados (${data?.ordersAnalyzed || 0} pedidos analizados)`);
     } catch (err: any) {
       toast.error('Error: ' + err.message);
     } finally {
@@ -349,7 +349,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                 disabled={loadingCrossSell}
               >
                 {loadingCrossSell ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShoppingCart className="w-4 h-4 mr-1" />}
-                Cross-sell
+                Combos frecuentes
               </Button>
             )}
             <Button
@@ -475,7 +475,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                               <Camera className="w-3.5 h-3.5" />
                             </Button>
                             {crossSell && (
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setExpandedProduct(expandedProduct === product.id ? null : product.id)} title="Cross-sell">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setExpandedProduct(expandedProduct === product.id ? null : product.id)} title="Ver combos frecuentes">
                                 {expandedProduct === product.id ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                               </Button>
                             )}
@@ -544,7 +544,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                     {expandedProduct === product.id && crossSell && (
                       <div className="mt-2 pt-2 border-t flex items-center gap-2 text-xs flex-wrap">
                         <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground font-medium">Se compra con:</span>
+                        <span className="text-muted-foreground font-medium">Se compra junto con:</span>
                         {crossSell.map((cs, i) => (
                           <Badge key={i} variant="outline" className="text-xs">
                             {cs.name} ({cs.percentage}%)
