@@ -238,12 +238,19 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
 
       insertHtml: (html: string) => {
         const editor = editorRef.current;
-        if (!editor) return;
+        if (!editor) { console.warn('[insertHtml] no editor'); return; }
         const wrapper = editor.getWrapper();
-        if (!wrapper) return;
-        wrapper.append(
-          `<mj-section><mj-column><mj-raw>${html}</mj-raw></mj-column></mj-section>`
-        );
+        if (!wrapper) { console.warn('[insertHtml] no wrapper'); return; }
+
+        const allTypes = wrapper.get('components')?.map((c: any) => c.get('type'));
+        console.log('[insertHtml] wrapper type:', wrapper.get('type'), '| children types:', allTypes);
+
+        const mjBody = wrapper.findType('mj-body')[0] || wrapper;
+        console.log('[insertHtml] target type:', mjBody.get('type'), '| is wrapper fallback?', mjBody === wrapper);
+
+        const mjml = `<mj-section><mj-column><mj-raw>${html}</mj-raw></mj-column></mj-section>`;
+        const added = mjBody.append(mjml);
+        console.log('[insertHtml] appended:', added?.length, 'components | html length:', html.length);
       },
     }));
 
