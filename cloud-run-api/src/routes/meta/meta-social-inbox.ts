@@ -9,6 +9,7 @@ type Action =
   | 'get_messages'
   | 'list_post_comments'
   | 'list_ad_comments'
+  | 'get_comment_replies'
   | 'reply_message'
   | 'reply_comment'
   | 'mark_read';
@@ -22,6 +23,7 @@ interface RequestBody {
   ad_id?: string;
   message?: string;
   after?: string; // pagination cursor
+  platform?: string; // 'instagram' | 'facebook'
 }
 
 // --- Helpers ---
@@ -234,36 +236,75 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
   const { page_id } = body;
   if (!page_id) return { body: { success: false, error: 'page_id required' }, status: 400 };
 
-  // Get page access token
-  const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
+  // Get page access token + IG account
+  const pageTokenResult = await metaGet(page_id, token, {
+    fields: 'access_token,instagram_business_account{id}',
+  });
   const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  const igAccountId = pageTokenResult.data?.instagram_business_account?.id;
 
-  // Get recent posts with their comments
+  // Get recent FB posts with their comments
   const postsResult = await metaGet(`${page_id}/feed`, pageToken, {
     fields: 'id,message,created_time,comments{id,message,from{name,id,picture},created_time,comment_count,like_count}',
     limit: '15',
   });
 
-  if (!postsResult.ok) return { body: { success: false, error: postsResult.error }, status: 502 };
-
   const comments: any[] = [];
 
-  for (const post of postsResult.data?.data || []) {
-    for (const comment of post.comments?.data || []) {
-      comments.push({
-        id: comment.id,
-        post_id: post.id,
-        post_text: (post.message || '').slice(0, 100),
-        platform: 'facebook',
-        type: 'comments',
-        user_name: comment.from?.name || 'Usuario',
-        user_id: comment.from?.id || '',
-        user_picture: comment.from?.picture?.data?.url || null,
-        message: comment.message || '',
-        created_time: comment.created_time,
-        like_count: comment.like_count || 0,
-        reply_count: comment.comment_count || 0,
-      });
+  if (postsResult.ok) {
+    for (const post of postsResult.data?.data || []) {
+      for (const comment of post.comments?.data || []) {
+        comments.push({
+          id: comment.id,
+          post_id: post.id,
+          post_text: (post.message || '').slice(0, 100),
+          platform: 'facebook',
+          type: 'comments',
+          user_name: comment.from?.name || 'Usuario',
+          user_id: comment.from?.id || '',
+          user_picture: comment.from?.picture?.data?.url || null,
+          message: comment.message || '',
+          created_time: comment.created_time,
+          like_count: comment.like_count || 0,
+          reply_count: comment.comment_count || 0,
+        });
+      }
+    }
+  }
+
+  // Get Instagram media comments if IG account is linked
+  if (igAccountId) {
+    const mediaResult = await metaGet(`${igAccountId}/media`, pageToken, {
+      fields: 'id,caption,media_type,thumbnail_url,permalink,timestamp',
+      limit: '15',
+    });
+
+    if (mediaResult.ok && mediaResult.data?.data) {
+      for (const media of mediaResult.data.data) {
+        const commentsResult = await metaGet(`${media.id}/comments`, pageToken, {
+          fields: 'id,text,from{id,username},timestamp,like_count',
+          limit: '20',
+        });
+
+        if (commentsResult.ok && commentsResult.data?.data) {
+          for (const comment of commentsResult.data.data) {
+            comments.push({
+              id: comment.id,
+              post_id: media.id,
+              post_text: (media.caption || '').slice(0, 100),
+              platform: 'instagram',
+              type: 'comments',
+              user_name: comment.from?.username || 'Usuario IG',
+              user_id: comment.from?.id || '',
+              user_picture: null,
+              message: comment.text || '',
+              created_time: comment.timestamp,
+              like_count: comment.like_count || 0,
+              reply_count: 0,
+            });
+          }
+        }
+      }
     }
   }
 
@@ -337,6 +378,56 @@ async function handleListAdComments(token: string, body: RequestBody): Promise<{
 
   comments.sort((a, b) => new Date(b.created_time).getTime() - new Date(a.created_time).getTime());
   return { body: { success: true, comments }, status: 200 };
+}
+
+/** Get replies to a specific comment */
+async function handleGetCommentReplies(token: string, body: RequestBody): Promise<{ body: any; status: number }> {
+  const { page_id, comment_id, platform } = body;
+  if (!page_id || !comment_id) {
+    return { body: { success: false, error: 'page_id and comment_id required' }, status: 400 };
+  }
+
+  // Get page access token
+  const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
+  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+
+  let replies: any[] = [];
+
+  if (platform === 'instagram') {
+    // Instagram: GET /{comment_id}/replies
+    const result = await metaGet(`${comment_id}/replies`, pageToken, {
+      fields: 'id,text,from{id,username},timestamp',
+    });
+
+    if (!result.ok) return { body: { success: false, error: result.error }, status: 502 };
+
+    replies = (result.data?.data || []).map((r: any) => ({
+      id: r.id,
+      message: r.text || '',
+      from_name: r.from?.username || 'Usuario IG',
+      from_id: r.from?.id || '',
+      created_time: r.timestamp,
+      is_page: false, // will be resolved client-side or via igAccountId
+    }));
+  } else {
+    // Facebook: GET /{comment_id}/comments
+    const result = await metaGet(`${comment_id}/comments`, pageToken, {
+      fields: 'id,message,from{name,id},created_time',
+    });
+
+    if (!result.ok) return { body: { success: false, error: result.error }, status: 502 };
+
+    replies = (result.data?.data || []).map((r: any) => ({
+      id: r.id,
+      message: r.message || '',
+      from_name: r.from?.name || 'Usuario',
+      from_id: r.from?.id || '',
+      created_time: r.created_time,
+      is_page: r.from?.id === page_id,
+    }));
+  }
+
+  return { body: { success: true, replies }, status: 200 };
 }
 
 /** Reply to a message in a conversation */
@@ -437,7 +528,7 @@ async function handleReplyMessage(token: string, body: RequestBody): Promise<{ b
 
 /** Reply to a comment */
 async function handleReplyComment(token: string, body: RequestBody): Promise<{ body: any; status: number }> {
-  const { page_id, comment_id, message } = body;
+  const { page_id, comment_id, message, platform } = body;
   if (!page_id || !comment_id || !message) {
     return { body: { success: false, error: 'page_id, comment_id, and message required' }, status: 400 };
   }
@@ -446,7 +537,14 @@ async function handleReplyComment(token: string, body: RequestBody): Promise<{ b
   const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
   const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
 
-  const result = await metaPost(`${comment_id}/comments`, pageToken, { message });
+  let result;
+  if (platform === 'instagram') {
+    // Instagram: POST /{comment_id}/replies with { message }
+    result = await metaPost(`${comment_id}/replies`, pageToken, { message });
+  } else {
+    // Facebook: POST /{comment_id}/comments with { message }
+    result = await metaPost(`${comment_id}/comments`, pageToken, { message });
+  }
 
   if (!result.ok) return { body: { success: false, error: result.error }, status: 502 };
 
@@ -571,6 +669,9 @@ export async function metaSocialInbox(c: Context) {
         break;
       case 'list_ad_comments':
         result = await handleListAdComments(decryptedToken, body);
+        break;
+      case 'get_comment_replies':
+        result = await handleGetCommentReplies(decryptedToken, body);
         break;
       case 'reply_message':
         result = await handleReplyMessage(decryptedToken, body);

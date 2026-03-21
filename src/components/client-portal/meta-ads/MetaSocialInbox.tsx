@@ -308,18 +308,38 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           setLoadingMessages(false);
         }
       } else {
-        // For comments, just show the single comment as a "message"
-        setMessages([
-          {
-            id: conv.id,
-            message: conv.message || conv.snippet || '',
-            from_name: conv.user_name,
-            from_id: conv.user_id,
-            created_time: conv.created_time || conv.updated_time || new Date().toISOString(),
-            is_page: false,
-          },
-        ]);
-        setLoadingMessages(false);
+        // For comments, show the original comment + load replies from API
+        const originalComment: MessageItem = {
+          id: conv.id,
+          message: conv.message || conv.snippet || '',
+          from_name: conv.user_name,
+          from_id: conv.user_id,
+          created_time: conv.created_time || conv.updated_time || new Date().toISOString(),
+          is_page: false,
+        };
+
+        setMessages([originalComment]);
+        setLoadingMessages(true);
+
+        try {
+          const { data, error } = await callApi('meta-social-inbox', {
+            body: {
+              action: 'get_comment_replies',
+              connection_id: connectionId,
+              page_id: selectedPageId,
+              comment_id: conv.id,
+              platform: conv.platform,
+            },
+          });
+
+          if (!error && data?.success && data.replies?.length > 0) {
+            setMessages([originalComment, ...data.replies]);
+          }
+        } catch {
+          // If replies fail, just show the original comment
+        } finally {
+          setLoadingMessages(false);
+        }
       }
     },
     [connectionId, selectedPageId],
@@ -347,7 +367,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
           page_id: selectedPageId,
           ...(isMessage
             ? { conversation_id: selectedConversation.id, message: replyText.trim() }
-            : { comment_id: selectedConversation.id, message: replyText.trim() }),
+            : { comment_id: selectedConversation.id, message: replyText.trim(), platform: selectedConversation.platform }),
         },
       });
 
