@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Tag, RefreshCw, Search, DollarSign, TrendingUp } from 'lucide-react';
+import { Tag, RefreshCw, Search, DollarSign, TrendingUp, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
+import { ShopifyDiscountDialog } from './ShopifyDiscountDialog';
 
 interface DiscountCode {
   id: number;
@@ -60,6 +61,7 @@ export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerforma
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     if (clientId) fetchDiscounts();
@@ -137,6 +139,10 @@ export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerforma
             </Select>
             <Button variant="ghost" size="icon" onClick={fetchDiscounts}>
               <RefreshCw className="w-4 h-4" />
+            </Button>
+            <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" />
+              Crear
             </Button>
           </div>
         </div>
@@ -249,6 +255,13 @@ export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerforma
           </div>
         )}
       </CardContent>
+
+      <ShopifyDiscountDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        clientId={clientId}
+        onSuccess={() => fetchDiscounts()}
+      />
     </Card>
   );
 }

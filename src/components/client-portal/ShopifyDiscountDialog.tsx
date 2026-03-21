@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface ShopifyDiscountDialogProps {
@@ -59,7 +59,7 @@ export function ShopifyDiscountDialog({
     setIsCreating(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-shopify-discount', {
+      const { data, error } = await callApi<any>('create-shopify-discount', {
         body: {
           clientId,
           code: code.toUpperCase().replace(/\s/g, ''),
@@ -72,7 +72,7 @@ export function ShopifyDiscountDialog({
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       if (data?.error) {
         throw new Error(data.error);
