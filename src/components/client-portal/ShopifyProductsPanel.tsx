@@ -216,7 +216,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
         return;
       }
       setCrossSellData(data?.crossSell || {});
-      toast.success(`Combos frecuentes calculados (${data?.ordersAnalyzed || 0} pedidos analizados)`);
+      toast.success(`Combos propuestos calculados (${data?.ordersAnalyzed || 0} pedidos analizados)`);
     } catch (err: any) {
       toast.error('Error: ' + err.message);
     } finally {
@@ -349,7 +349,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                 disabled={loadingCrossSell}
               >
                 {loadingCrossSell ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ShoppingCart className="w-4 h-4 mr-1" />}
-                Combos frecuentes
+                Combos propuestos
               </Button>
             )}
             <Button
@@ -539,7 +539,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                     {crossSell && crossSell.length > 0 && (
                       <div className="mt-2 pt-2 border-t flex items-center gap-2 text-xs flex-wrap">
                         <ShoppingCart className="w-3.5 h-3.5 text-purple-500" />
-                        <span className="text-muted-foreground font-medium">Combo:</span>
+                        <span className="text-muted-foreground font-medium">Combo propuesto:</span>
                         {crossSell.map((cs, i) => (
                           <Badge key={i} variant="secondary" className="text-xs">
                             {cs.name} <span className="ml-1 opacity-70">({cs.percentage}%)</span>
