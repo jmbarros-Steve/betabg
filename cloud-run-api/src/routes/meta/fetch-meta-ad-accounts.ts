@@ -1,6 +1,5 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { canRequest, recordSuccess, recordFailure } from '../../lib/circuit-breaker.js';
 
 // ---------------------------------------------------------------------------
 // In-memory cache (5 min TTL)
@@ -140,10 +139,7 @@ export async function fetchMetaAdAccounts(c: Context) {
       return c.json({ error: 'Failed to decrypt token' }, 500);
     }
 
-    // Circuit breaker — log but don't block (let Meta handle its own rate limits)
-    if (!canRequest('meta-graph-api')) {
-      console.warn('[ad-accounts] Circuit breaker open, but proceeding anyway');
-    }
+    // No circuit breaker — let Meta handle its own rate limits
 
     // First, check token permissions
     console.log('Checking token permissions...');
@@ -155,13 +151,8 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     if (!permissionsResponse.ok) {
       const errBody: any = await permissionsResponse.json().catch(() => ({}));
-      const errCode = errBody?.error?.code;
-      if (errCode === 4 || errCode === 80004 || errCode === 32 || permissionsResponse.status === 429) {
-        recordFailure('meta-graph-api', `permissions: code ${errCode}, HTTP ${permissionsResponse.status}`);
-        return c.json({ error: 'Meta API rate limited. Try again in 1 minute.' }, 503);
-      }
-    } else {
-      recordSuccess('meta-graph-api');
+      console.error('[ad-accounts] Permissions check failed:', errBody);
+      return c.json({ error: 'Error al verificar permisos de Meta', details: errBody?.error?.message }, 502);
     }
 
     const permissionsData: MetaPermissionsResponse = await permissionsResponse.json() as any;
