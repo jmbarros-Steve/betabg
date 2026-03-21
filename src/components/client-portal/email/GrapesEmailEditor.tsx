@@ -24,6 +24,152 @@ interface GrapesEmailEditorProps {
 
 const LICENSE_KEY = import.meta.env.VITE_GRAPESJS_LICENSE_KEY || '';
 
+// Spanish locale for the Studio SDK
+const esLocale: Record<string, any> = {
+  add: 'Agregar',
+  delete: 'Eliminar',
+  duplicate: 'Duplicar',
+  rename: 'Renombrar',
+  remove: 'Quitar',
+  clear: 'Limpiar',
+  select: 'Seleccionar',
+  selectList: 'Seleccionar de lista',
+  search: 'Buscar',
+  update: 'Actualizar',
+  updated: 'Actualizado',
+  confirm: 'Confirmar',
+  cancel: 'Cancelar',
+  enable: 'Activar',
+  disable: 'Desactivar',
+  upload: 'Subir',
+  close: 'Cerrar',
+  load: 'Cargar',
+  copy: 'Copiar',
+  save: 'Guardar',
+  error: 'Error',
+  current: 'Actual',
+  toggleCss: 'Alternar CSS',
+  selectTarget: 'Seleccionar objetivo',
+  noCode: 'Sin código',
+  noItems: 'Sin elementos',
+  confirmAction: '¿Estás seguro?',
+  notItemsFound: 'No se encontraron elementos',
+  actions: {
+    componentOutline: { title: 'Contorno de componentes' },
+    preview: { title: 'Vista previa' },
+    fullscreen: { title: 'Pantalla completa' },
+    showCode: { title: 'Ver código', exportButton: 'Exportar', content: 'Código' },
+    undo: { title: 'Deshacer' },
+    redo: { title: 'Rehacer' },
+    save: { title: 'Guardar' },
+    store: { title: 'Guardar' },
+    open: { title: 'Abrir' },
+    importCode: { title: 'Importar código', parseError: 'Error al parsear', content: 'Pega tu código aquí', button: 'Importar' },
+    clearCanvas: { title: 'Limpiar canvas', content: '¿Estás seguro de que quieres limpiar todo el contenido?' },
+    about: { title: 'Acerca de' },
+    embed: { title: 'Embeber' },
+    newProject: { title: 'Nuevo proyecto' },
+    installApp: { title: 'Instalar app', installed: 'Instalado' },
+  },
+  blockManager: {
+    notFound: 'No se encontraron bloques',
+    blocks: 'Bloques',
+    add: 'Agregar bloque',
+    search: 'Buscar bloques...',
+    labels: {
+      section: 'Sección',
+      column1: '1 Columna',
+      column2: '2 Columnas',
+      column3: '3 Columnas',
+      'column3-7': '2 Columnas 3/7',
+      gridRow: 'Fila',
+      heading: 'Encabezado',
+      divider: 'Divisor',
+      imageBox: 'Imagen',
+      linkBox: 'Enlace',
+    },
+    types: { regular: 'Bloques', symbols: 'Símbolos' },
+    symbols: {
+      notFound: 'No se encontraron símbolos',
+      instancesProject: 'instancias en el proyecto',
+      delete: 'Eliminar símbolo',
+      deleteConfirm: '¿Eliminar este símbolo y todas sus instancias?',
+    },
+  },
+  domComponents: {
+    names: {
+      section: 'Sección',
+      gridRow: 'Fila',
+      gridColumn: 'Columna',
+      heading: 'Encabezado',
+      divider: 'Divisor',
+      imageBox: 'Imagen',
+      linkBox: 'Enlace',
+    },
+  },
+  traitManager: {
+    empty: 'Selecciona un elemento para ver sus propiedades',
+    panelLabel: 'Propiedades',
+    traits: {
+      labels: { loading: 'Cargando...', target: 'Destino', showList: 'Mostrar lista', customAttributes: 'Atributos personalizados' },
+      attributes: {},
+    },
+  },
+  styleManager: {
+    panelLabel: 'Estilos',
+    properties: {
+      'font-family': 'Tipografía',
+      'font-size': 'Tamaño de fuente',
+      'font-weight': 'Peso de fuente',
+      'letter-spacing': 'Espaciado de letras',
+      'text-align': 'Alineación de texto',
+      'text-decoration': 'Decoración de texto',
+      'text-transform': 'Transformación de texto',
+    },
+  },
+  layerManager: { layers: 'Capas' },
+  deviceManager: { allDevices: 'Todos los dispositivos' },
+  assetManager: {
+    addUrl: 'Agregar URL',
+    projectAssets: 'Recursos del proyecto',
+    userAssets: 'Mis recursos',
+    errorLoad: 'Error al cargar recursos',
+    errorUpload: 'Error al subir',
+    errorDelete: 'Error al eliminar',
+    deleteConfirmQuestion: '¿Eliminar este recurso?',
+    deleteConfirmExplanation: 'Esta acción no se puede deshacer',
+    assetTypes: { all: 'Todos', image: 'Imágenes' },
+    noProvider: 'No hay proveedor de recursos configurado',
+  },
+  storageManager: {
+    errorLoad: 'Error al cargar el proyecto',
+    errorStore: 'Error al guardar el proyecto',
+  },
+  selectorManager: {
+    noSelecton: 'Sin selección',
+    selectFromCanvas: 'Seleccionar del canvas',
+    selection: 'Selección',
+    selector: 'Selector',
+    target: 'Objetivo',
+    device: 'Dispositivo',
+    state: 'Estado',
+  },
+  pageManager: {
+    pages: 'Páginas',
+    page: 'Página',
+    newPage: 'Nueva página',
+    add: 'Agregar',
+    rename: 'Renombrar',
+    duplicate: 'Duplicar',
+    copy: 'Copiar',
+    delete: 'Eliminar',
+    deletePage: 'Eliminar página',
+    confirmDelete: '¿Eliminar esta página?',
+    homePage: 'Página principal',
+    settings: { label: 'Configuración', title: 'Configuración de página', global: 'Global' },
+  },
+};
+
 const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
   ({ onChange, initialDesign, onReady, clientId, brandColor }, ref) => {
     const editorRef = useRef<Editor | null>(null);
@@ -52,7 +198,6 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
         const editor = editorRef.current;
         if (!editor) return '';
         try {
-          // Use studio:projectFiles to compile MJML → HTML
           const result = editor.runCommand('studio:projectFiles', { styles: 'inline' });
           if (result?.files) {
             const htmlFile = result.files.find(
@@ -64,7 +209,6 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
                 : await (htmlFile.content as Blob).text();
             }
           }
-          // Fallback: get raw HTML from editor
           return editor.getHtml({ cleanId: true }) || '';
         } catch {
           return editor.getHtml({ cleanId: true }) || '';
@@ -80,13 +224,10 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       loadDesign: (design: any) => {
         const editor = editorRef.current;
         if (!editor || !design) return;
-
-        // Detect Unlayer format and skip (incompatible)
         if (design?.body?.rows) {
           console.warn('[GrapesEditor] Unlayer design detected — skipping loadDesign');
           return;
         }
-
         editor.loadProjectData(design);
       },
 
@@ -102,12 +243,11 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
 
-      // Register Steve blocks after editor is fully ready
-      registerSteveBlocks(editor);
+      // Register Steve blocks with brand color
+      registerSteveBlocks(editor, brandColor);
 
       setReady(true);
 
-      // Load initial design if provided
       if (initialDesign && !initialDesignLoaded.current) {
         initialDesignLoaded.current = true;
         if (initialDesign?.body?.rows) {
@@ -124,13 +264,11 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       onChange?.();
     };
 
-    // Load design when it changes externally (e.g. AI generation, template selection)
     useEffect(() => {
       if (!ready || !editorRef.current || !initialDesign) return;
       if (initialDesignLoaded.current) return;
       initialDesignLoaded.current = true;
-
-      if (initialDesign?.body?.rows) return; // Unlayer format
+      if (initialDesign?.body?.rows) return;
       editorRef.current.loadProjectData(initialDesign);
     }, [ready, initialDesign]);
 
@@ -138,23 +276,35 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       licenseKey: LICENSE_KEY,
       project: {
         type: 'email',
+        default: {
+          pages: [{ name: 'Email', component: '<mj-body></mj-body>' }],
+        },
+      },
+      storage: {
+        type: 'self',
+        autosaveChanges: 0,
+        onSave: async () => {
+          // Manual save — CampaignBuilder controls when to save
+        },
+        onLoad: async () => ({ project: {} }),
       },
       theme: 'light',
       customTheme: getSteveTheme(brandColor),
       blocks: {
         default: steveBlocks,
       },
+      pages: false,
       settingsMenu: {
         about: false,
         embed: false,
         installApp: false,
+        saveProject: false,
+        loadProject: false,
+        openProject: false,
       },
       i18n: {
         locales: {
-          en: {
-            'blockManager.labels.Steve': 'Steve',
-            'blockManager.labels.Variables': 'Variables',
-          },
+          en: esLocale,
         },
       },
     };
