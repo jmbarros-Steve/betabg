@@ -29,18 +29,24 @@ export async function fetchShopifyAnalytics(c: Context) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const { connectionId, daysBack = 30, startDate: startDateParam, endDate: endDateParam } = await c.req.json();
-    if (!connectionId) {
-      return c.json({ error: 'connectionId required' }, 400);
+    const { connectionId, client_id, daysBack = 30, startDate: startDateParam, endDate: endDateParam } = await c.req.json();
+    if (!connectionId && !client_id) {
+      return c.json({ error: 'connectionId or client_id required' }, 400);
     }
 
     // Get connection with ownership check
-    const { data: connection, error: connError } = await serviceClient
+    let connQuery = serviceClient
       .from('platform_connections')
       .select('*, clients!inner(user_id, client_user_id)')
-      .eq('id', connectionId)
-      .eq('platform', 'shopify')
-      .single();
+      .eq('platform', 'shopify');
+
+    if (connectionId) {
+      connQuery = connQuery.eq('id', connectionId);
+    } else {
+      connQuery = connQuery.eq('client_id', client_id).eq('is_active', true);
+    }
+
+    const { data: connection, error: connError } = await connQuery.single();
 
     if (connError || !connection) {
       return c.json({ error: 'Connection not found' }, 404);

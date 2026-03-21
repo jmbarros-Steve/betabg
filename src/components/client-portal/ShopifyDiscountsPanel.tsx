@@ -35,6 +35,7 @@ interface DiscountPerformance {
 
 interface ShopifyDiscountsPanelProps {
   clientId: string;
+  connectionId?: string | null;
   discountPerformance?: DiscountPerformance[];
 }
 
@@ -54,7 +55,7 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export function ShopifyDiscountsPanel({ clientId, discountPerformance = [] }: ShopifyDiscountsPanelProps) {
+export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerformance = [] }: ShopifyDiscountsPanelProps) {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -67,7 +68,7 @@ export function ShopifyDiscountsPanel({ clientId, discountPerformance = [] }: Sh
   async function fetchDiscounts() {
     setLoading(true);
     const { data, error } = await callApi<any>('fetch-shopify-discounts', {
-      body: { client_id: clientId },
+      body: { client_id: clientId, connection_id: connectionId || undefined },
     });
     if (!error && data?.discounts) {
       setDiscounts(data.discounts);

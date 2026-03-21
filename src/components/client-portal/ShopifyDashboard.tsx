@@ -473,10 +473,10 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       <SeoAnalysisCard products={seoProducts} />
 
       {/* Pedidos recientes */}
-      <ShopifyOrdersPanel clientId={clientId} fulfillmentMetrics={fulfillmentMetrics} />
+      <ShopifyOrdersPanel clientId={clientId} connectionId={connectionId} fulfillmentMetrics={fulfillmentMetrics} />
 
       {/* Descuentos activos */}
-      <ShopifyDiscountsPanel clientId={clientId} discountPerformance={discountPerformance} />
+      <ShopifyDiscountsPanel clientId={clientId} connectionId={connectionId} discountPerformance={discountPerformance} />
 
       {/* Productos de Shopify */}
       <ShopifyProductsPanel clientId={clientId} allSkuSales={allSkuSales} connectionId={connectionId} />

@@ -60,10 +60,11 @@ function formatDate(iso: string) {
 
 interface ShopifyOrdersPanelProps {
   clientId: string;
+  connectionId?: string | null;
   fulfillmentMetrics?: FulfillmentMetrics | null;
 }
 
-export function ShopifyOrdersPanel({ clientId, fulfillmentMetrics }: ShopifyOrdersPanelProps) {
+export function ShopifyOrdersPanel({ clientId, connectionId: externalConnectionId, fulfillmentMetrics }: ShopifyOrdersPanelProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -77,9 +78,10 @@ export function ShopifyOrdersPanel({ clientId, fulfillmentMetrics }: ShopifyOrde
   async function fetchOrders() {
     setLoading(true);
     setError(null);
-    const { data, error: apiError } = await callApi<any>('fetch-shopify-analytics', {
-      body: { client_id: clientId, days_back: 30 },
-    });
+    const body: Record<string, any> = externalConnectionId
+      ? { connectionId: externalConnectionId, daysBack: 30 }
+      : { client_id: clientId, days_back: 30 };
+    const { data, error: apiError } = await callApi<any>('fetch-shopify-analytics', { body });
 
     if (apiError) {
       setError(apiError);
@@ -100,9 +102,10 @@ export function ShopifyOrdersPanel({ clientId, fulfillmentMetrics }: ShopifyOrde
 
   async function fetchOrdersDirect() {
     setLoading(true);
-    const { data, error: apiError } = await callApi<any>('fetch-shopify-analytics', {
-      body: { client_id: clientId, days_back: 30, include_orders: true },
-    });
+    const body: Record<string, any> = externalConnectionId
+      ? { connectionId: externalConnectionId, daysBack: 30, include_orders: true }
+      : { client_id: clientId, days_back: 30, include_orders: true };
+    const { data, error: apiError } = await callApi<any>('fetch-shopify-analytics', { body });
     if (!apiError && data?.rawOrders) {
       setOrders(data.rawOrders);
     }
