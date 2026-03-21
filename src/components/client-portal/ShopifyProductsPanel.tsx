@@ -731,9 +731,9 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
         />
       )}
 
-      {/* Combo Creation Dialog */}
+      {/* Combo Creation Dialog — with product page preview */}
       <Dialog open={!!comboDialog} onOpenChange={(open) => !open && setComboDialog(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           {comboDialog && (() => {
             const mainP = comboDialog.mainProduct;
             const allItems = [
@@ -746,82 +746,159 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
             const totalPrice = allItems.reduce((s, p) => s + p.price, 0);
             const discount = parseInt(comboDiscount) || 10;
             const comboPrice = Math.round(totalPrice * (1 - discount / 100));
+            const savings = Math.round(totalPrice - comboPrice);
 
             return (
               <>
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4 text-purple-600" />
+                    <ShoppingCart className="h-5 w-5 text-purple-600" />
                     Crear Combo en Shopify
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 pt-2">
-                  {/* Products in combo */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Productos del combo</Label>
-                    {allItems.map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
-                        {item.image ? (
-                          <img src={item.image} alt={item.title} className="w-8 h-8 rounded object-cover" />
-                        ) : (
-                          <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-                            <Package className="w-4 h-4 text-muted-foreground" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {/* ===== LEFT: Config ===== */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Configurar</h3>
+
+                    {/* Combo title */}
+                    <div className="space-y-1">
+                      <Label htmlFor="combo-title" className="text-sm">Nombre del combo</Label>
+                      <Input
+                        id="combo-title"
+                        value={comboTitle}
+                        onChange={(e) => setComboTitle(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Products */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Productos incluidos</Label>
+                      {allItems.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 p-2 bg-muted/40 rounded-lg">
+                          {item.image ? (
+                            <img src={item.image} alt={item.title} className="w-10 h-10 rounded object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                              <Package className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <span className="text-sm flex-1 line-clamp-1">{item.title}</span>
+                          <span className="text-sm font-medium tabular-nums">${item.price.toLocaleString('es-CL')}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Discount slider */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="combo-discount" className="text-sm">Descuento</Label>
+                        <span className="text-sm font-bold text-purple-600">{discount}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        id="combo-discount"
+                        min="0"
+                        max="50"
+                        step="5"
+                        value={comboDiscount}
+                        onChange={(e) => setComboDiscount(e.target.value)}
+                        className="w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>0%</span>
+                        <span>25%</span>
+                        <span>50%</span>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground">Se creará como borrador. Puedes revisarlo y publicarlo desde tu admin de Shopify.</p>
+
+                    <Button className="w-full" onClick={createCombo} disabled={creatingCombo} size="lg">
+                      {creatingCombo ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando en Shopify...</>
+                      ) : (
+                        <><Plus className="w-4 h-4 mr-2" />Crear combo en Shopify</>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* ===== RIGHT: Preview ===== */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Preview del producto</h3>
+
+                    {/* Product page preview */}
+                    <div className="border rounded-xl overflow-hidden bg-white dark:bg-zinc-950">
+                      {/* Product images */}
+                      <div className="bg-gray-50 dark:bg-zinc-900 p-4">
+                        <div className="flex gap-2 justify-center">
+                          {allItems.filter(p => p.image).length > 0 ? (
+                            allItems.filter(p => p.image).map((item, i) => (
+                              <img key={i} src={item.image!} alt={item.title} className="w-20 h-20 rounded-lg object-cover border-2 border-white dark:border-zinc-800 shadow-sm" />
+                            ))
+                          ) : (
+                            <div className="w-32 h-32 rounded-lg bg-muted flex items-center justify-center">
+                              <Package className="w-10 h-10 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        {allItems.filter(p => p.image).length > 1 && (
+                          <div className="flex justify-center mt-2">
+                            <Badge className="bg-purple-600 text-white text-[10px]">{allItems.length} productos</Badge>
                           </div>
                         )}
-                        <span className="text-sm flex-1 truncate">{item.title}</span>
-                        <span className="text-sm font-medium">${item.price.toLocaleString('es-CL')}</span>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Combo title */}
-                  <div className="space-y-1">
-                    <Label htmlFor="combo-title" className="text-sm">Nombre del combo</Label>
-                    <Input
-                      id="combo-title"
-                      value={comboTitle}
-                      onChange={(e) => setComboTitle(e.target.value)}
-                    />
-                  </div>
+                      {/* Product info */}
+                      <div className="p-4 space-y-3">
+                        {/* Badge */}
+                        <Badge variant="secondary" className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">COMBO</Badge>
 
-                  {/* Discount */}
-                  <div className="space-y-1">
-                    <Label htmlFor="combo-discount" className="text-sm">Descuento (%)</Label>
-                    <Input
-                      id="combo-discount"
-                      type="number"
-                      min="0"
-                      max="50"
-                      value={comboDiscount}
-                      onChange={(e) => setComboDiscount(e.target.value)}
-                    />
-                  </div>
+                        {/* Title */}
+                        <h4 className="font-bold text-base leading-tight">{comboTitle || 'Combo sin nombre'}</h4>
 
-                  {/* Price summary */}
-                  <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Precio normal</span>
-                      <span className="line-through">${Math.round(totalPrice).toLocaleString('es-CL')}</span>
+                        {/* Price */}
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-purple-600">${comboPrice.toLocaleString('es-CL')}</span>
+                          <span className="text-sm text-muted-foreground line-through">${Math.round(totalPrice).toLocaleString('es-CL')}</span>
+                          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 text-[10px]">-{discount}%</Badge>
+                        </div>
+
+                        {/* Savings callout */}
+                        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                          <p className="text-xs font-medium text-green-700 dark:text-green-300">
+                            Ahorra ${savings.toLocaleString('es-CL')} comprando este combo
+                          </p>
+                        </div>
+
+                        {/* Description preview */}
+                        <div className="text-xs text-muted-foreground space-y-2">
+                          <p className="font-semibold text-foreground text-sm">Este combo incluye:</p>
+                          <ul className="space-y-1.5">
+                            {allItems.map((item, i) => (
+                              <li key={i} className="flex items-center gap-2">
+                                {item.image ? (
+                                  <img src={item.image} alt="" className="w-6 h-6 rounded object-cover" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded bg-muted" />
+                                )}
+                                <span className="flex-1">{item.title}</span>
+                                <span className="tabular-nums">${item.price.toLocaleString('es-CL')}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Fake add to cart button */}
+                        <div className="pt-2">
+                          <div className="w-full bg-purple-600 text-white text-center py-2.5 rounded-lg text-sm font-semibold opacity-60 cursor-default">
+                            Agregar al carrito — ${comboPrice.toLocaleString('es-CL')}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Descuento ({discount}%)</span>
-                      <span className="text-red-600">-${Math.round(totalPrice - comboPrice).toLocaleString('es-CL')}</span>
-                    </div>
-                    <div className="flex justify-between text-base font-bold pt-1 border-t border-purple-200 dark:border-purple-800">
-                      <span>Precio combo</span>
-                      <span className="text-purple-600">${comboPrice.toLocaleString('es-CL')}</span>
-                    </div>
                   </div>
-
-                  <p className="text-[10px] text-muted-foreground">Se creará como borrador en Shopify. Puedes revisarlo y publicarlo desde tu admin.</p>
-
-                  <Button className="w-full" onClick={createCombo} disabled={creatingCombo}>
-                    {creatingCombo ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
-                    ) : (
-                      <><Plus className="w-4 h-4 mr-2" />Crear combo en Shopify</>
-                    )}
-                  </Button>
                 </div>
               </>
             );
