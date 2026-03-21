@@ -474,11 +474,6 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPhotoProduct(product)} title="Fotos IA">
                               <Camera className="w-3.5 h-3.5" />
                             </Button>
-                            {crossSell && (
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setExpandedProduct(expandedProduct === product.id ? null : product.id)} title="Ver combos frecuentes">
-                                {expandedProduct === product.id ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                              </Button>
-                            )}
                           </div>
                         </div>
 
@@ -540,14 +535,14 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                       </div>
                     </div>
 
-                    {/* F8: Cross-sell expanded */}
-                    {expandedProduct === product.id && crossSell && (
+                    {/* F8: Combos frecuentes — se muestra directo */}
+                    {crossSell && crossSell.length > 0 && (
                       <div className="mt-2 pt-2 border-t flex items-center gap-2 text-xs flex-wrap">
-                        <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground font-medium">Se compra junto con:</span>
+                        <ShoppingCart className="w-3.5 h-3.5 text-purple-500" />
+                        <span className="text-muted-foreground font-medium">Combo:</span>
                         {crossSell.map((cs, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
-                            {cs.name} ({cs.percentage}%)
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {cs.name} <span className="ml-1 opacity-70">({cs.percentage}%)</span>
                           </Badge>
                         ))}
                       </div>
