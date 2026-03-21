@@ -21,7 +21,7 @@ function sanitizeEmailHtml(html: string): string {
       'target', 'rel', 'role', 'aria-label', 'aria-hidden',
       'data-steve-products', 'data-steve-discount', 'data-steve-condition',
       'data-product-type', 'data-product-count', 'data-columns',
-      'data-show-price', 'data-show-button', 'data-button-text', 'data-button-color',
+      'data-show-price', 'data-show-button', 'data-button-text', 'data-button-color', 'data-title',
       'data-discount-source', 'data-discount-code', 'data-discount-type', 'data-discount-value',
       'data-merge-tag',
       'data-dynamic-feed',

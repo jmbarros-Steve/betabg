@@ -7,7 +7,7 @@ on:
 jobs:
   jit-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       pull-requests: write
       contents: read
@@ -23,7 +23,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -36,6 +36,26 @@ jobs:
           echo "$DIFF" >> $GITHUB_OUTPUT
           echo "DIFFEOF" >> $GITHUB_OUTPUT
 
+      - name: Find nearby existing tests
+        id: context
+        run: |
+          # Get changed files and find nearby test files for context
+          CHANGED=$(git diff origin/main...HEAD --name-only -- '*.ts' '*.tsx' ':!*.spec.*' ':!*.test.*')
+          NEARBY_TESTS=""
+          for f in $CHANGED; do
+            DIR=$(dirname "$f")
+            # Look for test files in same dir or __tests__ subdir
+            TESTS=$(find "$DIR" "$DIR/__tests__" -name '*.test.*' -o -name '*.spec.*' 2>/dev/null | head -2)
+            if [ -n "$TESTS" ]; then
+              for t in $TESTS; do
+                NEARBY_TESTS="${NEARBY_TESTS}\n--- $t ---\n$(head -50 "$t")\n"
+              done
+            fi
+          done
+          echo "nearby<<NEARBYEOF" >> $GITHUB_OUTPUT
+          echo -e "$NEARBY_TESTS" >> $GITHUB_OUTPUT
+          echo "NEARBYEOF" >> $GITHUB_OUTPUT
+
       - name: Generate JIT tests with Claude
         id: generate
         if: steps.diff.outputs.diff != ''
@@ -43,8 +63,22 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           DIFF='${{ steps.diff.outputs.diff }}'
-          
-          PROMPT="Basado en este diff de código de una app React + Playwright, genera EXACTAMENTE 5 tests de Playwright que verifiquen los cambios. La app está en https://betabgnuevosupa.vercel.app. Responde SOLO con código TypeScript válido, sin markdown, sin explicaciones. Usa import { test, expect } from '@playwright/test'. Cada test debe ser independiente.
+          NEARBY='${{ steps.context.outputs.nearby }}'
+
+          PROMPT="Basado en este diff de una app React + Vite + TypeScript + Supabase, genera tests. La app esta en https://betabgnuevosupa.vercel.app.
+
+          GENERA DOS TIPOS DE TESTS:
+
+          1. UNIT TESTS (Vitest): Si el diff toca hooks, lib, o utils, genera 3-5 unit tests usando vitest. Usa import { describe, it, expect, vi } from 'vitest'. Mockea @/integrations/supabase/client. Guarda como VITEST.
+
+          2. E2E TESTS (Playwright): Genera 3-5 tests E2E. Usa import { test, expect } from '@playwright/test'. Cada test debe ser independiente.
+
+          TESTS EXISTENTES CERCANOS (para referencia de estilo):
+          ${NEARBY}
+
+          Responde con DOS bloques separados por la linea ---SEPARATOR---
+          Primer bloque: unit tests (vitest). Si no aplica, pon // no unit tests needed
+          Segundo bloque: e2e tests (playwright)
 
           DIFF:
           ${DIFF}"
@@ -55,7 +89,7 @@ jobs:
             -H "content-type: application/json" \
             -d "{
               \"model\": \"claude-haiku-4-5-20241022\",
-              \"max_tokens\": 4096,
+              \"max_tokens\": 6000,
               \"messages\": [{\"role\": \"user\", \"content\": $(echo "$PROMPT" | jq -Rs .)}]
             }")
 
@@ -67,15 +101,36 @@ jobs:
             exit 0
           fi
 
-          echo "$CODE" > e2e/_jit-pr-tests.spec.ts
+          # Split into unit and e2e
+          mkdir -p src/test/jit-generated
+          UNIT=$(echo "$CODE" | sed -n '1,/---SEPARATOR---/p' | sed '/---SEPARATOR---/d')
+          E2E=$(echo "$CODE" | sed -n '/---SEPARATOR---/,$p' | sed '1d')
+
+          echo "$UNIT" > src/test/jit-generated/_jit-unit.test.ts
+          echo "$E2E" > e2e/_jit-pr-tests.spec.ts
           echo "skipped=false" >> $GITHUB_OUTPUT
 
-      - name: Run JIT tests
-        id: jit
+          # Check if unit tests are non-trivial
+          if echo "$UNIT" | grep -q "describe\|it("; then
+            echo "has_unit=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_unit=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run JIT unit tests
+        id: unit
+        if: steps.generate.outputs.skipped != 'true' && steps.generate.outputs.has_unit == 'true'
+        continue-on-error: true
+        run: |
+          npx vitest run src/test/jit-generated/_jit-unit.test.ts --reporter=line 2>&1 | tee /tmp/jit-unit-results.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Run JIT E2E tests
+        id: e2e
         if: steps.generate.outputs.skipped != 'true'
         continue-on-error: true
         run: |
-          npx playwright test e2e/_jit-pr-tests.spec.ts --reporter=line 2>&1 | tee /tmp/jit-results.txt
+          npx playwright test e2e/_jit-pr-tests.spec.ts --reporter=line 2>&1 | tee /tmp/jit-e2e-results.txt
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         env:
           TEST_BASE_URL: https://betabgnuevosupa.vercel.app
@@ -86,21 +141,22 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const results = fs.readFileSync('/tmp/jit-results.txt', 'utf8');
-            const passed = results.includes('passed') && !results.includes('failed');
-            
-            const emoji = passed ? '✅' : '❌';
-            const status = passed ? 'JIT Tests pasaron' : 'JIT Tests encontraron problemas';
-            
-            const body = `## 🤖 ${emoji} ${status}
 
-            Tests generados automáticamente por Claude basados en el diff de este PR:
+            let body = '## JIT Tests (AI-Generated)\n\n';
 
-            \`\`\`
-            ${results.substring(0, 3000)}
-            \`\`\`
+            // Unit test results
+            if (fs.existsSync('/tmp/jit-unit-results.txt')) {
+              const unitResults = fs.readFileSync('/tmp/jit-unit-results.txt', 'utf8');
+              const unitPassed = unitResults.includes('passed') && !unitResults.includes('failed');
+              body += `### Unit Tests ${unitPassed ? 'PASS' : 'FAIL'}\n\`\`\`\n${unitResults.substring(0, 1500)}\n\`\`\`\n\n`;
+            }
 
-            ${!passed ? '⚠️ **Revisa los fallos antes de mergear.**' : ''}`;
+            // E2E test results
+            if (fs.existsSync('/tmp/jit-e2e-results.txt')) {
+              const e2eResults = fs.readFileSync('/tmp/jit-e2e-results.txt', 'utf8');
+              const e2ePassed = e2eResults.includes('passed') && !e2eResults.includes('failed');
+              body += `### E2E Tests ${e2ePassed ? 'PASS' : 'FAIL'}\n\`\`\`\n${e2eResults.substring(0, 1500)}\n\`\`\`\n\n`;
+            }
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -111,4 +167,6 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -f e2e/_jit-pr-tests.spec.ts
+        run: |
+          rm -f e2e/_jit-pr-tests.spec.ts
+          rm -rf src/test/jit-generated/

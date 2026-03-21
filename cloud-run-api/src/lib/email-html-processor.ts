@@ -299,6 +299,7 @@ async function replaceProductBlocks(
       const showPrice = extractAttr(block.attrs, 'data-show-price') !== 'false';
       const buttonText = extractAttr(block.attrs, 'data-button-text') || 'Ver producto';
       const buttonColor = extractAttr(block.attrs, 'data-button-color') || '#1a1a1a';
+      const blockTitle = extractAttr(block.attrs, 'data-title') || null;
 
       let replacementHtml = '';
 
@@ -333,7 +334,7 @@ async function replaceProductBlocks(
 
         if (recommendedProducts.length > 0) {
           replacementHtml = renderProductGridStyled(recommendedProducts, {
-            columns, showPrice, buttonText, buttonColor, count: productCount,
+            columns, showPrice, buttonText, buttonColor, count: productCount, title: blockTitle,
           });
         }
       }
@@ -352,10 +353,18 @@ async function replaceProductBlocks(
           options.clientId
         );
 
+        // Apply custom title from data-title attribute
+        if (replacementHtml && blockTitle) {
+          replacementHtml = replacementHtml.replace(
+            'Productos recomendados para ti',
+            escapeHtml(blockTitle)
+          );
+        }
+
         // If the standard renderer was used but we have custom styling, re-render
         if (!replacementHtml) {
           replacementHtml = renderProductGridStyled(products.slice(0, productCount), {
-            columns, showPrice, buttonText, buttonColor, count: productCount,
+            columns, showPrice, buttonText, buttonColor, count: productCount, title: blockTitle,
           });
         }
       }
@@ -391,6 +400,7 @@ function renderProductGridStyled(
     buttonText: string;
     buttonColor: string;
     count: number;
+    title?: string | null;
   }
 ): string {
   const items = products.slice(0, config.count);
@@ -444,11 +454,12 @@ function renderProductGridStyled(
     rows.push(`<tr>${cells.join('')}</tr>`);
   }
 
+  const gridTitle = config.title ? escapeHtml(config.title) : 'Productos recomendados para ti';
   return `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
       <tr>
         <td colspan="${cols}" style="padding:0 8px 12px;font-size:18px;font-weight:bold;color:#1a1a1a;font-family:Georgia,serif;">
-          Productos recomendados para ti
+          ${gridTitle}
         </td>
       </tr>
       ${rows.join('')}

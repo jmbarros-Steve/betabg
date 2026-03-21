@@ -145,6 +145,7 @@ import { shopifyOauthCallback } from './shopify/shopify-oauth-callback.js';
 import { shopifyFulfillmentWebhooks } from './shopify/shopify-fulfillment-webhooks.js';
 import { shopifyGdprWebhooks } from './shopify/shopify-gdpr-webhooks.js';
 import { storeShopifyCredentials } from './shopify/store-shopify-credentials.js';
+import { storeShopifyToken } from './shopify/store-shopify-token.js';
 
 // Phase 5: Steve Mail (Email Marketing)
 import { sendEmailHandler } from './email/send-email.js';
@@ -166,6 +167,7 @@ import { emailRevenueAttribution } from './email/revenue-attribution.js';
 import { signupForms, signupFormPublic } from './email/signup-forms.js';
 import { formWidget } from './email/form-widget.js';
 import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-api.js';
+import { seedSystemEmailTemplates } from '../seed/email-system-templates.js';
 import { smartSendTime } from './email/smart-send-time.js';
 import { emailSendQueue } from './email/send-queue.js';
 import { emailListCleanup } from './email/list-cleanup.js';
@@ -273,6 +275,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/sync-shopify-metrics', authMiddleware, syncShopifyMetrics);
   app.post('/api/fetch-shopify-discounts', authMiddleware, fetchShopifyDiscounts);
   app.post('/api/store-shopify-credentials', authMiddleware, storeShopifyCredentials);
+  app.post('/api/store-shopify-token', authMiddleware, storeShopifyToken);
   app.post('/api/fetch-shopify-customers', authMiddleware, fetchShopifyCustomers);
   app.post('/api/update-shopify-product', authMiddleware, updateShopifyProduct);
 
@@ -316,6 +319,16 @@ export function registerRoutes(app: Hono) {
   // Email templates gallery & universal blocks
   app.post('/api/email-templates', authMiddleware, emailTemplatesApi);
   app.post('/api/universal-blocks', authMiddleware, universalBlocksApi);
+
+  // Seed system email templates (admin only, idempotent)
+  app.post('/api/seed-email-templates', async (c) => {
+    try {
+      const result = await seedSystemEmailTemplates();
+      return c.json(result);
+    } catch (err: any) {
+      return c.json({ error: err.message }, 500);
+    }
+  });
 
   // A/B testing (auth required)
   app.post('/api/email-ab-testing', authMiddleware, emailAbTesting);

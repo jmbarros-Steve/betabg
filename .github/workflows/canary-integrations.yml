@@ -1,0 +1,135 @@
+name: Canary — Integration Health Check
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  canary:
+    name: Check External APIs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      API_URL: https://steve-api-850416724643.us-central1.run.app
+      SUPABASE_URL: https://zpswjccsxjtnhetkkqde.supabase.co
+
+    steps:
+      - name: Check Meta Graph API
+        id: meta
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            "https://graph.facebook.com/v21.0/me?access_token=invalid")
+          # 400 = API is up (invalid token expected), 0 or 5xx = down
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Meta Graph API reachable (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Meta Graph API unreachable (HTTP $STATUS)"
+          fi
+
+      - name: Check Shopify Admin API
+        id: shopify
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            "https://shopify.dev/")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Shopify API reachable (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Shopify API unreachable (HTTP $STATUS)"
+          fi
+
+      - name: Check Klaviyo API
+        id: klaviyo
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            "https://a.klaviyo.com/api/campaigns" \
+            -H "Authorization: Klaviyo-API-Key invalid" \
+            -H "revision: 2024-02-15")
+          # 401 = API is up (invalid key expected)
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Klaviyo API reachable (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Klaviyo API unreachable (HTTP $STATUS)"
+          fi
+
+      - name: Check Cloud Run API
+        id: cloudrun
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${API_URL}/")
+          if [ "$STATUS" = "200" ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Cloud Run API healthy (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Cloud Run API down (HTTP $STATUS)"
+          fi
+
+      - name: Check Supabase
+        id: supabase
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            "${SUPABASE_URL}/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "result=pass" >> $GITHUB_OUTPUT
+            echo "✅ Supabase reachable (HTTP $STATUS)"
+          else
+            echo "result=fail" >> $GITHUB_OUTPUT
+            echo "❌ Supabase unreachable (HTTP $STATUS)"
+          fi
+
+      - name: Create issue on failure
+        if: |
+          steps.meta.outputs.result == 'fail' ||
+          steps.shopify.outputs.result == 'fail' ||
+          steps.klaviyo.outputs.result == 'fail' ||
+          steps.cloudrun.outputs.result == 'fail' ||
+          steps.supabase.outputs.result == 'fail'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FAILED=""
+          [ "${{ steps.meta.outputs.result }}" = "fail" ] && FAILED="${FAILED}- Meta Graph API\n"
+          [ "${{ steps.shopify.outputs.result }}" = "fail" ] && FAILED="${FAILED}- Shopify API\n"
+          [ "${{ steps.klaviyo.outputs.result }}" = "fail" ] && FAILED="${FAILED}- Klaviyo API\n"
+          [ "${{ steps.cloudrun.outputs.result }}" = "fail" ] && FAILED="${FAILED}- Cloud Run API\n"
+          [ "${{ steps.supabase.outputs.result }}" = "fail" ] && FAILED="${FAILED}- Supabase\n"
+
+          gh issue create \
+            --title "Canary Alert: External API(s) unreachable" \
+            --body "## APIs Down
+
+          $(echo -e "$FAILED")
+
+          **Time:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          **Workflow:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Investigate and verify if the issue persists." \
+            --label "bug,monitoring" || echo "Could not create issue"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Canary Integration Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Meta Graph API | ${{ steps.meta.outputs.result || 'skip' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Shopify API | ${{ steps.shopify.outputs.result || 'skip' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Klaviyo API | ${{ steps.klaviyo.outputs.result || 'skip' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Run API | ${{ steps.cloudrun.outputs.result || 'skip' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supabase | ${{ steps.supabase.outputs.result || 'skip' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY

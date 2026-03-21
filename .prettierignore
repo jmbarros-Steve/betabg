@@ -1,0 +1,9 @@
+dist
+node_modules
+.next
+coverage
+*.min.js
+*.min.css
+src/integrations/supabase/
+src/components/ui/
+cloud-run-api/dist

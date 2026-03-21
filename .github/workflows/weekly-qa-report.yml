@@ -1,0 +1,73 @@
+name: Weekly QA Report
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'  # Monday 12pm UTC (9am Chile)
+  workflow_dispatch:
+
+jobs:
+  report:
+    name: Generate QA Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      SUPABASE_URL: https://zpswjccsxjtnhetkkqde.supabase.co
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch QA metrics from Supabase
+        id: metrics
+        run: |
+          # Get qa_log entries from last 7 days
+          SINCE=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -v-7d +%Y-%m-%dT%H:%M:%S)
+
+          QA_DATA=$(curl -s \
+            "${SUPABASE_URL}/rest/v1/qa_log?created_at=gte.${SINCE}&select=check_type,passed,created_at&order=created_at.desc&limit=500" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+
+          TOTAL=$(echo "$QA_DATA" | jq 'length')
+          PASSED=$(echo "$QA_DATA" | jq '[.[] | select(.passed == true)] | length')
+          FAILED=$(echo "$QA_DATA" | jq '[.[] | select(.passed == false)] | length')
+
+          if [ "$TOTAL" -gt 0 ]; then
+            PASS_RATE=$(echo "scale=1; $PASSED * 100 / $TOTAL" | bc)
+          else
+            PASS_RATE="N/A"
+          fi
+
+          # Get open tasks count
+          TASKS=$(curl -s \
+            "${SUPABASE_URL}/rest/v1/tasks?status=in.(pending,in_progress)&select=id,priority&limit=100" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+
+          OPEN_TASKS=$(echo "$TASKS" | jq 'length')
+          CRITICAL_TASKS=$(echo "$TASKS" | jq '[.[] | select(.priority == "critical")] | length')
+
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+          echo "open_tasks=$OPEN_TASKS" >> $GITHUB_OUTPUT
+          echo "critical_tasks=$CRITICAL_TASKS" >> $GITHUB_OUTPUT
+
+      - name: Generate report
+        run: |
+          echo "## Weekly QA Report — $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### QA Checks (last 7 days)" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total checks | ${{ steps.metrics.outputs.total }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Passed | ${{ steps.metrics.outputs.passed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failed | ${{ steps.metrics.outputs.failed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pass rate | ${{ steps.metrics.outputs.pass_rate }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tasks" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Open tasks | ${{ steps.metrics.outputs.open_tasks }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | ${{ steps.metrics.outputs.critical_tasks }} |" >> $GITHUB_STEP_SUMMARY

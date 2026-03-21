@@ -2602,9 +2602,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       }
 
       if (data?.partial === true) {
+        // Safety net: si algún 207 residual llega, mostrar warning con errores específicos
         const errors = [data.adset_error, data.creative_error, data.ad_error].filter(Boolean);
         const errorMsg = errors.join('. ') || 'Error parcial al crear la campaña';
-        toast.warning(`Campaña creada pero incompleta: ${errorMsg}`);
+        toast.warning(`Campaña incompleta: ${errorMsg}`);
       } else {
         toast.success('Campaña creada como pausada en Meta. Activa cuando estés listo.');
       }

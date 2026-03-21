@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { BlocksEditorWrapper, type BlocksEditorRef } from './BlocksEditorWrapper';
+import UnlayerEditorWrapper, { type UnlayerEditorRef } from './UnlayerEditorWrapper';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,14 +19,10 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, Blocks, AlertTriangle,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, AlertTriangle,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
-import { UniversalBlocksPanel } from './UniversalBlocksPanel';
-import { ImageEditorPanel } from './ImageEditorPanel';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
-import { ProductBlockPanel } from './ProductBlockPanel';
-// GlobalStylesPanel removed — replaced by BlocksEditor templateColors
 import { ABTestResultsPanel } from './ABTestResultsPanel';
 
 interface CampaignBuilderProps {
@@ -74,8 +70,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign> | null>(null);
   const [editorStep, setEditorStep] = useState<'setup' | 'design' | 'audience' | 'review'>('setup');
 
-  // Blocks editor
-  const emailEditorRef = useRef<BlocksEditorRef>(null);
+  // Unlayer editor
+  const emailEditorRef = useRef<UnlayerEditorRef>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [designJson, setDesignJson] = useState<any>(null);
 
@@ -88,7 +84,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-  // Device toggle is now internal to BlocksEditorWrapper
+  // Device toggle is handled by Unlayer internally
 
   // A/B Testing (hidden behind advanced options)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -106,12 +102,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [recType, setRecType] = useState('best_sellers');
   const [recCount, setRecCount] = useState(4);
 
-  // Template Gallery & Universal Blocks
+  // Template Gallery & Conditional Blocks
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
-  const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
-  const [showImageEditor, setShowImageEditor] = useState(false);
   const [showConditionalPanel, setShowConditionalPanel] = useState(false);
-  const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
 
@@ -129,7 +122,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Concurrency: optimistic locking
   const lastKnownUpdatedAt = useRef<string | null>(null);
 
-  // Dirty tracking is handled via onChange callback on BlocksEditorWrapper
+  // Dirty tracking is handled via onChange callback on UnlayerEditorWrapper
 
   useEffect(() => {
     if (!showEditor || !isDirty) return;
@@ -145,8 +138,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   useEffect(() => {
     if (!showEditor || !editorReady || editorStep !== 'design') return;
     const interval = setInterval(() => {
-      const html = emailEditorRef.current?.getHtml() || '';
-      setEmailSizeBytes(new Blob([html]).size);
+      void (async () => {
+        const html = (await emailEditorRef.current?.getHtml?.()) || '';
+        setEmailSizeBytes(new Blob([html]).size);
+      })();
     }, 3000);
     return () => clearInterval(interval);
   }, [showEditor, editorReady, editorStep]);
@@ -213,28 +208,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   useEffect(() => {
     if (!showEditor) {
       setShowTemplateGallery(false);
-      setShowUniversalBlocks(false);
-      setShowImageEditor(false);
       setShowConditionalPanel(false);
-      setShowProductPanel(false);
     }
   }, [showEditor]);
 
-  // Load design when editor becomes ready or designJson/editingCampaign changes
+  // Load design when editor becomes ready or designJson changes
   useEffect(() => {
     if (!editorReady) return;
-    if (designJson) {
-      if (typeof designJson === 'string') {
-        // HTML template
-        emailEditorRef.current?.loadDesign(designJson);
-      } else {
-        // Structured design_json (blocks or legacy Unlayer)
-        emailEditorRef.current?.loadDesign(editingCampaign?.html_content || '', designJson);
-      }
-    } else if (editingCampaign?.html_content) {
-      emailEditorRef.current?.loadDesign(editingCampaign.html_content);
+    if (designJson && typeof designJson === 'object') {
+      emailEditorRef.current?.loadDesign(designJson);
     }
-  }, [editorReady, designJson, editingCampaign?.html_content]);
+  }, [editorReady, designJson]);
 
   const handleGenerateWithAI = async () => {
     setGenerating(true);
@@ -253,6 +237,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       const subject = data?.subject || editingCampaign?.subject || '';
       const previewText = data?.preview_text || '';
       const html = data?.html || '';
+      const generatedDesign = data?.design_json || null;
 
       setEditingCampaign(prev => ({
         ...prev,
@@ -261,10 +246,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         html_content: html,
       }));
 
-      // Load HTML into blocks editor
-      setDesignJson(null);
-      if (editorReady) {
-        emailEditorRef.current?.loadDesign(html);
+      // For Unlayer, prefer design_json generated by AI when available.
+      setDesignJson(generatedDesign);
+      if (editorReady && generatedDesign) {
+        emailEditorRef.current?.loadDesign(generatedDesign);
       }
 
       toast.success('Email generado con Steve AI');
@@ -279,12 +264,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   };
 
-  const exportEditorHtml = (): { html: string; design: any } => {
+  const exportEditorHtml = async (): Promise<{ html: string; design: any }> => {
     const editorRef = emailEditorRef.current;
     if (!editorRef) {
       return { html: editingCampaign?.html_content || '', design: designJson };
     }
-    let html = editorRef.getHtml() || '';
+    let html = (await editorRef.getHtml()) || '';
     const design = editorRef.getProjectData();
 
     // Embed conditional block conditions into the HTML body
@@ -309,7 +294,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
     // If on design step or later, export from blocks editor
     if (editorStep === 'design' || editorStep === 'audience' || editorStep === 'review') {
-      const { html, design } = exportEditorHtml();
+      const { html, design } = await exportEditorHtml();
       htmlContent = html;
       savedDesign = design;
     }
@@ -377,7 +362,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     setCriterioLoading(true);
     setCriterioResult(null);
     try {
-      const { html } = exportEditorHtml();
+      const { html } = await exportEditorHtml();
       const { data: criterio, error: criterioError } = await callApi<any>('criterio-email', {
         body: {
           email_data: {
@@ -527,9 +512,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     setEditorStep('design');
   };
 
-  const goToAudienceStep = () => {
+  const goToAudienceStep = async () => {
     // Save current design state
-    const { html, design } = exportEditorHtml();
+    const { html, design } = await exportEditorHtml();
     setEditingCampaign(prev => ({ ...prev, html_content: html }));
     setDesignJson(design);
     setEditorStep('audience');
@@ -541,14 +526,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       // Store in state - useEffect will load when editor is ready
       setDesignJson(templateDesign);
       // Also load immediately if editor is already ready
-      if (editorReady && emailEditorRef.current) {
-        if (typeof templateDesign === 'string') {
-          // HTML template — load as raw HTML
-          emailEditorRef.current.loadDesign(templateDesign);
-        } else {
-          // Structured design_json — load as project data
-          emailEditorRef.current.loadDesign('', templateDesign);
-        }
+      if (editorReady && emailEditorRef.current && typeof templateDesign === 'object') {
+        emailEditorRef.current.loadDesign(templateDesign);
       }
     }
   };
@@ -560,7 +539,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
     setSavingTemplate(true);
     try {
-      const { html, design } = exportEditorHtml();
+      const { html, design } = await exportEditorHtml();
       const { error } = await callApi<any>('email-templates', {
         body: {
           action: 'create',
@@ -633,8 +612,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return result;
   };
 
-  const goToReviewStep = () => {
-    const { html, design } = exportEditorHtml();
+  const goToReviewStep = async () => {
+    const { html, design } = await exportEditorHtml();
     setEditingCampaign(prev => ({ ...prev, html_content: html }));
     setDesignJson(design);
     setPreviewHtml(replaceMergeTagsForPreview(html));
@@ -713,9 +692,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <Button variant="outline" size="sm" onClick={() => setShowTemplateGallery(true)}>
                   <LayoutTemplate className="w-4 h-4 mr-1" /> Plantillas
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowUniversalBlocks(true)}>
-                  <Blocks className="w-4 h-4 mr-1" /> Bloques
-                </Button>
                 <Button variant="outline" size="sm" onClick={() => {
                   const existing = document.getElementById('save-template-overlay');
                   if (existing) existing.remove();
@@ -755,7 +731,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     btn.setAttribute('disabled', 'true');
                     setSaveTemplateName(name);
                     try {
-                      const { html, design } = exportEditorHtml();
+                      const { html, design } = await exportEditorHtml();
                       const { error } = await callApi('email-templates', {
                         body: {
                           action: 'create',
@@ -780,16 +756,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 }}>
                   <Save className="w-4 h-4 mr-1" /> Guardar Plantilla
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => {
-                  console.log('[DEBUG] Preview clicked');
+                <Button variant="outline" size="sm" onClick={async () => {
                   try {
-                    const { html } = exportEditorHtml();
-                    console.log('[DEBUG] Preview html length:', html?.length);
+                    const { html } = await exportEditorHtml();
                     setPreviewHtml(replaceMergeTagsForPreview(html));
                     setShowPreview(true);
-                    console.log('[DEBUG] showPreview set to true');
                   } catch (err) {
-                    console.error('[DEBUG] Preview error:', err);
+                    console.error('[SteveMail] Preview error:', err);
+                    toast.error('Error al generar vista previa');
                   }
                 }}>
                   <Eye className="w-4 h-4 mr-1" /> Vista previa
@@ -981,15 +955,6 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-zinc-50 shrink-0">
               <Button
                 size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => setShowProductPanel(true)}
-                title="Insertar productos"
-              >
-                <ShoppingBag className="w-3.5 h-3.5 mr-1" /> Productos
-              </Button>
-              <Button
-                size="sm"
                 variant={showConditionalPanel ? 'default' : 'ghost'}
                 className="h-7 px-2 text-xs"
                 onClick={() => setShowConditionalPanel(!showConditionalPanel)}
@@ -1010,57 +975,20 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
-            {/* Blocks editor */}
+            {/* Unlayer editor */}
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
-                <BlocksEditorWrapper
+                <UnlayerEditorWrapper
                   ref={emailEditorRef}
                   onReady={() => setEditorReady(true)}
                   onChange={() => setIsDirty(true)}
-                  style={{ height: '100%' }}
+                  initialDesign={designJson}
                   clientId={clientId}
                 />
               </div>
             </div>
 
-            {/* Universal Blocks Panel */}
-            <UniversalBlocksPanel
-              clientId={clientId}
-              editor={emailEditorRef.current}
-              isOpen={showUniversalBlocks}
-              onClose={() => setShowUniversalBlocks(false)}
-            />
-
-            {/* Image Editor (Gemini AI) - kept functional but not in toolbar */}
-            <ImageEditorPanel
-              clientId={clientId}
-              isOpen={showImageEditor}
-              onClose={() => setShowImageEditor(false)}
-              onImageReady={(url) => {
-                if (!emailEditorRef.current) {
-                  toast.info('Copia la URL: ' + url);
-                  return;
-                }
-                const imgHtml = `<div style="text-align:center;padding:10px;"><img src="${url}" alt="Imagen editada" style="max-width:100%;width:600px;" /></div>`;
-                emailEditorRef.current.addComponents(imgHtml);
-                toast.success('Imagen insertada al final del email');
-              }}
-              brandColor={brandInfo.brand_color}
-              brandSecondaryColor={brandInfo.brand_secondary_color}
-            />
-
-            {/* Product Block Panel - accessible from blocks panel */}
-            <ProductBlockPanel
-              clientId={clientId}
-              isOpen={showProductPanel}
-              onClose={() => setShowProductPanel(false)}
-              onInsert={(html) => {
-                if (!emailEditorRef.current) return;
-                emailEditorRef.current.addComponents(html);
-              }}
-            />
-
-            {/* Conditional Block Panel - kept functional but hidden from toolbar */}
+            {/* Conditional Block Panel */}
             {showConditionalPanel && (
               <div className="fixed right-0 top-[88px] bottom-0 w-80 bg-background border-l shadow-lg z-50 overflow-y-auto p-4">
                 <div className="flex items-center justify-between mb-4">

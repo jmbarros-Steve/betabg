@@ -126,21 +126,19 @@ async function resolveShopifyCredentials(
       .eq('platform', 'shopify')
       .single();
 
-    if (!conn?.shopify_client_id || !conn?.shopify_client_secret_encrypted) {
-      console.error('Per-client Shopify credentials not found for client:', perClientId);
-      return null;
-    }
+    if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
+      const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
+        .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
 
-    const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
-      .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
-
-    if (decryptError || !decryptedSecret) {
+      if (!decryptError && decryptedSecret) {
+        console.log('Using per-client Shopify credentials for callback, client:', perClientId);
+        return { clientId: conn.shopify_client_id, clientSecret: decryptedSecret };
+      }
       console.error('Error decrypting Shopify client secret:', decryptError);
-      return null;
     }
 
-    console.log('Using per-client Shopify credentials for callback, client:', perClientId);
-    return { clientId: conn.shopify_client_id, clientSecret: decryptedSecret };
+    // Fallback: clientId known but no per-client credentials — use centralized env vars
+    console.log('Per-client credentials not found for client:', perClientId, '— falling back to env vars');
   }
 
   // Centralized fallback
@@ -314,15 +312,34 @@ export async function shopifyOauthCallback(c: Context) {
         return c.json({ error: 'Error encrypting token' }, 500);
       }
 
-      // Update the existing platform_connections record
-      await supabaseAdmin.from('platform_connections').update({
-        store_name: storeName,
-        store_url: `https://${normalizedShopDomain}`,
-        shop_domain: normalizedShopDomain,
-        access_token_encrypted: encryptedToken,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }).eq('client_id', perClientId).eq('platform', 'shopify');
+      // Upsert platform_connections — handles both existing and new connections
+      const { data: existingConn } = await supabaseAdmin
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', perClientId)
+        .eq('platform', 'shopify')
+        .maybeSingle();
+
+      if (existingConn) {
+        await supabaseAdmin.from('platform_connections').update({
+          store_name: storeName,
+          store_url: `https://${normalizedShopDomain}`,
+          shop_domain: normalizedShopDomain,
+          access_token_encrypted: encryptedToken,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        }).eq('id', existingConn.id);
+      } else {
+        await supabaseAdmin.from('platform_connections').insert({
+          client_id: perClientId,
+          platform: 'shopify',
+          store_name: storeName,
+          store_url: `https://${normalizedShopDomain}`,
+          shop_domain: normalizedShopDomain,
+          access_token_encrypted: encryptedToken,
+          is_active: true,
+        });
+      }
 
       // Update client record with shop info
       await supabaseAdmin.from('clients').update({

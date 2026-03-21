@@ -1,8 +1,17 @@
 #!/bin/bash
 set -e
 
-# === QA tests only (skip record-*, screenshot utilities) ===
-echo "🧪 Corriendo tests QA..."
+# === 1. Unit tests (fast, <30s) ===
+echo "Running unit tests..."
+npx vitest run --reporter=line
+if [ $? -ne 0 ]; then
+  echo "UNIT TESTS FALLARON. Push bloqueado."
+  exit 1
+fi
+echo "Unit tests OK."
+
+# === 2. QA E2E tests (skip record-*, screenshot utilities) ===
+echo "Running E2E QA tests..."
 npx playwright test \
   e2e/qa-*.spec.ts \
   e2e/check-bugs.spec.ts \
@@ -10,9 +19,9 @@ npx playwright test \
   e2e/test-login.spec.ts \
   --reporter=line
 if [ $? -ne 0 ]; then
-  echo "❌ TESTS FALLARON. Push bloqueado."
+  echo "E2E TESTS FALLARON. Push bloqueado."
   exit 1
 fi
-echo "✅ Tests QA OK."
+echo "E2E tests OK."
 
-echo "🚀 Todo OK. Push permitido."
+echo "Todo OK. Push permitido."
