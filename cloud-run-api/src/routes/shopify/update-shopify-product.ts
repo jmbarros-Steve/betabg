@@ -25,7 +25,7 @@ export async function updateShopifyProduct(c: Context) {
     }
 
     const body = await c.req.json();
-    const { connectionId, productId, title, price, inventory_quantity, variant_id, inventory_item_id } = body;
+    const { connectionId, productId, title, price, inventory_quantity, variant_id, inventory_item_id, body_html, images } = body;
 
     if (!connectionId || !productId) {
       return c.json({ error: 'connectionId and productId required' }, 400);
@@ -79,12 +79,20 @@ export async function updateShopifyProduct(c: Context) {
 
     const updates: string[] = [];
 
-    // === Update product title and/or variant price ===
-    if (title !== undefined || price !== undefined) {
+    // === Update product title, variant price, body_html, images ===
+    if (title !== undefined || price !== undefined || body_html !== undefined || images !== undefined) {
       const productPayload: any = { product: { id: productId } };
 
       if (title !== undefined) {
         productPayload.product.title = title;
+      }
+
+      if (body_html !== undefined) {
+        productPayload.product.body_html = body_html;
+      }
+
+      if (images !== undefined && Array.isArray(images)) {
+        productPayload.product.images = images;
       }
 
       // Price is on the variant, not the product
@@ -107,6 +115,8 @@ export async function updateShopifyProduct(c: Context) {
 
       if (title !== undefined) updates.push('título');
       if (price !== undefined) updates.push('precio');
+      if (body_html !== undefined) updates.push('descripción');
+      if (images !== undefined) updates.push('imágenes');
     }
 
     // === Update inventory quantity ===

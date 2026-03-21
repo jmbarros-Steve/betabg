@@ -117,7 +117,7 @@ export async function fetchShopifyAnalytics(c: Context) {
     }
 
     const maxDateParam = untilDateISO ? `&created_at_max=${untilDateISO}` : '';
-    const ordersUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${sinceDate.toISOString()}${maxDateParam}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status`;
+    const ordersUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${sinceDate.toISOString()}${maxDateParam}&limit=250&fields=id,line_items,created_at,currency,source_name,landing_site,referring_site,total_price,customer,financial_status,fulfillment_status,fulfillments,discount_codes`;
     const checkoutsUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/checkouts.json?limit=250&created_at_min=${sinceDate.toISOString()}${maxDateParam}`;
 
     console.log('[fetch-shopify-analytics] Fetching orders and checkouts from:', cleanStoreUrl);
@@ -143,6 +143,14 @@ export async function fetchShopifyAnalytics(c: Context) {
 
     // Track customers who had abandoned checkouts for real conversion rate
     const checkoutCustomerEmails = new Set<string>();
+
+    // Fulfillment metrics tracking
+    const fulfillmentMetrics = { avgFulfillmentHours: 0, pendingCount: 0, overdueCount: 0 };
+    let fulfillmentTotalHours = 0;
+    let fulfilledCount = 0;
+
+    // Discount performance tracking
+    const discountMap = new Map<string, { code: string; orders: number; revenue: number; discountAmount: number }>();
 
     // Totals for summary
     let totalRevenue = 0;
@@ -202,6 +210,39 @@ export async function fetchShopifyAnalytics(c: Context) {
         } catch { /* ignore invalid URLs */ }
       }
 
+      // Fulfillment tracking
+      const fStatus = order.fulfillment_status || 'unfulfilled';
+      if (fStatus === 'unfulfilled' || fStatus === null) {
+        fulfillmentMetrics.pendingCount++;
+        // Check if overdue (>3 days since order)
+        const orderAge = (Date.now() - new Date(order.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        if (orderAge > 3) fulfillmentMetrics.overdueCount++;
+      }
+      if (order.fulfillments?.length > 0) {
+        for (const f of order.fulfillments) {
+          if (f.created_at && order.created_at) {
+            const hours = (new Date(f.created_at).getTime() - new Date(order.created_at).getTime()) / (1000 * 60 * 60);
+            if (hours >= 0) {
+              fulfillmentTotalHours += hours;
+              fulfilledCount++;
+            }
+          }
+        }
+      }
+
+      // Discount code tracking
+      if (order.discount_codes?.length > 0) {
+        for (const dc of order.discount_codes) {
+          const code = (dc.code || '').toUpperCase();
+          if (!code) continue;
+          const existing = discountMap.get(code) || { code, orders: 0, revenue: 0, discountAmount: 0 };
+          existing.orders += 1;
+          existing.revenue += orderRevenue;
+          existing.discountAmount += await convertToCLP(parseFloat(dc.amount || '0'), order.currency || 'CLP');
+          discountMap.set(code, existing);
+        }
+      }
+
       // Customer tracking
       totalOrderCount++;
       if (order.financial_status === 'paid' || order.financial_status === 'partially_paid') {
@@ -224,11 +265,19 @@ export async function fetchShopifyAnalytics(c: Context) {
       }
     }
 
-    const topSkus = Array.from(skuMap.values())
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 10);
+    const allSkuSales = Array.from(skuMap.values())
+      .sort((a, b) => b.quantity - a.quantity);
+
+    const topSkus = allSkuSales.slice(0, 10);
 
     const salesByChannel = Array.from(channelMap.values())
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // Finalize fulfillment metrics
+    fulfillmentMetrics.avgFulfillmentHours = fulfilledCount > 0 ? Math.round(fulfillmentTotalHours / fulfilledCount) : 0;
+
+    // Discount performance
+    const discountPerformance = Array.from(discountMap.values())
       .sort((a, b) => b.revenue - a.revenue);
 
     const utmPerformance = Array.from(utmMap.values())
@@ -411,6 +460,7 @@ export async function fetchShopifyAnalytics(c: Context) {
         total_price: o.total_price,
         currency: o.currency,
         financial_status: o.financial_status,
+        fulfillment_status: o.fulfillment_status || 'unfulfilled',
         source_name: o.source_name,
         customer: o.customer ? {
           first_name: o.customer.first_name,
@@ -422,9 +472,17 @@ export async function fetchShopifyAnalytics(c: Context) {
           quantity: li.quantity,
           price: li.price,
         })),
+        fulfillments: (o.fulfillments || []).map((f: any) => ({
+          id: f.id,
+          status: f.status,
+          created_at: f.created_at,
+          tracking_number: f.tracking_number || null,
+          tracking_url: f.tracking_url || null,
+        })),
+        discount_codes: o.discount_codes || [],
       }));
 
-    return c.json({ topSkus, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary, funnelData, rawOrders: recentOrders });
+    return c.json({ topSkus, allSkuSales, abandonedCarts, salesByChannel, utmPerformance, customerMetrics, cohorts, dailyBreakdown, summary, funnelData, fulfillmentMetrics, discountPerformance, rawOrders: recentOrders });
 
   } catch (error: any) {
     console.error('[fetch-shopify-analytics] Error:', error);

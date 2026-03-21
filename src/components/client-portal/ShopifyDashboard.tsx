@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
-import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, CheckCircle, AlertTriangle, Image, Type, FileText, ChevronDown, DollarSign, Package, Percent, HelpCircle } from 'lucide-react';
+import { ShoppingBag, RefreshCw, TrendingUp, Globe, Link2, Search, ShoppingCart, CheckCircle, AlertTriangle, Image, Type, FileText, ChevronDown, DollarSign, Package, Percent, HelpCircle, Eye } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
 import { DayOfWeekChart } from './metrics/DayOfWeekChart';
 import { AreaChart, Area, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Line } from 'recharts';
 import { TopSkusPanel, SkuData } from './metrics/TopSkusPanel';
 import { AbandonedCartsPanel, AbandonedCart } from './metrics/AbandonedCartsPanel';
+import { ShopifyFunnelPanel, FunnelData } from './metrics/ShopifyFunnelPanel';
+import { ProductMatrixPanel } from './metrics/ProductMatrixPanel';
+import { CollectionRevenuePanel } from './metrics/CollectionRevenuePanel';
 import { ShopifyProductsPanel } from './ShopifyProductsPanel';
 import { ShopifyOrdersPanel } from './ShopifyOrdersPanel';
 import { ShopifyDiscountsPanel } from './ShopifyDiscountsPanel';
@@ -62,6 +65,10 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [utmPerformance, setUtmPerformance] = useState<UtmData[]>([]);
   const [seoProducts, setSeoProducts] = useState<any[]>([]);
   const [dailyBreakdown, setDailyBreakdown] = useState<{ date: string; revenue: number; orders: number }[]>([]);
+  const [funnelData, setFunnelData] = useState<FunnelData | null>(null);
+  const [allSkuSales, setAllSkuSales] = useState<SkuData[]>([]);
+  const [fulfillmentMetrics, setFulfillmentMetrics] = useState<any>(null);
+  const [discountPerformance, setDiscountPerformance] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange | undefined>(undefined);
 
@@ -134,10 +141,14 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       ]);
       if (analyticsRes.error) throw new Error(analyticsRes.error);
       setSkuData(analyticsRes.data?.topSkus || []);
+      setAllSkuSales(analyticsRes.data?.allSkuSales || analyticsRes.data?.topSkus || []);
       setAbandonedCarts(analyticsRes.data?.abandonedCarts || []);
       setSalesByChannel(analyticsRes.data?.salesByChannel || []);
       setUtmPerformance(analyticsRes.data?.utmPerformance || []);
       setDailyBreakdown(analyticsRes.data?.dailyBreakdown || []);
+      setFunnelData(analyticsRes.data?.funnelData || null);
+      setFulfillmentMetrics(analyticsRes.data?.fulfillmentMetrics || null);
+      setDiscountPerformance(analyticsRes.data?.discountPerformance || []);
       if (productsRes.data?.products) {
         setSeoProducts(productsRes.data.products);
       }
@@ -271,6 +282,9 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
           </Card>
         ))}
       </div>
+
+      {/* Funnel de Conversión (F1) */}
+      {funnelData && <ShopifyFunnelPanel funnelData={funnelData} />}
 
       {/* Daily Sales Chart */}
       {dailyBreakdown.length > 0 && (
@@ -427,6 +441,12 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
         <AbandonedCartsPanel carts={abandonedCarts} currency="CLP" />
       </div>
 
+      {/* Matriz Estrella / Zombi (F4) */}
+      <ProductMatrixPanel products={seoProducts} allSkuSales={allSkuSales} />
+
+      {/* Colecciones por Revenue (F9) */}
+      {connectionId && <CollectionRevenuePanel connectionId={connectionId} />}
+
       {/* UTMs con más ventas */}
       <Card className="bg-card border border-border rounded-xl card-hover">
         <CardHeader>
@@ -453,13 +473,13 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
       <SeoAnalysisCard products={seoProducts} />
 
       {/* Pedidos recientes */}
-      <ShopifyOrdersPanel clientId={clientId} />
+      <ShopifyOrdersPanel clientId={clientId} fulfillmentMetrics={fulfillmentMetrics} />
 
       {/* Descuentos activos */}
-      <ShopifyDiscountsPanel clientId={clientId} />
+      <ShopifyDiscountsPanel clientId={clientId} discountPerformance={discountPerformance} />
 
       {/* Productos de Shopify */}
-      <ShopifyProductsPanel clientId={clientId} />
+      <ShopifyProductsPanel clientId={clientId} allSkuSales={allSkuSales} connectionId={connectionId} />
 
       {/* Clientes */}
       <ShopifyCustomersPanel clientId={clientId} />
