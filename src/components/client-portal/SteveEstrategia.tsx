@@ -80,10 +80,17 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       setBriefComplete(persona?.is_complete ?? false);
 
       // Check platform connections via Cloud Run (bypasses RLS)
-      const { data: connData } = await callApi('check-client-connections', {
-        body: { client_id: clientId },
-      });
-      setHasConnections(connData?.connected === true);
+      try {
+        const { data: connData } = await callApi('check-client-connections', {
+          body: { client_id: clientId },
+        });
+        if (connData) {
+          setHasConnections(connData.connected === true);
+        }
+        // If API fails, hasConnections stays null (no banner shown)
+      } catch {
+        // Silently ignore — no banner is better than a false "disconnected" banner
+      }
 
       // Find existing estrategia conversation
       const { data: existingConvs, error: convError } = await supabase
