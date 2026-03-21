@@ -12,8 +12,9 @@ import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
   Package, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, ImageOff, Pencil, Save, Loader2,
-  Sparkles, Camera, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, ShoppingCart, Clock
+  Sparkles, Camera, ArrowUpRight, ArrowDownRight, ChevronDown, ChevronRight, ShoppingCart, Clock, Plus, ExternalLink
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { ShopifyPhotoStudio } from './ShopifyPhotoStudio';
 
 interface SkuSale {
@@ -111,6 +112,12 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
   const [crossSellData, setCrossSellData] = useState<Record<number, Array<{ productId: number; name: string; count: number; percentage: number }>>>({});
   const [loadingCrossSell, setLoadingCrossSell] = useState(false);
   const [expandedProduct, setExpandedProduct] = useState<number | null>(null);
+
+  // Combo creation
+  const [comboDialog, setComboDialog] = useState<{ mainProduct: ShopifyProduct; comboProducts: Array<{ productId: number; name: string }> } | null>(null);
+  const [comboDiscount, setComboDiscount] = useState('10');
+  const [comboTitle, setComboTitle] = useState('');
+  const [creatingCombo, setCreatingCombo] = useState(false);
 
   // Update connectionId from external prop
   useEffect(() => {
@@ -221,6 +228,58 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
       toast.error('Error: ' + err.message);
     } finally {
       setLoadingCrossSell(false);
+    }
+  };
+
+  // Open combo creation dialog
+  const openComboDialog = (mainProduct: ShopifyProduct, comboItems: Array<{ productId: number; name: string }>) => {
+    const names = [mainProduct.title, ...comboItems.map(c => c.name)];
+    setComboTitle(`Combo: ${names.join(' + ')}`);
+    setComboDiscount('10');
+    setComboDialog({ mainProduct, comboProducts: comboItems });
+  };
+
+  // Create combo product in Shopify
+  const createCombo = async () => {
+    if (!comboDialog || !connectionId) return;
+    setCreatingCombo(true);
+    try {
+      // Build product list with prices and images
+      const mainP = comboDialog.mainProduct;
+      const comboProducts = [
+        { id: mainP.id, title: mainP.title, price: mainP.variants[0]?.price || 0, image: mainP.image || undefined },
+        ...comboDialog.comboProducts.map(cp => {
+          const found = products.find(p => p.id === cp.productId);
+          return {
+            id: cp.productId,
+            title: cp.name,
+            price: found?.variants[0]?.price || 0,
+            image: found?.image || undefined,
+          };
+        }),
+      ];
+
+      const { data, error } = await callApi<any>('create-shopify-combo', {
+        body: {
+          connectionId,
+          products: comboProducts,
+          comboTitle: comboTitle || undefined,
+          discountPercent: parseInt(comboDiscount) || 10,
+        },
+      });
+
+      if (error) {
+        toast.error('Error: ' + error);
+        return;
+      }
+
+      toast.success(`Combo creado en Shopify como borrador: "${data.product.title}" a $${data.product.price.toLocaleString('es-CL')}`);
+      setComboDialog(null);
+      fetchProducts();
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setCreatingCombo(false);
     }
   };
 
@@ -535,16 +594,29 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                       </div>
                     </div>
 
-                    {/* F8: Combos frecuentes — se muestra directo */}
+                    {/* F8: Combos propuestos — se muestra directo */}
                     {crossSell && crossSell.length > 0 && (
-                      <div className="mt-2 pt-2 border-t flex items-center gap-2 text-xs flex-wrap">
-                        <ShoppingCart className="w-3.5 h-3.5 text-purple-500" />
-                        <span className="text-muted-foreground font-medium">Combo propuesto:</span>
-                        {crossSell.map((cs, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {cs.name} <span className="ml-1 opacity-70">({cs.percentage}%)</span>
-                          </Badge>
-                        ))}
+                      <div className="mt-2 pt-2 border-t">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-xs flex-wrap flex-1">
+                            <ShoppingCart className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                            <span className="text-muted-foreground font-medium shrink-0">Combo propuesto:</span>
+                            {crossSell.map((cs, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">
+                                {cs.name} <span className="ml-1 opacity-70">({cs.percentage}%)</span>
+                              </Badge>
+                            ))}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs shrink-0 text-purple-600 border-purple-300 hover:bg-purple-50"
+                            onClick={() => openComboDialog(product, crossSell)}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Crear combo
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -658,6 +730,104 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
           onSaved={fetchProducts}
         />
       )}
+
+      {/* Combo Creation Dialog */}
+      <Dialog open={!!comboDialog} onOpenChange={(open) => !open && setComboDialog(null)}>
+        <DialogContent className="max-w-md">
+          {comboDialog && (() => {
+            const mainP = comboDialog.mainProduct;
+            const allItems = [
+              { title: mainP.title, price: mainP.variants[0]?.price || 0, image: mainP.image },
+              ...comboDialog.comboProducts.map(cp => {
+                const found = products.find(p => p.id === cp.productId);
+                return { title: cp.name, price: found?.variants[0]?.price || 0, image: found?.image || null };
+              }),
+            ];
+            const totalPrice = allItems.reduce((s, p) => s + p.price, 0);
+            const discount = parseInt(comboDiscount) || 10;
+            const comboPrice = Math.round(totalPrice * (1 - discount / 100));
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-purple-600" />
+                    Crear Combo en Shopify
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  {/* Products in combo */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Productos del combo</Label>
+                    {allItems.map((item, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                        {item.image ? (
+                          <img src={item.image} alt={item.title} className="w-8 h-8 rounded object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                            <Package className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span className="text-sm flex-1 truncate">{item.title}</span>
+                        <span className="text-sm font-medium">${item.price.toLocaleString('es-CL')}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Combo title */}
+                  <div className="space-y-1">
+                    <Label htmlFor="combo-title" className="text-sm">Nombre del combo</Label>
+                    <Input
+                      id="combo-title"
+                      value={comboTitle}
+                      onChange={(e) => setComboTitle(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Discount */}
+                  <div className="space-y-1">
+                    <Label htmlFor="combo-discount" className="text-sm">Descuento (%)</Label>
+                    <Input
+                      id="combo-discount"
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={comboDiscount}
+                      onChange={(e) => setComboDiscount(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Price summary */}
+                  <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Precio normal</span>
+                      <span className="line-through">${Math.round(totalPrice).toLocaleString('es-CL')}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Descuento ({discount}%)</span>
+                      <span className="text-red-600">-${Math.round(totalPrice - comboPrice).toLocaleString('es-CL')}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold pt-1 border-t border-purple-200 dark:border-purple-800">
+                      <span>Precio combo</span>
+                      <span className="text-purple-600">${comboPrice.toLocaleString('es-CL')}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground">Se creará como borrador en Shopify. Puedes revisarlo y publicarlo desde tu admin.</p>
+
+                  <Button className="w-full" onClick={createCombo} disabled={creatingCombo}>
+                    {creatingCombo ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>
+                    ) : (
+                      <><Plus className="w-4 h-4 mr-2" />Crear combo en Shopify</>
+                    )}
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
