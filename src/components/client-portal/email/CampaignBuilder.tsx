@@ -24,6 +24,7 @@ import {
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ABTestResultsPanel } from './ABTestResultsPanel';
+import { ProductBlockPanel } from './ProductBlockPanel';
 
 interface CampaignBuilderProps {
   clientId: string;
@@ -105,6 +106,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Template Gallery & Conditional Blocks
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showConditionalPanel, setShowConditionalPanel] = useState(false);
+  const [showProductPanel, setShowProductPanel] = useState(false);
   const [blockConditions, setBlockConditions] = useState<BlockCondition[]>([]);
   const [brandInfo, setBrandInfo] = useState<Record<string, string>>({});
 
@@ -209,6 +211,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     if (!showEditor) {
       setShowTemplateGallery(false);
       setShowConditionalPanel(false);
+      setShowProductPanel(false);
     }
   }, [showEditor]);
 
@@ -962,6 +965,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               >
                 <Eye className="w-3.5 h-3.5 mr-1" /> Condicional
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setShowProductPanel(true)}
+                title="Insertar productos de Shopify"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 mr-1" /> Productos
+              </Button>
               {emailSizeBytes > 0 && (
                 <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                   emailSizeBytes > GMAIL_CLIP_LIMIT ? 'bg-red-100 text-red-700 font-medium'
@@ -988,6 +1000,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 />
               </div>
             </div>
+
+            {/* Product Block Panel */}
+            <ProductBlockPanel
+              clientId={clientId}
+              isOpen={showProductPanel}
+              onClose={() => setShowProductPanel(false)}
+              onInsert={(html) => {
+                emailEditorRef.current?.insertHtml(html);
+                setIsDirty(true);
+              }}
+            />
 
             {/* Conditional Block Panel */}
             {showConditionalPanel && (

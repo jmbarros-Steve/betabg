@@ -12,6 +12,7 @@ export interface UnlayerEditorRef {
   getProjectData: () => any;
   loadDesign: (design: any) => void;
   setHtml: (html: string) => void;
+  insertHtml: (html: string) => void;
 }
 
 interface GrapesEmailEditorProps {
@@ -233,6 +234,14 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
 
       setHtml: (_html: string) => {
         // Legacy no-op
+      },
+
+      insertHtml: (html: string) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        const wrapper = editor.getWrapper();
+        if (!wrapper) return;
+        wrapper.append(`<mj-raw>${html}</mj-raw>`);
       },
     }));
 
