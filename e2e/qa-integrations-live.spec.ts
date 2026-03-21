@@ -25,24 +25,53 @@ async function login(page: any) {
 test('Meta Ads — campaigns load and sync works', async ({ page }) => {
   await login(page);
 
-  // Navigate to Meta Ads tab (look for tab or link)
-  const metaTab = page.locator('text=Meta').first();
-  if (await metaTab.isVisible()) {
-    await metaTab.click();
-    await page.waitForTimeout(3000);
+  // Close "Setup del portal" banner if visible
+  const closeSetup = page.locator('button[aria-label="close"], button:has(svg.lucide-x)').first();
+  if (await closeSetup.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await closeSetup.click({ force: true });
+    await page.waitForTimeout(500);
+  }
 
-    // Verify some campaign-related content loads
+  // Meta Ads may be under "Más" dropdown or as a direct tab
+  let opened = false;
+
+  // Try direct tab first
+  const directTab = page.locator('button:has-text("Meta Ads"), a:has-text("Meta Ads")').first();
+  if (await directTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await directTab.click({ force: true });
+    opened = true;
+  }
+
+  // If not found, try "Más" dropdown menu
+  if (!opened) {
+    const masBtn = page.locator('button:has-text("Más")').first();
+    if (await masBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await masBtn.click({ force: true });
+      await page.waitForTimeout(1500);
+
+      // Click Meta Ads inside the dropdown using force to bypass overlay
+      const metaOption = page.locator('[role="menuitem"]:has-text("Meta Ads"), [role="option"]:has-text("Meta Ads"), a:has-text("Meta Ads"), div:has-text("Meta Ads")').first();
+      if (await metaOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await metaOption.click({ force: true });
+        opened = true;
+      }
+    }
+  }
+
+  if (opened) {
+    await page.waitForTimeout(5000);
+
     const body = await page.textContent('body');
-    // Should have either campaigns, metricas, or an account selector
     const hasMeta =
       body?.includes('Campa') ||
       body?.includes('ROAS') ||
       body?.includes('Ad Account') ||
-      body?.includes('Meta');
+      body?.includes('Meta') ||
+      body?.includes('Inversión');
     expect(hasMeta).toBeTruthy();
-
-    await page.screenshot({ path: 'test-results/meta-ads-live.png' });
   }
+
+  await page.screenshot({ path: 'test-results/meta-ads-live.png' });
 });
 
 test('Klaviyo — connection status visible', async ({ page }) => {
