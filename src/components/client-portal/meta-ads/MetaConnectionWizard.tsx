@@ -19,7 +19,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import logoMeta from '@/assets/logo-meta-clean.png';
-import type { PortfolioItem, BusinessGroup } from './MetaBusinessContext';
+import type { PortfolioItem, BusinessGroup, PageOption } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +36,9 @@ interface BusinessInfo {
   profile_picture_uri?: string;
 }
 
-type WizardStep = 1 | 2 | 3;
+type WizardStep = 1 | 2 | 3 | 4;
+
+const TOTAL_STEPS = 4;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -59,7 +61,10 @@ export default function MetaConnectionWizard({
   const [allPortfolios, setAllPortfolios] = useState<PortfolioItem[]>([]);
   const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioItem | null>(null);
 
-  // Step 3: Confirming
+  // Step 3: Page selection
+  const [availablePages, setAvailablePages] = useState<PageOption[]>([]);
+
+  // Step 4: Confirming
   const [connecting, setConnecting] = useState(false);
 
   // ─── Step 1: Fetch Business Managers ──────────────────────────────────
@@ -84,7 +89,7 @@ export default function MetaConnectionWizard({
       }));
       setBusinesses(biz);
 
-      // Parse groups
+      // Parse groups (now with pages)
       const groups: BusinessGroup[] = (data.groups || []).map((g: any) => ({
         businessId: g.business_id,
         businessName: g.business_name,
@@ -101,6 +106,12 @@ export default function MetaConnectionWizard({
           igAccountId: p.ig_account_id,
           igAccountName: p.ig_account_name,
           pixelId: p.pixel_id,
+        })),
+        pages: (g.pages || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          igAccountId: p.ig_account_id,
+          igAccountName: p.ig_account_name,
         })),
       }));
       setBusinessGroups(groups);
@@ -126,7 +137,50 @@ export default function MetaConnectionWizard({
     fetchHierarchy();
   }, [fetchHierarchy]);
 
-  // ─── Step 3: Connect assets ──────────────────────────────────────────
+  // ─── Handle portfolio selection (Step 2 → 3 or 4) ─────────────────────
+
+  const handleSelectPortfolio = (portfolio: PortfolioItem) => {
+    setSelectedPortfolio(portfolio);
+
+    // Find available pages for this business
+    const group = businessGroups.find(
+      (g) => g.businessId === portfolio.businessId || selectedBusiness?.id === 'personal',
+    );
+    const pages = group?.pages || [];
+    setAvailablePages(pages);
+
+    if (pages.length <= 1) {
+      // 0 or 1 pages — skip page selection
+      if (pages.length === 1 && !portfolio.pageId) {
+        setSelectedPortfolio({
+          ...portfolio,
+          pageId: pages[0].id,
+          pageName: pages[0].name,
+          igAccountId: pages[0].igAccountId,
+          igAccountName: pages[0].igAccountName,
+        });
+      }
+      setStep(4);
+    } else {
+      setStep(3);
+    }
+  };
+
+  // ─── Handle page selection (Step 3 → 4) ────────────────────────────────
+
+  const handleSelectPage = (page: PageOption | null) => {
+    if (!selectedPortfolio) return;
+    setSelectedPortfolio({
+      ...selectedPortfolio,
+      pageId: page?.id || null,
+      pageName: page?.name || null,
+      igAccountId: page?.igAccountId || null,
+      igAccountName: page?.igAccountName || null,
+    });
+    setStep(4);
+  };
+
+  // ─── Step 4: Connect assets ────────────────────────────────────────────
 
   const handleConfirmConnect = async () => {
     if (!selectedPortfolio) return;
@@ -208,7 +262,7 @@ export default function MetaConnectionWizard({
       <CardContent className="py-6">
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          {[1, 2, 3].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center gap-2">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
@@ -221,9 +275,9 @@ export default function MetaConnectionWizard({
               >
                 {s < step ? <CheckCircle2 className="w-4 h-4" /> : s}
               </div>
-              {s < 3 && (
+              {s < TOTAL_STEPS && (
                 <div
-                  className={`w-12 h-0.5 ${s < step ? 'bg-primary' : 'bg-muted'}`}
+                  className={`w-8 h-0.5 ${s < step ? 'bg-primary' : 'bg-muted'}`}
                 />
               )}
             </div>
@@ -236,12 +290,14 @@ export default function MetaConnectionWizard({
             <p className="text-sm font-semibold">
               {step === 1 && 'Paso 1: Selecciona tu Business Manager'}
               {step === 2 && 'Paso 2: Selecciona tu negocio'}
-              {step === 3 && 'Paso 3: Confirma los activos a conectar'}
+              {step === 3 && 'Paso 3: Selecciona tu página de Facebook'}
+              {step === 4 && 'Paso 4: Confirma los activos a conectar'}
             </p>
             <p className="text-xs text-muted-foreground">
               {step === 1 && `${businesses.length} Business Manager${businesses.length !== 1 ? 's' : ''} encontrado${businesses.length !== 1 ? 's' : ''}`}
               {step === 2 && `${currentPortfolios.length} negocio${currentPortfolios.length !== 1 ? 's' : ''} en ${selectedBusiness?.name}`}
-              {step === 3 && `Revisa los activos de "${selectedPortfolio?.name}"`}
+              {step === 3 && `${availablePages.length} página${availablePages.length !== 1 ? 's' : ''} disponible${availablePages.length !== 1 ? 's' : ''}`}
+              {step === 4 && `Revisa los activos de "${selectedPortfolio?.name}"`}
             </p>
           </div>
         </div>
@@ -295,28 +351,13 @@ export default function MetaConnectionWizard({
               currentPortfolios.map((portfolio) => (
                 <button
                   key={portfolio.adAccountId}
-                  onClick={() => {
-                    setSelectedPortfolio(portfolio);
-                    setStep(3);
-                  }}
+                  onClick={() => handleSelectPortfolio(portfolio)}
                   className="w-full flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-left group"
                 >
                   <Megaphone className="w-6 h-6 text-muted-foreground group-hover:text-primary shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">{portfolio.name}</p>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      {portfolio.pageName && (
-                        <Badge variant="secondary" className="text-xs gap-1">
-                          <Facebook className="w-3 h-3" />
-                          {portfolio.pageName}
-                        </Badge>
-                      )}
-                      {portfolio.igAccountName && (
-                        <Badge variant="secondary" className="text-xs gap-1">
-                          <Instagram className="w-3 h-3" />
-                          @{portfolio.igAccountName}
-                        </Badge>
-                      )}
                       <Badge variant="outline" className="text-xs">
                         {portfolio.currency}
                       </Badge>
@@ -329,17 +370,80 @@ export default function MetaConnectionWizard({
           </div>
         )}
 
-        {/* ─── Step 3: Confirm Assets ────────────────────────────────── */}
-        {step === 3 && selectedPortfolio && (
+        {/* ─── Step 3: Select Facebook Page ───────────────────────────── */}
+        {step === 3 && (
+          <div className="space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setStep(2);
+                setSelectedPortfolio(null);
+              }}
+              className="mb-2"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Volver a negocios
+            </Button>
+
+            {availablePages.map((page) => (
+              <button
+                key={page.id}
+                onClick={() => handleSelectPage(page)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-left group"
+              >
+                <Facebook className="w-6 h-6 text-blue-600 group-hover:text-blue-700 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{page.name}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {page.igAccountName ? (
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <Instagram className="w-3 h-3" />
+                        @{page.igAccountName}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        Sin Instagram vinculado
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+              </button>
+            ))}
+
+            <button
+              onClick={() => handleSelectPage(null)}
+              className="w-full flex items-center gap-3 p-3 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-left group"
+            >
+              <Facebook className="w-6 h-6 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-muted-foreground">Sin página</p>
+                <p className="text-xs text-muted-foreground">Conectar solo la cuenta publicitaria</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+            </button>
+          </div>
+        )}
+
+        {/* ─── Step 4: Confirm Assets ────────────────────────────────── */}
+        {step === 4 && selectedPortfolio && (
           <div className="space-y-4">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                if (availablePages.length > 1) {
+                  setStep(3);
+                } else {
+                  setStep(2);
+                  setSelectedPortfolio(null);
+                }
+              }}
               className="mb-1"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Volver a negocios
+              {availablePages.length > 1 ? 'Cambiar página' : 'Volver a negocios'}
             </Button>
 
             <div className="bg-muted/30 rounded-lg p-4 space-y-3">
@@ -372,7 +476,7 @@ export default function MetaConnectionWizard({
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground">Página de Facebook</p>
                   <p className="text-sm font-medium">
-                    {selectedPortfolio.pageName || 'No detectada'}
+                    {selectedPortfolio.pageName || 'No seleccionada'}
                   </p>
                   {selectedPortfolio.pageId && (
                     <p className="text-xs text-muted-foreground font-mono">

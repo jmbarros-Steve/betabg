@@ -654,26 +654,18 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredAds.map(ad => (
               <Card key={ad.id} className="overflow-hidden">
-                {/* Ad snapshot preview — Meta provides iframe URLs */}
-                {ad.image_url ? (
-                  <div className="h-56 bg-muted relative">
-                    <iframe
-                      src={ad.image_url}
-                      title={`Ad ${ad.ad_library_id}`}
-                      className="w-full h-full border-0"
-                      sandbox="allow-scripts allow-same-origin allow-popups"
-                      loading="lazy"
-                    />
-                    <a
-                      href={ad.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
-                      title="Abrir en nueva pestaña"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
+                {/* Ad preview — link to Ad Library (snapshot URLs expire) */}
+                {ad.ad_library_id ? (
+                  <a
+                    href={`https://www.facebook.com/ads/library/?id=${ad.ad_library_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 transition-colors flex flex-col items-center justify-center text-muted-foreground hover:text-foreground group"
+                  >
+                    <ExternalLink className="h-6 w-6 mb-1 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium">Ver en Ad Library</span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">ID: {ad.ad_library_id}</span>
+                  </a>
                 ) : (
                   <div className="h-32 bg-muted/50 flex flex-col items-center justify-center text-muted-foreground">
                     <Megaphone className="h-6 w-6 mb-1" />

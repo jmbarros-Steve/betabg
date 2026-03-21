@@ -71,10 +71,18 @@ interface Portfolio {
   pixel_id: string | null;
 }
 
+interface PageSummary {
+  id: string;
+  name: string;
+  ig_account_id: string | null;
+  ig_account_name: string | null;
+}
+
 interface BusinessGroup {
   business_id: string;
   business_name: string;
   portfolios: Portfolio[];
+  pages: PageSummary[];
 }
 
 // ---------------------------------------------------------------------------
@@ -395,11 +403,18 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
         directPixels,
       );
 
+      const personalPages: PageSummary[] = directPages.map(p => ({
+        id: p.id,
+        name: p.name,
+        ig_account_id: p.instagram_business_account?.id || null,
+        ig_account_name: p.instagram_business_account?.username || p.instagram_business_account?.name || null,
+      }));
+
       const personalResult = {
         success: true,
         businesses: [],
         groups: personalPortfolios.length > 0
-          ? [{ business_id: 'personal', business_name: 'Cuenta Personal', portfolios: personalPortfolios }]
+          ? [{ business_id: 'personal', business_name: 'Cuenta Personal', portfolios: personalPortfolios, pages: personalPages }]
           : [],
         all_portfolios: personalPortfolios,
       };
@@ -451,11 +466,19 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
 
       const portfolios = buildPortfolios(biz.id, biz.name, adAccounts, allPages, pixels);
 
+      const groupPages: PageSummary[] = allPages.map(p => ({
+        id: p.id,
+        name: p.name,
+        ig_account_id: p.instagram_business_account?.id || null,
+        ig_account_name: p.instagram_business_account?.username || p.instagram_business_account?.name || null,
+      }));
+
       if (portfolios.length > 0) {
         groups.push({
           business_id: biz.id,
           business_name: biz.name,
           portfolios,
+          pages: groupPages,
         });
         allPortfolios.push(...portfolios);
       }

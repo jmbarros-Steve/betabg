@@ -109,13 +109,17 @@ async function handleListConversations(
   });
   if (!pageTokenResult.ok) return { body: { success: false, error: pageTokenResult.error }, status: 502 };
 
-  const pageToken = pageTokenResult.data?.access_token || token;
+  const pageToken = pageTokenResult.data?.access_token;
+  if (!pageToken) {
+    console.error(`[social-inbox] No page access_token returned for page ${page_id}. User token may lack page permissions.`);
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta o verifica permisos.' }, status: 502 };
+  }
   const igAccountId = pageTokenResult.data?.instagram_business_account?.id;
 
   // Fetch Messenger conversations
   const messengerParams: Record<string, string> = {
     fields: 'id,participants{name,id,email},updated_time,message_count,unread_count,snippet',
-    limit: '25',
+    limit: '50',
   };
   if (after) messengerParams.after = after;
 
@@ -146,7 +150,7 @@ async function handleListConversations(
     const igParams: Record<string, string> = {
       platform: 'instagram',
       fields: 'id,participants{username,id},updated_time',
-      limit: '5',
+      limit: '15',
     };
 
     const igResult = await metaGet(`${page_id}/conversations`, pageToken, igParams);
@@ -195,7 +199,11 @@ async function handleGetMessages(token: string, body: RequestBody): Promise<{ bo
 
   // Get page access token + IG account ID
   const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token,instagram_business_account{id}' });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  if (!pageTokenResult.ok || !pageTokenResult.data?.access_token) {
+    console.error(`[social-inbox] No page token for ${page_id}:`, pageTokenResult.error || 'access_token missing');
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta.' }, status: 502 };
+  }
+  const pageToken = pageTokenResult.data.access_token;
   const igAccountId = pageTokenResult.data?.instagram_business_account?.id;
 
   const params: Record<string, string> = {
@@ -240,7 +248,11 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
   const pageTokenResult = await metaGet(page_id, token, {
     fields: 'access_token,instagram_business_account{id}',
   });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  if (!pageTokenResult.ok || !pageTokenResult.data?.access_token) {
+    console.error(`[social-inbox] No page token for ${page_id}:`, pageTokenResult.error || 'access_token missing');
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta.' }, status: 502 };
+  }
+  const pageToken = pageTokenResult.data.access_token;
   const igAccountId = pageTokenResult.data?.instagram_business_account?.id;
 
   // Get recent FB posts with their comments
@@ -321,7 +333,11 @@ async function handleListAdComments(token: string, body: RequestBody): Promise<{
 
   // Get page access token
   const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  if (!pageTokenResult.ok || !pageTokenResult.data?.access_token) {
+    console.error(`[social-inbox] No page token for ${page_id}:`, pageTokenResult.error || 'access_token missing');
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta.' }, status: 502 };
+  }
+  const pageToken = pageTokenResult.data.access_token;
 
   // If specific ad_id provided, get comments for that ad
   if (ad_id) {
@@ -389,7 +405,11 @@ async function handleGetCommentReplies(token: string, body: RequestBody): Promis
 
   // Get page access token
   const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  if (!pageTokenResult.ok || !pageTokenResult.data?.access_token) {
+    console.error(`[social-inbox] No page token for ${page_id}:`, pageTokenResult.error || 'access_token missing');
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta.' }, status: 502 };
+  }
+  const pageToken = pageTokenResult.data.access_token;
 
   let replies: any[] = [];
 
@@ -447,7 +467,10 @@ async function handleReplyMessage(token: string, body: RequestBody): Promise<{ b
     return { body: { success: false, error: `No se pudo obtener el token de la página: ${pageTokenResult.error}` }, status: 502 };
   }
 
-  const pageToken = pageTokenResult.data?.access_token || token;
+  const pageToken = pageTokenResult.data?.access_token;
+  if (!pageToken) {
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta o verifica que la página esté correcta.' }, status: 502 };
+  }
   const igAccountId: string | null = pageTokenResult.data?.instagram_business_account?.id || null;
 
   // Get the conversation participants to find the recipient
@@ -535,7 +558,11 @@ async function handleReplyComment(token: string, body: RequestBody): Promise<{ b
 
   // Get page access token
   const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  if (!pageTokenResult.ok || !pageTokenResult.data?.access_token) {
+    console.error(`[social-inbox] No page token for ${page_id}:`, pageTokenResult.error || 'access_token missing');
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta.' }, status: 502 };
+  }
+  const pageToken = pageTokenResult.data.access_token;
 
   let result;
   if (platform === 'instagram') {
@@ -560,7 +587,11 @@ async function handleMarkRead(token: string, body: RequestBody): Promise<{ body:
 
   // Get page access token
   const pageTokenResult = await metaGet(page_id, token, { fields: 'access_token' });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
+  if (!pageTokenResult.ok || !pageTokenResult.data?.access_token) {
+    console.error(`[social-inbox] No page token for ${page_id}:`, pageTokenResult.error || 'access_token missing');
+    return { body: { success: false, error: 'No se obtuvo token de la página. Reconecta Meta.' }, status: 502 };
+  }
+  const pageToken = pageTokenResult.data.access_token;
 
   // Meta API: POST /{conversation_id}?is_read=true marks a conversation as read
   const url = new URL(`${META_API}/${conversation_id}`);

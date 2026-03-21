@@ -38,10 +38,18 @@ export interface PortfolioItem {
   pixelId: string | null;
 }
 
+export interface PageOption {
+  id: string;
+  name: string;
+  igAccountId: string | null;
+  igAccountName: string | null;
+}
+
 export interface BusinessGroup {
   businessId: string;
   businessName: string;
   portfolios: PortfolioItem[];
+  pages?: PageOption[];
 }
 
 // ---------------------------------------------------------------------------
