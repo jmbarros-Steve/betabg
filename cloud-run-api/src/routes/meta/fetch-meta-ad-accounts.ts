@@ -140,9 +140,9 @@ export async function fetchMetaAdAccounts(c: Context) {
       return c.json({ error: 'Failed to decrypt token' }, 500);
     }
 
-    // Circuit breaker check — don't call Meta if circuit is open
+    // Circuit breaker — log but don't block (let Meta handle its own rate limits)
     if (!canRequest('meta-graph-api')) {
-      return c.json({ error: 'Meta API temporarily unavailable (rate limited). Try again in 1 minute.' }, 503);
+      console.warn('[ad-accounts] Circuit breaker open, but proceeding anyway');
     }
 
     // First, check token permissions

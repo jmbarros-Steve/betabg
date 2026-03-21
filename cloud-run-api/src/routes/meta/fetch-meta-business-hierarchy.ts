@@ -359,9 +359,9 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       return c.json({ error: 'Failed to decrypt token' }, 500);
     }
 
-    // Circuit breaker check — don't call Meta if circuit is open
+    // Circuit breaker — log but don't block
     if (!canRequest(CIRCUIT_SERVICE)) {
-      return c.json({ error: 'Meta API temporarily unavailable (rate limited). Try again in 1 minute.' }, 503);
+      console.warn('[hierarchy] Circuit breaker open, but proceeding anyway');
     }
 
     console.log('Fetching business hierarchy...');
