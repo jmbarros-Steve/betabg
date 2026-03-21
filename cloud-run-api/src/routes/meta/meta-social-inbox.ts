@@ -350,12 +350,19 @@ async function handleReplyMessage(token: string, body: RequestBody): Promise<{ b
   const pageTokenResult = await metaGet(page_id, token, {
     fields: 'access_token,instagram_business_account{id}',
   });
-  const pageToken = pageTokenResult.ok ? pageTokenResult.data?.access_token || token : token;
-  const igAccountId = pageTokenResult.data?.instagram_business_account?.id;
+
+  if (!pageTokenResult.ok) {
+    console.error(`[social-inbox] Failed to get page token for ${page_id}:`, pageTokenResult.error);
+    return { body: { success: false, error: `No se pudo obtener el token de la página: ${pageTokenResult.error}` }, status: 502 };
+  }
+
+  const pageToken = pageTokenResult.data?.access_token || token;
+  const igAccountId: string | null = pageTokenResult.data?.instagram_business_account?.id || null;
 
   // Get the conversation participants to find the recipient
+  // Also request platform field to reliably detect Instagram vs Messenger
   const convResult = await metaGet(conversation_id, pageToken, {
-    fields: 'participants{id,name,username}',
+    fields: 'participants{id,name,username},id',
   });
 
   if (!convResult.ok) {
@@ -370,20 +377,34 @@ async function handleReplyMessage(token: string, body: RequestBody): Promise<{ b
   );
 
   if (!recipient?.id) {
-    return { body: { success: false, error: 'Could not find recipient in conversation' }, status: 400 };
+    return { body: { success: false, error: 'No se encontró el destinatario en la conversación' }, status: 400 };
   }
 
-  // Determine if this is an Instagram or Messenger conversation
-  const isInstagram = recipient.username || (igAccountId && participants.some((p: any) => p.id === igAccountId));
+  // Determine if this is an Instagram conversation:
+  // - If IG account exists AND a participant matches the IG account ID → Instagram
+  // - If recipient has a username field (Messenger users don't have username in participants) → Instagram
+  const igParticipant = igAccountId && participants.some((p: any) => p.id === igAccountId);
+  const isInstagram = igParticipant || (igAccountId && !!recipient.username);
+
+  console.log(`[social-inbox] Reply: isInstagram=${isInstagram}, igAccountId=${igAccountId}, recipientId=${recipient.id}, hasUsername=${!!recipient.username}`);
 
   let result;
 
   if (isInstagram && igAccountId) {
-    // Instagram: POST /{ig-user-id}/messages
+    // Instagram: POST /{ig-user-id}/messages using page token
     result = await metaPost(`${igAccountId}/messages`, pageToken, {
       recipient: { id: recipient.id },
       message: { text: message },
     });
+
+    // If Instagram endpoint fails, try Messenger as fallback
+    if (!result.ok) {
+      console.warn(`[social-inbox] Instagram reply failed, trying Messenger fallback: ${result.error}`);
+      result = await metaPost(`${page_id}/messages`, pageToken, {
+        recipient: { id: recipient.id },
+        message: { text: message },
+      });
+    }
   } else {
     // Messenger: POST /{page_id}/messages
     result = await metaPost(`${page_id}/messages`, pageToken, {

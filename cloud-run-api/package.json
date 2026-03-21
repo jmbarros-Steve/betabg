@@ -7,7 +7,10 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@google-cloud/tasks": "^6.2.1",
@@ -22,7 +25,10 @@
   "devDependencies": {
     "@types/node": "^20.17.0",
     "@types/nunjucks": "^3.2.6",
+    "@vitest/coverage-v8": "^4.1.0",
+    "msw": "^2.12.13",
     "tsx": "^4.19.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }

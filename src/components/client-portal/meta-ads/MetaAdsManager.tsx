@@ -778,10 +778,27 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
 
     setPortfolioSwitching(true);
     try {
-      // Note: DB update is already done by MetaConnectionWizard.handleConfirmConnect.
-      // We only update local state and sync metrics here.
+      // 1. Persist portfolio selection to DB (page_id, ig_account_id, pixel_id, etc.)
+      // Without this, a page refresh would lose the selection.
+      const { error: dbError } = await supabase
+        .from('platform_connections')
+        .update({
+          account_id: portfolio.adAccountId,
+          store_name: portfolio.name,
+          business_id: portfolio.businessId,
+          portfolio_name: portfolio.name,
+          page_id: portfolio.pageId,
+          ig_account_id: portfolio.igAccountId,
+          pixel_id: portfolio.pixelId,
+        })
+        .eq('id', metaConnection.id);
 
-      // 1. Update local state so UI shows new portfolio immediately
+      if (dbError) {
+        console.error('[MetaAdsManager] Failed to persist portfolio switch:', dbError);
+        // Continue anyway — local state will work for this session
+      }
+
+      // 2. Update local state so UI shows new portfolio immediately
       setMetaConnection(prev =>
         prev ? {
           ...prev,

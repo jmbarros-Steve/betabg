@@ -160,10 +160,35 @@ function buildPortfolios(
 
   if (activeAccounts.length === 0) return [];
 
-  // Build a lookup of pages by normalized name for matching
+  // SIMPLE CASE: If there's only 1 page, assign it to ALL ad accounts.
+  // Most small businesses (e.g. Jardín de Eva) have 1 page + 1 ad account.
+  // Name matching is unreliable because ad account names can be IDs or random strings.
+  if (pages.length === 1) {
+    const thePage = pages[0];
+    console.log(`[hierarchy] Only 1 page found ("${thePage.name}") — assigning to all ${activeAccounts.length} ad accounts`);
+
+    let bestPixel: PixelInfo | undefined = pixels[0];
+
+    return activeAccounts.map(acc => ({
+      name: acc.name,
+      business_id: businessId,
+      business_name: businessName,
+      ad_account_id: acc.account_id,
+      ad_account_name: acc.name,
+      currency: acc.currency,
+      timezone: acc.timezone_name,
+      page_id: thePage.id,
+      page_name: thePage.name,
+      ig_account_id: thePage.instagram_business_account?.id || null,
+      ig_account_name: thePage.instagram_business_account?.username || thePage.instagram_business_account?.name || null,
+      pixel_id: bestPixel?.id || null,
+    })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // MULTI-PAGE: Try name matching, then fallback for unmatched accounts
   const pagesUsed = new Set<string>();
 
-  return activeAccounts.map(acc => {
+  const portfolios = activeAccounts.map(acc => {
     // Try to find a matching page by name similarity
     const accNameLower = acc.name.toLowerCase().replace(/[^a-z0-9]/g, '');
     let bestPage: PageInfo | null = null;
@@ -228,7 +253,27 @@ function buildPortfolios(
       ig_account_name: bestPage?.instagram_business_account?.username || bestPage?.instagram_business_account?.name || null,
       pixel_id: bestPixel?.id || null,
     };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  // FALLBACK: Assign remaining pages to accounts that have no page
+  // This catches cases where name matching completely failed
+  const unusedPages = pages.filter(p => !pagesUsed.has(p.id));
+  if (unusedPages.length > 0) {
+    const accountsWithoutPage = portfolios.filter(p => !p.page_id);
+    if (accountsWithoutPage.length > 0) {
+      console.log(`[hierarchy] ${accountsWithoutPage.length} accounts without page, ${unusedPages.length} unused pages — assigning fallback`);
+      for (let i = 0; i < accountsWithoutPage.length && i < unusedPages.length; i++) {
+        const page = unusedPages[i];
+        accountsWithoutPage[i].page_id = page.id;
+        accountsWithoutPage[i].page_name = page.name;
+        accountsWithoutPage[i].ig_account_id = page.instagram_business_account?.id || null;
+        accountsWithoutPage[i].ig_account_name = page.instagram_business_account?.username || page.instagram_business_account?.name || null;
+        console.log(`[hierarchy] Fallback: "${accountsWithoutPage[i].ad_account_name}" → page "${page.name}"`);
+      }
+    }
+  }
+
+  return portfolios.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ---------------------------------------------------------------------------

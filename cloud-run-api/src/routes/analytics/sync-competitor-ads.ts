@@ -217,20 +217,31 @@ export async function syncCompetitorAds(c: Context) {
         let resolvedPageId = tracking.meta_page_id || null;
         let resolvedPageName = '';
 
+        // Track whether a fatal token/permission error occurred (skip remaining strategies)
+        let fatalTokenError = false;
+
         // Strategy 1: Use cached page_id if available
         if (resolvedPageId) {
           console.log(`[sync-competitor-ads] ${handle}: Using cached page_id ${resolvedPageId}`);
           const result = await fetchAdLibrary({ search_page_ids: resolvedPageId });
           if (result.error) {
-            results.push({ handle, ads_found: 0, status: result.error });
-            continue;
+            // Token/permission errors are fatal — no point trying other strategies
+            if (result.error.startsWith('token_expired') || result.error.startsWith('permission_denied')) {
+              results.push({ handle, ads_found: 0, status: result.error });
+              fatalTokenError = true;
+            } else {
+              // Non-fatal (e.g. page_id invalid) — try other strategies
+              console.warn(`[sync-competitor-ads] ${handle}: Strategy 1 failed (non-fatal): ${result.error}`);
+              resolvedPageId = null; // Clear bad cached page_id
+            }
+          } else {
+            ads = result.ads;
+            searchMethod = 'cached_page_id';
           }
-          ads = result.ads;
-          searchMethod = 'cached_page_id';
         }
 
         // Strategy 2: Try to resolve handle -> page_id via Pages Search API
-        if (ads.length === 0 && !resolvedPageId) {
+        if (!fatalTokenError && ads.length === 0 && !resolvedPageId) {
           // Generate search variations from handle
           const variations = [
             handle,
@@ -249,7 +260,12 @@ export async function syncCompetitorAds(c: Context) {
               console.log(`[sync-competitor-ads] ${handle}: Resolved to page "${page.pageName}" (${page.pageId}) via "${variation}"`);
               const result = await fetchAdLibrary({ search_page_ids: page.pageId });
               if (result.error) {
-                results.push({ handle, ads_found: 0, status: result.error });
+                if (result.error.startsWith('token_expired') || result.error.startsWith('permission_denied')) {
+                  results.push({ handle, ads_found: 0, status: result.error });
+                  fatalTokenError = true;
+                } else {
+                  console.warn(`[sync-competitor-ads] ${handle}: Strategy 2 failed for "${variation}" (non-fatal): ${result.error}`);
+                }
                 break;
               }
               ads = result.ads;
@@ -261,7 +277,7 @@ export async function syncCompetitorAds(c: Context) {
 
         // Strategy 3: Fallback — use search_terms to DISCOVER the page_id, then
         // re-query with search_page_ids to get only THEIR ads (not ads that mention them)
-        if (ads.length === 0 && !results.find(r => r.handle === handle)) {
+        if (!fatalTokenError && ads.length === 0) {
           const searchVariations = [
             handle,
             handle.replace(/_/g, ' '),

@@ -311,16 +311,17 @@ async function handleCreate(
     );
 
     if (!adsetResult.ok) {
-      console.error(`[manage-meta-campaign] Ad set creation failed: ${adsetResult.error}`);
+      console.error('[meta-campaign] Ad set creation failed:', adsetResult.error);
       return {
         body: {
-          success: true,
+          success: false,
           partial: true,
+          error: 'Falló la creación del Ad Set',
+          details: adsetResult.error,
           campaign_id: campaignId,
           adset_error: adsetResult.error,
-          message: 'Campaign created but ad set creation failed',
         },
-        status: 207
+        status: 502
       };
     }
 
@@ -370,6 +371,21 @@ async function handleCreate(
   let creativeId: string | null = null;
 
   // ---- DPA / Catalog: template creative with dynamic product fields ----
+  if (adSetId && product_catalog_id && product_set_id && !pageId) {
+    console.error('[meta-campaign] DPA requires pageId but it is null');
+    return {
+      body: {
+        success: false,
+        partial: true,
+        error: 'DPA requiere una Página de Facebook. Selecciona un portfolio con página asociada.',
+        details: 'pageId is null — DPA creative creation requires a Facebook Page',
+        campaign_id: campaignId,
+        adset_id: adSetId,
+        creative_error: 'Missing page_id for DPA',
+      },
+      status: 502,
+    };
+  }
   if (adSetId && product_catalog_id && product_set_id && pageId) {
     console.log(`[manage-meta-campaign] Creating DPA template creative for catalog=${product_catalog_id}`);
 
@@ -396,17 +412,18 @@ async function handleCreate(
     const dpaResult = await createCreativeWithRetry(dpaCreativePayload);
 
     if (!dpaResult.ok) {
-      console.error(`[manage-meta-campaign] DPA creative creation failed: ${dpaResult.error}`);
+      console.error('[meta-campaign] DPA creative creation failed:', dpaResult.error);
       return {
         body: {
-          success: true,
+          success: false,
           partial: true,
+          error: 'Falló la creación del creativo DPA',
+          details: dpaResult.error,
           campaign_id: campaignId,
           adset_id: adSetId,
           creative_error: dpaResult.error,
-          message: 'Campaign + ad set created but DPA creative failed',
         },
-        status: 207,
+        status: 502,
       };
     }
 
@@ -423,17 +440,19 @@ async function handleCreate(
     const adResult = await metaApiRequest(`act_${accountId}/ads`, accessToken, 'POST', adPayload);
 
     if (!adResult.ok) {
+      console.error('[meta-campaign] DPA ad creation failed:', adResult.error);
       return {
         body: {
-          success: true,
+          success: false,
           partial: true,
+          error: 'Falló la creación del anuncio DPA',
+          details: adResult.error,
           campaign_id: campaignId,
           adset_id: adSetId,
           creative_id: creativeId,
           ad_error: adResult.error,
-          message: 'Campaign + ad set + DPA creative created but ad creation failed',
         },
-        status: 207,
+        status: 502,
       };
     }
 
@@ -466,6 +485,23 @@ async function handleCreate(
 
   console.log(`[manage-meta-campaign] Creative check: adSetId=${adSetId}, hasCreativeData=${hasCreativeData}, pageId=${pageId}, images=${allImages.length}, texts=${allTexts.length}`);
 
+  // FAIL LOUDLY if we have creative data but no pageId — don't silently create empty campaigns
+  if (adSetId && hasCreativeData && !pageId) {
+    console.error('[meta-campaign] Cannot create creative: pageId is null. Campaign will have no ads.');
+    return {
+      body: {
+        success: false,
+        partial: true,
+        error: 'No se pudo resolver la Página de Facebook. Selecciona un portfolio con página asociada.',
+        details: 'pageId is null — creative and ad creation requires a Facebook Page',
+        campaign_id: campaignId,
+        adset_id: adSetId,
+        creative_error: 'Missing page_id',
+      },
+      status: 502,
+    };
+  }
+
   if (adSetId && hasCreativeData && pageId) {
 
     // ---- FLEXIBLE: Dynamic Creative with asset_feed_spec ----
@@ -491,15 +527,18 @@ async function handleCreate(
       }
 
       if (uniqueHashes.length === 0) {
+        console.error('[meta-campaign] All image uploads failed for Dynamic Creative');
         return {
           body: {
-            success: true,
+            success: false,
             partial: true,
+            error: 'Falló la subida de todas las imágenes',
+            details: 'All image uploads failed — cannot create Dynamic Creative without images',
             campaign_id: campaignId,
             adset_id: adSetId,
             creative_error: 'All image uploads failed — cannot create Dynamic Creative without images',
           },
-          status: 207,
+          status: 502,
         };
       }
 
@@ -537,17 +576,18 @@ async function handleCreate(
       const creativeResult = await createCreativeWithRetry(creativePayload);
 
       if (!creativeResult.ok) {
-        console.error(`[manage-meta-campaign] Dynamic Creative creation failed: ${creativeResult.error}`);
+        console.error('[meta-campaign] Dynamic Creative creation failed:', creativeResult.error);
         return {
           body: {
-            success: true,
+            success: false,
             partial: true,
+            error: 'Falló la creación del Dynamic Creative',
+            details: creativeResult.error,
             campaign_id: campaignId,
             adset_id: adSetId,
             creative_error: creativeResult.error,
-            message: 'Campaign + ad set created but Dynamic Creative failed',
           },
-          status: 207,
+          status: 502,
         };
       }
 
@@ -571,15 +611,18 @@ async function handleCreate(
       }
 
       if (imageHashes.length < 2) {
+        console.error('[meta-campaign] Carousel requires at least 2 images — not enough uploads succeeded');
         return {
           body: {
-            success: true,
+            success: false,
             partial: true,
+            error: 'Carousel necesita al menos 2 imágenes',
+            details: 'Carousel requires at least 2 images — not enough uploads succeeded',
             campaign_id: campaignId,
             adset_id: adSetId,
             creative_error: 'Carousel requires at least 2 images — not enough uploads succeeded',
           },
-          status: 207,
+          status: 502,
         };
       }
 
@@ -609,17 +652,18 @@ async function handleCreate(
       const creativeResult = await createCreativeWithRetry(creativePayload);
 
       if (!creativeResult.ok) {
-        console.error(`[manage-meta-campaign] Carousel creative creation failed: ${creativeResult.error}`);
+        console.error('[meta-campaign] Carousel creative creation failed:', creativeResult.error);
         return {
           body: {
-            success: true,
+            success: false,
             partial: true,
+            error: 'Falló la creación del creativo Carousel',
+            details: creativeResult.error,
             campaign_id: campaignId,
             adset_id: adSetId,
             creative_error: creativeResult.error,
-            message: 'Campaign + ad set created but Carousel creative failed',
           },
-          status: 207,
+          status: 502,
         };
       }
 
@@ -633,16 +677,18 @@ async function handleCreate(
         // Upload image to get image_hash (Meta no longer accepts image_url in link_data)
         const upload = await uploadImageFromUrl(accountId, accessToken, singleImage);
         if (!upload.ok || !upload.hash) {
-          console.error(`[manage-meta-campaign] Single image upload failed: ${upload.error}`);
+          console.error('[meta-campaign] Single image upload failed:', upload.error);
           return {
             body: {
-              success: true,
+              success: false,
               partial: true,
+              error: 'Falló la subida de imagen',
+              details: upload.error,
               campaign_id: campaignId,
               adset_id: adSetId,
               creative_error: `Image upload failed: ${upload.error}`,
             },
-            status: 207,
+            status: 502,
           };
         }
 
@@ -674,17 +720,18 @@ async function handleCreate(
         const creativeResult = await createCreativeWithRetry(creativePayload);
 
         if (!creativeResult.ok) {
-          console.error(`[manage-meta-campaign] Ad creative creation failed: ${creativeResult.error}`);
+          console.error('[meta-campaign] Ad creative creation failed:', creativeResult.error);
           return {
             body: {
-              success: true,
+              success: false,
               partial: true,
+              error: 'Falló la creación del creativo',
+              details: creativeResult.error,
               campaign_id: campaignId,
               adset_id: adSetId,
               creative_error: creativeResult.error,
-              message: 'Campaign + ad set created but ad creative failed',
             },
-            status: 207,
+            status: 502,
           };
         }
 
@@ -710,18 +757,19 @@ async function handleCreate(
       );
 
       if (!adResult.ok) {
-        console.error(`[manage-meta-campaign] Ad creation failed: ${adResult.error}`);
+        console.error('[meta-campaign] Ad creation failed:', adResult.error);
         return {
           body: {
-            success: true,
+            success: false,
             partial: true,
+            error: 'Falló la creación del anuncio',
+            details: adResult.error,
             campaign_id: campaignId,
             adset_id: adSetId,
             creative_id: creativeId,
             ad_error: adResult.error,
-            message: 'Campaign + ad set + creative created but ad creation failed',
           },
-          status: 207,
+          status: 502,
         };
       }
 
