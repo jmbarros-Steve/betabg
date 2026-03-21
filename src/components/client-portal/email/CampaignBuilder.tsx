@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import UnlayerEditorWrapper, { type UnlayerEditorRef } from './UnlayerEditorWrapper';
+import GrapesEmailEditor, { type UnlayerEditorRef } from './GrapesEmailEditor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,7 +70,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign> | null>(null);
   const [editorStep, setEditorStep] = useState<'setup' | 'design' | 'audience' | 'review'>('setup');
 
-  // Unlayer editor
+  // Email editor
   const emailEditorRef = useRef<UnlayerEditorRef>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [designJson, setDesignJson] = useState<any>(null);
@@ -122,7 +122,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   // Concurrency: optimistic locking
   const lastKnownUpdatedAt = useRef<string | null>(null);
 
-  // Dirty tracking is handled via onChange callback on UnlayerEditorWrapper
+  // Dirty tracking is handled via onChange callback on GrapesEmailEditor
 
   useEffect(() => {
     if (!showEditor || !isDirty) return;
@@ -975,15 +975,16 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
-            {/* Unlayer editor */}
+            {/* GrapeJS email editor */}
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
-                <UnlayerEditorWrapper
+                <GrapesEmailEditor
                   ref={emailEditorRef}
                   onReady={() => setEditorReady(true)}
                   onChange={() => setIsDirty(true)}
                   initialDesign={designJson}
                   clientId={clientId}
+                  brandColor={brandInfo?.brand_color}
                 />
               </div>
             </div>
