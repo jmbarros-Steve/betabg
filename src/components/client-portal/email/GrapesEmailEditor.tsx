@@ -4,7 +4,7 @@ import '@grapesjs/studio-sdk/style';
 import type { Editor } from 'grapesjs';
 import type { CreateEditorOptions } from '@grapesjs/studio-sdk';
 import { getSteveTheme } from './grapes-theme';
-import { steveBlocks } from './grapes-steve-blocks';
+import { steveBlocks, registerSteveBlocks } from './grapes-steve-blocks';
 import { callApi } from '@/lib/api';
 
 export interface UnlayerEditorRef {
@@ -101,13 +101,16 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
 
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
+
+      // Register Steve blocks after editor is fully ready
+      registerSteveBlocks(editor);
+
       setReady(true);
 
       // Load initial design if provided
       if (initialDesign && !initialDesignLoaded.current) {
         initialDesignLoaded.current = true;
         if (initialDesign?.body?.rows) {
-          // Unlayer format — ignore
           console.warn('[GrapesEditor] Unlayer design detected on ready — not loading');
         } else {
           editor.loadProjectData(initialDesign);

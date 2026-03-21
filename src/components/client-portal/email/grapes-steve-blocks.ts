@@ -1,4 +1,4 @@
-import type { BlockProperties } from 'grapesjs';
+import type { BlockProperties, Editor } from 'grapesjs';
 
 const icons = {
   product: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
@@ -121,3 +121,21 @@ Productos dinamicos - se cargan al enviar (best_sellers x4)
     content: '<mj-text color="{{ brand_color }}">Texto con color de marca</mj-text>',
   },
 ];
+
+/**
+ * Register Steve blocks programmatically after editor is ready.
+ * This ensures blocks are added after the editor is fully initialized.
+ */
+export function registerSteveBlocks(editor: Editor) {
+  const bm = editor.Blocks;
+  for (const block of steveBlocks) {
+    if (!block.id) continue;
+    // Skip if already registered via blocks.default
+    if (bm.get(block.id)) continue;
+    bm.add(block.id, {
+      ...block,
+      activate: true,
+      select: true,
+    });
+  }
+}
