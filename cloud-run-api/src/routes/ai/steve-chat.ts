@@ -1174,11 +1174,13 @@ NO eres un cuestionario. NO hagas preguntas estructuradas. Simplemente conversa 
 
 ${persona?.is_complete ? '' : '⚠️ NOTA: El brief del cliente aún NO está completo. Puedes responder sus preguntas pero recuérdale que para un análisis más profundo debería completar el brief en la pestaña "Steve".'}
 
+=== MÉTRICAS REALES (PRIORIDAD MÁXIMA — usa estos datos en TODA respuesta) ===
+${metricsContext}
+
 BRIEF DEL CLIENTE:
 ${briefSummary}
 
 ${researchContext ? `INVESTIGACIÓN DE MARCA:\n${researchContext}\n` : ''}
-${metricsContext}
 ${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
 ${creativeHistoryCtx}
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
@@ -1188,14 +1190,13 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
 
     const aiMessages = truncateMessages(sanitizeMessagesForAnthropic(recentMessages, message));
 
-    // Truncate system prompt if too large (avoid Anthropic context overflow)
-    const maxSystemLen = 12000;
+    // Truncate system prompt if too large (Sonnet 4.6 handles 200k tokens ~800k chars)
+    const maxSystemLen = 80000;
     let truncatedSystem = estrategiaSystemPrompt.length > maxSystemLen
       ? estrategiaSystemPrompt.slice(0, maxSystemLen) + '\n\n[...contexto truncado por límite de tamaño]'
       : estrategiaSystemPrompt;
 
     timelog('estrategia-pre-anthropic');
-    if (truncatedSystem.length > 12000) truncatedSystem = truncatedSystem.substring(0, 12000);
     const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
