@@ -32,7 +32,7 @@ export async function fetchInstagramInsights(c: Context) {
   // Get Meta connection (Instagram uses Meta token)
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('access_token_encrypted, meta_data')
+    .select('id, access_token_encrypted, ig_account_id')
     .eq('client_id', client_id)
     .eq('platform', 'meta')
     .maybeSingle();
@@ -46,12 +46,11 @@ export async function fetchInstagramInsights(c: Context) {
   });
   if (!token) return c.json({ error: 'Error descifrando token' }, 500);
 
-  // Find Instagram Business Account ID
-  const igUserId = conn.meta_data?.instagram_business_account_id;
-  let resolvedIgId = igUserId;
+  // Find Instagram Business Account ID — try DB first, then API discovery
+  let resolvedIgId = conn.ig_account_id;
 
   if (!resolvedIgId) {
-    // Try to discover it from connected pages
+    // Fallback: discover from connected pages
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', token, {
       params: { fields: 'id,instagram_business_account', limit: '10' },
     });
@@ -59,6 +58,11 @@ export async function fetchInstagramInsights(c: Context) {
       for (const page of pagesRes.data.data) {
         if (page.instagram_business_account?.id) {
           resolvedIgId = page.instagram_business_account.id;
+          // Persist for future use
+          await supabase
+            .from('platform_connections')
+            .update({ ig_account_id: resolvedIgId })
+            .eq('id', conn.id);
           break;
         }
       }

@@ -71,15 +71,19 @@ export function IGMetricsDashboard({ clientId }: { clientId: string }) {
     setError(null);
     try {
       const [overviewRes, postsRes] = await Promise.all([
-        callApi('fetch-instagram-insights', {
-          client_id: clientId,
-          action: 'overview',
-          date_from: dateFrom,
-          date_to: dateTo,
+        callApi<{ profile: IGProfile; metrics: IGMetrics; follower_trend: FollowerPoint[] }>('fetch-instagram-insights', {
+          body: {
+            client_id: clientId,
+            action: 'overview',
+            date_from: dateFrom,
+            date_to: dateTo,
+          },
         }),
-        callApi('fetch-instagram-insights', {
-          client_id: clientId,
-          action: 'top_posts',
+        callApi<{ top_posts: TopPost[] }>('fetch-instagram-insights', {
+          body: {
+            client_id: clientId,
+            action: 'top_posts',
+          },
         }),
       ]);
 
@@ -87,10 +91,10 @@ export function IGMetricsDashboard({ clientId }: { clientId: string }) {
         setError(overviewRes.error);
         return;
       }
-      setProfile(overviewRes.profile);
-      setMetrics(overviewRes.metrics);
-      setFollowerTrend(overviewRes.follower_trend || []);
-      setTopPosts(postsRes.top_posts || []);
+      setProfile(overviewRes.data?.profile ?? null);
+      setMetrics(overviewRes.data?.metrics ?? null);
+      setFollowerTrend(overviewRes.data?.follower_trend || []);
+      setTopPosts(postsRes.data?.top_posts || []);
     } catch (err: any) {
       setError(err.message || 'Error cargando datos');
     } finally {

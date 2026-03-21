@@ -19,18 +19,17 @@
 
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-
-const GRAPH_API = 'https://graph.facebook.com/v21.0';
+import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 async function getMetaToken(supabase: any, clientId: string): Promise<{ token: string; igUserId: string } | null> {
-  // Get meta connection
+  // Get meta connection — read ig_account_id which is now persisted by hierarchy/portfolio
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('id, access_token_encrypted, metadata')
+    .select('id, access_token_encrypted, ig_account_id')
     .eq('client_id', clientId)
     .eq('platform', 'meta')
     .eq('is_active', true)
@@ -44,21 +43,22 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
 
   if (!token) return null;
 
-  // Get IG user ID from metadata or fetch it
-  let igUserId = (conn.metadata as any)?.ig_user_id;
+  // 1. Try ig_account_id from DB (populated by hierarchy + portfolio selection)
+  let igUserId = conn.ig_account_id;
 
+  // 2. Fallback: discover from API
   if (!igUserId) {
-    // Fetch from API: get pages, then IG business account
-    const pagesResp = await fetch(`${GRAPH_API}/me/accounts?access_token=${token}&fields=id,instagram_business_account`);
-    if (pagesResp.ok) {
-      const pages: any = await pagesResp.json();
-      for (const page of pages.data || []) {
+    const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', token, {
+      params: { fields: 'id,instagram_business_account', limit: '10' },
+    });
+    if (pagesRes.ok && pagesRes.data?.data) {
+      for (const page of pagesRes.data.data) {
         if (page.instagram_business_account?.id) {
           igUserId = page.instagram_business_account.id;
-          // Save for future use
+          // Persist for future use
           await supabase
             .from('platform_connections')
-            .update({ metadata: { ...(conn.metadata || {}), ig_user_id: igUserId } })
+            .update({ ig_account_id: igUserId })
             .eq('id', conn.id);
           break;
         }
@@ -71,106 +71,59 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
 }
 
 async function createImageContainer(token: string, igUserId: string, imageUrl: string, caption: string): Promise<string> {
-  const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+  const res = await metaApiJson<{ id: string }>(`/${igUserId}/media`, token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image_url: imageUrl,
-      caption,
-      access_token: token,
-    }),
+    body: { image_url: imageUrl, caption },
   });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Container creation failed: ${resp.status} — ${err.substring(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  return data.id;
+  if (!res.ok) throw new Error(`Container creation failed: ${res.status} — ${JSON.stringify(res.error).substring(0, 200)}`);
+  return res.data.id;
 }
 
 async function createReelsContainer(token: string, igUserId: string, videoUrl: string, caption: string): Promise<string> {
-  const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+  const res = await metaApiJson<{ id: string }>(`/${igUserId}/media`, token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      media_type: 'REELS',
-      video_url: videoUrl,
-      caption,
-      access_token: token,
-    }),
+    body: { media_type: 'REELS', video_url: videoUrl, caption },
   });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Reels container failed: ${resp.status} — ${err.substring(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  return data.id;
+  if (!res.ok) throw new Error(`Reels container failed: ${res.status} — ${JSON.stringify(res.error).substring(0, 200)}`);
+  return res.data.id;
 }
 
 async function createCarouselContainer(token: string, igUserId: string, imageUrls: string[], caption: string): Promise<string> {
   // 1. Create child containers (no caption)
   const childIds: string[] = [];
   for (const url of imageUrls.slice(0, 10)) {
-    const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+    const res = await metaApiJson<{ id: string }>(`/${igUserId}/media`, token, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image_url: url,
-        is_carousel_item: true,
-        access_token: token,
-      }),
+      body: { image_url: url, is_carousel_item: true },
     });
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Carousel child failed: ${resp.status} — ${err.substring(0, 200)}`);
-    }
-    const data: any = await resp.json();
-    childIds.push(data.id);
+    if (!res.ok) throw new Error(`Carousel child failed: ${res.status} — ${JSON.stringify(res.error).substring(0, 200)}`);
+    childIds.push(res.data.id);
   }
 
   // 2. Create parent container
-  const resp = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+  const res = await metaApiJson<{ id: string }>(`/${igUserId}/media`, token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      media_type: 'CAROUSEL',
-      children: childIds,
-      caption,
-      access_token: token,
-    }),
+    body: { media_type: 'CAROUSEL', children: childIds, caption },
   });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Carousel parent failed: ${resp.status} — ${err.substring(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  return data.id;
+  if (!res.ok) throw new Error(`Carousel parent failed: ${res.status} — ${JSON.stringify(res.error).substring(0, 200)}`);
+  return res.data.id;
 }
 
 async function publishContainer(token: string, igUserId: string, creationId: string): Promise<{ mediaId: string; permalink: string }> {
-  const resp = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
+  const res = await metaApiJson<{ id: string }>(`/${igUserId}/media_publish`, token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      creation_id: creationId,
-      access_token: token,
-    }),
+    body: { creation_id: creationId },
   });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Publish failed: ${resp.status} — ${err.substring(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  const mediaId = data.id;
+  if (!res.ok) throw new Error(`Publish failed: ${res.status} — ${JSON.stringify(res.error).substring(0, 200)}`);
+  const mediaId = res.data.id;
 
   // Get permalink
   let permalink = '';
   try {
-    const infoResp = await fetch(`${GRAPH_API}/${mediaId}?fields=permalink&access_token=${token}`);
-    if (infoResp.ok) {
-      const info: any = await infoResp.json();
-      permalink = info.permalink || '';
-    }
+    const infoRes = await metaApiJson<{ permalink: string }>(`/${mediaId}`, token, {
+      params: { fields: 'permalink' },
+    });
+    if (infoRes.ok) permalink = infoRes.data.permalink || '';
   } catch { /* non-fatal */ }
 
   return { mediaId, permalink };

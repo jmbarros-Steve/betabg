@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ChevronLeft, ChevronRight, CalendarDays, Instagram, Plus,
-  Clock, CheckCircle, AlertTriangle, Loader2, ImagePlus, Film, Images, Trash2,
+  ChevronLeft, ChevronRight, CalendarDays, Instagram, Plus, X,
+  Clock, CheckCircle, AlertTriangle, Loader2, ImagePlus, Film, Images,
 } from 'lucide-react';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
