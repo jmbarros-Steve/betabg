@@ -226,8 +226,8 @@ async function handleGetMessages(token: string, body: RequestBody): Promise<{ bo
     attachments: m.attachments?.data || [],
   }));
 
-  // Messages come newest first from API -- reverse for chat display
-  messages.reverse();
+  // Meta returns newest first — sort ascending (oldest→newest) for chat display
+  messages.sort((a: any, b: any) => new Date(a.created_time).getTime() - new Date(b.created_time).getTime());
 
   return {
     body: {
