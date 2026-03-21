@@ -4,7 +4,7 @@ import '@grapesjs/studio-sdk/style';
 import type { Editor } from 'grapesjs';
 import type { CreateEditorOptions } from '@grapesjs/studio-sdk';
 import { getSteveTheme } from './grapes-theme';
-import { steveBlocksPlugin } from './grapes-steve-blocks';
+import { steveBlocks } from './grapes-steve-blocks';
 import { callApi } from '@/lib/api';
 
 export interface UnlayerEditorRef {
@@ -138,7 +138,9 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       },
       theme: 'light',
       customTheme: getSteveTheme(brandColor),
-      plugins: [steveBlocksPlugin],
+      blocks: {
+        default: steveBlocks,
+      },
       settingsMenu: {
         about: false,
         embed: false,
