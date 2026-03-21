@@ -146,7 +146,7 @@ async function handleListConversations(
     const igParams: Record<string, string> = {
       platform: 'instagram',
       fields: 'id,participants{username,id},updated_time',
-      limit: '10',
+      limit: '5',
     };
 
     const igResult = await metaGet(`${page_id}/conversations`, pageToken, igParams);

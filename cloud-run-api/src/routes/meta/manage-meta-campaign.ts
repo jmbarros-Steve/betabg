@@ -223,9 +223,9 @@ async function handleCreate(
   if (existingCampaignId) {
     try {
       const campCheck = await metaApiRequest(existingCampaignId, accessToken, 'GET', {
-        fields: 'is_campaign_budget_optimization',
+        fields: 'daily_budget,lifetime_budget,budget_remaining',
       });
-      if (campCheck.ok && campCheck.data?.is_campaign_budget_optimization) {
+      if (campCheck.ok && (campCheck.data?.daily_budget || campCheck.data?.lifetime_budget)) {
         isCboCampaign = true;
         console.log(`[manage-meta-campaign] Existing campaign ${existingCampaignId} uses CBO — skipping adset budget`);
       }
