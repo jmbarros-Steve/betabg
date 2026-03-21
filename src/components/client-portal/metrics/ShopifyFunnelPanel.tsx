@@ -1,6 +1,6 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Eye, ShoppingCart, CreditCard, CheckCircle, ArrowRight, ChevronDown } from 'lucide-react';
+import { Eye, ShoppingCart, CreditCard, CheckCircle, ArrowDown } from 'lucide-react';
 
 export interface FunnelData {
   sessions: number | null;
@@ -15,126 +15,102 @@ interface ShopifyFunnelPanelProps {
 
 interface FunnelStep {
   label: string;
-  value: number | null;
+  value: number;
   icon: React.ElementType;
   color: string;
   bgColor: string;
+  barColor: string;
+  estimated: boolean;
 }
 
 export function ShopifyFunnelPanel({ funnelData }: ShopifyFunnelPanelProps) {
-  const steps: FunnelStep[] = [
-    { label: 'Sesiones', value: funnelData.sessions, icon: Eye, color: 'text-blue-600', bgColor: 'bg-blue-100' },
-    { label: 'Agregar al Carro', value: funnelData.addToCarts, icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-100' },
-    { label: 'Checkout', value: funnelData.checkoutsInitiated, icon: CreditCard, color: 'text-amber-600', bgColor: 'bg-amber-100' },
-    { label: 'Compras', value: funnelData.purchases, icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
-  ];
+  const steps = useMemo<FunnelStep[]>(() => {
+    const purchases = funnelData.purchases || 0;
+    const checkouts = funnelData.checkoutsInitiated || 0;
 
-  // Filter out steps with null values (sessions/addToCarts may be unavailable)
-  const activeSteps = steps.filter(s => s.value !== null);
+    // Estimate missing values based on industry averages if null
+    const addToCarts = funnelData.addToCarts ?? (checkouts > 0 ? Math.round(checkouts * 2.5) : 0);
+    const sessions = funnelData.sessions ?? (addToCarts > 0 ? Math.round(addToCarts * 5) : 0);
 
-  if (activeSteps.length < 2) return null;
+    if (sessions === 0 && purchases === 0) return [];
+
+    return [
+      { label: 'Visitas', value: sessions, icon: Eye, color: 'text-blue-600', bgColor: 'bg-blue-100', barColor: 'bg-blue-500', estimated: funnelData.sessions === null },
+      { label: 'Agregar al Carro', value: addToCarts, icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-100', barColor: 'bg-purple-500', estimated: funnelData.addToCarts === null },
+      { label: 'Checkout', value: checkouts, icon: CreditCard, color: 'text-amber-600', bgColor: 'bg-amber-100', barColor: 'bg-amber-500', estimated: false },
+      { label: 'Compras', value: purchases, icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', barColor: 'bg-green-500', estimated: false },
+    ];
+  }, [funnelData]);
+
+  if (steps.length === 0) return null;
+
+  const maxValue = steps[0].value || 1;
 
   return (
     <Card className="bg-card border border-border rounded-xl card-hover">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Eye className="w-4 h-4" />
           Funnel de Conversión
         </CardTitle>
+        {(steps.some(s => s.estimated)) && (
+          <p className="text-[10px] text-muted-foreground">* Valores estimados donde Shopify no reporta datos directos</p>
+        )}
       </CardHeader>
-      <CardContent>
-        {/* Desktop: horizontal */}
-        <div className="hidden md:flex items-stretch gap-2">
-          {activeSteps.map((step, i) => {
-            const prevValue = i > 0 ? activeSteps[i - 1].value! : null;
-            const conversionPct = prevValue && prevValue > 0 && step.value !== null
-              ? ((step.value / prevValue) * 100).toFixed(1)
-              : null;
-            const dropPct = conversionPct ? (100 - parseFloat(conversionPct)).toFixed(1) : null;
-            const Icon = step.icon;
+      <CardContent className="space-y-1">
+        {steps.map((step, i) => {
+          const prevValue = i > 0 ? steps[i - 1].value : null;
+          const conversionPct = prevValue && prevValue > 0
+            ? ((step.value / prevValue) * 100).toFixed(1)
+            : null;
+          const widthPct = maxValue > 0 ? Math.max((step.value / maxValue) * 100, 4) : 4;
+          const Icon = step.icon;
 
-            return (
-              <div key={step.label} className="flex items-center flex-1 min-w-0">
-                {i > 0 && (
-                  <div className="flex flex-col items-center mx-1 shrink-0">
-                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex-1 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={`p-1.5 rounded-md ${step.bgColor}`}>
-                            <Icon className={`w-3.5 h-3.5 ${step.color}`} />
-                          </div>
-                          <span className="text-xs font-medium text-muted-foreground truncate">{step.label}</span>
-                        </div>
-                        <p className="text-xl font-bold tabular-nums">
-                          {step.value!.toLocaleString('es-CL')}
-                        </p>
-                        {conversionPct && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="text-xs font-medium text-green-600">{conversionPct}%</span>
-                            {dropPct && parseFloat(dropPct) > 0 && (
-                              <span className="text-xs text-red-500 flex items-center">
-                                <ChevronDown className="w-3 h-3" />
-                                {dropPct}%
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>{step.label}: {step.value!.toLocaleString('es-CL')}</p>
-                      {conversionPct && <p>Conversión desde paso anterior: {conversionPct}%</p>}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Mobile: vertical */}
-        <div className="md:hidden space-y-2">
-          {activeSteps.map((step, i) => {
-            const prevValue = i > 0 ? activeSteps[i - 1].value! : null;
-            const conversionPct = prevValue && prevValue > 0 && step.value !== null
-              ? ((step.value / prevValue) * 100).toFixed(1)
-              : null;
-            const dropPct = conversionPct ? (100 - parseFloat(conversionPct)).toFixed(1) : null;
-            const Icon = step.icon;
-
-            return (
-              <div key={step.label}>
-                {i > 0 && (
-                  <div className="flex justify-center py-1">
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                  <div className={`p-2 rounded-lg ${step.bgColor}`}>
-                    <Icon className={`w-4 h-4 ${step.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">{step.label}</p>
-                    <p className="text-lg font-bold tabular-nums">{step.value!.toLocaleString('es-CL')}</p>
-                  </div>
+          return (
+            <div key={step.label}>
+              {i > 0 && (
+                <div className="flex items-center gap-2 py-0.5 pl-4">
+                  <ArrowDown className="w-3 h-3 text-muted-foreground" />
                   {conversionPct && (
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-green-600">{conversionPct}%</span>
-                      {dropPct && parseFloat(dropPct) > 0 && (
-                        <p className="text-xs text-red-500">{dropPct}% caída</p>
-                      )}
-                    </div>
+                    <span className={`text-xs font-medium ${parseFloat(conversionPct) >= 50 ? 'text-green-600' : parseFloat(conversionPct) >= 20 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {conversionPct}% pasan al siguiente paso
+                    </span>
                   )}
                 </div>
+              )}
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-md ${step.bgColor} shrink-0`}>
+                  <Icon className={`w-4 h-4 ${step.color}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {step.label}
+                      {step.estimated && <span className="text-[10px] ml-1">*</span>}
+                    </span>
+                    <span className="text-sm font-bold tabular-nums">{step.value.toLocaleString('es-CL')}</span>
+                  </div>
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${step.barColor}`}
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  </div>
+                </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+
+        {/* Overall conversion */}
+        {steps.length >= 4 && steps[0].value > 0 && (
+          <div className="mt-3 pt-3 border-t flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Conversión total (visita → compra)</span>
+            <span className="text-sm font-bold text-green-600">
+              {((steps[3].value / steps[0].value) * 100).toFixed(2)}%
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

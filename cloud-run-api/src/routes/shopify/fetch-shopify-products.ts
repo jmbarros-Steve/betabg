@@ -158,6 +158,7 @@ export async function fetchShopifyProducts(c: Context) {
       image: product.images?.[0]?.src || null,
       image_count: (product.images || []).length,
       images_without_alt: (product.images || []).filter((img: any) => !img.alt || img.alt.trim() === '').length,
+      images: (product.images || []).map((img: any) => ({ id: img.id, src: img.src, alt: img.alt || '' })),
       variants: (product.variants || []).map((v: any) => ({
         id: v.id,
         title: v.title,

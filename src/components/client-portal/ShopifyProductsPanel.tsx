@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+// Table imports removed — using card layout instead
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -49,6 +49,7 @@ interface ShopifyProduct {
   body_html?: string;
   images?: Array<{ id: number; src: string; alt?: string }>;
   variants: ProductVariant[];
+  [key: string]: any;
 }
 
 // F10: Price suggestion algorithm
@@ -221,6 +222,13 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
       setLoadingCrossSell(false);
     }
   };
+
+  // Auto-load products when connectionId is available
+  useEffect(() => {
+    if (connectionId && products.length === 0 && !loading) {
+      fetchProducts();
+    }
+  }, [connectionId]);
 
   useEffect(() => {
     if (!externalConnectionId) checkShopifyConnection();
@@ -411,186 +419,141 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
               </div>
             )}
 
-            {/* Products table */}
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Costo</TableHead>
-                    <TableHead className="text-right">Margen</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-right">Días</TableHead>
-                    <TableHead className="text-right">Sugerido</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) =>
-                    product.variants.map((variant, vi) => {
-                      const margin = variant.cost !== null
-                        ? ((variant.price - variant.cost) / variant.price * 100)
-                        : null;
-                      const isFirstVariant = vi === 0;
-                      const sales = salesMap.get(variant.sku);
-                      const velocity = sales ? sales.quantity / 30 : 0;
-                      const daysOfStock = variant.inventory_quantity !== null && velocity > 0
-                        ? Math.round(variant.inventory_quantity / velocity)
-                        : null;
-                      const suggestion = getSuggestedPrice(variant, sales, 30);
-                      const crossSell = crossSellData[product.id];
+            {/* Products list — card-based layout */}
+            <div className="space-y-2">
+              {products.map((product) => {
+                const mainVariant = product.variants[0];
+                const margin = mainVariant?.cost !== null && mainVariant
+                  ? ((mainVariant.price - (mainVariant.cost || 0)) / mainVariant.price * 100)
+                  : null;
+                const sales = mainVariant?.sku ? salesMap.get(mainVariant.sku) : undefined;
+                const velocity = sales ? sales.quantity / 30 : 0;
+                const daysOfStock = mainVariant?.inventory_quantity !== null && velocity > 0
+                  ? Math.round((mainVariant.inventory_quantity ?? 0) / velocity)
+                  : null;
+                const suggestion = mainVariant ? getSuggestedPrice(mainVariant, sales, 30) : null;
+                const crossSell = crossSellData[product.id];
 
-                      return (
-                        <TooltipProvider key={`${product.id}-${variant.id}`}>
-                          <TableRow className={expandedProduct === product.id && isFirstVariant ? 'border-b-0' : ''}>
-                            <TableCell className="p-2">
-                              {isFirstVariant && (
-                                product.image ? (
-                                  <img src={product.image} alt={product.title} className="w-10 h-10 rounded object-cover" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                                    <ImageOff className="w-4 h-4 text-muted-foreground" />
-                                  </div>
-                                )
+                return (
+                  <div key={product.id} className="border rounded-lg p-3 hover:bg-muted/20 transition-colors">
+                    <div className="flex items-start gap-3">
+                      {/* Image */}
+                      <div className="shrink-0">
+                        {product.image ? (
+                          <img src={product.image} alt={product.title} className="w-12 h-12 rounded-lg object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                            <ImageOff className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm line-clamp-1">{product.title}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {mainVariant?.sku && (
+                                <span className="font-mono text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{mainVariant.sku}</span>
                               )}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                {isFirstVariant && (
-                                  <div className="flex items-center gap-1">
-                                    {crossSell && (
-                                      <button onClick={() => setExpandedProduct(expandedProduct === product.id ? null : product.id)} className="p-0.5 hover:bg-muted rounded">
-                                        {expandedProduct === product.id ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                      </button>
-                                    )}
-                                    <p className="font-medium text-sm line-clamp-1">{product.title}</p>
-                                  </div>
-                                )}
-                                {product.variants.length > 1 && (
-                                  <p className="text-xs text-muted-foreground">{variant.title}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="font-mono text-xs text-muted-foreground">
-                                {variant.sku || '—'}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              ${variant.price.toLocaleString('es-CL')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {variant.cost !== null ? (
-                                <span className="font-medium">${variant.cost.toLocaleString('es-CL')}</span>
-                              ) : (
-                                <Badge variant="outline" className="text-xs text-orange-500 border-orange-500/30">
-                                  Sin costo
-                                </Badge>
+                              {product.variants.length > 1 && (
+                                <span className="text-[10px] text-muted-foreground">{product.variants.length} variantes</span>
                               )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {margin !== null ? (
-                                <Badge
-                                  variant={margin >= 30 ? 'default' : margin >= 15 ? 'secondary' : 'destructive'}
-                                  className="font-mono"
-                                >
-                                  <TrendingUp className="w-3 h-3 mr-1" />
-                                  {margin.toFixed(1)}%
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              {variant.inventory_quantity !== null ? variant.inventory_quantity : '—'}
-                            </TableCell>
-                            {/* F2: Days of stock */}
-                            <TableCell className="text-right">
-                              {daysOfStock !== null ? (
-                                <Badge variant="outline" className={`text-xs font-mono ${
-                                  daysOfStock < 7 ? 'text-red-600 border-red-300 bg-red-50' :
-                                  daysOfStock < 14 ? 'text-orange-600 border-orange-300 bg-orange-50' :
-                                  'text-green-600 border-green-300 bg-green-50'
-                                }`}>
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  {daysOfStock}d
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">{sales ? '—' : 'Sin ventas'}</span>
-                              )}
-                            </TableCell>
-                            {/* F10: Suggested price */}
-                            <TableCell className="text-right">
-                              {suggestion ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      onClick={() => openEditModal(product, vi, suggestion.price)}
-                                      className="inline-flex items-center gap-1 text-xs font-medium hover:underline cursor-pointer"
-                                    >
-                                      {suggestion.direction === 'up' ? (
-                                        <ArrowUpRight className="w-3 h-3 text-green-600" />
-                                      ) : (
-                                        <ArrowDownRight className="w-3 h-3 text-red-600" />
-                                      )}
-                                      <span className={suggestion.direction === 'up' ? 'text-green-600' : 'text-red-600'}>
-                                        ${suggestion.price.toLocaleString('es-CL')}
-                                      </span>
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <p className="font-medium">{suggestion.reason}</p>
-                                    <p className="text-xs mt-1">Clic para aplicar en el editor</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            {/* Actions: Edit, AI Desc (F5), Photo (F6) */}
-                            <TableCell className="p-1">
-                              <div className="flex items-center gap-0.5">
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(product, vi)} title="Editar producto">
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                                {isFirstVariant && (
-                                  <>
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => generateDescription(product)} title="Generar descripción IA">
-                                      <Sparkles className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPhotoProduct(product)} title="Estudio fotográfico">
-                                      <Camera className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {/* F8: Cross-sell expanded row */}
-                          {isFirstVariant && expandedProduct === product.id && crossSell && (
-                            <TableRow className="bg-muted/30">
-                              <TableCell colSpan={10} className="py-2 px-4">
-                                <div className="flex items-center gap-2 text-xs">
-                                  <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
-                                  <span className="text-muted-foreground font-medium">Se compra con:</span>
-                                  {crossSell.map((cs, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {cs.name} ({cs.percentage}%)
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </TableCell>
-                            </TableRow>
+                            </div>
+                          </div>
+                          {/* Actions */}
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(product, 0)} title="Editar">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => generateDescription(product)} title="Descripción IA">
+                              <Sparkles className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPhotoProduct(product)} title="Fotos IA">
+                              <Camera className="w-3.5 h-3.5" />
+                            </Button>
+                            {crossSell && (
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setExpandedProduct(expandedProduct === product.id ? null : product.id)} title="Cross-sell">
+                                {expandedProduct === product.id ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Metrics row */}
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <span className="text-sm font-semibold">${mainVariant?.price.toLocaleString('es-CL')}</span>
+
+                          {margin !== null && (
+                            <Badge
+                              variant={margin >= 30 ? 'default' : margin >= 15 ? 'secondary' : 'destructive'}
+                              className="font-mono text-[10px] px-1.5 py-0"
+                            >
+                              {margin.toFixed(0)}%
+                            </Badge>
                           )}
-                        </TooltipProvider>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+
+                          {mainVariant?.inventory_quantity !== null && (
+                            <span className="text-xs text-muted-foreground">
+                              Stock: {mainVariant.inventory_quantity}
+                              {daysOfStock !== null && (
+                                <span className={`ml-1 font-medium ${
+                                  daysOfStock < 7 ? 'text-red-600' : daysOfStock < 14 ? 'text-orange-600' : 'text-green-600'
+                                }`}>
+                                  ({daysOfStock}d)
+                                </span>
+                              )}
+                            </span>
+                          )}
+
+                          {/* F10: Suggested price */}
+                          {suggestion && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => openEditModal(product, 0, suggestion.price)}
+                                    className={`inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded cursor-pointer ${
+                                      suggestion.direction === 'up'
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                    }`}
+                                  >
+                                    {suggestion.direction === 'up' ? (
+                                      <ArrowUpRight className="w-3 h-3" />
+                                    ) : (
+                                      <ArrowDownRight className="w-3 h-3" />
+                                    )}
+                                    ${suggestion.price.toLocaleString('es-CL')}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="font-medium">{suggestion.reason}</p>
+                                  <p className="text-xs mt-1">Clic para aplicar</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* F8: Cross-sell expanded */}
+                    {expandedProduct === product.id && crossSell && (
+                      <div className="mt-2 pt-2 border-t flex items-center gap-2 text-xs flex-wrap">
+                        <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground font-medium">Se compra con:</span>
+                        {crossSell.map((cs, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {cs.name} ({cs.percentage}%)
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
