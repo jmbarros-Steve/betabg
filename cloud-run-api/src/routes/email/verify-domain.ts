@@ -107,23 +107,47 @@ export async function verifyEmailDomain(c: Context) {
       const { data: domainInfo } = await resend.domains.get(domainRecord.resend_domain_id);
       const isVerified = domainInfo?.status === 'verified';
 
-      // Update database
+      // Parse individual record verification status from Resend
+      const records = domainInfo?.records || [];
+      const spfVerified = records.some((r: any) => (r.type === 'TXT' || r.record === 'SPF') && r.status === 'verified');
+      const dkimVerified = records.some((r: any) => (r.type === 'CNAME' || r.record === 'DKIM') && r.status === 'verified');
+      // DMARC is user-managed, check if record exists with our recommended value
+      const dmarcRecord = records.find((r: any) => r.name?.includes('_dmarc'));
+      const dmarcVerified = dmarcRecord?.status === 'verified';
+
+      // Update database with verification details
+      const updateData: any = {
+        spf_verified: spfVerified,
+        dkim_verified: dkimVerified,
+        dmarc_verified: dmarcVerified,
+        dns_records: records.map((r: any) => ({
+          type: r.type || r.record,
+          name: r.name,
+          value: r.value,
+          purpose: r.record || r.type,
+          status: r.status || 'pending',
+        })),
+      };
+
       if (isVerified) {
-        await supabase
-          .from('email_domains')
-          .update({
-            status: 'verified',
-            verified_at: new Date().toISOString(),
-          })
-          .eq('client_id', client_id)
-          .eq('domain', cleanDomain);
+        updateData.status = 'verified';
+        updateData.verified_at = new Date().toISOString();
       }
+
+      await supabase
+        .from('email_domains')
+        .update(updateData)
+        .eq('client_id', client_id)
+        .eq('domain', cleanDomain);
 
       return c.json({
         domain: cleanDomain,
         verified: isVerified,
         status: domainInfo?.status || 'not_started',
-        records: (domainInfo?.records || []).map((r: any) => ({
+        spf_verified: spfVerified,
+        dkim_verified: dkimVerified,
+        dmarc_verified: dmarcVerified,
+        records: records.map((r: any) => ({
           type: r.type || r.record,
           name: r.name,
           status: r.status,

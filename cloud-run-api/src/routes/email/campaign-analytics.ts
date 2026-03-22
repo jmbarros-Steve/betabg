@@ -356,12 +356,12 @@ export async function emailCampaignAnalytics(c: Context) {
       // Domain health
       const { data: domains } = await supabase
         .from('email_domains')
-        .select('domain, verified, spf_verified, dkim_verified, dmarc_verified, created_at')
+        .select('domain, status, spf_verified, dkim_verified, dmarc_verified, created_at')
         .eq('client_id', client_id);
 
       const domainHealth = (domains || []).map((d: any) => ({
         domain: d.domain,
-        verified: d.verified,
+        verified: d.status === 'verified',
         spf: d.spf_verified ?? false,
         dkim: d.dkim_verified ?? false,
         dmarc: d.dmarc_verified ?? false,

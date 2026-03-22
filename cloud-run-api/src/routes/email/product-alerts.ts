@@ -238,7 +238,7 @@ export async function productAlerts(c: Context) {
         .maybeSingle();
 
       const fromDomain = domainData?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
-      const fromName = domainData?.from_name || clientData?.company_name || 'Store';
+      const fromName = (domainData as any)?.from_name || clientData?.company_name || 'Store';
       const fromEmail = `noreply@${fromDomain}`;
 
       const results: Array<{ alert_id: string; email: string; success: boolean; error?: string }> = [];
