@@ -473,20 +473,31 @@ export async function syncCompetitorAds(c: Context) {
 
         const effectiveFbUrl = tracking.fb_page_url || fbUrl;
 
-        // Bypass cache if fb_page_url was just added/changed (force Apify resync)
-        const fbUrlChanged = fbUrl && fbUrl !== tracking.fb_page_url;
-        const hasApifyMetrics = await (async () => {
-          if (!effectiveFbUrl) return true; // no FB URL = no need to check Apify metrics
-          const { count } = await supabase
-            .from('competitor_ads')
-            .select('id', { count: 'exact', head: true })
-            .eq('tracking_id', tracking.id)
-            .not('impressions_lower', 'is', null);
-          return (count || 0) > 0;
-        })();
-        const forceFreshSync = !!fbUrlChanged || (!!effectiveFbUrl && !hasApifyMetrics);
+        // Build Apify source: fb_page_url > meta_page_id > nothing
+        // If we already know the page_id from a previous Meta API sync, use it for Apify too
+        let apifySource: string | null = null;
+        if (effectiveFbUrl && isFacebookUrl(effectiveFbUrl)) {
+          apifySource = effectiveFbUrl;
+        } else if (effectiveFbUrl && effectiveFbUrl.includes('ads/library')) {
+          apifySource = effectiveFbUrl;
+        } else if (tracking.meta_page_id) {
+          // Use cached meta_page_id to build Ad Library URL for Apify
+          apifySource = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&view_all_page_id=${tracking.meta_page_id}`;
+        }
 
-        // Check if synced recently (< 6h) — skip cache if fb_page_url changed
+        // Check if we already have Apify metrics for this competitor
+        const { count: apifyMetricCount } = await supabase
+          .from('competitor_ads')
+          .select('id', { count: 'exact', head: true })
+          .eq('tracking_id', tracking.id)
+          .not('impressions_lower', 'is', null);
+        const hasApifyMetrics = (apifyMetricCount || 0) > 0;
+
+        // Force fresh sync if: fb_page_url changed, OR we have Apify source but no metrics yet
+        const fbUrlChanged = fbUrl && fbUrl !== tracking.fb_page_url;
+        const forceFreshSync = !!fbUrlChanged || (!!apifySource && !hasApifyMetrics);
+
+        // Check if synced recently (< 6h) — skip cache if force fresh
         if (tracking.last_sync_at && !forceFreshSync) {
           const lastSync = new Date(tracking.last_sync_at);
           const hoursSince = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
@@ -502,15 +513,15 @@ export async function syncCompetitorAds(c: Context) {
         }
 
         if (forceFreshSync) {
-          console.log(`[sync-competitor-ads] ${handle}: Force fresh sync (fb_page_url=${effectiveFbUrl}, changed=${fbUrlChanged}, hasApifyMetrics=${hasApifyMetrics})`);
+          console.log(`[sync-competitor-ads] ${handle}: Force fresh sync (apifySource=${apifySource ? 'yes' : 'no'}, hasApifyMetrics=${hasApifyMetrics})`);
         }
 
         // ==========================================
-        // PRIMARY PATH: Apify (when fb_page_url exists)
+        // PRIMARY PATH: Apify (when we have a source URL)
         // ==========================================
-        if (effectiveFbUrl && hasApifyToken) {
-          console.log(`[sync-competitor-ads] ${handle}: Using Apify with FB URL: ${effectiveFbUrl}`);
-          const apifyResult = await fetchAdsViaApify(effectiveFbUrl, 50);
+        if (apifySource && hasApifyToken) {
+          console.log(`[sync-competitor-ads] ${handle}: Using Apify with: ${apifySource}`);
+          const apifyResult = await fetchAdsViaApify(apifySource, 50);
 
           if (apifyResult.error) {
             console.warn(`[sync-competitor-ads] ${handle}: Apify failed: ${apifyResult.error}`);
