@@ -151,7 +151,20 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     if (!permissionsResponse.ok) {
       const errBody: any = await permissionsResponse.json().catch(() => ({}));
+      const metaErrorCode = errBody?.error?.code;
       console.error('[ad-accounts] Permissions check failed:', errBody);
+
+      // Rate limit (#4) — cache the error so we stop hammering Meta
+      if (metaErrorCode === 4) {
+        const rateLimitResult = {
+          error: 'Rate limit de Meta alcanzado',
+          details: 'Demasiadas solicitudes a Meta. Espera unos minutos e intenta de nuevo.',
+          rate_limited: true,
+        };
+        setCache(connection_id, rateLimitResult);
+        return c.json(rateLimitResult, 429);
+      }
+
       return c.json({ error: 'Error al verificar permisos de Meta', details: errBody?.error?.message }, 502);
     }
 
@@ -190,6 +203,18 @@ export async function fetchMetaAdAccounts(c: Context) {
     if (!metaResponse.ok) {
       const errorData: any = await metaResponse.json();
       console.error('Meta API error:', errorData);
+      const metaErrCode = errorData?.error?.code;
+
+      if (metaErrCode === 4) {
+        const rateLimitResult = {
+          error: 'Rate limit de Meta alcanzado',
+          details: 'Demasiadas solicitudes a Meta. Espera unos minutos e intenta de nuevo.',
+          rate_limited: true,
+        };
+        setCache(connection_id, rateLimitResult);
+        return c.json(rateLimitResult, 429);
+      }
+
       return c.json({
         error: 'Meta API error',
         details: errorData.error?.message || 'Unknown error'
