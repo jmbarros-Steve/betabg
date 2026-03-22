@@ -23,39 +23,51 @@ interface AdLibraryAd {
   languages?: string[];
 }
 
-/** Response shape from apify~facebook-ads-scraper */
+/** Response shape from apify~facebook-ads-scraper (build 0.0.263+) */
 interface ApifyScraperAd {
-  ad_archive_id?: string;
   adArchiveID?: string;
+  adArchiveId?: string;
   pageId?: string;
-  page_id?: string;
+  pageID?: string;
   pageName?: string;
-  page_name?: string;
-  adText?: string;
-  ad_text?: string;
-  adTitle?: string;
-  adDescription?: string;
-  adImages?: string[];
-  adVideos?: string[];
-  impressionsWithIndex?: { impressions_lower_bound?: number; impressions_upper_bound?: number };
-  impressions?: { lower_bound?: number; upper_bound?: number };
-  spend?: { lower_bound?: number; upper_bound?: number };
-  reachEstimate?: { lower_bound?: number; upper_bound?: number };
-  reach?: { lower_bound?: number; upper_bound?: number };
-  platforms?: string[];
-  publisher_platforms?: string[];
-  startDate?: string;
-  endDate?: string;
-  ad_delivery_start_time?: string;
-  ad_delivery_stop_time?: string;
   isActive?: boolean;
   collationCount?: number;
-  ctaText?: string;
+  startDate?: number; // unix ms
+  endDate?: number; // unix ms
+  startDateFormatted?: string; // ISO string
+  endDateFormatted?: string; // ISO string
+  publisherPlatform?: string[];
+  currency?: string;
+  impressionsWithIndex?: {
+    impressions_text?: string;
+    [key: string]: any; // may contain index-based entries
+  };
+  spend?: {
+    lower_bound?: string;
+    upper_bound?: string;
+  };
+  reachEstimate?: {
+    lower_bound?: number;
+    upper_bound?: number;
+  };
   snapshot?: {
-    page_name?: string;
+    pageName?: string;
+    pageId?: string;
     body?: { markup?: { __html: string } };
     cta_text?: string;
-    cards?: Array<{ body?: string; title?: string; cta_text?: string }>;
+    cta_type?: string;
+    link_url?: string;
+    cards?: Array<{
+      body?: string;
+      title?: string;
+      link_url?: string;
+      cta_text?: string;
+      cta_type?: string;
+      video_preview_image_url?: string;
+      resized_image_url?: string;
+    }>;
+    images?: Array<{ resized_image_url?: string; original_image_url?: string }>;
+    videos?: Array<{ video_preview_image_url?: string }>;
   };
 }
 
@@ -90,21 +102,33 @@ function extractPageIdOrSlug(fbUrl: string): string | null {
 }
 
 /**
+ * Check if input looks like a Facebook URL (not just a random word)
+ */
+function isFacebookUrl(input: string): boolean {
+  const lower = input.toLowerCase().trim();
+  return lower.includes('facebook.com') || lower.includes('fb.com') || lower.includes('fb.me');
+}
+
+/**
  * Build Ad Library URL for Apify scraper input
  */
 function buildAdLibraryUrl(fbPageUrl: string): string {
   // If already an Ad Library URL, use as-is
   if (fbPageUrl.includes('ads/library')) return fbPageUrl;
 
-  const slug = extractPageIdOrSlug(fbPageUrl);
-  if (!slug) return fbPageUrl;
-
-  // If slug is numeric, use view_all_page_id; otherwise use search query
-  if (/^\d+$/.test(slug)) {
-    return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&view_all_page_id=${slug}`;
+  // If it's a proper Facebook URL, extract the page slug/id
+  if (isFacebookUrl(fbPageUrl)) {
+    const slug = extractPageIdOrSlug(fbPageUrl);
+    if (slug) {
+      if (/^\d+$/.test(slug)) {
+        return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&view_all_page_id=${slug}`;
+      }
+      return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&q=${encodeURIComponent(slug)}`;
+    }
   }
-  // Use search by page name (slug) — Apify resolves this
-  return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&q=${encodeURIComponent(slug)}`;
+
+  // Not a FB URL — treat the entire input as a search query for Ad Library
+  return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&q=${encodeURIComponent(fbPageUrl.trim())}`;
 }
 
 /**
@@ -124,16 +148,15 @@ async function fetchAdsViaApify(
 
   try {
     const resp = await fetch(
-      `https://api.apify.com/v2/acts/apify~facebook-ads-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}&format=json`,
+      `https://api.apify.com/v2/acts/apify~facebook-ads-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}&format=json&timeout=300`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          urls: [adLibraryUrl],
+          startUrls: [{ url: adLibraryUrl }],
           maxAds,
-          countryCode: 'CL',
         }),
-        signal: AbortSignal.timeout(120_000), // 2 min timeout
+        signal: AbortSignal.timeout(300_000), // 5 min timeout (Apify can take 2-4min)
       },
     );
 
@@ -143,9 +166,9 @@ async function fetchAdsViaApify(
     }
 
     const items = (await resp.json()) as any[];
-    // Filter valid items
+    // Filter valid items (exclude error items like {url, error, errorDescription})
     const validAds = (items || []).filter(
-      (item: any) => item.ad_archive_id || item.adArchiveID || item.page_id || item.pageId,
+      (item: any) => !item.error && (item.adArchiveID || item.adArchiveId || item.pageId || item.pageID),
     ) as ApifyScraperAd[];
 
     console.log(`[sync-competitor-ads] Apify returned ${validAds.length} ads`);
@@ -166,11 +189,11 @@ function mapApifyAdToRow(
   trackingId: string,
   clientId: string,
 ): Record<string, any> {
-  const archiveId = ad.ad_archive_id || ad.adArchiveID || '';
+  const archiveId = ad.adArchiveID || ad.adArchiveId || '';
 
-  // Start/end dates
-  const startStr = ad.startDate || ad.ad_delivery_start_time;
-  const endStr = ad.endDate || ad.ad_delivery_stop_time;
+  // Start/end dates — prefer formatted ISO strings, fallback to unix ms
+  const startStr = ad.startDateFormatted || (ad.startDate ? new Date(ad.startDate).toISOString() : null);
+  const endStr = ad.endDateFormatted || (ad.endDate ? new Date(ad.endDate).toISOString() : null);
   const startDate = startStr ? new Date(startStr) : null;
   const endDate = endStr ? new Date(endStr) : null;
   const isActive = ad.isActive !== undefined ? ad.isActive : (!endDate || endDate > new Date());
@@ -178,15 +201,21 @@ function mapApifyAdToRow(
     ? Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Ad text — try multiple fields
-  let adText = ad.adText || ad.ad_text || '';
-  if (!adText && ad.snapshot?.body?.markup?.__html) {
+  // Ad text — from snapshot body markup
+  let adText = '';
+  if (ad.snapshot?.body?.markup?.__html) {
     adText = ad.snapshot.body.markup.__html.replace(/<[^>]*>/g, '').trim();
   }
+  if (!adText && ad.snapshot?.cards?.[0]?.body) {
+    adText = ad.snapshot.cards[0].body;
+  }
+
+  // Headline — from first card title
+  const adHeadline = ad.snapshot?.cards?.[0]?.title || null;
 
   // Ad type
   let adType = 'image';
-  if (ad.adVideos && ad.adVideos.length > 0) adType = 'video';
+  if (ad.snapshot?.videos && ad.snapshot.videos.length > 0) adType = 'video';
   if (ad.collationCount && ad.collationCount > 1) adType = 'carousel';
 
   // CTA detection
@@ -197,46 +226,68 @@ function mapApifyAdToRow(
     'descargar': 'DOWNLOAD', 'download': 'DOWNLOAD',
   };
   let ctaType = 'OTHER';
-  const ctaText = (ad.ctaText || ad.snapshot?.cta_text || ad.adTitle || '').toLowerCase();
+  const ctaText = (ad.snapshot?.cta_text || ad.snapshot?.cards?.[0]?.cta_text || '').toLowerCase();
   for (const [key, value] of Object.entries(ctaMap)) {
     if (ctaText.includes(key)) { ctaType = value; break; }
   }
 
-  // Impressions — Apify uses different field names
-  const impData: any = ad.impressionsWithIndex || ad.impressions;
-  const impressionsLower = impData?.impressions_lower_bound ?? impData?.lower_bound ?? null;
-  const impressionsUpper = impData?.impressions_upper_bound ?? impData?.upper_bound ?? null;
+  // Impressions — impressionsWithIndex contains text like "1K-5K"
+  // Parse the text or use raw data
+  let impressionsLower: number | null = null;
+  let impressionsUpper: number | null = null;
+  if (ad.impressionsWithIndex) {
+    const impText = ad.impressionsWithIndex.impressions_text || '';
+    // Try to parse "1K-5K", "10K-50K", "500-1K" etc
+    const match = impText.match(/([0-9,.]+)\s*([KMB]?)\s*[-–]\s*([0-9,.]+)\s*([KMB]?)/i);
+    if (match) {
+      const mult = (s: string) => s.toUpperCase() === 'K' ? 1000 : s.toUpperCase() === 'M' ? 1000000 : s.toUpperCase() === 'B' ? 1000000000 : 1;
+      impressionsLower = Math.round(parseFloat(match[1].replace(/,/g, '')) * mult(match[2]));
+      impressionsUpper = Math.round(parseFloat(match[3].replace(/,/g, '')) * mult(match[4]));
+    }
+  }
 
-  // Spend
-  const spendData = ad.spend;
-  const spendLower = spendData?.lower_bound ?? null;
-  const spendUpper = spendData?.upper_bound ?? null;
+  // Spend — lower_bound/upper_bound as strings
+  const spendLower = ad.spend?.lower_bound ? parseFloat(ad.spend.lower_bound) : null;
+  const spendUpper = ad.spend?.upper_bound ? parseFloat(ad.spend.upper_bound) : null;
 
   // Reach
-  const reachData = ad.reachEstimate || ad.reach;
-  const reachLower = reachData?.lower_bound ?? null;
-  const reachUpper = reachData?.upper_bound ?? null;
+  const reachLower = ad.reachEstimate?.lower_bound ?? null;
+  const reachUpper = ad.reachEstimate?.upper_bound ?? null;
 
   // Platforms
-  const platforms = ad.platforms || ad.publisher_platforms || null;
+  const platforms = ad.publisherPlatform && ad.publisherPlatform.length > 0 ? ad.publisherPlatform : null;
 
-  // Images
-  const imageUrls = ad.adImages && ad.adImages.length > 0 ? ad.adImages : null;
+  // Images — from snapshot cards and images
+  const imageUrls: string[] = [];
+  if (ad.snapshot?.images) {
+    for (const img of ad.snapshot.images) {
+      if (img.resized_image_url) imageUrls.push(img.resized_image_url);
+      else if (img.original_image_url) imageUrls.push(img.original_image_url);
+    }
+  }
+  if (ad.snapshot?.cards) {
+    for (const card of ad.snapshot.cards) {
+      if (card.resized_image_url) imageUrls.push(card.resized_image_url);
+      if (card.video_preview_image_url) imageUrls.push(card.video_preview_image_url);
+    }
+  }
+  // Dedupe
+  const uniqueImages = [...new Set(imageUrls)];
 
   return {
     tracking_id: trackingId,
     client_id: clientId,
     ad_library_id: archiveId,
     ad_text: adText || null,
-    ad_headline: ad.adTitle || null,
-    ad_description: ad.adDescription || null,
-    image_url: imageUrls?.[0] || null,
+    ad_headline: adHeadline,
+    ad_description: null,
+    image_url: uniqueImages[0] || null,
     ad_type: adType,
     cta_type: ctaType,
     started_at: startStr || null,
     is_active: isActive,
     days_running: daysRunning,
-    // New Apify metric columns
+    // Apify metric columns
     impressions_lower: impressionsLower,
     impressions_upper: impressionsUpper,
     spend_lower: spendLower,
@@ -244,7 +295,7 @@ function mapApifyAdToRow(
     reach_lower: reachLower,
     reach_upper: reachUpper,
     platforms: platforms,
-    image_urls: imageUrls,
+    image_urls: uniqueImages.length > 0 ? uniqueImages : null,
   };
 }
 
@@ -450,8 +501,8 @@ export async function syncCompetitorAds(c: Context) {
             }
 
             // Update tracking
-            const pageName = apifyResult.ads[0]?.pageName || apifyResult.ads[0]?.page_name || apifyResult.ads[0]?.snapshot?.page_name;
-            const pageId = apifyResult.ads[0]?.pageId || apifyResult.ads[0]?.page_id;
+            const pageName = apifyResult.ads[0]?.pageName || apifyResult.ads[0]?.snapshot?.pageName;
+            const pageId = apifyResult.ads[0]?.pageId || apifyResult.ads[0]?.pageID;
             await supabase.from('competitor_tracking').update({
               last_sync_at: new Date().toISOString(),
               ...(pageId ? { meta_page_id: pageId } : {}),
