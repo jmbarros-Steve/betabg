@@ -3,6 +3,7 @@
  * Uses Authorization: Bearer header instead of access_token query param
  * to prevent token leakage in server logs, proxy logs, and stack traces.
  * Protected by circuit breaker to avoid hammering Meta during rate limits.
+ * Includes retry with exponential backoff and inter-request delays.
  */
 
 import { canRequest, recordSuccess, recordFailure } from './circuit-breaker.js';
@@ -11,16 +12,29 @@ const META_API_VERSION = 'v21.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 const CIRCUIT_SERVICE = 'meta-graph-api';
 
+/** Delay between consecutive Meta API requests (ms) — max ~300 req/min */
+const META_INTER_REQUEST_DELAY_MS = 200;
+/** Max retries on rate-limit / server errors */
+const MAX_RETRIES = 3;
+/** Base delay for exponential backoff (ms) */
+const BACKOFF_BASE_MS = 2000;
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 export interface MetaFetchOptions {
   method?: 'GET' | 'POST' | 'DELETE';
   params?: Record<string, string>;
   body?: Record<string, any> | FormData;
   /** Override timeout in ms (default: 30000) */
   timeout?: number;
+  /** Skip the inter-request delay (e.g. for the very first call) */
+  skipDelay?: boolean;
 }
 
 /**
  * Fetch from Meta Graph API with token in Authorization header.
+ * Includes inter-request delay, retry with exponential backoff,
+ * and Retry-After header support.
  * @param path - API path (e.g., "/me/adaccounts" or full URL for pagination)
  * @param token - Decrypted access token
  * @param options - Fetch options
@@ -30,7 +44,12 @@ export async function metaApiFetch(
   token: string,
   options: MetaFetchOptions = {}
 ): Promise<Response> {
-  const { method = 'GET', params, body, timeout = 30000 } = options;
+  const { method = 'GET', params, body, timeout = 30000, skipDelay = false } = options;
+
+  // Inter-request delay to avoid saturating Meta API
+  if (!skipDelay) {
+    await sleep(META_INTER_REQUEST_DELAY_MS);
+  }
 
   // Support full URLs (for pagination cursors) or relative paths
   const url = path.startsWith('http')
@@ -62,49 +81,128 @@ export async function metaApiFetch(
     }
   }
 
-  // Add timeout via AbortController
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  fetchOptions.signal = controller.signal;
-
   // Circuit breaker check
   if (!canRequest(CIRCUIT_SERVICE)) {
-    clearTimeout(timeoutId);
     return new Response(
       JSON.stringify({ error: { message: 'Circuit breaker open — Meta API temporarily blocked', code: 'CIRCUIT_OPEN' } }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
-  try {
-    const res = await fetch(url.toString(), fetchOptions);
+  // Retry loop with exponential backoff
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // Rate limit (code 4, 80004) or server errors → record failure
-    if (res.status === 429 || res.status >= 500) {
-      recordFailure(CIRCUIT_SERVICE, `HTTP ${res.status}`);
-    } else if (res.status === 403) {
-      // Check if it's a rate limit (code 4) vs auth error
-      const cloned = res.clone();
-      const body: any = await cloned.json().catch(() => ({}));
-      const errCode = body?.error?.code;
-      if (errCode === 4 || errCode === 80004 || errCode === 32) {
-        recordFailure(CIRCUIT_SERVICE, `Meta error code ${errCode}: ${body?.error?.message || ''}`);
+    try {
+      const res = await fetch(url.toString(), { ...fetchOptions, signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      // Check for rate-limit or server errors
+      const isRateLimit = res.status === 429;
+      const isServerError = res.status >= 500;
+
+      if (isRateLimit || isServerError) {
+        // Check if it's a Meta rate-limit error code
+        let isMetaRateLimit = isRateLimit;
+        if (res.status === 403 || res.status === 400) {
+          const cloned = res.clone();
+          const errBody: any = await cloned.json().catch(() => ({}));
+          const errCode = errBody?.error?.code;
+          if (errCode === 4 || errCode === 80004 || errCode === 32) {
+            isMetaRateLimit = true;
+          }
+        }
+
+        recordFailure(CIRCUIT_SERVICE, `HTTP ${res.status}`, isRateLimit || isMetaRateLimit);
+
+        // If we have retries left, wait and retry
+        if (attempt < MAX_RETRIES) {
+          // Read Retry-After header if present
+          const retryAfter = res.headers.get('Retry-After');
+          let waitMs: number;
+
+          if (retryAfter) {
+            const retrySeconds = parseInt(retryAfter, 10);
+            waitMs = (isNaN(retrySeconds) ? BACKOFF_BASE_MS : retrySeconds * 1000) + Math.random() * 1000;
+          } else {
+            // Exponential backoff: 2s, 4s, 8s + jitter
+            waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 1000;
+          }
+
+          console.warn(`[meta-fetch] HTTP ${res.status} on ${method} ${url.pathname} — retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(waitMs)}ms`);
+          await sleep(waitMs);
+
+          // Re-check circuit breaker before retry
+          if (!canRequest(CIRCUIT_SERVICE)) {
+            return new Response(
+              JSON.stringify({ error: { message: 'Circuit breaker open after retry — Meta API temporarily blocked', code: 'CIRCUIT_OPEN' } }),
+              { status: 503, headers: { 'Content-Type': 'application/json' } },
+            );
+          }
+          continue;
+        }
+
+        // No retries left — return the error response
+        return res;
       }
-      // Auth errors (code 190 etc.) don't trip the circuit
-    } else if (res.ok) {
-      recordSuccess(CIRCUIT_SERVICE);
-    }
 
-    return res;
-  } catch (err: any) {
-    // Network errors trip the circuit
-    if (err.name !== 'AbortError') {
-      recordFailure(CIRCUIT_SERVICE, err.message);
+      // Check for rate-limit error codes in 403/400 responses
+      if (res.status === 403) {
+        const cloned = res.clone();
+        const errBody: any = await cloned.json().catch(() => ({}));
+        const errCode = errBody?.error?.code;
+        if (errCode === 4 || errCode === 80004 || errCode === 32) {
+          recordFailure(CIRCUIT_SERVICE, `Meta error code ${errCode}: ${errBody?.error?.message || ''}`, true);
+
+          if (attempt < MAX_RETRIES) {
+            const waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 1000;
+            console.warn(`[meta-fetch] Meta rate-limit code ${errCode} — retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(waitMs)}ms`);
+            await sleep(waitMs);
+            if (!canRequest(CIRCUIT_SERVICE)) {
+              return new Response(
+                JSON.stringify({ error: { message: 'Circuit breaker open — Meta API temporarily blocked', code: 'CIRCUIT_OPEN' } }),
+                { status: 503, headers: { 'Content-Type': 'application/json' } },
+              );
+            }
+            continue;
+          }
+          return res;
+        }
+        // Non-rate-limit 403 (e.g. auth error) — don't retry
+      }
+
+      if (res.ok) {
+        recordSuccess(CIRCUIT_SERVICE);
+      }
+
+      return res;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        // Timeout — don't retry timeouts (they're slow by nature)
+        throw err;
+      }
+
+      // Network errors trip the circuit
+      recordFailure(CIRCUIT_SERVICE, err.message, false);
+
+      if (attempt < MAX_RETRIES) {
+        const waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 1000;
+        console.warn(`[meta-fetch] Network error: ${err.message} — retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(waitMs)}ms`);
+        await sleep(waitMs);
+        if (!canRequest(CIRCUIT_SERVICE)) {
+          throw new Error('Circuit breaker open after network error — Meta API temporarily blocked');
+        }
+        continue;
+      }
+      throw err;
     }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  // Should never reach here, but TypeScript needs it
+  throw new Error('[meta-fetch] Exhausted all retries');
 }
 
 /**
@@ -135,6 +233,7 @@ export async function metaApiJson<T = any>(
 
 /**
  * Paginate through all pages of a Meta API endpoint.
+ * Includes inter-request delay between pages.
  */
 export async function metaApiPaginateAll<T = any>(
   path: string,
@@ -159,6 +258,7 @@ export async function metaApiPaginateAll<T = any>(
     const cursorUrl = new URL(nextUrl);
     cursorUrl.searchParams.delete('access_token');
 
+    // Delay between pages is handled inside metaApiFetch (META_INTER_REQUEST_DELAY_MS)
     const pageRes = await metaApiFetch(cursorUrl.toString(), token);
     if (!pageRes.ok) break;
 

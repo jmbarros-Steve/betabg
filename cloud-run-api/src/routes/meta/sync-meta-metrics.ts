@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
+import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 
 // Currency conversion utilities
 const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -217,15 +218,15 @@ export async function syncMetaMetrics(c: Context) {
       : `act_${connection.account_id}`;
 
     // First, fetch the ad account currency to determine if conversion is needed
-    const accountInfoUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency,timezone_name`;
-    const accountInfoResponse = await fetch(accountInfoUrl, {
-      headers: { Authorization: `Bearer ${decryptedToken}` },
-    });
     let accountCurrency = 'CLP'; // Default to CLP (no conversion) to avoid 950x error
+    const accountInfoResult = await metaApiJson<AdAccountInfo>(
+      `/${adAccountId}`,
+      decryptedToken,
+      { params: { fields: 'currency,timezone_name' } }
+    );
 
-    if (accountInfoResponse.ok) {
-      const accountInfo: AdAccountInfo = await accountInfoResponse.json() as any;
-      accountCurrency = accountInfo.currency || 'CLP';
+    if (accountInfoResult.ok) {
+      accountCurrency = accountInfoResult.data.currency || 'CLP';
       console.log(`Ad account currency: ${accountCurrency}`);
     } else {
       console.warn('Could not fetch account currency — defaulting to CLP (no conversion)');
@@ -261,13 +262,12 @@ export async function syncMetaMetrics(c: Context) {
     console.log(`Fetching Meta insights for account ${adAccountId}`);
 
     // Fetch all pages of insights (Meta paginates daily breakdown)
+    // Uses metaApiFetch which includes inter-request delay + retry + circuit breaker
     let allInsights: MetaInsightsResponse['data'] = [];
     let nextUrl: string | null = insightsUrl.toString();
 
     while (nextUrl) {
-      const metaResponse = await fetch(nextUrl, {
-        headers: { Authorization: `Bearer ${decryptedToken}` },
-      });
+      const metaResponse = await metaApiFetch(nextUrl, decryptedToken);
 
       if (!metaResponse.ok) {
         const errorData: any = await metaResponse.json();
@@ -284,6 +284,10 @@ export async function syncMetaMetrics(c: Context) {
       }
       nextUrl = pageData.paging?.next || null;
       if (nextUrl) {
+        // Remove access_token from cursor URL (we use Authorization header)
+        const cursorUrl = new URL(nextUrl);
+        cursorUrl.searchParams.delete('access_token');
+        nextUrl = cursorUrl.toString();
         console.log(`Fetching next page of insights (${allInsights.length} days so far)...`);
       }
     }

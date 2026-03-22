@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 
 // Currency conversion utilities
 const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -41,6 +42,32 @@ async function convertToCLP(amount: number, fromCurrency: string): Promise<numbe
     const fromRate = rates[currency] || 1;
     const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
     return (amount / fromRate) * clpRate;
+  }
+}
+
+// Cache account currency by accountId (TTL: 1 hour)
+const currencyCache = new Map<string, { currency: string; fetchedAt: number }>();
+const CURRENCY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+async function getAccountCurrency(adAccountId: string, accessToken: string): Promise<string> {
+  const cached = currencyCache.get(adAccountId);
+  if (cached && Date.now() - cached.fetchedAt < CURRENCY_CACHE_TTL_MS) {
+    return cached.currency;
+  }
+
+  try {
+    const result = await metaApiJson<{ currency?: string }>(
+      `/${adAccountId}`,
+      accessToken,
+      { params: { fields: 'currency' } }
+    );
+    const currency = result.ok ? (result.data.currency || 'CLP') : 'CLP';
+    currencyCache.set(adAccountId, { currency, fetchedAt: Date.now() });
+    console.log(`Meta account currency for ${adAccountId}: ${currency}`);
+    return currency;
+  } catch (e) {
+    console.warn(`Could not fetch account currency for ${adAccountId} — defaulting to CLP`);
+    return 'CLP';
   }
 }
 
@@ -329,57 +356,50 @@ async function syncMetaCampaigns(
   const adAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-  // Get account currency first
-  // Token via Authorization header
-  let accountCurrency = 'CLP'; // Default CLP (no conversion) to avoid 950x error
-  try {
-    const accountRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (accountRes.ok) {
-      const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'CLP';
+  // Get account currency (cached)
+  const accountCurrency = await getAccountCurrency(adAccountId, accessToken);
+
+  // Fetch campaigns via metaApiJson (goes through circuit breaker + retry)
+  const campaignsResult = await metaApiJson<{ data: MetaCampaign[] }>(
+    `/${adAccountId}/campaigns`,
+    accessToken,
+    {
+      params: {
+        fields: 'id,name,status',
+        limit: '100',
+      },
     }
-  } catch (e) {
-    console.warn('Could not fetch account currency — defaulting to CLP (no conversion)');
-  }
-  console.log(`Meta account currency: ${accountCurrency}`);
+  );
 
-  // Fetch campaigns with insights
-  const campaignsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/campaigns`);
-  
-  campaignsUrl.searchParams.set('fields', 'id,name,status');
-  campaignsUrl.searchParams.set('limit', '100');
-
-  const campaignsRes = await fetch(campaignsUrl.toString(), {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!campaignsRes.ok) {
-    console.error('Meta campaigns fetch error:', await campaignsRes.text());
+  if (!campaignsResult.ok) {
+    console.error('Meta campaigns fetch error:', campaignsResult.error);
     return metrics;
   }
 
-  const campaignsData: any = await campaignsRes.json();
-  const campaigns: MetaCampaign[] = campaignsData.data || [];
-
+  const campaigns: MetaCampaign[] = campaignsResult.data?.data || [];
   console.log(`Found ${campaigns.length} Meta campaigns`);
 
-  // Fetch insights for each campaign
+  // Fetch insights for each campaign with delay
   for (const campaign of campaigns) {
-    const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign.id}/insights`);
-    
-    insightsUrl.searchParams.set('fields', 'spend,impressions,reach,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
-    insightsUrl.searchParams.set('time_range', JSON.stringify({
-      since: formatDate(startDate),
-      until: formatDate(endDate)
-    }));
-    insightsUrl.searchParams.set('time_increment', '1');
-
     try {
-      const insightsRes = await fetch(insightsUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!insightsRes.ok) continue;
+      const insightsResult = await metaApiJson<{ data: Array<any> }>(
+        `/${campaign.id}/insights`,
+        accessToken,
+        {
+          params: {
+            fields: 'spend,impressions,reach,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas',
+            time_range: JSON.stringify({
+              since: formatDate(startDate),
+              until: formatDate(endDate),
+            }),
+            time_increment: '1',
+          },
+        }
+      );
 
-      const insightsData: any = await insightsRes.json();
+      if (!insightsResult.ok) continue;
 
-      for (const day of insightsData.data || []) {
+      for (const day of insightsResult.data?.data || []) {
         const purchases = day.actions?.find((a: any) =>
           a.action_type === 'purchase' || a.action_type === 'omni_purchase'
         );
@@ -555,19 +575,8 @@ async function syncMetaAdsetMetrics(
   const adAccountId = accountId.startsWith('act_') ? accountId : `act_${accountId}`;
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-  // Get account currency for conversion
-  let accountCurrency = 'CLP'; // Default CLP (no conversion) to avoid 950x error
-  try {
-    const accountRes = await fetch(
-      `https://graph.facebook.com/v21.0/${adAccountId}?fields=currency`, { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (accountRes.ok) {
-      const accountData: any = await accountRes.json();
-      accountCurrency = accountData.currency || 'CLP';
-    }
-  } catch (e) {
-    console.warn('Could not fetch account currency for adset sync — defaulting to CLP');
-  }
+  // Get account currency (cached — no duplicate call)
+  const accountCurrency = await getAccountCurrency(adAccountId, accessToken);
 
   // Get unique campaign IDs from already-synced campaign metrics
   const campaignIds = [...new Set(campaignMetrics.map(m => m.campaign_id))];
@@ -576,34 +585,42 @@ async function syncMetaAdsetMetrics(
   for (const campaignId of campaignIds) {
     const campaignName = campaignMetrics.find(m => m.campaign_id === campaignId)?.campaign_name || '';
 
-    // Fetch adsets for this campaign
-    const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaignId}/adsets`);
-    
-    adsetsUrl.searchParams.set('fields', 'id,name');
-    adsetsUrl.searchParams.set('limit', '100');
-
+    // Fetch adsets for this campaign via metaApiJson (circuit breaker + retry + delay)
     try {
-      const adsetsRes = await fetch(adsetsUrl.toString());
-      if (!adsetsRes.ok) continue;
-      const adsetsData: any = await adsetsRes.json();
-      const adsets = adsetsData.data || [];
+      const adsetsResult = await metaApiJson<{ data: Array<{ id: string; name: string }> }>(
+        `/${campaignId}/adsets`,
+        accessToken,
+        {
+          params: {
+            fields: 'id,name',
+            limit: '100',
+          },
+        }
+      );
+
+      if (!adsetsResult.ok) continue;
+      const adsets = adsetsResult.data?.data || [];
 
       for (const adset of adsets) {
-        const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);
-        
-        insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
-        insightsUrl.searchParams.set('time_range', JSON.stringify({
-          since: formatDate(startDate),
-          until: formatDate(endDate),
-        }));
-        insightsUrl.searchParams.set('time_increment', '1');
-
         try {
-          const insightsRes = await fetch(insightsUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
-          if (!insightsRes.ok) continue;
-          const insightsData: any = await insightsRes.json();
+          const insightsResult = await metaApiJson<{ data: Array<any> }>(
+            `/${adset.id}/insights`,
+            accessToken,
+            {
+              params: {
+                fields: 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas',
+                time_range: JSON.stringify({
+                  since: formatDate(startDate),
+                  until: formatDate(endDate),
+                }),
+                time_increment: '1',
+              },
+            }
+          );
 
-          for (const day of insightsData.data || []) {
+          if (!insightsResult.ok) continue;
+
+          for (const day of insightsResult.data?.data || []) {
             const purchases = day.actions?.find((a: any) =>
               a.action_type === 'purchase' || a.action_type === 'omni_purchase'
             );

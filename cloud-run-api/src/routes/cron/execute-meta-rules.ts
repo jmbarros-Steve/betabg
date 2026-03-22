@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { metaApiFetch } from '../../lib/meta-fetch.js';
 
 /**
  * Cron: Execute all active Meta automated rules across all clients.
@@ -111,30 +112,29 @@ export async function executeMetaRulesCron(c: Context) {
 
             try {
               if (actionType === 'PAUSE_CAMPAIGN') {
-                const resp = await fetch(`https://graph.facebook.com/v21.0/${campaignId}`, {
+                // Uses metaApiFetch: circuit breaker + retry + inter-request delay
+                const resp = await metaApiFetch(`/${campaignId}`, decryptedToken, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${decryptedToken}` },
-                  body: JSON.stringify({ status: 'PAUSED' }),
+                  body: { status: 'PAUSED' },
                 });
                 executed = resp.ok;
                 execDetails = executed ? 'Campaign paused' : `Pause failed: ${resp.status}`;
               } else if (actionType === 'INCREASE_BUDGET' || actionType === 'DECREASE_BUDGET') {
                 const pct = action.percentage || 20;
                 const multiplier = actionType === 'INCREASE_BUDGET' ? (1 + pct / 100) : (1 - pct / 100);
-                // Fetch ad sets for this campaign
-                const adsetsResp = await fetch(
-                  `https://graph.facebook.com/v21.0/${campaignId}/adsets?fields=id,daily_budget&limit=50`,
-                  { headers: { Authorization: `Bearer ${decryptedToken}` } }
-                );
+                // Fetch ad sets for this campaign via metaApiFetch
+                const adsetsResp = await metaApiFetch(`/${campaignId}/adsets`, decryptedToken, {
+                  params: { fields: 'id,daily_budget', limit: '50' },
+                });
                 if (adsetsResp.ok) {
                   const adsetsData: any = await adsetsResp.json();
                   for (const adset of (adsetsData.data || [])) {
                     if (!adset.daily_budget) continue;
                     const newBudget = Math.round(parseFloat(adset.daily_budget) * multiplier);
-                    await fetch(`https://graph.facebook.com/v21.0/${adset.id}`, {
+                    // Each adset update goes through circuit breaker + delay
+                    await metaApiFetch(`/${adset.id}`, decryptedToken, {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${decryptedToken}` },
-                      body: JSON.stringify({ daily_budget: newBudget }),
+                      body: { daily_budget: newBudget },
                     });
                   }
                   executed = true;

@@ -40,7 +40,17 @@ export async function syncAllMetrics(c: Context) {
     return c.json({ error: 'SELF_URL not configured' }, 500);
   }
 
-  for (const conn of connections) {
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  for (let i = 0; i < connections.length; i++) {
+    const conn = connections[i];
+
+    // Delay between Meta connections to spread out API calls
+    if (i > 0 && conn.platform === 'meta') {
+      console.log(`[cron] Waiting 2s before syncing next Meta connection...`);
+      await sleep(2000);
+    }
+
     try {
       let endpoint: string;
       let body: Record<string, string>;
