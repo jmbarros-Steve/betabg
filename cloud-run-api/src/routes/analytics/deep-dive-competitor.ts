@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 interface DeepDiveResult {
   tech_stack: {
-    platform: string | null; // 'shopify', 'magento', 'vtex', 'woocommerce', 'custom'
+    platform: string | null; // 'shopify', 'magento', 'vtex', 'woocommerce', 'custom', etc.
     platform_evidence: string | null;
     cms_detected: string | null;
   };
@@ -33,6 +33,15 @@ interface DeepDiveResult {
     og_image: string | null;
     language: string | null;
   };
+  ai_insights?: {
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+    digital_sophistication: string;
+  } | null;
+  partial?: boolean;
+  html_source?: 'direct' | 'apify' | 'none';
 }
 
 function detectPlatform(html: string, markdown: string): DeepDiveResult['tech_stack'] {
@@ -59,6 +68,22 @@ function detectPlatform(html: string, markdown: string): DeepDiveResult['tech_st
   if (htmlLower.includes('jumpseller')) {
     return { platform: 'jumpseller', platform_evidence: 'Jumpseller detected', cms_detected: 'Jumpseller' };
   }
+  // New platforms
+  if (htmlLower.includes('static.wixstatic.com') || htmlLower.includes('wix.com')) {
+    return { platform: 'wix', platform_evidence: 'Wix static assets detected', cms_detected: 'Wix' };
+  }
+  if (htmlLower.includes('squarespace.com') || htmlLower.includes('static1.squarespace.com')) {
+    return { platform: 'squarespace', platform_evidence: 'Squarespace CDN detected', cms_detected: 'Squarespace' };
+  }
+  if (htmlLower.includes('bigcommerce.com') || htmlLower.includes('cdn11.bigcommerce.com')) {
+    return { platform: 'bigcommerce', platform_evidence: 'BigCommerce CDN detected', cms_detected: 'BigCommerce' };
+  }
+  if (htmlLower.includes('webflow.com') || htmlLower.includes('assets.website-files.com')) {
+    return { platform: 'webflow', platform_evidence: 'Webflow assets detected', cms_detected: 'Webflow' };
+  }
+  if (htmlLower.includes('bootic.io')) {
+    return { platform: 'bootic', platform_evidence: 'Bootic platform detected', cms_detected: 'Bootic' };
+  }
 
   return { platform: 'custom', platform_evidence: 'No known platform signature found', cms_detected: null };
 }
@@ -81,7 +106,7 @@ function detectTrackingScripts(html: string): DeepDiveResult['tracking_scripts']
   if (htmlLower.includes('criteo.com') || htmlLower.includes('criteo.net')) other.push('Criteo');
   if (htmlLower.includes('clarity.ms')) other.push('Microsoft Clarity');
   if (htmlLower.includes('segment.com') || htmlLower.includes('analytics.js')) other.push('Segment');
-  if (htmlLower.includes('intercom.com') || htmlLower.includes('intercomSettings')) other.push('Intercom');
+  if (htmlLower.includes('intercom.com') || htmlLower.includes('intercomsettings')) other.push('Intercom');
   if (htmlLower.includes('zendesk.com')) other.push('Zendesk');
 
   // Calculate sophistication
@@ -151,8 +176,9 @@ function extractOffer(html: string, markdown: string): DeepDiveResult['irresisti
     /(cuotas?\s*sin\s*interés)/i,
   ];
   let discountMessaging: string | null = null;
+  const searchText = markdown || html;
   for (const pattern of discountPatterns) {
-    const match = markdown.match(pattern);
+    const match = searchText.match(pattern);
     if (match) {
       discountMessaging = match[1];
       break;
@@ -181,6 +207,120 @@ function extractPageMeta(html: string): DeepDiveResult['page_meta'] {
     og_image: ogImageMatch ? ogImageMatch[1].trim() : null,
     language: langMatch ? langMatch[1].trim() : null,
   };
+}
+
+async function fetchDirectHtml(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
+      },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      console.log(`[deep-dive] Direct fetch failed: HTTP ${resp.status}`);
+      return '';
+    }
+
+    const text = await resp.text();
+    return text;
+  } catch (err: any) {
+    console.log(`[deep-dive] Direct fetch error: ${err.message}`);
+    return '';
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function generateAIInsights(
+  result: Omit<DeepDiveResult, 'ai_insights' | 'partial' | 'html_source'>,
+  markdown: string,
+  url: string
+): Promise<DeepDiveResult['ai_insights']> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    console.log('[deep-dive] ANTHROPIC_API_KEY not configured, skipping AI insights');
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const analysisContext = `
+URL: ${url}
+Plataforma: ${result.tech_stack.platform || 'No detectada'} (${result.tech_stack.platform_evidence || ''})
+Tracking Scripts: Meta Pixel=${result.tracking_scripts.meta_pixel}, GTM=${result.tracking_scripts.google_tag_manager}, GA=${result.tracking_scripts.google_analytics}, TikTok=${result.tracking_scripts.tiktok_pixel}, Klaviyo=${result.tracking_scripts.klaviyo}, Hotjar=${result.tracking_scripts.hotjar}
+Otros scripts: ${result.tracking_scripts.other.join(', ') || 'Ninguno'}
+Nivel marketing: ${result.tracking_scripts.marketing_sophistication}
+Título: ${result.page_meta.title || 'No detectado'}
+Descripción: ${result.page_meta.description || 'No detectada'}
+H1: ${result.irresistible_offer.h1 || 'No detectado'}
+Descuento: ${result.irresistible_offer.discount_messaging || 'No detectado'}
+Productos: ${result.irresistible_offer.featured_products.length}
+
+Contenido de la página (primeros 3000 chars):
+${markdown.slice(0, 3000)}
+`.trim();
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: `Eres Steve, un analista de marketing digital experto. Analiza esta tienda online de un competidor y genera insights estratégicos en español.
+
+${analysisContext}
+
+Responde SOLO con JSON válido (sin markdown, sin backticks), con esta estructura exacta:
+{
+  "summary": "Resumen ejecutivo de 1-2 oraciones sobre la tienda",
+  "strengths": ["Fortaleza 1", "Fortaleza 2", "Fortaleza 3"],
+  "weaknesses": ["Debilidad 1", "Debilidad 2"],
+  "recommendations": ["Recomendación 1 para superar a este competidor", "Recomendación 2"],
+  "digital_sophistication": "Una evaluación breve del nivel digital (ej: 'Nivel medio-alto con buen stack de tracking pero sin personalización avanzada')"
+}`
+        }],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      console.error(`[deep-dive] AI insights API error: ${resp.status}`);
+      return null;
+    }
+
+    const aiData: any = await resp.json();
+    const text = aiData.content?.[0]?.text || '';
+
+    const parsed = JSON.parse(text);
+    return {
+      summary: parsed.summary || '',
+      strengths: parsed.strengths || [],
+      weaknesses: parsed.weaknesses || [],
+      recommendations: parsed.recommendations || [],
+      digital_sophistication: parsed.digital_sophistication || '',
+    };
+  } catch (err: any) {
+    console.error(`[deep-dive] AI insights error: ${err.message}`);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function deepDiveCompetitor(c: Context) {
@@ -221,48 +361,98 @@ export async function deepDiveCompetitor(c: Context) {
       url = `https://${url}`;
     }
 
-    console.log(`[deep-dive] Scraping: ${url}`);
+    console.log(`[deep-dive] Starting analysis for: ${url}`);
 
-    // Scrape with Apify - get markdown content
-    const scrapeResponse = await fetch(
-      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startUrls: [{ url }],
-          maxCrawlPages: 1,
-          outputFormats: ['markdown'],
-        }),
+    // === STEP 1: Direct fetch for raw HTML (fast, free) ===
+    console.log(`[deep-dive] Step 1: Direct HTML fetch...`);
+    const directHtml = await fetchDirectHtml(url);
+    console.log(`[deep-dive] Direct fetch: ${directHtml.length} chars`);
+
+    // === STEP 2: Apify for markdown + rendered HTML ===
+    console.log(`[deep-dive] Step 2: Apify crawl (markdown + html)...`);
+    let apifyHtml = '';
+    let markdown = '';
+
+    try {
+      const scrapeResponse = await fetch(
+        `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startUrls: [{ url }],
+            maxCrawlPages: 1,
+            outputFormats: ['markdown', 'html'],
+          }),
+        }
+      );
+
+      if (scrapeResponse.ok) {
+        const items: any = await scrapeResponse.json();
+        markdown = items?.[0]?.text || items?.[0]?.markdown || '';
+        apifyHtml = items?.[0]?.html || '';
+        console.log(`[deep-dive] Apify: ${apifyHtml.length} chars HTML, ${markdown.length} chars markdown`);
+      } else {
+        const errData: any = await scrapeResponse.json().catch(() => ({}));
+        console.error('[deep-dive] Apify error:', errData);
       }
-    );
-
-    if (!scrapeResponse.ok) {
-      const errData: any = await scrapeResponse.json();
-      console.error('[deep-dive] Apify error:', errData);
-      return c.json({ error: 'Failed to scrape store', details: errData.error || 'Unknown' }, 502);
+    } catch (apifyErr: any) {
+      console.error(`[deep-dive] Apify fetch error: ${apifyErr.message}`);
     }
 
-    const items: any = await scrapeResponse.json();
-    const markdown = items?.[0]?.text || items?.[0]?.markdown || '';
-    // Apify website-content-crawler returns HTML in the html field when available
-    const html = items?.[0]?.html || '';
+    // === STEP 3: Choose best HTML source ===
+    // Prefer direct HTML (more complete for scripts/meta tags)
+    // Fallback to Apify HTML if direct failed
+    let html: string;
+    let htmlSource: 'direct' | 'apify' | 'none';
+
+    if (directHtml.length > 500) {
+      html = directHtml;
+      htmlSource = 'direct';
+    } else if (apifyHtml.length > 500) {
+      html = apifyHtml;
+      htmlSource = 'apify';
+    } else {
+      html = directHtml || apifyHtml;
+      htmlSource = 'none';
+    }
+
+    console.log(`[deep-dive] Using HTML from: ${htmlSource} (${html.length} chars)`);
 
     if (!html && !markdown) {
-      return c.json({ error: 'No content extracted from URL' }, 422);
+      return c.json({ error: 'No content extracted from URL. The site may be blocking automated requests.' }, 422);
     }
 
-    console.log(`[deep-dive] Got ${html.length} chars HTML, ${markdown.length} chars markdown`);
+    // === STEP 4: Analyze ===
+    console.log(`[deep-dive] Step 3: Running analysis...`);
 
-    // Analyze
-    const result: DeepDiveResult = {
-      tech_stack: detectPlatform(html, markdown),
-      irresistible_offer: extractOffer(html, markdown),
-      tracking_scripts: detectTrackingScripts(html),
-      page_meta: extractPageMeta(html),
+    const techStack = detectPlatform(html, markdown);
+    const trackingScripts = detectTrackingScripts(html);
+    const offer = extractOffer(html, markdown);
+    const pageMeta = extractPageMeta(html);
+
+    console.log(`[deep-dive] Platform: ${techStack.platform}, Sophistication: ${trackingScripts.marketing_sophistication}`);
+    console.log(`[deep-dive] Meta Pixel: ${trackingScripts.meta_pixel}, GTM: ${trackingScripts.google_tag_manager}, Klaviyo: ${trackingScripts.klaviyo}`);
+    console.log(`[deep-dive] Title: ${pageMeta.title?.slice(0, 60) || 'none'}`);
+
+    // === STEP 5: AI Insights ===
+    console.log(`[deep-dive] Step 4: Generating AI insights...`);
+    const baseResult = {
+      tech_stack: techStack,
+      irresistible_offer: offer,
+      tracking_scripts: trackingScripts,
+      page_meta: pageMeta,
     };
+    const aiInsights = await generateAIInsights(baseResult, markdown, url);
+    console.log(`[deep-dive] AI insights: ${aiInsights ? 'generated' : 'skipped/failed'}`);
 
-    console.log(`[deep-dive] Platform: ${result.tech_stack.platform}, Sophistication: ${result.tracking_scripts.marketing_sophistication}`);
+    // === Build final result ===
+    const result: DeepDiveResult = {
+      ...baseResult,
+      ai_insights: aiInsights,
+      partial: htmlSource === 'none',
+      html_source: htmlSource,
+    };
 
     // Store results
     const { error: updateError } = await supabase
@@ -279,6 +469,7 @@ export async function deepDiveCompetitor(c: Context) {
       return c.json({ error: 'Failed to save results', details: updateError.message }, 500);
     }
 
+    console.log(`[deep-dive] Analysis complete for ${url}`);
     return c.json({ success: true, data: result });
 
   } catch (error) {

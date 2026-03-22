@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,20 @@ import { toast } from 'sonner';
 import {
   Loader2, Globe, Code, ShoppingCart, BarChart3,
   Eye, CheckCircle2, XCircle, AlertTriangle, Zap,
-  DollarSign, Tag, Smartphone, Search
+  DollarSign, Tag, Smartphone, Search, FileText,
+  Brain, ThumbsUp, ThumbsDown, Lightbulb, Image
 } from 'lucide-react';
 
 interface CompetitorDeepDivePanelProps {
   clientId: string;
+}
+
+interface AIInsights {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  digital_sophistication: string;
 }
 
 interface DeepDiveData {
@@ -45,6 +54,9 @@ interface DeepDiveData {
     og_image: string | null;
     language: string | null;
   };
+  ai_insights?: AIInsights | null;
+  partial?: boolean;
+  html_source?: string;
 }
 
 interface TrackingRecord {
@@ -64,24 +76,46 @@ const PLATFORM_COLORS: Record<string, string> = {
   prestashop: 'bg-muted text-muted-foreground border-border',
   tiendanube: 'bg-secondary text-secondary-foreground border-secondary',
   jumpseller: 'bg-accent/10 text-accent-foreground border-accent/30',
+  wix: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700',
+  squarespace: 'bg-neutral-100 text-neutral-800 border-neutral-300 dark:bg-neutral-900 dark:text-neutral-300 dark:border-neutral-600',
+  bigcommerce: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-700',
+  webflow: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-700',
+  bootic: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-700',
   custom: 'bg-muted text-muted-foreground border-border',
 };
 
 const SOPHISTICATION_CONFIG = {
-  basic: { label: 'Básica', color: 'destructive' as const, icon: AlertTriangle },
+  basic: { label: 'Basica', color: 'destructive' as const, icon: AlertTriangle },
   intermediate: { label: 'Intermedia', color: 'secondary' as const, icon: BarChart3 },
   advanced: { label: 'Avanzada', color: 'default' as const, icon: Zap },
 };
+
+const LOADING_STEPS = [
+  'Descargando HTML...',
+  'Analizando tech stack...',
+  'Detectando scripts de tracking...',
+  'Extrayendo oferta y productos...',
+  'Generando insights con Steve AI...',
+];
 
 export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelProps) {
   const [competitors, setCompetitors] = useState<TrackingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrapingId, setScrapingId] = useState<string | null>(null);
   const [urlInputs, setUrlInputs] = useState<Record<string, string>>({});
+  const [loadingStep, setLoadingStep] = useState(0);
+  const loadingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchCompetitors();
   }, [clientId]);
+
+  // Cleanup loading interval on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingInterval.current) clearInterval(loadingInterval.current);
+    };
+  }, []);
 
   async function fetchCompetitors() {
     setLoading(true);
@@ -101,6 +135,29 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
     setLoading(false);
   }
 
+  function startLoadingSteps() {
+    setLoadingStep(0);
+    if (loadingInterval.current) clearInterval(loadingInterval.current);
+    let step = 0;
+    loadingInterval.current = setInterval(() => {
+      step++;
+      if (step < LOADING_STEPS.length) {
+        setLoadingStep(step);
+      } else {
+        // Stay on last step
+        if (loadingInterval.current) clearInterval(loadingInterval.current);
+      }
+    }, 8000); // ~8s per step, total ~40s for 5 steps
+  }
+
+  function stopLoadingSteps() {
+    if (loadingInterval.current) {
+      clearInterval(loadingInterval.current);
+      loadingInterval.current = null;
+    }
+    setLoadingStep(0);
+  }
+
   async function handleDeepDive(competitor: TrackingRecord) {
     const url = urlInputs[competitor.id]?.trim();
     if (!url) {
@@ -109,6 +166,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
     }
 
     setScrapingId(competitor.id);
+    startLoadingSteps();
     try {
       const response = await callApi('deep-dive-competitor', {
         body: {
@@ -116,6 +174,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
           tracking_id: competitor.id,
           store_url: url,
         },
+        timeoutMs: 120000, // 120s timeout (AI insights adds time)
       });
 
       if (response.error) throw new Error(response.error.message);
@@ -124,9 +183,9 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
       toast.success(`Deep Dive completado para @${competitor.ig_handle}`);
       await fetchCompetitors();
     } catch (err: any) {
-      // Error handled by toast below
-      toast.error(err.message || 'Error en el análisis');
+      toast.error(err.message || 'Error en el analisis');
     } finally {
+      stopLoadingSteps();
       setScrapingId(null);
     }
   }
@@ -142,8 +201,8 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
           <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Sin Competidores Configurados</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Primero agrega competidores en la pestaña <strong>Competencia</strong> con sus handles de Instagram.
-            Luego vuelve aquí para hacer el Deep Dive de sus tiendas.
+            Primero agrega competidores en la pestana <strong>Competencia</strong> con sus handles de Instagram.
+            Luego vuelve aqui para hacer el Deep Dive de sus tiendas.
           </p>
         </CardContent>
       </Card>
@@ -158,10 +217,10 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
       <div>
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Code className="h-5 w-5 text-primary" />
-          Deep Dive — Análisis de Tiendas
+          Deep Dive — Analisis de Tiendas
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Disecciona las landing pages de tus competidores: tech stack, ofertas y scripts de tracking.
+          Disecciona las landing pages de tus competidores: tech stack, ofertas, scripts de tracking e insights AI.
         </p>
       </div>
 
@@ -173,30 +232,38 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
         </CardHeader>
         <CardContent className="space-y-3">
           {competitors.map(comp => (
-            <div key={comp.id} className="flex items-center gap-3">
-              <Badge variant="outline" className="flex-shrink-0 text-xs min-w-[100px] justify-center">
-                @{comp.ig_handle}
-              </Badge>
-              <Input
-                value={urlInputs[comp.id] || ''}
-                onChange={(e) => setUrlInputs(prev => ({ ...prev, [comp.id]: e.target.value }))}
-                placeholder="https://tienda-competidor.com"
-                className="flex-1"
-                disabled={scrapingId === comp.id}
-              />
-              <Button
-                size="sm"
-                onClick={() => handleDeepDive(comp)}
-                disabled={scrapingId !== null || !(urlInputs[comp.id]?.trim())}
-              >
-                {scrapingId === comp.id ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Analizando...</>
-                ) : comp.deep_dive_data ? (
-                  <><Eye className="h-4 w-4 mr-1" />Re-analizar</>
-                ) : (
-                  <><Zap className="h-4 w-4 mr-1" />Analizar</>
-                )}
-              </Button>
+            <div key={comp.id} className="space-y-1">
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="flex-shrink-0 text-xs min-w-[100px] justify-center">
+                  @{comp.ig_handle}
+                </Badge>
+                <Input
+                  value={urlInputs[comp.id] || ''}
+                  onChange={(e) => setUrlInputs(prev => ({ ...prev, [comp.id]: e.target.value }))}
+                  placeholder="https://tienda-competidor.com"
+                  className="flex-1"
+                  disabled={scrapingId === comp.id}
+                />
+                <Button
+                  size="sm"
+                  onClick={() => handleDeepDive(comp)}
+                  disabled={scrapingId !== null || !(urlInputs[comp.id]?.trim())}
+                >
+                  {scrapingId === comp.id ? (
+                    <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Analizando...</>
+                  ) : comp.deep_dive_data ? (
+                    <><Eye className="h-4 w-4 mr-1" />Re-analizar</>
+                  ) : (
+                    <><Zap className="h-4 w-4 mr-1" />Analizar</>
+                  )}
+                </Button>
+              </div>
+              {scrapingId === comp.id && (
+                <div className="flex items-center gap-2 ml-[112px] text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {LOADING_STEPS[loadingStep]}
+                </div>
+              )}
             </div>
           ))}
         </CardContent>
@@ -209,13 +276,13 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
           <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
             <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
             <p className="text-xs text-yellow-700 dark:text-yellow-300">
-              Los datos se extraen del HTML público de la tienda. Campos marcados como "No se pudo verificar" significan que no encontramos evidencia concreta en el sitio — no se inventan datos.
+              Los datos se extraen del HTML publico de la tienda. Campos marcados como "No se pudo verificar" significan que no encontramos evidencia concreta en el sitio — no se inventan datos.
             </p>
           </div>
           {/* Summary comparison */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Comparación Rápida</CardTitle>
+              <CardTitle className="text-base">Comparacion Rapida</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -290,14 +357,50 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         </a>
                       )}
                     </CardTitle>
-                    {comp.last_deep_dive_at && (
-                      <span className="text-xs text-muted-foreground">
-                        Analizado: {new Date(comp.last_deep_dive_at).toLocaleDateString('es-CL')}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {dd.partial && (
+                        <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-700">
+                          Parcial
+                        </Badge>
+                      )}
+                      {comp.last_deep_dive_at && (
+                        <span className="text-xs text-muted-foreground">
+                          Analizado: {new Date(comp.last_deep_dive_at).toLocaleDateString('es-CL')}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {/* Page Meta */}
+                  {(dd.page_meta.title || dd.page_meta.description || dd.page_meta.og_image) && (
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary" />
+                        Metadata de la Pagina
+                      </h4>
+                      {dd.page_meta.title && (
+                        <p className="text-sm"><span className="text-muted-foreground">Titulo:</span> {dd.page_meta.title}</p>
+                      )}
+                      {dd.page_meta.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{dd.page_meta.description}</p>
+                      )}
+                      {dd.page_meta.og_image && (
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <Image className="h-3 w-3" /> OG Image:
+                          </p>
+                          <img
+                            src={dd.page_meta.og_image}
+                            alt="OG Image"
+                            className="rounded-md border border-border max-h-32 object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid gap-4 md:grid-cols-3">
                     {/* Tech Stack */}
                     <div className="bg-muted/50 rounded-lg p-4 space-y-2">
@@ -386,6 +489,70 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                       </div>
                     </div>
                   </div>
+
+                  {/* AI Insights */}
+                  {dd.ai_insights && (
+                    <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 space-y-3 border border-primary/20">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <Brain className="h-4 w-4 text-primary" />
+                        Insights de Steve AI
+                      </h4>
+
+                      {dd.ai_insights.summary && (
+                        <p className="text-sm">{dd.ai_insights.summary}</p>
+                      )}
+
+                      {dd.ai_insights.digital_sophistication && (
+                        <p className="text-xs text-muted-foreground italic">
+                          {dd.ai_insights.digital_sophistication}
+                        </p>
+                      )}
+
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {/* Strengths */}
+                        {dd.ai_insights.strengths.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold flex items-center gap-1 text-green-700 dark:text-green-400">
+                              <ThumbsUp className="h-3 w-3" /> Fortalezas
+                            </p>
+                            <ul className="space-y-0.5">
+                              {dd.ai_insights.strengths.map((s, i) => (
+                                <li key={i} className="text-xs text-muted-foreground">- {s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Weaknesses */}
+                        {dd.ai_insights.weaknesses.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold flex items-center gap-1 text-red-700 dark:text-red-400">
+                              <ThumbsDown className="h-3 w-3" /> Debilidades
+                            </p>
+                            <ul className="space-y-0.5">
+                              {dd.ai_insights.weaknesses.map((w, i) => (
+                                <li key={i} className="text-xs text-muted-foreground">- {w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Recommendations */}
+                        {dd.ai_insights.recommendations.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold flex items-center gap-1 text-blue-700 dark:text-blue-400">
+                              <Lightbulb className="h-3 w-3" /> Recomendaciones
+                            </p>
+                            <ul className="space-y-0.5">
+                              {dd.ai_insights.recommendations.map((r, i) => (
+                                <li key={i} className="text-xs text-muted-foreground">- {r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
