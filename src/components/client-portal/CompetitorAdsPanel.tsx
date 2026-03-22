@@ -147,7 +147,8 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             .from('competitor_ads')
             .select('*')
             .in('tracking_id', trackingIds)
-            .order('days_running', { ascending: false, nullsFirst: false });
+            .order('started_at', { ascending: false, nullsFirst: false })
+            .limit(30);
 
           if (Array.isArray(adsData)) {
             setAds(adsData as CompetitorAd[]);
@@ -390,6 +391,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     navigator.clipboard?.writeText(context).catch(() => {});
   }
 
+  // Ads already limited to 30 newest from DB query
   const filteredAds = ads.filter(ad => {
     if (filter === 'winners') return (ad.days_running || 0) >= 30;
     if (filter === 'active') return ad.is_active;
@@ -818,10 +820,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                     {ad.ad_type && (
                       <Badge variant="outline" className="text-xs">{ad.ad_type}</Badge>
                     )}
-                    {ad.cta_type && CTA_LABELS[ad.cta_type] && (
+                    {ad.cta_type && (
                       <span className="flex items-center gap-1">
-                        {CTA_LABELS[ad.cta_type].icon}
-                        {CTA_LABELS[ad.cta_type].label}
+                        {CTA_LABELS[ad.cta_type]?.icon || <Megaphone className="h-3 w-3" />}
+                        {CTA_LABELS[ad.cta_type]?.label || ad.cta_type}
                       </span>
                     )}
                   </div>
