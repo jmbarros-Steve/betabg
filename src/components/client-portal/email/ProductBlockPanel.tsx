@@ -349,7 +349,7 @@ export function ProductBlockPanel({ clientId, isOpen, onClose, onInsert }: Produ
   return createPortal(
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50"
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="bg-background rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-lg"
