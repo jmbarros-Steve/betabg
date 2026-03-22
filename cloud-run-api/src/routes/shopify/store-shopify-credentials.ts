@@ -2,41 +2,22 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 /**
- * Store per-client Shopify OAuth credentials.
- *
- * Receives the client's Shopify install link and Client Secret,
- * parses the client_id from the link, encrypts the secret,
- * upserts into platform_connections, and returns the install link
- * so the frontend can redirect to Shopify OAuth.
+ * Store Shopify Custom App Client ID + Client Secret (OAuth credentials).
+ * 
+ * These credentials are needed before the OAuth install link can work.
+ * The merchant creates a Custom App in Shopify Admin, and provides
+ * the Client ID and Client Secret from the API credentials tab.
  *
  * POST /api/store-shopify-credentials (authMiddleware)
- * Body: { clientId, installLink, shopifyClientSecret, shopDomain }
+ * Body: { clientId, shopDomain, shopifyClientId, shopifyClientSecret }
  */
 export async function storeShopifyCredentials(c: Context) {
   try {
     const body = await c.req.json();
-    const { clientId, installLink, shopifyClientSecret, shopDomain } = body;
+    const { clientId, shopDomain, shopifyClientId, shopifyClientSecret } = body;
 
-    if (!clientId || !installLink || !shopifyClientSecret || !shopDomain) {
-      return c.json({ error: 'Missing required fields: clientId, installLink, shopifyClientSecret, shopDomain' }, 400);
-    }
-
-    // Parse shopifyClientId from the install link
-    // Format: https://admin.shopify.com/store/{handle}/oauth/install?client_id={client_id}
-    let shopifyClientId: string;
-    try {
-      const linkUrl = new URL(installLink.trim());
-      shopifyClientId = linkUrl.searchParams.get('client_id') || '';
-      if (!shopifyClientId) {
-        return c.json({ error: 'No se encontró client_id en el enlace de instalación. Verifica que sea un enlace válido de Shopify Partners.' }, 400);
-      }
-    } catch {
-      return c.json({ error: 'El enlace de instalación no es una URL válida' }, 400);
-    }
-
-    // Validate shopifyClientSecret format (basic check)
-    if (shopifyClientSecret.trim().length < 10) {
-      return c.json({ error: 'Invalid Shopify Client Secret' }, 400);
+    if (!clientId || !shopDomain || !shopifyClientId || !shopifyClientSecret) {
+      return c.json({ error: 'Faltan campos requeridos: clientId, shopDomain, shopifyClientId, shopifyClientSecret' }, 400);
     }
 
     // Normalize domain
@@ -46,14 +27,9 @@ export async function storeShopifyCredentials(c: Context) {
       normalizedDomain = `${normalizedDomain}.myshopify.com`;
     }
 
-    const shopRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
-    if (!shopRegex.test(normalizedDomain)) {
-      return c.json({ error: 'Invalid shop domain format' }, 400);
-    }
-
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Validate that the authenticated user owns this client
+    // Validate that the authenticated user owns this client or is super admin
     const userId = (c as any).userId;
     if (userId) {
       const { data: client } = await supabaseAdmin
@@ -71,7 +47,7 @@ export async function storeShopifyCredentials(c: Context) {
           .single();
 
         if (!role?.is_super_admin && role?.role !== 'admin') {
-          return c.json({ error: 'Unauthorized: you do not own this client' }, 403);
+          return c.json({ error: 'No autorizado' }, 403);
         }
       }
     }
@@ -82,42 +58,54 @@ export async function storeShopifyCredentials(c: Context) {
 
     if (encryptError) {
       console.error('Error encrypting Shopify client secret:', encryptError);
-      return c.json({ error: 'Error encrypting credentials' }, 500);
+      return c.json({ error: 'Error al cifrar las credenciales' }, 500);
     }
 
-    // Upsert platform_connections with Shopify credentials (inactive until OAuth completes)
+    // Upsert platform_connections
     const { data: existing } = await supabaseAdmin
       .from('platform_connections')
       .select('id')
       .eq('client_id', clientId)
       .eq('platform', 'shopify')
-      .single();
+      .maybeSingle();
+
+    const connectionData = {
+      shopify_client_id: shopifyClientId.trim(),
+      shopify_client_secret_encrypted: encryptedSecret,
+      shop_domain: normalizedDomain,
+      store_url: `https://${normalizedDomain}`,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    };
 
     if (existing) {
-      await supabaseAdmin.from('platform_connections').update({
-        shopify_client_id: shopifyClientId,
-        shopify_client_secret_encrypted: encryptedSecret,
-        shop_domain: normalizedDomain,
-        store_url: `https://${normalizedDomain}`,
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      }).eq('id', existing.id);
+      const { error: updateErr } = await supabaseAdmin
+        .from('platform_connections')
+        .update(connectionData)
+        .eq('id', existing.id);
+
+      if (updateErr) {
+        console.error('Error updating platform_connections:', updateErr);
+        return c.json({ error: 'Error al actualizar la conexión' }, 500);
+      }
     } else {
-      await supabaseAdmin.from('platform_connections').insert({
-        client_id: clientId,
-        platform: 'shopify',
-        shopify_client_id: shopifyClientId,
-        shopify_client_secret_encrypted: encryptedSecret,
-        shop_domain: normalizedDomain,
-        store_url: `https://${normalizedDomain}`,
-        is_active: false,
-      });
+      const { error: insertErr } = await supabaseAdmin
+        .from('platform_connections')
+        .insert({
+          client_id: clientId,
+          platform: 'shopify',
+          ...connectionData,
+        });
+
+      if (insertErr) {
+        console.error('Error inserting platform_connections:', insertErr);
+        return c.json({ error: 'Error al crear la conexión' }, 500);
+      }
     }
 
-    console.log('Stored Shopify credentials for client:', clientId, 'shopifyClientId:', shopifyClientId);
+    console.log('Shopify credentials stored for client:', clientId, 'domain:', normalizedDomain);
 
-    // Return the install link directly — the client will be redirected to Shopify
-    return c.json({ success: true, installUrl: installLink.trim() });
+    return c.json({ success: true, shopDomain: normalizedDomain });
   } catch (error: any) {
     console.error('Error in store-shopify-credentials:', error);
     return c.json({ error: error.message }, 500);

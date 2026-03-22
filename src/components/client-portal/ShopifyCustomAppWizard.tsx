@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
 
@@ -55,7 +56,11 @@ export function ShopifyCustomAppWizard({
   const [domain, setDomain] = useState('');
   const [error, setError] = useState('');
   const [scopesCopied, setScopesCopied] = useState(false);
+  const [shopifyClientId, setShopifyClientId] = useState('');
+  const [shopifyClientSecret, setShopifyClientSecret] = useState('');
+  const [savingCredentials, setSavingCredentials] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cleanup polling on unmount
@@ -63,21 +68,22 @@ export function ShopifyCustomAppWizard({
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Start polling when step 4 is shown
+  // Start polling when step 5 is shown (install step)
   useEffect(() => {
-    if (step === 4 && open) {
+    if (step === 5 && open) {
       setPolling(true);
       pollRef.current = setInterval(async () => {
         const { data } = await supabase
           .from('platform_connections')
-          .select('id')
+          .select('id, access_token_encrypted')
           .eq('client_id', clientId)
           .eq('platform', 'shopify')
           .limit(1);
-        if (data && data.length > 0) {
+        // Connection exists AND has the OAuth token (not just the client credentials)
+        if (data && data.length > 0 && data[0].access_token_encrypted) {
           if (pollRef.current) clearInterval(pollRef.current);
           setPolling(false);
-          setStep(5);
+          setStep(6);
           onConnected();
         }
       }, 3000);
@@ -93,7 +99,10 @@ export function ShopifyCustomAppWizard({
     setDomain('');
     setError('');
     setScopesCopied(false);
+    setShopifyClientId('');
+    setShopifyClientSecret('');
     setPolling(false);
+    setLinkCopied(false);
     if (pollRef.current) clearInterval(pollRef.current);
     onClose();
   };
@@ -108,6 +117,7 @@ export function ShopifyCustomAppWizard({
 
   const cleanDomain = normalizeDomain(domain);
   const isValidDomain = cleanDomain && /^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(cleanDomain);
+  const shopDomain = `${cleanDomain}.myshopify.com`;
   const adminUrl = cleanDomain
     ? `https://admin.shopify.com/store/${cleanDomain}/settings/apps/development`
     : '';
@@ -115,11 +125,50 @@ export function ShopifyCustomAppWizard({
   const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://betabgnuevosupa.vercel.app';
   const redirectUrl = `${API_BASE}/api/shopify-oauth-callback`;
 
+  // Install link — only works after credentials are saved (step 4)
+  const installLink = `${API_BASE}/api/shopify-install?shop=${encodeURIComponent(shopDomain)}&client_id=${encodeURIComponent(clientId)}`;
+
   const handleCopyScopes = () => {
     navigator.clipboard.writeText(REQUIRED_SCOPES.join(', '));
     setScopesCopied(true);
     toast.success('Permisos copiados');
     setTimeout(() => setScopesCopied(false), 2000);
+  };
+
+  const handleCopyInstallLink = () => {
+    navigator.clipboard.writeText(installLink);
+    setLinkCopied(true);
+    toast.success('Link copiado — pégalo en tu navegador');
+    setTimeout(() => setLinkCopied(false), 3000);
+  };
+
+  // Save Client ID + Client Secret to backend
+  const handleSaveCredentials = async () => {
+    if (!shopifyClientId.trim() || !shopifyClientSecret.trim()) {
+      setError('Pega ambos: Client ID y Client Secret');
+      return;
+    }
+    setSavingCredentials(true);
+    setError('');
+
+    const { data, error: apiError } = await callApi('store-shopify-credentials', {
+      body: {
+        clientId,
+        shopDomain: cleanDomain,
+        shopifyClientId: shopifyClientId.trim(),
+        shopifyClientSecret: shopifyClientSecret.trim(),
+      },
+    });
+
+    setSavingCredentials(false);
+
+    if (apiError) {
+      setError(apiError);
+      return;
+    }
+
+    toast.success('Credenciales guardadas');
+    setStep(5);
   };
 
   // ─── Step 1: Nombre de la tienda ─────────────────────
@@ -153,8 +202,7 @@ export function ShopifyCustomAppWizard({
         disabled={!domain.trim()}
         className="w-full bg-green-600 hover:bg-green-700"
       >
-        Siguiente
-        <ChevronRight className="w-4 h-4 ml-2" />
+        Siguiente <ChevronRight className="w-4 h-4 ml-2" />
       </Button>
     </div>
   );
@@ -201,8 +249,7 @@ export function ShopifyCustomAppWizard({
 
       <a href={adminUrl} target="_blank" rel="noopener noreferrer"
         className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium">
-        Abrir admin de {cleanDomain}.myshopify.com
-        <ExternalLink className="w-4 h-4" />
+        Abrir admin de {cleanDomain}.myshopify.com <ExternalLink className="w-4 h-4" />
       </a>
 
       <div className="flex gap-2">
@@ -258,8 +305,7 @@ export function ShopifyCustomAppWizard({
 
       <a href={adminUrl} target="_blank" rel="noopener noreferrer"
         className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-xs">
-        Volver al admin de {cleanDomain}.myshopify.com
-        <ExternalLink className="w-4 h-4" />
+        Volver al admin de {cleanDomain}.myshopify.com <ExternalLink className="w-4 h-4" />
       </a>
 
       <div className="flex gap-2">
@@ -273,19 +319,106 @@ export function ShopifyCustomAppWizard({
     </div>
   );
 
-  // ─── Step 4: Distribución personalizada → instalar ─────────────────────
+  // ─── Step 4: Client ID + Client Secret ─────────────────────
   const renderStep4 = () => (
+    <div className="space-y-4 py-4">
+      <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
+        <p className="font-medium">Copia el Client ID y Client Secret de tu app:</p>
+        <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+          <li>En tu Shopify Admin, abre la app <strong>"Steve"</strong></li>
+          <li>Ve a la pestaña <strong>"API credentials"</strong></li>
+          <li>Copia el <strong>Client ID</strong> y pégalo abajo</li>
+          <li>Copia el <strong>Client Secret</strong> y pégalo abajo</li>
+        </ol>
+
+        <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Estos NO son el Access Token. Son las credenciales de la app que aparecen en la pestaña <strong>"API credentials"</strong>, arriba de todo.
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <Label htmlFor="client-id">Client ID</Label>
+          <Input
+            id="client-id"
+            placeholder="ej: a1b2c3d4e5f6..."
+            value={shopifyClientId}
+            onChange={(e) => { setShopifyClientId(e.target.value); setError(''); }}
+            autoFocus
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="client-secret">Client Secret</Label>
+          <Input
+            id="client-secret"
+            type="password"
+            placeholder="ej: shpss_xxxxx..."
+            value={shopifyClientSecret}
+            onChange={(e) => { setShopifyClientSecret(e.target.value); setError(''); }}
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveCredentials()}
+            autoComplete="off"
+          />
+        </div>
+        {error && (
+          <p className="text-sm text-destructive flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" /> {error}
+          </p>
+        )}
+      </div>
+
+      <a href={adminUrl} target="_blank" rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-xs">
+        Ir al admin de {cleanDomain}.myshopify.com <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={() => setStep(3)} disabled={savingCredentials} className="flex-1">
+          <ChevronLeft className="w-4 h-4 mr-2" /> Atrás
+        </Button>
+        <Button
+          onClick={handleSaveCredentials}
+          disabled={savingCredentials || !shopifyClientId.trim() || !shopifyClientSecret.trim()}
+          className="flex-1 bg-green-600 hover:bg-green-700"
+        >
+          {savingCredentials ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...</>
+          ) : (
+            <>Guardar y continuar <ChevronRight className="w-4 h-4 ml-2" /></>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+
+  // ─── Step 5: Distribución personalizada → instalar ─────────────────────
+  const renderStep5 = () => (
     <div className="space-y-4 py-4">
       <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
         <p className="font-medium">Último paso — instala la app:</p>
         <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
           <li>Dentro de la app "Steve", ve a la sección <strong>"Distribución"</strong></li>
           <li>Haz clic en <strong>"Gestionar distribución personalizada"</strong></li>
-          <li>Shopify te va a generar un <strong>link de instalación</strong></li>
-          <li><strong>Copia ese link</strong> y pégalo en tu navegador</li>
-          <li>Shopify te pedirá que autorices la app — haz clic en <strong>"Instalar"</strong></li>
-          <li>La app se instala sola y esta ventana se actualiza automáticamente</li>
+          <li>Copia el <strong>link de instalación</strong> que te da Shopify</li>
+          <li><strong>Pégalo en tu navegador</strong> y presiona Enter</li>
+          <li>Shopify te pedirá que autorices — haz clic en <strong>"Instalar"</strong></li>
+          <li>Esta ventana se actualiza automáticamente cuando termine</li>
         </ol>
+
+        {/* Or use our generated link */}
+        <div className="bg-background rounded-lg border-2 border-green-200 p-3 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">O usa este link directo:</p>
+          <code className="text-xs block text-green-700 break-all select-all">{installLink}</code>
+          <Button onClick={handleCopyInstallLink} className="w-full bg-green-600 hover:bg-green-700" size="sm">
+            {linkCopied ? (
+              <><CheckCircle2 className="w-4 h-4 mr-2" /> Copiado — pégalo en tu navegador</>
+            ) : (
+              <><Copy className="w-4 h-4 mr-2" /> Copiar link de instalación</>
+            )}
+          </Button>
+        </div>
 
         {polling && (
           <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
@@ -300,22 +433,21 @@ export function ShopifyCustomAppWizard({
         </div>
       </div>
 
-      <a href={adminUrl} target="_blank" rel="noopener noreferrer"
+      <a href={installLink} target="_blank" rel="noopener noreferrer"
         className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium">
-        Abrir admin de {cleanDomain}.myshopify.com
-        <ExternalLink className="w-4 h-4" />
+        Abrir link de instalación directamente <ExternalLink className="w-4 h-4" />
       </a>
 
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => setStep(3)} className="flex-1">
+        <Button variant="outline" onClick={() => setStep(4)} className="flex-1">
           <ChevronLeft className="w-4 h-4 mr-2" /> Atrás
         </Button>
       </div>
     </div>
   );
 
-  // ─── Step 5: App instalada ─────────────────────
-  const renderStep5 = () => (
+  // ─── Step 6: App instalada ─────────────────────
+  const renderStep6 = () => (
     <div className="space-y-6 py-8">
       <div className="flex flex-col items-center text-center space-y-4">
         <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
@@ -337,7 +469,8 @@ export function ShopifyCustomAppWizard({
     </div>
   );
 
-  const stepTitles = ['Tu tienda', 'Crear app', 'Permisos', 'Instalar', 'Conectada'];
+  const totalSteps = 6;
+  const stepTitles = ['Tu tienda', 'Crear app', 'Permisos', 'Credenciales', 'Instalar', 'Conectada'];
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
@@ -348,16 +481,16 @@ export function ShopifyCustomAppWizard({
             Conectar Shopify
           </DialogTitle>
           <DialogDescription>
-            {step === 5
+            {step === 6
               ? 'Conexión completada'
-              : `Paso ${step} de 5: ${stepTitles[step - 1]}`}
+              : `Paso ${step} de ${totalSteps}: ${stepTitles[step - 1]}`}
           </DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}
-        {step < 5 && (
+        {step < 6 && (
           <div className="flex items-center gap-1 px-1">
-            {[1, 2, 3, 4, 5].map((s) => (
+            {[1, 2, 3, 4, 5, 6].map((s) => (
               <div
                 key={s}
                 className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -373,6 +506,7 @@ export function ShopifyCustomAppWizard({
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
         {step === 5 && renderStep5()}
+        {step === 6 && renderStep6()}
       </DialogContent>
     </Dialog>
   );
