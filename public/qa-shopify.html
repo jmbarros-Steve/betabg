@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Shopify — 35 Pasos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 2.2rem; color: #fff; margin-bottom: 8px; }
+  .header p { color: #94a3b8; font-size: 1rem; max-width: 600px; margin: 0 auto; }
+
+  /* HOW-TO BANNER */
+  .howto {
+    max-width: 900px; margin: 20px auto; background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 20px 24px; line-height: 1.7;
+  }
+  .howto h3 { color: #fbbf24; margin-bottom: 10px; font-size: 1rem; }
+  .howto ol { padding-left: 20px; }
+  .howto li { margin-bottom: 6px; font-size: 0.85rem; color: #cbd5e1; }
+  .howto code { background: #334155; color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+  .howto .warn { color: #f87171; font-weight: 700; }
+  .howto .ok { color: #4ade80; }
+  .howto a { color: #60a5fa; text-decoration: none; }
+  .howto a:hover { text-decoration: underline; }
+  .howto .nav-path {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0f172a; border: 1px solid #475569; border-radius: 6px;
+    padding: 2px 8px; font-size: 0.8rem; color: #60a5fa; white-space: nowrap;
+  }
+  .howto .nav-path .sep { color: #475569; }
+
+  .score-bar {
+    display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+    margin: 20px auto 30px; max-width: 900px;
+  }
+  .score-card {
+    background: #1e293b; border-radius: 12px; padding: 16px 24px; text-align: center; min-width: 120px;
+    border: 1px solid #334155;
+  }
+  .score-card .num { font-size: 2rem; font-weight: 700; }
+  .score-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .score-card.green .num { color: #4ade80; }
+  .score-card.red .num { color: #f87171; }
+  .score-card.yellow .num { color: #fbbf24; }
+  .score-card.blue .num { color: #60a5fa; }
+
+  .progress-wrap { max-width: 900px; margin: 0 auto 30px; }
+  .progress-bg { background: #1e293b; border-radius: 99px; height: 12px; overflow: hidden; }
+  .progress-fill { background: linear-gradient(90deg, #4ade80, #22d3ee); height: 100%; border-radius: 99px; transition: width 0.5s; }
+  .progress-label { text-align: center; margin-top: 6px; font-size: 0.85rem; color: #94a3b8; }
+
+  .blocks { max-width: 900px; margin: 0 auto; }
+
+  .block { margin-bottom: 24px; }
+  .block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1e293b; border-radius: 12px 12px 0 0; padding: 14px 20px;
+    cursor: pointer; border: 1px solid #334155; border-bottom: none;
+    user-select: none;
+  }
+  .block-header:hover { background: #253347; }
+  .block-header h2 { font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .block-header .badge {
+    font-size: 0.7rem; background: #334155; color: #94a3b8; padding: 2px 8px;
+    border-radius: 99px; font-weight: 600;
+  }
+  .block-header .arrow { transition: transform 0.3s; font-size: 0.8rem; color: #64748b; }
+  .block-header.open .arrow { transform: rotate(180deg); }
+  .block-header .block-score { font-size: 0.85rem; }
+
+  .block-body {
+    border: 1px solid #334155; border-top: none; border-radius: 0 0 12px 12px;
+    overflow: hidden; max-height: 0; transition: max-height 0.4s ease;
+  }
+  .block-body.open { max-height: 8000px; }
+
+  /* NAV HINT above steps */
+  .nav-hint {
+    background: #0c1425; padding: 10px 20px; border-bottom: 1px solid #1e293b;
+    font-size: 0.8rem; color: #60a5fa; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-hint .icon { font-size: 1rem; }
+
+  .step {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 20px;
+    border-bottom: 1px solid #1e293b; background: #151f2e;
+    transition: background 0.2s;
+  }
+  .step:hover { background: #1a2740; }
+  .step:last-child { border-bottom: none; }
+
+  .step-info { flex: 1; }
+  .step-title { font-weight: 600; font-size: 0.9rem; color: #f1f5f9; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .step-title .critical { font-size: 0.6rem; background: #dc2626; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+
+  .step-instructions {
+    font-size: 0.82rem; color: #94a3b8; line-height: 1.7;
+    background: #0f172a; border-radius: 8px; padding: 10px 14px; margin-top: 6px;
+    border-left: 3px solid #334155;
+  }
+  .step-instructions .num-step { color: #fbbf24; font-weight: 700; }
+  .step-instructions .click { color: #60a5fa; font-weight: 600; }
+  .step-instructions .expect-ok { color: #4ade80; }
+  .step-instructions .expect-fail { color: #f87171; }
+
+  .step-actions { flex-shrink: 0; display: flex; gap: 4px; padding-top: 4px; }
+  .btn-pass, .btn-fail {
+    width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; font-weight: 700;
+  }
+  .btn-pass { background: #1a3a2a; color: #4ade80; }
+  .btn-pass:hover { background: #4ade80; color: #0f172a; }
+  .btn-fail { background: #3a1a1a; color: #f87171; }
+  .btn-fail:hover { background: #f87171; color: #0f172a; }
+
+  .step.passed { }
+  .step.passed .step-title { color: #4ade80; }
+  .step.passed .step-instructions { opacity: 0.4; }
+  .step.failed .step-title { color: #f87171; }
+
+  .note-input {
+    width: 100%; margin-top: 8px; background: #1e293b; border: 1px solid #334155;
+    border-radius: 6px; padding: 6px 10px; color: #e2e8f0; font-size: 0.78rem;
+    font-family: inherit; resize: none; display: none;
+  }
+  .step.failed .note-input { display: block; }
+
+  .legend { max-width: 900px; margin: 30px auto; display: flex; gap: 20px; justify-content: center; font-size: 0.8rem; color: #64748b; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .reset-btn {
+    display: block; margin: 10px auto 40px; background: #3a1a1a; color: #f87171; border: 1px solid #f87171;
+    padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+  }
+  .reset-btn:hover { background: #f87171; color: #0f172a; }
+
+  .footer { text-align: center; padding: 20px 20px 40px; color: #475569; font-size: 0.75rem; }
+
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    .header h1 { font-size: 1.5rem; }
+    .score-bar { gap: 8px; }
+    .score-card { min-width: 70px; padding: 10px 14px; }
+    .score-card .num { font-size: 1.4rem; }
+    .step { padding: 10px 14px; }
+    .howto { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Shopify</h1>
+  <p>35 pruebas con instrucciones paso a paso. Sigue las instrucciones exactas de cada paso. Al terminar, marca con &#10003; o &#10007;.</p>
+</div>
+
+<!-- INSTRUCCIONES GENERALES -->
+<div class="howto">
+  <h3>ANTES DE EMPEZAR — Lee esto primero</h3>
+  <ol>
+    <li>Abre <a href="https://betabgnuevosupa.vercel.app" target="_blank">https://betabgnuevosupa.vercel.app</a> en Chrome</li>
+    <li>Haz login con tu cuenta</li>
+    <li>Vas a llegar al <strong>Portal del Cliente</strong>. Arriba hay tabs: Steve, Brief, Metricas, etc.</li>
+    <li>Para llegar a Shopify: busca el boton <code>Mas</code> en la barra de tabs (arriba a la derecha). Click ahi y selecciona <code>Shopify</code></li>
+    <li><strong>IMPORTANTE:</strong> Shopify requiere una conexion activa. Si no tienes Shopify conectado, ve primero a la pestana <code>Conexiones</code> y conecta tu tienda Shopify.</li>
+    <li>Adentro de Shopify hay varias secciones en la misma pagina (scroll hacia abajo):
+      <code>KPIs</code> · <code>Graficos</code> · <code>Ventas por Canal</code> · <code>Top SKUs</code> · <code>SEO</code> · <code>Pedidos</code> · <code>Descuentos</code> · <code>Productos</code> · <code>Clientes</code></li>
+    <li class="warn">Si algo falla: apreta &#10007; en rojo, escribe que paso en la nota que aparece, y sigue con el siguiente paso</li>
+    <li class="ok">Si funciona bien: apreta &#10003; en verde y sigue</li>
+    <li>Tu progreso se guarda automaticamente en el navegador. Puedes cerrar y volver.</li>
+  </ol>
+</div>
+
+<div class="score-bar">
+  <div class="score-card blue"><div class="num" id="total">35</div><div class="label">Total</div></div>
+  <div class="score-card green"><div class="num" id="passed">0</div><div class="label">Pasaron</div></div>
+  <div class="score-card red"><div class="num" id="failed">0</div><div class="label">Fallaron</div></div>
+  <div class="score-card yellow"><div class="num" id="pending">35</div><div class="label">Pendientes</div></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-bg"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+  <div class="progress-label" id="progressLabel">0% completado</div>
+</div>
+
+<div class="blocks" id="blocks"></div>
+
+<div class="legend">
+  <span><div class="dot" style="background:#4ade80"></div> Pasa (boton verde &#10003;)</span>
+  <span><div class="dot" style="background:#f87171"></div> Falla (boton rojo &#10007;)</span>
+  <span><div class="dot" style="background:#fbbf24"></div> Pendiente</span>
+  <span><div class="dot" style="background:#dc2626"></div> Paso critico</span>
+</div>
+
+<button class="reset-btn" onclick="if(confirm('Borrar todo el progreso?')){localStorage.removeItem('steve-shopify-qa-v2');location.reload();}">Borrar progreso y empezar de nuevo</button>
+
+<div class="footer">Shopify QA — 2026-03-22 — Generado por Claude Code</div>
+
+<script>
+const DATA = [
+  {
+    name: "Conexion y Dashboard",
+    icon: "🛍️",
+    nav: "Portal > Mas > Shopify",
+    steps: [
+      {
+        id: 1, title: "Abrir seccion Shopify", critical: true,
+        instructions: [
+          { type: 'do', text: 'En la barra de tabs del portal, haz click en <span class="click">Mas</span> (arriba a la derecha)' },
+          { type: 'do', text: 'En el dropdown que aparece, haz click en <span class="click">Shopify</span>' },
+          { type: 'wait', text: 'Espera 2-4 segundos mientras carga la seccion' },
+          { type: 'ok', text: 'Se carga el dashboard de Shopify con KPIs y graficos, O aparece un mensaje tipo "Conecta tu tienda Shopify" si no hay conexion activa' },
+          { type: 'fail', text: 'Pantalla blanca, error rojo, o el circulito de carga gira para siempre sin parar. Si dice "Conecta Shopify", ve a Conexiones primero y vuelve.' },
+        ]
+      },
+      {
+        id: 2, title: "Ver KPIs principales", critical: true,
+        instructions: [
+          { type: 'do', text: 'Mira la parte superior del dashboard de Shopify. Deben verse 4 tarjetas de KPI' },
+          { type: 'ok', text: 'Se ven 4 cards: <strong>Ingresos del Periodo</strong> (monto en $), <strong>Pedidos</strong> (numero), <strong>Ticket Promedio</strong> (monto en $), <strong>Dinero en Carritos</strong> (monto en $). Cada una con un valor numerico visible.' },
+          { type: 'fail', text: 'Faltan cards, se ven vacias sin numeros, o hay menos de 4 KPIs visibles' },
+        ]
+      },
+      {
+        id: 3, title: "Filtro de fecha en KPIs", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un dropdown o selector de periodo cerca de los KPIs. Deberia decir algo como <span class="click">7d</span>, <span class="click">30d</span>, o <span class="click">90d</span>' },
+          { type: 'do', text: 'Haz click y selecciona <span class="click">30d</span> (ultimos 30 dias)' },
+          { type: 'wait', text: 'Espera 1-3 segundos mientras recalcula los datos' },
+          { type: 'do', text: 'Ahora cambia a <span class="click">7d</span> (ultimos 7 dias)' },
+          { type: 'ok', text: 'Los valores de los 4 KPIs cambian al seleccionar un periodo diferente. Los numeros de 7d deberian ser menores o iguales a los de 30d.' },
+          { type: 'fail', text: 'No hay selector de periodo, los valores no cambian al cambiar el filtro, o sale error' },
+        ]
+      },
+      {
+        id: 4, title: "Boton Actualizar datos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton de <span class="click">Actualizar</span> o un icono de refresh (flechas circulares) cerca de los KPIs o en la cabecera de la seccion' },
+          { type: 'do', text: 'Haz click en el boton' },
+          { type: 'wait', text: 'Espera 3-10 segundos. Puede aparecer un spinner o mensaje "Sincronizando..."' },
+          { type: 'ok', text: 'Los datos se recargan, los KPIs se actualizan, y aparece un mensaje de exito o simplemente los datos se refrescan sin error' },
+          { type: 'fail', text: 'Error al actualizar, el boton no hace nada, o se queda cargando infinitamente' },
+        ]
+      },
+      {
+        id: 5, title: "Grafico Ventas por Dia", critical: false,
+        instructions: [
+          { type: 'do', text: 'Debajo de los KPIs, busca un grafico titulado <span class="click">Ventas por Dia</span> o similar' },
+          { type: 'ok', text: 'Se ve un grafico con barras y/o linea mostrando las ventas diarias del periodo seleccionado. El eje X tiene fechas y el eje Y tiene montos en $.' },
+          { type: 'fail', text: 'No hay grafico, se ve un espacio vacio, o el grafico no muestra datos (solo ejes sin barras/lineas)' },
+        ]
+      },
+      {
+        id: 6, title: "Grafico Carritos Abandonados", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un segundo grafico titulado <span class="click">Carritos Abandonados</span> o similar, al lado o debajo del grafico de ventas' },
+          { type: 'ok', text: 'Se ve un grafico mostrando la cantidad o monto de carritos abandonados en el periodo. Puede ser barras, linea, o area chart.' },
+          { type: 'fail', text: 'No existe el grafico de carritos abandonados, o muestra error' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Ventas y Analisis",
+    icon: "📊",
+    nav: "Portal > Mas > Shopify > scroll hacia abajo",
+    steps: [
+      {
+        id: 7, title: "Ventas por Canal", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz scroll hacia abajo en la pagina de Shopify hasta encontrar una seccion llamada <span class="click">Ventas por Canal</span>' },
+          { type: 'ok', text: 'Se ve una lista o tabla de canales de venta (ej: Tienda Online, POS, Draft Orders, etc.) con porcentajes o montos asociados a cada canal' },
+          { type: 'fail', text: 'No existe la seccion de Ventas por Canal, esta vacia sin datos, o muestra error' },
+        ]
+      },
+      {
+        id: 8, title: "Top SKUs", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca una seccion llamada <span class="click">Top SKUs</span> o <span class="click">Productos mas vendidos</span>' },
+          { type: 'ok', text: 'Se ve una tabla con los productos mas vendidos mostrando: nombre del producto, SKU, cantidad vendida, e ingresos generados. Al menos 1 producto visible.' },
+          { type: 'fail', text: 'No hay seccion de Top SKUs, la tabla esta vacia, o muestra error' },
+        ]
+      },
+      {
+        id: 9, title: "UTMs con Mas Ventas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca una seccion o tabla que diga <span class="click">UTMs con Mas Ventas</span> o <span class="click">Fuentes de trafico</span>' },
+          { type: 'ok', text: 'Se ve una tabla con columnas: Fuente (utm_source), Medio (utm_medium), Campana (utm_campaign), Pedidos, Ingresos. Puede estar vacia si no hay UTMs configurados — eso esta OK.' },
+          { type: 'fail', text: 'La seccion no existe o muestra un error al intentar cargar' },
+        ]
+      },
+      {
+        id: 10, title: "Analisis SEO Rapido", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca una seccion llamada <span class="click">Analisis SEO Rapido</span> o <span class="click">SEO Score</span>' },
+          { type: 'ok', text: 'Se ve un puntaje SEO de 0 a 100, y una lista de al menos 5 checks (ej: productos sin imagen, productos sin descripcion, paginas sin meta title, URLs no optimizadas, etc.) con indicadores verde/rojo por cada uno' },
+          { type: 'fail', text: 'No existe la seccion de SEO, el puntaje no aparece, o los checks no se muestran' },
+        ]
+      },
+      {
+        id: 11, title: "Matriz de Productos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca una seccion llamada <span class="click">Matriz de Productos</span> o un grafico tipo cuadrante/scatter' },
+          { type: 'ok', text: 'Se ve una matriz o clasificacion de productos en categorias como: Estrellas (alta venta, alto margen), Zombies (baja venta, bajo margen), Vacas (alta venta, bajo margen), Interrogantes (baja venta, alto margen). Los productos estan distribuidos en las categorias.' },
+          { type: 'fail', text: 'No existe la seccion de Matriz, o se ve vacia sin productos clasificados' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Pedidos",
+    icon: "📦",
+    nav: "Portal > Mas > Shopify > seccion Pedidos recientes",
+    steps: [
+      {
+        id: 12, title: "Ver tabla de pedidos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz scroll hasta encontrar la seccion <span class="click">Pedidos recientes</span> o <span class="click">Pedidos</span>' },
+          { type: 'do', text: 'Verifica que haya una tabla visible' },
+          { type: 'ok', text: 'Se ve una tabla con columnas: # (numero de pedido), Fecha, Cliente, Productos, Total ($), Estado (Pagado/Pendiente/etc). Debe haber al menos 1 pedido listado.' },
+          { type: 'fail', text: 'La tabla no carga, esta vacia sin razon, o faltan columnas importantes' },
+        ]
+      },
+      {
+        id: 13, title: "Filtrar pedidos por estado", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un dropdown de filtro encima de la tabla que diga <span class="click">Todos</span> o <span class="click">Estado</span>' },
+          { type: 'do', text: 'Haz click y selecciona <span class="click">Pagado</span>' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'do', text: 'Ahora selecciona <span class="click">Pendiente</span>' },
+          { type: 'do', text: 'Finalmente selecciona <span class="click">Todos</span> para volver al listado completo' },
+          { type: 'ok', text: 'La tabla se filtra correctamente: al seleccionar "Pagado" solo se ven pedidos pagados, al seleccionar "Pendiente" solo pendientes, y "Todos" muestra todo' },
+          { type: 'fail', text: 'No hay filtro de estado, no filtra correctamente, o da error al cambiar filtro' },
+        ]
+      },
+      {
+        id: 14, title: "Buscar pedido especifico", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un campo de busqueda (input con lupa o placeholder "Buscar...") encima de la tabla de pedidos' },
+          { type: 'do', text: 'Escribe el nombre de un cliente que veas en la tabla, o un numero de pedido' },
+          { type: 'wait', text: 'Espera 1-2 segundos mientras filtra' },
+          { type: 'ok', text: 'La tabla se filtra y muestra solo los pedidos que coinciden con tu busqueda' },
+          { type: 'fail', text: 'No hay campo de busqueda, no filtra, o devuelve resultados incorrectos' },
+        ]
+      },
+      {
+        id: 15, title: "Tab de Envios", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de la seccion de Pedidos, busca un sub-tab que diga <span class="click">Envios</span> o <span class="click">Fulfillment</span>' },
+          { type: 'do', text: 'Haz click en ese sub-tab' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'ok', text: 'Se ve una tabla de envios con el estado de fulfillment de cada pedido: Enviado, Pendiente de envio, Parcialmente enviado, etc.' },
+          { type: 'fail', text: 'No existe el sub-tab de Envios, o la tabla no carga' },
+        ]
+      },
+      {
+        id: 16, title: "KPIs de envio", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro del tab de Envios, busca tarjetas KPI o metricas resumidas arriba de la tabla' },
+          { type: 'ok', text: 'Se ven metricas como: <strong>Tiempo promedio de envio</strong> (ej: 2.3 dias), <strong>Pendientes de envio</strong> (numero), <strong>Atrasados</strong> (numero de envios que llevan mas de X dias sin enviar)' },
+          { type: 'fail', text: 'No hay KPIs de envio, solo la tabla sin metricas resumidas' },
+        ]
+      },
+      {
+        id: 17, title: "Ver tracking de envio", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la tabla de envios, busca un pedido que tenga un link o icono de <span class="click">Tracking</span> o <span class="click">Seguimiento</span>' },
+          { type: 'do', text: 'Haz click en el link de tracking' },
+          { type: 'ok', text: 'Se abre una nueva pestana del navegador con la pagina de seguimiento del courier (ej: Chilexpress, Starken, Blue Express, etc.) mostrando el estado del envio' },
+          { type: 'fail', text: 'No hay links de tracking, el link esta roto (404), o no abre nada. Si no hay pedidos con tracking, marca como pass.' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Descuentos",
+    icon: "🏷️",
+    nav: "Portal > Mas > Shopify > seccion Descuentos",
+    steps: [
+      {
+        id: 18, title: "Ver tabla de descuentos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz scroll hasta encontrar la seccion <span class="click">Descuentos</span> o <span class="click">Discounts</span>' },
+          { type: 'ok', text: 'Se ve una tabla con columnas: Codigo, Tipo (porcentaje/monto fijo), Valor, Usos (veces usado), Vence (fecha expiracion), Estado (Activo/Expirado). Puede estar vacia si no hay descuentos creados — eso esta OK.' },
+          { type: 'fail', text: 'La seccion de descuentos no existe o muestra error al cargar' },
+        ]
+      },
+      {
+        id: 19, title: "Crear descuento nuevo", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">+ Crear</span> o <span class="click">Nuevo Descuento</span> en la seccion de Descuentos' },
+          { type: 'do', text: 'Haz click. Debe abrirse un dialogo/modal con un formulario' },
+          { type: 'do', text: 'Llena los campos: Codigo: <code>TESTQA25</code>, Tipo: <span class="click">Porcentaje</span>, Valor: <code>25</code>, Compra Minima: <code>10000</code>, Limite de Usos: <code>100</code>, Fecha Expiracion: una fecha futura' },
+          { type: 'do', text: 'Haz click en <span class="click">Crear</span> o <span class="click">Guardar</span>' },
+          { type: 'wait', text: 'Espera 2-4 segundos' },
+          { type: 'ok', text: 'El descuento "TESTQA25" aparece en la tabla con los datos que ingresaste: 25%, activo, con la fecha de expiracion correcta' },
+          { type: 'fail', text: 'Error al crear, el modal no se abre, faltan campos en el formulario, o el descuento no aparece en la tabla' },
+        ]
+      },
+      {
+        id: 20, title: "Generar codigo aleatorio", critical: false,
+        instructions: [
+          { type: 'do', text: 'Abre nuevamente el dialogo de crear descuento (haz click en <span class="click">+ Crear</span>)' },
+          { type: 'do', text: 'Dentro del dialogo, busca un boton <span class="click">Generar</span> o un icono de dados al lado del campo de Codigo' },
+          { type: 'do', text: 'Haz click en <span class="click">Generar</span>' },
+          { type: 'ok', text: 'Se genera automaticamente un codigo aleatorio en el campo (ej: "SAVE-X7K2M", "DISC-AB3FG" o similar). El campo no esta vacio.' },
+          { type: 'fail', text: 'No hay boton de generar, el campo sigue vacio despues de hacer click, o sale error' },
+        ]
+      },
+      {
+        id: 21, title: "Filtrar descuentos por estado", critical: false,
+        instructions: [
+          { type: 'do', text: 'Cierra el dialogo de crear (click en X o Cancel)' },
+          { type: 'do', text: 'Busca un filtro o tabs encima de la tabla de descuentos que diga <span class="click">Activo</span> / <span class="click">Expirado</span> / <span class="click">Todos</span>' },
+          { type: 'do', text: 'Haz click en <span class="click">Activo</span>' },
+          { type: 'do', text: 'Luego haz click en <span class="click">Expirado</span>' },
+          { type: 'ok', text: 'Al seleccionar "Activo" solo se ven descuentos activos. Al seleccionar "Expirado" solo se ven los expirados. El filtro funciona correctamente.' },
+          { type: 'fail', text: 'No hay filtro de estado, o no filtra correctamente' },
+        ]
+      },
+      {
+        id: 22, title: "Ver ROI de descuento", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la tabla de descuentos, busca columnas adicionales como <span class="click">Ingresos</span>, <span class="click">Desc.</span> (monto descontado), o <span class="click">ROI</span>' },
+          { type: 'do', text: 'Si hay descuentos con usos > 0, verifica que estas columnas muestren valores' },
+          { type: 'ok', text: 'Se ven columnas de rendimiento (Ingresos generados, Monto descontado total, ROI) al menos para los descuentos que se han usado. Si no hay descuentos usados, marca como pass.' },
+          { type: 'fail', text: 'No existen columnas de rendimiento/ROI en la tabla, o muestran error/NaN' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Productos",
+    icon: "📋",
+    nav: "Portal > Mas > Shopify > seccion Productos",
+    steps: [
+      {
+        id: 23, title: "Cargar productos desde Shopify", critical: true,
+        instructions: [
+          { type: 'do', text: 'Haz scroll hasta encontrar la seccion <span class="click">Productos</span>' },
+          { type: 'do', text: 'Busca un boton que diga <span class="click">Cargar Productos</span> o <span class="click">Actualizar</span>' },
+          { type: 'do', text: 'Haz click en el boton' },
+          { type: 'wait', text: 'Espera 5-15 segundos. Puede mostrar un spinner o "Cargando productos..."' },
+          { type: 'ok', text: 'Aparece una lista/grilla de productos con imagenes, nombres, y precios cargados desde Shopify. Mensaje de exito como "X productos cargados".' },
+          { type: 'fail', text: 'Error al cargar, se queda en spinner infinito, o no aparece ningun producto' },
+        ]
+      },
+      {
+        id: 24, title: "Ver catalogo de productos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Mira la seccion de productos ya cargados' },
+          { type: 'ok', text: 'Se ven tarjetas de producto (cards) con: imagen del producto, titulo/nombre, SKU, precio de venta, margen (si tiene costo configurado), y stock disponible' },
+          { type: 'fail', text: 'Las cards se ven sin imagen (placeholder roto), faltan datos clave (precio, SKU), o el layout esta roto' },
+        ]
+      },
+      {
+        id: 25, title: "Stats de productos (4 cards resumen)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca 4 tarjetas resumen arriba de la grilla de productos' },
+          { type: 'ok', text: 'Se ven 4 cards de stats: <strong>Productos</strong> (total), <strong>Con costo</strong> (cuantos tienen costo definido), <strong>Sin costo</strong> (cuantos NO tienen costo), <strong>Margen promedio</strong> (%). Los numeros son coherentes.' },
+          { type: 'fail', text: 'No hay cards de stats, faltan algunas, o los numeros son incoherentes (ej: "Con costo" + "Sin costo" no suman el "Total")' },
+        ]
+      },
+      {
+        id: 26, title: "Alerta de restock (bajo stock)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca productos que tengan stock bajo (menos de 5 unidades) o una alerta/badge rojo que diga <span class="click">Bajo stock</span> o <span class="click">Restock</span>' },
+          { type: 'ok', text: 'Los productos con stock bajo muestran una alerta visual roja o naranja indicando que necesitan restock. Si ningun producto tiene stock bajo, marca como pass.' },
+          { type: 'fail', text: 'Hay productos con stock 0 o 1 y no muestran ninguna alerta visual' },
+        ]
+      },
+      {
+        id: 27, title: "Editar producto", critical: true,
+        instructions: [
+          { type: 'do', text: 'En una tarjeta de producto, busca un icono de lapiz (editar) o un boton <span class="click">Editar</span>' },
+          { type: 'do', text: 'Haz click en el icono/boton' },
+          { type: 'do', text: 'Se debe abrir un modal/dialog con campos editables: <strong>Nombre</strong>, <strong>Precio</strong>, <strong>Stock</strong>' },
+          { type: 'do', text: 'Cambia el precio a un valor diferente (ej: suma $100) y haz click en <span class="click">Guardar</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'ok', text: 'El modal se cierra, y el producto en la grilla muestra el nuevo precio actualizado' },
+          { type: 'fail', text: 'No hay boton de editar, el modal no se abre, error al guardar, o el precio no se actualiza en la vista' },
+        ]
+      },
+      {
+        id: 28, title: "Descripcion generada por IA", critical: false,
+        instructions: [
+          { type: 'do', text: 'En una tarjeta de producto, busca un icono de estrellitas/sparkles (&#10024;) o un boton que diga <span class="click">IA</span> o <span class="click">Generar descripcion</span>' },
+          { type: 'do', text: 'Haz click en el icono' },
+          { type: 'wait', text: 'Espera 5-10 segundos mientras la IA genera la descripcion' },
+          { type: 'ok', text: 'Aparece un panel o modal mostrando la descripcion actual (Before) y la descripcion generada por IA (After). La nueva descripcion es diferente y mas elaborada que la original.' },
+          { type: 'fail', text: 'No hay icono de IA, error al generar, o la descripcion generada esta vacia' },
+        ]
+      },
+      {
+        id: 29, title: "Fotos generadas por IA (Photo Studio)", critical: false,
+        instructions: [
+          { type: 'do', text: 'En una tarjeta de producto, busca un icono de camara (&#128247;) o un boton que diga <span class="click">Photo Studio</span> o <span class="click">Fotos IA</span>' },
+          { type: 'do', text: 'Haz click en el icono' },
+          { type: 'ok', text: 'Se abre un panel o modal de Photo Studio donde puedes generar nuevas imagenes del producto con IA. Puede tener opciones de estilo, fondo, o angulo.' },
+          { type: 'fail', text: 'No hay icono de camara, error al abrir, o el Photo Studio no carga' },
+        ]
+      },
+      {
+        id: 30, title: "Combos propuestos (cross-sell)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton que diga <span class="click">Combos propuestos</span>, <span class="click">Cross-sell</span>, o <span class="click">Productos relacionados</span>' },
+          { type: 'do', text: 'Haz click en el boton' },
+          { type: 'wait', text: 'Espera 3-8 segundos mientras analiza los datos de ventas' },
+          { type: 'ok', text: 'Se muestra una lista de combos o pares de productos que se compran juntos frecuentemente (ej: "Producto A + Producto B = X ventas juntas"). El analisis de cross-sell funciona.' },
+          { type: 'fail', text: 'No hay boton de combos, error al cargar, o el analisis no muestra resultados. Si la tienda tiene muy pocos productos/ventas y dice "No hay datos suficientes", marca como pass.' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Clientes",
+    icon: "👥",
+    nav: "Portal > Mas > Shopify > seccion Clientes",
+    steps: [
+      {
+        id: 31, title: "Ver tabla de clientes", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz scroll hasta encontrar la seccion <span class="click">Clientes</span> en la pagina de Shopify' },
+          { type: 'ok', text: 'Se ve una tabla con columnas: <strong>Nombre</strong>, <strong>Email</strong>, <strong>Total gastado</strong> ($), <strong>Pedidos</strong> (cantidad), <strong>Cliente desde</strong> (fecha). Debe haber al menos 1 cliente listado.' },
+          { type: 'fail', text: 'La tabla no carga, esta vacia sin razon, faltan columnas, o muestra error' },
+        ]
+      },
+      {
+        id: 32, title: "Buscar cliente", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un campo de busqueda (input con lupa o placeholder "Buscar cliente...") encima de la tabla de clientes' },
+          { type: 'do', text: 'Escribe el nombre o email de un cliente que veas en la tabla' },
+          { type: 'wait', text: 'Espera 1-2 segundos mientras filtra' },
+          { type: 'ok', text: 'La tabla se filtra y muestra solo el cliente (o clientes) que coinciden con tu busqueda' },
+          { type: 'fail', text: 'No hay campo de busqueda, no filtra, o devuelve resultados incorrectos' },
+        ]
+      },
+      {
+        id: 33, title: "Actualizar lista de clientes", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Actualizar</span> o icono de refresh en la seccion de Clientes' },
+          { type: 'do', text: 'Haz click' },
+          { type: 'wait', text: 'Espera 3-8 segundos mientras sincroniza con Shopify' },
+          { type: 'ok', text: 'La lista de clientes se recarga. Puede mostrar un mensaje como "X clientes sincronizados" o simplemente refrescar la tabla sin error.' },
+          { type: 'fail', text: 'Error al actualizar, boton no hace nada, o se queda cargando infinitamente' },
+        ]
+      },
+      {
+        id: 34, title: "Ver detalle de cliente", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en una fila de la tabla de clientes (en el nombre o email de un cliente)' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'ok', text: 'Se abre un modal o panel lateral mostrando: datos del cliente (nombre, email, telefono), estadisticas (total gastado, cantidad de pedidos, ticket promedio), y un historial de pedidos recientes de ese cliente' },
+          { type: 'fail', text: 'No pasa nada al hacer click en la fila, el modal no se abre, o se abre vacio sin datos' },
+        ]
+      },
+      {
+        id: 35, title: "Stats de recurrencia de clientes", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un resumen o barra de stats encima de la tabla de clientes que muestre metricas de recurrencia' },
+          { type: 'ok', text: 'Se ve un texto o tarjetas con stats tipo: "<strong>X clientes</strong> · <strong>Y recurrentes</strong> (que compraron mas de 1 vez) · <strong>Ticket promedio $Z</strong>". Los numeros son coherentes con los datos de la tabla.' },
+          { type: 'fail', text: 'No hay stats de recurrencia, los numeros son incoherentes, o muestra error/NaN' },
+        ]
+      },
+    ]
+  },
+];
+
+// State
+const state = {};
+const notes = {};
+const STORAGE_KEY = 'steve-shopify-qa-v2';
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    Object.assign(state, saved.state || {});
+    Object.assign(notes, saved.notes || {});
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, notes }));
+}
+
+function updateScores() {
+  let passed = 0, failed = 0;
+  for (const k in state) {
+    if (state[k] === 'pass') passed++;
+    else if (state[k] === 'fail') failed++;
+  }
+  const total = 35;
+  const pending = total - passed - failed;
+  const pct = Math.round(((passed + failed) / total) * 100);
+
+  document.getElementById('passed').textContent = passed;
+  document.getElementById('failed').textContent = failed;
+  document.getElementById('pending').textContent = pending;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = pct + '% completado — ' + passed + ' pasaron, ' + failed + ' fallaron';
+
+  if (failed > 0) {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #fbbf24, #f87171)';
+  } else {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+  }
+}
+
+function setResult(id, result) {
+  if (state[id] === result) {
+    delete state[id];
+  } else {
+    state[id] = result;
+  }
+  saveState();
+  renderStep(id);
+  updateScores();
+  updateBlockScores();
+}
+
+function saveNote(id) {
+  const el = document.getElementById('note-' + id);
+  if (el) {
+    notes[id] = el.value;
+    saveState();
+  }
+}
+
+function renderStep(id) {
+  const el = document.getElementById('step-' + id);
+  if (!el) return;
+  el.classList.remove('passed', 'failed');
+  if (state[id] === 'pass') el.classList.add('passed');
+  else if (state[id] === 'fail') el.classList.add('failed');
+
+  const passBtn = el.querySelector('.btn-pass');
+  const failBtn = el.querySelector('.btn-fail');
+  if (passBtn) {
+    passBtn.style.background = state[id] === 'pass' ? '#4ade80' : '#1a3a2a';
+    passBtn.style.color = state[id] === 'pass' ? '#0f172a' : '#4ade80';
+  }
+  if (failBtn) {
+    failBtn.style.background = state[id] === 'fail' ? '#f87171' : '#3a1a1a';
+    failBtn.style.color = state[id] === 'fail' ? '#0f172a' : '#f87171';
+  }
+}
+
+function updateBlockScores() {
+  DATA.forEach((block, bIdx) => {
+    const bp = block.steps.filter(s => state[s.id] === 'pass').length;
+    const bf = block.steps.filter(s => state[s.id] === 'fail').length;
+    const el = document.getElementById('bscore-' + bIdx);
+    if (el) {
+      let html = '';
+      if (bp) html += `<span style="color:#4ade80">${bp}&#10003;</span> `;
+      if (bf) html += `<span style="color:#f87171">${bf}&#10007;</span>`;
+      if (!bp && !bf) html = `<span style="color:#64748b">0/${block.steps.length}</span>`;
+      el.innerHTML = html;
+    }
+  });
+}
+
+function toggleBlock(idx) {
+  const header = document.getElementById('bh-' + idx);
+  const body = document.getElementById('bb-' + idx);
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+function formatInstruction(inst) {
+  if (inst.type === 'do') return `<span class="num-step">→</span> ${inst.text}`;
+  if (inst.type === 'wait') return `<span style="color:#fbbf24">⏳</span> ${inst.text}`;
+  if (inst.type === 'ok') return `<span class="expect-ok">✅ PASA SI:</span> ${inst.text}`;
+  if (inst.type === 'fail') return `<span class="expect-fail">❌ FALLA SI:</span> ${inst.text}`;
+  return inst.text;
+}
+
+function render() {
+  const container = document.getElementById('blocks');
+  let html = '';
+
+  DATA.forEach((block, bIdx) => {
+    const stepCount = block.steps.length;
+
+    html += `<div class="block">`;
+    html += `<div class="block-header" id="bh-${bIdx}" onclick="toggleBlock(${bIdx})">`;
+    html += `<h2>${block.icon} ${block.name} <span class="badge">${stepCount} pasos</span></h2>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;">`;
+    html += `<span id="bscore-${bIdx}" style="font-size:0.85rem;"></span>`;
+    html += `<span class="arrow">▼</span></div></div>`;
+
+    html += `<div class="block-body" id="bb-${bIdx}">`;
+
+    // Navigation hint
+    html += `<div class="nav-hint"><span class="icon">🧭</span> <strong>Como llegar:</strong>&nbsp; ${block.nav}</div>`;
+
+    block.steps.forEach(step => {
+      const cls = state[step.id] === 'pass' ? 'passed' : state[step.id] === 'fail' ? 'failed' : '';
+      html += `<div class="step ${cls}" id="step-${step.id}">`;
+      html += `<div style="color:#475569;font-size:0.85rem;font-weight:800;min-width:28px;margin-top:3px;text-align:center;">${step.id}</div>`;
+      html += `<div class="step-info">`;
+      html += `<div class="step-title">${step.title}`;
+      if (step.critical) html += ` <span class="critical">CRITICO</span>`;
+      html += `</div>`;
+
+      // Step-by-step instructions
+      html += `<div class="step-instructions">`;
+      step.instructions.forEach(inst => {
+        html += `<div style="margin-bottom:4px;">${formatInstruction(inst)}</div>`;
+      });
+      html += `</div>`;
+
+      // Notes textarea (visible on fail)
+      html += `<textarea class="note-input" id="note-${step.id}" placeholder="Escribe que fallo aqui..." onchange="saveNote(${step.id})">${notes[step.id] || ''}</textarea>`;
+
+      html += `</div>`; // step-info
+
+      html += `<div class="step-actions">`;
+      html += `<button class="btn-pass" onclick="setResult(${step.id},'pass')" title="Pasa">✓</button>`;
+      html += `<button class="btn-fail" onclick="setResult(${step.id},'fail')" title="Falla">✗</button>`;
+      html += `</div></div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+
+  DATA.forEach(block => block.steps.forEach(step => renderStep(step.id)));
+  updateBlockScores();
+}
+
+loadState();
+render();
+updateScores();
+</script>
+</body>
+</html>

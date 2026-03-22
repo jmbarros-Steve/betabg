@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Steve Mail — 50 Pasos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 2.2rem; color: #fff; margin-bottom: 8px; }
+  .header p { color: #94a3b8; font-size: 1rem; max-width: 600px; margin: 0 auto; }
+
+  /* HOW-TO BANNER */
+  .howto {
+    max-width: 900px; margin: 20px auto; background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 20px 24px; line-height: 1.7;
+  }
+  .howto h3 { color: #fbbf24; margin-bottom: 10px; font-size: 1rem; }
+  .howto ol { padding-left: 20px; }
+  .howto li { margin-bottom: 6px; font-size: 0.85rem; color: #cbd5e1; }
+  .howto code { background: #334155; color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+  .howto .warn { color: #f87171; font-weight: 700; }
+  .howto .ok { color: #4ade80; }
+  .howto a { color: #60a5fa; text-decoration: none; }
+  .howto a:hover { text-decoration: underline; }
+  .howto .nav-path {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0f172a; border: 1px solid #475569; border-radius: 6px;
+    padding: 2px 8px; font-size: 0.8rem; color: #60a5fa; white-space: nowrap;
+  }
+  .howto .nav-path .sep { color: #475569; }
+
+  .score-bar {
+    display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+    margin: 20px auto 30px; max-width: 900px;
+  }
+  .score-card {
+    background: #1e293b; border-radius: 12px; padding: 16px 24px; text-align: center; min-width: 120px;
+    border: 1px solid #334155;
+  }
+  .score-card .num { font-size: 2rem; font-weight: 700; }
+  .score-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .score-card.green .num { color: #4ade80; }
+  .score-card.red .num { color: #f87171; }
+  .score-card.yellow .num { color: #fbbf24; }
+  .score-card.blue .num { color: #60a5fa; }
+
+  .progress-wrap { max-width: 900px; margin: 0 auto 30px; }
+  .progress-bg { background: #1e293b; border-radius: 99px; height: 12px; overflow: hidden; }
+  .progress-fill { background: linear-gradient(90deg, #4ade80, #22d3ee); height: 100%; border-radius: 99px; transition: width 0.5s; }
+  .progress-label { text-align: center; margin-top: 6px; font-size: 0.85rem; color: #94a3b8; }
+
+  .blocks { max-width: 900px; margin: 0 auto; }
+
+  .block { margin-bottom: 24px; }
+  .block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1e293b; border-radius: 12px 12px 0 0; padding: 14px 20px;
+    cursor: pointer; border: 1px solid #334155; border-bottom: none;
+    user-select: none;
+  }
+  .block-header:hover { background: #253347; }
+  .block-header h2 { font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .block-header .badge {
+    font-size: 0.7rem; background: #334155; color: #94a3b8; padding: 2px 8px;
+    border-radius: 99px; font-weight: 600;
+  }
+  .block-header .arrow { transition: transform 0.3s; font-size: 0.8rem; color: #64748b; }
+  .block-header.open .arrow { transform: rotate(180deg); }
+  .block-header .block-score { font-size: 0.85rem; }
+
+  .block-body {
+    border: 1px solid #334155; border-top: none; border-radius: 0 0 12px 12px;
+    overflow: hidden; max-height: 0; transition: max-height 0.4s ease;
+  }
+  .block-body.open { max-height: 8000px; }
+
+  /* NAV HINT above steps */
+  .nav-hint {
+    background: #0c1425; padding: 10px 20px; border-bottom: 1px solid #1e293b;
+    font-size: 0.8rem; color: #60a5fa; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-hint .icon { font-size: 1rem; }
+
+  .step {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 20px;
+    border-bottom: 1px solid #1e293b; background: #151f2e;
+    transition: background 0.2s;
+  }
+  .step:hover { background: #1a2740; }
+  .step:last-child { border-bottom: none; }
+
+  .step-info { flex: 1; }
+  .step-title { font-weight: 600; font-size: 0.9rem; color: #f1f5f9; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .step-title .critical { font-size: 0.6rem; background: #dc2626; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+
+  .step-instructions {
+    font-size: 0.82rem; color: #94a3b8; line-height: 1.7;
+    background: #0f172a; border-radius: 8px; padding: 10px 14px; margin-top: 6px;
+    border-left: 3px solid #334155;
+  }
+  .step-instructions .num-step { color: #fbbf24; font-weight: 700; }
+  .step-instructions .click { color: #60a5fa; font-weight: 600; }
+  .step-instructions .expect-ok { color: #4ade80; }
+  .step-instructions .expect-fail { color: #f87171; }
+
+  .step-actions { flex-shrink: 0; display: flex; gap: 4px; padding-top: 4px; }
+  .btn-pass, .btn-fail {
+    width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; font-weight: 700;
+  }
+  .btn-pass { background: #1a3a2a; color: #4ade80; }
+  .btn-pass:hover { background: #4ade80; color: #0f172a; }
+  .btn-fail { background: #3a1a1a; color: #f87171; }
+  .btn-fail:hover { background: #f87171; color: #0f172a; }
+
+  .step.passed { }
+  .step.passed .step-title { color: #4ade80; }
+  .step.passed .step-instructions { opacity: 0.4; }
+  .step.failed .step-title { color: #f87171; }
+
+  .note-input {
+    width: 100%; margin-top: 8px; background: #1e293b; border: 1px solid #334155;
+    border-radius: 6px; padding: 6px 10px; color: #e2e8f0; font-size: 0.78rem;
+    font-family: inherit; resize: none; display: none;
+  }
+  .step.failed .note-input { display: block; }
+
+  .legend { max-width: 900px; margin: 30px auto; display: flex; gap: 20px; justify-content: center; font-size: 0.8rem; color: #64748b; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .reset-btn {
+    display: block; margin: 10px auto 40px; background: #3a1a1a; color: #f87171; border: 1px solid #f87171;
+    padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+  }
+  .reset-btn:hover { background: #f87171; color: #0f172a; }
+
+  .footer { text-align: center; padding: 20px 20px 40px; color: #475569; font-size: 0.75rem; }
+
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    .header h1 { font-size: 1.5rem; }
+    .score-bar { gap: 8px; }
+    .score-card { min-width: 70px; padding: 10px 14px; }
+    .score-card .num { font-size: 1.4rem; }
+    .step { padding: 10px 14px; }
+    .howto { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Steve Mail</h1>
+  <p>50 pruebas con instrucciones paso a paso. Sigue las instrucciones exactas de cada paso. Al terminar, marca con ✓ o ✗.</p>
+</div>
+
+<!-- INSTRUCCIONES GENERALES -->
+<div class="howto">
+  <h3>ANTES DE EMPEZAR — Lee esto primero</h3>
+  <ol>
+    <li>Abre <a href="https://betabgnuevosupa.vercel.app" target="_blank">https://betabgnuevosupa.vercel.app</a> en Chrome</li>
+    <li>Haz login con tu cuenta</li>
+    <li>Vas a llegar al <strong>Portal del Cliente</strong>. Arriba hay tabs: Steve, Brief, Metricas, etc.</li>
+    <li>Para llegar a Steve Mail: busca el boton <code>Mas</code> en la barra de tabs (arriba a la derecha). Click ahi y selecciona <code>Steve Mail</code></li>
+    <li>Adentro de Steve Mail hay <strong>5 pestanas</strong>:
+      <code>Campanas</code> · <code>Contactos</code> · <code>Automatizaciones</code> · <code>Formularios</code> · <code>Rendimiento</code></li>
+    <li class="warn">Si algo falla: apreta ✗ en rojo, escribe que paso en la nota que aparece, y sigue con el siguiente paso</li>
+    <li class="ok">Si funciona bien: apreta ✓ en verde y sigue</li>
+    <li>Tu progreso se guarda automaticamente en el navegador. Puedes cerrar y volver.</li>
+  </ol>
+</div>
+
+<div class="score-bar">
+  <div class="score-card blue"><div class="num" id="total">50</div><div class="label">Total</div></div>
+  <div class="score-card green"><div class="num" id="passed">0</div><div class="label">Pasaron</div></div>
+  <div class="score-card red"><div class="num" id="failed">0</div><div class="label">Fallaron</div></div>
+  <div class="score-card yellow"><div class="num" id="pending">50</div><div class="label">Pendientes</div></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-bg"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+  <div class="progress-label" id="progressLabel">0% completado</div>
+</div>
+
+<div class="blocks" id="blocks"></div>
+
+<div class="legend">
+  <span><div class="dot" style="background:#4ade80"></div> Pasa (boton verde ✓)</span>
+  <span><div class="dot" style="background:#f87171"></div> Falla (boton rojo ✗)</span>
+  <span><div class="dot" style="background:#fbbf24"></div> Pendiente</span>
+  <span><div class="dot" style="background:#dc2626"></div> Paso critico</span>
+</div>
+
+<button class="reset-btn" onclick="if(confirm('Borrar todo el progreso?')){localStorage.removeItem('steve-mail-qa-v2');location.reload();}">Borrar progreso y empezar de nuevo</button>
+
+<div class="footer">Steve Mail QA — 2026-03-22 — Generado por Claude Code</div>
+
+<script>
+const DATA = [
+  {
+    name: "Campanas",
+    icon: "📧",
+    nav: "Portal > Mas > Steve Mail > pestana «Campanas»",
+    steps: [
+      {
+        id: 1, title: "Ver lista de campanas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en la pestana <span class="click">Campanas</span> (es la primera pestana, ya deberia estar seleccionada)' },
+          { type: 'wait', text: 'Espera que cargue la pagina (1-3 segundos)' },
+          { type: 'ok', text: 'Ves una lista de campanas con nombre y estado, O un mensaje tipo "No hay campanas" si esta vacio' },
+          { type: 'fail', text: 'Pantalla blanca, error rojo, o el circulito de carga gira para siempre sin parar' },
+        ]
+      },
+      {
+        id: 2, title: "Crear campana nueva", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton que diga <span class="click">Nueva Campana</span> o <span class="click">Crear</span> y haz click' },
+          { type: 'do', text: 'Te va a pedir un nombre. Escribe: <code>Test QA 1</code>' },
+          { type: 'do', text: 'Si pide tipo, selecciona "Promotional" o el primero que aparezca' },
+          { type: 'do', text: 'Haz click en <span class="click">Crear</span> o <span class="click">Guardar</span>' },
+          { type: 'ok', text: 'La campana "Test QA 1" aparece en la lista con estado "Borrador" o "Draft"' },
+          { type: 'fail', text: 'Sale error, o la campana no aparece en la lista' },
+        ]
+      },
+      {
+        id: 3, title: "Abrir editor de email", critical: true,
+        instructions: [
+          { type: 'do', text: 'Haz click en la campana <span class="click">Test QA 1</span> para abrirla' },
+          { type: 'do', text: 'Busca un boton que diga <span class="click">Disenar</span>, <span class="click">Editar</span> o <span class="click">Design</span> y haz click' },
+          { type: 'wait', text: 'Espera 3-5 segundos. Va a cargar un editor visual grande' },
+          { type: 'ok', text: 'Se abre un editor tipo drag & drop: a la izquierda hay bloques (texto, imagen, boton) y al centro una preview del email' },
+          { type: 'fail', text: 'El editor no carga, se ve pantalla blanca, o hay un error en la consola del navegador (F12)' },
+        ]
+      },
+      {
+        id: 4, title: "Editar contenido del email", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro del editor, busca un bloque de <span class="click">Texto</span> en el panel izquierdo' },
+          { type: 'do', text: 'Arrastralo al centro del email (drag & drop)' },
+          { type: 'do', text: 'Haz click en el texto y escribe: <code>Hola mundo QA</code>' },
+          { type: 'do', text: 'Haz click en <span class="click">Guardar</span> (arriba o abajo del editor)' },
+          { type: 'do', text: 'Ahora cierra el editor y vuelvelo a abrir' },
+          { type: 'ok', text: 'Al reabrir, el texto "Hola mundo QA" sigue ahi' },
+          { type: 'fail', text: 'El texto desaparecio o el editor se ve vacio al reabrir' },
+        ]
+      },
+      {
+        id: 5, title: "Cambiar asunto del email", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la configuracion de la campana (puede ser el paso 1 del wizard), busca el campo <span class="click">Asunto</span> o <span class="click">Subject</span>' },
+          { type: 'do', text: 'Escribe: <code>Test de QA - Ignorar</code>' },
+          { type: 'do', text: 'Guarda la campana' },
+          { type: 'do', text: 'Recarga la pagina (F5 o Cmd+R)' },
+          { type: 'ok', text: 'El asunto sigue diciendo "Test de QA - Ignorar" despues de recargar' },
+          { type: 'fail', text: 'No hay campo de asunto, o el texto no se guardo' },
+        ]
+      },
+      {
+        id: 6, title: "Seleccionar destinatarios", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de la campana, busca el paso de <span class="click">Audiencia</span> o <span class="click">Destinatarios</span> (puede ser paso 3 del wizard)' },
+          { type: 'do', text: 'Debe haber una opcion para elegir a quien enviar: "Todos los contactos" o una lista especifica' },
+          { type: 'do', text: 'Selecciona cualquier opcion' },
+          { type: 'ok', text: 'Muestra cuantos suscriptores van a recibir el email (ej: "150 contactos")' },
+          { type: 'fail', text: 'No hay forma de seleccionar destinatarios' },
+        ]
+      },
+      {
+        id: 7, title: "Programar envio futuro", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el ultimo paso de la campana (Review/Enviar), busca la opcion <span class="click">Programar</span> o <span class="click">Schedule</span>' },
+          { type: 'do', text: 'Selecciona una fecha y hora en el futuro (ej: manana a las 10:00)' },
+          { type: 'do', text: 'Confirma la programacion' },
+          { type: 'ok', text: 'La campana cambia su estado a "Programada" o "Scheduled" con la fecha visible' },
+          { type: 'fail', text: 'Error al programar, o el estado no cambia' },
+        ]
+      },
+      {
+        id: 8, title: "Cancelar envio programado", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la campana que acabas de programar, busca un boton <span class="click">Cancelar</span> o <span class="click">Desprogramar</span>' },
+          { type: 'do', text: 'Haz click y confirma' },
+          { type: 'ok', text: 'La campana vuelve a estado "Borrador" o "Draft"' },
+          { type: 'fail', text: 'No hay boton para cancelar, o sigue mostrando "Programada"' },
+        ]
+      },
+      {
+        id: 9, title: "Enviar email de prueba", critical: true,
+        instructions: [
+          { type: 'do', text: 'Dentro de la campana, busca un boton <span class="click">Enviar prueba</span> o <span class="click">Test send</span>' },
+          { type: 'do', text: 'Escribe TU email personal (el que puedas revisar ahora)' },
+          { type: 'do', text: 'Haz click en Enviar' },
+          { type: 'wait', text: 'Espera 1-2 minutos. Revisa tu bandeja de entrada (y spam)' },
+          { type: 'ok', text: 'Recibes el email con el contenido que disenaste. Se ve bien.' },
+          { type: 'fail', text: 'No llega el email, llega vacio, o sale error al enviar' },
+        ]
+      },
+      {
+        id: 10, title: "Eliminar campana de prueba", critical: false,
+        instructions: [
+          { type: 'do', text: 'Vuelve a la lista de campanas' },
+          { type: 'do', text: 'En la campana "Test QA 1", busca un icono de basura o boton <span class="click">Eliminar</span>' },
+          { type: 'do', text: 'Confirma la eliminacion' },
+          { type: 'ok', text: 'La campana desaparece de la lista' },
+          { type: 'fail', text: 'Error al eliminar o sigue apareciendo' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Flujos / Automatizaciones",
+    icon: "🔄",
+    nav: "Portal > Mas > Steve Mail > pestana «Automatizaciones»",
+    steps: [
+      {
+        id: 11, title: "Ver lista de flujos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en la pestana <span class="click">Automatizaciones</span> (la tercera pestana en Steve Mail)' },
+          { type: 'ok', text: 'Se ve una lista de flujos, o un mensaje de que no hay flujos. La pagina carga sin error.' },
+          { type: 'fail', text: 'Pantalla blanca o error' },
+        ]
+      },
+      {
+        id: 12, title: "Crear flujo nuevo", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Nueva Automatizacion</span> o <span class="click">Crear</span> y haz click' },
+          { type: 'do', text: 'Te va a pedir elegir un trigger. Elige <span class="click">Carrito abandonado</span> (Abandoned Cart)' },
+          { type: 'do', text: 'Ponle nombre: <code>Test QA Flow</code>' },
+          { type: 'do', text: 'Confirma la creacion' },
+          { type: 'ok', text: 'Se abre un canvas visual (tipo diagrama de flujo) con el trigger como primer nodo arriba' },
+          { type: 'fail', text: 'Error al crear, o no se abre ningun canvas' },
+        ]
+      },
+      {
+        id: 13, title: "Agregar paso de email al flujo", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el canvas, busca un boton <span class="click">+</span> o <span class="click">Agregar paso</span> debajo del trigger' },
+          { type: 'do', text: 'Selecciona tipo <span class="click">Email</span>' },
+          { type: 'ok', text: 'Aparece un nuevo nodo de "Email" en el canvas, conectado al trigger' },
+          { type: 'fail', text: 'No se puede agregar o no aparece' },
+        ]
+      },
+      {
+        id: 14, title: "Editar el email del paso", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en el nodo de <span class="click">Email</span> que acabas de agregar' },
+          { type: 'do', text: 'Debe abrirse un editor para escribir el contenido del email' },
+          { type: 'ok', text: 'Se abre un editor (puede ser mas simple que el de campanas) donde puedes escribir contenido' },
+          { type: 'fail', text: 'No pasa nada al hacer click, o sale error' },
+        ]
+      },
+      {
+        id: 15, title: "Agregar paso de espera (delay)", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el canvas, haz click en <span class="click">+</span> para agregar otro paso' },
+          { type: 'do', text: 'Selecciona tipo <span class="click">Delay</span> o <span class="click">Espera</span>' },
+          { type: 'do', text: 'Configura: esperar <code>1 hora</code>' },
+          { type: 'ok', text: 'Nodo de delay aparece en el canvas mostrando "1 hora" o "1h"' },
+          { type: 'fail', text: 'No se puede configurar el tiempo' },
+        ]
+      },
+      {
+        id: 16, title: "Agregar condicion (ramificacion)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Agrega otro paso con <span class="click">+</span>' },
+          { type: 'do', text: 'Selecciona tipo <span class="click">Condicion</span>' },
+          { type: 'do', text: 'Configura alguna condicion (ej: "Abrio email anterior")' },
+          { type: 'ok', text: 'En el canvas aparece un nodo que se DIVIDE en dos ramas: SI (verde) y NO (rojo)' },
+          { type: 'fail', text: 'No aparecen las dos ramas, o error' },
+        ]
+      },
+      {
+        id: 17, title: "Agregar email DENTRO de rama SI", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de la rama SI (la verde/izquierda), busca un <span class="click">+</span> para agregar un paso' },
+          { type: 'do', text: 'Agrega un paso tipo <span class="click">Email</span>' },
+          { type: 'ok', text: 'El email aparece como sub-paso DENTRO de la rama SI, indentado o debajo de "SI"' },
+          { type: 'fail', text: 'No se puede agregar email dentro de la rama' },
+        ]
+      },
+      {
+        id: 18, title: "Editar email de rama SI (BUG FIX CRITICO)", critical: true,
+        instructions: [
+          { type: 'do', text: 'Haz click en el email que esta <strong>DENTRO de la rama SI</strong> (el que agregaste en el paso anterior)' },
+          { type: 'wait', text: 'Debe abrirse un editor para ese email especifico' },
+          { type: 'ok', text: 'Se abre el editor con el contenido de ESE sub-paso. Puedes editar y guardar.' },
+          { type: 'fail', text: '<strong>FALLA CRITICA:</strong> No pasa nada al hacer click, se abre el email equivocado (el del paso 14), o sale error en consola' },
+        ]
+      },
+      {
+        id: 19, title: "Guardar contenido del sub-step", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro del editor del sub-step, cambia el asunto a: <code>Email rama SI - QA</code>' },
+          { type: 'do', text: 'Haz click en <span class="click">Guardar</span>' },
+          { type: 'do', text: 'Cierra el editor y vuelve a abrir el mismo email de la rama SI' },
+          { type: 'ok', text: 'El asunto sigue diciendo "Email rama SI - QA". No se perdio.' },
+          { type: 'fail', text: 'El asunto se perdio, aparece vacio, o se guardo en otro paso' },
+        ]
+      },
+      {
+        id: 20, title: "Activar flujo", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Activar</span> en el flujo "Test QA Flow"' },
+          { type: 'do', text: 'Haz click para activar' },
+          { type: 'ok', text: 'El estado del flujo cambia a "Activo". Puede aparecer un badge verde.' },
+          { type: 'fail', text: 'Error al activar' },
+        ]
+      },
+      {
+        id: 21, title: "Pausar flujo (BUG FIX CRITICO)", critical: true,
+        instructions: [
+          { type: 'do', text: 'En el flujo que acabas de activar, busca un boton <span class="click">Pausar</span>' },
+          { type: 'do', text: 'Haz click para pausar' },
+          { type: 'ok', text: 'Estado cambia a "Pausado". Los emails pendientes NO deben seguir enviandose.' },
+          { type: 'fail', text: '<strong>FALLA CRITICA:</strong> Error al pausar, o el flujo sigue activo' },
+        ]
+      },
+      {
+        id: 22, title: "Eliminar flujo de prueba", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca el boton <span class="click">Eliminar</span> en el flujo "Test QA Flow"' },
+          { type: 'do', text: 'Confirma' },
+          { type: 'ok', text: 'El flujo desaparece de la lista' },
+          { type: 'fail', text: 'Error o sigue apareciendo' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Campaign Studio (verificar que NO hay Klaviyo)",
+    icon: "🎯",
+    nav: "Portal > pestana «Campanas» (la de arriba, NO Steve Mail) > sub-tab «Flujos»",
+    steps: [
+      {
+        id: 23, title: "Flujos en Campaign Studio muestra FlowBuilder", critical: true,
+        instructions: [
+          { type: 'do', text: 'Vuelve al Portal principal (arriba de todo)' },
+          { type: 'do', text: 'Busca la pestana <span class="click">Campanas</span> en la barra principal de arriba (NO la de Steve Mail, sino la del portal)' },
+          { type: 'do', text: 'Dentro, busca un sub-tab que diga <span class="click">Flujos</span> o <span class="click">Flows</span>' },
+          { type: 'do', text: 'Haz click ahi' },
+          { type: 'ok', text: 'Se ve el MISMO FlowBuilder de Steve Mail (con triggers como Carrito Abandonado, Bienvenida, etc. y canvas visual)' },
+          { type: 'fail', text: '<strong>FALLA:</strong> Aparece un wizard de 4 pasos, templates de Klaviyo, o cualquier mencion a Klaviyo' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Contactos / Suscriptores",
+    icon: "👥",
+    nav: "Portal > Mas > Steve Mail > pestana «Contactos»",
+    steps: [
+      {
+        id: 24, title: "Ver lista de contactos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en la pestana <span class="click">Contactos</span> (segunda pestana en Steve Mail)' },
+          { type: 'ok', text: 'Se ve una tabla con columnas: email, nombre, estado (subscribed/unsubscribed), fecha' },
+          { type: 'fail', text: 'Tabla vacia sin razon, error, o no carga' },
+        ]
+      },
+      {
+        id: 25, title: "Agregar contacto manual", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Agregar</span> o <span class="click">Nuevo contacto</span>' },
+          { type: 'do', text: 'Escribe email: <code>qa-test@example.com</code>' },
+          { type: 'do', text: 'Guarda' },
+          { type: 'ok', text: 'El contacto aparece en la tabla con estado "subscribed"' },
+          { type: 'fail', text: 'Error al guardar' },
+        ]
+      },
+      {
+        id: 26, title: "Buscar contacto", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un campo de busqueda arriba de la tabla de contactos' },
+          { type: 'do', text: 'Escribe: <code>qa-test</code>' },
+          { type: 'ok', text: 'La tabla se filtra y muestra solo el contacto qa-test@example.com' },
+          { type: 'fail', text: 'No filtra, o no hay campo de busqueda' },
+        ]
+      },
+      {
+        id: 27, title: "Importar CSV", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Importar</span> o <span class="click">CSV</span>' },
+          { type: 'do', text: 'Si existe, sube un archivo CSV con 3 emails de prueba' },
+          { type: 'do', text: '(Si no existe el boton, marca como falla)' },
+          { type: 'ok', text: 'Muestra resumen: "3 importados, 0 duplicados" o similar' },
+          { type: 'fail', text: 'No hay opcion de importar, o error al procesar el CSV' },
+        ]
+      },
+      {
+        id: 28, title: "Crear lista de contactos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de Contactos, busca un sub-tab <span class="click">Listas</span> y haz click' },
+          { type: 'do', text: 'Busca <span class="click">Crear lista</span>' },
+          { type: 'do', text: 'Nombre: <code>Lista QA Test</code>. Guarda.' },
+          { type: 'ok', text: 'La lista aparece en el panel' },
+          { type: 'fail', text: 'No se puede crear o error' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Dominio de envio",
+    icon: "🌐",
+    nav: "Portal > Mas > Steve Mail > boton «Configurar dominio» (arriba a la derecha)",
+    steps: [
+      {
+        id: 29, title: "Abrir configuracion de dominio", critical: false,
+        instructions: [
+          { type: 'do', text: 'En Steve Mail, busca arriba a la derecha un boton que diga <span class="click">Configurar dominio</span>' },
+          { type: 'do', text: 'Haz click. Se abre un dialogo/panel lateral.' },
+          { type: 'ok', text: 'Se abre un panel mostrando dominios configurados (o vacio si no hay ninguno)' },
+          { type: 'fail', text: 'No existe el boton, o error al abrir' },
+        ]
+      },
+      {
+        id: 30, title: "Agregar dominio nuevo", critical: true,
+        instructions: [
+          { type: 'do', text: 'Dentro del panel de dominio, busca un campo para escribir un dominio' },
+          { type: 'do', text: 'Escribe: <code>tudominio.cl</code> (o cualquier dominio de prueba)' },
+          { type: 'do', text: 'Haz click en <span class="click">Verificar</span> o <span class="click">Agregar</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos mientras consulta a Resend' },
+          { type: 'ok', text: 'Aparecen registros DNS que hay que agregar: SPF (TXT), DKIM (CNAME), y DMARC (TXT). Cada uno con un valor para copiar.' },
+          { type: 'fail', text: 'Error de Resend, no muestra registros, o pantalla de error' },
+        ]
+      },
+      {
+        id: 31, title: "Ver estado de verificacion por registro", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el dominio que agregaste, busca un boton <span class="click">Verificar</span> o <span class="click">Check</span>' },
+          { type: 'do', text: 'Haz click' },
+          { type: 'ok', text: 'Muestra estado individual para cada registro: SPF ✓/✗, DKIM ✓/✗, DMARC ✓/✗ (probablemente todos ✗ porque no agregaste los DNS reales)' },
+          { type: 'fail', text: 'Solo dice "verificado" o "no verificado" sin desglosar por tipo de registro' },
+        ]
+      },
+      {
+        id: 32, title: "Campo nombre de remitente", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un campo que diga <span class="click">Nombre del remitente</span>, <span class="click">From name</span>, o similar' },
+          { type: 'do', text: 'Si existe, escribe: <code>Mi Tienda</code>' },
+          { type: 'ok', text: 'Existe el campo y se puede editar. Los emails saldrian como "Mi Tienda <noreply@tudominio.cl>"' },
+          { type: 'fail', text: 'No hay campo para configurar el nombre del remitente' },
+        ]
+      },
+      {
+        id: 33, title: "Eliminar dominio de prueba", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton o icono de basura para eliminar el dominio de prueba' },
+          { type: 'do', text: 'Confirma' },
+          { type: 'ok', text: 'El dominio desaparece de la lista' },
+          { type: 'fail', text: 'Error o no se puede eliminar' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Templates",
+    icon: "📄",
+    nav: "Portal > Mas > Steve Mail > pestana «Campanas» > dentro del wizard buscar galeria de templates",
+    steps: [
+      {
+        id: 34, title: "Ver galeria de templates", critical: false,
+        instructions: [
+          { type: 'do', text: 'Al crear o editar una campana, en el paso de "Diseno", busca una opcion para elegir <span class="click">Template</span> o <span class="click">Plantilla</span>' },
+          { type: 'ok', text: 'Se ve una galeria de templates con previews/miniaturas para elegir' },
+          { type: 'fail', text: 'No hay galeria, o esta vacia sin templates' },
+        ]
+      },
+      {
+        id: 35, title: "Crear template desde editor", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro del editor de email (de una campana), busca una opcion para <span class="click">Guardar como template</span>' },
+          { type: 'do', text: 'Ponle nombre: <code>Template QA</code>. Guarda.' },
+          { type: 'ok', text: 'Se confirma que se guardo. Al volver a la galeria, aparece "Template QA"' },
+          { type: 'fail', text: 'No hay opcion de guardar como template, o error al guardar' },
+        ]
+      },
+      {
+        id: 36, title: "Cargar template en campana", critical: false,
+        instructions: [
+          { type: 'do', text: 'Crea una nueva campana (o abre una existente)' },
+          { type: 'do', text: 'En la galeria de templates, selecciona <span class="click">Template QA</span>' },
+          { type: 'ok', text: 'El editor se llena con el diseno del template. No esta vacio.' },
+          { type: 'fail', text: 'El editor carga vacio, o carga un template distinto' },
+        ]
+      },
+      {
+        id: 37, title: "Eliminar template", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la galeria de templates, busca un boton para eliminar "Template QA"' },
+          { type: 'do', text: 'Confirma' },
+          { type: 'ok', text: 'Template eliminado de la galeria' },
+          { type: 'fail', text: 'Error o no hay opcion de eliminar' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Analytics / Rendimiento",
+    icon: "📊",
+    nav: "Portal > Mas > Steve Mail > pestana «Rendimiento»",
+    steps: [
+      {
+        id: 38, title: "Dashboard general de metricas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en la pestana <span class="click">Rendimiento</span> (ultima pestana en Steve Mail)' },
+          { type: 'ok', text: 'Se ven metricas: emails enviados, tasa de apertura, tasa de clicks, bounces. Pueden ser 0 si no hay envios.' },
+          { type: 'fail', text: 'Error, pantalla blanca, o no carga' },
+        ]
+      },
+      {
+        id: 39, title: "Metricas de una campana especifica", critical: false,
+        instructions: [
+          { type: 'do', text: 'Si hay campanas enviadas, busca una y haz click para ver sus metricas individuales' },
+          { type: 'do', text: '(Si no hay campanas enviadas, marca como "pass" y pasa al siguiente)' },
+          { type: 'ok', text: 'Se ven open rate, click rate, bounces, unsubs para esa campana especifica' },
+          { type: 'fail', text: 'Error al ver metricas de campana individual' },
+        ]
+      },
+      {
+        id: 40, title: "Deliverability / Entregabilidad", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de Rendimiento, busca una seccion de <span class="click">Deliverability</span> o <span class="click">Entregabilidad</span> o <span class="click">Salud del dominio</span>' },
+          { type: 'ok', text: 'Se ven metricas de entrega: tasa de rebote, spam complaints, reputacion' },
+          { type: 'fail', text: 'No existe esa seccion, o error' },
+        ]
+      },
+      {
+        id: 41, title: "Metricas de flujos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Vuelve a la pestana Automatizaciones y abre un flujo existente' },
+          { type: 'do', text: 'Busca una seccion de estadisticas o metricas del flujo' },
+          { type: 'ok', text: 'Se ven metricas desglosadas por paso del flujo (enviados, abiertos, clicks por step)' },
+          { type: 'fail', text: 'No hay metricas por flujo, o error' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Alertas de Producto",
+    icon: "🔔",
+    nav: "Esto es backend. Se prueba desde la API, no desde el portal (a menos que haya seccion visible)",
+    steps: [
+      {
+        id: 42, title: "Ver seccion de alertas de producto", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca en Steve Mail o en el portal alguna seccion llamada <span class="click">Product Alerts</span> o <span class="click">Alertas</span>' },
+          { type: 'do', text: 'Si no hay seccion visible, abre en otra pestana: <code>https://steve-api-850416724643.us-central1.run.app/health</code> para verificar que la API esta viva' },
+          { type: 'ok', text: 'La seccion carga, O la API responde con status OK' },
+          { type: 'fail', text: 'Error 500 en la API o seccion rota' },
+        ]
+      },
+      {
+        id: 43, title: "Stats de alertas (API)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Esto es una verificacion tecnica. Si no tienes Postman o curl, marca como "pass" y continua.' },
+          { type: 'do', text: 'Si puedes, envia POST a <code>/api/email-product-alerts</code> con body: <code>{"action":"get_stats","client_id":"TU_ID"}</code>' },
+          { type: 'ok', text: 'Responde con JSON que tiene "stats", "by_status", "total"' },
+          { type: 'fail', text: 'Error 500 o respuesta invalida' },
+        ]
+      },
+      {
+        id: 44, title: "Widget de alertas (URL publica)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Abre en el navegador: <code>https://steve-api-850416724643.us-central1.run.app/api/email-product-alert-widget?client_id=test</code>' },
+          { type: 'ok', text: 'Devuelve codigo JavaScript (puede ser un script largo o un error controlado de "client not found")' },
+          { type: 'fail', text: 'Error 500, pagina en blanco, o error del servidor' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Formularios de Registro",
+    icon: "📝",
+    nav: "Portal > Mas > Steve Mail > pestana «Formularios»",
+    steps: [
+      {
+        id: 45, title: "Ver formularios existentes", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en la pestana <span class="click">Formularios</span> (cuarta pestana en Steve Mail)' },
+          { type: 'ok', text: 'Se ve una lista de formularios (o vacia). La pagina carga sin error.' },
+          { type: 'fail', text: 'Error o pantalla blanca' },
+        ]
+      },
+      {
+        id: 46, title: "Crear formulario de registro", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Crear formulario</span> o <span class="click">Nuevo</span>' },
+          { type: 'do', text: 'Elige tipo: Popup, Slide-in, o Inline (cualquiera)' },
+          { type: 'do', text: 'Configura: titulo, descripcion, color del boton' },
+          { type: 'do', text: 'Guarda el formulario' },
+          { type: 'ok', text: 'Formulario creado. Debe mostrar un snippet HTML/JS para copiar e insertar en tu sitio web.' },
+          { type: 'fail', text: 'Error al crear, o no genera snippet embed' },
+        ]
+      },
+      {
+        id: 47, title: "Widget de formulario (URL publica)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Si el formulario genera un snippet con una URL, abre esa URL en el navegador' },
+          { type: 'do', text: 'Si no, prueba: <code>https://steve-api-850416724643.us-central1.run.app/api/email-form-widget?form_id=test</code>' },
+          { type: 'ok', text: 'Devuelve codigo HTML/JS del formulario embebible (o error controlado "form not found")' },
+          { type: 'fail', text: 'Error 500 del servidor' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Tracking y Unsubscribe",
+    icon: "🔗",
+    nav: "Se prueba revisando un email que hayas recibido (del paso 9)",
+    steps: [
+      {
+        id: 48, title: "Pixel de apertura en emails", critical: false,
+        instructions: [
+          { type: 'do', text: 'Abre el email de prueba que recibiste en el Paso 9' },
+          { type: 'do', text: 'Haz click derecho > "Ver codigo fuente" o "Show original" en Gmail' },
+          { type: 'do', text: 'Busca (Ctrl+F) la palabra: <code>email-track/open</code>' },
+          { type: 'ok', text: 'Encuentras una etiqueta &lt;img&gt; con src que contiene "/api/email-track/open?..." — es el pixel de tracking' },
+          { type: 'fail', text: 'No hay ningun pixel de tracking en el HTML del email' },
+        ]
+      },
+      {
+        id: 49, title: "Click tracking en links", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el mismo codigo fuente del email, busca: <code>email-track/click</code>' },
+          { type: 'ok', text: 'Los links del email apuntan a "/api/email-track/click?..." en vez de ir directo al destino. Asi se miden los clicks.' },
+          { type: 'fail', text: 'Los links van directos al destino sin pasar por el tracker' },
+        ]
+      },
+      {
+        id: 50, title: "Link de desuscripcion funciona", critical: true,
+        instructions: [
+          { type: 'do', text: 'En el email recibido, baja hasta el footer (parte de abajo)' },
+          { type: 'do', text: 'Busca un link que diga <span class="click">Desuscribirse</span> o <span class="click">Unsubscribe</span>' },
+          { type: 'do', text: 'Haz click en el link' },
+          { type: 'ok', text: 'Se abre una pagina de confirmacion diciendo que te desuscribiste. En la tabla de contactos, tu email deberia cambiar a "unsubscribed".' },
+          { type: 'fail', text: '<strong>FALLA CRITICA:</strong> Link roto (error 404/500), o el estado del contacto no cambia' },
+        ]
+      },
+    ]
+  },
+];
+
+// State
+const state = {};
+const notes = {};
+const STORAGE_KEY = 'steve-mail-qa-v2';
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    Object.assign(state, saved.state || {});
+    Object.assign(notes, saved.notes || {});
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, notes }));
+}
+
+function updateScores() {
+  let passed = 0, failed = 0;
+  for (const k in state) {
+    if (state[k] === 'pass') passed++;
+    else if (state[k] === 'fail') failed++;
+  }
+  const total = 50;
+  const pending = total - passed - failed;
+  const pct = Math.round(((passed + failed) / total) * 100);
+
+  document.getElementById('passed').textContent = passed;
+  document.getElementById('failed').textContent = failed;
+  document.getElementById('pending').textContent = pending;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = pct + '% completado — ' + passed + ' pasaron, ' + failed + ' fallaron';
+
+  if (failed > 0) {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #fbbf24, #f87171)';
+  } else {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+  }
+}
+
+function setResult(id, result) {
+  if (state[id] === result) {
+    delete state[id];
+  } else {
+    state[id] = result;
+  }
+  saveState();
+  renderStep(id);
+  updateScores();
+  updateBlockScores();
+}
+
+function saveNote(id) {
+  const el = document.getElementById('note-' + id);
+  if (el) {
+    notes[id] = el.value;
+    saveState();
+  }
+}
+
+function renderStep(id) {
+  const el = document.getElementById('step-' + id);
+  if (!el) return;
+  el.classList.remove('passed', 'failed');
+  if (state[id] === 'pass') el.classList.add('passed');
+  else if (state[id] === 'fail') el.classList.add('failed');
+
+  const passBtn = el.querySelector('.btn-pass');
+  const failBtn = el.querySelector('.btn-fail');
+  if (passBtn) {
+    passBtn.style.background = state[id] === 'pass' ? '#4ade80' : '#1a3a2a';
+    passBtn.style.color = state[id] === 'pass' ? '#0f172a' : '#4ade80';
+  }
+  if (failBtn) {
+    failBtn.style.background = state[id] === 'fail' ? '#f87171' : '#3a1a1a';
+    failBtn.style.color = state[id] === 'fail' ? '#0f172a' : '#f87171';
+  }
+}
+
+function updateBlockScores() {
+  DATA.forEach((block, bIdx) => {
+    const bp = block.steps.filter(s => state[s.id] === 'pass').length;
+    const bf = block.steps.filter(s => state[s.id] === 'fail').length;
+    const el = document.getElementById('bscore-' + bIdx);
+    if (el) {
+      let html = '';
+      if (bp) html += `<span style="color:#4ade80">${bp}✓</span> `;
+      if (bf) html += `<span style="color:#f87171">${bf}✗</span>`;
+      if (!bp && !bf) html = `<span style="color:#64748b">0/${block.steps.length}</span>`;
+      el.innerHTML = html;
+    }
+  });
+}
+
+function toggleBlock(idx) {
+  const header = document.getElementById('bh-' + idx);
+  const body = document.getElementById('bb-' + idx);
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+function formatInstruction(inst) {
+  if (inst.type === 'do') return `<span class="num-step">→</span> ${inst.text}`;
+  if (inst.type === 'wait') return `<span style="color:#fbbf24">⏳</span> ${inst.text}`;
+  if (inst.type === 'ok') return `<span class="expect-ok">✅ PASA SI:</span> ${inst.text}`;
+  if (inst.type === 'fail') return `<span class="expect-fail">❌ FALLA SI:</span> ${inst.text}`;
+  return inst.text;
+}
+
+function render() {
+  const container = document.getElementById('blocks');
+  let html = '';
+
+  DATA.forEach((block, bIdx) => {
+    const stepCount = block.steps.length;
+
+    html += `<div class="block">`;
+    html += `<div class="block-header" id="bh-${bIdx}" onclick="toggleBlock(${bIdx})">`;
+    html += `<h2>${block.icon} ${block.name} <span class="badge">${stepCount} pasos</span></h2>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;">`;
+    html += `<span id="bscore-${bIdx}" style="font-size:0.85rem;"></span>`;
+    html += `<span class="arrow">▼</span></div></div>`;
+
+    html += `<div class="block-body" id="bb-${bIdx}">`;
+
+    // Navigation hint
+    html += `<div class="nav-hint"><span class="icon">🧭</span> <strong>Como llegar:</strong>&nbsp; ${block.nav}</div>`;
+
+    block.steps.forEach(step => {
+      const cls = state[step.id] === 'pass' ? 'passed' : state[step.id] === 'fail' ? 'failed' : '';
+      html += `<div class="step ${cls}" id="step-${step.id}">`;
+      html += `<div style="color:#475569;font-size:0.85rem;font-weight:800;min-width:28px;margin-top:3px;text-align:center;">${step.id}</div>`;
+      html += `<div class="step-info">`;
+      html += `<div class="step-title">${step.title}`;
+      if (step.critical) html += ` <span class="critical">CRITICO</span>`;
+      html += `</div>`;
+
+      // Step-by-step instructions
+      html += `<div class="step-instructions">`;
+      step.instructions.forEach(inst => {
+        html += `<div style="margin-bottom:4px;">${formatInstruction(inst)}</div>`;
+      });
+      html += `</div>`;
+
+      // Notes textarea (visible on fail)
+      html += `<textarea class="note-input" id="note-${step.id}" placeholder="Escribe que fallo aqui..." onchange="saveNote(${step.id})">${notes[step.id] || ''}</textarea>`;
+
+      html += `</div>`; // step-info
+
+      html += `<div class="step-actions">`;
+      html += `<button class="btn-pass" onclick="setResult(${step.id},'pass')" title="Pasa">✓</button>`;
+      html += `<button class="btn-fail" onclick="setResult(${step.id},'fail')" title="Falla">✗</button>`;
+      html += `</div></div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+
+  DATA.forEach(block => block.steps.forEach(step => renderStep(step.id)));
+  updateBlockScores();
+}
+
+loadState();
+render();
+updateScores();
+</script>
+</body>
+</html>
