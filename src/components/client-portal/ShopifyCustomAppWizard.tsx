@@ -60,7 +60,6 @@ export function ShopifyCustomAppWizard({
   const [shopifyClientSecret, setShopifyClientSecret] = useState('');
   const [savingCredentials, setSavingCredentials] = useState(false);
   const [polling, setPolling] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cleanup polling on unmount
@@ -102,7 +101,6 @@ export function ShopifyCustomAppWizard({
     setShopifyClientId('');
     setShopifyClientSecret('');
     setPolling(false);
-    setLinkCopied(false);
     if (pollRef.current) clearInterval(pollRef.current);
     onClose();
   };
@@ -122,24 +120,15 @@ export function ShopifyCustomAppWizard({
     ? `https://admin.shopify.com/store/${cleanDomain}/settings/apps/development`
     : '';
 
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://betabgnuevosupa.vercel.app';
+  // App URL must be our API install endpoint so Shopify's install link redirects through our OAuth
+  const appUrl = `${API_BASE}/api/shopify-install`;
   const redirectUrl = `${API_BASE}/api/shopify-oauth-callback`;
-
-  // Install link — only works after credentials are saved (step 4)
-  const installLink = `${API_BASE}/api/shopify-install?shop=${encodeURIComponent(shopDomain)}&client_id=${encodeURIComponent(clientId)}`;
 
   const handleCopyScopes = () => {
     navigator.clipboard.writeText(REQUIRED_SCOPES.join(', '));
     setScopesCopied(true);
     toast.success('Permisos copiados');
     setTimeout(() => setScopesCopied(false), 2000);
-  };
-
-  const handleCopyInstallLink = () => {
-    navigator.clipboard.writeText(installLink);
-    setLinkCopied(true);
-    toast.success('Link copiado — pégalo en tu navegador');
-    setTimeout(() => setLinkCopied(false), 3000);
   };
 
   // Save Client ID + Client Secret to backend
@@ -399,31 +388,25 @@ export function ShopifyCustomAppWizard({
       <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
         <p className="font-medium">Último paso — instala la app:</p>
         <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-          <li>Dentro de la app "Steve", ve a la sección <strong>"Distribución"</strong></li>
+          <li>En tu Shopify Admin, abre la app <strong>"Steve"</strong></li>
+          <li>Ve a la sección <strong>"Distribución"</strong></li>
           <li>Haz clic en <strong>"Gestionar distribución personalizada"</strong></li>
-          <li>Copia el <strong>link de instalación</strong> que te da Shopify</li>
-          <li><strong>Pégalo en tu navegador</strong> y presiona Enter</li>
+          <li>Shopify te genera un <strong>link de instalación único</strong></li>
+          <li><strong>Copia ese link</strong> y pégalo en tu navegador</li>
           <li>Shopify te pedirá que autorices — haz clic en <strong>"Instalar"</strong></li>
-          <li>Esta ventana se actualiza automáticamente cuando termine</li>
         </ol>
 
-        {/* Or use our generated link */}
-        <div className="bg-background rounded-lg border-2 border-green-200 p-3 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">O usa este link directo:</p>
-          <code className="text-xs block text-green-700 break-all select-all">{installLink}</code>
-          <Button onClick={handleCopyInstallLink} className="w-full bg-green-600 hover:bg-green-700" size="sm">
-            {linkCopied ? (
-              <><CheckCircle2 className="w-4 h-4 mr-2" /> Copiado — pégalo en tu navegador</>
-            ) : (
-              <><Copy className="w-4 h-4 mr-2" /> Copiar link de instalación</>
-            )}
-          </Button>
+        <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            <strong>Importante:</strong> Usa el link que te da Shopify en "Distribución", NO otro link. Es un link único para tu app.
+          </span>
         </div>
 
         {polling && (
-          <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+          <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-xs">
             <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-            <span>Esperando que instales la app en Shopify...</span>
+            <span>Esperando que instales la app... esta ventana se actualiza sola</span>
           </div>
         )}
 
@@ -433,9 +416,9 @@ export function ShopifyCustomAppWizard({
         </div>
       </div>
 
-      <a href={installLink} target="_blank" rel="noopener noreferrer"
+      <a href={adminUrl} target="_blank" rel="noopener noreferrer"
         className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium">
-        Abrir link de instalación directamente <ExternalLink className="w-4 h-4" />
+        Abrir admin de {cleanDomain}.myshopify.com <ExternalLink className="w-4 h-4" />
       </a>
 
       <div className="flex gap-2">
