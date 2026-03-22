@@ -23,7 +23,7 @@ import { CampaignCreationWizard } from './create/CampaignCreationWizard';
 import { MonthlyCalendar } from './calendar/MonthlyCalendar';
 import { MonthlyPlannerWizard } from './bulk/MonthlyPlannerWizard';
 import { BulkUploadWizard } from './bulk/BulkUploadWizard';
-import { FlowsPanel } from './flows/FlowsPanel';
+import { FlowBuilder } from '../email/FlowBuilder';
 import { MetricsInsights } from './insights/MetricsInsights';
 import { SteveKlaviyoChat } from './chat/SteveKlaviyoChat';
 import { AutoActivation } from './activation/AutoActivation';
@@ -284,7 +284,7 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
 
         {/* TAB: Flujos */}
         <TabsContent value="flujos" className="mt-6">
-          <FlowsPanel clientId={clientId} />
+          <FlowBuilder clientId={clientId} />
         </TabsContent>
 
         {/* TAB: Calendario */}

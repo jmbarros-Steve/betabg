@@ -194,6 +194,27 @@ export async function emailFlowExecute(c: Context) {
     }
   }
 
+  // 7b. Idempotency check — skip if this step was already sent (Cloud Tasks retry)
+  const { count: alreadySentCount } = await supabase
+    .from('email_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('subscriber_id', subscriber.id)
+    .eq('flow_id', flow.id)
+    .eq('event_type', 'sent')
+    .eq('metadata->>step_path', effectivePath);
+
+  if (alreadySentCount && alreadySentCount > 0) {
+    console.log(`Step ${effectivePath} already sent to ${subscriber.email}. Skipping (idempotency).`);
+    // Still schedule the next step in case it wasn't scheduled
+    const nextPath = getNextStepPath(steps, effectivePath);
+    if (nextPath) {
+      const nextStep = resolveStep(steps, nextPath);
+      const delay = nextStep?.delay_seconds || 3600;
+      await scheduleFlowStep(enrollment_id, nextPath, new Date(Date.now() + delay * 1000), enrollment.client_id);
+    }
+    return c.json({ skipped: true, reason: 'Already sent (idempotency)' });
+  }
+
   // 8. Send the email
   console.log(`Sending flow email step ${effectivePath} to ${subscriber.email}`);
 
@@ -266,6 +287,14 @@ export async function emailFlowExecute(c: Context) {
   if (!result.success) {
     console.error(`Failed to send flow email: ${result.error}`);
     return c.json({ error: result.error }, 500);
+  }
+
+  // Tag the sent event with step_path for idempotency checks on Cloud Tasks retries
+  if (result.eventId) {
+    const { data: evt } = await supabase.from('email_events').select('metadata').eq('id', result.eventId).single();
+    if (evt) {
+      await supabase.from('email_events').update({ metadata: { ...evt.metadata, step_path: effectivePath } }).eq('id', result.eventId);
+    }
   }
 
   // 9. Schedule next step
@@ -678,6 +707,38 @@ export async function manageEmailFlows(c: Context) {
         .single();
 
       if (error) return c.json({ error: error.message }, 500);
+
+      // Cancel all pending Cloud Tasks for active enrollments and pause them
+      const { data: activeEnrollments } = await supabase
+        .from('email_flow_enrollments')
+        .select('id, cloud_task_name')
+        .eq('flow_id', flow_id)
+        .eq('status', 'active');
+
+      if (activeEnrollments && activeEnrollments.length > 0) {
+        // Try to cancel Cloud Tasks in parallel
+        try {
+          const { CloudTasksClient } = await import('@google-cloud/tasks');
+          const tasksClient = new CloudTasksClient();
+          await Promise.allSettled(
+            activeEnrollments
+              .filter((e: any) => e.cloud_task_name)
+              .map((e: any) => tasksClient.deleteTask({ name: e.cloud_task_name }).catch(() => {}))
+          );
+        } catch (err) {
+          console.error('Failed to import/init CloudTasksClient for pause:', err);
+        }
+
+        // Pause all active enrollments
+        await supabase
+          .from('email_flow_enrollments')
+          .update({ status: 'paused' })
+          .eq('flow_id', flow_id)
+          .eq('status', 'active');
+
+        console.log(`Paused ${activeEnrollments.length} enrollments and cancelled their Cloud Tasks for flow ${flow_id}`);
+      }
+
       return c.json({ success: true, flow: data });
     }
 

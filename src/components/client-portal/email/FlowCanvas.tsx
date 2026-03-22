@@ -43,6 +43,7 @@ interface FlowCanvasProps {
   onAddSubStep: (parentIndex: number, branch: 'yes_steps' | 'no_steps', type: 'email' | 'condition') => void;
   onUpdateSubStep: (parentIndex: number, branch: 'yes_steps' | 'no_steps', subIndex: number, updates: Partial<FlowStep>) => void;
   onRemoveSubStep: (parentIndex: number, branch: 'yes_steps' | 'no_steps', subIndex: number) => void;
+  onOpenSubStepEditor: (parentIndex: number, branch: 'yes_steps' | 'no_steps', subIndex: number) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -421,6 +422,7 @@ function ConditionNode({
   onRemoveSubStep: (branch: 'yes_steps' | 'no_steps', subIndex: number) => void;
   onOpenStepEditor: (index: number) => void;
   onPreviewStep: (html: string) => void;
+  onOpenSubStepEditor: (branch: 'yes_steps' | 'no_steps', subIndex: number) => void;
 }) {
   return (
     <div className="flex flex-col items-center">
@@ -524,7 +526,7 @@ function ConditionNode({
                   compact
                   onUpdate={(updates) => onUpdateSubStep('yes_steps', subIdx, updates)}
                   onRemove={() => onRemoveSubStep('yes_steps', subIdx)}
-                  onOpenEditor={() => {/* handled by parent via sub-step index */}}
+                  onOpenEditor={() => onOpenSubStepEditor('yes_steps', subIdx)}
                   onPreview={() => subStep.html_content && onPreviewStep(subStep.html_content)}
                 />
               </div>
@@ -555,7 +557,7 @@ function ConditionNode({
                   compact
                   onUpdate={(updates) => onUpdateSubStep('no_steps', subIdx, updates)}
                   onRemove={() => onRemoveSubStep('no_steps', subIdx)}
-                  onOpenEditor={() => {/* handled by parent */}}
+                  onOpenEditor={() => onOpenSubStepEditor('no_steps', subIdx)}
                   onPreview={() => subStep.html_content && onPreviewStep(subStep.html_content)}
                 />
               </div>
@@ -623,6 +625,7 @@ export function FlowCanvas({
   onAddSubStep,
   onUpdateSubStep,
   onRemoveSubStep,
+  onOpenSubStepEditor,
 }: FlowCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -676,6 +679,7 @@ export function FlowCanvas({
                   onRemoveSubStep={(branch, subIdx) => onRemoveSubStep(index, branch, subIdx)}
                   onOpenStepEditor={onOpenStepEditor}
                   onPreviewStep={onPreviewStep}
+                  onOpenSubStepEditor={(branch, subIdx) => onOpenSubStepEditor(index, branch, subIdx)}
                 />
               )}
             </div>

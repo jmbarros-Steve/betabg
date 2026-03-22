@@ -184,6 +184,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showUniversalBlocks, setShowUniversalBlocks] = useState(false);
   const [showTriggerPicker, setShowTriggerPicker] = useState(false);
+  const [editingSubStep, setEditingSubStep] = useState<{ pi: number; branch: 'yes_steps' | 'no_steps'; si: number } | null>(null);
 
   const loadFlows = useCallback(async () => {
     setLoading(true);
@@ -338,18 +339,37 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
 
   const openStepInEditor = (index: number) => {
     setEditingStepIndex(index);
+    setEditingSubStep(null);
+    setEditorReady(false);
+    setShowEmailEditor(true);
+  };
+
+  const openSubStepInEditor = (pi: number, branch: 'yes_steps' | 'no_steps', si: number) => {
+    setEditingSubStep({ pi, branch, si });
+    setEditingStepIndex(null);
     setEditorReady(false);
     setShowEmailEditor(true);
   };
 
   const saveStepFromEditor = () => {
-    if (!emailEditorRef.current || editingStepIndex === null) return;
-    updateStep(editingStepIndex, {
-      html_content: emailEditorRef.current.getHtml(),
-      design_json: emailEditorRef.current.getProjectData(),
-    });
+    if (!emailEditorRef.current) return;
+    const html = emailEditorRef.current.getHtml();
+    const design = emailEditorRef.current.getProjectData();
+
+    if (editingSubStep) {
+      updateSubStep(editingSubStep.pi, editingSubStep.branch, editingSubStep.si, {
+        html_content: html,
+        design_json: design,
+      });
+    } else if (editingStepIndex !== null) {
+      updateStep(editingStepIndex, {
+        html_content: html,
+        design_json: design,
+      });
+    }
     setShowEmailEditor(false);
     setEditingStepIndex(null);
+    setEditingSubStep(null);
     toast.success('Email guardado');
   };
 
@@ -362,8 +382,13 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const triggerLabel = (t: string) => TRIGGER_CONFIG[t]?.label || t;
 
   // =============== FULLSCREEN EMAIL EDITOR ===============
-  if (showEmailEditor && editingStepIndex !== null) {
-    const currentStep = editingFlow?.steps?.[editingStepIndex];
+  if (showEmailEditor && (editingStepIndex !== null || editingSubStep !== null)) {
+    const currentStep = editingSubStep
+      ? editingFlow?.steps?.[editingSubStep.pi]?.[editingSubStep.branch]?.[editingSubStep.si]
+      : editingFlow?.steps?.[editingStepIndex!];
+    const editorLabel = editingSubStep
+      ? `Sub-email (${editingSubStep.branch === 'yes_steps' ? 'Sí' : 'No'} #${editingSubStep.si + 1})`
+      : `Email ${(editingStepIndex ?? 0) + 1}`;
     return (
       <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0">
@@ -372,10 +397,10 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               <Save className="w-4 h-4 mr-1" /> Guardar y volver
             </Button>
             <span className="text-sm font-medium">
-              Email {editingStepIndex + 1}: {currentStep?.subject || 'Sin asunto'}
+              {editorLabel}: {currentStep?.subject || 'Sin asunto'}
             </span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { setShowEmailEditor(false); setEditingStepIndex(null); }}>
+          <Button variant="outline" size="sm" onClick={() => { setShowEmailEditor(false); setEditingStepIndex(null); setEditingSubStep(null); }}>
             <X className="w-4 h-4 mr-1" /> Cancelar
           </Button>
         </div>
@@ -384,7 +409,13 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
             <Label className="text-xs whitespace-nowrap">Asunto:</Label>
             <Input
               value={currentStep?.subject || ''}
-              onChange={(e) => updateStep(editingStepIndex, { subject: e.target.value })}
+              onChange={(e) => {
+                if (editingSubStep) {
+                  updateSubStep(editingSubStep.pi, editingSubStep.branch, editingSubStep.si, { subject: e.target.value });
+                } else if (editingStepIndex !== null) {
+                  updateStep(editingStepIndex, { subject: e.target.value });
+                }
+              }}
               className="h-8 text-sm"
               placeholder="Asunto del email"
             />
@@ -400,7 +431,9 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               ref={emailEditorRef}
               onReady={() => {
                 setEditorReady(true);
-                const step = editingFlow?.steps?.[editingStepIndex];
+                const step = editingSubStep
+                  ? editingFlow?.steps?.[editingSubStep.pi]?.[editingSubStep.branch]?.[editingSubStep.si]
+                  : editingFlow?.steps?.[editingStepIndex!];
                 if (step?.html_content || step?.design_json) {
                   emailEditorRef.current?.loadDesign(step.html_content || '', step.design_json);
                 }
@@ -604,6 +637,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
               onAddSubStep={addSubStep}
               onUpdateSubStep={updateSubStep}
               onRemoveSubStep={removeSubStep}
+              onOpenSubStepEditor={openSubStepInEditor}
             />
           </div>
         </div>

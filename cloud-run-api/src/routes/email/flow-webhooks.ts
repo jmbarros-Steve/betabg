@@ -3,6 +3,29 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
+ * Insert an enrollment, silently skipping if a duplicate active enrollment exists.
+ * Returns the enrollment data or null if it was a duplicate.
+ */
+async function insertEnrollmentSafe(supabase: any, enrollmentData: any): Promise<any | null> {
+  const { data, error } = await supabase
+    .from('email_flow_enrollments')
+    .insert(enrollmentData)
+    .select('id')
+    .single();
+
+  if (error) {
+    // 23505 = unique_violation — duplicate active enrollment, skip silently
+    if (error.code === '23505') {
+      console.log(`Duplicate enrollment skipped (flow: ${enrollmentData.flow_id}, subscriber: ${enrollmentData.subscriber_id})`);
+      return null;
+    }
+    console.error('Failed to create enrollment:', error);
+    return null;
+  }
+  return data;
+}
+
+/**
  * Handle Shopify webhooks for email flow triggers.
  * POST /api/email-flow-webhooks
  *
@@ -160,36 +183,29 @@ async function handleCheckoutCreated(supabase: any, clientId: string, payload: a
 
     // Create enrollment
     const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
-    const { data: enrollment, error } = await supabase
-      .from('email_flow_enrollments')
-      .insert({
-        flow_id: flow.id,
-        subscriber_id: subscriber.id,
-        client_id: clientId,
-        status: 'active',
-        current_step: 0,
-        next_send_at: nextSendAt.toISOString(),
-        metadata: {
-          checkout_id: payload.id || payload.token,
-          total_price: payload.total_price,
-          abandoned_checkout_url: payload.abandoned_checkout_url,
-          line_items: (payload.line_items || []).slice(0, 5).map((item: any) => ({
-            title: item.title,
-            image: item.image_url || item.featured_image?.url,
-            price: item.price,
-            quantity: item.quantity,
-            product_id: item.product_id ? String(item.product_id) : null,
-            variant_id: item.variant_id ? String(item.variant_id) : null,
-          })),
-        },
-      })
-      .select('id')
-      .single();
+    const enrollment = await insertEnrollmentSafe(supabase, {
+      flow_id: flow.id,
+      subscriber_id: subscriber.id,
+      client_id: clientId,
+      status: 'active',
+      current_step: 0,
+      next_send_at: nextSendAt.toISOString(),
+      metadata: {
+        checkout_id: payload.id || payload.token,
+        total_price: payload.total_price,
+        abandoned_checkout_url: payload.abandoned_checkout_url,
+        line_items: (payload.line_items || []).slice(0, 5).map((item: any) => ({
+          title: item.title,
+          image: item.image_url || item.featured_image?.url,
+          price: item.price,
+          quantity: item.quantity,
+          product_id: item.product_id ? String(item.product_id) : null,
+          variant_id: item.variant_id ? String(item.variant_id) : null,
+        })),
+      },
+    });
 
-    if (error) {
-      console.error('Failed to create enrollment:', error);
-      continue;
-    }
+    if (!enrollment) continue;
 
     // Schedule first step via Cloud Tasks
     try {
@@ -243,27 +259,20 @@ async function handleCustomerCreated(supabase: any, clientId: string, payload: a
     const firstStepDelay = steps[0]?.delay_seconds || 0; // Welcome is usually immediate
     const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
 
-    const { data: enrollment, error } = await supabase
-      .from('email_flow_enrollments')
-      .insert({
-        flow_id: flow.id,
-        subscriber_id: subscriber.id,
-        client_id: clientId,
-        status: 'active',
-        current_step: 0,
-        next_send_at: nextSendAt.toISOString(),
-        metadata: { shopify_customer_id: String(payload.id) },
-      })
-      .select('id')
-      .single();
+    const enrollment = await insertEnrollmentSafe(supabase, {
+      flow_id: flow.id,
+      subscriber_id: subscriber.id,
+      client_id: clientId,
+      status: 'active',
+      current_step: 0,
+      next_send_at: nextSendAt.toISOString(),
+      metadata: { shopify_customer_id: String(payload.id) },
+    });
 
-    if (error) {
-      console.error('Failed to create welcome enrollment:', error);
-      continue;
-    }
+    if (!enrollment) continue;
 
     try {
-      await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, clientId);
+      await scheduleFlowStepViaCloudTasks(enrollment.id, 0, nextSendAt, clientId);
       console.log(`Enrolled subscriber ${subscriber.id} in welcome flow ${flow.id}`);
     } catch (err) {
       console.error('Failed to schedule welcome step:', err);
@@ -400,36 +409,32 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
       const firstStepDelay = steps[0]?.delay_seconds || 86400; // Default 24h for post-purchase
       const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
 
-      const { data: enrollment, error } = await supabase
-        .from('email_flow_enrollments')
-        .insert({
-          flow_id: flow.id,
-          subscriber_id: subscriber.id,
-          client_id: clientId,
-          status: 'active',
-          current_step: 0,
-          next_send_at: nextSendAt.toISOString(),
-          metadata: {
-            order_id: payload.id,
-            order_number: payload.order_number,
-            total_price: payload.total_price,
-            line_items: (payload.line_items || []).slice(0, 5).map((item: any) => ({
-              title: item.title,
-              image: item.image_url || item.featured_image?.url || null,
-              price: item.price,
-              quantity: item.quantity,
-              product_id: item.product_id ? String(item.product_id) : null,
-              variant_id: item.variant_id ? String(item.variant_id) : null,
-            })),
-          },
-        })
-        .select('id')
-        .single();
+      const enrollment = await insertEnrollmentSafe(supabase, {
+        flow_id: flow.id,
+        subscriber_id: subscriber.id,
+        client_id: clientId,
+        status: 'active',
+        current_step: 0,
+        next_send_at: nextSendAt.toISOString(),
+        metadata: {
+          order_id: payload.id,
+          order_number: payload.order_number,
+          total_price: payload.total_price,
+          line_items: (payload.line_items || []).slice(0, 5).map((item: any) => ({
+            title: item.title,
+            image: item.image_url || item.featured_image?.url || null,
+            price: item.price,
+            quantity: item.quantity,
+            product_id: item.product_id ? String(item.product_id) : null,
+            variant_id: item.variant_id ? String(item.variant_id) : null,
+          })),
+        },
+      });
 
-      if (error) continue;
+      if (!enrollment) continue;
 
       try {
-        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, clientId);
+        await scheduleFlowStepViaCloudTasks(enrollment.id, 0, nextSendAt, clientId);
         console.log(`Enrolled subscriber ${subscriber.id} in post-purchase flow ${flow.id}`);
       } catch (err) {
         console.error('Failed to schedule post-purchase step:', err);
@@ -608,28 +613,24 @@ async function enrollInFlows(
       const firstStepDelay = steps[0]?.delay_seconds || 0;
       const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
 
-      const { data: enrollment, error } = await supabase
-        .from('email_flow_enrollments')
-        .insert({
-          flow_id: flow.id,
-          subscriber_id: subscriberId,
-          client_id: clientId,
-          status: 'active',
-          current_step: 0,
-          next_send_at: nextSendAt.toISOString(),
-          metadata: {
-            product_id: productId,
-            product_title: payload.title,
-            trigger: triggerType,
-          },
-        })
-        .select('id')
-        .single();
+      const enrollment = await insertEnrollmentSafe(supabase, {
+        flow_id: flow.id,
+        subscriber_id: subscriberId,
+        client_id: clientId,
+        status: 'active',
+        current_step: 0,
+        next_send_at: nextSendAt.toISOString(),
+        metadata: {
+          product_id: productId,
+          product_title: payload.title,
+          trigger: triggerType,
+        },
+      });
 
-      if (error) continue;
+      if (!enrollment) continue;
 
       try {
-        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, clientId);
+        await scheduleFlowStepViaCloudTasks(enrollment.id, 0, nextSendAt, clientId);
         console.log(`Enrolled subscriber ${subscriberId} in ${triggerType} flow ${flow.id}`);
       } catch (err) {
         console.error(`Failed to schedule ${triggerType} flow step:`, err);
@@ -691,24 +692,20 @@ export async function emailFlowCronWinback(c: Context) {
       const firstStepDelay = steps[0]?.delay_seconds || 0;
       const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
 
-      const { data: enrollment, error } = await supabase
-        .from('email_flow_enrollments')
-        .insert({
-          flow_id: flow.id,
-          subscriber_id: subscriber.id,
-          client_id: flow.client_id,
-          status: 'active',
-          current_step: 0,
-          next_send_at: nextSendAt.toISOString(),
-          metadata: { trigger: 'winback', inactivity_days: inactivityDays },
-        })
-        .select('id')
-        .single();
+      const enrollment = await insertEnrollmentSafe(supabase, {
+        flow_id: flow.id,
+        subscriber_id: subscriber.id,
+        client_id: flow.client_id,
+        status: 'active',
+        current_step: 0,
+        next_send_at: nextSendAt.toISOString(),
+        metadata: { trigger: 'winback', inactivity_days: inactivityDays },
+      });
 
-      if (error) continue;
+      if (!enrollment) continue;
 
       try {
-        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, flow.client_id);
+        await scheduleFlowStepViaCloudTasks(enrollment.id, 0, nextSendAt, flow.client_id);
         totalEnrolled++;
       } catch (err) {
         console.error('Failed to schedule winback step:', err);
@@ -790,28 +787,24 @@ export async function emailFlowCronBirthday(c: Context) {
       const firstStepDelay = steps[0]?.delay_seconds || 0;
       const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
 
-      const { data: enrollment, error } = await supabase
-        .from('email_flow_enrollments')
-        .insert({
-          flow_id: flow.id,
-          subscriber_id: subscriber.id,
-          client_id: flow.client_id,
-          status: 'active',
-          current_step: 0,
-          next_send_at: nextSendAt.toISOString(),
-          metadata: {
-            trigger: 'birthday',
-            birthday: subscriber.custom_fields?.birthday || subscriber.custom_fields?.birthdate,
-            include_discount: flow.settings?.trigger_config?.include_discount || 'none',
-          },
-        })
-        .select('id')
-        .single();
+      const enrollment = await insertEnrollmentSafe(supabase, {
+        flow_id: flow.id,
+        subscriber_id: subscriber.id,
+        client_id: flow.client_id,
+        status: 'active',
+        current_step: 0,
+        next_send_at: nextSendAt.toISOString(),
+        metadata: {
+          trigger: 'birthday',
+          birthday: subscriber.custom_fields?.birthday || subscriber.custom_fields?.birthdate,
+          include_discount: flow.settings?.trigger_config?.include_discount || 'none',
+        },
+      });
 
-      if (error) continue;
+      if (!enrollment) continue;
 
       try {
-        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, flow.client_id);
+        await scheduleFlowStepViaCloudTasks(enrollment.id, 0, nextSendAt, flow.client_id);
         totalEnrolled++;
       } catch (err) {
         console.error('Failed to schedule birthday step:', err);
@@ -910,27 +903,23 @@ export async function emailFlowTrackBrowse(c: Context) {
       const firstStepDelay = steps[0]?.delay_seconds || waitMinutes * 60;
       const nextSendAt = new Date(Date.now() + firstStepDelay * 1000);
 
-      const { data: enrollment, error } = await supabase
-        .from('email_flow_enrollments')
-        .insert({
-          flow_id: flow.id,
-          subscriber_id: subscriber.id,
-          client_id: client_id,
-          status: 'active',
-          current_step: 0,
-          next_send_at: nextSendAt.toISOString(),
-          metadata: {
-            trigger: 'browse_abandonment',
-            browsed_products: recentBrowses.slice(0, 5),
-          },
-        })
-        .select('id')
-        .single();
+      const enrollment = await insertEnrollmentSafe(supabase, {
+        flow_id: flow.id,
+        subscriber_id: subscriber.id,
+        client_id: client_id,
+        status: 'active',
+        current_step: 0,
+        next_send_at: nextSendAt.toISOString(),
+        metadata: {
+          trigger: 'browse_abandonment',
+          browsed_products: recentBrowses.slice(0, 5),
+        },
+      });
 
-      if (error) continue;
+      if (!enrollment) continue;
 
       try {
-        await scheduleFlowStepViaCloudTasks(enrollment!.id, 0, nextSendAt, client_id);
+        await scheduleFlowStepViaCloudTasks(enrollment.id, 0, nextSendAt, client_id);
         console.log(`Enrolled ${subscriber.email} in browse abandonment flow ${flow.id}`);
       } catch (err) {
         console.error('Failed to schedule browse abandonment step:', err);
