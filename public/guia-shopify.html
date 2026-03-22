@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guía: Conectar Shopify con Custom App</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.7;padding:20px}
+.container{max-width:900px;margin:0 auto}
+h1{color:#4ade80;font-size:1.8em;margin-bottom:8px;border-bottom:2px solid #4ade80;padding-bottom:12px}
+h2{color:#38bdf8;font-size:1.3em;margin:32px 0 12px;border-left:4px solid #38bdf8;padding-left:12px}
+h3{color:#fbbf24;font-size:1.1em;margin:24px 0 8px}
+p{margin:8px 0}
+strong{color:#f1f5f9}
+code{background:#1e293b;color:#4ade80;padding:2px 6px;border-radius:4px;font-size:0.9em}
+pre{background:#1e293b;padding:16px;border-radius:8px;overflow-x:auto;margin:12px 0;border:1px solid #334155}
+pre code{background:none;padding:0}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th{background:#1e293b;color:#38bdf8;text-align:left;padding:10px 12px;border:1px solid #334155;font-size:0.85em}
+td{padding:10px 12px;border:1px solid #334155;font-size:0.85em}
+tr:nth-child(even){background:#1e293b50}
+ol,ul{padding-left:24px;margin:8px 0}
+li{margin:4px 0}
+.important{background:#7c2d1280;border:1px solid #ef4444;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:0.9em}
+.important::before{content:"⚠️ IMPORTANTE: ";font-weight:bold;color:#ef4444}
+.info{background:#1e3a5f80;border:1px solid #38bdf8;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:0.9em}
+.copy-btn{background:#4ade80;color:#0f172a;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:0.85em;margin:8px 0}
+.copy-btn:hover{background:#22c55e}
+.copy-btn:active{transform:scale(0.97)}
+.step{background:#1e293b;border-radius:12px;padding:20px;margin:16px 0;border:1px solid #334155}
+.step-num{display:inline-block;background:#4ade80;color:#0f172a;width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;font-weight:bold;margin-right:8px;font-size:0.9em}
+#toast{position:fixed;bottom:20px;right:20px;background:#4ade80;color:#0f172a;padding:10px 20px;border-radius:8px;font-weight:bold;display:none;z-index:999}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Guía: Conectar Shopify con Custom App Personalizada</h1>
+<p>Cada cliente tiene su propia Custom App en Shopify. El flujo usa OAuth — el access token se obtiene automáticamente, NUNCA se pide manualmente.</p>
+
+<h2>Arquitectura</h2>
+<ul>
+<li><strong>Frontend:</strong> React + Vite en Vercel (<code>betabgnuevosupa.vercel.app</code>)</li>
+<li><strong>Backend API:</strong> Hono en Cloud Run (<code>steve-api-850416724643.us-central1.run.app</code>)</li>
+<li><strong>Base de datos:</strong> Supabase (tabla <code>platform_connections</code>)</li>
+<li><strong>Wizard:</strong> <code>src/components/client-portal/ShopifyCustomAppWizard.tsx</code></li>
+</ul>
+
+<h2>Flujo completo (6 pasos)</h2>
+
+<div class="step">
+<h3><span class="step-num">1</span> Nombre de la tienda</h3>
+<p>El usuario ingresa el subdominio de su tienda (ej: <code>mi-tienda</code> para <code>mi-tienda.myshopify.com</code>).</p>
+</div>
+
+<div class="step">
+<h3><span class="step-num">2</span> Crear Custom App en Shopify Admin</h3>
+<p>El usuario va a Shopify Admin → Settings → Apps → Develop apps:</p>
+<ol>
+<li>Clic en <strong>"Desarrollar apps"</strong></li>
+<li>Si es primera vez: <strong>"Permitir el desarrollo de apps personalizadas"</strong></li>
+<li><strong>"Crear una app"</strong> → nombre: <strong>Steve</strong></li>
+<li>Configurar estas URLs:</li>
+</ol>
+
+<table>
+<tr><th>Campo</th><th>Valor</th><th></th></tr>
+<tr>
+<td><strong>App URL</strong></td>
+<td><code id="app-url">https://steve-api-850416724643.us-central1.run.app/api/shopify-install</code></td>
+<td><button class="copy-btn" onclick="copyText('app-url')">Copiar</button></td>
+</tr>
+<tr>
+<td><strong>Allowed redirection URL</strong></td>
+<td><code id="redirect-url">https://steve-api-850416724643.us-central1.run.app/api/shopify-oauth-callback</code></td>
+<td><button class="copy-btn" onclick="copyText('redirect-url')">Copiar</button></td>
+</tr>
+</table>
+
+<div class="important">La App URL DEBE apuntar al endpoint <code>/api/shopify-install</code> del backend, NO al frontend. Esto es necesario para que el link de distribución personalizada redirija correctamente al OAuth.</div>
+</div>
+
+<div class="step">
+<h3><span class="step-num">3</span> Configurar permisos (API Scopes)</h3>
+<p>Custom App → "Configure Admin API scopes" → activar estos 11 permisos:</p>
+<pre><code id="scopes">read_products
+write_products
+read_orders
+read_customers
+read_checkouts
+read_analytics
+read_inventory
+write_inventory
+read_fulfillments
+read_discounts
+write_discounts</code></pre>
+<button class="copy-btn" onclick="copyText('scopes')">Copiar permisos</button>
+<p>Guardar (Save).</p>
+</div>
+
+<div class="step">
+<h3><span class="step-num">4</span> Copiar Client ID y Client Secret</h3>
+<p>Custom App → pestaña <strong>"API credentials"</strong>:</p>
+<ol>
+<li>Copiar el <strong>Client ID</strong> (público, identifica la app)</li>
+<li>Copiar el <strong>Client Secret</strong> (secreto, se usa para OAuth)</li>
+</ol>
+<p>Pegarlos en el wizard de Steve. El backend los guarda encriptados en <code>platform_connections</code>.</p>
+
+<div class="info">
+<strong>Endpoint:</strong> <code>POST /api/store-shopify-credentials</code><br>
+Body: <code>{ clientId, shopDomain, shopifyClientId, shopifyClientSecret }</code>
+</div>
+
+<p>Esto NO es el Access Token (<code>shpat_...</code>). Son las credenciales de la app para hacer OAuth.</p>
+</div>
+
+<div class="step">
+<h3><span class="step-num">5</span> Distribución personalizada → Instalar</h3>
+<p>En la Custom App de Shopify:</p>
+<ol>
+<li>Ir a la sección <strong>"Distribución"</strong></li>
+<li>Clic en <strong>"Gestionar distribución personalizada"</strong></li>
+<li>Shopify genera un <strong>link de instalación único</strong> (hash random)</li>
+<li>Copiar ese link y pegarlo en el navegador</li>
+<li>Shopify muestra pantalla de autorización → clic en <strong>"Instalar"</strong></li>
+</ol>
+
+<h3>Qué pasa por detrás:</h3>
+<ol>
+<li>Shopify redirige al <strong>App URL</strong> (<code>/api/shopify-install</code>) con params <code>shop</code>, <code>hmac</code>, <code>host</code></li>
+<li><code>shopify-install.ts</code> busca credenciales por <code>shop_domain</code> en DB</li>
+<li>Genera <code>nonce</code>, lo guarda en <code>oauth_states</code>, construye URL de autorización</li>
+<li>Redirige a <code>https://{shop}/admin/oauth/authorize?client_id=...&scope=...&redirect_uri=...&state=...</code></li>
+<li>Usuario autoriza → Shopify redirige a <code>/api/shopify-oauth-callback</code> con <code>code</code></li>
+<li>Callback intercambia <code>code</code> por <code>access_token</code></li>
+<li>Encripta token → guarda en <code>platform_connections.access_token_encrypted</code></li>
+<li>Redirige al frontend <code>/oauth/shopify/callback?success=true</code></li>
+</ol>
+
+<div class="important">El endpoint usa <code>window.top.location.href</code> en vez de redirect 302 para romper el iframe si está embebido en Shopify admin.</div>
+</div>
+
+<div class="step">
+<h3><span class="step-num">6</span> App instalada</h3>
+<p>El wizard hace polling cada 3s a <code>platform_connections</code> buscando <code>access_token_encrypted IS NOT NULL</code>. Cuando lo encuentra → pantalla de éxito.</p>
+</div>
+
+<h2>Tabla: platform_connections</h2>
+<table>
+<tr><th>Columna</th><th>Tipo</th><th>Descripción</th></tr>
+<tr><td><code>id</code></td><td>uuid</td><td>PK</td></tr>
+<tr><td><code>client_id</code></td><td>uuid</td><td>FK a clients</td></tr>
+<tr><td><code>platform</code></td><td>text</td><td>'shopify'</td></tr>
+<tr><td><code>shop_domain</code></td><td>text</td><td>mi-tienda.myshopify.com</td></tr>
+<tr><td><code>store_url</code></td><td>text</td><td>https://mi-tienda.myshopify.com</td></tr>
+<tr><td><code>store_name</code></td><td>text</td><td>Nombre de la tienda</td></tr>
+<tr><td><code>shopify_client_id</code></td><td>text</td><td>Client ID de la Custom App</td></tr>
+<tr><td><code>shopify_client_secret_encrypted</code></td><td>text</td><td>Client Secret encriptado</td></tr>
+<tr><td><code>access_token_encrypted</code></td><td>text</td><td>Access Token OAuth encriptado</td></tr>
+<tr><td><code>is_active</code></td><td>boolean</td><td>true si está conectada</td></tr>
+<tr><td><code>last_sync_at</code></td><td>timestamp</td><td>Última sincronización</td></tr>
+</table>
+
+<h2>Endpoints</h2>
+<table>
+<tr><th>Endpoint</th><th>Método</th><th>Auth</th><th>Descripción</th></tr>
+<tr><td><code>/api/store-shopify-credentials</code></td><td>POST</td><td>JWT</td><td>Guarda Client ID + Secret</td></tr>
+<tr><td><code>/api/shopify-install</code></td><td>GET</td><td>No</td><td>Inicia OAuth</td></tr>
+<tr><td><code>/api/shopify-oauth-callback</code></td><td>GET</td><td>No</td><td>Recibe code, intercambia por token</td></tr>
+<tr><td><code>/api/sync-shopify-metrics</code></td><td>POST</td><td>JWT</td><td>Sincroniza órdenes/métricas</td></tr>
+<tr><td><code>/api/fetch-shopify-products</code></td><td>POST</td><td>JWT</td><td>Obtiene productos</td></tr>
+</table>
+
+<h2>Errores comunes</h2>
+<table>
+<tr><th>Error</th><th>Causa</th><th>Solución</th></tr>
+<tr><td>"Shopify credentials not found"</td><td>No se guardaron Client ID/Secret (paso 4)</td><td>Volver al paso 4</td></tr>
+<tr><td>"redirect_uri is not whitelisted"</td><td>Redirect URL no está en Shopify</td><td>Agregar la Redirect URL en la Custom App</td></tr>
+<tr><td>"Store URL and Access Token required"</td><td>OAuth no se completó (paso 5)</td><td>Completar instalación via distribución personalizada</td></tr>
+<tr><td>Polling no detecta</td><td><code>access_token_encrypted</code> es NULL</td><td>OAuth no completó — revisar logs</td></tr>
+</table>
+
+<h2>Archivos clave</h2>
+<pre><code>src/components/client-portal/ShopifyCustomAppWizard.tsx    — Wizard frontend 6 pasos
+src/components/client-portal/ClientPortalConnections.tsx   — Panel de conexiones
+cloud-run-api/src/routes/shopify/shopify-install.ts        — OAuth install (GET)
+cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts — OAuth callback
+cloud-run-api/src/routes/shopify/store-shopify-credentials.ts — Guardar credenciales
+cloud-run-api/src/routes/shopify/sync-shopify-metrics.ts   — Sync métricas</code></pre>
+
+<h2>Copiar todo el documento</h2>
+<p>Para inyectarle este documento a otro Claude, haz clic acá:</p>
+<button class="copy-btn" style="font-size:1em;padding:12px 24px" onclick="copyAll()">Copiar documento completo al portapapeles</button>
+
+</div>
+
+<div id="toast">Copiado!</div>
+
+<script>
+function copyText(id){
+  const el=document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent.trim());
+  showToast();
+}
+function copyAll(){
+  const md=document.querySelector('.container').innerText;
+  navigator.clipboard.writeText(md);
+  showToast();
+}
+function showToast(){
+  const t=document.getElementById('toast');
+  t.style.display='block';
+  setTimeout(()=>t.style.display='none',2000);
+}
+</script>
+</body>
+</html>
