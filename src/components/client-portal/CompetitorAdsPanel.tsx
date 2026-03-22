@@ -184,10 +184,15 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       const igHandles = competitors
         .filter(c => c.fbUrl.trim() || c.igHandle.trim())
         .map(c => {
-          // If only FB URL, use slug as handle
+          // If only FB URL, extract page slug as handle
           if (!c.igHandle.trim() && c.fbUrl.trim()) {
-            const slug = c.fbUrl.trim().replace(/^https?:\/\/(www\.)?facebook\.com\/?/, '').replace(/\/+$/, '').split('/')[0];
-            return slug || 'unknown';
+            // Remove protocol, www, and facebook.com to get the page slug
+            const slug = c.fbUrl.trim()
+              .replace(/^https?:\/\//, '')
+              .replace(/^(www\.)?facebook\.com\/?/, '')
+              .replace(/\/+$/, '')
+              .split('/')[0];
+            return slug?.toLowerCase() || 'unknown';
           }
           return c.igHandle.trim().replace(/^@/, '').toLowerCase();
         });
