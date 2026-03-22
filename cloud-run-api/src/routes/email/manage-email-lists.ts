@@ -174,8 +174,26 @@ export async function manageEmailLists(c: Context) {
   }
 }
 
+function resolveValue(value: any): any {
+  if (typeof value !== 'string') return value;
+  // Handle relative dates like "relative:30d", "relative:90d"
+  const relMatch = value.match(/^relative:(\d+)d$/);
+  if (relMatch) {
+    const days = parseInt(relMatch[1], 10);
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  }
+  // Legacy format: "30_days_ago", "90_days_ago"
+  const legacyMatch = value.match(/^(\d+)_days_ago$/);
+  if (legacyMatch) {
+    const days = parseInt(legacyMatch[1], 10);
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  }
+  return value;
+}
+
 function applyFilter(query: any, filter: { field: string; operator: string; value: any }) {
-  const { field, operator, value } = filter;
+  const { field, operator } = filter;
+  const value = resolveValue(filter.value);
   const allowedFields = [
     'email', 'first_name', 'last_name', 'status', 'source',
     'total_orders', 'total_spent', 'last_order_at', 'subscribed_at',
@@ -184,12 +202,12 @@ function applyFilter(query: any, filter: { field: string; operator: string; valu
   if (!allowedFields.includes(field)) return query;
 
   switch (operator) {
-    case 'eq': return query.eq(field, value);
-    case 'neq': return query.neq(field, value);
-    case 'gt': return query.gt(field, value);
-    case 'gte': return query.gte(field, value);
-    case 'lt': return query.lt(field, value);
-    case 'lte': return query.lte(field, value);
+    case 'eq': case '=': case '==': return query.eq(field, value);
+    case 'neq': case '!=': return query.neq(field, value);
+    case 'gt': case '>': return query.gt(field, value);
+    case 'gte': case '>=': return query.gte(field, value);
+    case 'lt': case '<': return query.lt(field, value);
+    case 'lte': case '<=': return query.lte(field, value);
     case 'like': return query.ilike(field, `%${value}%`);
     case 'is_null': return query.is(field, null);
     case 'not_null': return query.not(field, 'is', null);

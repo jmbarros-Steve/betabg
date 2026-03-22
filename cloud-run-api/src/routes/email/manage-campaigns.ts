@@ -552,6 +552,19 @@ export async function manageEmailCampaigns(c: Context) {
   }
 }
 
+function resolveRelativeValue(value: any): any {
+  if (typeof value !== 'string') return value;
+  const relMatch = value.match(/^relative:(\d+)d$/);
+  if (relMatch) {
+    return new Date(Date.now() - parseInt(relMatch[1], 10) * 24 * 60 * 60 * 1000).toISOString();
+  }
+  const legacyMatch = value.match(/^(\d+)_days_ago$/);
+  if (legacyMatch) {
+    return new Date(Date.now() - parseInt(legacyMatch[1], 10) * 24 * 60 * 60 * 1000).toISOString();
+  }
+  return value;
+}
+
 /**
  * Get subscribers matching audience filter.
  * Supports: { type: 'all' }, { type: 'list', list_id }, { type: 'segment', segment_id },
@@ -613,28 +626,15 @@ async function getFilteredSubscribers(
 
     const segFilters = segment.filters || [];
     for (const f of segFilters) {
-      const { field, operator, value } = f;
-      // Handle relative date values
-      if (value === '30_days_ago') {
-        const date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        if (operator === '>') query = query.gte(field, date);
-        else if (operator === '<') query = query.lte(field, date);
-      } else if (value === '90_days_ago') {
-        const date = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-        if (operator === '>') query = query.gte(field, date);
-        else if (operator === '<') query = query.lte(field, date);
-      } else if (operator === '>=') {
-        query = query.gte(field, value);
-      } else if (operator === '<=') {
-        query = query.lte(field, value);
-      } else if (operator === '>') {
-        query = query.gt(field, value);
-      } else if (operator === '<') {
-        query = query.lt(field, value);
-      } else if (operator === '=' || operator === '==') {
-        query = query.eq(field, value);
-      } else if (operator === '!=') {
-        query = query.neq(field, value);
+      const { field, operator } = f;
+      const value = resolveRelativeValue(f.value);
+      switch (operator) {
+        case 'gte': case '>=': query = query.gte(field, value); break;
+        case 'lte': case '<=': query = query.lte(field, value); break;
+        case 'gt': case '>': query = query.gt(field, value); break;
+        case 'lt': case '<': query = query.lt(field, value); break;
+        case 'eq': case '=': case '==': query = query.eq(field, value); break;
+        case 'neq': case '!=': query = query.neq(field, value); break;
       }
     }
 
