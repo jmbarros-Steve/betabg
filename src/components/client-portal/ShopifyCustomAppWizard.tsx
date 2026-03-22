@@ -20,6 +20,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { callApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface ShopifyCustomAppWizardProps {
   open: boolean;
@@ -164,16 +165,19 @@ export function ShopifyCustomAppWizard({
     </div>
   );
 
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://betabgnuevosupa.vercel.app';
+  const redirectUrl = `${appUrl}/oauth/shopify/callback`;
+
   const renderStep2 = () => (
     <div className="space-y-4 py-4">
       <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
         <p className="font-medium">Sigue estos pasos en tu Shopify Admin:</p>
         <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
           <li>
-            Ve a <strong>Configuración → Apps y canales de venta</strong>
+            Haz clic en el botón de abajo para ir a tu admin de <strong>{cleanDomain}.myshopify.com</strong>
           </li>
           <li>
-            Haz clic en <strong>Desarrollar apps</strong> (arriba a la derecha)
+            Haz clic en <strong>"Desarrollar apps"</strong> (arriba a la derecha)
           </li>
           <li>
             Si es la primera vez, haz clic en <strong>"Permitir el desarrollo de apps personalizadas"</strong>
@@ -184,16 +188,64 @@ export function ShopifyCustomAppWizard({
           <li>
             Ponle nombre: <strong>Steve</strong>
           </li>
+          <li>
+            Si te pide <strong>"App URL"</strong>, pega esto:
+          </li>
         </ol>
+
+        <div className="bg-background rounded border p-3 mt-1 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">APP URL</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(appUrl);
+                toast.success('App URL copiada');
+              }}
+              className="h-6 px-2 text-xs"
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              Copiar
+            </Button>
+          </div>
+          <code className="text-xs block text-green-600 break-all">{appUrl}</code>
+        </div>
+
+        <div className="bg-background rounded border p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">ALLOWED REDIRECTION URL</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(redirectUrl);
+                toast.success('Redirect URL copiada');
+              }}
+              className="h-6 px-2 text-xs"
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              Copiar
+            </Button>
+          </div>
+          <code className="text-xs block text-green-600 break-all">{redirectUrl}</code>
+        </div>
+
+        <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Si Shopify no te pide estas URLs, ignóralas y sigue adelante. Solo son necesarias en algunos casos.
+          </span>
+        </div>
       </div>
 
       <a
         href={adminUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm"
+        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium"
       >
-        Abrir Shopify Admin
+        Abrir admin de {cleanDomain}.myshopify.com
         <ExternalLink className="w-4 h-4" />
       </a>
 
@@ -216,17 +268,17 @@ export function ShopifyCustomAppWizard({
   const renderStep3 = () => (
     <div className="space-y-4 py-4">
       <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
-        <p className="font-medium">Configura los permisos de la app:</p>
+        <p className="font-medium">Ahora configura los permisos de la app "Steve":</p>
         <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
           <li>
-            En la app que creaste, ve a <strong>Configuración → Admin API access scopes</strong>
+            Dentro de la app que creaste, haz clic en <strong>"Configure Admin API scopes"</strong>
           </li>
-          <li>Activa los siguientes permisos:</li>
+          <li>Busca y activa cada uno de estos permisos (puedes copiarlos para buscarlos más rápido):</li>
         </ol>
 
         <div className="bg-background rounded border p-3 mt-2">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground">SCOPES REQUERIDOS</span>
+            <span className="text-xs font-medium text-muted-foreground">11 PERMISOS REQUERIDOS</span>
             <Button
               variant="ghost"
               size="sm"
@@ -260,13 +312,30 @@ export function ShopifyCustomAppWizard({
 
         <ol start={3} className="list-decimal list-inside space-y-2 text-muted-foreground">
           <li>
-            Haz clic en <strong>Guardar</strong>
+            Haz clic en <strong>"Save"</strong> (Guardar)
           </li>
           <li>
-            Luego haz clic en <strong>"Instalar app"</strong>
+            Luego haz clic en <strong>"Install app"</strong> y confirma
           </li>
         </ol>
+
+        <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Asegúrate de activar los 11 permisos. Si falta alguno, Steve no podrá leer tus productos, pedidos o clientes.
+          </span>
+        </div>
       </div>
+
+      <a
+        href={adminUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-xs"
+      >
+        Volver al admin de {cleanDomain}.myshopify.com
+        <ExternalLink className="w-4 h-4" />
+      </a>
 
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
@@ -300,23 +369,38 @@ export function ShopifyCustomAppWizard({
       ) : (
         <>
           <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
-            <p className="font-medium">Copia el Admin API Access Token:</p>
+            <p className="font-medium">Último paso — copia el token de la app:</p>
             <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
               <li>
-                En la app instalada, ve a <strong>API credentials</strong>
+                En tu Shopify Admin, abre la app <strong>"Steve"</strong> que instalaste
               </li>
               <li>
-                En la sección <strong>"Admin API access token"</strong>, haz clic en <strong>"Reveal token once"</strong>
+                Haz clic en la pestaña <strong>"API credentials"</strong>
               </li>
-              <li>Copia el token y pégalo abajo</li>
+              <li>
+                Baja hasta <strong>"Admin API access token"</strong> y haz clic en <strong>"Reveal token once"</strong>
+              </li>
+              <li>
+                <strong>Copia el token</strong> (empieza con <code className="bg-muted px-1 rounded text-xs">shpat_</code>) y pégalo abajo
+              </li>
             </ol>
-            <div className="flex items-start gap-2 mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+            <div className="flex items-start gap-2 mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-xs">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                El token solo se muestra una vez. Si lo pierdes, deberás desinstalar y reinstalar la app para generar uno nuevo.
+                <strong>Importante:</strong> El token solo se muestra UNA VEZ. Cópialo ahora. Si lo pierdes, tendrás que desinstalar y reinstalar la app.
               </span>
             </div>
           </div>
+
+          <a
+            href={adminUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-xs"
+          >
+            Ir al admin de {cleanDomain}.myshopify.com
+            <ExternalLink className="w-4 h-4" />
+          </a>
 
           <div className="space-y-2">
             <Label htmlFor="access-token">Admin API Access Token</Label>
