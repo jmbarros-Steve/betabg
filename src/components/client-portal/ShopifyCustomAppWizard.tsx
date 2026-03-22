@@ -24,6 +24,20 @@ import { supabase } from '@/integrations/supabase/client';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
 
+const REQUIRED_SCOPES = [
+  'read_products',
+  'write_products',
+  'read_orders',
+  'read_customers',
+  'read_checkouts',
+  'read_analytics',
+  'read_inventory',
+  'write_inventory',
+  'read_fulfillments',
+  'read_discounts',
+  'write_discounts',
+];
+
 interface ShopifyCustomAppWizardProps {
   open: boolean;
   onClose: () => void;
@@ -40,20 +54,18 @@ export function ShopifyCustomAppWizard({
   const [step, setStep] = useState(1);
   const [domain, setDomain] = useState('');
   const [error, setError] = useState('');
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [scopesCopied, setScopesCopied] = useState(false);
   const [polling, setPolling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Cleanup polling on unmount or close
+  // Cleanup polling on unmount
   useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Start polling when step 2 is shown
+  // Start polling when step 4 is shown
   useEffect(() => {
-    if (step === 2 && open) {
+    if (step === 4 && open) {
       setPolling(true);
       pollRef.current = setInterval(async () => {
         const { data } = await supabase
@@ -62,30 +74,25 @@ export function ShopifyCustomAppWizard({
           .eq('client_id', clientId)
           .eq('platform_type', 'shopify')
           .limit(1);
-
         if (data && data.length > 0) {
-          // Connection found — advance to step 3
           if (pollRef.current) clearInterval(pollRef.current);
           setPolling(false);
-          setStep(3);
+          setStep(5);
           onConnected();
         }
-      }, 3000); // Check every 3 seconds
+      }, 3000);
     } else {
       if (pollRef.current) clearInterval(pollRef.current);
       setPolling(false);
     }
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [step, open, clientId, onConnected]);
 
   const handleClose = () => {
     setStep(1);
     setDomain('');
     setError('');
-    setLinkCopied(false);
+    setScopesCopied(false);
     setPolling(false);
     if (pollRef.current) clearInterval(pollRef.current);
     onClose();
@@ -101,19 +108,21 @@ export function ShopifyCustomAppWizard({
 
   const cleanDomain = normalizeDomain(domain);
   const isValidDomain = cleanDomain && /^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(cleanDomain);
-  const shopDomain = `${cleanDomain}.myshopify.com`;
+  const adminUrl = cleanDomain
+    ? `https://admin.shopify.com/store/${cleanDomain}/settings/apps/development`
+    : '';
 
-  // Personalized OAuth install link
-  const installLink = `${API_BASE}/api/shopify-install?shop=${encodeURIComponent(shopDomain)}&client_id=${encodeURIComponent(clientId)}`;
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://betabgnuevosupa.vercel.app';
+  const redirectUrl = `${API_BASE}/api/shopify-oauth-callback`;
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(installLink);
-    setLinkCopied(true);
-    toast.success('Link copiado — pégalo en tu navegador');
-    setTimeout(() => setLinkCopied(false), 3000);
+  const handleCopyScopes = () => {
+    navigator.clipboard.writeText(REQUIRED_SCOPES.join(', '));
+    setScopesCopied(true);
+    toast.success('Permisos copiados');
+    setTimeout(() => setScopesCopied(false), 2000);
   };
 
-  // Step 1: Enter store name
+  // ─── Step 1: Nombre de la tienda ─────────────────────
   const renderStep1 = () => (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
@@ -123,123 +132,190 @@ export function ShopifyCustomAppWizard({
             id="shopify-domain"
             placeholder="mi-tienda"
             value={domain}
-            onChange={(e) => {
-              setDomain(e.target.value);
-              setError('');
-            }}
+            onChange={(e) => { setDomain(e.target.value); setError(''); }}
             onKeyDown={(e) => e.key === 'Enter' && isValidDomain && setStep(2)}
             autoFocus
           />
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            .myshopify.com
-          </span>
+          <span className="text-sm text-muted-foreground whitespace-nowrap">.myshopify.com</span>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <p className="text-xs text-muted-foreground">
           Es el nombre que aparece en tu URL de Shopify, ej: <strong>mi-tienda</strong>.myshopify.com
         </p>
       </div>
-
       <Button
         onClick={() => {
-          if (!cleanDomain) {
-            setError('Ingresa el nombre de tu tienda');
-            return;
-          }
-          if (!isValidDomain) {
-            setError('Solo letras, números y guiones');
-            return;
-          }
+          if (!cleanDomain) { setError('Ingresa el nombre de tu tienda'); return; }
+          if (!isValidDomain) { setError('Solo letras, números y guiones'); return; }
           setError('');
           setStep(2);
         }}
         disabled={!domain.trim()}
         className="w-full bg-green-600 hover:bg-green-700"
       >
-        Generar link de conexión
+        Siguiente
         <ChevronRight className="w-4 h-4 ml-2" />
       </Button>
     </div>
   );
 
-  // Step 2: Show install link + polling for connection
+  // ─── Step 2: Crear app + URLs ─────────────────────
   const renderStep2 = () => (
     <div className="space-y-4 py-4">
       <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
-        <p className="font-medium">Tu link personalizado para <strong>{cleanDomain}.myshopify.com</strong>:</p>
+        <p className="font-medium">Crea una Custom App en tu Shopify Admin:</p>
+        <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+          <li>Haz clic en el botón de abajo para ir a tu admin</li>
+          <li>Haz clic en <strong>"Desarrollar apps"</strong> (arriba a la derecha)</li>
+          <li>Si es la primera vez, haz clic en <strong>"Permitir el desarrollo de apps personalizadas"</strong></li>
+          <li>Haz clic en <strong>"Crear una app"</strong></li>
+          <li>Ponle nombre: <strong>Steve</strong></li>
+          <li>Si te pide <strong>"App URL"</strong> y <strong>"Redirect URL"</strong>, pega estos:</li>
+        </ol>
 
-        {/* The install link */}
-        <div className="bg-background rounded-lg border-2 border-green-200 p-4 space-y-3">
-          <code className="text-xs block text-green-700 break-all leading-relaxed select-all">
-            {installLink}
-          </code>
-          <Button
-            onClick={handleCopyLink}
-            className={`w-full ${linkCopied ? 'bg-green-600' : 'bg-green-600 hover:bg-green-700'}`}
-          >
-            {linkCopied ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Copiado — ahora pégalo en tu navegador
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 mr-2" />
-                Copiar link
-              </>
-            )}
-          </Button>
+        <div className="bg-background rounded border p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">APP URL</span>
+            <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(appUrl); toast.success('App URL copiada'); }} className="h-6 px-2 text-xs">
+              <Copy className="w-3 h-3 mr-1" /> Copiar
+            </Button>
+          </div>
+          <code className="text-xs block text-green-600 break-all">{appUrl}</code>
         </div>
 
-        {/* Instructions */}
-        <div className="space-y-2 pt-2">
-          <p className="font-medium text-foreground">Qué hacer:</p>
-          <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-            <li>Haz clic en <strong>"Copiar link"</strong> arriba</li>
-            <li><strong>Pega el link</strong> en la barra de tu navegador y presiona Enter</li>
-            <li>Shopify te pedirá que <strong>autorices la app</strong> — haz clic en <strong>"Instalar"</strong></li>
-            <li>La app se instala sola y esta ventana se actualizará automáticamente</li>
-          </ol>
+        <div className="bg-background rounded border p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">REDIRECT URL</span>
+            <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(redirectUrl); toast.success('Redirect URL copiada'); }} className="h-6 px-2 text-xs">
+              <Copy className="w-3 h-3 mr-1" /> Copiar
+            </Button>
+          </div>
+          <code className="text-xs block text-green-600 break-all">{redirectUrl}</code>
         </div>
 
-        {/* Polling indicator */}
+        <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>Si Shopify no te pide estas URLs, ignóralas y sigue adelante.</span>
+        </div>
+      </div>
+
+      <a href={adminUrl} target="_blank" rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium">
+        Abrir admin de {cleanDomain}.myshopify.com
+        <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+          <ChevronLeft className="w-4 h-4 mr-2" /> Atrás
+        </Button>
+        <Button onClick={() => setStep(3)} className="flex-1 bg-green-600 hover:bg-green-700">
+          Ya creé la app <ChevronRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  // ─── Step 3: Configurar permisos ─────────────────────
+  const renderStep3 = () => (
+    <div className="space-y-4 py-4">
+      <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
+        <p className="font-medium">Configura los permisos de la app "Steve":</p>
+        <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+          <li>Dentro de la app, haz clic en <strong>"Configure Admin API scopes"</strong></li>
+          <li>Busca y activa cada uno de estos permisos:</li>
+        </ol>
+
+        <div className="bg-background rounded border p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">11 PERMISOS REQUERIDOS</span>
+            <Button variant="ghost" size="sm" onClick={handleCopyScopes} className="h-6 px-2 text-xs">
+              {scopesCopied ? (
+                <><CheckCircle2 className="w-3 h-3 mr-1 text-green-500" /> Copiado</>
+              ) : (
+                <><Copy className="w-3 h-3 mr-1" /> Copiar</>
+              )}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {REQUIRED_SCOPES.map((scope) => (
+              <span key={scope} className="inline-block px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                {scope}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <ol start={3} className="list-decimal list-inside space-y-2 text-muted-foreground">
+          <li>Haz clic en <strong>"Save"</strong> (Guardar)</li>
+        </ol>
+
+        <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>Asegúrate de activar los 11 permisos. Si falta alguno, Steve no podrá acceder a tus datos.</span>
+        </div>
+      </div>
+
+      <a href={adminUrl} target="_blank" rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-xs">
+        Volver al admin de {cleanDomain}.myshopify.com
+        <ExternalLink className="w-4 h-4" />
+      </a>
+
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+          <ChevronLeft className="w-4 h-4 mr-2" /> Atrás
+        </Button>
+        <Button onClick={() => setStep(4)} className="flex-1 bg-green-600 hover:bg-green-700">
+          Ya configuré los permisos <ChevronRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  // ─── Step 4: Distribución personalizada → instalar ─────────────────────
+  const renderStep4 = () => (
+    <div className="space-y-4 py-4">
+      <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
+        <p className="font-medium">Último paso — instala la app:</p>
+        <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+          <li>Dentro de la app "Steve", ve a la sección <strong>"Distribución"</strong></li>
+          <li>Haz clic en <strong>"Gestionar distribución personalizada"</strong></li>
+          <li>Shopify te va a generar un <strong>link de instalación</strong></li>
+          <li><strong>Copia ese link</strong> y pégalo en tu navegador</li>
+          <li>Shopify te pedirá que autorices la app — haz clic en <strong>"Instalar"</strong></li>
+          <li>La app se instala sola y esta ventana se actualiza automáticamente</li>
+        </ol>
+
         {polling && (
           <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
-            <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
             <span>Esperando que instales la app en Shopify...</span>
           </div>
         )}
 
         <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>
-            Debes estar logueado en Shopify como <strong>administrador</strong> de {cleanDomain}.myshopify.com
-          </span>
+          <span>Debes estar logueado como <strong>administrador</strong> de {cleanDomain}.myshopify.com</span>
         </div>
       </div>
 
-      {/* Direct link button */}
-      <a
-        href={installLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium"
-      >
-        O haz clic aquí para abrir directamente
+      <a href={adminUrl} target="_blank" rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-sm font-medium">
+        Abrir admin de {cleanDomain}.myshopify.com
         <ExternalLink className="w-4 h-4" />
       </a>
 
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-          <ChevronLeft className="w-4 h-4 mr-2" />
-          Cambiar tienda
+        <Button variant="outline" onClick={() => setStep(3)} className="flex-1">
+          <ChevronLeft className="w-4 h-4 mr-2" /> Atrás
         </Button>
       </div>
     </div>
   );
 
-  // Step 3: App installed — success!
-  const renderStep3 = () => (
+  // ─── Step 5: App instalada ─────────────────────
+  const renderStep5 = () => (
     <div className="space-y-6 py-8">
       <div className="flex flex-col items-center text-center space-y-4">
         <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
@@ -255,17 +331,13 @@ export function ShopifyCustomAppWizard({
           Ya estamos sincronizando tus productos, órdenes y clientes. Esto puede tomar unos minutos.
         </p>
       </div>
-
-      <Button
-        onClick={handleClose}
-        className="w-full bg-green-600 hover:bg-green-700"
-      >
+      <Button onClick={handleClose} className="w-full bg-green-600 hover:bg-green-700">
         Listo
       </Button>
     </div>
   );
 
-  const stepTitles = ['Tu tienda', 'Instalar app', 'App instalada'];
+  const stepTitles = ['Tu tienda', 'Crear app', 'Permisos', 'Instalar', 'Conectada'];
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
@@ -276,27 +348,31 @@ export function ShopifyCustomAppWizard({
             Conectar Shopify
           </DialogTitle>
           <DialogDescription>
-            {step === 3
+            {step === 5
               ? 'Conexión completada'
-              : `Paso ${step} de 3: ${stepTitles[step - 1]}`}
+              : `Paso ${step} de 5: ${stepTitles[step - 1]}`}
           </DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-1 px-1">
-          {[1, 2, 3].map((s) => (
-            <div
-              key={s}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                s <= step ? 'bg-green-500' : 'bg-muted'
-              }`}
-            />
-          ))}
-        </div>
+        {step < 5 && (
+          <div className="flex items-center gap-1 px-1">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <div
+                key={s}
+                className={`h-1.5 flex-1 rounded-full transition-colors ${
+                  s <= step ? 'bg-green-500' : 'bg-muted'
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
+        {step === 5 && renderStep5()}
       </DialogContent>
     </Dialog>
   );
