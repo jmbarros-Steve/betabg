@@ -412,6 +412,7 @@ function ConditionNode({
   onRemoveSubStep,
   onOpenStepEditor,
   onPreviewStep,
+  onOpenSubStepEditor,
 }: {
   step: FlowStep;
   index: number;
