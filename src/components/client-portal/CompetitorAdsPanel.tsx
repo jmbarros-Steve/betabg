@@ -196,8 +196,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         .filter(c => c.fbUrl.trim() || c.igHandle.trim())
         .map(c => c.fbUrl.trim() || null);
 
+      const hasFbUrls = fbUrls.some(u => u);
       const response = await callApi('sync-competitor-ads', {
         body: { client_id: clientId, ig_handles: igHandles, fb_urls: fbUrls },
+        timeoutMs: hasFbUrls ? 360_000 : 90_000, // 6min for Apify, 90s for Meta API
       });
 
       if (response.error) {

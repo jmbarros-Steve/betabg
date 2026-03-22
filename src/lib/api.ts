@@ -13,9 +13,9 @@ interface ApiResponse<T = any> {
  */
 export async function callApi<T = any>(
   functionName: string,
-  options: { method?: string; body?: any } = {}
+  options: { method?: string; body?: any; timeoutMs?: number } = {}
 ): Promise<ApiResponse<T>> {
-  const { method = 'POST', body } = options;
+  const { method = 'POST', body, timeoutMs } = options;
 
   try {
     // getSession() returns cached token that may be expired.
@@ -43,7 +43,7 @@ export async function callApi<T = any>(
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s for AI generation
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || 90000);
 
     const response = await fetch(`${API_URL}/api/${functionName}`, {
       method,

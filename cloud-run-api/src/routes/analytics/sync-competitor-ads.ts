@@ -133,6 +133,7 @@ function buildAdLibraryUrl(fbPageUrl: string): string {
 
 /**
  * Fetch ads via apify~facebook-ads-scraper (official actor)
+ * Uses async pattern: start run → poll status → fetch dataset items
  */
 async function fetchAdsViaApify(
   fbPageUrl: string,
@@ -147,8 +148,9 @@ async function fetchAdsViaApify(
   console.log(`[sync-competitor-ads] Apify scraper URL: ${adLibraryUrl}`);
 
   try {
-    const resp = await fetch(
-      `https://api.apify.com/v2/acts/apify~facebook-ads-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}&format=json&timeout=300`,
+    // Step 1: Start the actor run (returns immediately)
+    const startResp = await fetch(
+      `https://api.apify.com/v2/acts/apify~facebook-ads-scraper/runs?token=${encodeURIComponent(apifyToken)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,27 +158,67 @@ async function fetchAdsViaApify(
           startUrls: [{ url: adLibraryUrl }],
           maxAds,
         }),
-        signal: AbortSignal.timeout(300_000), // 5 min timeout (Apify can take 2-4min)
       },
     );
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      return { ads: [], error: `apify_error: ${resp.status} — ${text.substring(0, 200)}` };
+    if (!startResp.ok) {
+      const text = await startResp.text();
+      return { ads: [], error: `apify_start_error: ${startResp.status} — ${text.substring(0, 200)}` };
     }
 
-    const items = (await resp.json()) as any[];
+    const startData: any = await startResp.json();
+    const runId = startData?.data?.id;
+    const datasetId = startData?.data?.defaultDatasetId;
+    if (!runId || !datasetId) {
+      return { ads: [], error: 'apify_error: No run ID returned' };
+    }
+
+    console.log(`[sync-competitor-ads] Apify run started: ${runId}, dataset: ${datasetId}`);
+
+    // Step 2: Poll for completion (every 10s, max 5min)
+    const maxWaitMs = 300_000;
+    const pollIntervalMs = 10_000;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitMs) {
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+      const statusResp = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}?token=${encodeURIComponent(apifyToken)}`,
+      );
+      const statusData: any = await statusResp.json();
+      const status = statusData?.data?.status;
+
+      if (status === 'SUCCEEDED') {
+        console.log(`[sync-competitor-ads] Apify run ${runId} completed in ${Math.round((Date.now() - startTime) / 1000)}s`);
+        break;
+      }
+      if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
+        return { ads: [], error: `apify_run_${status.toLowerCase()}: Run ${runId} finished with status ${status}` };
+      }
+      // READY, RUNNING — keep polling
+      console.log(`[sync-competitor-ads] Apify run ${runId}: ${status} (${Math.round((Date.now() - startTime) / 1000)}s)`);
+    }
+
+    // Step 3: Fetch dataset items
+    const itemsResp = await fetch(
+      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(apifyToken)}&format=json&limit=${maxAds}`,
+    );
+
+    if (!itemsResp.ok) {
+      const text = await itemsResp.text();
+      return { ads: [], error: `apify_dataset_error: ${itemsResp.status} — ${text.substring(0, 200)}` };
+    }
+
+    const items = (await itemsResp.json()) as any[];
     // Filter valid items (exclude error items like {url, error, errorDescription})
     const validAds = (items || []).filter(
       (item: any) => !item.error && (item.adArchiveID || item.adArchiveId || item.pageId || item.pageID),
     ) as ApifyScraperAd[];
 
-    console.log(`[sync-competitor-ads] Apify returned ${validAds.length} ads`);
+    console.log(`[sync-competitor-ads] Apify returned ${validAds.length} valid ads from ${items?.length || 0} items`);
     return { ads: validAds };
   } catch (err: any) {
-    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
-      return { ads: [], error: 'apify_timeout: Apify tardó más de 2 minutos' };
-    }
     return { ads: [], error: `apify_error: ${err.message}` };
   }
 }
