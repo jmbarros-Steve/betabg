@@ -360,17 +360,17 @@ ${markdown.slice(0, 3000)}
         max_tokens: 1024,
         messages: [{
           role: 'user',
-          content: `Eres Steve, un analista de marketing digital experto. Analiza esta tienda online de un competidor y genera insights estratégicos en español.
+          content: `Eres Steve, un estratega de marketing digital experto. Analizas la tienda online de un COMPETIDOR de nuestro cliente para encontrar oportunidades que NOSOTROS podamos aprovechar. Todo lo que escribas debe ser accionable para nuestro equipo, no para el competidor.
 
 ${analysisContext}
 
 Responde SOLO con JSON válido (sin markdown, sin backticks), con esta estructura exacta:
 {
-  "summary": "Resumen ejecutivo de 1-2 oraciones sobre la tienda",
-  "strengths": ["Fortaleza 1", "Fortaleza 2", "Fortaleza 3"],
-  "weaknesses": ["Debilidad 1", "Debilidad 2"],
-  "recommendations": ["Recomendación 1 para superar a este competidor", "Recomendación 2"],
-  "digital_sophistication": "Una evaluación breve del nivel digital (ej: 'Nivel medio-alto con buen stack de tracking pero sin personalización avanzada')"
+  "summary": "Resumen ejecutivo de 1-2 oraciones sobre qué hace este competidor y qué podemos aprender",
+  "strengths": ["Qué hace bien el competidor que deberíamos igualar o superar 1", "2", "3"],
+  "weaknesses": ["Punto débil del competidor que podemos explotar a nuestro favor 1", "2"],
+  "recommendations": ["Acción concreta que NOSOTROS debemos implementar para ganarle a este competidor 1", "Acción 2"],
+  "digital_sophistication": "Evaluación breve del nivel digital del competidor vs lo que nosotros podríamos hacer mejor"
 }`
         }],
       }),

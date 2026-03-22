@@ -506,7 +506,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         {dd.ai_insights.strengths.length > 0 && (
                           <div className="space-y-1">
                             <p className="text-xs font-semibold flex items-center gap-1 text-green-700 dark:text-green-400">
-                              <ThumbsUp className="h-3 w-3" /> Fortalezas
+                              <ThumbsUp className="h-3 w-3" /> Qué hace bien
                             </p>
                             <ul className="space-y-0.5">
                               {dd.ai_insights.strengths.map((s, i) => (
@@ -520,7 +520,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         {dd.ai_insights.weaknesses.length > 0 && (
                           <div className="space-y-1">
                             <p className="text-xs font-semibold flex items-center gap-1 text-red-700 dark:text-red-400">
-                              <ThumbsDown className="h-3 w-3" /> Debilidades
+                              <ThumbsDown className="h-3 w-3" /> Donde podemos ganarle
                             </p>
                             <ul className="space-y-0.5">
                               {dd.ai_insights.weaknesses.map((w, i) => (
@@ -534,7 +534,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         {dd.ai_insights.recommendations.length > 0 && (
                           <div className="space-y-1">
                             <p className="text-xs font-semibold flex items-center gap-1 text-blue-700 dark:text-blue-400">
-                              <Lightbulb className="h-3 w-3" /> Recomendaciones
+                              <Lightbulb className="h-3 w-3" /> Qué hacer nosotros
                             </p>
                             <ul className="space-y-0.5">
                               {dd.ai_insights.recommendations.map((r, i) => (
