@@ -91,10 +91,10 @@ const SOPHISTICATION_CONFIG = {
 };
 
 const LOADING_STEPS = [
-  'Descargando HTML...',
+  'Recopilando información...',
   'Analizando tech stack...',
   'Detectando scripts de tracking...',
-  'Extrayendo oferta y productos...',
+  'Analizando oferta y productos...',
   'Generando insights con Steve AI...',
 ];
 
@@ -177,7 +177,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
         timeoutMs: 120000, // 120s timeout (AI insights adds time)
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) throw new Error(response.error);
       if (!response.data?.success) throw new Error(response.data?.error || 'Failed');
 
       toast.success(`Deep Dive completado para @${competitor.ig_handle}`);
@@ -272,13 +272,6 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
       {/* Results */}
       {analyzedCompetitors.length > 0 && (
         <div className="space-y-6">
-          {/* Disclaimer */}
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
-            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-yellow-700 dark:text-yellow-300">
-              Los datos se extraen del HTML publico de la tienda. Campos marcados como "No se pudo verificar" significan que no encontramos evidencia concreta en el sitio — no se inventan datos.
-            </p>
-          </div>
           {/* Summary comparison */}
           <Card>
             <CardHeader className="pb-3">
@@ -418,7 +411,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                           )}
                         </>
                       ) : (
-                        <p className="text-xs text-muted-foreground italic">No se pudo verificar la plataforma</p>
+                        <p className="text-xs text-muted-foreground italic">Plataforma no identificada</p>
                       )}
                     </div>
 
@@ -431,7 +424,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                       {dd.irresistible_offer.h1 ? (
                         <p className="text-sm font-medium">"{dd.irresistible_offer.h1}"</p>
                       ) : (
-                        <p className="text-xs text-muted-foreground italic">No se pudo verificar el H1</p>
+                        <p className="text-xs text-muted-foreground italic">Sin titular principal detectado</p>
                       )}
                       {dd.irresistible_offer.discount_messaging ? (
                         <Badge variant="secondary" className="text-xs">

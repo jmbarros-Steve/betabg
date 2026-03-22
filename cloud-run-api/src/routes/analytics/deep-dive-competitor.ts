@@ -85,29 +85,71 @@ function detectPlatform(html: string, markdown: string): DeepDiveResult['tech_st
     return { platform: 'bootic', platform_evidence: 'Bootic platform detected', cms_detected: 'Bootic' };
   }
 
+  // Fallback: search in markdown when HTML is empty/blocked
+  if (markdown) {
+    const mdLower = markdown.toLowerCase();
+    if (mdLower.includes('shopify') || mdLower.includes('myshopify')) {
+      return { platform: 'shopify', platform_evidence: 'Shopify reference found in page content', cms_detected: 'Shopify' };
+    }
+    if (mdLower.includes('woocommerce') || mdLower.includes('wordpress') || mdLower.includes('wp-content')) {
+      return { platform: 'woocommerce', platform_evidence: 'WooCommerce/WordPress reference in content', cms_detected: 'WooCommerce' };
+    }
+    if (mdLower.includes('wix.com') || mdLower.includes('wixstatic')) {
+      return { platform: 'wix', platform_evidence: 'Wix reference found in content', cms_detected: 'Wix' };
+    }
+    if (mdLower.includes('squarespace')) {
+      return { platform: 'squarespace', platform_evidence: 'Squarespace reference in content', cms_detected: 'Squarespace' };
+    }
+    if (mdLower.includes('magento')) {
+      return { platform: 'magento', platform_evidence: 'Magento reference in content', cms_detected: 'Magento' };
+    }
+    if (mdLower.includes('vtex')) {
+      return { platform: 'vtex', platform_evidence: 'VTEX reference in content', cms_detected: 'VTEX' };
+    }
+    if (mdLower.includes('tiendanube') || mdLower.includes('nuvemshop')) {
+      return { platform: 'tiendanube', platform_evidence: 'Tienda Nube reference in content', cms_detected: 'Tienda Nube' };
+    }
+    if (mdLower.includes('jumpseller')) {
+      return { platform: 'jumpseller', platform_evidence: 'Jumpseller reference in content', cms_detected: 'Jumpseller' };
+    }
+    if (mdLower.includes('prestashop')) {
+      return { platform: 'prestashop', platform_evidence: 'PrestaShop reference in content', cms_detected: 'PrestaShop' };
+    }
+    if (mdLower.includes('bigcommerce')) {
+      return { platform: 'bigcommerce', platform_evidence: 'BigCommerce reference in content', cms_detected: 'BigCommerce' };
+    }
+    if (mdLower.includes('webflow')) {
+      return { platform: 'webflow', platform_evidence: 'Webflow reference in content', cms_detected: 'Webflow' };
+    }
+    if (mdLower.includes('bootic')) {
+      return { platform: 'bootic', platform_evidence: 'Bootic reference in content', cms_detected: 'Bootic' };
+    }
+  }
+
   return { platform: 'custom', platform_evidence: 'No known platform signature found', cms_detected: null };
 }
 
-function detectTrackingScripts(html: string): DeepDiveResult['tracking_scripts'] {
-  const htmlLower = html.toLowerCase();
+function detectTrackingScripts(html: string, markdown: string): DeepDiveResult['tracking_scripts'] {
+  // Combine HTML + markdown for broader detection (markdown captures links/references when HTML is empty)
+  const combined = (html + ' ' + markdown).toLowerCase();
   const other: string[] = [];
 
-  const metaPixel = htmlLower.includes('fbq(') || htmlLower.includes('facebook.com/tr') || htmlLower.includes('connect.facebook.net');
-  const gtm = htmlLower.includes('googletagmanager.com') || htmlLower.includes('gtm.js');
-  const ga = htmlLower.includes('google-analytics.com') || htmlLower.includes('gtag(') || htmlLower.includes('analytics.js');
-  const tiktok = htmlLower.includes('analytics.tiktok.com') || htmlLower.includes('ttq.load');
-  const klaviyo = htmlLower.includes('klaviyo.com') || htmlLower.includes('_learnq');
-  const hotjar = htmlLower.includes('hotjar.com') || htmlLower.includes('hj(');
+  const metaPixel = combined.includes('fbq(') || combined.includes('facebook.com/tr') || combined.includes('connect.facebook.net');
+  const gtm = combined.includes('googletagmanager.com') || combined.includes('gtm.js');
+  const ga = combined.includes('google-analytics.com') || combined.includes('gtag(') || combined.includes('analytics.js');
+  const tiktok = combined.includes('analytics.tiktok.com') || combined.includes('ttq.load');
+  const klaviyo = combined.includes('klaviyo.com') || combined.includes('_learnq');
+  const hotjar = combined.includes('hotjar.com') || combined.includes('hj(');
 
   // Additional detections
-  if (htmlLower.includes('snap.licdn.com') || htmlLower.includes('linkedin.com/px')) other.push('LinkedIn Pixel');
-  if (htmlLower.includes('ads.pinterest.com') || htmlLower.includes('pintrk(')) other.push('Pinterest Tag');
-  if (htmlLower.includes('twitter.com/i/adsct') || htmlLower.includes('twq(')) other.push('Twitter/X Pixel');
-  if (htmlLower.includes('criteo.com') || htmlLower.includes('criteo.net')) other.push('Criteo');
-  if (htmlLower.includes('clarity.ms')) other.push('Microsoft Clarity');
-  if (htmlLower.includes('segment.com') || htmlLower.includes('analytics.js')) other.push('Segment');
-  if (htmlLower.includes('intercom.com') || htmlLower.includes('intercomsettings')) other.push('Intercom');
-  if (htmlLower.includes('zendesk.com')) other.push('Zendesk');
+  if (combined.includes('snap.licdn.com') || combined.includes('linkedin.com/px')) other.push('LinkedIn Pixel');
+  if (combined.includes('ads.pinterest.com') || combined.includes('pintrk(')) other.push('Pinterest Tag');
+  if (combined.includes('twitter.com/i/adsct') || combined.includes('twq(')) other.push('Twitter/X Pixel');
+  if (combined.includes('criteo.com') || combined.includes('criteo.net')) other.push('Criteo');
+  if (combined.includes('clarity.ms')) other.push('Microsoft Clarity');
+  if (combined.includes('segment.com') || combined.includes('analytics.js')) other.push('Segment');
+  if (combined.includes('intercom.com') || combined.includes('intercomsettings')) other.push('Intercom');
+  if (combined.includes('zendesk.com')) other.push('Zendesk');
 
   // Calculate sophistication
   const trackerCount = [metaPixel, gtm, ga, tiktok, klaviyo, hotjar].filter(Boolean).length + other.length;
@@ -193,7 +235,7 @@ function extractOffer(html: string, markdown: string): DeepDiveResult['irresisti
   };
 }
 
-function extractPageMeta(html: string): DeepDiveResult['page_meta'] {
+function extractPageMeta(html: string, markdown: string): DeepDiveResult['page_meta'] {
   const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/is);
   const descMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"[^>]*>/is)
     || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="description"[^>]*>/is);
@@ -201,42 +243,78 @@ function extractPageMeta(html: string): DeepDiveResult['page_meta'] {
     || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/is);
   const langMatch = html.match(/<html[^>]*lang="([^"]*)"[^>]*>/is);
 
-  return {
-    title: titleMatch ? titleMatch[1].trim() : null,
-    description: descMatch ? descMatch[1].trim() : null,
-    og_image: ogImageMatch ? ogImageMatch[1].trim() : null,
-    language: langMatch ? langMatch[1].trim() : null,
-  };
+  let title = titleMatch ? titleMatch[1].trim() : null;
+  let description = descMatch ? descMatch[1].trim() : null;
+  const ogImage = ogImageMatch ? ogImageMatch[1].trim() : null;
+  const language = langMatch ? langMatch[1].trim() : null;
+
+  // Fallback to markdown when HTML meta is empty
+  if ((!title || !description) && markdown) {
+    const lines = markdown.split('\n').filter(l => l.trim());
+    if (!title) {
+      // First heading (# Title) as title
+      const headingMatch = markdown.match(/^#{1,2}\s+(.+)$/m);
+      if (headingMatch) title = headingMatch[1].trim();
+      else if (lines.length > 0) title = lines[0].trim().slice(0, 120);
+    }
+    if (!description) {
+      // First non-heading paragraph as description
+      const paragraph = lines.find(l => !l.startsWith('#') && l.length > 20);
+      if (paragraph) description = paragraph.trim().slice(0, 300);
+    }
+  }
+
+  return { title, description, og_image: ogImage, language };
 }
 
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+];
+
 async function fetchDirectHtml(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
-  try {
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
+    try {
+      const resp = await fetch(url, {
+        headers: {
+          'User-Agent': USER_AGENTS[attempt % USER_AGENTS.length],
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'es-CL,es;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Cache-Control': 'max-age=0',
+        },
+        redirect: 'follow',
+        signal: controller.signal,
+      });
 
-    if (!resp.ok) {
-      console.log(`[deep-dive] Direct fetch failed: HTTP ${resp.status}`);
+      if (!resp.ok) {
+        console.log(`[deep-dive] Direct fetch attempt ${attempt + 1} failed: HTTP ${resp.status}`);
+        clearTimeout(timeout);
+        if (resp.status === 403 && attempt === 0) continue; // Retry with different UA
+        return '';
+      }
+
+      const text = await resp.text();
+      return text;
+    } catch (err: any) {
+      console.log(`[deep-dive] Direct fetch attempt ${attempt + 1} error: ${err.message}`);
+      clearTimeout(timeout);
       return '';
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const text = await resp.text();
-    return text;
-  } catch (err: any) {
-    console.log(`[deep-dive] Direct fetch error: ${err.message}`);
-    return '';
-  } finally {
-    clearTimeout(timeout);
   }
+  return '';
 }
 
 async function generateAIInsights(
@@ -305,9 +383,11 @@ Responde SOLO con JSON válido (sin markdown, sin backticks), con esta estructur
     }
 
     const aiData: any = await resp.json();
-    const text = aiData.content?.[0]?.text || '';
+    const rawText = aiData.content?.[0]?.text || '';
 
-    const parsed = JSON.parse(text);
+    // Strip markdown code fences (```json ... ```) that Claude sometimes returns
+    const cleanText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleanText);
     return {
       summary: parsed.summary || '',
       strengths: parsed.strengths || [],
@@ -373,6 +453,8 @@ export async function deepDiveCompetitor(c: Context) {
     let apifyHtml = '';
     let markdown = '';
 
+    const apifyController = new AbortController();
+    const apifyTimeout = setTimeout(() => apifyController.abort(), 60000);
     try {
       const scrapeResponse = await fetch(
         `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
@@ -384,6 +466,7 @@ export async function deepDiveCompetitor(c: Context) {
             maxCrawlPages: 1,
             outputFormats: ['markdown', 'html'],
           }),
+          signal: apifyController.signal,
         }
       );
 
@@ -398,6 +481,8 @@ export async function deepDiveCompetitor(c: Context) {
       }
     } catch (apifyErr: any) {
       console.error(`[deep-dive] Apify fetch error: ${apifyErr.message}`);
+    } finally {
+      clearTimeout(apifyTimeout);
     }
 
     // === STEP 3: Choose best HTML source ===
@@ -427,9 +512,9 @@ export async function deepDiveCompetitor(c: Context) {
     console.log(`[deep-dive] Step 3: Running analysis...`);
 
     const techStack = detectPlatform(html, markdown);
-    const trackingScripts = detectTrackingScripts(html);
+    const trackingScripts = detectTrackingScripts(html, markdown);
     const offer = extractOffer(html, markdown);
-    const pageMeta = extractPageMeta(html);
+    const pageMeta = extractPageMeta(html, markdown);
 
     console.log(`[deep-dive] Platform: ${techStack.platform}, Sophistication: ${trackingScripts.marketing_sophistication}`);
     console.log(`[deep-dive] Meta Pixel: ${trackingScripts.meta_pixel}, GTM: ${trackingScripts.google_tag_manager}, Klaviyo: ${trackingScripts.klaviyo}`);
