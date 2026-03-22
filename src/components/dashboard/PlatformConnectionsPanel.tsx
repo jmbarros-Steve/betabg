@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, RefreshCw, Store, TrendingUp } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, RefreshCw, Store, TrendingUp, Copy, CheckCircle2, Loader2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
 
 interface Client {
   id: string;
@@ -75,6 +77,13 @@ export function PlatformConnectionsPanel() {
   const [storeUrl, setStoreUrl] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [accountId, setAccountId] = useState('');
+
+  // Shopify OAuth flow state
+  const [shopifyDomain, setShopifyDomain] = useState('');
+  const [shopifyStep, setShopifyStep] = useState<'domain' | 'link' | 'done'>('domain');
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [pollingShopify, setPollingShopify] = useState(false);
+  const shopifyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -206,13 +215,68 @@ export function PlatformConnectionsPanel() {
     }
   };
 
+  // Shopify OAuth helpers
+  const normalizeShopifyDomain = (raw: string): string => {
+    let d = raw.trim().toLowerCase();
+    d = d.replace(/^https?:\/\//, '');
+    d = d.replace(/\.myshopify\.com.*$/, '');
+    d = d.replace(/\/+$/, '');
+    return d;
+  };
+
+  const cleanShopifyDomain = normalizeShopifyDomain(shopifyDomain);
+  const isValidShopifyDomain = cleanShopifyDomain && /^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(cleanShopifyDomain);
+  const shopifyInstallLink = selectedClient
+    ? `${API_BASE}/api/shopify-install?shop=${encodeURIComponent(`${cleanShopifyDomain}.myshopify.com`)}&client_id=${encodeURIComponent(selectedClient)}`
+    : '';
+
+  const handleCopyShopifyLink = () => {
+    navigator.clipboard.writeText(shopifyInstallLink);
+    setLinkCopied(true);
+    toast.success('Link copiado — pégalo en tu navegador');
+    setTimeout(() => setLinkCopied(false), 3000);
+  };
+
+  const startShopifyPolling = () => {
+    if (shopifyPollRef.current) clearInterval(shopifyPollRef.current);
+    setPollingShopify(true);
+    shopifyPollRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', selectedClient)
+        .eq('platform', 'shopify')
+        .limit(1);
+      if (data && data.length > 0) {
+        if (shopifyPollRef.current) clearInterval(shopifyPollRef.current);
+        setPollingShopify(false);
+        setShopifyStep('done');
+        fetchConnections();
+      }
+    }, 3000);
+  };
+
+  const stopShopifyPolling = () => {
+    if (shopifyPollRef.current) clearInterval(shopifyPollRef.current);
+    setPollingShopify(false);
+  };
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (shopifyPollRef.current) clearInterval(shopifyPollRef.current); };
+  }, []);
+
   const resetForm = () => {
     setSelectedClient('');
     setSelectedPlatform('shopify');
     setStoreName('');
     setStoreUrl('');
-    setAccessToken(''); // Clear token immediately
+    setAccessToken('');
     setAccountId('');
+    setShopifyDomain('');
+    setShopifyStep('domain');
+    setLinkCopied(false);
+    stopShopifyPolling();
   };
 
   if (loading) {
@@ -296,38 +360,83 @@ export function PlatformConnectionsPanel() {
 
               {selectedPlatform === 'shopify' && (
                 <>
-                  <div className="space-y-2">
-                    <Label>Nombre de la Tienda</Label>
-                    <Input
-                      value={storeName}
-                      onChange={(e) => setStoreName(e.target.value)}
-                      placeholder="Mi Tienda"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>URL de la Tienda</Label>
-                    <Input
-                      value={storeUrl}
-                      onChange={(e) => setStoreUrl(e.target.value)}
-                      placeholder="mi-tienda.myshopify.com"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Solo el dominio, sin https://
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Access Token</Label>
-                    <Input
-                      type="password"
-                      value={accessToken}
-                      onChange={(e) => setAccessToken(e.target.value)}
-                      placeholder="shpat_..."
-                      autoComplete="off"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      El token se envía de forma segura y no se almacena en el navegador
-                    </p>
-                  </div>
+                  {shopifyStep === 'domain' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Dominio de la tienda Shopify</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={shopifyDomain}
+                            onChange={(e) => setShopifyDomain(e.target.value)}
+                            placeholder="mi-tienda"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && isValidShopifyDomain && selectedClient) {
+                                setShopifyStep('link');
+                                startShopifyPolling();
+                              }
+                            }}
+                          />
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">.myshopify.com</span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (!selectedClient) { toast.error('Selecciona un cliente primero'); return; }
+                          if (!isValidShopifyDomain) { toast.error('Ingresa un dominio válido'); return; }
+                          setShopifyStep('link');
+                          startShopifyPolling();
+                        }}
+                        disabled={!isValidShopifyDomain || !selectedClient}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        Generar link de conexión
+                      </Button>
+                    </>
+                  )}
+
+                  {shopifyStep === 'link' && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Link para <strong>{cleanShopifyDomain}.myshopify.com</strong>:</p>
+                      <div className="bg-muted/50 rounded-lg border-2 border-green-200 p-3 space-y-2">
+                        <code className="text-xs block text-green-700 break-all select-all">{shopifyInstallLink}</code>
+                        <Button onClick={handleCopyShopifyLink} className="w-full bg-green-600 hover:bg-green-700" size="sm">
+                          {linkCopied ? (
+                            <><CheckCircle2 className="w-4 h-4 mr-2" /> Copiado</>
+                          ) : (
+                            <><Copy className="w-4 h-4 mr-2" /> Copiar link</>
+                          )}
+                        </Button>
+                      </div>
+                      <a href={shopifyInstallLink} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 text-xs font-medium">
+                        O abrir directamente <ExternalLink className="w-3 h-3" />
+                      </a>
+                      {pollingShopify && (
+                        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs">
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                          Esperando instalación...
+                        </div>
+                      )}
+                      <Button variant="outline" size="sm" onClick={() => { setShopifyStep('domain'); stopShopifyPolling(); }}>
+                        Cambiar tienda
+                      </Button>
+                    </div>
+                  )}
+
+                  {shopifyStep === 'done' && (
+                    <div className="flex flex-col items-center text-center space-y-3 py-4">
+                      <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle2 className="w-8 h-8 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-bold">App instalada</h3>
+                      <p className="text-sm text-muted-foreground">
+                        <strong>{cleanShopifyDomain}.myshopify.com</strong> conectada correctamente.
+                      </p>
+                      <Button onClick={() => { setDialogOpen(false); resetForm(); }} className="w-full bg-green-600 hover:bg-green-700">
+                        Listo
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -365,13 +474,15 @@ export function PlatformConnectionsPanel() {
                 </div>
               )}
 
-              <Button 
-                onClick={handleAddConnection} 
-                className="w-full" 
-                disabled={selectedPlatform === 'google' || submitting}
-              >
-                {submitting ? 'Guardando...' : 'Guardar Conexión'}
-              </Button>
+              {selectedPlatform !== 'shopify' && (
+                <Button
+                  onClick={handleAddConnection}
+                  className="w-full"
+                  disabled={selectedPlatform === 'google' || submitting}
+                >
+                  {submitting ? 'Guardando...' : 'Guardar Conexión'}
+                </Button>
+              )}
             </div>
           </DialogContent>
         </Dialog>
