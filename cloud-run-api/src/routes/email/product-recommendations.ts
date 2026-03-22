@@ -93,13 +93,13 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
   // Get Shopify credentials
   const { data: connection } = await supabase
     .from('platform_connections')
-    .select('shop_domain, access_token, access_token_encrypted')
+    .select('store_url, access_token, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
     .maybeSingle();
 
-  if (!connection?.shop_domain) {
+  if (!connection?.store_url) {
     return [];
   }
 
@@ -116,7 +116,7 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
     return [];
   }
 
-  const shop = connection.shop_domain;
+  const shop = connection.store_url.replace(/^https?:\/\//, '');
 
   try {
     const response = await fetch(
@@ -355,13 +355,13 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
   // Get Shopify credentials
   const { data: connection } = await supabase
     .from('platform_connections')
-    .select('shop_domain, access_token, access_token_encrypted')
+    .select('store_url, access_token, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
     .maybeSingle();
 
-  if (!connection?.shop_domain) return [];
+  if (!connection?.store_url) return [];
 
   let accessToken = connection.access_token;
   if (connection.access_token_encrypted) {
@@ -373,10 +373,12 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
 
   if (!accessToken) return [];
 
+  const shop = connection.store_url.replace(/^https?:\/\//, '');
+
   try {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString();
     const response = await fetch(
-      `https://${connection.shop_domain}/admin/api/2024-10/orders.json?status=any&created_at_min=${ninetyDaysAgo}&limit=250&fields=line_items`,
+      `https://${shop}/admin/api/2024-10/orders.json?status=any&created_at_min=${ninetyDaysAgo}&limit=250&fields=line_items`,
       {
         headers: {
           'X-Shopify-Access-Token': accessToken,
