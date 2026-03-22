@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Plus, Loader2, List, Filter, Trash2, Users, Upload, ArrowLeft, FileUp } from 'lucide-react';
+import { Plus, Loader2, List, Filter, Trash2, Users, Upload, ArrowLeft, FileUp, ShoppingCart, Star, UserPlus, Clock, Mail, Zap } from 'lucide-react';
 import { SegmentBuilder } from './SegmentBuilder';
 
 interface ListsManagerProps {
@@ -38,10 +38,56 @@ interface ListMember {
   added_at: string;
 }
 
+const SEGMENT_TEMPLATES = [
+  {
+    name: 'Compradores frecuentes',
+    description: 'Clientes con 3 o más compras',
+    icon: ShoppingCart,
+    color: 'text-green-600 bg-green-50',
+    filters: [{ field: 'total_orders', operator: '>=', value: '3' }],
+  },
+  {
+    name: 'Clientes VIP',
+    description: 'Clientes que han gastado $100.000+',
+    icon: Star,
+    color: 'text-yellow-600 bg-yellow-50',
+    filters: [{ field: 'total_spent', operator: '>=', value: '100000' }],
+  },
+  {
+    name: 'Nuevos clientes',
+    description: 'Registrados en los últimos 30 días',
+    icon: UserPlus,
+    color: 'text-blue-600 bg-blue-50',
+    filters: [{ field: 'created_at', operator: '>', value: '30_days_ago' }],
+  },
+  {
+    name: 'Inactivos',
+    description: 'Sin compras en más de 90 días',
+    icon: Clock,
+    color: 'text-red-600 bg-red-50',
+    filters: [{ field: 'last_order_at', operator: '<', value: '90_days_ago' }],
+  },
+  {
+    name: 'Carrito abandonado',
+    description: 'Contactos de carritos abandonados',
+    icon: ShoppingCart,
+    color: 'text-orange-600 bg-orange-50',
+    filters: [{ field: 'source', operator: '=', value: 'shopify_abandoned' }],
+  },
+  {
+    name: 'Solo suscritos',
+    description: 'Contactos activamente suscritos',
+    icon: Mail,
+    color: 'text-purple-600 bg-purple-50',
+    filters: [{ field: 'status', operator: '=', value: 'subscribed' }],
+  },
+];
+
 export function ListsManager({ clientId }: ListsManagerProps) {
   const [lists, setLists] = useState<EmailList[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCustomCreate, setShowCustomCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newType, setNewType] = useState<'static' | 'segment'>('static');
@@ -107,10 +153,33 @@ export function ListsManager({ clientId }: ListsManagerProps) {
       if (error) { toast.error(error); return; }
       toast.success(newType === 'segment' ? 'Segmento creado' : 'Lista creada');
       setShowCreate(false);
+      setShowCustomCreate(false);
       setNewName('');
       setNewDesc('');
       setNewType('static');
       setSegmentFilters([]);
+      loadLists();
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCreateFromTemplate = async (template: typeof SEGMENT_TEMPLATES[0]) => {
+    setCreating(true);
+    try {
+      const { error } = await callApi('manage-email-lists', {
+        body: {
+          action: 'create',
+          client_id: clientId,
+          name: template.name,
+          description: template.description,
+          type: 'segment',
+          filters: template.filters,
+        },
+      });
+      if (error) { toast.error(error); return; }
+      toast.success(`Segmento "${template.name}" creado`);
+      setShowCreate(false);
       loadLists();
     } finally {
       setCreating(false);
@@ -482,59 +551,123 @@ export function ListsManager({ clientId }: ListsManagerProps) {
         </>
       )}
 
-      {/* Create Dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="sm:max-w-lg">
+      {/* Create Panel */}
+      <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) setShowCustomCreate(false); }}>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Crear {newType === 'segment' ? 'Segmento' : 'Lista'}</DialogTitle>
+            <DialogTitle>{showCustomCreate ? `Crear ${newType === 'segment' ? 'Segmento' : 'Lista'}` : 'Crear Lista o Segmento'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Tipo</Label>
-              <Select value={newType} onValueChange={(v: any) => setNewType(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="static">Lista (contactos manuales)</SelectItem>
-                  <SelectItem value="segment">Segmento (filtros automaticos)</SelectItem>
-                </SelectContent>
-              </Select>
+
+          {!showCustomCreate ? (
+            <div className="space-y-6">
+              {/* Templates section */}
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-500" /> Usar template (un clic)
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {SEGMENT_TEMPLATES.map((template) => {
+                    const Icon = template.icon;
+                    return (
+                      <Card
+                        key={template.name}
+                        className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
+                        onClick={() => !creating && handleCreateFromTemplate(template)}
+                      >
+                        <CardContent className="py-3 px-4">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${template.color}`}>
+                              <Icon className="w-4.5 h-4.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{template.name}</p>
+                              <p className="text-xs text-muted-foreground">{template.description}</p>
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {template.filters.map((f, i) => (
+                                  <Badge key={i} variant="secondary" className="text-[10px]">
+                                    {f.field} {f.operator} {f.value}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                {creating && (
+                  <div className="flex items-center justify-center py-2 mt-2">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">Creando segmento...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Custom creation section */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-3">Crear personalizado</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    className="h-auto py-4 flex flex-col items-center gap-2"
+                    onClick={() => { setNewType('static'); setShowCustomCreate(true); }}
+                  >
+                    <List className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">Lista manual</span>
+                    <span className="text-xs text-muted-foreground">Agrega contactos manualmente o por CSV</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-auto py-4 flex flex-col items-center gap-2"
+                    onClick={() => { setNewType('segment'); setShowCustomCreate(true); }}
+                  >
+                    <Filter className="w-5 h-5 text-blue-500" />
+                    <span className="text-sm font-medium">Segmento con filtros</span>
+                    <span className="text-xs text-muted-foreground">Define reglas para segmentar automáticamente</span>
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div>
-              <Label>Nombre *</Label>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={newType === 'segment' ? 'ej: Compradores frecuentes' : 'ej: VIP Clientes'}
-              />
-            </div>
-            <div>
-              <Label>Descripcion</Label>
-              <Textarea
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Opcional"
-                rows={2}
-              />
-            </div>
-            {newType === 'segment' && (
-              <div className="border rounded-lg p-3">
-                <SegmentBuilder
-                  clientId={clientId}
-                  compact
-                  onApply={(filters) => setSegmentFilters(filters)}
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Label>Nombre *</Label>
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder={newType === 'segment' ? 'ej: Compradores frecuentes' : 'ej: VIP Clientes'}
                 />
               </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
-              {creating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-              Crear
-            </Button>
-          </DialogFooter>
+              <div>
+                <Label>Descripcion</Label>
+                <Textarea
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  placeholder="Opcional"
+                  rows={2}
+                />
+              </div>
+              {newType === 'segment' && (
+                <div className="border rounded-lg p-3">
+                  <SegmentBuilder
+                    clientId={clientId}
+                    compact
+                    onApply={(filters) => setSegmentFilters(filters)}
+                  />
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setShowCustomCreate(false); setNewName(''); setNewDesc(''); setSegmentFilters([]); }}>
+                  <ArrowLeft className="w-4 h-4 mr-1" /> Volver
+                </Button>
+                <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
+                  {creating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Crear
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

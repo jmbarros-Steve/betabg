@@ -19,7 +19,7 @@ import { Slider } from '@/components/ui/slider';
 import {
   Send, Plus, Edit, Trash2, Clock, Loader2, Eye, X, Save,
   Sparkles, Smartphone, Monitor, CalendarClock, Users, FlaskConical, ShoppingBag, MailCheck,
-  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, AlertTriangle,
+  ArrowLeft, ChevronRight, ChevronLeft, LayoutTemplate, AlertTriangle, Filter, List,
 } from 'lucide-react';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
@@ -115,6 +115,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [saveTemplateName, setSaveTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
 
+  // Audience selection
+  const [audienceType, setAudienceType] = useState<'all' | 'specific'>('all');
+  const [emailLists, setEmailLists] = useState<Array<{ id: string; name: string; type: string; subscriber_count: number; filters: any[] }>>([]);
+  const [listsLoading, setListsLoading] = useState(false);
+
   // Unsaved changes protection
   const [isDirty, setIsDirty] = useState(false);
 
@@ -183,6 +188,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   }, [clientId]);
 
   useEffect(() => { loadSubscriberCount(); }, [loadSubscriberCount]);
+
+  const loadEmailLists = useCallback(async () => {
+    setListsLoading(true);
+    try {
+      const { data, error } = await callApi<any>('manage-email-lists', {
+        body: { action: 'list', client_id: clientId },
+      });
+      if (!error) setEmailLists(data?.lists || []);
+    } finally {
+      setListsLoading(false);
+    }
+  }, [clientId]);
 
   // Load brand info for editor designTags
   useEffect(() => {
@@ -502,6 +519,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     setAbEnabled(false);
     setSendMode('now');
     setScheduleDate('');
+    setAudienceType(c.audience_filter?.type === 'list' || c.audience_filter?.type === 'segment' ? 'specific' : 'all');
     setShowEditor(true);
   };
 
@@ -520,6 +538,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     const { html, design } = await exportEditorHtml();
     setEditingCampaign(prev => ({ ...prev, html_content: html }));
     setDesignJson(design);
+    // Load lists for audience selection
+    loadEmailLists();
+    // Restore audience type from existing filter
+    const af = editingCampaign?.audience_filter;
+    if (af?.type === 'list' || af?.type === 'segment') {
+      setAudienceType('specific');
+    } else {
+      setAudienceType('all');
+    }
     setEditorStep('audience');
   };
 
@@ -1043,19 +1070,121 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 <p className="text-sm text-muted-foreground">Define a quién enviar esta campaña</p>
               </div>
 
-              <Card className="bg-muted/50">
-                <CardContent className="py-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-primary" />
+              {/* Radio: All vs Specific */}
+              <div className="space-y-3">
+                <Card
+                  className={`cursor-pointer transition-all ${audienceType === 'all' ? 'border-primary ring-1 ring-primary/20' : 'hover:bg-muted/30'}`}
+                  onClick={() => {
+                    setAudienceType('all');
+                    setEditingCampaign(prev => ({ ...prev, audience_filter: { type: 'all' } }));
+                  }}
+                >
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${audienceType === 'all' ? 'border-primary' : 'border-muted-foreground/40'}`}>
+                        {audienceType === 'all' && <div className="w-2 h-2 rounded-full bg-primary" />}
+                      </div>
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Todos los suscritos</p>
+                        <p className="text-sm text-muted-foreground">{subscriberCount} contactos recibirán esta campaña</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Todos los contactos suscritos</p>
-                      <p className="text-sm text-muted-foreground">{subscriberCount} contactos recibirán esta campaña</p>
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className={`cursor-pointer transition-all ${audienceType === 'specific' ? 'border-primary ring-1 ring-primary/20' : 'hover:bg-muted/30'}`}
+                  onClick={() => setAudienceType('specific')}
+                >
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${audienceType === 'specific' ? 'border-primary' : 'border-muted-foreground/40'}`}>
+                        {audienceType === 'specific' && <div className="w-2 h-2 rounded-full bg-primary" />}
+                      </div>
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                        <Filter className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Lista o segmento específico</p>
+                        <p className="text-sm text-muted-foreground">Enviar solo a un grupo de contactos</p>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* List/Segment selector */}
+              {audienceType === 'specific' && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Selecciona una lista o segmento</h4>
+                  {listsLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : emailLists.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-6 text-center">
+                        <List className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                        <p className="text-sm text-muted-foreground">No tienes listas ni segmentos creados</p>
+                        <p className="text-xs text-muted-foreground mt-1">Ve a la sección "Listas" para crear una</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid gap-2">
+                      {emailLists.map(list => {
+                        const isSelected =
+                          (editingCampaign?.audience_filter?.type === 'list' && editingCampaign?.audience_filter?.list_id === list.id) ||
+                          (editingCampaign?.audience_filter?.type === 'segment' && editingCampaign?.audience_filter?.segment_id === list.id);
+                        return (
+                          <Card
+                            key={list.id}
+                            className={`cursor-pointer transition-all ${isSelected ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'hover:bg-muted/30'}`}
+                            onClick={() => {
+                              const filterType = list.type === 'segment' ? 'segment' : 'list';
+                              const idKey = filterType === 'segment' ? 'segment_id' : 'list_id';
+                              setEditingCampaign(prev => ({
+                                ...prev,
+                                audience_filter: { type: filterType, [idKey]: list.id, name: list.name },
+                              }));
+                            }}
+                          >
+                            <CardContent className="py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {list.type === 'segment' ? (
+                                    <Filter className="w-4 h-4 text-blue-500" />
+                                  ) : (
+                                    <List className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                  <div>
+                                    <p className="text-sm font-medium">{list.name}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {list.type === 'segment' ? 'Segmento' : 'Lista'}
+                                      </Badge>
+                                      {list.filters?.length > 0 && list.filters.map((f: any, i: number) => (
+                                        <Badge key={i} variant="secondary" className="text-[10px]">
+                                          {f.field} {f.operator} {f.value}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Badge variant="outline">
+                                  <Users className="w-3 h-3 mr-1" /> {list.subscriber_count}
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setEditorStep('design')}>
@@ -1100,7 +1229,23 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Audiencia</p>
-                      <p className="text-sm">{subscriberCount} contactos suscritos</p>
+                      {editingCampaign?.audience_filter?.type === 'list' || editingCampaign?.audience_filter?.type === 'segment' ? (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {editingCampaign.audience_filter.type === 'segment' ? 'Segmento' : 'Lista'}
+                          </Badge>
+                          <p className="text-sm font-medium">{editingCampaign.audience_filter.name || 'Seleccionado'}</p>
+                          {(() => {
+                            const selectedId = editingCampaign.audience_filter.list_id || editingCampaign.audience_filter.segment_id;
+                            const match = emailLists.find(l => l.id === selectedId);
+                            return match ? (
+                              <span className="text-xs text-muted-foreground">({match.subscriber_count} contactos)</span>
+                            ) : null;
+                          })()}
+                        </div>
+                      ) : (
+                        <p className="text-sm">{subscriberCount} contactos suscritos</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>

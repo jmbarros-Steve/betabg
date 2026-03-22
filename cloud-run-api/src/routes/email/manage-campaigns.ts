@@ -554,19 +554,106 @@ export async function manageEmailCampaigns(c: Context) {
 
 /**
  * Get subscribers matching audience filter.
+ * Supports: { type: 'all' }, { type: 'list', list_id }, { type: 'segment', segment_id },
+ * and legacy flat filters (source, tags, min_orders, etc.)
  */
 async function getFilteredSubscribers(
   supabase: any,
   clientId: string,
   filter: any
 ): Promise<Array<{ id: string; email: string; first_name: string | null; last_name: string | null; tags: string[]; total_orders: number; total_spent: number; last_order_at: string | null; custom_fields: Record<string, any> | null }>> {
+
+  // --- Type: list → join email_list_members ---
+  if (filter?.type === 'list' && filter.list_id) {
+    const { data: members, error: memErr } = await supabase
+      .from('email_list_members')
+      .select('subscriber_id')
+      .eq('list_id', filter.list_id);
+
+    if (memErr || !members || members.length === 0) {
+      console.error('Failed to query list members or list is empty:', memErr);
+      return [];
+    }
+
+    const subscriberIds = members.map((m: any) => m.subscriber_id);
+    const { data, error } = await supabase
+      .from('email_subscribers')
+      .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
+      .eq('client_id', clientId)
+      .eq('status', 'subscribed')
+      .in('id', subscriberIds);
+
+    if (error) {
+      console.error('Failed to query subscribers for list:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  // --- Type: segment → load segment filters and apply ---
+  if (filter?.type === 'segment' && filter.segment_id) {
+    const { data: segment, error: segErr } = await supabase
+      .from('email_lists')
+      .select('filters')
+      .eq('id', filter.segment_id)
+      .eq('client_id', clientId)
+      .single();
+
+    if (segErr || !segment) {
+      console.error('Failed to load segment:', segErr);
+      return [];
+    }
+
+    // Build query from segment filters
+    let query = supabase
+      .from('email_subscribers')
+      .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
+      .eq('client_id', clientId)
+      .eq('status', 'subscribed');
+
+    const segFilters = segment.filters || [];
+    for (const f of segFilters) {
+      const { field, operator, value } = f;
+      // Handle relative date values
+      if (value === '30_days_ago') {
+        const date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        if (operator === '>') query = query.gte(field, date);
+        else if (operator === '<') query = query.lte(field, date);
+      } else if (value === '90_days_ago') {
+        const date = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        if (operator === '>') query = query.gte(field, date);
+        else if (operator === '<') query = query.lte(field, date);
+      } else if (operator === '>=') {
+        query = query.gte(field, value);
+      } else if (operator === '<=') {
+        query = query.lte(field, value);
+      } else if (operator === '>') {
+        query = query.gt(field, value);
+      } else if (operator === '<') {
+        query = query.lt(field, value);
+      } else if (operator === '=' || operator === '==') {
+        query = query.eq(field, value);
+      } else if (operator === '!=') {
+        query = query.neq(field, value);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Failed to query subscribers for segment:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  // --- Type: all or legacy flat filters ---
   let query = supabase
     .from('email_subscribers')
     .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
     .eq('client_id', clientId)
     .eq('status', 'subscribed');
 
-  // Apply filters
+  // Apply legacy flat filters (backward compatible)
   if (filter) {
     if (filter.source) query = query.eq('source', filter.source);
     if (filter.tags && filter.tags.length > 0) query = query.overlaps('tags', filter.tags);
