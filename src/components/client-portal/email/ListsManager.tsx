@@ -58,7 +58,7 @@ const SEGMENT_TEMPLATES = [
     description: 'Registrados en los últimos 30 días',
     icon: UserPlus,
     color: 'text-blue-600 bg-blue-50',
-    filters: [{ field: 'created_at', operator: 'gte', value: 'relative:30d' }],
+    filters: [{ field: 'subscribed_at', operator: 'gte', value: 'relative:30d' }],
   },
   {
     name: 'Inactivos',
