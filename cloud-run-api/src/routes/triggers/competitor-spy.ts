@@ -22,7 +22,7 @@ interface ApifyAd {
   endDate?: number;
   startDateFormatted?: string;
   endDateFormatted?: string;
-  impressionsWithIndex?: { impressions_text?: string; [key: string]: any };
+  impressionsWithIndex?: { impressionsText?: string; [key: string]: any };
   spend?: { lower_bound?: string; upper_bound?: string };
   reachEstimate?: { lower_bound?: number; upper_bound?: number };
   publisherPlatform?: string[];
@@ -59,7 +59,7 @@ async function runApifyActor(token: string): Promise<ApifyAd[]> {
     'ecommerce envio gratis',
   ];
   const startUrls = queries.map(q => ({
-    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(q)}`,
+    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&is_targeted_country=false&media_type=all&search_type=keyword_unordered&q=${encodeURIComponent(q)}`,
   }));
 
   const resp = await fetch(
@@ -88,7 +88,12 @@ async function runApifyActor(token: string): Promise<ApifyAd[]> {
 }
 
 function extractAdText(ad: ApifyAd): string {
-  // Try body markup
+  // Try body text (Apify returns body.text as a string)
+  const bodyText = (ad.snapshot?.body as any)?.text;
+  if (bodyText && typeof bodyText === 'string') {
+    return bodyText.trim();
+  }
+  // Fallback: body markup (some responses use __html)
   const bodyHtml = ad.snapshot?.body?.markup?.__html;
   if (bodyHtml) {
     return bodyHtml.replace(/<[^>]*>/g, '').trim();
@@ -142,7 +147,7 @@ function filterLongRunningAds(ads: ApifyAd[], minDays: number): AdInsight[] {
     if (daysActive < minDays) continue;
 
     // Format metrics for analysis
-    const impressions = ad.impressionsWithIndex?.impressions_text || undefined;
+    const impressions = ad.impressionsWithIndex?.impressionsText || undefined;
 
     const spendLower = ad.spend?.lower_bound;
     const spendUpper = ad.spend?.upper_bound;

@@ -39,8 +39,10 @@ interface ApifyScraperAd {
   publisherPlatform?: string[];
   currency?: string;
   impressionsWithIndex?: {
+    impressionsText?: string;
     impressions_text?: string;
-    [key: string]: any; // may contain index-based entries
+    impressionsIndex?: number;
+    [key: string]: any;
   };
   spend?: {
     lower_bound?: string;
@@ -53,21 +55,46 @@ interface ApifyScraperAd {
   snapshot?: {
     pageName?: string;
     pageId?: string;
-    body?: { markup?: { __html: string } };
+    // Body can be either { text: string } or { markup: { __html: string } }
+    body?: { text?: string; markup?: { __html: string } };
+    // Apify returns camelCase for some fields, snake_case for others
+    ctaText?: string;
     cta_text?: string;
+    ctaType?: string;
     cta_type?: string;
+    linkUrl?: string;
     link_url?: string;
+    caption?: string;
+    displayFormat?: string;
+    title?: string;
     cards?: Array<{
       body?: string;
       title?: string;
+      linkUrl?: string;
       link_url?: string;
+      ctaText?: string;
       cta_text?: string;
+      ctaType?: string;
       cta_type?: string;
+      videoPreviewImageUrl?: string;
       video_preview_image_url?: string;
+      resizedImageUrl?: string;
       resized_image_url?: string;
+      originalImageUrl?: string;
+      original_image_url?: string;
     }>;
-    images?: Array<{ resized_image_url?: string; original_image_url?: string }>;
-    videos?: Array<{ video_preview_image_url?: string }>;
+    images?: Array<{
+      resizedImageUrl?: string;
+      resized_image_url?: string;
+      originalImageUrl?: string;
+      original_image_url?: string;
+    }>;
+    videos?: Array<{
+      videoPreviewImageUrl?: string;
+      video_preview_image_url?: string;
+      videoSdUrl?: string;
+      videoHdUrl?: string;
+    }>;
   };
 }
 
@@ -116,19 +143,20 @@ function buildAdLibraryUrl(fbPageUrl: string): string {
   // If already an Ad Library URL, use as-is
   if (fbPageUrl.includes('ads/library')) return fbPageUrl;
 
+  // Base params that Apify needs to return results
+  const base = 'https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&is_targeted_country=false&media_type=all&search_type=keyword_unordered';
+
   // If it's a proper Facebook URL, extract the page slug/id
   if (isFacebookUrl(fbPageUrl)) {
     const slug = extractPageIdOrSlug(fbPageUrl);
     if (slug) {
-      if (/^\d+$/.test(slug)) {
-        return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&view_all_page_id=${slug}`;
-      }
-      return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&q=${encodeURIComponent(slug)}`;
+      // Use the slug as search query — Apify resolves it on the Ad Library page
+      return `${base}&q=${encodeURIComponent(slug)}`;
     }
   }
 
-  // Not a FB URL — treat the entire input as a search query for Ad Library
-  return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&q=${encodeURIComponent(fbPageUrl.trim())}`;
+  // Fallback: use as search query
+  return `${base}&q=${encodeURIComponent(fbPageUrl.trim())}`;
 }
 
 /**
@@ -243,22 +271,27 @@ function mapApifyAdToRow(
     ? Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Ad text — from snapshot body markup
+  // Ad text — body can be { text: "..." } or { markup: { __html: "..." } }
   let adText = '';
-  if (ad.snapshot?.body?.markup?.__html) {
+  if (ad.snapshot?.body?.text) {
+    adText = ad.snapshot.body.text.trim();
+  } else if (ad.snapshot?.body?.markup?.__html) {
     adText = ad.snapshot.body.markup.__html.replace(/<[^>]*>/g, '').trim();
   }
   if (!adText && ad.snapshot?.cards?.[0]?.body) {
     adText = ad.snapshot.cards[0].body;
   }
+  // Truncate very long ad texts (some can be thousands of chars)
+  if (adText.length > 1000) adText = adText.substring(0, 1000);
 
-  // Headline — from first card title
-  const adHeadline = ad.snapshot?.cards?.[0]?.title || null;
+  // Headline — from snapshot title or first card title
+  const adHeadline = ad.snapshot?.title || ad.snapshot?.cards?.[0]?.title || null;
 
-  // Ad type
+  // Ad type — use displayFormat if available, fallback to heuristics
   let adType = 'image';
-  if (ad.snapshot?.videos && ad.snapshot.videos.length > 0) adType = 'video';
-  if (ad.collationCount && ad.collationCount > 1) adType = 'carousel';
+  const displayFmt = (ad.snapshot?.displayFormat || '').toUpperCase();
+  if (displayFmt === 'VIDEO' || (ad.snapshot?.videos && ad.snapshot.videos.length > 0)) adType = 'video';
+  if (displayFmt === 'DCO' || (ad.collationCount && ad.collationCount > 1)) adType = 'carousel';
 
   // CTA detection
   const ctaMap: Record<string, string> = {
@@ -268,7 +301,7 @@ function mapApifyAdToRow(
     'descargar': 'DOWNLOAD', 'download': 'DOWNLOAD',
   };
   let ctaType = 'OTHER';
-  const ctaText = (ad.snapshot?.cta_text || ad.snapshot?.cards?.[0]?.cta_text || '').toLowerCase();
+  const ctaText = (ad.snapshot?.ctaText || ad.snapshot?.cta_text || ad.snapshot?.cards?.[0]?.ctaText || ad.snapshot?.cards?.[0]?.cta_text || '').toLowerCase();
   for (const [key, value] of Object.entries(ctaMap)) {
     if (ctaText.includes(key)) { ctaType = value; break; }
   }
@@ -278,7 +311,7 @@ function mapApifyAdToRow(
   let impressionsLower: number | null = null;
   let impressionsUpper: number | null = null;
   if (ad.impressionsWithIndex) {
-    const impText = ad.impressionsWithIndex.impressions_text || '';
+    const impText = ad.impressionsWithIndex.impressionsText || ad.impressionsWithIndex.impressions_text || '';
     // Try to parse "1K-5K", "10K-50K", "500-1K" etc
     const match = impText.match(/([0-9,.]+)\s*([KMB]?)\s*[-–]\s*([0-9,.]+)\s*([KMB]?)/i);
     if (match) {
@@ -299,18 +332,27 @@ function mapApifyAdToRow(
   // Platforms
   const platforms = ad.publisherPlatform && ad.publisherPlatform.length > 0 ? ad.publisherPlatform : null;
 
-  // Images — from snapshot cards and images
+  // Images — from snapshot images, cards, and video previews (handle both camelCase and snake_case)
   const imageUrls: string[] = [];
   if (ad.snapshot?.images) {
     for (const img of ad.snapshot.images) {
-      if (img.resized_image_url) imageUrls.push(img.resized_image_url);
-      else if (img.original_image_url) imageUrls.push(img.original_image_url);
+      const url = img.resizedImageUrl || img.resized_image_url || img.originalImageUrl || img.original_image_url;
+      if (url) imageUrls.push(url);
     }
   }
   if (ad.snapshot?.cards) {
     for (const card of ad.snapshot.cards) {
-      if (card.resized_image_url) imageUrls.push(card.resized_image_url);
-      if (card.video_preview_image_url) imageUrls.push(card.video_preview_image_url);
+      const imgUrl = card.resizedImageUrl || card.resized_image_url || card.originalImageUrl || card.original_image_url;
+      if (imgUrl) imageUrls.push(imgUrl);
+      const vidUrl = card.videoPreviewImageUrl || card.video_preview_image_url;
+      if (vidUrl) imageUrls.push(vidUrl);
+    }
+  }
+  // Video preview images as fallback
+  if (ad.snapshot?.videos) {
+    for (const vid of ad.snapshot.videos) {
+      const url = vid.videoPreviewImageUrl || vid.video_preview_image_url;
+      if (url) imageUrls.push(url);
     }
   }
   // Dedupe
@@ -473,16 +515,13 @@ export async function syncCompetitorAds(c: Context) {
 
         const effectiveFbUrl = tracking.fb_page_url || fbUrl;
 
-        // Build Apify source: fb_page_url > meta_page_id > nothing
-        // If we already know the page_id from a previous Meta API sync, use it for Apify too
+        // Build Apify source: ONLY use when user provided a valid Facebook URL
+        // Do NOT use meta_page_id from Meta API search — it's unreliable (often resolves to wrong pages)
         let apifySource: string | null = null;
         if (effectiveFbUrl && isFacebookUrl(effectiveFbUrl)) {
           apifySource = effectiveFbUrl;
         } else if (effectiveFbUrl && effectiveFbUrl.includes('ads/library')) {
           apifySource = effectiveFbUrl;
-        } else if (tracking.meta_page_id) {
-          // Use cached meta_page_id to build Ad Library URL for Apify
-          apifySource = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&view_all_page_id=${tracking.meta_page_id}`;
         }
 
         // Check if we already have Apify metrics for this competitor
@@ -534,6 +573,9 @@ export async function syncCompetitorAds(c: Context) {
           } else if (apifyResult.ads.length > 0) {
             // Success — map and save Apify ads
             const adsToUpsert = apifyResult.ads.map(ad => mapApifyAdToRow(ad, tracking.id, client_id));
+            // Log first mapped ad for debugging
+            const firstAd = adsToUpsert[0];
+            console.log(`[sync-competitor-ads] ${handle}: First mapped ad: text=${(firstAd?.ad_text || '').substring(0, 50)}, images=${(firstAd?.image_urls || []).length}, impressions=${firstAd?.impressions_lower}, type=${firstAd?.ad_type}`);
 
             // Clear old ads
             await supabase.from('competitor_ads').delete().eq('tracking_id', tracking.id);
