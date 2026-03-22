@@ -23,6 +23,231 @@ interface AdLibraryAd {
   languages?: string[];
 }
 
+/** Response shape from apify~facebook-ads-scraper */
+interface ApifyScraperAd {
+  ad_archive_id?: string;
+  adArchiveID?: string;
+  pageId?: string;
+  page_id?: string;
+  pageName?: string;
+  page_name?: string;
+  adText?: string;
+  ad_text?: string;
+  adTitle?: string;
+  adDescription?: string;
+  adImages?: string[];
+  adVideos?: string[];
+  impressionsWithIndex?: { impressions_lower_bound?: number; impressions_upper_bound?: number };
+  impressions?: { lower_bound?: number; upper_bound?: number };
+  spend?: { lower_bound?: number; upper_bound?: number };
+  reachEstimate?: { lower_bound?: number; upper_bound?: number };
+  reach?: { lower_bound?: number; upper_bound?: number };
+  platforms?: string[];
+  publisher_platforms?: string[];
+  startDate?: string;
+  endDate?: string;
+  ad_delivery_start_time?: string;
+  ad_delivery_stop_time?: string;
+  isActive?: boolean;
+  collationCount?: number;
+  ctaText?: string;
+  snapshot?: {
+    page_name?: string;
+    body?: { markup?: { __html: string } };
+    cta_text?: string;
+    cards?: Array<{ body?: string; title?: string; cta_text?: string }>;
+  };
+}
+
+/**
+ * Extract Facebook page ID from a FB page URL.
+ * Supports: facebook.com/PAGENAME, facebook.com/profile.php?id=123, facebook.com/pages/xxx/123
+ */
+function extractPageIdOrSlug(fbUrl: string): string | null {
+  try {
+    let url = fbUrl.trim();
+    if (!url.startsWith('http')) url = 'https://' + url;
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '');
+
+    // facebook.com/profile.php?id=123456
+    if (path.includes('profile.php')) {
+      return parsed.searchParams.get('id');
+    }
+    // facebook.com/pages/Name/123456
+    const pagesMatch = path.match(/\/pages\/[^/]+\/(\d+)/);
+    if (pagesMatch) return pagesMatch[1];
+
+    // facebook.com/PAGENAME or facebook.com/p/PAGENAME
+    const segments = path.split('/').filter(Boolean);
+    if (segments[0] === 'p' && segments[1]) return segments[1];
+    if (segments[0]) return segments[0];
+  } catch {
+    // Not a valid URL — treat as raw slug
+    return fbUrl.trim().replace(/^\//, '');
+  }
+  return null;
+}
+
+/**
+ * Build Ad Library URL for Apify scraper input
+ */
+function buildAdLibraryUrl(fbPageUrl: string): string {
+  // If already an Ad Library URL, use as-is
+  if (fbPageUrl.includes('ads/library')) return fbPageUrl;
+
+  const slug = extractPageIdOrSlug(fbPageUrl);
+  if (!slug) return fbPageUrl;
+
+  // If slug is numeric, use view_all_page_id; otherwise use search query
+  if (/^\d+$/.test(slug)) {
+    return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&view_all_page_id=${slug}`;
+  }
+  // Use search by page name (slug) — Apify resolves this
+  return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=CL&q=${encodeURIComponent(slug)}`;
+}
+
+/**
+ * Fetch ads via apify~facebook-ads-scraper (official actor)
+ */
+async function fetchAdsViaApify(
+  fbPageUrl: string,
+  maxAds: number = 50,
+): Promise<{ ads: ApifyScraperAd[]; error?: string }> {
+  const apifyToken = process.env.APIFY_TOKEN;
+  if (!apifyToken) {
+    return { ads: [], error: 'APIFY_TOKEN not configured' };
+  }
+
+  const adLibraryUrl = buildAdLibraryUrl(fbPageUrl);
+  console.log(`[sync-competitor-ads] Apify scraper URL: ${adLibraryUrl}`);
+
+  try {
+    const resp = await fetch(
+      `https://api.apify.com/v2/acts/apify~facebook-ads-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}&format=json`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urls: [adLibraryUrl],
+          maxAds,
+          countryCode: 'CL',
+        }),
+        signal: AbortSignal.timeout(120_000), // 2 min timeout
+      },
+    );
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      return { ads: [], error: `apify_error: ${resp.status} — ${text.substring(0, 200)}` };
+    }
+
+    const items = (await resp.json()) as any[];
+    // Filter valid items
+    const validAds = (items || []).filter(
+      (item: any) => item.ad_archive_id || item.adArchiveID || item.page_id || item.pageId,
+    ) as ApifyScraperAd[];
+
+    console.log(`[sync-competitor-ads] Apify returned ${validAds.length} ads`);
+    return { ads: validAds };
+  } catch (err: any) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      return { ads: [], error: 'apify_timeout: Apify tardó más de 2 minutos' };
+    }
+    return { ads: [], error: `apify_error: ${err.message}` };
+  }
+}
+
+/**
+ * Map an Apify ad to the competitor_ads row format (with new metric columns)
+ */
+function mapApifyAdToRow(
+  ad: ApifyScraperAd,
+  trackingId: string,
+  clientId: string,
+): Record<string, any> {
+  const archiveId = ad.ad_archive_id || ad.adArchiveID || '';
+
+  // Start/end dates
+  const startStr = ad.startDate || ad.ad_delivery_start_time;
+  const endStr = ad.endDate || ad.ad_delivery_stop_time;
+  const startDate = startStr ? new Date(startStr) : null;
+  const endDate = endStr ? new Date(endStr) : null;
+  const isActive = ad.isActive !== undefined ? ad.isActive : (!endDate || endDate > new Date());
+  const daysRunning = startDate
+    ? Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  // Ad text — try multiple fields
+  let adText = ad.adText || ad.ad_text || '';
+  if (!adText && ad.snapshot?.body?.markup?.__html) {
+    adText = ad.snapshot.body.markup.__html.replace(/<[^>]*>/g, '').trim();
+  }
+
+  // Ad type
+  let adType = 'image';
+  if (ad.adVideos && ad.adVideos.length > 0) adType = 'video';
+  if (ad.collationCount && ad.collationCount > 1) adType = 'carousel';
+
+  // CTA detection
+  const ctaMap: Record<string, string> = {
+    'comprar': 'SHOP_NOW', 'shop': 'SHOP_NOW', 'buy': 'SHOP_NOW',
+    'learn more': 'LEARN_MORE', 'más información': 'LEARN_MORE',
+    'sign up': 'SIGN_UP', 'registrarse': 'SIGN_UP',
+    'descargar': 'DOWNLOAD', 'download': 'DOWNLOAD',
+  };
+  let ctaType = 'OTHER';
+  const ctaText = (ad.ctaText || ad.snapshot?.cta_text || ad.adTitle || '').toLowerCase();
+  for (const [key, value] of Object.entries(ctaMap)) {
+    if (ctaText.includes(key)) { ctaType = value; break; }
+  }
+
+  // Impressions — Apify uses different field names
+  const impData: any = ad.impressionsWithIndex || ad.impressions;
+  const impressionsLower = impData?.impressions_lower_bound ?? impData?.lower_bound ?? null;
+  const impressionsUpper = impData?.impressions_upper_bound ?? impData?.upper_bound ?? null;
+
+  // Spend
+  const spendData = ad.spend;
+  const spendLower = spendData?.lower_bound ?? null;
+  const spendUpper = spendData?.upper_bound ?? null;
+
+  // Reach
+  const reachData = ad.reachEstimate || ad.reach;
+  const reachLower = reachData?.lower_bound ?? null;
+  const reachUpper = reachData?.upper_bound ?? null;
+
+  // Platforms
+  const platforms = ad.platforms || ad.publisher_platforms || null;
+
+  // Images
+  const imageUrls = ad.adImages && ad.adImages.length > 0 ? ad.adImages : null;
+
+  return {
+    tracking_id: trackingId,
+    client_id: clientId,
+    ad_library_id: archiveId,
+    ad_text: adText || null,
+    ad_headline: ad.adTitle || null,
+    ad_description: ad.adDescription || null,
+    image_url: imageUrls?.[0] || null,
+    ad_type: adType,
+    cta_type: ctaType,
+    started_at: startStr || null,
+    is_active: isActive,
+    days_running: daysRunning,
+    // New Apify metric columns
+    impressions_lower: impressionsLower,
+    impressions_upper: impressionsUpper,
+    spend_lower: spendLower,
+    spend_upper: spendUpper,
+    reach_lower: reachLower,
+    reach_upper: reachUpper,
+    platforms: platforms,
+    image_urls: imageUrls,
+  };
+}
+
 export async function syncCompetitorAds(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
@@ -33,10 +258,15 @@ export async function syncCompetitorAds(c: Context) {
       return c.json({ error: 'Missing authorization' }, 401);
     }
 
-    const { client_id, ig_handles } = await c.req.json();
+    const { client_id, ig_handles, fb_urls } = await c.req.json();
     if (!client_id || !ig_handles || !Array.isArray(ig_handles) || ig_handles.length === 0) {
       return c.json({ error: 'client_id and ig_handles[] required' }, 400);
     }
+
+    // fb_urls is an optional parallel array of Facebook page URLs
+    const fbUrls: (string | null)[] = Array.isArray(fb_urls)
+      ? fb_urls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+      : [];
 
     // Verify ownership
     const { data: client, error: clientError } = await supabase
@@ -60,7 +290,7 @@ export async function syncCompetitorAds(c: Context) {
 
     console.log(`[sync-competitor-ads] Processing ${handles.length} handles for client ${client_id}`);
 
-    // Get Meta access token — PRIORITIZE the client's user token (already has ads_read)
+    // Get Meta access token — needed for fallback (ig_handle only) path
     const { data: metaConn } = await supabase
       .from('platform_connections')
       .select('access_token_encrypted')
@@ -73,7 +303,6 @@ export async function syncCompetitorAds(c: Context) {
     let accessToken = '';
     let tokenSource = '';
 
-    // Priority 1: Client's own Meta OAuth token (already approved with ads_read)
     if (metaConn?.access_token_encrypted) {
       const { data: decrypted } = await supabase
         .rpc('decrypt_platform_token', { encrypted_token: metaConn.access_token_encrypted });
@@ -83,7 +312,6 @@ export async function syncCompetitorAds(c: Context) {
       }
     }
 
-    // Priority 2: App access token (requires Marketing API approval on Meta App)
     if (!accessToken) {
       const metaAppId = process.env.META_APP_ID;
       const metaAppSecret = process.env.META_APP_SECRET;
@@ -111,29 +339,37 @@ export async function syncCompetitorAds(c: Context) {
       }
     }
 
-    if (!accessToken) {
+    // Apify path doesn't need Meta token, but fallback does
+    const hasApifyToken = !!process.env.APIFY_TOKEN;
+    if (!accessToken && !hasApifyToken) {
       return c.json({
         error: 'meta_not_connected',
-        message: 'Debes conectar tu cuenta de Meta Ads primero para poder rastrear competidores.'
+        message: 'Debes conectar tu cuenta de Meta Ads o configurar Apify para rastrear competidores.'
       }, 400);
     }
 
-    console.log(`[sync-competitor-ads] Using ${tokenSource} for Ad Library queries`);
+    console.log(`[sync-competitor-ads] Meta token: ${tokenSource || 'none'}, Apify: ${hasApifyToken ? 'yes' : 'no'}`);
 
     const results: { handle: string; ads_found: number; status: string }[] = [];
 
-    for (const handle of handles) {
+    for (let i = 0; i < handles.length; i++) {
+      const handle = handles[i];
+      const fbUrl = fbUrls[i] || null;
+
       try {
-        // Step 1: Upsert competitor tracking record
+        // Step 1: Upsert competitor tracking record (include fb_page_url if provided)
+        const upsertData: Record<string, any> = {
+          client_id,
+          ig_handle: handle,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        };
+        if (fbUrl) upsertData.fb_page_url = fbUrl;
+
         const { data: tracking, error: trackError } = await supabase
           .from('competitor_tracking')
-          .upsert({
-            client_id,
-            ig_handle: handle,
-            is_active: true,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'client_id,ig_handle' })
-          .select('id, meta_page_id, last_sync_at')
+          .upsert(upsertData, { onConflict: 'client_id,ig_handle' })
+          .select('id, meta_page_id, last_sync_at, fb_page_url')
           .single();
 
         if (trackError) {
@@ -148,7 +384,6 @@ export async function syncCompetitorAds(c: Context) {
           const hoursSince = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
           if (hoursSince < 6) {
             console.log(`[sync-competitor-ads] ${handle} synced ${hoursSince.toFixed(1)}h ago, skipping`);
-            // Count existing ads
             const { count } = await supabase
               .from('competitor_ads')
               .select('id', { count: 'exact', head: true })
@@ -158,24 +393,82 @@ export async function syncCompetitorAds(c: Context) {
           }
         }
 
-        // Step 2: Search Ad Library with multi-strategy approach
+        const effectiveFbUrl = tracking.fb_page_url || fbUrl;
+
+        // ==========================================
+        // PRIMARY PATH: Apify (when fb_page_url exists)
+        // ==========================================
+        if (effectiveFbUrl && hasApifyToken) {
+          console.log(`[sync-competitor-ads] ${handle}: Using Apify with FB URL: ${effectiveFbUrl}`);
+          const apifyResult = await fetchAdsViaApify(effectiveFbUrl, 50);
+
+          if (apifyResult.error) {
+            console.warn(`[sync-competitor-ads] ${handle}: Apify failed: ${apifyResult.error}`);
+            // Don't fail hard — fall through to Meta API fallback if token available
+            if (!accessToken) {
+              results.push({ handle, ads_found: 0, status: apifyResult.error });
+              continue;
+            }
+            console.log(`[sync-competitor-ads] ${handle}: Falling back to Meta API`);
+          } else if (apifyResult.ads.length > 0) {
+            // Success — map and save Apify ads
+            const adsToUpsert = apifyResult.ads.map(ad => mapApifyAdToRow(ad, tracking.id, client_id));
+
+            // Clear old ads
+            await supabase.from('competitor_ads').delete().eq('tracking_id', tracking.id);
+
+            if (adsToUpsert.length > 0) {
+              const { error: upsertError } = await supabase
+                .from('competitor_ads')
+                .upsert(adsToUpsert, { onConflict: 'tracking_id,ad_library_id', ignoreDuplicates: false });
+
+              if (upsertError) {
+                console.error(`Upsert error for ${handle}:`, upsertError);
+                results.push({ handle, ads_found: 0, status: 'upsert_error: ' + upsertError.message });
+              } else {
+                results.push({ handle, ads_found: adsToUpsert.length, status: 'synced_apify' });
+              }
+            } else {
+              results.push({ handle, ads_found: 0, status: 'synced_apify' });
+            }
+
+            // Update tracking
+            const pageName = apifyResult.ads[0]?.pageName || apifyResult.ads[0]?.page_name || apifyResult.ads[0]?.snapshot?.page_name;
+            const pageId = apifyResult.ads[0]?.pageId || apifyResult.ads[0]?.page_id;
+            await supabase.from('competitor_tracking').update({
+              last_sync_at: new Date().toISOString(),
+              ...(pageId ? { meta_page_id: pageId } : {}),
+              ...(pageName ? { display_name: pageName } : {}),
+            }).eq('id', tracking.id);
+
+            continue;
+          }
+          // If Apify returned 0 ads, fall through to Meta API
+        }
+
+        // ==========================================
+        // FALLBACK PATH: Meta Ad Library API (ig_handle only, or Apify failed)
+        // ==========================================
+        if (!accessToken) {
+          results.push({ handle, ads_found: 0, status: 'no_meta_token' });
+          continue;
+        }
+
+        console.log(`[sync-competitor-ads] ${handle}: Using Meta API fallback (${tokenSource})`);
+
         const AD_LIBRARY_FIELDS = 'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages';
         const AD_LIBRARY_COUNTRIES = '["CL","MX","CO","AR","PE","US"]';
 
-        // Helper: fetch Ad Library with given params
         async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
           const url = new URL('https://graph.facebook.com/v21.0/ads_archive');
-
           url.searchParams.set('access_token', accessToken);
           url.searchParams.set('ad_type', 'ALL');
           url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);
           url.searchParams.set('ad_active_status', 'ALL');
           url.searchParams.set('fields', AD_LIBRARY_FIELDS);
-          // Use higher limit when querying by page_id (more relevant results)
           url.searchParams.set('limit', params.search_page_ids ? '50' : '25');
           for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
-          console.log(`[sync-competitor-ads] Ad Library query:`, url.toString().replace(accessToken, '***'));
           const res = await fetch(url.toString());
           const text = await res.text();
           let json: any;
@@ -192,18 +485,15 @@ export async function syncCompetitorAds(c: Context) {
           return { ads: json.data || [] };
         }
 
-        // Helper: try to resolve IG handle -> Facebook page ID via Pages Search API
         async function resolvePageId(searchQuery: string): Promise<{ pageId: string; pageName: string } | null> {
           try {
             const url = new URL('https://graph.facebook.com/v21.0/pages/search');
             url.searchParams.set('access_token', accessToken);
             url.searchParams.set('q', searchQuery);
             url.searchParams.set('fields', 'id,name,verification_status');
-
             const res = await fetch(url.toString());
             const json: any = await res.json();
             if (json.data && json.data.length > 0) {
-              console.log(`[sync-competitor-ads] Page search for "${searchQuery}" found: ${json.data[0].name} (${json.data[0].id})`);
               return { pageId: json.data[0].id, pageName: json.data[0].name };
             }
           } catch (e) {
@@ -216,23 +506,17 @@ export async function syncCompetitorAds(c: Context) {
         let searchMethod = '';
         let resolvedPageId = tracking.meta_page_id || null;
         let resolvedPageName = '';
-
-        // Track whether a fatal token/permission error occurred (skip remaining strategies)
         let fatalTokenError = false;
 
-        // Strategy 1: Use cached page_id if available
+        // Strategy 1: Use cached page_id
         if (resolvedPageId) {
-          console.log(`[sync-competitor-ads] ${handle}: Using cached page_id ${resolvedPageId}`);
           const result = await fetchAdLibrary({ search_page_ids: resolvedPageId });
           if (result.error) {
-            // Token/permission errors are fatal — no point trying other strategies
             if (result.error.startsWith('token_expired') || result.error.startsWith('permission_denied')) {
               results.push({ handle, ads_found: 0, status: result.error });
               fatalTokenError = true;
             } else {
-              // Non-fatal (e.g. page_id invalid) — try other strategies
-              console.warn(`[sync-competitor-ads] ${handle}: Strategy 1 failed (non-fatal): ${result.error}`);
-              resolvedPageId = null; // Clear bad cached page_id
+              resolvedPageId = null;
             }
           } else {
             ads = result.ads;
@@ -240,31 +524,25 @@ export async function syncCompetitorAds(c: Context) {
           }
         }
 
-        // Strategy 2: Try to resolve handle -> page_id via Pages Search API
+        // Strategy 2: Resolve handle -> page_id
         if (!fatalTokenError && ads.length === 0 && !resolvedPageId) {
-          // Generate search variations from handle
-          const variations = [
+          const variations = [...new Set([
             handle,
             handle.replace(/_/g, ' '),
             handle.replace(/([a-z])([A-Z])/g, '$1 $2'),
             handle.replace(/(\d+)/g, ' $1 ').trim(),
-          ];
-          // Deduplicate
-          const uniqueVariations = [...new Set(variations)];
+          ])];
 
-          for (const variation of uniqueVariations) {
+          for (const variation of variations) {
             const page = await resolvePageId(variation);
             if (page) {
               resolvedPageId = page.pageId;
               resolvedPageName = page.pageName;
-              console.log(`[sync-competitor-ads] ${handle}: Resolved to page "${page.pageName}" (${page.pageId}) via "${variation}"`);
               const result = await fetchAdLibrary({ search_page_ids: page.pageId });
               if (result.error) {
                 if (result.error.startsWith('token_expired') || result.error.startsWith('permission_denied')) {
                   results.push({ handle, ads_found: 0, status: result.error });
                   fatalTokenError = true;
-                } else {
-                  console.warn(`[sync-competitor-ads] ${handle}: Strategy 2 failed for "${variation}" (non-fatal): ${result.error}`);
                 }
                 break;
               }
@@ -275,18 +553,13 @@ export async function syncCompetitorAds(c: Context) {
           }
         }
 
-        // Strategy 3 removed — search_terms returns ads that MENTION the competitor,
-        // not ads BY the competitor. This produced irrelevant/noisy results.
         if (!fatalTokenError && ads.length === 0) {
-          console.log(`[sync-competitor-ads] ${handle}: No ads found via page_id or search. Handle may not have active ads.`);
+          console.log(`[sync-competitor-ads] ${handle}: No ads found via Meta API`);
         }
 
-        // Skip if already pushed an error result
         if (results.find(r => r.handle === handle)) continue;
 
-        console.log(`[sync-competitor-ads] ${handle}: Found ${ads.length} ads via ${searchMethod || 'none'}`);
-
-        // Update tracking record with page info and sync timestamp
+        // Update tracking
         const updateData: Record<string, any> = { last_sync_at: new Date().toISOString() };
         if (ads.length > 0 && ads[0].page_id) {
           updateData.meta_page_id = ads[0].page_id;
@@ -295,20 +568,11 @@ export async function syncCompetitorAds(c: Context) {
           updateData.meta_page_id = resolvedPageId;
           if (resolvedPageName) updateData.display_name = resolvedPageName;
         }
-        await supabase
-          .from('competitor_tracking')
-          .update(updateData)
-          .eq('id', tracking.id);
+        await supabase.from('competitor_tracking').update(updateData).eq('id', tracking.id);
 
-        // Step 3: Clear old ads and insert fresh ones (removes stale "mentioned" ads from previous bad syncs)
+        // Clear old ads and insert fresh ones
         if (ads.length > 0) {
-          const { error: deleteError } = await supabase
-            .from('competitor_ads')
-            .delete()
-            .eq('tracking_id', tracking.id);
-          if (deleteError) {
-            console.error(`[sync-competitor-ads] Delete old ads for ${handle}:`, deleteError);
-          }
+          await supabase.from('competitor_ads').delete().eq('tracking_id', tracking.id);
         }
 
         const adsToUpsert = ads.map((ad) => {
@@ -319,20 +583,14 @@ export async function syncCompetitorAds(c: Context) {
             ? Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
             : null;
 
-          // Determine ad type from content
           let adType = 'image';
           if (ad.collation_count && ad.collation_count > 1) adType = 'carousel';
 
-          // Extract CTA from link titles
           const ctaMap: Record<string, string> = {
-            'comprar': 'SHOP_NOW',
-            'shop': 'SHOP_NOW',
-            'learn more': 'LEARN_MORE',
-            'más información': 'LEARN_MORE',
-            'sign up': 'SIGN_UP',
-            'registrarse': 'SIGN_UP',
-            'descargar': 'DOWNLOAD',
-            'download': 'DOWNLOAD',
+            'comprar': 'SHOP_NOW', 'shop': 'SHOP_NOW',
+            'learn more': 'LEARN_MORE', 'más información': 'LEARN_MORE',
+            'sign up': 'SIGN_UP', 'registrarse': 'SIGN_UP',
+            'descargar': 'DOWNLOAD', 'download': 'DOWNLOAD',
           };
           let ctaType = 'OTHER';
           const linkTitle = (ad.ad_creative_link_titles?.[0] || '').toLowerCase();
@@ -362,13 +620,12 @@ export async function syncCompetitorAds(c: Context) {
             .upsert(adsToUpsert, { onConflict: 'tracking_id,ad_library_id', ignoreDuplicates: false });
 
           if (upsertError) {
-            console.error(`Upsert error for ${handle}:`, upsertError);
             results.push({ handle, ads_found: 0, status: 'upsert_error: ' + upsertError.message });
             continue;
           }
         }
 
-        results.push({ handle, ads_found: adsToUpsert.length, status: 'synced' });
+        results.push({ handle, ads_found: adsToUpsert.length, status: 'synced_meta' });
       } catch (err: any) {
         console.error(`Error processing ${handle}:`, err);
         results.push({ handle, ads_found: 0, status: 'error: ' + err.message });
@@ -376,7 +633,6 @@ export async function syncCompetitorAds(c: Context) {
     }
 
     console.log('[sync-competitor-ads] Complete:', results);
-
     return c.json({ success: true, results });
 
   } catch (error) {

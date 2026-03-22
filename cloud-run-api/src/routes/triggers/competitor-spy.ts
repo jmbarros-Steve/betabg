@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 /**
  * Competitor Spy — Fase 5 A.5
- * Scrapes Facebook Ads Library via Apify for Chilean ecommerce ads.
+ * Scrapes Facebook Ads Library via Apify (apify~facebook-ads-scraper) for Chilean ecommerce ads.
  * Filters long-running ads (>14 days), analyzes patterns with Claude Haiku,
  * and saves insights to steve_knowledge.
  *
@@ -12,13 +12,31 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
  */
 
 interface ApifyAd {
-  ad_archive_id: string;
-  page_id: string;
-  start_date: number; // unix timestamp
-  end_date: number;   // unix timestamp or 0
-  snapshot: {
-    page_name: string;
-    page_id: string;
+  ad_archive_id?: string;
+  adArchiveID?: string;
+  pageId?: string;
+  page_id?: string;
+  pageName?: string;
+  page_name?: string;
+  adText?: string;
+  ad_text?: string;
+  adTitle?: string;
+  adImages?: string[];
+  impressionsWithIndex?: { impressions_lower_bound?: number; impressions_upper_bound?: number };
+  impressions?: { lower_bound?: number; upper_bound?: number };
+  spend?: { lower_bound?: number; upper_bound?: number };
+  reachEstimate?: { lower_bound?: number; upper_bound?: number };
+  platforms?: string[];
+  publisher_platforms?: string[];
+  startDate?: string;
+  endDate?: string;
+  ad_delivery_start_time?: string;
+  ad_delivery_stop_time?: string;
+  isActive?: boolean;
+  ctaText?: string;
+  snapshot?: {
+    page_name?: string;
+    page_id?: string;
     body?: { markup?: { __html: string } };
     cta_text?: string;
     caption?: string;
@@ -37,29 +55,32 @@ interface AdInsight {
   daysActive: number;
   adText: string;
   linkUrl: string | null;
+  impressions?: string;
+  spend?: string;
 }
 
 async function runApifyActor(token: string): Promise<ApifyAd[]> {
-  // Use curious_coder/facebook-ads-library-scraper — reliable scraper with rich output
-  // Search multiple ecommerce-related queries in Chile
+  // Use apify~facebook-ads-scraper — official actor with rich metrics
   const queries = [
     'tienda online chile',
     'ofertas ropa chile',
     'ecommerce envio gratis',
   ];
-  const startUrls = queries.map(q => ({
-    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(q)}`,
-  }));
+  const urls = queries.map(q =>
+    `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(q)}`
+  );
 
   const resp = await fetch(
-    `https://api.apify.com/v2/acts/curious_coder~facebook-ads-library-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
+    `https://api.apify.com/v2/acts/apify~facebook-ads-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&format=json`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        urls: startUrls,
+        urls,
         maxAds: 50,
+        countryCode: 'CL',
       }),
+      signal: AbortSignal.timeout(180_000), // 3 min timeout for cron
     },
   );
 
@@ -68,13 +89,18 @@ async function runApifyActor(token: string): Promise<ApifyAd[]> {
     throw new Error(`Apify returned ${resp.status}: ${text.substring(0, 300)}`);
   }
 
-  const items = (await resp.json()) as any;
-  // Filter out error items
-  return (items || []).filter((item: any) => item.ad_archive_id && item.snapshot) as ApifyAd[];
+  const items = (await resp.json()) as any[];
+  // Filter valid items — support both old and new field names
+  return (items || []).filter(
+    (item: any) => (item.ad_archive_id || item.adArchiveID) && (item.snapshot || item.adText || item.ad_text),
+  ) as ApifyAd[];
 }
 
 function extractAdText(ad: ApifyAd): string {
-  // Try body markup first
+  // Try direct fields first (new actor format)
+  if (ad.adText) return ad.adText;
+  if (ad.ad_text) return ad.ad_text;
+  // Try body markup (old actor format)
   const bodyHtml = ad.snapshot?.body?.markup?.__html;
   if (bodyHtml) {
     return bodyHtml.replace(/<[^>]*>/g, '').trim();
@@ -90,40 +116,65 @@ function extractLinkUrl(ad: ApifyAd): string | null {
   return firstCard?.link_url || ad.snapshot?.caption || null;
 }
 
+function getStartMs(ad: ApifyAd): number {
+  // New format: ISO string
+  if (ad.startDate) return new Date(ad.startDate).getTime();
+  if (ad.ad_delivery_start_time) return new Date(ad.ad_delivery_start_time).getTime();
+  // Old format: unix timestamp (seconds) — check if it looks like seconds vs ms
+  return 0;
+}
+
+function getEndMs(ad: ApifyAd): number {
+  if (ad.endDate) return new Date(ad.endDate).getTime();
+  if (ad.ad_delivery_stop_time) return new Date(ad.ad_delivery_stop_time).getTime();
+  return 0;
+}
+
 function filterLongRunningAds(ads: ApifyAd[], minDays: number): AdInsight[] {
   const now = Date.now();
   const results: AdInsight[] = [];
-  const seen = new Set<string>(); // deduplicate by ad_archive_id
+  const seen = new Set<string>();
 
   for (const ad of ads) {
-    if (seen.has(ad.ad_archive_id)) continue;
-    seen.add(ad.ad_archive_id);
+    const archiveId = ad.ad_archive_id || ad.adArchiveID || '';
+    if (!archiveId || seen.has(archiveId)) continue;
+    seen.add(archiveId);
 
     const adText = extractAdText(ad);
     if (!adText) continue;
 
-    // start_date is unix timestamp (seconds)
-    const startMs = ad.start_date * 1000;
+    const startMs = getStartMs(ad);
     if (!startMs || isNaN(startMs)) continue;
 
-    // If ad has end_date > 0 and it's in the past, skip
-    if (ad.end_date && ad.end_date > 0) {
-      const endMs = ad.end_date * 1000;
-      if (endMs < now) continue;
-    }
+    // If ad has end date and it's in the past, skip
+    const endMs = getEndMs(ad);
+    if (endMs > 0 && endMs < now) continue;
+    // Also skip if explicitly marked inactive
+    if (ad.isActive === false) continue;
 
     const daysActive = Math.floor((now - startMs) / (1000 * 60 * 60 * 24));
     if (daysActive < minDays) continue;
 
+    // Format metrics for analysis
+    const impData = ad.impressionsWithIndex || ad.impressions;
+    const impLower = (impData as any)?.impressions_lower_bound ?? (impData as any)?.lower_bound;
+    const impUpper = (impData as any)?.impressions_upper_bound ?? (impData as any)?.upper_bound;
+    const impressions = impLower && impUpper ? `${impLower.toLocaleString()}-${impUpper.toLocaleString()}` : undefined;
+
+    const spendLower = ad.spend?.lower_bound;
+    const spendUpper = ad.spend?.upper_bound;
+    const spend = spendLower && spendUpper ? `$${spendLower}-$${spendUpper}` : undefined;
+
     results.push({
-      pageName: ad.snapshot?.page_name || 'Unknown',
+      pageName: ad.pageName || ad.page_name || ad.snapshot?.page_name || 'Unknown',
       daysActive,
       adText: adText.substring(0, 500),
       linkUrl: extractLinkUrl(ad),
+      impressions,
+      spend,
     });
   }
 
-  // Sort by days active descending (most proven first)
   return results.sort((a, b) => b.daysActive - a.daysActive);
 }
 
@@ -135,7 +186,7 @@ async function analyzeWithHaiku(ads: AdInsight[]): Promise<string> {
     .slice(0, 20)
     .map(
       (a, i) =>
-        `${i + 1}. "${a.pageName}" — ${a.daysActive} días activo\nTexto: ${a.adText}\nURL: ${a.linkUrl || 'N/A'}`,
+        `${i + 1}. "${a.pageName}" — ${a.daysActive} días activo${a.impressions ? ` | Impresiones: ${a.impressions}` : ''}${a.spend ? ` | Gasto: ${a.spend}` : ''}\nTexto: ${a.adText}\nURL: ${a.linkUrl || 'N/A'}`,
     )
     .join('\n\n');
 
@@ -195,9 +246,9 @@ export async function competitorSpy(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
-  // Check if already ran this week (avoid duplicate runs)
+  // Check if already ran this week
   const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
   weekStart.setHours(0, 0, 0, 0);
 
   const { data: lastRun } = await supabase
@@ -217,7 +268,7 @@ export async function competitorSpy(c: Context) {
 
   try {
     // Step 1: Fetch ads from Apify
-    console.log('[competitor-spy] Running Apify facebook-ads-library-scraper actor...');
+    console.log('[competitor-spy] Running Apify facebook-ads-scraper actor...');
     const rawAds = await runApifyActor(apifyToken);
     console.log(`[competitor-spy] Got ${rawAds.length} raw ads`);
 

@@ -13,6 +13,7 @@ import {
   Megaphone, ShoppingCart, ArrowRight, ExternalLink,
   Plus, X, RefreshCw, TrendingUp, AlertCircle, Link2,
   Sparkles, Lightbulb, BarChart3, Target, Zap, Copy,
+  Facebook, DollarSign, Users, Image,
 } from 'lucide-react';
 import MetaScopeAlert from './meta-ads/MetaScopeAlert';
 
@@ -23,6 +24,7 @@ interface CompetitorAdsPanelProps {
 interface CompetitorTracking {
   id: string;
   ig_handle: string;
+  fb_page_url: string | null;
   display_name: string | null;
   meta_page_id: string | null;
   last_sync_at: string | null;
@@ -42,14 +44,30 @@ interface CompetitorAd {
   started_at: string | null;
   is_active: boolean;
   days_running: number | null;
+  impressions_lower: number | null;
+  impressions_upper: number | null;
+  spend_lower: number | null;
+  spend_upper: number | null;
+  reach_lower: number | null;
+  reach_upper: number | null;
+  platforms: string[] | null;
+  image_urls: string[] | null;
 }
 
 const CTA_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   SHOP_NOW: { label: 'Comprar', icon: <ShoppingCart className="h-3 w-3" /> },
-  LEARN_MORE: { label: 'Más Info', icon: <ArrowRight className="h-3 w-3" /> },
+  LEARN_MORE: { label: 'Mas Info', icon: <ArrowRight className="h-3 w-3" /> },
   SIGN_UP: { label: 'Registrarse', icon: <Plus className="h-3 w-3" /> },
   DOWNLOAD: { label: 'Descargar', icon: <ArrowRight className="h-3 w-3" /> },
   OTHER: { label: 'CTA', icon: <Megaphone className="h-3 w-3" /> },
+};
+
+const PLATFORM_ICONS: Record<string, string> = {
+  facebook: 'FB',
+  instagram: 'IG',
+  messenger: 'MSG',
+  whatsapp: 'WA',
+  audience_network: 'AN',
 };
 
 interface SteveAnalysis {
@@ -62,8 +80,21 @@ interface SteveAnalysis {
   ganadores_insight: string[];
 }
 
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toLocaleString();
+}
+
+interface CompetitorInput {
+  fbUrl: string;
+  igHandle: string;
+}
+
 export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
-  const [handles, setHandles] = useState<string[]>(['', '', '', '', '']);
+  const [competitors, setCompetitors] = useState<CompetitorInput[]>(
+    Array(5).fill(null).map(() => ({ fbUrl: '', igHandle: '' }))
+  );
   const [tracking, setTracking] = useState<CompetitorTracking[]>([]);
   const [ads, setAds] = useState<CompetitorAd[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +112,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   async function fetchData() {
     setLoading(true);
     try {
-      // Check if Meta is connected
       const { data: metaConn } = await supabase
         .from('platform_connections')
         .select('id')
@@ -93,7 +123,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       setHasMetaConnection(!!metaConn);
 
-      // Fetch tracking records
       const { data: trackingData } = await supabase
         .from('competitor_tracking')
         .select('*')
@@ -103,22 +132,23 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       if (trackingData && trackingData.length > 0) {
         setTracking(trackingData as CompetitorTracking[]);
-        const existing = trackingData.map(t => t.ig_handle);
+        // Populate inputs from existing tracking records
+        const existing = trackingData.map(t => ({
+          fbUrl: (t as any).fb_page_url || '',
+          igHandle: t.ig_handle || '',
+        }));
         const padCount = Math.max(0, 5 - existing.length);
-        const filled = [...existing, ...Array(padCount).fill('')].slice(0, 5);
-        setHandles(filled);
+        const filled = [...existing, ...Array(padCount).fill(null).map(() => ({ fbUrl: '', igHandle: '' }))].slice(0, 5);
+        setCompetitors(filled);
 
         const trackingIds = trackingData.map(t => t.id).filter(Boolean);
         if (trackingIds.length > 0) {
-          const { data: adsData, error: adsError } = await supabase
+          const { data: adsData } = await supabase
             .from('competitor_ads')
             .select('*')
             .in('tracking_id', trackingIds)
             .order('days_running', { ascending: false, nullsFirst: false });
 
-          if (adsError) {
-            // Error handled by toast
-          }
           if (Array.isArray(adsData)) {
             setAds(adsData as CompetitorAd[]);
           } else {
@@ -135,9 +165,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   }
 
   async function handleSync() {
-    const validHandles = handles.filter(h => h.trim().length > 0);
-    if (validHandles.length === 0) {
-      toast.error('Ingresa al menos un handle de Instagram');
+    // Need at least one competitor with FB URL or IG handle
+    const validCompetitors = competitors.filter(c => c.fbUrl.trim() || c.igHandle.trim());
+    if (validCompetitors.length === 0) {
+      toast.error('Ingresa al menos una URL de Facebook o handle de Instagram');
       return;
     }
 
@@ -145,17 +176,33 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session?.access_token) {
-        toast.error('Sesión expirada');
+        toast.error('Sesion expirada');
         return;
       }
 
+      // Build parallel arrays: ig_handles (required key) and fb_urls
+      const igHandles = competitors
+        .filter(c => c.fbUrl.trim() || c.igHandle.trim())
+        .map(c => {
+          // If only FB URL, use slug as handle
+          if (!c.igHandle.trim() && c.fbUrl.trim()) {
+            const slug = c.fbUrl.trim().replace(/^https?:\/\/(www\.)?facebook\.com\/?/, '').replace(/\/+$/, '').split('/')[0];
+            return slug || 'unknown';
+          }
+          return c.igHandle.trim().replace(/^@/, '').toLowerCase();
+        });
+
+      const fbUrls = competitors
+        .filter(c => c.fbUrl.trim() || c.igHandle.trim())
+        .map(c => c.fbUrl.trim() || null);
+
       const response = await callApi('sync-competitor-ads', {
-        body: { client_id: clientId, ig_handles: validHandles },
+        body: { client_id: clientId, ig_handles: igHandles, fb_urls: fbUrls },
       });
 
       if (response.error) {
         if (response.error === 'meta_not_connected') {
-          toast.error('Conecta Meta Ads primero en la pestaña Conexiones');
+          toast.error('Conecta Meta Ads o configura Apify para rastrear competidores');
           setHasMetaConnection(false);
           return;
         }
@@ -171,6 +218,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         r.status?.startsWith?.('error') || r.status?.startsWith?.('api_error') || r.status?.startsWith?.('upsert_error')
       );
       const allErrors = [...permissionErrors, ...tokenErrors, ...otherErrors];
+      const apifySynced = results.filter((r: any) => r.status === 'synced_apify');
 
       if (permissionErrors.length > 0) {
         setAdLibraryPermissionError(true);
@@ -183,7 +231,8 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         toast.warning(`${totalAds} anuncios encontrados, ${allErrors.length} handles con errores`);
       } else {
         setAdLibraryPermissionError(false);
-        toast.success(`${totalAds} anuncios sincronizados de ${results.length} competidores`);
+        const source = apifySynced.length > 0 ? ' (via Apify)' : '';
+        toast.success(`${totalAds} anuncios sincronizados de ${results.length} competidores${source}`);
       }
 
       await fetchData();
@@ -194,16 +243,14 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     }
   }
 
-  // AI Analysis of competitor patterns
+  // AI Analysis
   async function handleAnalyze() {
     if (ads.length === 0) return;
     setAnalyzing(true);
     try {
-      // Build analysis locally from ad data
       const winners = ads.filter(a => (a.days_running || 0) >= 30);
       const activeAds = ads.filter(a => a.is_active);
 
-      // Count CTAs
       const ctaCounts: Record<string, number> = {};
       for (const ad of ads) {
         const cta = ad.cta_type || 'OTHER';
@@ -214,7 +261,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         .slice(0, 3)
         .map(([key, count]) => `${CTA_LABELS[key]?.label || key} (${count} ads)`);
 
-      // Count ad types
       const typeCounts: Record<string, number> = {};
       for (const ad of ads) {
         const t = ad.ad_type || 'unknown';
@@ -224,7 +270,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         .sort((a, b) => b[1] - a[1])
         .map(([key, count]) => `${key} (${count})`);
 
-      // Analyze text patterns from winners
       const winnerTexts = winners.filter(w => w.ad_text).map(w => w.ad_text!);
       const hasQuestions = winnerTexts.filter(t => t.includes('?')).length;
       const hasEmojis = winnerTexts.filter(t => /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(t)).length;
@@ -232,17 +277,30 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
       const patrones: string[] = [];
       if (hasQuestions > winnerTexts.length * 0.3) patrones.push('Usan preguntas en el copy para generar curiosidad');
-      if (hasEmojis > winnerTexts.length * 0.4) patrones.push('Uso frecuente de emojis para llamar la atención');
-      if (hasNumbers > winnerTexts.length * 0.2) patrones.push('Incluyen números y estadísticas en sus ads ganadores');
-      if (winners.length > 3) patrones.push(`${winners.length} ads llevan más de 30 días - están escalando agresivamente`);
-      if (patrones.length === 0) patrones.push('Patrón mixto - necesitan más data para identificar tendencias claras');
+      if (hasEmojis > winnerTexts.length * 0.4) patrones.push('Uso frecuente de emojis para llamar la atencion');
+      if (hasNumbers > winnerTexts.length * 0.2) patrones.push('Incluyen numeros y estadisticas en sus ads ganadores');
+      if (winners.length > 3) patrones.push(`${winners.length} ads llevan mas de 30 dias - estan escalando agresivamente`);
+      if (patrones.length === 0) patrones.push('Patron mixto - necesitan mas data para identificar tendencias claras');
 
-      // Analyze copy angles from winner ads
+      // Use real spend data if available
+      const adsWithSpend = ads.filter(a => a.spend_lower && a.spend_upper);
+      let estimacion: string;
+      if (adsWithSpend.length > 0) {
+        const totalSpendLower = adsWithSpend.reduce((s, a) => s + (a.spend_lower || 0), 0);
+        const totalSpendUpper = adsWithSpend.reduce((s, a) => s + (a.spend_upper || 0), 0);
+        estimacion = `Gasto real reportado: $${formatNumber(totalSpendLower)}-$${formatNumber(totalSpendUpper)} USD total (${adsWithSpend.length} ads con datos)`;
+      } else {
+        const avgDays = ads.reduce((s, a) => s + (a.days_running || 0), 0) / Math.max(ads.length, 1);
+        const estMinDaily = activeAds.length * 15;
+        const estMaxDaily = activeAds.length * 50;
+        estimacion = `Estimacion: $${estMinDaily}-$${estMaxDaily} USD/dia (${activeAds.length} ads activos, promedio ${Math.round(avgDays)} dias)`;
+      }
+
       const angulos: string[] = [];
       for (const w of winnerTexts) {
         const lower = w.toLowerCase();
         if (lower.includes('descuento') || lower.includes('%') || lower.includes('off')) angulos.push('Descuentos/Ofertas');
-        else if (lower.includes('antes') || lower.includes('resultado')) angulos.push('Antes y Después');
+        else if (lower.includes('antes') || lower.includes('resultado')) angulos.push('Antes y Despues');
         else if (lower.includes('mejor') || lower.includes('unico') || lower.includes('solo')) angulos.push('Bold Statement');
         else if (lower.includes('?') || lower.includes('cansad') || lower.includes('busc')) angulos.push('Call Out');
         else if (lower.includes('testimonio') || lower.includes('opinion') || lower.includes('review')) angulos.push('Reviews');
@@ -250,36 +308,22 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       }
       const uniqueAngulos = [...new Set(angulos)].slice(0, 4);
 
-      // Estimate spend per competitor
-      const avgDays = ads.reduce((s, a) => s + (a.days_running || 0), 0) / Math.max(ads.length, 1);
-      const estMinDaily = activeAds.length * 15; // conservative: $15/day per ad
-      const estMaxDaily = activeAds.length * 50; // aggressive: $50/day per ad
-      const estimacion = `Estimación: $${estMinDaily}-$${estMaxDaily} USD/día (${activeAds.length} ads activos, promedio ${Math.round(avgDays)} días)`;
-
-      // Winner insights
       const ganadorInsights: string[] = [];
       for (const w of winners.slice(0, 3)) {
         const handle = tracking.find(t => t.id === w.tracking_id)?.ig_handle || '?';
+        const spendInfo = w.spend_lower && w.spend_upper ? ` | Gasto: $${w.spend_lower}-$${w.spend_upper}` : '';
+        const impInfo = w.impressions_lower && w.impressions_upper ? ` | ${formatNumber(w.impressions_lower)}-${formatNumber(w.impressions_upper)} imp.` : '';
         ganadorInsights.push(
-          `@${handle}: "${(w.ad_headline || w.ad_text || '').slice(0, 60)}..." — ${w.days_running}d activo. ${w.cta_type ? `CTA: ${CTA_LABELS[w.cta_type]?.label || w.cta_type}` : ''}`
+          `@${handle}: "${(w.ad_headline || w.ad_text || '').slice(0, 60)}..." — ${w.days_running}d activo${spendInfo}${impInfo}. ${w.cta_type ? `CTA: ${CTA_LABELS[w.cta_type]?.label || w.cta_type}` : ''}`
         );
       }
 
-      // Recommendations
       const recomendaciones: string[] = [];
-      if (winners.length > 0) {
-        recomendaciones.push(`Hay ${winners.length} ads ganadores (30d+). Analiza sus copies y crea versiones mejoradas.`);
-      }
-      if (topCtas[0]) {
-        recomendaciones.push(`CTA más popular: ${topCtas[0]}. Considera usar el mismo para competir.`);
-      }
-      if (uniqueAngulos[0]) {
-        recomendaciones.push(`Ángulo dominante: ${uniqueAngulos[0]}. Prueba un ángulo diferente para diferenciarte.`);
-      }
-      if (activeAds.length > 10) {
-        recomendaciones.push(`Competidores tienen ${activeAds.length} ads activos. Necesitas al menos ${Math.ceil(activeAds.length * 0.5)} para competir.`);
-      }
-      recomendaciones.push('Usa la metodología 3:2:2 para testear variaciones inspiradas en los ganadores.');
+      if (winners.length > 0) recomendaciones.push(`Hay ${winners.length} ads ganadores (30d+). Analiza sus copies y crea versiones mejoradas.`);
+      if (topCtas[0]) recomendaciones.push(`CTA mas popular: ${topCtas[0]}. Considera usar el mismo para competir.`);
+      if (uniqueAngulos[0]) recomendaciones.push(`Angulo dominante: ${uniqueAngulos[0]}. Prueba un angulo diferente para diferenciarte.`);
+      if (activeAds.length > 10) recomendaciones.push(`Competidores tienen ${activeAds.length} ads activos. Necesitas al menos ${Math.ceil(activeAds.length * 0.5)} para competir.`);
+      recomendaciones.push('Usa la metodologia 3:2:2 para testear variaciones inspiradas en los ganadores.');
 
       setAnalysis({
         patrones,
@@ -297,11 +341,9 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     }
   }
 
-  // Open Meta Ad Library — use page_id when available for accurate results
   function openAdLibrary(query: string, pageId?: string | null) {
     let url: string;
     if (pageId) {
-      // Direct link to the page's ads — much more accurate than text search
       url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&view_all_page_id=${pageId}`;
     } else {
       url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&q=${encodeURIComponent(query)}`;
@@ -309,7 +351,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
-  // Send winning patterns to copy generator as context
   function handleUseWinningPatterns() {
     if (!analysis) return;
     const context = [
@@ -318,7 +359,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       'PATRONES DETECTADOS:',
       ...analysis.patrones.map(p => `- ${p}`),
       '',
-      'ÁNGULOS FRECUENTES:',
+      'ANGULOS FRECUENTES:',
       ...analysis.angulos_frecuentes.map(a => `- ${a}`),
       '',
       'CTAs POPULARES:',
@@ -327,7 +368,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       'FORMATOS:',
       ...analysis.formatos_usados.map(f => `- ${f}`),
       '',
-      'ESTIMACIÓN DE GASTO:',
+      'ESTIMACION DE GASTO:',
       analysis.estimacion_gasto,
       '',
       'TOP ADS GANADORES:',
@@ -337,11 +378,8 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       ...analysis.recomendaciones.map(r => `- ${r}`),
     ].join('\n');
 
-    // Store in sessionStorage so the copy generator can pick it up
     sessionStorage.setItem('competitor_context', context);
     toast.success('Patrones copiados. Ve a Generar Copies para usarlos como contexto.');
-
-    // Also copy to clipboard as fallback
     navigator.clipboard?.writeText(context).catch(() => {});
   }
 
@@ -355,16 +393,16 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     return tracking.find(t => t.id === trackingId)?.ig_handle || '?';
   };
 
+  const hasAnyCompetitor = competitors.some(c => c.fbUrl.trim() || c.igHandle.trim());
+
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-48 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Scope alert for pages permission */}
       <MetaScopeAlert clientId={clientId} requiredFeature="pages" compact />
 
-      {/* Meta Connection Warning */}
       {hasMetaConnection === false && (
         <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
           <Link2 className="h-4 w-4" />
@@ -375,21 +413,20 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
               Esto le permite a Steve acceder a la <strong>Meta Ad Library</strong> y buscar los anuncios activos.
             </p>
             <p className="text-xs text-muted-foreground">
-              Ve a la pestaña <strong>"Conexiones"</strong> → conecta <strong>Meta Ads</strong> con tu cuenta de Facebook/Instagram.
+              Ve a la pestana <strong>"Conexiones"</strong> &rarr; conecta <strong>Meta Ads</strong> con tu cuenta de Facebook/Instagram.
             </p>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Ad Library Permission Error */}
       {adLibraryPermissionError && (
         <Alert variant="destructive" className="border-orange-500/50 bg-orange-500/5">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Acceso a Meta Ad Library requerido</AlertTitle>
           <AlertDescription className="mt-2 space-y-2">
             <p>
-              La aplicación de Meta no tiene permisos para acceder a la <strong>Ad Library API</strong>.
-              Este es un requisito de Meta que debe configurarse a nivel de aplicación.
+              La aplicacion de Meta no tiene permisos para acceder a la <strong>Ad Library API</strong>.
+              Este es un requisito de Meta que debe configurarse a nivel de aplicacion.
             </p>
             <p className="text-xs text-muted-foreground">
               El administrador debe registrar la app en{' '}
@@ -411,67 +448,82 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Instagram className="h-5 w-5 text-primary" />
+            <Eye className="h-5 w-5 text-primary" />
             Competidores a Rastrear
           </CardTitle>
           <CardDescription>
-            Ingresa hasta 5 handles de Instagram de tus competidores. Steve buscará sus anuncios activos en Meta Ad Library.
+            Ingresa la URL de Facebook de tus competidores (recomendado) o su handle de Instagram. Steve buscara sus anuncios activos con metricas reales.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {handles.map((handle, i) => (
-              <div key={i} className="space-y-1">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
-                  <Input
-                    value={handle}
-                    onChange={(e) => {
-                      const updated = [...handles];
-                      updated[i] = e.target.value.replace(/^@/, '');
-                      setHandles(updated);
-                    }}
-                    placeholder={`competidor_${i + 1}`}
-                    className="pl-7"
-                    disabled={syncing}
-                  />
-                  {handle && (
-                    <button
-                      onClick={() => {
-                        const updated = [...handles];
-                        updated[i] = '';
-                        setHandles(updated);
+          <div className="space-y-4">
+            {competitors.map((comp, i) => (
+              <div key={i} className="grid gap-2 sm:grid-cols-2 items-start">
+                {/* FB URL - Primary */}
+                <div className="space-y-1">
+                  <div className="relative">
+                    <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-600" />
+                    <Input
+                      value={comp.fbUrl}
+                      onChange={(e) => {
+                        const updated = [...competitors];
+                        updated[i] = { ...updated[i], fbUrl: e.target.value };
+                        setCompetitors(updated);
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                      placeholder="facebook.com/SHEINOFFICIAL"
+                      className="pl-9"
+                      disabled={syncing}
+                    />
+                    {(comp.fbUrl || comp.igHandle) && (
+                      <button
+                        onClick={() => {
+                          const updated = [...competitors];
+                          updated[i] = { fbUrl: '', igHandle: '' };
+                          setCompetitors(updated);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  {i === 0 && (
+                    <p className="text-[10px] text-muted-foreground">URL de Facebook (con metricas via Apify)</p>
                   )}
                 </div>
-                {handle.trim() && (
-                  <button
-                    onClick={() => {
-                      const t = tracking.find(tr => tr.ig_handle === handle.trim());
-                      openAdLibrary(handle.trim(), t?.meta_page_id);
-                    }}
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    Buscar en Meta Ad Library
-                  </button>
-                )}
+
+                {/* IG Handle - Secondary */}
+                <div className="space-y-1">
+                  <div className="relative">
+                    <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-pink-500" />
+                    <Input
+                      value={comp.igHandle}
+                      onChange={(e) => {
+                        const updated = [...competitors];
+                        updated[i] = { ...updated[i], igHandle: e.target.value.replace(/^@/, '') };
+                        setCompetitors(updated);
+                      }}
+                      placeholder="@shein_official"
+                      className="pl-9"
+                      disabled={syncing}
+                    />
+                  </div>
+                  {i === 0 && (
+                    <p className="text-[10px] text-muted-foreground">Handle IG (opcional, fallback Meta API)</p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
 
           <div className="flex items-center justify-between pt-2">
             <p className="text-xs text-muted-foreground">
-              {handles.filter(h => h.trim()).length}/5 competidores configurados
+              {competitors.filter(c => c.fbUrl.trim() || c.igHandle.trim()).length}/5 competidores configurados
               {tracking.length > 0 && tracking[0].last_sync_at && (
-                <span> • Última sync: {new Date(tracking[0].last_sync_at).toLocaleDateString('es-CL')}</span>
+                <span> &bull; Ultima sync: {new Date(tracking[0].last_sync_at).toLocaleDateString('es-CL')}</span>
               )}
             </p>
-            <Button onClick={handleSync} disabled={syncing || handles.every(h => !h.trim())}>
+            <Button onClick={handleSync} disabled={syncing || !hasAnyCompetitor}>
               {syncing ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sincronizando...</>
               ) : (
@@ -497,7 +549,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             </Card>
             <Card className="p-4 text-center">
               <p className="text-2xl font-bold text-primary">{ads.filter(a => (a.days_running || 0) >= 30).length}</p>
-              <p className="text-xs text-muted-foreground">🏆 Ganadores (30d+)</p>
+              <p className="text-xs text-muted-foreground">Ganadores (30d+)</p>
             </Card>
             <Card className="p-4 text-center">
               <p className="text-2xl font-bold text-primary">{tracking.length}</p>
@@ -523,7 +575,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  Análisis de Steve — Inteligencia Competitiva
+                  Analisis de Steve — Inteligencia Competitiva
                 </CardTitle>
                 <CardDescription className="text-xs">
                   Patrones detectados en {ads.length} anuncios de {tracking.length} competidores
@@ -531,7 +583,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
-                  {/* Patterns */}
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                       <Target className="h-3.5 w-3.5" /> Patrones Detectados
@@ -539,17 +590,16 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                     <ul className="space-y-1">
                       {analysis.patrones.map((p, i) => (
                         <li key={i} className="text-xs flex items-start gap-1.5">
-                          <span className="text-primary mt-0.5 shrink-0">•</span>
+                          <span className="text-primary mt-0.5 shrink-0">&bull;</span>
                           <span>{p}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  {/* Angles & Formats */}
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                      <BarChart3 className="h-3.5 w-3.5" /> Ángulos y Formatos
+                      <BarChart3 className="h-3.5 w-3.5" /> Angulos y Formatos
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
                       {analysis.angulos_frecuentes.map((a, i) => (
@@ -572,15 +622,13 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                   </div>
                 </div>
 
-                {/* Spend Estimation */}
                 <div className="p-3 rounded-lg bg-background border border-border/50">
                   <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <BarChart3 className="h-3.5 w-3.5" /> Estimación de Gasto
+                    <DollarSign className="h-3.5 w-3.5" /> Estimacion de Gasto
                   </h4>
                   <p className="text-sm font-medium">{analysis.estimacion_gasto}</p>
                 </div>
 
-                {/* Winner Insights */}
                 {analysis.ganadores_insight.length > 0 && (
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-2">
@@ -596,7 +644,6 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                   </div>
                 )}
 
-                {/* Recommendations */}
                 <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
                   <h4 className="text-sm font-medium text-primary flex items-center gap-1.5 mb-2">
                     <Lightbulb className="h-3.5 w-3.5" /> Recomendaciones de Steve
@@ -629,7 +676,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
           <div className="flex gap-2">
             {([
               { key: 'all', label: 'Todos', icon: Megaphone },
-              { key: 'winners', label: '🏆 Ganadores (30d+)', icon: Trophy },
+              { key: 'winners', label: 'Ganadores (30d+)', icon: Trophy },
               { key: 'active', label: 'Activos', icon: TrendingUp },
             ] as const).map(f => (
               <Button
@@ -654,8 +701,33 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredAds.map(ad => (
               <Card key={ad.id} className="overflow-hidden">
-                {/* Ad preview — link to Ad Library (snapshot URLs expire) */}
-                {ad.ad_library_id ? (
+                {/* Ad preview — show real image if available */}
+                {ad.image_urls && ad.image_urls.length > 0 ? (
+                  <div className="h-40 bg-muted/30 relative">
+                    <img
+                      src={ad.image_urls[0]}
+                      alt="Ad creative"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Fallback to Ad Library link on image load error
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center');
+                          parent.innerHTML = `<span class="text-xs text-muted-foreground">Imagen no disponible</span>`;
+                        }
+                      }}
+                    />
+                    {ad.image_urls.length > 1 && (
+                      <Badge className="absolute top-2 right-2 text-[10px] bg-black/60 text-white border-0">
+                        <Image className="h-2.5 w-2.5 mr-0.5" />
+                        +{ad.image_urls.length - 1}
+                      </Badge>
+                    )}
+                  </div>
+                ) : ad.ad_library_id ? (
                   <a
                     href={`https://www.facebook.com/ads/library/?id=${ad.ad_library_id}`}
                     target="_blank"
@@ -673,7 +745,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                   </div>
                 )}
                 <CardContent className="p-4 space-y-2">
-                  {/* Header: handle + days */}
+                  {/* Header: handle + badges */}
                   <div className="flex items-center justify-between">
                     <Badge variant="outline" className="text-xs">
                       <Instagram className="h-3 w-3 mr-1" />
@@ -688,6 +760,35 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                       )}
                     </div>
                   </div>
+
+                  {/* Metrics badges — from Apify data */}
+                  {(ad.impressions_lower || ad.spend_lower || (ad.platforms && ad.platforms.length > 0)) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {ad.impressions_lower != null && ad.impressions_upper != null && (
+                        <Badge variant="outline" className="text-[10px] gap-1 font-normal">
+                          <Eye className="h-2.5 w-2.5" />
+                          {formatNumber(ad.impressions_lower)}-{formatNumber(ad.impressions_upper)}
+                        </Badge>
+                      )}
+                      {ad.spend_lower != null && ad.spend_upper != null && (
+                        <Badge variant="outline" className="text-[10px] gap-1 font-normal text-green-600 border-green-200">
+                          <DollarSign className="h-2.5 w-2.5" />
+                          ${Number(ad.spend_lower).toLocaleString()}-${Number(ad.spend_upper).toLocaleString()}
+                        </Badge>
+                      )}
+                      {ad.reach_lower != null && ad.reach_upper != null && (
+                        <Badge variant="outline" className="text-[10px] gap-1 font-normal text-blue-600 border-blue-200">
+                          <Users className="h-2.5 w-2.5" />
+                          {formatNumber(ad.reach_lower)}-{formatNumber(ad.reach_upper)}
+                        </Badge>
+                      )}
+                      {ad.platforms && ad.platforms.length > 0 && (
+                        <Badge variant="outline" className="text-[10px] gap-1 font-normal">
+                          {ad.platforms.map(p => PLATFORM_ICONS[p] || p).join(', ')}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
 
                   {/* Ad text */}
                   {ad.ad_text && (
@@ -762,11 +863,11 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
       {ads.length === 0 && tracking.length === 0 && (
         <Card className="text-center py-12">
           <CardContent>
-            <Instagram className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Rastreo de Competidores</h3>
             <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
-              Ingresa los handles de Instagram de tus competidores arriba y Steve buscará sus anuncios
-              activos en Meta Ad Library. Los anuncios que llevan más de 30 días son los <strong>ganadores</strong>.
+              Ingresa la URL de Facebook de tus competidores arriba y Steve buscara sus anuncios
+              activos con metricas reales (impresiones, gasto, reach). Los anuncios de mas de 30 dias son los <strong>ganadores</strong>.
             </p>
           </CardContent>
         </Card>
@@ -777,10 +878,9 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         <Card className="text-center py-8">
           <CardContent className="space-y-4">
             <AlertCircle className="h-10 w-10 mx-auto text-muted-foreground" />
-            <h3 className="text-base font-semibold">No se encontraron anuncios via API</h3>
+            <h3 className="text-base font-semibold">No se encontraron anuncios</h3>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Es posible que la API de Meta no haya encontrado resultados para estos handles.
-              Puedes buscar directamente en Meta Ad Library:
+              No se encontraron anuncios para estos competidores. Puedes buscar directamente en Meta Ad Library:
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {tracking.map(t => (
@@ -797,8 +897,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Tip: Si el nombre de la pagina de Facebook es diferente al handle de Instagram,
-              intenta buscar con el nombre de la marca directamente.
+              Tip: Usa la URL de Facebook del competidor para mejores resultados con Apify.
             </p>
           </CardContent>
         </Card>
