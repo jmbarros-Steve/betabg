@@ -378,8 +378,23 @@ export async function syncCompetitorAds(c: Context) {
           continue;
         }
 
-        // Check if synced recently (< 6h)
-        if (tracking.last_sync_at) {
+        const effectiveFbUrl = tracking.fb_page_url || fbUrl;
+
+        // Bypass cache if fb_page_url was just added/changed (force Apify resync)
+        const fbUrlChanged = fbUrl && fbUrl !== tracking.fb_page_url;
+        const hasApifyMetrics = await (async () => {
+          if (!effectiveFbUrl) return true; // no FB URL = no need to check Apify metrics
+          const { count } = await supabase
+            .from('competitor_ads')
+            .select('id', { count: 'exact', head: true })
+            .eq('tracking_id', tracking.id)
+            .not('impressions_lower', 'is', null);
+          return (count || 0) > 0;
+        })();
+        const forceFreshSync = !!fbUrlChanged || (!!effectiveFbUrl && !hasApifyMetrics);
+
+        // Check if synced recently (< 6h) — skip cache if fb_page_url changed
+        if (tracking.last_sync_at && !forceFreshSync) {
           const lastSync = new Date(tracking.last_sync_at);
           const hoursSince = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
           if (hoursSince < 6) {
@@ -393,7 +408,9 @@ export async function syncCompetitorAds(c: Context) {
           }
         }
 
-        const effectiveFbUrl = tracking.fb_page_url || fbUrl;
+        if (forceFreshSync) {
+          console.log(`[sync-competitor-ads] ${handle}: Force fresh sync (fb_page_url=${effectiveFbUrl}, changed=${fbUrlChanged}, hasApifyMetrics=${hasApifyMetrics})`);
+        }
 
         // ==========================================
         // PRIMARY PATH: Apify (when fb_page_url exists)
