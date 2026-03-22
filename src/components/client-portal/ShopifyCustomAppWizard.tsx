@@ -72,7 +72,7 @@ export function ShopifyCustomAppWizard({
           .from('platform_connections')
           .select('id')
           .eq('client_id', clientId)
-          .eq('platform_type', 'shopify')
+          .eq('platform', 'shopify')
           .limit(1);
         if (data && data.length > 0) {
           if (pollRef.current) clearInterval(pollRef.current);

@@ -237,10 +237,15 @@ export async function shopifyInstall(c: Context) {
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('state', state);
 
-    console.log('Redirecting to Shopify OAuth:', authUrl.toString());
+    const targetUrl = authUrl.toString();
+    console.log('Redirecting to Shopify OAuth:', targetUrl);
 
-    // Redirect to Shopify OAuth
-    return c.redirect(authUrl.toString(), 302);
+    // Use JS top-level navigation to break out of Shopify admin iframe if embedded
+    return c.html(`<!DOCTYPE html><html><head><title>Conectando con Shopify...</title></head><body>
+<p>Redirigiendo a Shopify...</p>
+<script>window.top.location.href = ${JSON.stringify(targetUrl)};</script>
+<noscript><a href="${targetUrl}">Haz clic aquí para continuar</a></noscript>
+</body></html>`);
 
   } catch (error: any) {
     console.error('Error in Shopify install:', error);
