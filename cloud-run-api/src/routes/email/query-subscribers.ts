@@ -127,10 +127,29 @@ export async function queryEmailSubscribers(c: Context) {
 }
 
 /**
+ * Resolve relative date values like "relative:30d" or "90_days_ago" to ISO strings.
+ */
+function resolveValue(value: any): any {
+  if (typeof value !== 'string') return value;
+  const relMatch = value.match(/^relative:(\d+)d$/);
+  if (relMatch) {
+    const days = parseInt(relMatch[1], 10);
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  }
+  const legacyMatch = value.match(/^(\d+)_days_ago$/);
+  if (legacyMatch) {
+    const days = parseInt(legacyMatch[1], 10);
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  }
+  return value;
+}
+
+/**
  * Apply a single filter condition to a Supabase query.
  */
 function applyFilter(query: any, filter: { field: string; operator: string; value: any }) {
-  const { field, operator, value } = filter;
+  const { field, operator } = filter;
+  let value = resolveValue(filter.value);
 
   // Validate field names to prevent injection
   const allowedFields = [
@@ -141,13 +160,19 @@ function applyFilter(query: any, filter: { field: string; operator: string; valu
 
   if (!allowedFields.includes(field)) return query;
 
+  // Numeric conversion for integer/numeric columns
+  const numericFields = ['total_orders', 'total_spent'];
+  if (numericFields.includes(field) && value != null && operator !== 'is_null' && operator !== 'not_null') {
+    value = Number(value);
+  }
+
   switch (operator) {
-    case 'eq': return query.eq(field, value);
-    case 'neq': return query.neq(field, value);
-    case 'gt': return query.gt(field, value);
-    case 'gte': return query.gte(field, value);
-    case 'lt': return query.lt(field, value);
-    case 'lte': return query.lte(field, value);
+    case 'eq': case '=': case '==': return query.eq(field, value);
+    case 'neq': case '!=': return query.neq(field, value);
+    case 'gt': case '>': return query.gt(field, value);
+    case 'gte': case '>=': return query.gte(field, value);
+    case 'lt': case '<': return query.lt(field, value);
+    case 'lte': case '<=': return query.lte(field, value);
     case 'like': return query.ilike(field, `%${value}%`);
     case 'in': return query.in(field, Array.isArray(value) ? value : [value]);
     case 'contains': return query.contains(field, Array.isArray(value) ? value : [value]);

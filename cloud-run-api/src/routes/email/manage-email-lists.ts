@@ -193,13 +193,19 @@ function resolveValue(value: any): any {
 
 function applyFilter(query: any, filter: { field: string; operator: string; value: any }) {
   const { field, operator } = filter;
-  const value = resolveValue(filter.value);
+  let value = resolveValue(filter.value);
   const allowedFields = [
     'email', 'first_name', 'last_name', 'status', 'source',
     'total_orders', 'total_spent', 'last_order_at', 'subscribed_at',
     'created_at', 'tags',
   ];
   if (!allowedFields.includes(field)) return query;
+
+  // Numeric conversion for integer/numeric columns
+  const numericFields = ['total_orders', 'total_spent'];
+  if (numericFields.includes(field) && value != null && operator !== 'is_null' && operator !== 'not_null') {
+    value = Number(value);
+  }
 
   switch (operator) {
     case 'eq': case '=': case '==': return query.eq(field, value);

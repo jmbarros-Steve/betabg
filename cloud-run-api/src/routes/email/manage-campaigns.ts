@@ -625,9 +625,14 @@ async function getFilteredSubscribers(
       .eq('status', 'subscribed');
 
     const segFilters = segment.filters || [];
+    const numericFields = ['total_orders', 'total_spent'];
     for (const f of segFilters) {
       const { field, operator } = f;
-      const value = resolveRelativeValue(f.value);
+      let value = resolveRelativeValue(f.value);
+      // Numeric conversion for integer/numeric columns
+      if (numericFields.includes(field) && value != null && operator !== 'is_null' && operator !== 'not_null') {
+        value = Number(value);
+      }
       switch (operator) {
         case 'gte': case '>=': query = query.gte(field, value); break;
         case 'lte': case '<=': query = query.lte(field, value); break;
@@ -635,6 +640,9 @@ async function getFilteredSubscribers(
         case 'lt': case '<': query = query.lt(field, value); break;
         case 'eq': case '=': case '==': query = query.eq(field, value); break;
         case 'neq': case '!=': query = query.neq(field, value); break;
+        case 'like': query = query.ilike(field, `%${value}%`); break;
+        case 'is_null': query = query.is(field, null); break;
+        case 'not_null': query = query.not(field, 'is', null); break;
       }
     }
 
