@@ -8,6 +8,13 @@ import { metaApiFetch } from '../../lib/meta-fetch.js';
  * POST /api/cron/execute-meta-rules
  */
 export async function executeMetaRulesCron(c: Context) {
+  // Validate cron secret
+  const cronSecret = process.env.CRON_SECRET;
+  const providedSecret = c.req.header('X-Cron-Secret');
+  if (!cronSecret || providedSecret !== cronSecret) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
 

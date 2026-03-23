@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 
 /**
  * Detective Visual — Compares Steve data vs real platform data every 2 hours.
@@ -46,63 +47,69 @@ async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>)
 
   const { data: connections } = await supabase
     .from('platform_connections')
-    .select('shop_id, credentials')
+    .select('id, client_id, account_id, access_token_encrypted')
     .eq('platform', 'meta')
-    .eq('status', 'active');
+    .eq('is_active', true);
 
   if (!connections?.length) return results;
 
   for (const conn of connections.slice(0, 5)) {
-    const shopId = conn.shop_id;
+    const clientId = conn.client_id;
     const { data: steveCampaigns } = await supabase
-      .from('meta_campaigns')
-      .select('id, name, status, daily_budget, lifetime_budget, campaign_id')
-      .eq('shop_id', shopId)
+      .from('campaign_metrics')
+      .select('id, campaign_name, campaign_status, metric_date, spend')
+      .eq('connection_id', conn.id)
+      .order('metric_date', { ascending: false })
       .limit(50);
 
     if (!steveCampaigns?.length) continue;
 
-    const accessToken = (conn.credentials as any)?.access_token;
-    const adAccountId = (conn.credentials as any)?.ad_account_id;
+    const accessToken = await decryptPlatformToken(supabase, conn.access_token_encrypted);
+    const adAccountId = conn.account_id;
     if (!accessToken || !adAccountId) continue;
 
     try {
       const metaRes = await fetch(
-        `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=name,status,daily_budget,lifetime_budget&limit=50&access_token=${accessToken}`
+        `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=name,status,daily_budget,lifetime_budget&limit=50`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (!metaRes.ok) {
-        results.push({ module: 'meta-campaigns', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Meta API error: HTTP ${metaRes.status}`, client_id: shopId });
+        results.push({ module: 'meta-campaigns', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Meta API error: HTTP ${metaRes.status}`, client_id: clientId });
         continue;
       }
 
       const metaData = await metaRes.json() as { data?: any[] };
       const metaCampaigns = metaData.data || [];
-      const metaMap = new Map(metaCampaigns.map((c: any) => [c.id, c]));
+      const metaByName = new Map(metaCampaigns.map((c: any) => [c.name?.toLowerCase(), c]));
 
+      // Deduplicate Steve campaigns by name (campaign_metrics has daily rows)
+      const uniqueSteveCampaigns = new Map<string, typeof steveCampaigns[0]>();
       for (const sc of steveCampaigns) {
-        const metaCamp = metaMap.get(sc.campaign_id);
+        if (sc.campaign_name && !uniqueSteveCampaigns.has(sc.campaign_name.toLowerCase())) {
+          uniqueSteveCampaigns.set(sc.campaign_name.toLowerCase(), sc);
+        }
+      }
+
+      for (const [, sc] of uniqueSteveCampaigns) {
+        const metaCamp = metaByName.get(sc.campaign_name?.toLowerCase());
         if (!metaCamp) {
-          results.push({ module: 'meta-campaigns', check_type: 'campaign_exists', status: 'MISSING', severity: 'MAJOR', steve_value: { name: sc.name, campaign_id: sc.campaign_id }, real_value: null, mismatched_fields: ['existence'], details: `Campaign "${sc.name}" in Steve but not in Meta`, client_id: shopId, steve_record_id: sc.id, external_id: sc.campaign_id });
+          results.push({ module: 'meta-campaigns', check_type: 'campaign_exists', status: 'MISSING', severity: 'MAJOR', steve_value: { name: sc.campaign_name }, real_value: null, mismatched_fields: ['existence'], details: `Campaign "${sc.campaign_name}" in Steve but not in Meta`, client_id: clientId, steve_record_id: sc.id, external_id: metaCamp?.id });
           continue;
         }
 
         const mismatched: string[] = [];
         const metaStatus = metaCamp.status?.toLowerCase();
-        const steveStatus = sc.status?.toLowerCase();
+        const steveStatus = sc.campaign_status?.toLowerCase();
         if (metaStatus && steveStatus && metaStatus !== steveStatus) mismatched.push('status');
 
-        const steveBudget = sc.daily_budget || sc.lifetime_budget || 0;
-        const metaBudget = Number(metaCamp.daily_budget || metaCamp.lifetime_budget || 0) / 100;
-        if (steveBudget > 0 && metaBudget > 0 && !withinTolerance(steveBudget, metaBudget, TOLERANCES.budget)) mismatched.push('budget');
-
         if (mismatched.length > 0) {
-          results.push({ module: 'meta-campaigns', check_type: 'campaign_data', status: 'MISMATCH', severity: mismatched.includes('budget') ? 'CRITICAL' : 'MAJOR', steve_value: { name: sc.name, status: sc.status, budget: steveBudget }, real_value: { name: metaCamp.name, status: metaStatus, budget: metaBudget }, mismatched_fields: mismatched, details: `Campaign "${sc.name}": ${mismatched.join(', ')} differ`, client_id: shopId, steve_record_id: sc.id, external_id: sc.campaign_id });
+          results.push({ module: 'meta-campaigns', check_type: 'campaign_data', status: 'MISMATCH', severity: 'MAJOR', steve_value: { name: sc.campaign_name, status: sc.campaign_status }, real_value: { name: metaCamp.name, status: metaStatus }, mismatched_fields: mismatched, details: `Campaign "${sc.campaign_name}": ${mismatched.join(', ')} differ`, client_id: clientId, steve_record_id: sc.id, external_id: metaCamp.id });
         } else {
-          results.push({ module: 'meta-campaigns', check_type: 'campaign_data', status: 'PASS', severity: 'MINOR', steve_value: { name: sc.name }, real_value: { name: metaCamp.name }, mismatched_fields: [], details: `Campaign "${sc.name}" matches`, client_id: shopId });
+          results.push({ module: 'meta-campaigns', check_type: 'campaign_data', status: 'PASS', severity: 'MINOR', steve_value: { name: sc.campaign_name }, real_value: { name: metaCamp.name }, mismatched_fields: [], details: `Campaign "${sc.campaign_name}" matches`, client_id: clientId });
         }
       }
     } catch (e) {
-      results.push({ module: 'meta-campaigns', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Meta API fetch error: ${(e as Error).message}`, client_id: shopId });
+      results.push({ module: 'meta-campaigns', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Meta API fetch error: ${(e as Error).message}`, client_id: clientId });
     }
   }
   return results;
@@ -113,23 +120,22 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
 
   const { data: connections } = await supabase
     .from('platform_connections')
-    .select('shop_id, credentials')
+    .select('id, client_id, shop_domain, access_token_encrypted')
     .eq('platform', 'shopify')
-    .eq('status', 'active');
+    .eq('is_active', true);
 
   if (!connections?.length) return results;
 
   for (const conn of connections.slice(0, 5)) {
-    const shopId = conn.shop_id;
-    const creds = conn.credentials as any;
-    const shopDomain = creds?.shop_domain || creds?.shop;
-    const accessToken = creds?.access_token;
+    const clientId = conn.client_id;
+    const shopDomain = conn.shop_domain;
+    const accessToken = await decryptPlatformToken(supabase, conn.access_token_encrypted);
     if (!shopDomain || !accessToken) continue;
 
     const { data: steveProducts } = await supabase
       .from('shopify_products')
       .select('id, title, price, shopify_product_id')
-      .eq('shop_id', shopId)
+      .eq('client_id', clientId)
       .limit(50);
 
     if (!steveProducts?.length) continue;
@@ -140,7 +146,7 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
         { headers: { 'X-Shopify-Access-Token': accessToken } }
       );
       if (!shopifyRes.ok) {
-        results.push({ module: 'shopify-products', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Shopify API error: HTTP ${shopifyRes.status}`, client_id: shopId });
+        results.push({ module: 'shopify-products', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Shopify API error: HTTP ${shopifyRes.status}`, client_id: clientId });
         continue;
       }
 
@@ -151,20 +157,20 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
       for (const sp of steveProducts) {
         const realProd = shopifyMap.get(sp.shopify_product_id);
         if (!realProd) {
-          results.push({ module: 'shopify-products', check_type: 'product_exists', status: 'MISSING', severity: 'MAJOR', steve_value: { title: sp.title, id: sp.shopify_product_id }, real_value: null, mismatched_fields: ['existence'], details: `Product "${sp.title}" in Steve but missing in Shopify`, client_id: shopId, steve_record_id: sp.id, external_id: sp.shopify_product_id });
+          results.push({ module: 'shopify-products', check_type: 'product_exists', status: 'MISSING', severity: 'MAJOR', steve_value: { title: sp.title, id: sp.shopify_product_id }, real_value: null, mismatched_fields: ['existence'], details: `Product "${sp.title}" in Steve but missing in Shopify`, client_id: clientId, steve_record_id: sp.id, external_id: sp.shopify_product_id });
           continue;
         }
         const firstVariant = realProd.variants?.[0];
         const realPrice = firstVariant ? Number(firstVariant.price) : 0;
         const stevePrice = Number(sp.price) || 0;
         if (stevePrice > 0 && realPrice > 0 && !withinTolerance(stevePrice, realPrice, TOLERANCES.price)) {
-          results.push({ module: 'shopify-products', check_type: 'product_data', status: 'MISMATCH', severity: 'CRITICAL', steve_value: { title: sp.title, price: stevePrice }, real_value: { title: realProd.title, price: realPrice }, mismatched_fields: ['price'], details: `Product "${sp.title}": price Steve=$${stevePrice} vs Shopify=$${realPrice}`, client_id: shopId, steve_record_id: sp.id, external_id: sp.shopify_product_id });
+          results.push({ module: 'shopify-products', check_type: 'product_data', status: 'MISMATCH', severity: 'CRITICAL', steve_value: { title: sp.title, price: stevePrice }, real_value: { title: realProd.title, price: realPrice }, mismatched_fields: ['price'], details: `Product "${sp.title}": price Steve=$${stevePrice} vs Shopify=$${realPrice}`, client_id: clientId, steve_record_id: sp.id, external_id: sp.shopify_product_id });
         } else {
-          results.push({ module: 'shopify-products', check_type: 'product_data', status: 'PASS', severity: 'MINOR', steve_value: { title: sp.title }, real_value: { title: realProd.title }, mismatched_fields: [], details: `Product "${sp.title}" matches`, client_id: shopId });
+          results.push({ module: 'shopify-products', check_type: 'product_data', status: 'PASS', severity: 'MINOR', steve_value: { title: sp.title }, real_value: { title: realProd.title }, mismatched_fields: [], details: `Product "${sp.title}" matches`, client_id: clientId });
         }
       }
     } catch (e) {
-      results.push({ module: 'shopify-products', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Shopify API fetch error: ${(e as Error).message}`, client_id: shopId });
+      results.push({ module: 'shopify-products', check_type: 'api_access', status: 'ERROR', severity: 'MAJOR', steve_value: null, real_value: null, mismatched_fields: [], details: `Shopify API fetch error: ${(e as Error).message}`, client_id: clientId });
     }
   }
   return results;

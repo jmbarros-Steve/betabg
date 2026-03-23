@@ -77,7 +77,7 @@ export async function metaApiFetch(
       fetchOptions.body = body;
     } else {
       headers['Content-Type'] = 'application/json';
-      fetchOptions.body = JSON.stringify({ ...body, access_token: token });
+      fetchOptions.body = JSON.stringify(body);
     }
   }
 

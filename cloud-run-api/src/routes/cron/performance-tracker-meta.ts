@@ -105,7 +105,7 @@ export async function performanceTrackerMeta(c: Context) {
         .select('access_token_encrypted')
         .eq('client_id', clientId)
         .eq('platform', 'meta')
-        .eq('status', 'active')
+        .eq('is_active', true)
         .limit(1)
         .maybeSingle();
 
@@ -120,13 +120,14 @@ export async function performanceTrackerMeta(c: Context) {
         continue;
       }
 
-      // Fetch insights from Meta Graph API
+      // Fetch insights from Meta Graph API (token in header, not URL)
       const insightsUrl =
         `https://graph.facebook.com/${META_API_VERSION}/${creative.meta_campaign_id}/insights?` +
-        `fields=impressions,clicks,spend,actions,cost_per_action_type,ctr&` +
-        `access_token=${encodeURIComponent(token)}`;
+        `fields=impressions,clicks,spend,actions,cost_per_action_type,ctr`;
 
-      const response = await fetch(insightsUrl);
+      const response = await fetch(insightsUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) {
         console.error(`[perf-tracker-meta] Meta API ${response.status} for campaign ${creative.meta_campaign_id}`);
         errors++;

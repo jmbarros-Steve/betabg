@@ -37,8 +37,16 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Client not found' }, 404);
     }
 
+    // Allow both client_user_id and admin (user_id) to connect Meta
     if (client.client_user_id !== user.id) {
-      return c.json({ error: 'Access denied' }, 403);
+      // Check if user is admin/owner of the client
+      const { data: fullClient } = await supabase.from('clients').select('user_id').eq('id', client_id).single();
+      const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('id', user.id).maybeSingle();
+      const isOwner = fullClient?.user_id === user.id;
+      const isAdmin = profile?.is_super_admin === true;
+      if (!isOwner && !isAdmin) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
     }
 
     const metaAppId = process.env.META_APP_ID;

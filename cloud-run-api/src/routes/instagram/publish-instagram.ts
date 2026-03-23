@@ -88,6 +88,30 @@ async function createReelsContainer(token: string, igUserId: string, videoUrl: s
   return res.data.id;
 }
 
+/** Poll a media container until it finishes processing (required for video/reels) */
+async function waitForContainerReady(token: string, containerId: string, maxWaitMs = 60000): Promise<void> {
+  const start = Date.now();
+  const pollInterval = 3000; // 3 seconds between polls
+
+  while (Date.now() - start < maxWaitMs) {
+    const res = await metaApiJson<{ status_code: string; status: string }>(`/${containerId}`, token, {
+      params: { fields: 'status_code,status' },
+      skipDelay: true,
+    });
+
+    if (res.ok) {
+      const status = res.data.status_code || res.data.status;
+      if (status === 'FINISHED') return;
+      if (status === 'ERROR') throw new Error(`Container processing failed: ${JSON.stringify(res.data)}`);
+      // IN_PROGRESS — keep polling
+    }
+
+    await new Promise(r => setTimeout(r, pollInterval));
+  }
+
+  throw new Error(`Container ${containerId} not ready after ${maxWaitMs / 1000}s`);
+}
+
 async function createCarouselContainer(token: string, igUserId: string, imageUrls: string[], caption: string): Promise<string> {
   // 1. Create child containers (no caption)
   const childIds: string[] = [];
@@ -180,9 +204,9 @@ export async function publishInstagram(c: Context) {
           creationId = await createImageContainer(meta.token, meta.igUserId, url, fullCaption);
         }
 
-        // For reels, wait a bit for processing
+        // For reels, poll until container is ready
         if (media_type === 'REELS') {
-          await new Promise(r => setTimeout(r, 5000));
+          await waitForContainerReady(meta.token, creationId);
         }
 
         const { mediaId, permalink } = await publishContainer(meta.token, meta.igUserId, creationId);
@@ -470,7 +494,7 @@ export async function cronPublishInstagram(c: Context) {
         creationId = await createCarouselContainer(meta.token, meta.igUserId, post.image_urls, fullCaption);
       } else if (post.media_type === 'REELS' && post.video_url) {
         creationId = await createReelsContainer(meta.token, meta.igUserId, post.video_url, fullCaption);
-        await new Promise(r => setTimeout(r, 5000));
+        await waitForContainerReady(meta.token, creationId);
       } else {
         const url = post.image_url || post.image_urls?.[0];
         if (!url) throw new Error('No image URL');

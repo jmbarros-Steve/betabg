@@ -629,8 +629,8 @@ async function handleCreate(
       const childAttachments = imageHashes.map((hash, i) => ({
         image_hash: hash,
         link: destUrl,
-        name: allHeadlines[0] || '',
-        description: allDescriptions[0] || '',
+        name: allHeadlines[i] || allHeadlines[0] || '',
+        description: allDescriptions[i] || allDescriptions[0] || '',
       }));
 
       const carouselStorySpec: Record<string, any> = {

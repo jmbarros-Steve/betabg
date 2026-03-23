@@ -42,15 +42,22 @@ export async function metaAdsetAction(c: Context) {
     if (connError || !connection) return c.json({ error: 'Connection not found' }, 404);
 
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
+    // Check ownership — allow both client owner and admin
+    const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('id', user.id).maybeSingle();
+    const isAdmin = profile?.is_super_admin === true;
+    if (!isAdmin && clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
     // Decrypt token
-    const { data: decryptResult } = await supabase.rpc('decrypt_access_token', {
+    const { data: decryptResult } = await supabase.rpc('decrypt_platform_token', {
       encrypted_token: connection.access_token_encrypted,
     });
-    const decryptedToken = decryptResult || connection.access_token_encrypted;
+    if (!decryptResult) {
+      console.error('[meta-adset-action] Failed to decrypt token for connection', connection_id);
+      return c.json({ error: 'Failed to decrypt Meta token' }, 500);
+    }
+    const decryptedToken = decryptResult;
 
     // Call Meta API to update ad set status
     const newStatus = action === 'pause' ? 'PAUSED' : 'ACTIVE';
