@@ -221,8 +221,11 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
   if (systemPrompt.length > 12000) systemPrompt = systemPrompt.substring(0, 12000);
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 240_000); // 4 min timeout
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       'x-api-key': ANTHROPIC_API_KEY,
       'content-type': 'application/json',
@@ -235,6 +238,7 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
       messages: [{ role: 'user', content: userMessage }],
     }),
   });
+  clearTimeout(fetchTimeout);
 
   if (!response.ok) {
     const errText = await response.text();

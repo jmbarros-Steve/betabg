@@ -255,19 +255,16 @@ export async function signupForms(c: Context) {
 
       if (updateErr) return c.json({ error: updateErr.message }, 500);
 
-      // Install ScriptTag on Shopify store
+      // Try to install ScriptTag on Shopify store (optional — form works via embed too)
+      let script_tag_id: string | null = null;
       const result = await installScriptTag(supabase, client_id, form_id);
       if ('error' in result) {
-        // Revert status if ScriptTag install fails
-        await supabase
-          .from('email_forms')
-          .update({ status: 'draft', updated_at: new Date().toISOString() })
-          .eq('id', form_id)
-          .eq('client_id', client_id);
-        return c.json({ error: result.error }, 500);
+        console.warn(`ScriptTag install skipped for form ${form_id}: ${result.error}`);
+      } else {
+        script_tag_id = result.scriptTagId;
       }
 
-      return c.json({ success: true, form, script_tag_id: result.scriptTagId });
+      return c.json({ success: true, form, script_tag_id });
     }
 
     // ----- pause -----
