@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Meta Ads Complete — Steve API</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0e17;
+    color: #e2e8f0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  /* Top Bar */
+  .topbar {
+    background: #111827;
+    border-bottom: 1px solid #1f2937;
+    padding: 12px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .topbar .logo {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #60a5fa;
+    white-space: nowrap;
+  }
+  .topbar .logo span { color: #f59e0b; }
+  .summary-pills {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .pill.total { background: #1e293b; color: #94a3b8; }
+  .pill.pass { background: #064e3b; color: #34d399; }
+  .pill.fail { background: #7f1d1d; color: #fca5a5; }
+  .pill.pending { background: #78350f; color: #fcd34d; }
+
+  /* Auth Panel */
+  .auth-panel {
+    background: #111827;
+    border: 1px solid #1f2937;
+    margin: 16px 24px;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .auth-panel h3 {
+    color: #60a5fa;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .auth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .auth-field label {
+    display: block;
+    font-size: 0.7rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .auth-field input {
+    width: 100%;
+    background: #0a0e17;
+    border: 1px solid #374151;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .auth-field input:focus {
+    outline: none;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  }
+  .auth-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #3b82f6; }
+  .btn-success { background: #059669; color: #fff; }
+  .btn-success:hover { background: #10b981; }
+  .btn-warning { background: #d97706; color: #fff; }
+  .btn-warning:hover { background: #f59e0b; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .btn-danger:hover { background: #ef4444; }
+  .btn-ghost { background: #1f2937; color: #9ca3af; border: 1px solid #374151; }
+  .btn-ghost:hover { background: #374151; color: #e5e7eb; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .auth-status {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    display: none;
+  }
+  .auth-status.ok { display: block; background: #064e3b; color: #34d399; }
+  .auth-status.err { display: block; background: #7f1d1d; color: #fca5a5; }
+
+  /* Main Content */
+  .main { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+
+  /* Section */
+  .section {
+    margin-bottom: 16px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #1f2937;
+  }
+  .section-header {
+    background: #111827;
+    padding: 14px 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .section-header:hover { background: #1a2332; }
+  .section-header h2 {
+    font-size: 0.95rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-header .sec-badge {
+    font-size: 0.65rem;
+    background: #1e3a5f;
+    color: #60a5fa;
+    padding: 2px 8px;
+    border-radius: 99px;
+  }
+  .section-header .arrow {
+    color: #4b5563;
+    font-size: 0.8rem;
+    transition: transform 0.3s;
+  }
+  .section-header.open .arrow { transform: rotate(180deg); }
+  .section-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+    background: #0d1117;
+  }
+  .section-body.open { max-height: 50000px; }
+
+  /* Endpoint Card */
+  .ep-card {
+    border-bottom: 1px solid #1f2937;
+    padding: 16px 20px;
+  }
+  .ep-card:last-child { border-bottom: none; }
+  .ep-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .method-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .method-badge.post { background: #854d0e; color: #fcd34d; }
+  .method-badge.get { background: #064e3b; color: #6ee7b7; }
+  .method-badge.cron { background: #581c87; color: #c084fc; }
+  .ep-path {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+  }
+  .ep-desc {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-left: auto;
+  }
+  .ep-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #374151;
+    flex-shrink: 0;
+  }
+  .ep-status-dot.ok { background: #34d399; }
+  .ep-status-dot.warn { background: #fbbf24; }
+  .ep-status-dot.err { background: #f87171; }
+
+  /* Params */
+  .ep-params {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .ep-param label {
+    display: block;
+    font-size: 0.65rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .ep-param input, .ep-param select, .ep-param textarea {
+    width: 100%;
+    background: #111827;
+    border: 1px solid #2d3748;
+    color: #e2e8f0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .ep-param textarea {
+    min-height: 60px;
+    resize: vertical;
+  }
+  .ep-param input:focus, .ep-param select:focus, .ep-param textarea:focus {
+    outline: none;
+    border-color: #60a5fa;
+  }
+
+  .ep-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .ep-actions .response-time {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-left: 8px;
+  }
+  .ep-actions .http-status {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .http-status.s2xx { background: #064e3b; color: #34d399; }
+  .http-status.s4xx { background: #78350f; color: #fcd34d; }
+  .http-status.s5xx { background: #7f1d1d; color: #fca5a5; }
+
+  /* Response */
+  .ep-response {
+    margin-top: 10px;
+    background: #0a0e17;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    max-height: 400px;
+    overflow: auto;
+    display: none;
+  }
+  .ep-response.visible { display: block; }
+  .ep-response pre {
+    padding: 12px 16px;
+    font-size: 0.78rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: #a5b4fc;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Run All Bar */
+  .run-all-bar {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .run-all-bar .progress-bar {
+    flex: 1;
+    min-width: 200px;
+    background: #1f2937;
+    border-radius: 99px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .run-all-bar .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #34d399, #60a5fa);
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .run-all-bar .progress-text {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    white-space: nowrap;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #4b5563;
+    border-top-color: #60a5fa;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    animation: toastIn 0.3s;
+    max-width: 350px;
+  }
+  .toast.info { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb; }
+  .toast.success { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+  .toast.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  .tag-readonly {
+    font-size: 0.55rem;
+    background: #064e3b;
+    color: #6ee7b7;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .tag-write {
+    font-size: 0.55rem;
+    background: #78350f;
+    color: #fcd34d;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+
+  @media (max-width: 768px) {
+    .topbar { padding: 10px 12px; }
+    .auth-panel, .run-all-bar { margin: 12px; }
+    .main { padding: 0 12px 40px; }
+    .ep-params { grid-template-columns: 1fr; }
+    .summary-pills { margin-left: 0; width: 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">Steve <span>QA</span> | Meta Ads API</div>
+  <div class="summary-pills">
+    <div class="pill total">Total: <b id="totalCount">0</b></div>
+    <div class="pill pass">OK: <b id="passCount">0</b></div>
+    <div class="pill fail">Error: <b id="failCount">0</b></div>
+    <div class="pill pending">Pendiente: <b id="pendingCount">0</b></div>
+  </div>
+</div>
+
+<!-- Auth Panel -->
+<div class="auth-panel">
+  <h3>Autenticacion y Configuracion</h3>
+  <div class="auth-grid">
+    <div class="auth-field">
+      <label>API Base URL</label>
+      <input type="text" id="apiBaseUrl" value="https://steve-api-850416724643.us-central1.run.app">
+    </div>
+    <div class="auth-field">
+      <label>Supabase URL</label>
+      <input type="text" id="supabaseUrl" value="https://zpswjccsxjtnhetkkqde.supabase.co">
+    </div>
+    <div class="auth-field">
+      <label>Supabase Anon Key</label>
+      <input type="text" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpwc3dqY2NzeGp0bmhldGtrcWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MzM2NjgsImV4cCI6MjA4NzIwOTY2OH0.PRkFg5sdmu8kXdL9xtpZFREKgohF9cGrNjWVVwZ7IXw">
+    </div>
+    <div class="auth-field">
+      <label>JWT Token</label>
+      <input type="text" id="jwtToken" placeholder="Se obtiene al hacer login...">
+    </div>
+    <div class="auth-field">
+      <label>Connection ID</label>
+      <input type="text" id="connectionId" value="4a03ab6b-7192-4ace-bcfb-a1fcf8677cc8">
+    </div>
+    <div class="auth-field">
+      <label>Client ID</label>
+      <input type="text" id="clientId" value="9432e754-ad5a-4115-904c-d048de1d0e1e">
+    </div>
+    <div class="auth-field">
+      <label>Cron Secret (para endpoints cron)</label>
+      <input type="text" id="cronSecret" placeholder="X-Cron-Secret header value">
+    </div>
+  </div>
+  <div class="auth-actions">
+    <button class="btn btn-primary" onclick="doLogin()">Login Supabase</button>
+    <button class="btn btn-ghost" onclick="checkToken()">Verificar Token</button>
+    <button class="btn btn-ghost" onclick="clearAllResults()">Limpiar Resultados</button>
+  </div>
+  <div class="auth-status" id="authStatus"></div>
+</div>
+
+<!-- Run All Bar -->
+<div class="run-all-bar">
+  <button class="btn btn-success" id="runAllBtn" onclick="runAllReadOnly()">Ejecutar Todos los Tests de Lectura</button>
+  <div class="progress-bar"><div class="progress-fill" id="runAllProgress"></div></div>
+  <div class="progress-text" id="runAllText">0 / 0</div>
+  <button class="btn btn-ghost" onclick="exportResults()">Exportar Resultados</button>
+</div>
+
+<!-- Main Content -->
+<div class="main" id="sectionsContainer"></div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// =========================================
+// CONFIG & STATE
+// =========================================
+const state = {
+  results: {},
+  totalTests: 0,
+  passed: 0,
+  failed: 0,
+  pending: 0
+};
+
+function getApiBase() { return document.getElementById('apiBaseUrl').value.replace(/\/$/, ''); }
+function getJwt() { return document.getElementById('jwtToken').value; }
+function getConnectionId() { return document.getElementById('connectionId').value; }
+function getClientId() { return document.getElementById('clientId').value; }
+function getCronSecret() { return document.getElementById('cronSecret').value; }
+
+// =========================================
+// TOAST
+// =========================================
+function showToast(msg, type='info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// =========================================
+// AUTH
+// =========================================
+async function doLogin() {
+  const url = document.getElementById('supabaseUrl').value;
+  const key = document.getElementById('supabaseKey').value;
+  const statusEl = document.getElementById('authStatus');
+
+  try {
+    const res = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': key
+      },
+      body: JSON.stringify({
+        email: 'patricio.correa@jardindeeva.cl',
+        password: 'Jardin2026'
+      })
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      document.getElementById('jwtToken').value = data.access_token;
+      statusEl.className = 'auth-status ok';
+      statusEl.textContent = `Login exitoso. User: ${data.user?.email || 'ok'} | Expira: ${new Date(data.expires_at * 1000).toLocaleString('es-CL')}`;
+      showToast('Login exitoso', 'success');
+    } else {
+      statusEl.className = 'auth-status err';
+      statusEl.textContent = `Error: ${data.error_description || data.msg || JSON.stringify(data)}`;
+      showToast('Error en login', 'error');
+    }
+  } catch (e) {
+    statusEl.className = 'auth-status err';
+    statusEl.textContent = `Error de red: ${e.message}`;
+    showToast('Error de conexion', 'error');
+  }
+}
+
+async function checkToken() {
+  const jwt = getJwt();
+  const statusEl = document.getElementById('authStatus');
+  if (!jwt) {
+    statusEl.className = 'auth-status err';
+    statusEl.textContent = 'No hay token. Haz login primero.';
+    return;
+  }
+  try {
+    const parts = jwt.split('.');
+    const payload = JSON.parse(atob(parts[1]));
+    const exp = new Date(payload.exp * 1000);
+    const now = new Date();
+    if (exp < now) {
+      statusEl.className = 'auth-status err';
+      statusEl.textContent = `Token EXPIRADO. Expiro: ${exp.toLocaleString('es-CL')}`;
+    } else {
+      statusEl.className = 'auth-status ok';
+      statusEl.textContent = `Token valido. Sub: ${payload.sub} | Rol: ${payload.role} | Expira: ${exp.toLocaleString('es-CL')}`;
+    }
+  } catch (e) {
+    statusEl.className = 'auth-status err';
+    statusEl.textContent = `Token invalido: ${e.message}`;
+  }
+}
+
+// =========================================
+// API CALL
+// =========================================
+async function callApi(epId, path, body, isCron=false) {
+  const base = getApiBase();
+  const jwt = getJwt();
+  const cronSecret = getCronSecret();
+
+  const url = base + path;
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (isCron) {
+    if (cronSecret) headers['X-Cron-Secret'] = cronSecret;
+  } else {
+    if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+  }
+
+  const responseEl = document.getElementById(`resp-${epId}`);
+  const statusEl = document.getElementById(`status-${epId}`);
+  const timeEl = document.getElementById(`time-${epId}`);
+  const dotEl = document.getElementById(`dot-${epId}`);
+
+  responseEl.classList.add('visible');
+  responseEl.querySelector('pre').textContent = 'Cargando...';
+  statusEl.textContent = '';
+  statusEl.className = 'http-status';
+  timeEl.textContent = '';
+  dotEl.className = 'ep-status-dot';
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    timeEl.textContent = `${elapsed}ms`;
+
+    let data;
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('json')) {
+      data = await res.json();
+    } else {
+      data = await res.text();
+    }
+
+    const statusCode = res.status;
+    statusEl.textContent = statusCode;
+    if (statusCode >= 200 && statusCode < 300) {
+      statusEl.className = 'http-status s2xx';
+      dotEl.className = 'ep-status-dot ok';
+      updateResult(epId, 'pass');
+    } else if (statusCode >= 400 && statusCode < 500) {
+      statusEl.className = 'http-status s4xx';
+      dotEl.className = 'ep-status-dot warn';
+      updateResult(epId, 'fail');
+    } else {
+      statusEl.className = 'http-status s5xx';
+      dotEl.className = 'ep-status-dot err';
+      updateResult(epId, 'fail');
+    }
+
+    responseEl.querySelector('pre').textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    timeEl.textContent = `${elapsed}ms`;
+    statusEl.textContent = 'ERR';
+    statusEl.className = 'http-status s5xx';
+    dotEl.className = 'ep-status-dot err';
+    responseEl.querySelector('pre').textContent = `Error de red: ${e.message}`;
+    updateResult(epId, 'fail');
+  }
+}
+
+function updateResult(epId, status) {
+  const prev = state.results[epId];
+  state.results[epId] = status;
+
+  if (prev === 'pass') state.passed--;
+  else if (prev === 'fail') state.failed--;
+  else if (!prev) state.pending--;
+
+  if (status === 'pass') state.passed++;
+  else if (status === 'fail') state.failed++;
+
+  refreshCounts();
+}
+
+function refreshCounts() {
+  state.pending = state.totalTests - state.passed - state.failed;
+  document.getElementById('totalCount').textContent = state.totalTests;
+  document.getElementById('passCount').textContent = state.passed;
+  document.getElementById('failCount').textContent = state.failed;
+  document.getElementById('pendingCount').textContent = state.pending;
+}
+
+function clearAllResults() {
+  state.results = {};
+  state.passed = 0;
+  state.failed = 0;
+  state.pending = state.totalTests;
+  refreshCounts();
+  document.querySelectorAll('.ep-response').forEach(el => {
+    el.classList.remove('visible');
+    el.querySelector('pre').textContent = '';
+  });
+  document.querySelectorAll('.http-status').forEach(el => { el.textContent = ''; el.className = 'http-status'; });
+  document.querySelectorAll('.response-time').forEach(el => el.textContent = '');
+  document.querySelectorAll('.ep-status-dot').forEach(el => el.className = 'ep-status-dot');
+  showToast('Resultados limpiados', 'info');
+}
+
+// =========================================
+// ENDPOINT DEFINITIONS
+// =========================================
+const sections = [
+  {
+    id: 'oauth',
+    title: 'OAuth y Conexion',
+    icon: '🔐',
+    endpoints: [
+      {
+        id: 'check-scopes',
+        path: '/api/check-meta-scopes',
+        method: 'POST',
+        desc: 'Verifica permisos concedidos/rechazados',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' }
+        ]
+      },
+      {
+        id: 'fetch-ad-accounts',
+        path: '/api/fetch-meta-ad-accounts',
+        method: 'POST',
+        desc: 'Lista cuentas publicitarias con agrupacion por negocio',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' }
+        ]
+      },
+      {
+        id: 'fetch-hierarchy',
+        path: '/api/fetch-meta-business-hierarchy',
+        method: 'POST',
+        desc: 'Jerarquia completa con portfolios',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'campaigns',
+    title: 'Gestion de Campanas',
+    icon: '📊',
+    endpoints: [
+      {
+        id: 'campaign-get-details',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Obtener detalles de un anuncio (get_ad_details)',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'get_ad_details' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_id', label: 'Ad ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'campaign-create',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Crear campana',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'create' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' },
+          { name: 'name', label: 'Nombre Campana', defaultVal: 'QA Test Campaign' },
+          { name: 'objective', label: 'Objetivo', defaultVal: 'OUTCOME_TRAFFIC' },
+          { name: 'daily_budget', label: 'Presupuesto Diario (centavos)', defaultVal: '1000' },
+          { name: 'status', label: 'Estado', defaultVal: 'PAUSED' }
+        ]
+      },
+      {
+        id: 'campaign-pause',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Pausar campana',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'pause' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'campaign-resume',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Reanudar campana',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'resume' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'campaign-update',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Actualizar campana',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'update' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' },
+          { name: 'name', label: 'Nuevo Nombre', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'campaign-update-budget',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Actualizar presupuesto',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'update_budget' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' },
+          { name: 'daily_budget', label: 'Nuevo Presupuesto (centavos)', defaultVal: '2000' }
+        ]
+      },
+      {
+        id: 'campaign-duplicate',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Duplicar campana',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'duplicate' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'campaign-archive',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Archivar campana',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'archive' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'campaign-update-ad',
+        path: '/api/manage-meta-campaign',
+        method: 'POST',
+        desc: 'Actualizar anuncio (update_ad)',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'update_ad' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_id', label: 'Ad ID', defaultVal: '' },
+          { name: 'status', label: 'Nuevo Estado', defaultVal: 'PAUSED' }
+        ]
+      },
+      {
+        id: 'fetch-adsets',
+        path: '/api/fetch-campaign-adsets',
+        method: 'POST',
+        desc: 'Obtener adsets de una campana',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'adset-action',
+        path: '/api/meta-adset-action',
+        method: 'POST',
+        desc: 'Pausar/reanudar adsets',
+        readonly: false,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'adset_id', label: 'Adset ID', defaultVal: '' },
+          { name: 'action', label: 'Accion (pause/resume)', defaultVal: 'pause' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'audiences',
+    title: 'Audiencias',
+    icon: '👥',
+    endpoints: [
+      {
+        id: 'audience-list',
+        path: '/api/manage-meta-audiences',
+        method: 'POST',
+        desc: 'Listar audiencias',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'audience-create-custom',
+        path: '/api/manage-meta-audiences',
+        method: 'POST',
+        desc: 'Crear audiencia personalizada',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'create_custom' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' },
+          { name: 'name', label: 'Nombre', defaultVal: 'QA Test Audience' },
+          { name: 'description', label: 'Descripcion', defaultVal: 'Test audience from QA' },
+          { name: 'subtype', label: 'Subtipo', defaultVal: 'CUSTOM' }
+        ]
+      },
+      {
+        id: 'audience-create-lookalike',
+        path: '/api/manage-meta-audiences',
+        method: 'POST',
+        desc: 'Crear audiencia similar (lookalike)',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'create_lookalike' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' },
+          { name: 'source_audience_id', label: 'Audiencia Origen ID', defaultVal: '' },
+          { name: 'country', label: 'Pais', defaultVal: 'CL' },
+          { name: 'ratio', label: 'Ratio (0.01-0.20)', defaultVal: '0.01' }
+        ]
+      },
+      {
+        id: 'audience-create-retargeting',
+        path: '/api/manage-meta-audiences',
+        method: 'POST',
+        desc: 'Crear audiencia de retargeting',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'create_retargeting' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' },
+          { name: 'pixel_id', label: 'Pixel ID', defaultVal: '' },
+          { name: 'retention_days', label: 'Dias Retencion', defaultVal: '30' },
+          { name: 'name', label: 'Nombre', defaultVal: 'QA Retargeting' }
+        ]
+      },
+      {
+        id: 'audience-delete',
+        path: '/api/manage-meta-audiences',
+        method: 'POST',
+        desc: 'Eliminar audiencia',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'delete' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'audience_id', label: 'Audience ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'audience-overlap',
+        path: '/api/detect-audience-overlap',
+        method: 'POST',
+        desc: 'Detectar superposicion de audiencias',
+        readonly: true,
+        params: [
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'sync-klaviyo-meta',
+        path: '/api/sync-klaviyo-to-meta-audience',
+        method: 'POST',
+        desc: 'Sincronizar lista Klaviyo a Meta',
+        readonly: false,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'klaviyo_list_id', label: 'Klaviyo List ID', defaultVal: '' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'pixel',
+    title: 'Pixel y Tracking',
+    icon: '🎯',
+    endpoints: [
+      {
+        id: 'pixel-list',
+        path: '/api/manage-meta-pixel',
+        method: 'POST',
+        desc: 'Listar pixeles',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_account_id', label: 'Ad Account ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'pixel-get',
+        path: '/api/manage-meta-pixel',
+        method: 'POST',
+        desc: 'Obtener pixel especifico',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'get' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'pixel_id', label: 'Pixel ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'pixel-stats',
+        path: '/api/manage-meta-pixel',
+        method: 'POST',
+        desc: 'Estadisticas del pixel',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'stats' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'pixel_id', label: 'Pixel ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'targeting-search',
+        path: '/api/meta-targeting-search',
+        method: 'POST',
+        desc: 'Buscar intereses/ubicaciones para targeting',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'query', label: 'Busqueda', defaultVal: 'yoga' },
+          { name: 'type', label: 'Tipo (interest/location)', defaultVal: 'interest' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'inbox',
+    title: 'Social Inbox',
+    icon: '💬',
+    endpoints: [
+      {
+        id: 'inbox-list-pages',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Listar paginas conectadas',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list_pages' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' }
+        ]
+      },
+      {
+        id: 'inbox-list-conversations',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Listar conversaciones',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list_conversations' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'page_id', label: 'Page ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'inbox-get-messages',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Obtener mensajes de una conversacion',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'get_messages' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'conversation_id', label: 'Conversation ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'inbox-list-post-comments',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Listar comentarios de publicaciones',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list_post_comments' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'page_id', label: 'Page ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'inbox-list-ad-comments',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Listar comentarios de anuncios',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list_ad_comments' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'ad_id', label: 'Ad ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'inbox-reply-message',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Responder mensaje',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'reply_message' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'recipient_id', label: 'Recipient ID', defaultVal: '' },
+          { name: 'page_id', label: 'Page ID', defaultVal: '' },
+          { name: 'message', label: 'Mensaje', defaultVal: 'Prueba QA' }
+        ]
+      },
+      {
+        id: 'inbox-reply-comment',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Responder comentario',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'reply_comment' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'comment_id', label: 'Comment ID', defaultVal: '' },
+          { name: 'message', label: 'Respuesta', defaultVal: 'Respuesta QA' }
+        ]
+      },
+      {
+        id: 'inbox-mark-read',
+        path: '/api/meta-social-inbox',
+        method: 'POST',
+        desc: 'Marcar como leido',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'mark_read' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'conversation_id', label: 'Conversation ID', defaultVal: '' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'instagram',
+    title: 'Instagram',
+    icon: '📸',
+    endpoints: [
+      {
+        id: 'ig-list',
+        path: '/api/publish-instagram',
+        method: 'POST',
+        desc: 'Listar publicaciones programadas',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'list' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' }
+        ]
+      },
+      {
+        id: 'ig-publish',
+        path: '/api/publish-instagram',
+        method: 'POST',
+        desc: 'Publicar en Instagram',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'publish' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'image_url', label: 'URL Imagen', defaultVal: '' },
+          { name: 'caption', label: 'Caption', defaultVal: 'Test desde QA' }
+        ]
+      },
+      {
+        id: 'ig-schedule',
+        path: '/api/publish-instagram',
+        method: 'POST',
+        desc: 'Programar publicacion',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'schedule' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'image_url', label: 'URL Imagen', defaultVal: '' },
+          { name: 'caption', label: 'Caption', defaultVal: 'Publicacion programada QA' },
+          { name: 'scheduled_at', label: 'Fecha (ISO 8601)', defaultVal: new Date(Date.now() + 86400000).toISOString() }
+        ]
+      },
+      {
+        id: 'ig-update',
+        path: '/api/publish-instagram',
+        method: 'POST',
+        desc: 'Actualizar publicacion programada',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'update' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'post_id', label: 'Post ID', defaultVal: '' },
+          { name: 'caption', label: 'Nuevo Caption', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'ig-delete',
+        path: '/api/publish-instagram',
+        method: 'POST',
+        desc: 'Eliminar publicacion programada',
+        readonly: false,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'delete' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'post_id', label: 'Post ID', defaultVal: '' }
+        ]
+      },
+      {
+        id: 'ig-generate-caption',
+        path: '/api/publish-instagram',
+        method: 'POST',
+        desc: 'Generar caption con IA',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'generate_caption' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'prompt', label: 'Prompt', defaultVal: 'Caption para foto de productos naturales' }
+        ]
+      },
+      {
+        id: 'ig-insights-overview',
+        path: '/api/fetch-instagram-insights',
+        method: 'POST',
+        desc: 'Resumen de Instagram insights',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'overview' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' }
+        ]
+      },
+      {
+        id: 'ig-insights-top-posts',
+        path: '/api/fetch-instagram-insights',
+        method: 'POST',
+        desc: 'Top posts de Instagram',
+        readonly: true,
+        params: [
+          { name: 'action', label: 'Accion', defaultVal: 'top_posts' },
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'metrics',
+    title: 'Metricas, Catalogos e IA',
+    icon: '📈',
+    endpoints: [
+      {
+        id: 'sync-metrics',
+        path: '/api/sync-meta-metrics',
+        method: 'POST',
+        desc: 'Sincronizar metricas de Meta',
+        readonly: false,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' }
+        ]
+      },
+      {
+        id: 'meta-catalogs',
+        path: '/api/meta-catalogs',
+        method: 'POST',
+        desc: 'Listar catalogos de productos',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' }
+        ]
+      },
+      {
+        id: 'generate-copy',
+        path: '/api/generate-meta-copy',
+        method: 'POST',
+        desc: 'Generar copy con IA para Meta',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'prompt', label: 'Prompt / Indicaciones', defaultVal: 'Crear copy para campana de productos naturales para mujeres 25-45' },
+          { name: 'tone', label: 'Tono', defaultVal: 'profesional' },
+          { name: 'language', label: 'Idioma', defaultVal: 'es' }
+        ]
+      },
+      {
+        id: 'criterio-meta',
+        path: '/api/criterio-meta',
+        method: 'POST',
+        desc: 'Evaluacion de calidad CRITERIO',
+        readonly: true,
+        params: [
+          { name: 'connection_id', label: 'Connection ID', useGlobal: 'connectionId' },
+          { name: 'client_id', label: 'Client ID', useGlobal: 'clientId' },
+          { name: 'campaign_id', label: 'Campaign ID (opcional)', defaultVal: '' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'cron',
+    title: 'Cron Jobs (sin JWT)',
+    icon: '⏰',
+    endpoints: [
+      {
+        id: 'cron-performance-tracker',
+        path: '/api/cron/performance-tracker-meta',
+        method: 'CRON',
+        desc: 'Performance tracker de campanas Meta',
+        readonly: true,
+        isCron: true,
+        params: []
+      },
+      {
+        id: 'cron-execute-rules',
+        path: '/api/cron/execute-meta-rules',
+        method: 'CRON',
+        desc: 'Ejecutar reglas automaticas Meta',
+        readonly: false,
+        isCron: true,
+        params: []
+      },
+      {
+        id: 'cron-publish-instagram',
+        path: '/api/cron/publish-instagram',
+        method: 'CRON',
+        desc: 'Publicar posts programados de Instagram',
+        readonly: false,
+        isCron: true,
+        params: []
+      }
+    ]
+  }
+];
+
+// =========================================
+// BUILD UI
+// =========================================
+function buildUI() {
+  const container = document.getElementById('sectionsContainer');
+  let totalEps = 0;
+
+  sections.forEach(sec => {
+    totalEps += sec.endpoints.length;
+
+    const sectionDiv = document.createElement('div');
+    sectionDiv.className = 'section';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerHTML = `
+      <h2>${sec.icon} ${sec.title} <span class="sec-badge">${sec.endpoints.length} endpoints</span></h2>
+      <span class="arrow">&#9660;</span>
+    `;
+    header.addEventListener('click', () => {
+      header.classList.toggle('open');
+      body.classList.toggle('open');
+    });
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'section-body';
+
+    sec.endpoints.forEach(ep => {
+      const card = document.createElement('div');
+      card.className = 'ep-card';
+
+      const methodClass = ep.isCron ? 'cron' : ep.method.toLowerCase();
+      const readonlyTag = ep.readonly
+        ? '<span class="tag-readonly">lectura</span>'
+        : '<span class="tag-write">escritura</span>';
+
+      let paramsHtml = '';
+      if (ep.params.length > 0) {
+        paramsHtml = '<div class="ep-params">';
+        ep.params.forEach(p => {
+          const val = p.useGlobal ? '' : (p.defaultVal || '');
+          const globalNote = p.useGlobal ? ' (auto)' : '';
+          paramsHtml += `
+            <div class="ep-param">
+              <label>${p.label}${globalNote}</label>
+              <input type="text" id="param-${ep.id}-${p.name}" value="${val}"
+                     placeholder="${p.useGlobal ? 'Se auto-llena desde config' : ''}"
+                     data-global="${p.useGlobal || ''}" data-name="${p.name}">
+            </div>
+          `;
+        });
+        paramsHtml += '</div>';
+      }
+
+      card.innerHTML = `
+        <div class="ep-head">
+          <span class="ep-status-dot" id="dot-${ep.id}"></span>
+          <span class="method-badge ${methodClass}">${ep.isCron ? 'CRON' : ep.method}</span>
+          <span class="ep-path">${ep.path}</span>
+          ${readonlyTag}
+          <span class="ep-desc">${ep.desc}</span>
+        </div>
+        ${paramsHtml}
+        <div class="ep-actions">
+          <button class="btn btn-primary" onclick="executeEndpoint('${ep.id}')">Ejecutar</button>
+          <span class="http-status" id="status-${ep.id}"></span>
+          <span class="response-time" id="time-${ep.id}"></span>
+        </div>
+        <div class="ep-response" id="resp-${ep.id}">
+          <pre></pre>
+        </div>
+      `;
+
+      body.appendChild(card);
+    });
+
+    sectionDiv.appendChild(header);
+    sectionDiv.appendChild(body);
+    container.appendChild(sectionDiv);
+  });
+
+  state.totalTests = totalEps;
+  state.pending = totalEps;
+  refreshCounts();
+}
+
+function getEndpointDef(epId) {
+  for (const sec of sections) {
+    for (const ep of sec.endpoints) {
+      if (ep.id === epId) return ep;
+    }
+  }
+  return null;
+}
+
+function collectParams(ep) {
+  const body = {};
+  ep.params.forEach(p => {
+    const input = document.getElementById(`param-${ep.id}-${p.name}`);
+    let val = input ? input.value : '';
+
+    // Auto-fill from global
+    if (p.useGlobal && !val) {
+      const globalEl = document.getElementById(p.useGlobal);
+      if (globalEl) val = globalEl.value;
+    }
+
+    if (val !== '') {
+      // Try to parse numbers
+      if (!isNaN(val) && val.trim() !== '' && !p.name.includes('id') && !p.name.includes('key') && !p.name.includes('token')) {
+        body[p.name] = Number(val);
+      } else {
+        body[p.name] = val;
+      }
+    }
+  });
+  return body;
+}
+
+function executeEndpoint(epId) {
+  const ep = getEndpointDef(epId);
+  if (!ep) return;
+
+  // Fill global params into inputs for visibility
+  ep.params.forEach(p => {
+    if (p.useGlobal) {
+      const input = document.getElementById(`param-${ep.id}-${p.name}`);
+      const globalEl = document.getElementById(p.useGlobal);
+      if (input && globalEl && !input.value) {
+        input.value = globalEl.value;
+      }
+    }
+  });
+
+  const body = collectParams(ep);
+  callApi(ep.id, ep.path, body, ep.isCron || false);
+}
+
+// =========================================
+// RUN ALL READ-ONLY
+// =========================================
+async function runAllReadOnly() {
+  const readOnlyEps = [];
+  sections.forEach(sec => {
+    sec.endpoints.forEach(ep => {
+      if (ep.readonly) readOnlyEps.push(ep);
+    });
+  });
+
+  const total = readOnlyEps.length;
+  const progressBar = document.getElementById('runAllProgress');
+  const progressText = document.getElementById('runAllText');
+  const btn = document.getElementById('runAllBtn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Ejecutando...';
+
+  // Open all sections
+  document.querySelectorAll('.section-header').forEach(h => {
+    if (!h.classList.contains('open')) {
+      h.classList.add('open');
+      h.nextElementSibling.classList.add('open');
+    }
+  });
+
+  for (let i = 0; i < readOnlyEps.length; i++) {
+    const ep = readOnlyEps[i];
+
+    // Auto-fill global params
+    ep.params.forEach(p => {
+      if (p.useGlobal) {
+        const input = document.getElementById(`param-${ep.id}-${p.name}`);
+        const globalEl = document.getElementById(p.useGlobal);
+        if (input && globalEl && !input.value) {
+          input.value = globalEl.value;
+        }
+      }
+    });
+
+    const body = collectParams(ep);
+    await callApi(ep.id, ep.path, body, ep.isCron || false);
+
+    const pct = Math.round(((i + 1) / total) * 100);
+    progressBar.style.width = pct + '%';
+    progressText.textContent = `${i + 1} / ${total}`;
+
+    // Small delay between requests
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Ejecutar Todos los Tests de Lectura';
+  showToast(`Completados ${total} tests de lectura`, 'success');
+}
+
+// =========================================
+// EXPORT
+// =========================================
+function exportResults() {
+  const report = {
+    timestamp: new Date().toISOString(),
+    apiBase: getApiBase(),
+    summary: {
+      total: state.totalTests,
+      passed: state.passed,
+      failed: state.failed,
+      pending: state.pending
+    },
+    results: {}
+  };
+
+  sections.forEach(sec => {
+    report.results[sec.id] = {};
+    sec.endpoints.forEach(ep => {
+      const statusEl = document.getElementById(`status-${ep.id}`);
+      const timeEl = document.getElementById(`time-${ep.id}`);
+      const respEl = document.getElementById(`resp-${ep.id}`);
+      report.results[sec.id][ep.id] = {
+        path: ep.path,
+        status: statusEl ? statusEl.textContent : 'pending',
+        time: timeEl ? timeEl.textContent : '',
+        result: state.results[ep.id] || 'pending',
+        response: respEl ? respEl.querySelector('pre').textContent.substring(0, 500) : ''
+      };
+    });
+  });
+
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `qa-meta-ads-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Resultados exportados', 'success');
+}
+
+// =========================================
+// INIT
+// =========================================
+buildUI();
+</script>
+</body>
+</html>

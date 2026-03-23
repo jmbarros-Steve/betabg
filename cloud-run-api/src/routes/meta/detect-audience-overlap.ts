@@ -75,8 +75,12 @@ export async function detectAudienceOverlap(c: Context) {
       },
     });
 
-    if (!adsetsRes.ok || !adsetsRes.data?.data) {
-      return c.json({ error: 'Error obteniendo ad sets' }, 500);
+    if (!adsetsRes.ok) {
+      const metaError = adsetsRes.error?.message || 'Error obteniendo ad sets';
+      return c.json({ error: metaError }, 502);
+    }
+    if (!adsetsRes.data?.data) {
+      return c.json({ error: 'No se encontraron ad sets para esta campaña' }, 404);
     }
 
     // Filter active ad sets only

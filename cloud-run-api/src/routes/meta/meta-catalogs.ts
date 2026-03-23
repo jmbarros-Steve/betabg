@@ -75,7 +75,12 @@ export async function metaCatalogs(c: Context) {
     const catalogsData: any = await catalogsRes.json();
 
     if (!catalogsRes.ok) {
+      const errCode = catalogsData?.error?.code;
       const msg = catalogsData?.error?.message || 'Failed to fetch catalogs';
+      // If the account doesn't support catalogs, return empty array instead of error
+      if (errCode === 100 || errCode === 200 || msg.includes('does not exist') || msg.includes('not supported')) {
+        return c.json({ catalogs: [] });
+      }
       console.error('[meta-catalogs] Error fetching catalogs:', msg);
       return c.json({ error: msg }, 502);
     }

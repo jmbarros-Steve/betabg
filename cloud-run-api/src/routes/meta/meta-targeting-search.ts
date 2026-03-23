@@ -39,6 +39,11 @@ export async function metaTargetingSearch(c: Context) {
       return c.json({ error: 'Missing required fields: connection_id, search_type, query' }, 400);
     }
 
+    const validSearchTypes: SearchType[] = ['interests', 'locations', 'locales'];
+    if (!validSearchTypes.includes(search_type as SearchType)) {
+      return c.json({ error: `Invalid search_type: "${search_type}". Valid types: ${validSearchTypes.join(', ')}` }, 400);
+    }
+
     if (query.length < 2) {
       return c.json({ success: true, results: [] });
     }
