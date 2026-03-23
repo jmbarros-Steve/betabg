@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -43,11 +43,12 @@ import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTr
 import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
 import { IGMetricsDashboard } from '@/components/client-portal/instagram/IGMetricsDashboard';
 import { InstagramHub } from '@/components/client-portal/InstagramHub';
+import { ProductsHub } from '@/components/products/ProductsHub';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'instagram' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'instagram' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'productos';
 interface ClientInfo {
   id: string;
   name: string;
@@ -278,6 +279,7 @@ export default function ClientPortal() {
   ] as const;
 
   const secondaryTabs = [
+    { id: 'productos', label: 'Productos', icon: Package },
     { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
@@ -429,6 +431,13 @@ export default function ClientPortal() {
             <div className={activeTab !== 'campaigns' ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Campañas">
                 <CampaignAnalyticsPanel clientId={effectiveClientId} />
+              </TabErrorBoundary>
+            </div>
+          )}
+          {visitedTabs.has('productos') && effectiveClientId && (
+            <div className={activeTab !== 'productos' ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="Productos">
+                <ProductsHub clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}

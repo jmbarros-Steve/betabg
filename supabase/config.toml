@@ -173,3 +173,21 @@ verify_jwt = false
 
 [functions.shopify-data-verify]
 verify_jwt = false
+
+[functions.import-shopify-products]
+verify_jwt = false
+
+[functions.import-ml-products]
+verify_jwt = false
+
+[functions.ml-search-categories]
+verify_jwt = false
+
+[functions.ml-create-item]
+verify_jwt = false
+
+[functions.sync-stock]
+verify_jwt = false
+
+[functions.sync-prices]
+verify_jwt = false
