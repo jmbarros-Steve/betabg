@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Steve Mail - Nivel Dios</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --border: #475569;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --pass: #22c55e;
+    --fail: #ef4444;
+    --skip: #f59e0b;
+    --info: #06b6d4;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-stats {
+    display: flex;
+    gap: 24px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 20px;
+    min-width: 140px;
+  }
+  .stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+  .stat-card.pass .value { color: var(--pass); }
+  .stat-card.fail .value { color: var(--fail); }
+  .stat-card.skip .value { color: var(--skip); }
+  .stat-card.total .value { color: var(--accent); }
+
+  /* Progress bar */
+  .progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    margin-top: 16px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    background: linear-gradient(90deg, var(--pass), var(--accent));
+  }
+  .progress-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    text-align: right;
+  }
+
+  /* Main content */
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+
+  /* Tabs */
+  .tab-nav {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { background: var(--surface2); color: var(--text); }
+  .tab-btn.active { background: var(--accent); color: white; }
+  .tab-btn .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-left: 6px;
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Phase sections */
+  .phase {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .phase-header {
+    padding: 16px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .phase-header:hover { background: var(--surface2); }
+  .phase-title {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phase-count {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 12px;
+  }
+  .phase-count span { display: flex; align-items: center; gap: 4px; }
+  .phase-body { padding: 0 20px 16px; }
+  .phase.collapsed .phase-body { display: none; }
+
+  /* Test items */
+  .test-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: background 0.15s;
+  }
+  .test-item:hover { background: var(--surface2); }
+
+  .test-checkbox {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--pass);
+    cursor: pointer;
+  }
+
+  .test-info { min-width: 0; }
+  .test-id {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .test-name { font-size: 14px; margin-top: 2px; }
+  .test-detail {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .test-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 60px;
+    text-align: center;
+  }
+  .status-pending { background: var(--surface2); color: var(--text-dim); }
+  .status-pass { background: rgba(34,197,94,0.15); color: var(--pass); }
+  .status-fail { background: rgba(239,68,68,0.15); color: var(--fail); }
+  .status-skip { background: rgba(245,158,11,0.15); color: var(--skip); }
+
+  .status-toggle {
+    display: flex;
+    gap: 4px;
+  }
+  .status-toggle button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .status-toggle button:hover { border-color: var(--accent); color: var(--text); }
+  .status-toggle button.active-pass { background: rgba(34,197,94,0.2); border-color: var(--pass); color: var(--pass); }
+  .status-toggle button.active-fail { background: rgba(239,68,68,0.2); border-color: var(--fail); color: var(--fail); }
+  .status-toggle button.active-skip { background: rgba(245,158,11,0.2); border-color: var(--skip); color: var(--skip); }
+
+  /* Notes */
+  .test-notes {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+  .test-notes textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 40px;
+  }
+  .test-notes textarea:focus { outline: none; border-color: var(--accent); }
+
+  /* API Results Import */
+  .import-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .import-section h3 { font-size: 16px; margin-bottom: 12px; }
+  .import-section textarea {
+    width: 100%;
+    height: 120px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    resize: vertical;
+  }
+  .import-section textarea:focus { outline: none; border-color: var(--accent); }
+
+  .btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-danger { background: var(--fail); color: white; }
+  .btn-danger:hover { opacity: 0.9; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-group { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+  /* Blocker alert */
+  .alert {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .alert-warning {
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.3);
+    color: var(--skip);
+  }
+  .alert-info {
+    background: rgba(6,182,212,0.1);
+    border: 1px solid rgba(6,182,212,0.3);
+    color: var(--info);
+  }
+  .alert-icon { font-size: 20px; flex-shrink: 0; }
+  .alert-text { font-size: 14px; }
+  .alert-text strong { display: block; margin-bottom: 4px; }
+
+  /* Export */
+  .export-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .export-modal.show { display: flex; }
+  .export-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .export-content h3 { margin-bottom: 16px; }
+  .export-content pre {
+    background: var(--bg);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    color: var(--text-dim);
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header { padding: 16px; }
+    .container { padding: 16px; }
+    .header-stats { gap: 8px; }
+    .stat-card { min-width: 100px; padding: 8px 12px; }
+    .stat-card .value { font-size: 22px; }
+    .test-item { grid-template-columns: auto 1fr; gap: 8px; }
+    .status-toggle, .test-status { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+    QA Steve Mail — Nivel Dios
+  </h1>
+  <div class="header-stats">
+    <div class="stat-card pass"><div class="label">Pass</div><div class="value" id="stat-pass">0</div></div>
+    <div class="stat-card fail"><div class="label">Fail</div><div class="value" id="stat-fail">0</div></div>
+    <div class="stat-card skip"><div class="label">Skip</div><div class="value" id="stat-skip">0</div></div>
+    <div class="stat-card total"><div class="label">Total</div><div class="value" id="stat-total">0</div></div>
+    <div class="stat-card" style="flex-grow:1;">
+      <div class="label">Progreso</div>
+      <div class="progress-bar-container"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+      <div class="progress-text" id="progress-text">0%</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Tab navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('api')">API Tests <span class="badge" id="badge-api">0</span></button>
+    <button class="tab-btn" onclick="switchTab('frontend')">Frontend <span class="badge" id="badge-frontend">0</span></button>
+    <button class="tab-btn" onclick="switchTab('rls')">RLS Security <span class="badge" id="badge-rls">0</span></button>
+    <button class="tab-btn" onclick="switchTab('import')">Import Results</button>
+    <button class="tab-btn" onclick="switchTab('report')">Report</button>
+  </div>
+
+  <!-- API Tests Tab -->
+  <div id="tab-api" class="tab-content active">
+    <div class="alert alert-info">
+      <div class="alert-icon">&#x1f4e1;</div>
+      <div class="alert-text">
+        <strong>API Tests</strong>
+        Ejecuta <code>bash qa-steve-mail-api.sh</code> para correr todas las pruebas automatizadas.
+        Luego importa los resultados en la tab "Import Results".
+        Tambien puedes marcar manualmente cada prueba aqui.
+      </div>
+    </div>
+
+    <!-- Phase 0 -->
+    <div class="phase" id="phase-0">
+      <div class="phase-header" onclick="togglePhase('phase-0')">
+        <div class="phase-title">
+          <span>Fase 0: Pre-requisitos</span>
+        </div>
+        <div class="phase-count" id="phase-0-count"></div>
+      </div>
+      <div class="phase-body" id="phase-0-body"></div>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="phase" id="phase-1">
+      <div class="phase-header" onclick="togglePhase('phase-1')">
+        <div class="phase-title"><span>Fase 1: Campaign CRUD</span></div>
+        <div class="phase-count" id="phase-1-count"></div>
+      </div>
+      <div class="phase-body" id="phase-1-body"></div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase" id="phase-2">
+      <div class="phase-header" onclick="togglePhase('phase-2')">
+        <div class="phase-title"><span>Fase 2: Subscribers & Lists</span></div>
+        <div class="phase-count" id="phase-2-count"></div>
+      </div>
+      <div class="phase-body" id="phase-2-body"></div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase" id="phase-3">
+      <div class="phase-header" onclick="togglePhase('phase-3')">
+        <div class="phase-title"><span>Fase 3: Email Templates</span></div>
+        <div class="phase-count" id="phase-3-count"></div>
+      </div>
+      <div class="phase-body" id="phase-3-body"></div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase" id="phase-4">
+      <div class="phase-header" onclick="togglePhase('phase-4')">
+        <div class="phase-title"><span>Fase 4: Flows / Automations</span></div>
+        <div class="phase-count" id="phase-4-count"></div>
+      </div>
+      <div class="phase-body" id="phase-4-body"></div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="phase" id="phase-5">
+      <div class="phase-header" onclick="togglePhase('phase-5')">
+        <div class="phase-title"><span>Fase 5: Forms / Signup</span></div>
+        <div class="phase-count" id="phase-5-count"></div>
+      </div>
+      <div class="phase-body" id="phase-5-body"></div>
+    </div>
+
+    <!-- Phase 6 -->
+    <div class="phase" id="phase-6">
+      <div class="phase-header" onclick="togglePhase('phase-6')">
+        <div class="phase-title"><span>Fase 6: Analytics & Tracking</span></div>
+        <div class="phase-count" id="phase-6-count"></div>
+      </div>
+      <div class="phase-body" id="phase-6-body"></div>
+    </div>
+
+    <!-- Phase 7 -->
+    <div class="phase" id="phase-7">
+      <div class="phase-header" onclick="togglePhase('phase-7')">
+        <div class="phase-title"><span>Fase 7: AI Content Generation</span></div>
+        <div class="phase-count" id="phase-7-count"></div>
+      </div>
+      <div class="phase-body" id="phase-7-body"></div>
+    </div>
+
+    <!-- Phase 8 -->
+    <div class="phase" id="phase-8">
+      <div class="phase-header" onclick="togglePhase('phase-8')">
+        <div class="phase-title"><span>Fase 8: A/B Testing</span></div>
+        <div class="phase-count" id="phase-8-count"></div>
+      </div>
+      <div class="phase-body" id="phase-8-body"></div>
+    </div>
+
+    <!-- Phase 9 -->
+    <div class="phase" id="phase-9">
+      <div class="phase-header" onclick="togglePhase('phase-9')">
+        <div class="phase-title"><span>Fase 9: Domain & Sending</span></div>
+        <div class="phase-count" id="phase-9-count"></div>
+      </div>
+      <div class="phase-body" id="phase-9-body"></div>
+    </div>
+
+    <!-- Phase 10 -->
+    <div class="phase" id="phase-10">
+      <div class="phase-header" onclick="togglePhase('phase-10')">
+        <div class="phase-title"><span>Fase 10: Product Features</span></div>
+        <div class="phase-count" id="phase-10-count"></div>
+      </div>
+      <div class="phase-body" id="phase-10-body"></div>
+    </div>
+  </div>
+
+  <!-- Frontend Tab -->
+  <div id="tab-frontend" class="tab-content">
+    <div class="alert alert-info">
+      <div class="alert-icon">&#x1f4bb;</div>
+      <div class="alert-text">
+        <strong>Pruebas Frontend Manuales</strong>
+        Abre <a href="https://betabgnuevosupa.vercel.app" target="_blank" style="color:var(--accent)">betabgnuevosupa.vercel.app</a>,
+        inicia sesion como admin (jmbarros@bgconsult.cl), navega a Steve Mail, y verifica cada prueba.
+      </div>
+    </div>
+
+    <div class="phase" id="phase-frontend">
+      <div class="phase-header" onclick="togglePhase('phase-frontend')">
+        <div class="phase-title"><span>Frontend UI Completa (20 pruebas)</span></div>
+        <div class="phase-count" id="phase-frontend-count"></div>
+      </div>
+      <div class="phase-body" id="phase-frontend-body"></div>
+    </div>
+  </div>
+
+  <!-- RLS Tab -->
+  <div id="tab-rls" class="tab-content">
+    <div class="alert alert-warning">
+      <div class="alert-icon">&#x1f512;</div>
+      <div class="alert-text">
+        <strong>Pruebas de Seguridad RLS</strong>
+        Estas pruebas verifican que un usuario NO puede acceder a datos de otro cliente.
+        Algunas se ejecutan automaticamente en el script, otras requieren verificacion manual.
+      </div>
+    </div>
+
+    <div class="phase" id="phase-rls">
+      <div class="phase-header" onclick="togglePhase('phase-rls')">
+        <div class="phase-title"><span>RLS Security (10 pruebas)</span></div>
+        <div class="phase-count" id="phase-rls-count"></div>
+      </div>
+      <div class="phase-body" id="phase-rls-body"></div>
+    </div>
+  </div>
+
+  <!-- Import Tab -->
+  <div id="tab-import" class="tab-content">
+    <div class="import-section">
+      <h3>Importar Resultados del Script API</h3>
+      <p style="color:var(--text-dim); font-size:14px; margin-bottom:12px;">
+        Pega aqui el contenido del archivo de resultados generado por <code>qa-steve-mail-api.sh</code>.
+        El formato es: <code>[PASS|FAIL|SKIP] ID | Nombre | Detalle</code>
+      </p>
+      <textarea id="import-text" placeholder="[PASS] 0.1 | Obtener JWT valido | Token obtenido (892 chars)
+[PASS] 0.2 | Seed email templates | HTTP 200
+[FAIL] 0.3 | Verificar tablas DB | 2 tablas fallaron
+..."></textarea>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="importResults()">Importar Resultados</button>
+        <button class="btn btn-outline" onclick="document.getElementById('import-text').value=''">Limpiar</button>
+      </div>
+    </div>
+
+    <div class="import-section">
+      <h3>Importar desde Archivo</h3>
+      <input type="file" id="import-file" accept=".log,.txt" style="color:var(--text-dim)" onchange="importFromFile(event)">
+    </div>
+  </div>
+
+  <!-- Report Tab -->
+  <div id="tab-report" class="tab-content">
+    <div class="import-section">
+      <h3>Reporte Final QA</h3>
+      <div class="btn-group" style="margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="generateReport()">Generar Reporte</button>
+        <button class="btn btn-outline" onclick="copyReport()">Copiar al Clipboard</button>
+        <button class="btn btn-danger" onclick="resetAll()">Reset Todo</button>
+      </div>
+      <pre id="report-output" style="min-height:200px;">Haz clic en "Generar Reporte" para ver el resumen.</pre>
+    </div>
+
+    <div class="import-section">
+      <h3>Bugs Encontrados</h3>
+      <p style="color:var(--text-dim); font-size:14px; margin-bottom:12px;">
+        Lista de pruebas que fallaron. Puedes copiar esto para crear issues.
+      </p>
+      <pre id="bugs-output" style="min-height:100px;">Sin bugs registrados aun.</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="export-modal" id="export-modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="export-content">
+    <h3>Reporte Exportado</h3>
+    <pre id="export-pre"></pre>
+    <div class="btn-group" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="copyReport()">Copiar</button>
+      <button class="btn btn-outline" onclick="document.getElementById('export-modal').classList.remove('show')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== TEST DATA =====
+const TESTS = {
+  // Phase 0: Pre-requisitos
+  '0': [
+    { id: '0.1', name: 'Obtener JWT valido', detail: 'Magic link o manual → token con exp futuro', category: 'api' },
+    { id: '0.2', name: 'Seed email templates', detail: 'POST /api/seed-email-templates → 200', category: 'api' },
+    { id: '0.3', name: 'Verificar tablas DB (15)', detail: 'Todas las 15 tablas email_* existen', category: 'api' },
+    { id: '0.4', name: 'RESEND_API_KEY presente', detail: 'gcloud run services describe → variable presente', category: 'api' },
+    { id: '0.5', name: 'API health check', detail: 'API responde a requests', category: 'api' },
+  ],
+  // Phase 1: Campaign CRUD
+  '1': [
+    { id: '1.1', name: 'Listar campanias (vacio)', detail: 'manage-email-campaigns action=list → 200', category: 'api' },
+    { id: '1.2', name: 'Crear campania draft', detail: 'action=create → id UUID retornado', category: 'api' },
+    { id: '1.3', name: 'Obtener campania', detail: 'action=get → todos los campos presentes', category: 'api' },
+    { id: '1.4', name: 'Actualizar subject', detail: 'action=update subject → cambiado', category: 'api' },
+    { id: '1.5', name: 'Actualizar HTML', detail: 'action=update html_content → guardado', category: 'api' },
+    { id: '1.6', name: 'Actualizar design_json', detail: 'action=update design_json → guardado', category: 'api' },
+    { id: '1.7', name: 'Actualizar audience_filter', detail: 'action=update audience_filter → guardado', category: 'api' },
+    { id: '1.8', name: 'Listar campanias (con datos)', detail: 'action=list → 1+ campania', category: 'api' },
+    { id: '1.9', name: 'Filtrar por status', detail: 'action=list status=draft → solo drafts', category: 'api' },
+    { id: '1.10', name: 'Cancelar campania', detail: 'action=cancel → status=cancelled', category: 'api' },
+    { id: '1.11', name: 'Eliminar campania', detail: 'action=delete → 200, no aparece en list', category: 'api' },
+    { id: '1.12', name: 'Crear campania con from_email', detail: 'action=create con from_name/from_email → guardados', category: 'api' },
+  ],
+  // Phase 2: Subscribers & Lists
+  '2': [
+    { id: '2.1', name: 'Query suscriptores', detail: 'query-email-subscribers action=list → 200', category: 'api' },
+    { id: '2.2', name: 'Sync desde Shopify', detail: 'sync-email-subscribers action=sync → importados', category: 'api' },
+    { id: '2.3', name: 'Agregar suscriptor manual', detail: 'action=add → subscriber creado', category: 'api' },
+    { id: '2.4', name: 'Buscar por email', detail: 'query con search → match exacto', category: 'api' },
+    { id: '2.5', name: 'Filtrar por status', detail: 'status=subscribed → solo subscribed', category: 'api' },
+    { id: '2.6', name: 'Filtrar por tags', detail: 'tags=[test] → solo con ese tag', category: 'api' },
+    { id: '2.7', name: 'Paginacion', detail: 'limit=5 offset=0 → max 5 resultados', category: 'api' },
+    { id: '2.8', name: 'Crear lista estatica', detail: 'manage-email-lists action=create type=static → creada', category: 'api' },
+    { id: '2.9', name: 'Crear segmento dinamico', detail: 'action=create type=segment filters=[...] → creado', category: 'api' },
+    { id: '2.10', name: 'Listar listas', detail: 'action=list → array con subscriber_count', category: 'api' },
+    { id: '2.11', name: 'Agregar miembros a lista', detail: 'action=add_members → miembros en email_list_members', category: 'api' },
+    { id: '2.12', name: 'Obtener miembros', detail: 'action=get_members → lista de subscribers', category: 'api' },
+    { id: '2.13', name: 'Remover miembro', detail: 'action=remove_members → miembro eliminado', category: 'api' },
+    { id: '2.14', name: 'Actualizar lista', detail: 'action=update → nombre/descripcion cambiados', category: 'api' },
+    { id: '2.15', name: 'Eliminar lista', detail: 'action=delete → lista y miembros eliminados', category: 'api' },
+  ],
+  // Phase 3: Templates
+  '3': [
+    { id: '3.1', name: 'Listar templates sistema', detail: 'email-templates action=list → 15+ templates', category: 'api' },
+    { id: '3.2', name: 'Obtener template individual', detail: 'action=get → design_json + html_preview', category: 'api' },
+    { id: '3.3', name: 'Crear template custom', detail: 'action=create → is_system=false', category: 'api' },
+    { id: '3.4', name: 'Eliminar template custom', detail: 'action=delete → eliminado OK', category: 'api' },
+    { id: '3.5', name: 'NO eliminar template sistema', detail: 'action=delete sistema → error/rechazo', category: 'api' },
+  ],
+  // Phase 4: Flows
+  '4': [
+    { id: '4.1', name: 'Listar flows', detail: 'manage-email-flows action=list → 200', category: 'api' },
+    { id: '4.2', name: 'Crear flow abandoned_cart', detail: 'trigger_type=abandoned_cart, 3+ steps → creado', category: 'api' },
+    { id: '4.3', name: 'Crear flow welcome', detail: 'trigger_type=welcome → creado', category: 'api' },
+    { id: '4.4', name: 'Crear flow post_purchase', detail: 'trigger_type=post_purchase → creado', category: 'api' },
+    { id: '4.5', name: 'Crear flow winback', detail: 'trigger_type=winback → creado', category: 'api' },
+    { id: '4.6', name: 'Obtener flow', detail: 'action=get → todos los campos + steps', category: 'api' },
+    { id: '4.7', name: 'Actualizar steps', detail: 'action=update steps → actualizados', category: 'api' },
+    { id: '4.8', name: 'Step condition con branches', detail: 'type=condition + yes/no branches → guardado', category: 'api' },
+    { id: '4.9', name: 'Configurar quiet hours', detail: 'quiet_hours_start=22, end=8 → guardado', category: 'api' },
+    { id: '4.10', name: 'Configurar exit_on_purchase', detail: 'exit_on_purchase=true → guardado', category: 'api' },
+    { id: '4.11', name: 'Activar flow', detail: 'action=activate → status=active', category: 'api' },
+    { id: '4.12', name: 'Pausar flow', detail: 'action=deactivate → status=paused', category: 'api' },
+    { id: '4.13', name: 'Reactivar flow', detail: 'action=activate desde paused → active', category: 'api' },
+    { id: '4.14', name: 'Eliminar flow', detail: 'action=delete → eliminado', category: 'api' },
+    { id: '4.15', name: 'Flow con delay steps', detail: 'delay_seconds guardados correctamente', category: 'api' },
+  ],
+  // Phase 5: Forms
+  '5': [
+    { id: '5.1', name: 'Crear form popup', detail: 'type=popup → form creado', category: 'api' },
+    { id: '5.2', name: 'Crear form slide_in', detail: 'type=slide_in → form creado', category: 'api' },
+    { id: '5.3', name: 'Crear form inline', detail: 'type=inline → form creado', category: 'api' },
+    { id: '5.4', name: 'Activar form', detail: 'status=active → activado', category: 'api' },
+    { id: '5.5', name: 'Pausar form', detail: 'status=paused → pausado', category: 'api' },
+    { id: '5.6', name: 'Obtener widget JS', detail: 'GET /api/email-form-widget → JavaScript', category: 'api' },
+    { id: '5.7', name: 'Submit form publico', detail: 'email-signup-form-public → subscriber creado', category: 'api' },
+    { id: '5.8', name: 'Eliminar forms', detail: 'action=delete → forms eliminados', category: 'api' },
+  ],
+  // Phase 6: Analytics
+  '6': [
+    { id: '6.1', name: 'Overview sin datos', detail: 'overview days=30 → response con zeros', category: 'api' },
+    { id: '6.2', name: 'Insertar evento sent', detail: 'DB insert email_events type=sent', category: 'api' },
+    { id: '6.3', name: 'Insertar evento opened', detail: 'DB insert email_events type=opened', category: 'api' },
+    { id: '6.4', name: 'Insertar evento clicked', detail: 'DB insert email_events type=clicked', category: 'api' },
+    { id: '6.5', name: 'Overview con datos', detail: 'overview → metricas calculadas', category: 'api' },
+    { id: '6.6', name: 'Campaign stats', detail: 'campaign-stats → open_rate, click_rate', category: 'api' },
+    { id: '6.7', name: 'Timeline', detail: 'timeline days=7 → serie temporal', category: 'api' },
+    { id: '6.8', name: 'Click heatmap', detail: 'click_heatmap → top URLs', category: 'api' },
+    { id: '6.9', name: 'Deliverability dashboard', detail: 'health_score 0-100', category: 'api' },
+    { id: '6.10', name: 'Industry benchmarks', detail: 'Comparacion con promedios', category: 'api' },
+    { id: '6.11', name: 'Tracking pixel open', detail: 'GET /api/email-track/open → 1x1 GIF', category: 'api' },
+    { id: '6.12', name: 'Tracking click redirect', detail: 'GET /api/email-track/click → 302 redirect', category: 'api' },
+  ],
+  // Phase 7: AI
+  '7': [
+    { id: '7.1', name: 'Generar HTML campania', detail: 'generate_campaign_html → HTML valido', category: 'api' },
+    { id: '7.2', name: 'Generar subjects', detail: 'generate_subjects → 3-5 variantes', category: 'api' },
+    { id: '7.3', name: 'Generar flow emails (abandoned)', detail: 'flow_type=abandoned_cart → 3 emails', category: 'api' },
+    { id: '7.4', name: 'Generar flow emails (welcome)', detail: 'flow_type=welcome → 2-3 emails', category: 'api' },
+    { id: '7.5', name: 'Contenido en espanol', detail: 'HTML generado en espanol', category: 'api' },
+    { id: '7.6', name: 'Merge tags incluidos', detail: '{{ first_name }}, {{ brand_name }} presentes', category: 'api' },
+  ],
+  // Phase 8: A/B
+  '8': [
+    { id: '8.1', name: 'Crear A/B test', detail: 'create_test → status=pending', category: 'api' },
+    { id: '8.2', name: 'Configurar variante B', detail: 'variant_b_subject guardado', category: 'api' },
+    { id: '8.3', name: 'Configurar % y metrica', detail: 'test_percentage=20, winning_metric → ok', category: 'api' },
+    { id: '8.4', name: 'Constraint >50%', detail: 'test_percentage=60 → error de validacion', category: 'api' },
+    { id: '8.5', name: 'Get A/B results', detail: 'get_results → variant A vs B stats', category: 'api' },
+    { id: '8.6', name: 'Eliminar A/B test', detail: 'delete_test → eliminado', category: 'api' },
+  ],
+  // Phase 9: Domain
+  '9': [
+    { id: '9.1', name: 'Listar dominios', detail: 'verify-email-domain action=list → 200', category: 'api' },
+    { id: '9.2', name: 'Iniciar verificacion', detail: 'action=initiate → DNS records retornados', category: 'api' },
+    { id: '9.3', name: 'Check DNS', detail: 'action=check → status spf/dkim/dmarc', category: 'api' },
+    { id: '9.4', name: 'Frontend DomainSetup', detail: 'Modal abre, campos visibles', category: 'api' },
+    { id: '9.5', name: 'Envio test (RESEND)', detail: 'send-email action=send-test → email recibido', category: 'api' },
+    { id: '9.6', name: 'Envio campania (RESEND)', detail: 'manage-campaigns action=send → sent_count > 0', category: 'api' },
+    { id: '9.7', name: 'Unsubscribe endpoint', detail: 'GET /api/email-unsubscribe → responde', category: 'api' },
+    { id: '9.8', name: 'Unsubscribe token invalido', detail: 'token=INVALID → error 400', category: 'api' },
+  ],
+  // Phase 10: Products
+  '10': [
+    { id: '10.1', name: 'Listar productos', detail: 'product-recommendations action=list_products', category: 'api' },
+    { id: '10.2', name: 'Buscar producto', detail: 'action=search_products query=test', category: 'api' },
+    { id: '10.3', name: 'Generar recomendaciones', detail: 'action=generate type=best_sellers', category: 'api' },
+    { id: '10.4', name: 'Preview recomendaciones', detail: 'action=preview → HTML', category: 'api' },
+    { id: '10.5', name: 'Subscribir alerta (publico)', detail: 'action=subscribe sin auth → alerta creada', category: 'api' },
+    { id: '10.6', name: 'Listar alertas', detail: 'action=list → array', category: 'api' },
+    { id: '10.7', name: 'Stats alertas', detail: 'action=get_stats → conteos', category: 'api' },
+    { id: '10.8', name: 'Eliminar alerta', detail: 'action=delete → eliminada', category: 'api' },
+  ],
+  // Frontend
+  'frontend': [
+    { id: 'F.1', name: 'Tab Campaigns carga', detail: 'Lista visible sin error', category: 'frontend' },
+    { id: 'F.2', name: 'Crear campania desde UI', detail: 'Wizard 4 pasos funciona', category: 'frontend' },
+    { id: 'F.3', name: 'Editor GrapeJS carga', detail: 'Canvas visible, toolbar funcional', category: 'frontend' },
+    { id: 'F.4', name: 'Template gallery abre', detail: 'Modal con templates', category: 'frontend' },
+    { id: 'F.5', name: 'Preview desktop/mobile', detail: 'Toggle funciona', category: 'frontend' },
+    { id: 'F.6', name: 'Tab Subscribers carga', detail: 'Lista o empty state', category: 'frontend' },
+    { id: 'F.7', name: 'Sync Shopify funciona', detail: 'Boton sync ejecuta y actualiza', category: 'frontend' },
+    { id: 'F.8', name: 'Tab Lists funciona', detail: 'Crear/ver listas', category: 'frontend' },
+    { id: 'F.9', name: 'Tab Flows carga', detail: 'Lista de flows', category: 'frontend' },
+    { id: 'F.10', name: 'Crear flow desde UI', detail: 'Trigger picker → editor', category: 'frontend' },
+    { id: 'F.11', name: 'FlowCanvas renderiza', detail: 'Nodos y conexiones visibles', category: 'frontend' },
+    { id: 'F.12', name: 'Agregar step email', detail: 'Step anadido al canvas', category: 'frontend' },
+    { id: 'F.13', name: 'Agregar step delay', detail: 'Delay anadido', category: 'frontend' },
+    { id: 'F.14', name: 'Tab Forms carga', detail: 'Lista o empty state', category: 'frontend' },
+    { id: 'F.15', name: 'Crear form popup', detail: 'Designer abre', category: 'frontend' },
+    { id: 'F.16', name: 'Tab Analytics carga', detail: 'Dashboard con cards', category: 'frontend' },
+    { id: 'F.17', name: 'Dominio setup', detail: 'Modal con campos DNS', category: 'frontend' },
+    { id: 'F.18', name: 'Responsive mobile (375px)', detail: 'UI no se rompe', category: 'frontend' },
+    { id: 'F.19', name: 'Errores en consola', detail: '0 errores rojos en DevTools', category: 'frontend' },
+    { id: 'F.20', name: 'Navegacion entre tabs', detail: 'Sin pantalla blanca al cambiar', category: 'frontend' },
+  ],
+  // RLS
+  'rls': [
+    { id: 'R.1', name: 'User A no ve campanias de User B', detail: 'Query con JWT de A, client_id de B → vacio', category: 'rls' },
+    { id: 'R.2', name: 'User A no ve suscriptores de B', detail: 'Query retorna 0 resultados', category: 'rls' },
+    { id: 'R.3', name: 'User A no puede editar campania de B', detail: 'Update retorna error o sin efecto', category: 'rls' },
+    { id: 'R.4', name: 'User A no puede eliminar flow de B', detail: 'Delete retorna error', category: 'rls' },
+    { id: 'R.5', name: 'Admin ve todo', detail: 'Admin JWT puede listar cualquier cliente', category: 'rls' },
+    { id: 'R.6', name: 'Sin JWT → 401', detail: 'Cualquier endpoint sin Authorization → 401', category: 'rls' },
+    { id: 'R.7', name: 'JWT expirado → 401', detail: 'Token caducado → 401', category: 'rls' },
+    { id: 'R.8', name: 'Tracking sin auth OK', detail: 'GET /api/email-track/open sin JWT → funciona', category: 'rls' },
+    { id: 'R.9', name: 'Form submit sin auth OK', detail: 'POST email-signup-form-public sin JWT → ok', category: 'rls' },
+    { id: 'R.10', name: 'Product alert subscribe sin auth OK', detail: 'POST product-alerts subscribe sin JWT → ok', category: 'rls' },
+  ],
+};
+
+// ===== STATE =====
+let state = {};
+const STORAGE_KEY = 'qa-steve-mail-state-v1';
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    state = saved ? JSON.parse(saved) : {};
+  } catch(e) { state = {}; }
+}
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function getTestState(id) {
+  return state[id] || { status: 'pending', notes: '' };
+}
+
+function setTestStatus(id, status) {
+  if (!state[id]) state[id] = { status: 'pending', notes: '' };
+  state[id].status = status;
+  saveState();
+  renderAll();
+}
+
+function setTestNotes(id, notes) {
+  if (!state[id]) state[id] = { status: 'pending', notes: '' };
+  state[id].notes = notes;
+  saveState();
+}
+
+// ===== RENDER =====
+function renderTestItem(test) {
+  const ts = getTestState(test.id);
+  const statusClass = ts.status === 'pending' ? 'status-pending' :
+                      ts.status === 'pass' ? 'status-pass' :
+                      ts.status === 'fail' ? 'status-fail' : 'status-skip';
+
+  return `
+    <div class="test-item">
+      <input type="checkbox" class="test-checkbox" ${ts.status === 'pass' ? 'checked' : ''}
+        onchange="setTestStatus('${test.id}', this.checked ? 'pass' : 'pending')">
+      <div class="test-info">
+        <div class="test-id">${test.id}</div>
+        <div class="test-name">${test.name}</div>
+        <div class="test-detail">${test.detail}</div>
+      </div>
+      <div class="test-status ${statusClass}">${ts.status}</div>
+      <div class="status-toggle">
+        <button title="Pass" class="${ts.status === 'pass' ? 'active-pass' : ''}"
+          onclick="setTestStatus('${test.id}', 'pass')">&#10003;</button>
+        <button title="Fail" class="${ts.status === 'fail' ? 'active-fail' : ''}"
+          onclick="setTestStatus('${test.id}', 'fail')">&#10007;</button>
+        <button title="Skip" class="${ts.status === 'skip' ? 'active-skip' : ''}"
+          onclick="setTestStatus('${test.id}', 'skip')">&#8709;</button>
+      </div>
+    </div>
+    <div class="test-notes" style="margin-left:34px;margin-bottom:8px;">
+      <textarea placeholder="Notas..." rows="1"
+        onblur="setTestNotes('${test.id}', this.value)"
+        onfocus="this.rows=3">${ts.notes || ''}</textarea>
+    </div>
+  `;
+}
+
+function renderPhase(phaseId, tests) {
+  const body = document.getElementById(`phase-${phaseId}-body`);
+  if (!body) return;
+  body.innerHTML = tests.map(t => renderTestItem(t)).join('');
+
+  // Update count
+  const countEl = document.getElementById(`phase-${phaseId}-count`);
+  if (countEl) {
+    let pass = 0, fail = 0, skip = 0;
+    tests.forEach(t => {
+      const s = getTestState(t.id).status;
+      if (s === 'pass') pass++;
+      else if (s === 'fail') fail++;
+      else if (s === 'skip') skip++;
+    });
+    countEl.innerHTML = `
+      <span style="color:var(--pass)">${pass} pass</span>
+      <span style="color:var(--fail)">${fail} fail</span>
+      <span style="color:var(--skip)">${skip} skip</span>
+      <span style="color:var(--text-dim)">${tests.length} total</span>
+    `;
+  }
+}
+
+function updateStats() {
+  let pass = 0, fail = 0, skip = 0, total = 0;
+  let apiPass = 0, frontendPass = 0, rlsPass = 0;
+
+  Object.keys(TESTS).forEach(phase => {
+    TESTS[phase].forEach(t => {
+      total++;
+      const s = getTestState(t.id).status;
+      if (s === 'pass') {
+        pass++;
+        if (t.category === 'api') apiPass++;
+        else if (t.category === 'frontend') frontendPass++;
+        else if (t.category === 'rls') rlsPass++;
+      }
+      else if (s === 'fail') fail++;
+      else if (s === 'skip') skip++;
+    });
+  });
+
+  document.getElementById('stat-pass').textContent = pass;
+  document.getElementById('stat-fail').textContent = fail;
+  document.getElementById('stat-skip').textContent = skip;
+  document.getElementById('stat-total').textContent = `${pass + fail + skip}/${total}`;
+
+  const done = pass + fail + skip;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = `${pct}% completado (${done}/${total})`;
+
+  // Badge counts
+  const apiTotal = Object.keys(TESTS).filter(k => !['frontend','rls'].includes(k)).reduce((s,k) => s + TESTS[k].length, 0);
+  document.getElementById('badge-api').textContent = `${apiPass}/${apiTotal}`;
+  document.getElementById('badge-frontend').textContent = `${frontendPass}/${TESTS.frontend.length}`;
+  document.getElementById('badge-rls').textContent = `${rlsPass}/${TESTS.rls.length}`;
+}
+
+function renderAll() {
+  Object.keys(TESTS).forEach(phase => {
+    renderPhase(phase, TESTS[phase]);
+  });
+  updateStats();
+}
+
+// ===== TABS =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ===== PHASE TOGGLE =====
+function togglePhase(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ===== IMPORT =====
+function importResults() {
+  const text = document.getElementById('import-text').value;
+  if (!text.trim()) return alert('Pega el contenido del archivo de resultados primero.');
+
+  let imported = 0;
+  text.split('\n').forEach(line => {
+    const match = line.match(/\[(PASS|FAIL|SKIP)\]\s*(\S+)\s*\|/);
+    if (match) {
+      const status = match[1].toLowerCase();
+      const id = match[2].trim();
+      // Find test with this ID
+      let found = false;
+      Object.keys(TESTS).forEach(phase => {
+        TESTS[phase].forEach(t => {
+          if (t.id === id) {
+            setTestStatus(id, status);
+            // Extract detail after second |
+            const parts = line.split('|');
+            if (parts.length >= 3) {
+              setTestNotes(id, parts.slice(2).join('|').trim());
+            }
+            found = true;
+            imported++;
+          }
+        });
+      });
+    }
+  });
+
+  saveState();
+  renderAll();
+  alert(`${imported} resultados importados.`);
+}
+
+function importFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('import-text').value = e.target.result;
+    importResults();
+  };
+  reader.readAsText(file);
+}
+
+// ===== REPORT =====
+function generateReport() {
+  let report = `# QA Steve Mail - Reporte Final\n`;
+  report += `Fecha: ${new Date().toLocaleString('es-CL')}\n\n`;
+
+  let totalPass = 0, totalFail = 0, totalSkip = 0, totalPending = 0;
+  let bugs = [];
+
+  const phaseNames = {
+    '0': 'Pre-requisitos', '1': 'Campaign CRUD', '2': 'Subscribers & Lists',
+    '3': 'Templates', '4': 'Flows', '5': 'Forms', '6': 'Analytics',
+    '7': 'AI Content', '8': 'A/B Testing', '9': 'Domain & Sending',
+    '10': 'Products', 'frontend': 'Frontend UI', 'rls': 'RLS Security'
+  };
+
+  Object.keys(TESTS).forEach(phase => {
+    let pPass = 0, pFail = 0, pSkip = 0, pPending = 0;
+    let lines = [];
+
+    TESTS[phase].forEach(t => {
+      const ts = getTestState(t.id);
+      const icon = ts.status === 'pass' ? '[PASS]' : ts.status === 'fail' ? '[FAIL]' : ts.status === 'skip' ? '[SKIP]' : '[----]';
+      lines.push(`  ${icon} ${t.id} ${t.name}${ts.notes ? ' -- ' + ts.notes : ''}`);
+
+      if (ts.status === 'pass') { pPass++; totalPass++; }
+      else if (ts.status === 'fail') { pFail++; totalFail++; bugs.push({ id: t.id, name: t.name, notes: ts.notes }); }
+      else if (ts.status === 'skip') { pSkip++; totalSkip++; }
+      else { pPending++; totalPending++; }
+    });
+
+    report += `## ${phaseNames[phase] || phase} (${pPass}/${TESTS[phase].length} pass)\n`;
+    report += lines.join('\n') + '\n\n';
+  });
+
+  const total = totalPass + totalFail + totalSkip + totalPending;
+  const effective = totalPass + totalFail;
+  const score = effective > 0 ? Math.round(totalPass / effective * 100) : 0;
+
+  report += `## Resumen\n`;
+  report += `- PASS: ${totalPass}\n`;
+  report += `- FAIL: ${totalFail}\n`;
+  report += `- SKIP: ${totalSkip}\n`;
+  report += `- PENDING: ${totalPending}\n`;
+  report += `- TOTAL: ${total}\n`;
+  report += `- SCORE: ${score}% (${totalPass}/${effective} efectivas)\n`;
+
+  document.getElementById('report-output').textContent = report;
+
+  // Bugs
+  if (bugs.length > 0) {
+    let bugReport = `# Bugs Encontrados (${bugs.length})\n\n`;
+    bugs.forEach((b, i) => {
+      bugReport += `${i+1}. [${b.id}] ${b.name}\n`;
+      if (b.notes) bugReport += `   Notas: ${b.notes}\n`;
+      bugReport += '\n';
+    });
+    document.getElementById('bugs-output').textContent = bugReport;
+  } else {
+    document.getElementById('bugs-output').textContent = 'Sin bugs encontrados.';
+  }
+}
+
+function copyReport() {
+  const text = document.getElementById('report-output').textContent;
+  navigator.clipboard.writeText(text).then(() => alert('Copiado al clipboard!'));
+}
+
+function resetAll() {
+  if (!confirm('Esto eliminara TODOS los resultados. Continuar?')) return;
+  state = {};
+  saveState();
+  renderAll();
+}
+
+// ===== INIT =====
+loadState();
+renderAll();
+</script>
+</body>
+</html>
