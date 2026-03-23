@@ -10,7 +10,23 @@ import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Send, User, Lightbulb, AlertTriangle, Activity, WifiOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import avatarSteve from '@/assets/avatar-steve.png';
+
+/** Error boundary to prevent ReactMarkdown crashes from breaking the entire chat */
+class MarkdownErrorBoundary extends Component<{ children: ReactNode; fallback: string }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[EST] ReactMarkdown render error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <p className="text-sm whitespace-pre-wrap">{this.props.fallback}</p>;
+    }
+    return this.props.children;
+  }
+}
 
 /** Strip <thinking>...</thinking> blocks that leak from chain-of-thought models */
 function stripThinking(text: string): string {
@@ -40,6 +56,7 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initRef = useRef(false);
+  const activeRequestId = useRef<string | null>(null);
 
   const suggestedQuestions = [
     '¿Cómo están mis campañas de Meta este mes?',
@@ -129,10 +146,13 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   }
 
   async function sendMessage(messageText: string) {
-    console.log('[EST] sendMessage called, text:', messageText?.slice(0, 50), 'isLoading:', isLoading);
     if (!messageText.trim() || isLoading) return;
     const userMessage = messageText.trim();
     setInput('');
+
+    // Track request to prevent race conditions with safety timeout
+    const requestId = crypto.randomUUID();
+    activeRequestId.current = requestId;
 
     const tempUserMsg: Message = {
       id: crypto.randomUUID(),
@@ -140,29 +160,25 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
       content: userMessage,
       created_at: new Date().toISOString(),
     };
-    console.log('[EST] Adding user message to state, id:', tempUserMsg.id);
-    setMessages(prev => {
-      console.log('[EST] setMessages(user): prev.length=', prev.length, '→ new length=', prev.length + 1);
-      return [...prev, tempUserMsg];
-    });
+    setMessages(prev => [...prev, tempUserMsg]);
     setIsLoading(true);
 
-    // Safety timeout: if callApi hangs (network drop, browser tab suspension),
-    // force-unlock the UI after 100s so the user can retry without reloading.
+    // Safety timeout: force-unlock UI after 130s (backend has 120s timeout)
     const safetyTimer = setTimeout(() => {
-      console.warn('[EST] SAFETY TIMEOUT — force-unlocking UI after 100s');
+      // Only fire if this is still the active request
+      if (activeRequestId.current !== requestId) return;
+      console.warn('[EST] SAFETY TIMEOUT — force-unlocking UI after 130s');
+      activeRequestId.current = null;
       setIsLoading(false);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: '⚠️ La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.',
+        content: 'La solicitud tardó demasiado. Revisa tu conexión e intenta de nuevo.',
         created_at: new Date().toISOString(),
       }]);
-      inputRef.current?.focus();
-    }, 100_000);
+    }, 130_000);
 
     try {
-      console.log('[EST] Calling callApi steve-chat, clientId:', clientId, 'convId:', conversationId);
       const { data, error } = await callApi('steve-chat', {
         body: {
           client_id: clientId,
@@ -171,43 +187,37 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
           mode: 'estrategia',
         },
       });
-      console.log('[EST] callApi returned — error:', error, 'data keys:', data ? Object.keys(data) : 'null', 'data.message length:', data?.message?.length);
+
+      // Ignore response if a newer request superseded this one
+      if (activeRequestId.current !== requestId) return;
 
       if (error) throw error;
       if (!data) throw new Error('No data returned from API');
 
       if (data.conversation_id && !conversationId) {
-        console.log('[EST] Setting conversationId:', data.conversation_id);
         setConversationId(data.conversation_id);
       }
 
-      // Accept message from response — handle both string and empty cases
       const responseText = data.message || data.text || data.response;
-      console.log('[EST] responseText type:', typeof responseText, 'length:', responseText?.length, 'first 80:', String(responseText || '').slice(0, 80));
-      if (responseText) {
-        const assistantMsg: Message = {
+      if (responseText && String(responseText).trim().length > 0) {
+        setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           role: 'assistant',
           content: String(responseText),
           created_at: new Date().toISOString(),
-        };
-        console.log('[EST] Adding assistant message to state, id:', assistantMsg.id);
-        setMessages(prev => {
-          console.log('[EST] setMessages(assistant): prev.length=', prev.length, '→ new length=', prev.length + 1);
-          return [...prev, assistantMsg];
-        });
+        }]);
       } else {
-        console.warn('[EST] API returned OK but no message. Full data:', JSON.stringify(data).slice(0, 500));
-        const fallbackMsg: Message = {
+        setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: '⚠️ Steve procesó tu mensaje pero no generó respuesta. Intenta de nuevo.',
+          content: 'Steve procesó tu mensaje pero no generó respuesta. Intenta de nuevo.',
           created_at: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, fallbackMsg]);
+        }]);
       }
     } catch (err: any) {
-      console.error('[EST] CATCH — error:', err, 'type:', typeof err, 'message:', err?.message);
+      // Ignore errors from stale requests
+      if (activeRequestId.current !== requestId) return;
+
       const errStr = typeof err === 'string' ? err : (err?.message || '');
       const is429 = err?.status === 429 || errStr.includes('429');
       const is5xx = /\b50[0-9]\b/.test(errStr);
@@ -215,27 +225,31 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
 
       let errorText: string;
       if (is429) {
-        errorText = '⚠️ Demasiadas solicitudes. Espera un momento e intenta de nuevo.';
+        errorText = 'Demasiadas solicitudes. Espera un momento e intenta de nuevo.';
       } else if (is5xx) {
-        errorText = '⚠️ El servidor está temporalmente fuera de servicio. Intenta de nuevo en unos segundos.';
+        errorText = 'El servidor está temporalmente fuera de servicio. Intenta de nuevo en unos segundos.';
       } else if (isNetwork) {
-        errorText = '⚠️ Error de conexión. Revisa tu internet e intenta de nuevo.';
+        errorText = 'Error de conexión. Revisa tu internet e intenta de nuevo.';
       } else {
-        errorText = `⚠️ Error al procesar tu mensaje. Intenta de nuevo.${errStr ? ` (${errStr.slice(0, 120)})` : ''}`;
+        errorText = `Error al procesar tu mensaje. Intenta de nuevo.${errStr ? ` (${errStr.slice(0, 120)})` : ''}`;
       }
 
-      const errorMsg: Message = {
+      setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: errorText,
         created_at: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      }]);
     } finally {
       clearTimeout(safetyTimer);
-      console.log('[EST] FINALLY — setting isLoading=false');
-      setIsLoading(false);
-      inputRef.current?.focus();
+      if (activeRequestId.current === requestId) {
+        activeRequestId.current = null;
+        setIsLoading(false);
+        // Only refocus if user hasn't focused elsewhere
+        if (document.activeElement === document.body || document.activeElement?.tagName === 'BODY') {
+          inputRef.current?.focus();
+        }
+      }
     }
   }
 
@@ -243,8 +257,6 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     e.preventDefault();
     sendMessage(input);
   }
-
-  console.log('[EST] RENDER — messages.length:', messages.length, 'isLoading:', isLoading, 'isInitializing:', isInitializing, 'conversationId:', conversationId);
 
   if (isInitializing) {
     return (
@@ -361,7 +373,9 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
                   </Avatar>
                   <div className="max-w-[80%] px-4 py-3 text-sm shadow-sm bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm">
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed">
-                      <ReactMarkdown>{stripThinking(message.content)}</ReactMarkdown>
+                      <MarkdownErrorBoundary fallback={stripThinking(message.content)}>
+                        <ReactMarkdown>{stripThinking(message.content)}</ReactMarkdown>
+                      </MarkdownErrorBoundary>
                     </div>
                   </div>
                 </div>

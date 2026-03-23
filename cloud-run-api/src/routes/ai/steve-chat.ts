@@ -835,10 +835,16 @@ export async function steveChat(c: Context) {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString().split('T')[0];
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000).toISOString().split('T')[0];
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 86400000).toISOString().split('T')[0];
-    const dayOfWeek = now.getDay() || 7;
-    const thisMonday = new Date(now.getTime() - (dayOfWeek - 1) * 86400000).toISOString().split('T')[0];
-    const lastMonday = new Date(now.getTime() - (dayOfWeek + 6) * 86400000).toISOString().split('T')[0];
-    const lastSunday = new Date(now.getTime() - dayOfWeek * 86400000).toISOString().split('T')[0];
+    const dayOfWeek = now.getDay() || 7; // Mon=1 … Sun=7
+    const thisMondayDate = new Date(now);
+    thisMondayDate.setDate(now.getDate() - (dayOfWeek - 1));
+    const thisMonday = thisMondayDate.toISOString().split('T')[0];
+    const lastMondayDate = new Date(thisMondayDate);
+    lastMondayDate.setDate(thisMondayDate.getDate() - 7);
+    const lastMonday = lastMondayDate.toISOString().split('T')[0];
+    const lastSundayDate = new Date(thisMondayDate);
+    lastSundayDate.setDate(thisMondayDate.getDate() - 1);
+    const lastSunday = lastSundayDate.toISOString().split('T')[0];
     const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthStart = lastMonthDate.toISOString().split('T')[0];
@@ -887,7 +893,11 @@ export async function steveChat(c: Context) {
     ]);
     timelog('estrategia-parallel-queries');
 
-    const recentMessages = (convMessages || []).slice(-20);
+    // Smart truncation: keep first 5 messages (context) + last 15 (recent) to preserve conversation intent
+    const allMessages = convMessages || [];
+    const recentMessages = allMessages.length > 20
+      ? [...allMessages.slice(0, 5), ...allMessages.slice(-15)]
+      : allMessages;
 
     const briefSummary = persona?.persona_data
       ? JSON.stringify(persona.persona_data)
@@ -901,10 +911,14 @@ export async function steveChat(c: Context) {
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
     ).join('\n\n') || '';
 
-    const connIds = (connections || []).map((c: { id: string }) => c.id);
-    const shopifyConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'shopify').map((c: { id: string }) => c.id);
-    const metaConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'meta').map((c: { id: string }) => c.id);
-    const googleConnIds = (connections || []).filter((c: { platform: string }) => c.platform === 'google_ads').map((c: { id: string }) => c.id);
+    const safeConnections = connections || [];
+    if (!connections) {
+      console.warn('[EST] platform_connections query returned null — treating as no connections');
+    }
+    const connIds = safeConnections.map((c: { id: string }) => c.id);
+    const shopifyConnIds = safeConnections.filter((c: { platform: string }) => c.platform === 'shopify').map((c: { id: string }) => c.id);
+    const metaConnIds = safeConnections.filter((c: { platform: string }) => c.platform === 'meta').map((c: { id: string }) => c.id);
+    const googleConnIds = safeConnections.filter((c: { platform: string }) => c.platform === 'google_ads').map((c: { id: string }) => c.id);
 
     let metricsContext = '';
 
@@ -1105,10 +1119,10 @@ export async function steveChat(c: Context) {
       }
 
       if (!metricsContext) {
-        metricsContext = '\nMÉTRICAS: El cliente tiene conexiones activas pero aún no hay datos de métricas en los últimos 30 días.\n';
+        metricsContext = '\n⚠️ MÉTRICAS: El cliente tiene conexiones activas pero NO hay datos de métricas en los últimos 90 días. Es probable que la sincronización no haya corrido aún o que las plataformas estén recién conectadas. NO inventes números — di explícitamente que aún no hay datos disponibles y sugiere revisar las conexiones.\n';
       }
     } else {
-      metricsContext = '\nMÉTRICAS: El cliente aún no tiene plataformas conectadas (Meta, Google, Shopify).\n';
+      metricsContext = '\n⚠️ MÉTRICAS: El cliente NO tiene plataformas conectadas (Meta, Google, Shopify). NO inventes métricas ni números. Di claramente que no hay datos porque no hay plataformas conectadas y recomienda conectarlas.\n';
     }
 
     // Add current connection status to prevent hallucination from old chat history
@@ -1197,20 +1211,35 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       : estrategiaSystemPrompt;
 
     timelog('estrategia-pre-anthropic');
-    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        system: truncatedSystem,
-        messages: aiMessages,
-      }),
-    });
+    const anthropicController = new AbortController();
+    const anthropicTimeout = setTimeout(() => anthropicController.abort(), 120000); // 2 minutes
+    let aiResponse: Response;
+    try {
+      aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2000,
+          system: truncatedSystem,
+          messages: aiMessages,
+        }),
+        signal: anthropicController.signal,
+      });
+    } catch (fetchErr: any) {
+      clearTimeout(anthropicTimeout);
+      if (fetchErr.name === 'AbortError') {
+        console.error('[EST] Anthropic API timed out after 120s');
+        return c.json({ error: 'La respuesta tardó demasiado. Intenta de nuevo.' }, 504);
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(anthropicTimeout);
+    }
 
     timelog('estrategia-post-anthropic');
 
@@ -1226,11 +1255,14 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     // Strip <thinking>...</thinking> blocks from chain-of-thought models
     const assistantMsg = rawMsg.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
 
-    await supabase.from('steve_messages').insert({
+    const { error: insertError } = await supabase.from('steve_messages').insert({
       conversation_id: estrategiaConvId,
       role: 'assistant',
       content: assistantMsg,
     });
+    if (insertError) {
+      console.error('[EST] Failed to persist assistant message:', insertError);
+    }
 
     timelog('estrategia-complete');
     console.log(`Steve estrategia: conversation ${estrategiaConvId}, client ${client_id}, total ${Date.now() - requestStart}ms`);
