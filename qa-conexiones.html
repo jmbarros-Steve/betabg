@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Conexiones — 30 Pasos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 2.2rem; color: #fff; margin-bottom: 8px; }
+  .header p { color: #94a3b8; font-size: 1rem; max-width: 600px; margin: 0 auto; }
+
+  /* HOW-TO BANNER */
+  .howto {
+    max-width: 900px; margin: 20px auto; background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 20px 24px; line-height: 1.7;
+  }
+  .howto h3 { color: #fbbf24; margin-bottom: 10px; font-size: 1rem; }
+  .howto ol { padding-left: 20px; }
+  .howto li { margin-bottom: 6px; font-size: 0.85rem; color: #cbd5e1; }
+  .howto code { background: #334155; color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+  .howto .warn { color: #f87171; font-weight: 700; }
+  .howto .ok { color: #4ade80; }
+  .howto a { color: #60a5fa; text-decoration: none; }
+  .howto a:hover { text-decoration: underline; }
+  .howto .nav-path {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0f172a; border: 1px solid #475569; border-radius: 6px;
+    padding: 2px 8px; font-size: 0.8rem; color: #60a5fa; white-space: nowrap;
+  }
+  .howto .nav-path .sep { color: #475569; }
+
+  .score-bar {
+    display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+    margin: 20px auto 30px; max-width: 900px;
+  }
+  .score-card {
+    background: #1e293b; border-radius: 12px; padding: 16px 24px; text-align: center; min-width: 120px;
+    border: 1px solid #334155;
+  }
+  .score-card .num { font-size: 2rem; font-weight: 700; }
+  .score-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .score-card.green .num { color: #4ade80; }
+  .score-card.red .num { color: #f87171; }
+  .score-card.yellow .num { color: #fbbf24; }
+  .score-card.blue .num { color: #60a5fa; }
+
+  .progress-wrap { max-width: 900px; margin: 0 auto 30px; }
+  .progress-bg { background: #1e293b; border-radius: 99px; height: 12px; overflow: hidden; }
+  .progress-fill { background: linear-gradient(90deg, #4ade80, #22d3ee); height: 100%; border-radius: 99px; transition: width 0.5s; }
+  .progress-label { text-align: center; margin-top: 6px; font-size: 0.85rem; color: #94a3b8; }
+
+  .blocks { max-width: 900px; margin: 0 auto; }
+
+  .block { margin-bottom: 24px; }
+  .block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1e293b; border-radius: 12px 12px 0 0; padding: 14px 20px;
+    cursor: pointer; border: 1px solid #334155; border-bottom: none;
+    user-select: none;
+  }
+  .block-header:hover { background: #253347; }
+  .block-header h2 { font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .block-header .badge {
+    font-size: 0.7rem; background: #334155; color: #94a3b8; padding: 2px 8px;
+    border-radius: 99px; font-weight: 600;
+  }
+  .block-header .arrow { transition: transform 0.3s; font-size: 0.8rem; color: #64748b; }
+  .block-header.open .arrow { transform: rotate(180deg); }
+  .block-header .block-score { font-size: 0.85rem; }
+
+  .block-body {
+    border: 1px solid #334155; border-top: none; border-radius: 0 0 12px 12px;
+    overflow: hidden; max-height: 0; transition: max-height 0.4s ease;
+  }
+  .block-body.open { max-height: 8000px; }
+
+  /* NAV HINT above steps */
+  .nav-hint {
+    background: #0c1425; padding: 10px 20px; border-bottom: 1px solid #1e293b;
+    font-size: 0.8rem; color: #60a5fa; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-hint .icon { font-size: 1rem; }
+
+  .step {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 20px;
+    border-bottom: 1px solid #1e293b; background: #151f2e;
+    transition: background 0.2s;
+  }
+  .step:hover { background: #1a2740; }
+  .step:last-child { border-bottom: none; }
+
+  .step-info { flex: 1; }
+  .step-title { font-weight: 600; font-size: 0.9rem; color: #f1f5f9; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .step-title .critical { font-size: 0.6rem; background: #dc2626; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+
+  .step-instructions {
+    font-size: 0.82rem; color: #94a3b8; line-height: 1.7;
+    background: #0f172a; border-radius: 8px; padding: 10px 14px; margin-top: 6px;
+    border-left: 3px solid #334155;
+  }
+  .step-instructions .num-step { color: #fbbf24; font-weight: 700; }
+  .step-instructions .click { color: #60a5fa; font-weight: 600; }
+  .step-instructions .expect-ok { color: #4ade80; }
+  .step-instructions .expect-fail { color: #f87171; }
+
+  .step-actions { flex-shrink: 0; display: flex; gap: 4px; padding-top: 4px; }
+  .btn-pass, .btn-fail {
+    width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; font-weight: 700;
+  }
+  .btn-pass { background: #1a3a2a; color: #4ade80; }
+  .btn-pass:hover { background: #4ade80; color: #0f172a; }
+  .btn-fail { background: #3a1a1a; color: #f87171; }
+  .btn-fail:hover { background: #f87171; color: #0f172a; }
+
+  .step.passed { }
+  .step.passed .step-title { color: #4ade80; }
+  .step.passed .step-instructions { opacity: 0.4; }
+  .step.failed .step-title { color: #f87171; }
+
+  .note-input {
+    width: 100%; margin-top: 8px; background: #1e293b; border: 1px solid #334155;
+    border-radius: 6px; padding: 6px 10px; color: #e2e8f0; font-size: 0.78rem;
+    font-family: inherit; resize: none; display: none;
+  }
+  .step.failed .note-input { display: block; }
+
+  .legend { max-width: 900px; margin: 30px auto; display: flex; gap: 20px; justify-content: center; font-size: 0.8rem; color: #64748b; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .reset-btn {
+    display: block; margin: 10px auto 40px; background: #3a1a1a; color: #f87171; border: 1px solid #f87171;
+    padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+  }
+  .reset-btn:hover { background: #f87171; color: #0f172a; }
+
+  .footer { text-align: center; padding: 20px 20px 40px; color: #475569; font-size: 0.75rem; }
+
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    .header h1 { font-size: 1.5rem; }
+    .score-bar { gap: 8px; }
+    .score-card { min-width: 70px; padding: 10px 14px; }
+    .score-card .num { font-size: 1.4rem; }
+    .step { padding: 10px 14px; }
+    .howto { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Conexiones</h1>
+  <p>30 pruebas con instrucciones paso a paso. Sigue las instrucciones exactas de cada paso. Al terminar, marca con ✓ o ✗.</p>
+</div>
+
+<!-- INSTRUCCIONES GENERALES -->
+<div class="howto">
+  <h3>ANTES DE EMPEZAR — Lee esto primero</h3>
+  <ol>
+    <li>Abre <a href="https://betabgnuevosupa.vercel.app" target="_blank">https://betabgnuevosupa.vercel.app</a> en Chrome</li>
+    <li>Haz login con tu cuenta</li>
+    <li>Vas a llegar al <strong>Portal del Cliente</strong>. Arriba hay tabs: Steve, Brief, Metricas, etc.</li>
+    <li>Para llegar a Conexiones: busca la pestana <code>Conexiones</code> en la barra de tabs de arriba (4ta pestana, icono de cadena Link2)</li>
+    <li>Adentro de Conexiones veras el titulo <strong>"Mis Conexiones"</strong> con subtitulo <strong>"Gestiona tus plataformas conectadas"</strong></li>
+    <li>Hay <strong>4 plataformas</strong>: <code>Shopify</code> · <code>Meta Ads</code> · <code>Google Ads</code> · <code>Klaviyo</code></li>
+    <li class="warn">Si algo falla: apreta ✗ en rojo, escribe que paso en la nota que aparece, y sigue con el siguiente paso</li>
+    <li class="ok">Si funciona bien: apreta ✓ en verde y sigue</li>
+    <li>Tu progreso se guarda automaticamente en el navegador. Puedes cerrar y volver.</li>
+  </ol>
+</div>
+
+<div class="score-bar">
+  <div class="score-card blue"><div class="num" id="total">30</div><div class="label">Total</div></div>
+  <div class="score-card green"><div class="num" id="passed">0</div><div class="label">Pasaron</div></div>
+  <div class="score-card red"><div class="num" id="failed">0</div><div class="label">Fallaron</div></div>
+  <div class="score-card yellow"><div class="num" id="pending">30</div><div class="label">Pendientes</div></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-bg"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+  <div class="progress-label" id="progressLabel">0% completado</div>
+</div>
+
+<div class="blocks" id="blocks"></div>
+
+<div class="legend">
+  <span><div class="dot" style="background:#4ade80"></div> Pasa (boton verde ✓)</span>
+  <span><div class="dot" style="background:#f87171"></div> Falla (boton rojo ✗)</span>
+  <span><div class="dot" style="background:#fbbf24"></div> Pendiente</span>
+  <span><div class="dot" style="background:#dc2626"></div> Paso critico</span>
+</div>
+
+<button class="reset-btn" onclick="if(confirm('Borrar todo el progreso?')){localStorage.removeItem('steve-conexiones-qa-v2');location.reload();}">Borrar progreso y empezar de nuevo</button>
+
+<div class="footer">QA Conexiones — 2026-03-22 — Generado por Claude Code</div>
+
+<script>
+const DATA = [
+  {
+    name: "Vista General",
+    icon: "🔗",
+    nav: "Portal > pestana «Conexiones» (4ta pestana arriba, icono de cadena Link2)",
+    steps: [
+      {
+        id: 1, title: "Abrir Conexiones", critical: true,
+        instructions: [
+          { type: 'do', text: 'En la barra de tabs del Portal (arriba), busca la pestana <span class="click">Conexiones</span> (4ta pestana, tiene un icono de cadena/Link2)' },
+          { type: 'do', text: 'Haz click en <span class="click">Conexiones</span>' },
+          { type: 'wait', text: 'Espera 1-3 segundos mientras carga la pagina' },
+          { type: 'ok', text: 'Se muestra el titulo "Mis Conexiones" con subtitulo "Gestiona tus plataformas conectadas". Debajo aparecen tarjetas de plataformas.' },
+          { type: 'fail', text: 'Pantalla blanca, error rojo, spinner infinito, o no aparece el titulo "Mis Conexiones"' },
+        ]
+      },
+      {
+        id: 2, title: "Ver plataformas disponibles", critical: false,
+        instructions: [
+          { type: 'do', text: 'Mira las tarjetas (cards) de plataformas disponibles en la seccion de Conexiones' },
+          { type: 'do', text: 'Verifica que aparezcan las 4 plataformas: <span class="click">Shopify</span>, <span class="click">Meta Ads</span>, <span class="click">Google Ads</span>, <span class="click">Klaviyo</span>' },
+          { type: 'ok', text: 'Aparecen 4 cards con: Shopify ("Conecta tu tienda online"), Meta Ads ("Facebook e Instagram Ads"), Google Ads ("Campanas de busqueda y display"), Klaviyo ("Email marketing y automatizaciones")' },
+          { type: 'fail', text: 'Falta alguna plataforma, las descripciones son incorrectas, o no se ven las tarjetas' },
+        ]
+      },
+      {
+        id: 3, title: "Ver conexiones activas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Revisa si alguna plataforma ya esta conectada (puede que ya tengas alguna conectada previamente)' },
+          { type: 'do', text: 'Las plataformas conectadas deben mostrar un badge o indicador de estado' },
+          { type: 'ok', text: 'Las plataformas conectadas muestran un badge verde "Activo" con un icono CheckCircle. Se distinguen claramente de las no conectadas.' },
+          { type: 'fail', text: 'No se distingue visualmente entre plataformas conectadas y no conectadas, o no hay badge de estado' },
+        ]
+      },
+      {
+        id: 4, title: "Mensaje todo conectado", critical: false,
+        instructions: [
+          { type: 'do', text: 'Si las 4 plataformas estan conectadas, busca un mensaje informativo en la pagina' },
+          { type: 'do', text: '(Si no todas estan conectadas, salta este paso — marcalo como pass y continua)' },
+          { type: 'ok', text: 'Aparece un mensaje que dice "Todas las plataformas disponibles estan conectadas" o similar, indicando que no hay mas plataformas por conectar' },
+          { type: 'fail', text: 'Todas estan conectadas pero sigue mostrando la seccion de "Conectar nueva plataforma" sin ningun mensaje' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Conectar Shopify",
+    icon: "🛒",
+    nav: "Portal > Conexiones > card Shopify > «Conectar Shopify»",
+    steps: [
+      {
+        id: 5, title: "Abrir wizard Shopify", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion de plataformas disponibles, busca la card de <span class="click">Shopify</span>' },
+          { type: 'do', text: 'Haz click en el boton verde <span class="click">Conectar Shopify</span>' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'ok', text: 'Se abre un dialogo (modal) con el wizard de conexion de Shopify. Muestra "Paso 1 de 4" o similar con el primer paso del proceso.' },
+          { type: 'fail', text: 'No pasa nada al hacer click, el dialogo no se abre, o sale error' },
+        ]
+      },
+      {
+        id: 6, title: "Step 1: Tu tienda", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el primer paso del wizard, busca el campo <span class="click">Nombre de tu tienda</span>' },
+          { type: 'do', text: 'El campo debe mostrar el formato: <code>mi-tienda.myshopify.com</code>' },
+          { type: 'do', text: 'Escribe un nombre de tienda valido (solo letras, numeros y guiones). Ejemplo: <code>tienda-test</code>' },
+          { type: 'do', text: 'Haz click en <span class="click">Siguiente</span>' },
+          { type: 'ok', text: 'Avanza al paso 2. El campo acepta el nombre y no muestra errores de validacion.' },
+          { type: 'fail', text: 'No hay campo de nombre, no valida el formato, o no avanza al paso 2' },
+        ]
+      },
+      {
+        id: 7, title: "Step 2: Crear Custom App", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el paso 2 del wizard, lee las instrucciones que indican como crear una Custom App en Shopify Admin' },
+          { type: 'do', text: 'Busca el boton <span class="click">Abrir Shopify Admin</span> y haz click — debe abrir una nueva pestana con Shopify' },
+          { type: 'do', text: 'Vuelve a la pestana de Steve Ads' },
+          { type: 'do', text: 'Haz click en <span class="click">Ya cree la app</span>' },
+          { type: 'ok', text: 'El boton "Abrir Shopify Admin" abre nueva pestana correctamente. Al hacer click en "Ya cree la app" avanza al paso 3.' },
+          { type: 'fail', text: 'El boton no abre nueva pestana, o no avanza al paso 3' },
+        ]
+      },
+      {
+        id: 8, title: "Step 3: Configurar permisos", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el paso 3 del wizard, revisa la lista de permisos (scopes) necesarios' },
+          { type: 'do', text: 'Deben aparecer 11 scopes como: <code>read_products</code>, <code>write_products</code>, etc.' },
+          { type: 'do', text: 'Busca el boton <span class="click">Copiar</span> y haz click para copiar los scopes al portapapeles' },
+          { type: 'do', text: 'Haz click en <span class="click">Ya instale la app</span>' },
+          { type: 'ok', text: 'Se muestran los 11 scopes necesarios. El boton "Copiar" funciona (copia al portapapeles). Al hacer click en "Ya instale la app" avanza al paso 4.' },
+          { type: 'fail', text: 'No se muestran scopes, el boton copiar no funciona, o no avanza' },
+        ]
+      },
+      {
+        id: 9, title: "Step 4: Pegar token", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el paso 4 (ultimo paso), busca el campo para pegar el <span class="click">Admin API Access Token</span>' },
+          { type: 'do', text: 'El campo debe indicar que el token empieza con <code>shpat_</code>' },
+          { type: 'do', text: 'Debe haber una advertencia visible: "El token solo se muestra una vez"' },
+          { type: 'do', text: 'Pega un token valido de Shopify si lo tienes' },
+          { type: 'do', text: 'Haz click en <span class="click">Conectar</span>' },
+          { type: 'ok', text: 'El campo acepta el token, se ve la advertencia del token unico, y al hacer click en Conectar inicia el proceso de conexion' },
+          { type: 'fail', text: 'No hay campo para token, no muestra advertencia, o error al hacer click en Conectar' },
+        ]
+      },
+      {
+        id: 10, title: "Conexion exitosa Shopify", critical: true,
+        instructions: [
+          { type: 'do', text: 'Despues de hacer click en "Conectar" con un token valido, espera el resultado' },
+          { type: 'wait', text: 'Espera 3-5 segundos mientras se conecta con Shopify' },
+          { type: 'ok', text: 'Muestra mensaje "Conectado exitosamente" con un icono de checkmark verde. Shopify aparece en la seccion "Mis Conexiones" con badge "Activo" en verde.' },
+          { type: 'fail', text: 'Error de conexion, no aparece mensaje de exito, o Shopify no aparece como activo en Mis Conexiones' },
+        ]
+      },
+      {
+        id: 11, title: "Validacion de errores Shopify", critical: true,
+        instructions: [
+          { type: 'do', text: 'Si Shopify no esta conectado, abre de nuevo el wizard haciendo click en <span class="click">Conectar Shopify</span>' },
+          { type: 'do', text: 'En el paso 1, deja el campo de nombre de tienda VACIO y haz click en <span class="click">Siguiente</span>' },
+          { type: 'do', text: 'Verifica que aparece el error: "Ingresa el nombre de tu tienda"' },
+          { type: 'do', text: 'Ahora navega hasta el paso 4 (token) y escribe un token muy corto (ej: <code>abc</code>) y haz click en <span class="click">Conectar</span>' },
+          { type: 'ok', text: 'Campo vacio muestra "Ingresa el nombre de tu tienda". Token muy corto muestra un mensaje de error de validacion. No se puede avanzar sin datos validos.' },
+          { type: 'fail', text: 'No hay validacion de campos vacios, acepta tokens invalidos sin error, o permite avanzar sin datos' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Conectar Meta Ads",
+    icon: "📘",
+    nav: "Portal > Conexiones > card Meta Ads > «Conectar Meta»",
+    steps: [
+      {
+        id: 12, title: "Iniciar OAuth Meta", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion de plataformas disponibles, busca la card de <span class="click">Meta Ads</span>' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Conectar Meta</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'ok', text: 'Se redirige al login de Facebook (facebook.com). Aparece la pagina de autorizacion de Facebook pidiendo permisos.' },
+          { type: 'fail', text: 'No redirige a Facebook, sale error, o se queda cargando sin redirigir' },
+        ]
+      },
+      {
+        id: 13, title: "Autorizar permisos Meta", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la pagina de Facebook, haz login con tu cuenta de Facebook (si no estas logueado)' },
+          { type: 'do', text: 'Autoriza los permisos que pide la aplicacion (paginas, cuentas publicitarias, etc.)' },
+          { type: 'do', text: 'Haz click en <span class="click">Continuar</span> o <span class="click">Autorizar</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos mientras redirige de vuelta a Steve Ads' },
+          { type: 'ok', text: 'Facebook acepta la autorizacion y redirige de vuelta a la aplicacion Steve Ads' },
+          { type: 'fail', text: 'Error de autorizacion en Facebook, no redirige de vuelta, o se pierde la sesion' },
+        ]
+      },
+      {
+        id: 14, title: "Callback exitoso Meta", critical: false,
+        instructions: [
+          { type: 'do', text: 'Despues de autorizar en Facebook, la pagina debe redirigir de vuelta a Steve Ads' },
+          { type: 'wait', text: 'Espera 1-2 segundos para que procese el callback' },
+          { type: 'do', text: 'Debe aparecer un mensaje de exito y un toast notification' },
+          { type: 'ok', text: 'La pagina muestra "Conexion exitosa!" con un toast de confirmacion. Redirige automaticamente a la seccion Conexiones en aproximadamente 1.5 segundos.' },
+          { type: 'fail', text: 'Pagina de error en el callback, no aparece mensaje de exito, o no redirige a Conexiones' },
+        ]
+      },
+      {
+        id: 15, title: "Selector de cuenta publicitaria", critical: true,
+        instructions: [
+          { type: 'do', text: 'Una vez conectado Meta Ads, busca en la card de Meta el dropdown <span class="click">Cuenta Publicitaria de Meta</span>' },
+          { type: 'do', text: 'Haz click en el dropdown para abrirlo' },
+          { type: 'do', text: 'Revisa que las cuentas aparezcan agrupadas por nombre de Business (negocio)' },
+          { type: 'ok', text: 'El dropdown muestra cuentas publicitarias agrupadas por Business Name. Cada cuenta muestra: badge de moneda (ej: CLP, USD), ID de la cuenta, y timezone. Se puede seleccionar una cuenta.' },
+          { type: 'fail', text: 'No aparece dropdown, las cuentas no estan agrupadas por business, falta informacion (moneda, ID, timezone), o el dropdown esta vacio' },
+        ]
+      },
+      {
+        id: 16, title: "Seleccionar cuenta publicitaria", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el dropdown de cuentas publicitarias de Meta, selecciona una cuenta haciendo click sobre ella' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'ok', text: 'La cuenta seleccionada se marca con un icono CheckCircle o indicador visual de seleccion. La card de Meta muestra la cuenta elegida.' },
+          { type: 'fail', text: 'No se puede seleccionar cuenta, no aparece indicador de seleccion, o error al seleccionar' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Conectar Google Ads",
+    icon: "🔍",
+    nav: "Portal > Conexiones > card Google Ads > «Conectar Google»",
+    steps: [
+      {
+        id: 17, title: "Iniciar OAuth Google", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion de plataformas disponibles, busca la card de <span class="click">Google Ads</span>' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Conectar Google</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'ok', text: 'Se redirige a la pagina de login de Google (accounts.google.com). Aparece el selector de cuenta o pagina de autorizacion de Google.' },
+          { type: 'fail', text: 'No redirige a Google, sale error, o se queda cargando sin redirigir' },
+        ]
+      },
+      {
+        id: 18, title: "Autorizar y callback Google", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la pagina de Google, selecciona tu cuenta de Google o haz login' },
+          { type: 'do', text: 'Autoriza los permisos que pide la aplicacion para Google Ads' },
+          { type: 'do', text: 'Haz click en <span class="click">Permitir</span> o <span class="click">Allow</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos mientras redirige de vuelta a Steve Ads' },
+          { type: 'ok', text: 'Google redirige a <code>/oauth/google-ads/callback</code> y muestra el mensaje "Google Ads conectado exitosamente!". Se redirige a Conexiones.' },
+          { type: 'fail', text: 'Error en el callback de Google, pagina de error, o no redirige correctamente a la app' },
+        ]
+      },
+      {
+        id: 19, title: "Verificar conexion Google", critical: false,
+        instructions: [
+          { type: 'do', text: 'Una vez de vuelta en la seccion Conexiones, busca la card de Google Ads' },
+          { type: 'do', text: 'Verifica el estado de la conexion' },
+          { type: 'ok', text: 'Google Ads aparece en la seccion "Mis Conexiones" con badge "Activo" en verde y el icono CheckCircle' },
+          { type: 'fail', text: 'Google Ads no aparece como conectado, no tiene badge "Activo", o sigue mostrando el boton "Conectar Google"' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Conectar Klaviyo",
+    icon: "💜",
+    nav: "Portal > Conexiones > card Klaviyo > «Conectar Klaviyo»",
+    steps: [
+      {
+        id: 20, title: "Abrir dialog Klaviyo", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion de plataformas disponibles, busca la card de <span class="click">Klaviyo</span>' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Conectar Klaviyo</span>' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'ok', text: 'Se abre un dialogo (modal) con instrucciones: ir a klaviyo.com > Settings > API Keys > Create Private API Key. Muestra un campo para ingresar la API Key.' },
+          { type: 'fail', text: 'No se abre el dialogo, sale error, o no muestra instrucciones claras' },
+        ]
+      },
+      {
+        id: 21, title: "Ingresar API Key Klaviyo", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el dialogo de Klaviyo, busca el campo <span class="click">Private API Key</span>' },
+          { type: 'do', text: 'El campo debe estar enmascarado (tipo password) y tener un placeholder que diga <code>pk_...</code>' },
+          { type: 'do', text: 'Pega una API Key valida de Klaviyo (empieza con pk_)' },
+          { type: 'ok', text: 'El campo acepta la API Key, esta enmascarado como password, y muestra el placeholder "pk_..." cuando esta vacio' },
+          { type: 'fail', text: 'No hay campo de API Key, no esta enmascarado, o no acepta el input' },
+        ]
+      },
+      {
+        id: 22, title: "Conectar Klaviyo exitosamente", critical: false,
+        instructions: [
+          { type: 'do', text: 'Con la API Key ingresada, haz click en el boton <span class="click">Conectar</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos mientras valida la key con Klaviyo' },
+          { type: 'ok', text: 'Aparece un toast de exito diciendo "Klaviyo conectado correctamente". Klaviyo aparece en Mis Conexiones con badge "Activo" en verde.' },
+          { type: 'fail', text: 'Error de conexion, no aparece toast de exito, o Klaviyo no aparece como activo' },
+        ]
+      },
+      {
+        id: 23, title: "Validacion key vacia Klaviyo", critical: false,
+        instructions: [
+          { type: 'do', text: 'Si Klaviyo no esta conectado, abre de nuevo el dialogo haciendo click en <span class="click">Conectar Klaviyo</span>' },
+          { type: 'do', text: 'Deja el campo de API Key VACIO' },
+          { type: 'do', text: 'Haz click en <span class="click">Conectar</span>' },
+          { type: 'ok', text: 'Aparece un mensaje de error: "Ingresa tu API Key de Klaviyo". No se intenta conectar con campo vacio.' },
+          { type: 'fail', text: 'No hay validacion de campo vacio, intenta conectar sin key, o no muestra mensaje de error' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Sincronizar y Desconectar",
+    icon: "🔄",
+    nav: "Portal > Conexiones > seccion «Mis Conexiones»",
+    steps: [
+      {
+        id: 24, title: "Sincronizar Shopify", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion "Mis Conexiones", busca la card de <span class="click">Shopify</span> (debe estar conectada)' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Sincronizar</span> en la card de Shopify' },
+          { type: 'wait', text: 'Espera 3-10 segundos. Debe mostrar un spinner con texto "Sincronizando..."' },
+          { type: 'ok', text: 'Muestra spinner con "Sincronizando..." durante el proceso. Al terminar muestra "Sincronizacion completada" o toast de exito.' },
+          { type: 'fail', text: 'No hay boton Sincronizar, no muestra spinner, error durante la sincronizacion, o se queda cargando para siempre' },
+        ]
+      },
+      {
+        id: 25, title: "Sincronizar Meta Ads", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion "Mis Conexiones", busca la card de <span class="click">Meta Ads</span> (debe estar conectada y con cuenta seleccionada)' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Sincronizar</span> en la card de Meta' },
+          { type: 'wait', text: 'Espera 3-10 segundos' },
+          { type: 'ok', text: 'La sincronizacion se completa exitosamente. Debe tener una cuenta publicitaria seleccionada ANTES de sincronizar.' },
+          { type: 'fail', text: 'Error de sincronizacion, no funciona sin cuenta seleccionada (pero no muestra error claro), o se cuelga' },
+        ]
+      },
+      {
+        id: 26, title: "Sincronizar Google Ads", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion "Mis Conexiones", busca la card de <span class="click">Google Ads</span> (debe estar conectada)' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Sincronizar</span> en la card de Google Ads' },
+          { type: 'wait', text: 'Espera 3-10 segundos' },
+          { type: 'ok', text: 'La sincronizacion se completa exitosamente con mensaje de confirmacion o toast.' },
+          { type: 'fail', text: 'Error de sincronizacion, no hay boton, o se queda cargando' },
+        ]
+      },
+      {
+        id: 27, title: "Klaviyo NO tiene sync", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion "Mis Conexiones", busca la card de <span class="click">Klaviyo</span> (debe estar conectada)' },
+          { type: 'do', text: 'Verifica si tiene un boton "Sincronizar"' },
+          { type: 'ok', text: 'Klaviyo NO muestra boton "Sincronizar" (porque no requiere sincronizacion manual), O si tiene el boton y lo clickeas, muestra un mensaje tipo "Klaviyo no requiere sincronizacion".' },
+          { type: 'fail', text: 'Klaviyo tiene boton Sincronizar y al clickearlo hace una sincronizacion real que no deberia existir, o da error' },
+        ]
+      },
+      {
+        id: 28, title: "Desconectar plataforma", critical: true,
+        instructions: [
+          { type: 'do', text: 'En la seccion "Mis Conexiones", elige CUALQUIER plataforma que este conectada' },
+          { type: 'do', text: 'Busca un icono de desconexion (Unlink / cadena rota) o boton <span class="click">Desconectar</span> en la card de esa plataforma' },
+          { type: 'do', text: 'Haz click en el icono/boton de desconexion' },
+          { type: 'do', text: 'Debe aparecer un dialogo de confirmacion que diga "Estas seguro?" con el nombre de la plataforma' },
+          { type: 'do', text: 'Haz click en <span class="click">Confirmar</span>' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'ok', text: 'Aparece dialogo de confirmacion con nombre de plataforma. Al confirmar, la plataforma se desconecta y desaparece de "Mis Conexiones". Puede aparecer en la seccion de "Conectar Nueva Plataforma" para reconectar.' },
+          { type: 'fail', text: 'No hay opcion de desconectar, no aparece dialogo de confirmacion, error al desconectar, o la plataforma sigue apareciendo como conectada' },
+        ]
+      },
+      {
+        id: 29, title: "Cancelar desconexion", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion "Mis Conexiones", elige otra plataforma conectada' },
+          { type: 'do', text: 'Haz click en el icono de desconexion (Unlink) o boton <span class="click">Desconectar</span>' },
+          { type: 'do', text: 'Cuando aparezca el dialogo de confirmacion, haz click en <span class="click">Cancelar</span>' },
+          { type: 'ok', text: 'El dialogo se cierra. La plataforma sigue conectada con badge "Activo". No se desconecto nada.' },
+          { type: 'fail', text: 'No hay boton Cancelar en el dialogo, la plataforma se desconecta de todas formas, o error' },
+        ]
+      },
+      {
+        id: 30, title: "Reconectar despues de desconectar", critical: false,
+        instructions: [
+          { type: 'do', text: 'Despues de desconectar una plataforma en el paso 28, verifica que esa plataforma ahora aparece en la seccion de "Conectar Nueva Plataforma"' },
+          { type: 'do', text: 'Haz click en el boton <span class="click">Conectar</span> de esa plataforma para iniciar la reconexion' },
+          { type: 'ok', text: 'La plataforma desconectada reaparece en la seccion de plataformas disponibles con su boton de "Conectar". Al hacer click, se abre el wizard/dialogo/OAuth correspondiente para reconectar.' },
+          { type: 'fail', text: 'La plataforma desconectada no reaparece para reconectar, el boton Conectar no funciona, o no se puede volver a conectar' },
+        ]
+      },
+    ]
+  },
+];
+
+// State
+const state = {};
+const notes = {};
+const STORAGE_KEY = 'steve-conexiones-qa-v2';
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    Object.assign(state, saved.state || {});
+    Object.assign(notes, saved.notes || {});
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, notes }));
+}
+
+function updateScores() {
+  let passed = 0, failed = 0;
+  for (const k in state) {
+    if (state[k] === 'pass') passed++;
+    else if (state[k] === 'fail') failed++;
+  }
+  const total = 30;
+  const pending = total - passed - failed;
+  const pct = Math.round(((passed + failed) / total) * 100);
+
+  document.getElementById('passed').textContent = passed;
+  document.getElementById('failed').textContent = failed;
+  document.getElementById('pending').textContent = pending;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = pct + '% completado — ' + passed + ' pasaron, ' + failed + ' fallaron';
+
+  if (failed > 0) {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #fbbf24, #f87171)';
+  } else {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+  }
+}
+
+function setResult(id, result) {
+  if (state[id] === result) {
+    delete state[id];
+  } else {
+    state[id] = result;
+  }
+  saveState();
+  renderStep(id);
+  updateScores();
+  updateBlockScores();
+}
+
+function saveNote(id) {
+  const el = document.getElementById('note-' + id);
+  if (el) {
+    notes[id] = el.value;
+    saveState();
+  }
+}
+
+function renderStep(id) {
+  const el = document.getElementById('step-' + id);
+  if (!el) return;
+  el.classList.remove('passed', 'failed');
+  if (state[id] === 'pass') el.classList.add('passed');
+  else if (state[id] === 'fail') el.classList.add('failed');
+
+  const passBtn = el.querySelector('.btn-pass');
+  const failBtn = el.querySelector('.btn-fail');
+  if (passBtn) {
+    passBtn.style.background = state[id] === 'pass' ? '#4ade80' : '#1a3a2a';
+    passBtn.style.color = state[id] === 'pass' ? '#0f172a' : '#4ade80';
+  }
+  if (failBtn) {
+    failBtn.style.background = state[id] === 'fail' ? '#f87171' : '#3a1a1a';
+    failBtn.style.color = state[id] === 'fail' ? '#0f172a' : '#f87171';
+  }
+}
+
+function updateBlockScores() {
+  DATA.forEach((block, bIdx) => {
+    const bp = block.steps.filter(s => state[s.id] === 'pass').length;
+    const bf = block.steps.filter(s => state[s.id] === 'fail').length;
+    const el = document.getElementById('bscore-' + bIdx);
+    if (el) {
+      let html = '';
+      if (bp) html += `<span style="color:#4ade80">${bp}✓</span> `;
+      if (bf) html += `<span style="color:#f87171">${bf}✗</span>`;
+      if (!bp && !bf) html = `<span style="color:#64748b">0/${block.steps.length}</span>`;
+      el.innerHTML = html;
+    }
+  });
+}
+
+function toggleBlock(idx) {
+  const header = document.getElementById('bh-' + idx);
+  const body = document.getElementById('bb-' + idx);
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+function formatInstruction(inst) {
+  if (inst.type === 'do') return `<span class="num-step">→</span> ${inst.text}`;
+  if (inst.type === 'wait') return `<span style="color:#fbbf24">⏳</span> ${inst.text}`;
+  if (inst.type === 'ok') return `<span class="expect-ok">✅ PASA SI:</span> ${inst.text}`;
+  if (inst.type === 'fail') return `<span class="expect-fail">❌ FALLA SI:</span> ${inst.text}`;
+  return inst.text;
+}
+
+function render() {
+  const container = document.getElementById('blocks');
+  let html = '';
+
+  DATA.forEach((block, bIdx) => {
+    const stepCount = block.steps.length;
+
+    html += `<div class="block">`;
+    html += `<div class="block-header" id="bh-${bIdx}" onclick="toggleBlock(${bIdx})">`;
+    html += `<h2>${block.icon} ${block.name} <span class="badge">${stepCount} pasos</span></h2>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;">`;
+    html += `<span id="bscore-${bIdx}" style="font-size:0.85rem;"></span>`;
+    html += `<span class="arrow">▼</span></div></div>`;
+
+    html += `<div class="block-body" id="bb-${bIdx}">`;
+
+    // Navigation hint
+    html += `<div class="nav-hint"><span class="icon">🧭</span> <strong>Como llegar:</strong>&nbsp; ${block.nav}</div>`;
+
+    block.steps.forEach(step => {
+      const cls = state[step.id] === 'pass' ? 'passed' : state[step.id] === 'fail' ? 'failed' : '';
+      html += `<div class="step ${cls}" id="step-${step.id}">`;
+      html += `<div style="color:#475569;font-size:0.85rem;font-weight:800;min-width:28px;margin-top:3px;text-align:center;">${step.id}</div>`;
+      html += `<div class="step-info">`;
+      html += `<div class="step-title">${step.title}`;
+      if (step.critical) html += ` <span class="critical">CRITICO</span>`;
+      html += `</div>`;
+
+      // Step-by-step instructions
+      html += `<div class="step-instructions">`;
+      step.instructions.forEach(inst => {
+        html += `<div style="margin-bottom:4px;">${formatInstruction(inst)}</div>`;
+      });
+      html += `</div>`;
+
+      // Notes textarea (visible on fail)
+      html += `<textarea class="note-input" id="note-${step.id}" placeholder="Escribe que fallo aqui..." onchange="saveNote(${step.id})">${notes[step.id] || ''}</textarea>`;
+
+      html += `</div>`; // step-info
+
+      html += `<div class="step-actions">`;
+      html += `<button class="btn-pass" onclick="setResult(${step.id},'pass')" title="Pasa">✓</button>`;
+      html += `<button class="btn-fail" onclick="setResult(${step.id},'fail')" title="Falla">✗</button>`;
+      html += `</div></div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+
+  DATA.forEach(block => block.steps.forEach(step => renderStep(step.id)));
+  updateBlockScores();
+}
+
+loadState();
+render();
+updateScores();
+</script>
+</body>
+</html>

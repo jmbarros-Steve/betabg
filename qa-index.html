@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Manual de QA</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+  .hero {
+    text-align: center; padding: 60px 20px 40px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  }
+  .hero .logo { font-size: 3rem; margin-bottom: 12px; }
+  .hero h1 { font-size: 2.5rem; color: #fff; margin-bottom: 10px; font-weight: 800; }
+  .hero p { color: #94a3b8; font-size: 1.1rem; max-width: 600px; margin: 0 auto 8px; }
+  .hero .url { color: #60a5fa; font-size: 0.85rem; }
+  .hero .date { color: #475569; font-size: 0.8rem; margin-top: 12px; }
+
+  .howto-box {
+    max-width: 800px; margin: 0 auto 40px; background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 24px 28px;
+  }
+  .howto-box h2 { color: #fbbf24; font-size: 1.1rem; margin-bottom: 14px; }
+  .howto-box ol { padding-left: 22px; }
+  .howto-box li { margin-bottom: 8px; font-size: 0.9rem; color: #cbd5e1; line-height: 1.6; }
+  .howto-box code { background: #334155; color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.82rem; }
+  .howto-box a { color: #60a5fa; text-decoration: none; }
+
+  .modules { max-width: 800px; margin: 0 auto; padding: 0 20px 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  .module-card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+    padding: 28px; transition: all 0.3s; cursor: pointer; text-decoration: none; color: inherit;
+    display: block; position: relative; overflow: hidden;
+  }
+  .module-card:hover { border-color: #60a5fa; transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+  .module-card .icon { font-size: 2.2rem; margin-bottom: 12px; }
+  .module-card h3 { font-size: 1.2rem; color: #fff; margin-bottom: 6px; }
+  .module-card .desc { font-size: 0.82rem; color: #94a3b8; line-height: 1.5; margin-bottom: 14px; }
+  .module-card .meta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .module-card .meta .tag {
+    font-size: 0.7rem; background: #0f172a; border: 1px solid #334155;
+    padding: 3px 10px; border-radius: 99px; color: #94a3b8;
+  }
+  .module-card .meta .tag.green { border-color: #4ade80; color: #4ade80; }
+  .module-card .arrow {
+    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    font-size: 1.2rem; color: #334155; transition: color 0.3s;
+  }
+  .module-card:hover .arrow { color: #60a5fa; }
+
+  .module-card.full-width { grid-column: 1 / -1; }
+
+  .progress-summary {
+    max-width: 800px; margin: 0 auto 30px; padding: 0 20px;
+  }
+  .progress-summary h2 { color: #fff; font-size: 1.1rem; margin-bottom: 14px; text-align: center; }
+  .progress-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .progress-item {
+    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+    padding: 12px; text-align: center;
+  }
+  .progress-item .name { font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .progress-item .bar-bg { background: #334155; border-radius: 99px; height: 6px; margin-bottom: 4px; }
+  .progress-item .bar-fill { height: 100%; border-radius: 99px; background: #4ade80; transition: width 0.5s; }
+  .progress-item .pct { font-size: 0.8rem; font-weight: 700; color: #fff; }
+
+  .footer {
+    text-align: center; padding: 40px 20px; color: #475569; font-size: 0.75rem;
+    border-top: 1px solid #1e293b;
+  }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 1.6rem; }
+    .modules { grid-template-columns: 1fr; }
+    .progress-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">🧪</div>
+  <h1>Manual de QA — Steve Ads</h1>
+  <p>Guia completa de pruebas para cada modulo de la plataforma. Haz click en un modulo para empezar a probar.</p>
+  <div class="url">https://betabgnuevosupa.vercel.app</div>
+  <div class="date">Generado: Marzo 2026</div>
+</div>
+
+<div class="progress-summary">
+  <h2>Progreso General</h2>
+  <div class="progress-grid">
+    <div class="progress-item">
+      <div class="name">Steve Mail</div>
+      <div class="bar-bg"><div class="bar-fill" id="bar-mail" style="width:0%"></div></div>
+      <div class="pct" id="pct-mail">0%</div>
+    </div>
+    <div class="progress-item">
+      <div class="name">Shopify</div>
+      <div class="bar-bg"><div class="bar-fill" id="bar-shopify" style="width:0%"></div></div>
+      <div class="pct" id="pct-shopify">0%</div>
+    </div>
+    <div class="progress-item">
+      <div class="name">Conexiones</div>
+      <div class="bar-bg"><div class="bar-fill" id="bar-conexiones" style="width:0%"></div></div>
+      <div class="pct" id="pct-conexiones">0%</div>
+    </div>
+    <div class="progress-item">
+      <div class="name">Meta Ads</div>
+      <div class="bar-bg"><div class="bar-fill" id="bar-meta" style="width:0%"></div></div>
+      <div class="pct" id="pct-meta">0%</div>
+    </div>
+  </div>
+</div>
+
+<div class="howto-box">
+  <h2>Como usar este manual</h2>
+  <ol>
+    <li>Abre <a href="https://betabgnuevosupa.vercel.app" target="_blank">betabgnuevosupa.vercel.app</a> en Chrome en otra pestana</li>
+    <li>Haz login con tu cuenta</li>
+    <li>Empieza por <strong>Conexiones</strong> (para verificar que las plataformas estan conectadas)</li>
+    <li>Luego prueba cada modulo en orden: Shopify → Meta Ads → Steve Mail</li>
+    <li>Dentro de cada modulo, sigue los pasos en orden. Cada paso dice exactamente donde hacer click y que esperar.</li>
+    <li>Marca <code>✓</code> (verde) si pasa, <code>✗</code> (rojo) si falla. Si falla, escribe que paso en la nota.</li>
+    <li>Tu progreso se guarda automaticamente. Puedes cerrar y volver.</li>
+  </ol>
+</div>
+
+<div class="modules">
+  <a class="module-card" href="qa-conexiones.html">
+    <div class="icon">🔗</div>
+    <h3>Conexiones</h3>
+    <div class="desc">Conectar Shopify, Meta Ads, Google Ads y Klaviyo. OAuth, wizards, API keys, sync y desconexion.</div>
+    <div class="meta">
+      <span class="tag">30 pasos</span>
+      <span class="tag green">Empezar aqui</span>
+    </div>
+    <span class="arrow">→</span>
+  </a>
+
+  <a class="module-card" href="qa-shopify.html">
+    <div class="icon">🛍️</div>
+    <h3>Shopify</h3>
+    <div class="desc">Dashboard, KPIs, productos, pedidos, descuentos, clientes, SEO, IA, combos y fotos.</div>
+    <div class="meta">
+      <span class="tag">35 pasos</span>
+      <span class="tag">Requiere conexion</span>
+    </div>
+    <span class="arrow">→</span>
+  </a>
+
+  <a class="module-card" href="qa-meta-ads.html">
+    <div class="icon">📢</div>
+    <h3>Meta Ads</h3>
+    <div class="desc">Campanas, audiencias, pixel, bandeja social, reglas automaticas, analisis y competencia.</div>
+    <div class="meta">
+      <span class="tag">40 pasos</span>
+      <span class="tag">Requiere conexion</span>
+    </div>
+    <span class="arrow">→</span>
+  </a>
+
+  <a class="module-card" href="qa-steve-mail.html">
+    <div class="icon">📧</div>
+    <h3>Steve Mail</h3>
+    <div class="desc">Campanas de email, flujos automaticos, suscriptores, dominio, templates, analytics y tracking.</div>
+    <div class="meta">
+      <span class="tag">50 pasos</span>
+      <span class="tag">Independiente</span>
+    </div>
+    <span class="arrow">→</span>
+  </a>
+</div>
+
+<div class="footer">
+  Steve Ads QA Manual — 155 pasos totales — Marzo 2026<br>
+  Generado por Claude Code
+</div>
+
+<script>
+function getProgress(storageKey, totalSteps) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    const state = saved.state || saved;
+    let passed = 0, done = 0;
+    for (const k in state) {
+      if (state[k] === 'pass') { passed++; done++; }
+      else if (state[k] === 'fail') { done++; }
+    }
+    return Math.round((done / totalSteps) * 100);
+  } catch(e) { return 0; }
+}
+
+function updateProgress() {
+  const modules = [
+    { key: 'steve-mail-qa-v2', total: 50, bar: 'bar-mail', pct: 'pct-mail' },
+    { key: 'steve-shopify-qa-v2', total: 35, bar: 'bar-shopify', pct: 'pct-shopify' },
+    { key: 'steve-conexiones-qa-v2', total: 30, bar: 'bar-conexiones', pct: 'pct-conexiones' },
+    { key: 'steve-meta-qa-v2', total: 40, bar: 'bar-meta', pct: 'pct-meta' },
+  ];
+
+  modules.forEach(m => {
+    const p = getProgress(m.key, m.total);
+    document.getElementById(m.bar).style.width = p + '%';
+    document.getElementById(m.pct).textContent = p + '%';
+    if (p > 0 && p < 100) {
+      document.getElementById(m.bar).style.background = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+    } else if (p >= 100) {
+      document.getElementById(m.bar).style.background = '#4ade80';
+    }
+  });
+}
+
+updateProgress();
+</script>
+</body>
+</html>

@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pruebas Meta/Instagram - Guia Simple</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --muted: #8b8fa3;
+    --accent: #6366f1;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --orange: #f97316;
+    --blue: #3b82f6;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); line-height:1.7; }
+
+  .hero { text-align:center; padding:40px 24px 30px; background:linear-gradient(135deg,#1e1b4b,#312e81,#1e1b4b); border-bottom:2px solid var(--accent); }
+  .hero h1 { font-size:1.8rem; margin-bottom:6px; }
+  .hero p { color:var(--muted); font-size:1rem; }
+
+  .container { max-width:900px; margin:0 auto; padding:24px 20px; }
+
+  /* Progress */
+  .progress-box { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin-bottom:28px; }
+  .progress-header { display:flex; justify-content:space-between; font-size:.9rem; margin-bottom:8px; }
+  .progress-track { height:12px; background:var(--surface2); border-radius:99px; overflow:hidden; }
+  .progress-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--green)); border-radius:99px; transition:width .3s; }
+  .reset-btn { background:var(--surface2); color:var(--muted); border:1px solid var(--border); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:.8rem; margin-top:10px; }
+  .reset-btn:hover { color:var(--text); border-color:var(--accent); }
+
+  /* Start box */
+  .start-box { background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(34,197,94,.08)); border:2px solid var(--accent); border-radius:16px; padding:28px; margin-bottom:36px; }
+  .start-box h2 { font-size:1.3rem; margin-bottom:16px; color:var(--accent); }
+  .start-box .cred { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin:10px 0; font-size:.95rem; }
+  .start-box .cred b { color:var(--accent); }
+  .start-box .cred code { background:var(--surface2); padding:2px 8px; border-radius:4px; font-size:.88rem; color:var(--green); }
+
+  /* Stages */
+  .stage { margin-bottom:40px; }
+  .stage-header { display:flex; align-items:center; gap:14px; margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--border); cursor:pointer; user-select:none; }
+  .stage-header:hover { border-bottom-color:var(--accent); }
+  .stage-num { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:800; flex-shrink:0; }
+  .stage-header h2 { font-size:1.15rem; flex:1; }
+  .stage-progress { font-size:.8rem; color:var(--muted); background:var(--surface2); padding:4px 12px; border-radius:99px; }
+  .stage-arrow { font-size:1.2rem; color:var(--muted); transition:transform .2s; }
+  .stage-arrow.open { transform:rotate(90deg); }
+  .stage-body { display:none; }
+  .stage-body.show { display:block; }
+
+  /* Steps */
+  .step-group { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 24px; margin-bottom:14px; }
+  .step-group-title { font-size:1rem; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+  .step-group-title .tag { font-size:.7rem; font-weight:600; padding:2px 8px; border-radius:5px; }
+  .tag-critica { background:rgba(239,68,68,.15); color:var(--red); }
+  .tag-alta { background:rgba(249,115,22,.15); color:var(--orange); }
+  .tag-media { background:rgba(234,179,8,.15); color:var(--yellow); }
+  .tag-baja { background:rgba(34,197,94,.15); color:var(--green); }
+
+  .step { display:flex; gap:14px; margin-bottom:14px; align-items:flex-start; }
+  .step-num { width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:700; flex-shrink:0; margin-top:1px; }
+  .step-text { flex:1; font-size:.92rem; }
+  .step-text code { background:var(--surface2); padding:1px 6px; border-radius:4px; font-size:.84rem; color:var(--green); }
+  .step-text strong { color:var(--accent); }
+  .step-text em { color:var(--yellow); font-style:normal; }
+
+  /* OK / FAIL boxes */
+  .ok-box { background:rgba(34,197,94,.08); border-left:4px solid var(--green); border-radius:0 8px 8px 0; padding:12px 16px; margin:12px 0 8px; font-size:.88rem; }
+  .ok-box::before { content:'✅ '; }
+  .fail-box { background:rgba(239,68,68,.08); border-left:4px solid var(--red); border-radius:0 8px 8px 0; padding:12px 16px; margin:8px 0; font-size:.88rem; }
+  .fail-box::before { content:'❌ '; }
+  .tip-box { background:rgba(59,130,246,.08); border-left:4px solid var(--blue); border-radius:0 8px 8px 0; padding:12px 16px; margin:8px 0; font-size:.88rem; }
+  .tip-box::before { content:'💡 '; }
+
+  /* Checkbox per step group */
+  .done-check { display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); cursor:pointer; user-select:none; }
+  .done-check input { display:none; }
+  .done-check .box { width:24px; height:24px; border-radius:6px; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; transition:all .2s; flex-shrink:0; }
+  .done-check input:checked ~ .box { background:var(--green); border-color:var(--green); }
+  .done-check input:checked ~ .box::after { content:'✓'; color:#fff; font-size:.8rem; font-weight:700; }
+  .done-check span { font-size:.88rem; color:var(--muted); }
+
+  .img-hint { background:var(--surface2); border:1px dashed var(--border); border-radius:8px; padding:14px; margin:10px 0; text-align:center; color:var(--muted); font-size:.82rem; }
+
+  @media (max-width:600px) {
+    .container { padding:14px; }
+    .step-group { padding:14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Pruebas Meta / Instagram</h1>
+  <p>Guia paso a paso — sigue las instrucciones de cada etapa en orden</p>
+</div>
+
+<div class="container">
+
+<!-- ============ PROGRESS ============ -->
+<div class="progress-box">
+  <div class="progress-header">
+    <span>Progreso total</span>
+    <span id="progressPct">0 / 50</span>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  <button class="reset-btn" onclick="resetAll()">Borrar todo y empezar de nuevo</button>
+</div>
+
+<!-- ============ START ============ -->
+<div class="start-box">
+  <h2>ANTES DE EMPEZAR — Lee esto primero</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-text">Abre <strong>Google Chrome</strong> en tu computador (o el navegador que uses)</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-text">Escribe esta direccion en la barra de arriba y presiona Enter:</div>
+  </div>
+  <div class="cred"><code>https://betabgnuevosupa.vercel.app</code></div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-text">Aparece la pantalla de login. Escribe estos datos:</div>
+  </div>
+  <div class="cred">
+    <b>Email:</b> <code>patricio.correa@jardindeeva.cl</code><br>
+    <b>Contrasena:</b> <code>Jardin2026</code>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-text">Haz click en <strong>"Iniciar Sesion"</strong></div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-text">Cuando cargue, a la izquierda veras una lista de clientes. Haz click en <strong>"Jardin de Eva"</strong></div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-text">Se abre el portal del cliente. En la barra lateral izquierda busca el tab que dice <strong>"Meta Ads"</strong> y haz click</div>
+  </div>
+
+  <div class="ok-box">Ahora estas dentro del modulo de Meta Ads. Desde aqui empiezan las pruebas.</div>
+  <div class="tip-box">Si en algun momento la pagina se pone blanca o da error, recarga con <strong>F5</strong> (o Cmd+R en Mac). Si sigue fallando, cierra la pestana y empieza de nuevo desde el paso 1.</div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA A: CONEXION -->
+<!-- ============================================= -->
+<div class="stage" id="stage-a">
+  <div class="stage-header" onclick="toggleStage('a')">
+    <div class="stage-num" style="background:rgba(59,130,246,.15);color:var(--blue);">A</div>
+    <h2>Etapa A — Conexion con Facebook</h2>
+    <span class="stage-progress" id="prog-a">0/5</span>
+    <span class="stage-arrow" id="arrow-a">▶</span>
+  </div>
+  <div class="stage-body" id="body-a">
+
+    <!-- A1 -->
+    <div class="step-group" data-test="1">
+      <div class="step-group-title">
+        Prueba #1: Conectar cuenta de Facebook
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Dentro de Meta Ads, mira si ya dice <em>"Conectado"</em> con un punto verde arriba</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Si ya esta conectado → <strong>pasa directo a la prueba #2</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si NO esta conectado, veras un boton azul que dice <strong>"Conectar con Facebook"</strong> — haz click en el</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Se abre una ventana emergente (popup) de Facebook. Inicia sesion con tu Facebook y acepta TODOS los permisos que pida</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">La ventana se cierra sola. Vuelves a Steve Ads y aparece un <strong>asistente</strong> para elegir tu cuenta publicitaria, pagina e Instagram</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text">Selecciona cada opcion y haz click en <strong>"Confirmar"</strong></div></div>
+      <div class="ok-box">ESTA BIEN SI: Aparece un mensaje verde de "Conectado" y puedes ver el nombre de tu cuenta</div>
+      <div class="fail-box">ALGO ESTA MAL SI: La ventana de Facebook no se abre, da error, o al volver no aparece el asistente</div>
+      <div class="tip-box">Si el popup no se abre: desactiva el bloqueador de popups de tu navegador</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(1,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- A2 -->
+    <div class="step-group" data-test="2">
+      <div class="step-group-title">
+        Prueba #2: Ver que portfolio (cuenta publicitaria) esta seleccionado
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Arriba en Meta Ads busca un <strong>menu desplegable</strong> (dropdown) que muestra el nombre de la cuenta publicitaria</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click en el — deben aparecer las cuentas disponibles</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si hay mas de una, selecciona otra</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Ahora <strong>recarga la pagina</strong> con F5 (o Cmd+R en Mac)</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Verifica que el dropdown sigue mostrando la misma cuenta que elegiste (no se reseteo)</div></div>
+      <div class="ok-box">ESTA BIEN SI: El dropdown muestra cuentas con nombre, y al recargar se mantiene tu seleccion</div>
+      <div class="fail-box">ALGO ESTA MAL SI: El dropdown esta vacio, o al recargar vuelve a otra cuenta</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(2,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- A3 -->
+    <div class="step-group" data-test="3">
+      <div class="step-group-title">
+        Prueba #3: Ver la pagina de Facebook e Instagram asociados
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca en el panel de Meta Ads una seccion que muestre la <strong>Pagina de Facebook</strong> vinculada (nombre + foto)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debajo o al lado de la pagina, debe aparecer la <strong>cuenta de Instagram</strong> vinculada</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Verifica que el nombre de la pagina corresponde con la pagina real del cliente en Facebook</div></div>
+      <div class="ok-box">ESTA BIEN SI: Aparecen el nombre de la Page de Facebook y la cuenta de Instagram con su foto</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No aparece nada, o dice "Sin pagina vinculada"</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(3,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- A4 -->
+    <div class="step-group" data-test="4">
+      <div class="step-group-title">
+        Prueba #4: No hay alertas de permisos faltantes
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Mira arriba de la seccion de Meta Ads — busca si hay algun <strong>banner amarillo o rojo</strong> que diga algo sobre "permisos" o "scopes"</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Si NO hay ningun banner de alerta → <strong>todo bien, pasa a la siguiente</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si SI hay un banner amarillo que dice "Faltan permisos" con un boton "Reconectar" → anota que permisos faltan</div></div>
+      <div class="ok-box">ESTA BIEN SI: No hay ningun banner de alerta amarillo/rojo arriba</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Aparece un banner que dice que faltan permisos</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(4,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- A5 -->
+    <div class="step-group" data-test="5">
+      <div class="step-group-title">
+        Prueba #5: Desconectar y reconectar
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un boton o link de <strong>"Configuracion"</strong> o un icono de engranaje ⚙️ en Meta Ads</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Dentro de configuracion, busca <strong>"Desconectar cuenta Meta"</strong> y haz click</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Aparece un dialogo de confirmacion — haz click en <strong>"Si, desconectar"</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Verifica que ahora la seccion de campanas queda vacia y vuelve a aparecer el boton <strong>"Conectar con Facebook"</strong></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Haz click en <strong>"Conectar con Facebook"</strong> de nuevo y repite el flujo de conexion (popup → permisos → asistente)</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text">Verifica que vuelve a quedar conectado igual que antes</div></div>
+      <div class="ok-box">ESTA BIEN SI: Puedes desconectar, luego reconectar sin errores, y todo vuelve a funcionar</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Al desconectar da error, o al reconectar no aparece el asistente, o se pierde la cuenta</div>
+      <div class="tip-box">CUIDADO: Si desconectas y no puedes reconectar, avisa a soporte. No te quedes atascado aqui.</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(5,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA B: CAMPANAS -->
+<!-- ============================================= -->
+<div class="stage" id="stage-b">
+  <div class="stage-header" onclick="toggleStage('b')">
+    <div class="stage-num" style="background:rgba(168,85,247,.15);color:#a855f7;">B</div>
+    <h2>Etapa B — Campanas y Metricas</h2>
+    <span class="stage-progress" id="prog-b">0/10</span>
+    <span class="stage-arrow" id="arrow-b">▶</span>
+  </div>
+  <div class="stage-body" id="body-b">
+
+    <!-- B1 -->
+    <div class="step-group" data-test="6">
+      <div class="step-group-title">
+        Prueba #6: Sincronizar metricas de Meta
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Dentro de Meta Ads, busca un boton que diga <strong>"Sincronizar"</strong> o <strong>"Sync"</strong> (puede tener un icono de flechas circulares 🔄)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click en el</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Espera unos segundos — debe aparecer un spinner o mensaje de "Sincronizando..."</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Cuando termine, debe aparecer un mensaje verde de <strong>"Sincronizacion exitosa"</strong> o similar</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Mira abajo: deben aparecer <strong>datos de campanas</strong> con numeros (gastos, impresiones, etc.)</div></div>
+      <div class="ok-box">ESTA BIEN SI: Aparece mensaje de exito y se ven datos/numeros en la pantalla</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error rojo, o dice "0 metricas sincronizadas", o se queda cargando para siempre</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(6,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B2 -->
+    <div class="step-group" data-test="7">
+      <div class="step-group-title">
+        Prueba #7: Ver lista de campanas
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca una seccion o tab que diga <strong>"Campanas"</strong> o <strong>"Campaigns"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe aparecer una <strong>tabla o lista</strong> con las campanas publicitarias</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Cada campana debe mostrar: <strong>nombre</strong>, <strong>estado</strong> (Activa/Pausada), <strong>gasto</strong>, <strong>impresiones</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Verifica que haya al menos 1 campana en la lista</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ve una tabla con campanas, con nombres reales y numeros que tienen sentido</div>
+      <div class="fail-box">ALGO ESTA MAL SI: La tabla esta vacia, los nombres no corresponden, o los numeros son todos 0</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(7,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B3 -->
+    <div class="step-group" data-test="8">
+      <div class="step-group-title">
+        Prueba #8: Los gastos estan en pesos chilenos (CLP)
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Mira los numeros de <strong>gasto</strong> (Ad Spend) en la tabla de campanas o en las tarjetas de metricas</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Los gastos deben estar en <strong>pesos chilenos</strong> — valores como $15.000, $250.000, etc.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si ves numeros muy chicos como $15 o $250 → probablemente estan en dolares sin convertir (MAL)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Si ves numeros gigantes como $15.000.000 para un dia → probablemente se convirtio doble (MAL)</div></div>
+      <div class="ok-box">ESTA BIEN SI: Los gastos son valores razonables en pesos chilenos (ej: $50.000 a $500.000 por dia es normal)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Los montos son demasiado chicos (dolares) o demasiado grandes (conversion doble)</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(8,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B4 -->
+    <div class="step-group" data-test="9">
+      <div class="step-group-title">
+        Prueba #9: Detalle de una campana
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la tabla de campanas, haz <strong>click en el nombre</strong> de cualquier campana</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe abrirse una vista de detalle o un panel lateral con mas informacion</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Busca estos datos: <strong>Nombre</strong>, <strong>Estado</strong>, <strong>Gasto total</strong>, <strong>Impresiones</strong>, <strong>Compras</strong>, <strong>ROAS</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Verifica que los numeros no esten vacios ni sean todos cero</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se abre el detalle y muestra datos reales de la campana</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Hace click pero no pasa nada, o se abre con todo en blanco</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(9,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B5 -->
+    <div class="step-group" data-test="10">
+      <div class="step-group-title">
+        Prueba #10: Graficos de metricas
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca graficos o charts en la seccion de Meta Ads (pueden ser de linea o de barras)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Verifica que muestran datos de los ultimos 30 dias</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Pasa el mouse sobre los puntos del grafico — debe aparecer un tooltip con la fecha y el valor</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Comprueba que los numeros del grafico tienen sentido (no son todos 0, no son negativos)</div></div>
+      <div class="ok-box">ESTA BIEN SI: Hay graficos con curvas/barras que muestran datos reales, los tooltips funcionan</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No hay graficos, estan vacios, o los numeros no tienen sentido</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(10,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B6 -->
+    <div class="step-group" data-test="11">
+      <div class="step-group-title">
+        Prueba #11: Tarjetas resumen (KPIs)
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la parte superior de Meta Ads busca <strong>tarjetas grandes</strong> que muestren numeros clave como:</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Gasto Total</strong> — cuanto se gasto en anuncios</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Impresiones</strong> — cuantas veces se mostraron los anuncios</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Compras</strong> — cuantas ventas generaron los anuncios</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text"><strong>ROAS</strong> — retorno por cada peso invertido (ej: 3.5x)</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text">Todos deben tener numeros reales, no "$0" ni "N/A"</div></div>
+      <div class="ok-box">ESTA BIEN SI: Las tarjetas muestran numeros reales y razonables</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Alguna tarjeta dice $0, NaN, undefined, o no aparece</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(11,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B7 -->
+    <div class="step-group" data-test="12">
+      <div class="step-group-title">
+        Prueba #12: Filtrar por rango de fechas
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un selector de fechas o un dropdown que diga <strong>"Ultimos 7 dias"</strong>, <strong>"Ultimos 30 dias"</strong>, etc.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Cambia a <strong>"Ultimos 7 dias"</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Los numeros en las tarjetas y graficos deben <strong>cambiar</strong> (ser menores que los de 30 dias)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Cambia a <strong>"Ultimos 30 dias"</strong> — deben volver a los valores originales</div></div>
+      <div class="ok-box">ESTA BIEN SI: Al cambiar las fechas, los numeros se actualizan y cambian</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Los numeros no cambian al filtrar, o se ponen todos en 0</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(12,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B8 -->
+    <div class="step-group" data-test="13">
+      <div class="step-group-title">
+        Prueba #13: Adsets (conjuntos de anuncios)
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la tabla de campanas o en el detalle de una campana, busca una seccion de <strong>"Adsets"</strong> o <strong>"Conjuntos de anuncios"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar una sublista con los ad sets de cada campana</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Cada adset debe tener: nombre, presupuesto diario, estado, metricas</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ven adsets con datos reales bajo cada campana</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No aparece seccion de adsets, o estan todos vacios</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(13,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B9 -->
+    <div class="step-group" data-test="14">
+      <div class="step-group-title">
+        Prueba #14: Indicadores de estado de campana
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la tabla de campanas, mira la columna de <strong>estado</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar etiquetas como <strong>"Activa"</strong> (verde), <strong>"Pausada"</strong> (gris/amarillo), <strong>"Eliminada"</strong> (rojo)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Verifica que los estados corresponden con la realidad en Facebook Ads Manager</div></div>
+      <div class="ok-box">ESTA BIEN SI: Las campanas activas dicen "Activa" con color verde, las pausadas dicen "Pausada"</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Todas dicen lo mismo, o el estado no tiene color/badge</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(14,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- B10 -->
+    <div class="step-group" data-test="15">
+      <div class="step-group-title">
+        Prueba #15: Sincronizar de nuevo (no se duplica)
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Haz click de nuevo en el boton <strong>"Sincronizar"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Espera a que termine</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Verifica que los numeros NO se duplicaron (el gasto no se duplico, las campanas no aparecen dos veces)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Si antes habia 3 campanas, despues de sincronizar de nuevo debe haber 3 (no 6)</div></div>
+      <div class="ok-box">ESTA BIEN SI: Los datos se actualizan pero no se duplican</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Las campanas aparecen duplicadas, o el gasto se doblo</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(15,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA C: CREAR CAMPANAS -->
+<!-- ============================================= -->
+<div class="stage" id="stage-c">
+  <div class="stage-header" onclick="toggleStage('c')">
+    <div class="stage-num" style="background:rgba(34,197,94,.15);color:var(--green);">C</div>
+    <h2>Etapa C — Crear Campanas y Anuncios</h2>
+    <span class="stage-progress" id="prog-c">0/8</span>
+    <span class="stage-arrow" id="arrow-c">▶</span>
+  </div>
+  <div class="stage-body" id="body-c">
+
+    <!-- C1 -->
+    <div class="step-group" data-test="16">
+      <div class="step-group-title">
+        Prueba #16: Boton de crear campana
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un boton que diga <strong>"Crear Campana"</strong>, <strong>"Nueva Campana"</strong> o un boton con <strong>"+"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click en el</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Debe abrirse un formulario o asistente (wizard) para crear una campana nueva</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se abre un formulario con campos para llenar</div>
+      <div class="fail-box">ALGO ESTA MAL SI: El boton no existe, no responde, o da error al hacer click</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(16,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C2 -->
+    <div class="step-group" data-test="17">
+      <div class="step-group-title">
+        Prueba #17: Llenar formulario de campana
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En el formulario, llena los campos:</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Nombre:</strong> escribe <em>"QA Test Campaign - Borrar"</em></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Objetivo:</strong> selecciona <em>"Conversiones"</em> o <em>"Ventas"</em> (o el que haya disponible)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Presupuesto:</strong> escribe un valor bajo como <em>"5000"</em> (5.000 pesos)</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text"><strong>Publico:</strong> selecciona un publico objetivo o deja el que viene por defecto</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text">NO hagas click en "Crear" todavia — primero verifica que todos los campos se llenaron correctamente</div></div>
+      <div class="ok-box">ESTA BIEN SI: Todos los campos aceptan datos y se ven correctamente</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Algun campo no deja escribir, un dropdown esta vacio, o hay errores rojos</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(17,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C3 -->
+    <div class="step-group" data-test="18">
+      <div class="step-group-title">
+        Prueba #18: Crear campana (enviar a Facebook)
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Con el formulario lleno, haz click en <strong>"Crear Campana"</strong> o <strong>"Publicar"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Espera — puede tardar unos segundos</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Debe aparecer un mensaje verde de <strong>"Campana creada exitosamente"</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">La nueva campana debe aparecer en la lista de campanas</div></div>
+      <div class="ok-box">ESTA BIEN SI: Mensaje verde de exito y la campana aparece en la lista</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error rojo, o la campana no aparece en la lista despues de crearla</div>
+      <div class="tip-box">Si la campana se creo, despues podras eliminarla o pausarla desde Facebook Ads Manager</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(18,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C4 -->
+    <div class="step-group" data-test="19">
+      <div class="step-group-title">
+        Prueba #19: Generar copy con IA (Steve)
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Dentro del formulario de crear campana o en una seccion de <strong>"Copies"</strong> / <strong>"Creativos"</strong>, busca un boton que diga <strong>"Generar con Steve"</strong> o <strong>"IA"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — Steve genera automaticamente textos para el anuncio</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Deben aparecer opciones de texto (titulo, descripcion, call-to-action)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Verifica que el texto generado tiene sentido y esta en espanol</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se generan textos en espanol que tienen sentido para un anuncio</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No genera nada, genera texto en ingles, o genera texto sin sentido</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(19,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C5 -->
+    <div class="step-group" data-test="20">
+      <div class="step-group-title">
+        Prueba #20: Subir imagen para anuncio
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En el formulario de campana/anuncio, busca un area para <strong>subir imagen</strong> o <strong>"Agregar creativo"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click y selecciona una imagen JPG o PNG de tu computador</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">La imagen debe subirse y mostrar una previsualizacion (thumbnail)</div></div>
+      <div class="ok-box">ESTA BIEN SI: La imagen se sube y se ve la previsualizacion</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error al subir, no muestra la imagen, o se queda cargando</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(20,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C6 -->
+    <div class="step-group" data-test="21">
+      <div class="step-group-title">
+        Prueba #21: Seleccion de targeting (publico objetivo)
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En el formulario de campana, busca la seccion de <strong>"Segmentacion"</strong> o <strong>"Targeting"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe haber campos para <strong>edad</strong>, <strong>genero</strong>, <strong>ubicacion</strong>, <strong>intereses</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Prueba cambiar la edad (ej: 25-45) y escribir un interes (ej: "moda")</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Al escribir intereses, debe aparecer una lista de sugerencias de Facebook</div></div>
+      <div class="ok-box">ESTA BIEN SI: Los campos de targeting funcionan y los intereses muestran sugerencias</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No hay campos de targeting, o no aparecen sugerencias al escribir intereses</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(21,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C7 -->
+    <div class="step-group" data-test="22">
+      <div class="step-group-title">
+        Prueba #22: Preview del anuncio
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un boton de <strong>"Preview"</strong> o <strong>"Vista previa"</strong> en el formulario de campana</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — debe mostrar como se vera el anuncio en Facebook/Instagram</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">La preview debe mostrar: imagen, texto, boton de call-to-action</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ve una previsualizacion del anuncio con imagen y texto</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No hay boton de preview, o muestra una pantalla vacia</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(22,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- C8 -->
+    <div class="step-group" data-test="23">
+      <div class="step-group-title">
+        Prueba #23: Generacion masiva de campanas
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca una opcion de <strong>"Crear multiples campanas"</strong> o <strong>"Mass Campaign"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Si existe, prueba generar 2-3 campanas a la vez</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si no existe esta opcion, marca como "No aplica" y pasa a la siguiente</div></div>
+      <div class="ok-box">ESTA BIEN SI: Puedes generar varias campanas a la vez, o la opcion no existe (esta bien si no esta)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: La opcion existe pero da error al usarla</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(23,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA D: AUDIENCIAS -->
+<!-- ============================================= -->
+<div class="stage" id="stage-d">
+  <div class="stage-header" onclick="toggleStage('d')">
+    <div class="stage-num" style="background:rgba(236,72,153,.15);color:#ec4899;">D</div>
+    <h2>Etapa D — Audiencias (Publicos)</h2>
+    <span class="stage-progress" id="prog-d">0/7</span>
+    <span class="stage-arrow" id="arrow-d">▶</span>
+  </div>
+  <div class="stage-body" id="body-d">
+
+    <!-- D1 -->
+    <div class="step-group" data-test="24">
+      <div class="step-group-title">
+        Prueba #24: Ver audiencias existentes
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un tab o seccion que diga <strong>"Audiencias"</strong>, <strong>"Publicos"</strong> o <strong>"Audiences"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — debe mostrar una lista de audiencias guardadas en Facebook</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Cada audiencia debe mostrar: <strong>nombre</strong>, <strong>tamano estimado</strong> (numero de personas), <strong>tipo</strong></div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ve una lista de audiencias con nombres y tamanos</div>
+      <div class="fail-box">ALGO ESTA MAL SI: La seccion esta vacia (y se sabe que hay audiencias en Facebook) o da error</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(24,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- D2 -->
+    <div class="step-group" data-test="25">
+      <div class="step-group-title">
+        Prueba #25: Crear audiencia personalizada
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la seccion de Audiencias, busca un boton <strong>"Crear Audiencia"</strong> o <strong>"+"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Selecciona tipo: <strong>"Custom Audience"</strong> o <strong>"Audiencia Personalizada"</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Nombre: escribe <em>"QA Test Audience - Borrar"</em></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Selecciona una fuente (ej: visitantes del sitio web, lista de clientes)</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Haz click en <strong>"Crear"</strong></div></div>
+      <div class="ok-box">ESTA BIEN SI: Mensaje de exito y la audiencia aparece en la lista</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error al crear, o no aparece en la lista despues</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(25,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- D3 -->
+    <div class="step-group" data-test="26">
+      <div class="step-group-title">
+        Prueba #26: Crear audiencia Lookalike
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la seccion de Audiencias, busca la opcion <strong>"Lookalike"</strong> o <strong>"Similares"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Selecciona una audiencia fuente (la que creaste antes u otra existente)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Selecciona pais (Chile) y porcentaje (1%)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Haz click en <strong>"Crear"</strong></div></div>
+      <div class="ok-box">ESTA BIEN SI: Se crea la audiencia lookalike y aparece en la lista</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error o no se puede seleccionar una audiencia fuente</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(26,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- D4 -->
+    <div class="step-group" data-test="27">
+      <div class="step-group-title">
+        Prueba #27: Eliminar audiencia de prueba
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la lista de audiencias, busca la audiencia <em>"QA Test Audience - Borrar"</em> que creaste</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Busca un boton de <strong>eliminar</strong> (icono de basura 🗑️ o boton "Eliminar")</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Confirma la eliminacion</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">La audiencia debe desaparecer de la lista</div></div>
+      <div class="ok-box">ESTA BIEN SI: La audiencia se elimina y ya no aparece en la lista</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No se puede eliminar o sigue apareciendo despues de borrar</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(27,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- D5 -->
+    <div class="step-group" data-test="28">
+      <div class="step-group-title">
+        Prueba #28: Tamano de audiencia se muestra correctamente
+        <span class="tag tag-baja">BAJA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la lista de audiencias, verifica que cada una muestra un <strong>rango de tamano</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Ejemplo: "1,200 - 1,500 personas" o "Aprox. 50,000"</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">No debe decir "0 personas" ni estar vacio</div></div>
+      <div class="ok-box">ESTA BIEN SI: Las audiencias muestran un rango de tamano razonable</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Dice "0 personas" o no muestra el tamano</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(28,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- D6 -->
+    <div class="step-group" data-test="29">
+      <div class="step-group-title">
+        Prueba #29: Buscar intereses para targeting
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En el formulario de campana o audiencia, busca un campo de <strong>"Intereses"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Escribe <em>"moda"</em> o <em>"fitness"</em></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Debe aparecer un dropdown con sugerencias de Facebook (ej: "Moda", "Moda femenina", etc.)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Selecciona una — debe agregarse como chip/tag</div></div>
+      <div class="ok-box">ESTA BIEN SI: Aparecen sugerencias de intereses y se pueden seleccionar</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No aparecen sugerencias o da error al escribir</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(29,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- D7 -->
+    <div class="step-group" data-test="30">
+      <div class="step-group-title">
+        Prueba #30: Usar audiencia en campana nueva
+        <span class="tag tag-baja">BAJA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Al crear una campana nueva, en la seccion de publico, busca un selector de <strong>"Audiencia guardada"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — deben aparecer las audiencias que tienes en Facebook</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Selecciona una y verifica que se aplica a la campana</div></div>
+      <div class="ok-box">ESTA BIEN SI: Puedes seleccionar una audiencia guardada para la campana</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No aparece la opcion o la lista esta vacia</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(30,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA E: PIXEL Y CONFIGURACION -->
+<!-- ============================================= -->
+<div class="stage" id="stage-e">
+  <div class="stage-header" onclick="toggleStage('e')">
+    <div class="stage-num" style="background:rgba(249,115,22,.15);color:var(--orange);">E</div>
+    <h2>Etapa E — Pixel de Facebook y Configuracion</h2>
+    <span class="stage-progress" id="prog-e">0/5</span>
+    <span class="stage-arrow" id="arrow-e">▶</span>
+  </div>
+  <div class="stage-body" id="body-e">
+
+    <!-- E1 -->
+    <div class="step-group" data-test="31">
+      <div class="step-group-title">
+        Prueba #31: Ver informacion del Pixel
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca una seccion o tab que diga <strong>"Pixel"</strong> o <strong>"Configuracion"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar: <strong>nombre del pixel</strong>, <strong>ID del pixel</strong>, <strong>estado</strong> (activo/inactivo)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">El ID del pixel es un numero largo como <em>123456789012345</em></div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ve el pixel con su nombre e ID, y dice que esta activo</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No se ve pixel, o dice "No hay pixel configurado"</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(31,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- E2 -->
+    <div class="step-group" data-test="32">
+      <div class="step-group-title">
+        Prueba #32: Estadisticas del Pixel
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Dentro de la seccion de Pixel, busca estadisticas o eventos recientes</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Deben mostrar eventos como: <strong>PageView</strong>, <strong>Purchase</strong>, <strong>AddToCart</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Cada evento debe tener un conteo (ej: "1,234 eventos en los ultimos 7 dias")</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ven eventos del pixel con conteos recientes</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No hay estadisticas o los conteos son todos 0</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(32,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- E3 -->
+    <div class="step-group" data-test="33">
+      <div class="step-group-title">
+        Prueba #33: Codigo de instalacion del Pixel
+        <span class="tag tag-baja">BAJA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la seccion de Pixel, busca un boton <strong>"Obtener codigo"</strong> o <strong>"Instrucciones"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar un bloque de codigo HTML/JavaScript con el ID del pixel</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si no hay boton de codigo, esta bien — no todas las integraciones lo muestran</div></div>
+      <div class="ok-box">ESTA BIEN SI: Muestra codigo valido con el pixel ID, o no tiene esta opcion (ambos son OK)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Muestra codigo con un pixel ID diferente al que se ve arriba</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(33,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- E4 -->
+    <div class="step-group" data-test="34">
+      <div class="step-group-title">
+        Prueba #34: Configuracion de moneda
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la configuracion de Meta Ads, busca informacion sobre la <strong>moneda</strong> de la cuenta</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe indicar que la moneda de visualizacion es <strong>CLP (Pesos chilenos)</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si la cuenta de Facebook esta en USD, debe indicar que se <strong>convierte automaticamente</strong> a CLP</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se muestra CLP como moneda, y si la cuenta es USD indica conversion automatica</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Dice USD o muestra otra moneda sin mencion de conversion</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(34,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- E5 -->
+    <div class="step-group" data-test="35">
+      <div class="step-group-title">
+        Prueba #35: Ultima sincronizacion
+        <span class="tag tag-baja">BAJA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca en la pantalla un texto que diga <strong>"Ultima sincronizacion"</strong> o <strong>"Last sync"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar una fecha/hora reciente (ej: "Hace 5 minutos" o la fecha de hoy)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si dice "Nunca sincronizado" → vuelve a la Prueba #6 y sincroniza</div></div>
+      <div class="ok-box">ESTA BIEN SI: Muestra una fecha/hora reciente (de hoy o de hace poco)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Dice "Nunca" o muestra una fecha de hace mas de una semana</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(35,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA F: REGLAS AUTOMATICAS -->
+<!-- ============================================= -->
+<div class="stage" id="stage-f">
+  <div class="stage-header" onclick="toggleStage('f')">
+    <div class="stage-num" style="background:rgba(234,179,8,.15);color:var(--yellow);">F</div>
+    <h2>Etapa F — Reglas Automaticas</h2>
+    <span class="stage-progress" id="prog-f">0/5</span>
+    <span class="stage-arrow" id="arrow-f">▶</span>
+  </div>
+  <div class="stage-body" id="body-f">
+
+    <!-- F1 -->
+    <div class="step-group" data-test="36">
+      <div class="step-group-title">
+        Prueba #36: Ver seccion de reglas
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un tab o seccion que diga <strong>"Reglas"</strong>, <strong>"Automatizacion"</strong> o <strong>"Rules"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — debe abrirse la seccion de reglas automaticas</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Puede estar vacia (sin reglas creadas) — eso esta bien si es primera vez</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se abre la seccion de reglas (aunque este vacia)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No hay tab de reglas o da error al abrirlo</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(36,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- F2 -->
+    <div class="step-group" data-test="37">
+      <div class="step-group-title">
+        Prueba #37: Crear regla automatica
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Haz click en <strong>"Crear Regla"</strong> o <strong>"Nueva Regla"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Llena los campos:</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Nombre:</strong> escribe <em>"QA Test Rule - Borrar"</em></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Condicion:</strong> selecciona <em>"CPA mayor a 50000"</em> (o la opcion que haya)</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text"><strong>Accion:</strong> selecciona <em>"Pausar campana"</em></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text"><strong>Aplica a:</strong> selecciona <em>"Todas las campanas activas"</em></div></div>
+      <div class="step"><div class="step-num">7</div><div class="step-text">Haz click en <strong>"Guardar"</strong> o <strong>"Crear"</strong></div></div>
+      <div class="ok-box">ESTA BIEN SI: La regla se crea y aparece en la lista con estado "Activa"</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error al guardar, o no aparece en la lista</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(37,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- F3 -->
+    <div class="step-group" data-test="38">
+      <div class="step-group-title">
+        Prueba #38: Pausar/activar regla
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la lista de reglas, busca la regla que creaste (<em>"QA Test Rule"</em>)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Busca un <strong>switch</strong> o boton de <strong>"Pausar"/"Activar"</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Haz click para pausarla — debe cambiar a estado "Pausada" o "Inactiva"</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Haz click de nuevo para reactivarla — debe volver a "Activa"</div></div>
+      <div class="ok-box">ESTA BIEN SI: Puedes pausar y reactivar la regla con un click</div>
+      <div class="fail-box">ALGO ESTA MAL SI: El switch no funciona o el estado no cambia</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(38,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- F4 -->
+    <div class="step-group" data-test="39">
+      <div class="step-group-title">
+        Prueba #39: Historial de ejecucion de reglas
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la seccion de reglas, busca un tab o link de <strong>"Historial"</strong> o <strong>"Ejecuciones"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar una lista de cuando se ejecuto cada regla</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Si no hay historial (las reglas nunca se han disparado), esta bien — debe decir "Sin ejecuciones" o algo similar</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ve el historial (o dice "sin ejecuciones" si es primera vez)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error al abrir el historial</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(39,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- F5 -->
+    <div class="step-group" data-test="40">
+      <div class="step-group-title">
+        Prueba #40: Eliminar regla de prueba
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la lista de reglas, busca la regla <em>"QA Test Rule - Borrar"</em></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click en el icono de <strong>eliminar</strong> 🗑️ o boton "Eliminar"</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Confirma la eliminacion</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Debe desaparecer de la lista</div></div>
+      <div class="ok-box">ESTA BIEN SI: La regla se elimina correctamente</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No se puede eliminar o sigue apareciendo</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(40,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA G: INSTAGRAM / SOCIAL INBOX -->
+<!-- ============================================= -->
+<div class="stage" id="stage-g">
+  <div class="stage-header" onclick="toggleStage('g')">
+    <div class="stage-num" style="background:rgba(99,102,241,.15);color:var(--accent);">G</div>
+    <h2>Etapa G — Instagram y Social Inbox</h2>
+    <span class="stage-progress" id="prog-g">0/5</span>
+    <span class="stage-arrow" id="arrow-g">▶</span>
+  </div>
+  <div class="stage-body" id="body-g">
+
+    <!-- G1 -->
+    <div class="step-group" data-test="41">
+      <div class="step-group-title">
+        Prueba #41: Ver feed de Instagram
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un tab que diga <strong>"Instagram"</strong>, <strong>"Social"</strong> o <strong>"Social Inbox"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — debe mostrar los posts recientes de la cuenta de Instagram del cliente</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Cada post debe mostrar: <strong>imagen</strong>, <strong>likes</strong>, <strong>comentarios</strong></div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ven los posts de Instagram con imagenes y metricas</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No se ve nada, o dice "No hay cuenta de Instagram vinculada"</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(41,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- G2 -->
+    <div class="step-group" data-test="42">
+      <div class="step-group-title">
+        Prueba #42: Ver comentarios de un post
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En la seccion de Instagram, haz click en <strong>un post</strong> que tenga comentarios</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe abrirse una vista de detalle mostrando los <strong>comentarios</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Verifica que se ven los textos de los comentarios con el nombre del usuario</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ven los comentarios con nombre de usuario y texto</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No se cargan los comentarios o da error</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(42,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- G3 -->
+    <div class="step-group" data-test="43">
+      <div class="step-group-title">
+        Prueba #43: Responder comentario desde Steve
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En los comentarios de un post, busca un campo de texto o boton de <strong>"Responder"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Escribe una respuesta de prueba: <em>"Gracias por tu comentario! (prueba QA)"</em></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Haz click en <strong>"Enviar"</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">La respuesta debe aparecer publicada bajo el comentario</div></div>
+      <div class="ok-box">ESTA BIEN SI: La respuesta se publica y aparece como respuesta al comentario</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error al enviar o no aparece la respuesta</div>
+      <div class="tip-box">CUIDADO: Esta respuesta se publica de verdad en Instagram. Si es un post real, despues borra la respuesta desde Instagram</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(43,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- G4 -->
+    <div class="step-group" data-test="44">
+      <div class="step-group-title">
+        Prueba #44: Mensajes directos (DMs) de Instagram
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Busca un tab de <strong>"Mensajes"</strong> o <strong>"DMs"</strong> dentro de Social Inbox</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Debe mostrar las conversaciones de mensajes directos de Instagram</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Haz click en una conversacion para ver los mensajes</div></div>
+      <div class="ok-box">ESTA BIEN SI: Se ven las conversaciones con los mensajes de cada usuario</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No hay tab de mensajes, o la lista esta vacia cuando deberia tener DMs</div>
+      <div class="tip-box">Si no hay DMs, puede ser porque la cuenta de Instagram no tiene mensajes recientes — eso esta OK</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(44,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- G5 -->
+    <div class="step-group" data-test="45">
+      <div class="step-group-title">
+        Prueba #45: Respuesta IA a comentarios
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">En un comentario, busca un boton de <strong>"Generar respuesta con IA"</strong> o <strong>"Steve sugiere"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click — Steve genera automaticamente una respuesta sugerida</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">La respuesta generada debe ser coherente con el comentario y en espanol</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">NO la envies automaticamente — solo verifica que se genera bien</div></div>
+      <div class="ok-box">ESTA BIEN SI: Steve genera una respuesta que tiene sentido, en espanol</div>
+      <div class="fail-box">ALGO ESTA MAL SI: No genera nada, genera en ingles, o la respuesta no tiene sentido</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(45,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================= -->
+<!-- ETAPA H: RENDIMIENTO Y ESTABILIDAD -->
+<!-- ============================================= -->
+<div class="stage" id="stage-h">
+  <div class="stage-header" onclick="toggleStage('h')">
+    <div class="stage-num" style="background:rgba(239,68,68,.15);color:var(--red);">H</div>
+    <h2>Etapa H — Rendimiento y Estabilidad</h2>
+    <span class="stage-progress" id="prog-h">0/5</span>
+    <span class="stage-arrow" id="arrow-h">▶</span>
+  </div>
+  <div class="stage-body" id="body-h">
+
+    <!-- H1 -->
+    <div class="step-group" data-test="46">
+      <div class="step-group-title">
+        Prueba #46: Velocidad de carga
+        <span class="tag tag-alta">ALTA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Navega a otro tab del portal (ej: "Dashboard") y luego vuelve a <strong>"Meta Ads"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Cuenta mentalmente cuanto tarda en cargar los datos</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Debe cargar en <strong>menos de 5 segundos</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Mientras carga, debe mostrar un <strong>spinner</strong> o esqueleto (no una pantalla blanca)</div></div>
+      <div class="ok-box">ESTA BIEN SI: Carga en menos de 5 segundos y muestra indicador de carga</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Tarda mas de 10 segundos, o muestra pantalla blanca mientras carga</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(46,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- H2 -->
+    <div class="step-group" data-test="47">
+      <div class="step-group-title">
+        Prueba #47: Errores en consola
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Con Meta Ads abierto, presiona <strong>F12</strong> (o clic derecho → "Inspeccionar")</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Se abre el panel de desarrollo. Haz click en el tab <strong>"Console"</strong> (consola)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Mira si hay textos en <strong>rojo</strong> — esos son errores</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Errores amarillos (warnings) estan OK. Solo preocupate por los <strong>rojos</strong></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Si hay errores rojos, anota el texto del error</div></div>
+      <div class="ok-box">ESTA BIEN SI: No hay errores rojos en la consola (los amarillos estan OK)</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Hay errores rojos, especialmente si dicen "Failed to fetch", "401", "500" o "TypeError"</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(47,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- H3 -->
+    <div class="step-group" data-test="48">
+      <div class="step-group-title">
+        Prueba #48: Funciona en celular
+        <span class="tag tag-media">MEDIA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Abre la app en tu <strong>celular</strong> (Chrome o Safari)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Navega a <code>https://betabgnuevosupa.vercel.app</code></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Inicia sesion y ve a Meta Ads</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Verifica que la tabla de campanas se ve bien (no se corta, se puede hacer scroll)</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Verifica que los graficos se ven y los botones se pueden tocar</div></div>
+      <div class="ok-box">ESTA BIEN SI: Todo se ve y funciona en el celular, aunque los graficos sean mas chicos</div>
+      <div class="fail-box">ALGO ESTA MAL SI: La tabla se desborda, los botones no se pueden tocar, o algo se corta</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(48,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- H4 -->
+    <div class="step-group" data-test="49">
+      <div class="step-group-title">
+        Prueba #49: Acceso como cliente (no admin)
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Cierra sesion</strong> completamente (busca boton de logout)</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Inicia sesion como el <strong>cliente</strong>:</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Email: <code>patricio.correa@jardindeeva.cl</code> / Contrasena: <code>Jardin2026</code></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Navega a Meta Ads — debe cargar los mismos datos que viste como admin</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Verifica que el cliente NO puede ver datos de OTROS clientes</div></div>
+      <div class="ok-box">ESTA BIEN SI: El cliente ve sus propios datos de Meta Ads correctamente</div>
+      <div class="fail-box">ALGO ESTA MAL SI: Da error 403/401, no ve datos, o puede ver datos de otros clientes</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(49,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+    <!-- H5 -->
+    <div class="step-group" data-test="50">
+      <div class="step-group-title">
+        Prueba #50: Sincronizar multiples veces rapido (stress test)
+        <span class="tag tag-critica">CRITICA</span>
+      </div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Vuelve a Meta Ads y busca el boton de <strong>"Sincronizar"</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Haz click <strong>3 veces seguidas rapido</strong> (click, click, click)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Espera unos segundos</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Verifica que:</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">a) NO da un error de "Too many requests" o "Rate limited" (si sale, esta bien — es una proteccion)</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text">b) Los datos NO se duplican despues de los 3 clicks</div></div>
+      <div class="step"><div class="step-num">7</div><div class="step-text">c) La app no se rompe ni muestra pantalla blanca</div></div>
+      <div class="ok-box">ESTA BIEN SI: Sale mensaje de "Rate limited" (proteccion activa) O sincroniza bien sin duplicar datos</div>
+      <div class="fail-box">ALGO ESTA MAL SI: La app se rompe, muestra pantalla blanca, o los datos se duplican</div>
+      <label class="done-check"><input type="checkbox" onchange="markDone(50,this.checked)"><div class="box"></div><span>Marcar como probada</span></label>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// State
+const STORAGE_KEY = 'qa-meta-simple-v1';
+let state = {};
+
+function loadState() {
+  try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { state = {}; }
+  // Restore checkboxes
+  document.querySelectorAll('.step-group').forEach(g => {
+    const id = g.dataset.test;
+    if (state[id]) {
+      const cb = g.querySelector('.done-check input');
+      if (cb) cb.checked = true;
+      const box = g.querySelector('.done-check .box');
+      // visual
+    }
+  });
+  updateProgress();
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function markDone(testId, checked) {
+  if (checked) state[testId] = true;
+  else delete state[testId];
+  saveState();
+  updateProgress();
+}
+
+function resetAll() {
+  if (!confirm('Borrar todo el progreso y empezar de nuevo?')) return;
+  state = {};
+  saveState();
+  document.querySelectorAll('.done-check input').forEach(cb => cb.checked = false);
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = 50;
+  const done = Object.keys(state).length;
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progressPct').textContent = `${done} / ${total}`;
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  // Per-stage
+  const stages = { a:[1,5], b:[6,15], c:[16,23], d:[24,30], e:[31,35], f:[36,40], g:[41,45], h:[46,50] };
+  for (const [key, [min, max]] of Object.entries(stages)) {
+    let count = 0;
+    const stageTotal = max - min + 1;
+    for (let i = min; i <= max; i++) { if (state[i]) count++; }
+    const el = document.getElementById('prog-' + key);
+    if (el) el.textContent = `${count}/${stageTotal}`;
+  }
+}
+
+function toggleStage(id) {
+  const body = document.getElementById('body-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  if (body.classList.contains('show')) {
+    body.classList.remove('show');
+    arrow.classList.remove('open');
+  } else {
+    body.classList.add('show');
+    arrow.classList.add('open');
+  }
+}
+
+// Init
+loadState();
+</script>
+
+</body>
+</html>

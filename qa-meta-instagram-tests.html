@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Meta/Instagram - Steve Ads - 50 Pruebas</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3347;
+    --text: #e4e6f0;
+    --text-muted: #8b8fa3;
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --green: #22c55e;
+    --green-bg: rgba(34,197,94,.12);
+    --yellow: #eab308;
+    --yellow-bg: rgba(234,179,8,.12);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,.12);
+    --orange: #f97316;
+    --orange-bg: rgba(249,115,22,.12);
+    --blue: #3b82f6;
+    --blue-bg: rgba(59,130,246,.12);
+    --purple: #a855f7;
+    --purple-bg: rgba(168,85,247,.12);
+    --pink: #ec4899;
+    --pink-bg: rgba(236,72,153,.12);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .header { text-align:center; padding:40px 24px; background:linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#1e1b4b 100%); border-bottom:1px solid var(--border); margin-bottom:32px; }
+  .header h1 { font-size:2rem; font-weight:800; background:linear-gradient(135deg,#c7d2fe,#818cf8,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
+  .header p { color:var(--text-muted); font-size:.95rem; }
+  .header .date { color:var(--accent-light); font-weight:600; margin-top:4px; }
+
+  .stats-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:24px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; }
+  .stat-card .number { font-size:1.6rem; font-weight:800; }
+  .stat-card .label { font-size:.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+  .progress-container { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin-bottom:24px; }
+  .progress-label { display:flex; justify-content:space-between; margin-bottom:8px; font-size:.85rem; }
+  .progress-bar { height:10px; background:var(--surface2); border-radius:99px; overflow:hidden; }
+  .progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--green)); border-radius:99px; transition:width .4s; width:0%; }
+
+  .env-info { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin-bottom:24px; font-size:.85rem; line-height:2; }
+  .env-info code { background:var(--surface2); padding:2px 8px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:.78rem; color:var(--accent-light); }
+
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px; }
+  .filter-btn { padding:6px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); cursor:pointer; font-size:.8rem; font-weight:500; transition:all .2s; }
+  .filter-btn:hover { border-color:var(--accent); color:var(--text); }
+  .filter-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  .section { margin-bottom:36px; }
+  .section-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .section-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:800; flex-shrink:0; }
+  .section-header h2 { font-size:1.15rem; font-weight:700; }
+  .section-header .count { margin-left:auto; font-size:.8rem; color:var(--text-muted); background:var(--surface2); padding:2px 10px; border-radius:99px; }
+
+  .test-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin-bottom:10px; transition:all .2s; }
+  .test-card:hover { border-color:var(--accent); }
+  .test-card.done { opacity:.5; }
+  .test-card.done .test-title { text-decoration:line-through; }
+
+  .test-top { display:flex; align-items:flex-start; gap:12px; cursor:pointer; }
+  .test-checkbox { width:22px; height:22px; border-radius:6px; border:2px solid var(--border); flex-shrink:0; margin-top:2px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; }
+  .test-checkbox.checked { background:var(--green); border-color:var(--green); }
+  .test-checkbox.checked::after { content:'✓'; color:#fff; font-size:.75rem; font-weight:700; }
+  .test-number { font-size:.72rem; font-weight:700; color:var(--text-muted); background:var(--surface2); padding:2px 8px; border-radius:6px; flex-shrink:0; margin-top:2px; }
+  .test-content { flex:1; min-width:0; }
+  .test-title { font-weight:600; font-size:.92rem; margin-bottom:4px; }
+
+  .test-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .badge { font-size:.68rem; font-weight:600; padding:2px 8px; border-radius:5px; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  .badge.critical { background:var(--red-bg); color:var(--red); }
+  .badge.high { background:var(--orange-bg); color:var(--orange); }
+  .badge.medium { background:var(--yellow-bg); color:var(--yellow); }
+  .badge.low { background:var(--green-bg); color:var(--green); }
+  .badge.hard { background:var(--red-bg); color:var(--red); }
+  .badge.moderate { background:var(--yellow-bg); color:var(--yellow); }
+  .badge.easy { background:var(--green-bg); color:var(--green); }
+  .badge.endpoint { background:var(--blue-bg); color:var(--blue); }
+  .badge.ui { background:var(--purple-bg); color:var(--purple); }
+  .badge.cron { background:var(--pink-bg); color:var(--pink); }
+
+  .test-steps { display:none; margin-top:14px; padding:16px; background:var(--surface2); border-radius:10px; font-size:.84rem; }
+  .test-steps.show { display:block; }
+  .test-steps h4 { color:var(--accent-light); margin-bottom:10px; font-size:.85rem; }
+  .test-steps ol { padding-left:22px; }
+  .test-steps li { margin-bottom:8px; color:var(--text); }
+  .test-steps li code { background:var(--bg); padding:1px 6px; border-radius:3px; font-family:'JetBrains Mono',monospace; font-size:.78rem; color:var(--accent-light); }
+  .test-steps .url-box { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px 14px; margin:10px 0; font-family:'JetBrains Mono',monospace; font-size:.78rem; color:var(--green); overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
+  .test-steps .expected { margin-top:12px; padding:10px 14px; background:rgba(99,102,241,.08); border-left:3px solid var(--accent); border-radius:4px; color:var(--accent-light); font-size:.82rem; }
+  .test-steps .warn { margin-top:8px; padding:8px 12px; background:var(--orange-bg); border-left:3px solid var(--orange); border-radius:4px; color:var(--orange); font-size:.8rem; }
+  .test-steps .data-table { width:100%; border-collapse:collapse; margin:10px 0; font-size:.8rem; }
+  .test-steps .data-table th { text-align:left; padding:6px 10px; background:var(--bg); color:var(--text-muted); font-weight:600; border:1px solid var(--border); }
+  .test-steps .data-table td { padding:6px 10px; border:1px solid var(--border); color:var(--text); }
+
+  @media (max-width:768px) {
+    .container { padding:12px; }
+    .header h1 { font-size:1.4rem; }
+    .stats-bar { grid-template-columns:repeat(3,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Test Plan — Meta Ads & Instagram</h1>
+  <p>Steve Ads Platform — 50 pruebas detalladas con instrucciones paso a paso</p>
+  <div class="date">22 de Marzo 2026 &nbsp;|&nbsp; Click en cada prueba para expandir instrucciones</div>
+</div>
+
+<div class="container">
+
+<div class="env-info">
+  <strong>Datos de prueba:</strong><br>
+  App: <code>https://betabgnuevosupa.vercel.app</code><br>
+  API: <code>https://steve-api-850416724643.us-central1.run.app</code><br>
+  Admin: <code>jmbarros@bgconsult.cl</code> &nbsp;|&nbsp; Client: <code>patricio.correa@jardindeeva.cl</code> / <code>Jardin2026</code><br>
+  Connection ID: <code>5295df6f-48eb-45b1-864f-43cd21fc76ca</code> &nbsp;|&nbsp; Ad Account: <code>act_783831847505548</code><br>
+  Portal: <code>/portal/9432e754-ad5a-4115-904c-d048de1d0e1e</code> &gt; Tab "Meta Ads"
+</div>
+
+<div class="stats-bar">
+  <div class="stat-card"><div class="number" style="color:var(--accent-light)">50</div><div class="label">Total</div></div>
+  <div class="stat-card"><div class="number" style="color:var(--green)" id="passedTests">0</div><div class="label">Pasadas</div></div>
+  <div class="stat-card"><div class="number" style="color:var(--red)">12</div><div class="label">Criticas</div></div>
+  <div class="stat-card"><div class="number" style="color:var(--orange)">16</div><div class="label">Alta</div></div>
+  <div class="stat-card"><div class="number" style="color:var(--yellow)">15</div><div class="label">Media</div></div>
+  <div class="stat-card"><div class="number" style="color:var(--green)">7</div><div class="label">Baja</div></div>
+</div>
+
+<div class="progress-container">
+  <div class="progress-label"><span>Progreso</span><span id="progressPct">0%</span></div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" onclick="filterTests('all',this)">Todas</button>
+  <button class="filter-btn" onclick="filterTests('critical',this)">Criticas</button>
+  <button class="filter-btn" onclick="filterTests('high',this)">Alta</button>
+  <button class="filter-btn" onclick="filterTests('medium',this)">Media</button>
+  <button class="filter-btn" onclick="filterTests('low',this)">Baja</button>
+  <button class="filter-btn" onclick="filterTests('hard',this)">Dificil</button>
+  <button class="filter-btn" onclick="filterTests('pending',this)">Pendientes</button>
+  <button class="filter-btn" onclick="filterTests('done',this)">Completadas</button>
+</div>
+
+<!-- ======================= SECTION A ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--blue-bg);color:var(--blue);">A</div>
+    <h2>OAuth y Conexion Meta</h2>
+    <span class="count">5 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="hard" data-id="1">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#01</span>
+      <div class="test-content">
+        <div class="test-title">Flujo OAuth completo con Meta</div>
+        <div class="test-meta">
+          <span class="badge critical">Critica</span>
+          <span class="badge hard">Dificil</span>
+          <span class="badge ui">UI + API</span>
+        </div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Abrir <code>https://betabgnuevosupa.vercel.app</code> y loguearse como <code>jmbarros@bgconsult.cl</code></li>
+        <li>Navegar al portal del cliente: click en "Jardin de Eva" o ir directo a <code>/portal/9432e754-ad5a-4115-904c-d048de1d0e1e</code></li>
+        <li>Click en el tab <strong>"Meta Ads"</strong> en la barra lateral</li>
+        <li>Si ya hay conexion: ir a la seccion <strong>Configuracion</strong> (icono engranaje) y click <strong>"Desconectar"</strong> primero</li>
+        <li>Click en boton <strong>"Conectar con Facebook"</strong> — se abre popup de Facebook</li>
+        <li>En el popup: loguearse con la cuenta de Facebook que administra los anuncios</li>
+        <li>Aceptar TODOS los permisos solicitados (ads_management, read_insights, pages_manage_metadata, instagram_basic, etc.)</li>
+        <li>El popup se cierra automaticamente y vuelve a Steve Ads</li>
+        <li>Aparece el <strong>MetaConnectionWizard</strong>: seleccionar Business Manager → Ad Account → Page → Instagram</li>
+        <li>Click <strong>"Confirmar conexion"</strong></li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> En la UI aparece el nombre de la cuenta, icono verde de "Conectado". Llamar a <code>POST /api/check-meta-scopes</code> con el connection_id — debe retornar <code>granted: [22+ scopes]</code> y <code>declined: []</code>.</div>
+      <div class="warn">Si el popup de Facebook se bloquea, desactivar el bloqueador de popups del browser.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="moderate" data-id="2">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#02</span>
+      <div class="test-content">
+        <div class="test-title">Seleccion de Portfolio (Ad Account)</div>
+        <div class="test-meta">
+          <span class="badge critical">Critica</span>
+          <span class="badge moderate">Moderada</span>
+          <span class="badge ui">UI</span>
+        </div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Dentro de Meta Ads, buscar el selector de <strong>Portfolio</strong> en la parte superior (dropdown con el nombre del Ad Account)</li>
+        <li>Click en el dropdown — deben listarse todos los ad accounts disponibles</li>
+        <li>Verificar que el account <code>act_783831847505548</code> esta seleccionado</li>
+        <li>Si hay mas de un account, cambiar a otro</li>
+        <li><strong>Recargar la pagina</strong> (F5 o Cmd+R)</li>
+        <li>Verificar que el portfolio seleccionado se mantiene (no vuelve al default)</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> El dropdown muestra portfolios con nombre y ID. La seleccion persiste despues de recargar porque se guarda en <code>platform_connections</code>.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="3">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#03</span>
+      <div class="test-content">
+        <div class="test-title">Vincular Page de Facebook + cuenta Instagram</div>
+        <div class="test-meta">
+          <span class="badge high">Alta</span>
+          <span class="badge moderate">Moderada</span>
+          <span class="badge ui">UI + API</span>
+        </div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Meta Ads, ir a la seccion de <strong>Business Hierarchy</strong> (aparece en el wizard de conexion o en Configuracion)</li>
+        <li>Verificar que la Page de Facebook aparece con su nombre e imagen</li>
+        <li>Verificar que debajo de la Page aparece la cuenta de Instagram Business asociada</li>
+        <li>Si no aparece Instagram: la Page no tiene IG Business vinculado en Meta Business Suite</li>
+      </ol>
+      <div class="url-box">API test: POST /api/fetch-meta-business-hierarchy
+Body: { "connection_id": "5295df6f-48eb-45b1-864f-43cd21fc76ca" }
+Verificar que response incluye: pages[].instagram_business_account</div>
+      <div class="expected"><strong>Verificar:</strong> Response tiene <code>pages</code> con al menos 1 page, y cada page tiene <code>instagram_business_account.id</code> si esta vinculada.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="4">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#04</span>
+      <div class="test-content">
+        <div class="test-title">Alerta de scopes faltantes</div>
+        <div class="test-meta">
+          <span class="badge medium">Media</span>
+          <span class="badge moderate">Moderada</span>
+          <span class="badge ui">UI + API</span>
+        </div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Meta Ads, verificar si aparece un banner amarillo/rojo de <strong>MetaScopeAlert</strong> en la parte superior</li>
+        <li>Si NO aparece: los scopes estan completos (todo bien)</li>
+        <li>Para verificar manualmente:</li>
+      </ol>
+      <div class="url-box">POST /api/check-meta-scopes
+Body: { "connection_id": "5295df6f-48eb-45b1-864f-43cd21fc76ca" }
+
+Scopes requeridos: ads_management, read_insights, pages_show_list,
+instagram_basic, instagram_manage_comments, business_management</div>
+      <div class="expected"><strong>Verificar:</strong> <code>granted</code> tiene 22+ scopes, <code>declined: []</code>. Si declined tiene algo, la UI debe mostrar banner con boton "Reconectar".</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="hard" data-id="5">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#05</span>
+      <div class="test-content">
+        <div class="test-title">Reconexion tras desconectar</div>
+        <div class="test-meta">
+          <span class="badge high">Alta</span>
+          <span class="badge hard">Dificil</span>
+          <span class="badge ui">UI + API</span>
+        </div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > Configuracion</li>
+        <li>Click <strong>"Desconectar cuenta Meta"</strong></li>
+        <li>Confirmar en el dialogo</li>
+        <li>Verificar que la seccion de campanas queda vacia o muestra "Conecta tu cuenta"</li>
+        <li>Click <strong>"Conectar con Facebook"</strong> de nuevo</li>
+        <li>Completar el flujo OAuth (misma cuenta)</li>
+        <li>Esperar sync automatico o click en <strong>"Sincronizar"</strong></li>
+        <li>Verificar que las campanas y metricas vuelven a aparecer</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Despues de reconectar, <code>last_sync_at</code> se actualiza, campanas visibles en dashboard, metricas historicas intactas en <code>campaign_metrics</code>.</div>
+      <div class="warn">CUIDADO: Si desconectas y no reconectas, el cron de sync fallara para este client.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION B ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--purple-bg);color:var(--purple);">B</div>
+    <h2>Creacion de Campanas</h2>
+    <span class="count">10 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="hard" data-id="6">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#06</span>
+      <div class="test-content">
+        <div class="test-title">Crear campana con presupuesto ABO</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Meta Ads, click en seccion <strong>"Campanas"</strong> (icono megafono)</li>
+        <li>Click boton <strong>"+ Crear Campana"</strong> — abre CampaignCreateWizard</li>
+        <li><strong>Paso 1 - Objetivo:</strong> Seleccionar <code>CONVERSIONES</code> (Ventas, leads, registros)</li>
+        <li><strong>Paso 2 - Config:</strong> Nombre: "Test QA ABO" | Tipo presupuesto: <code>ABO</code></li>
+        <li><strong>Paso 3 - Funnel:</strong> Seleccionar <code>TOFU</code> (Top of funnel)</li>
+        <li><strong>Paso 4 - Angulo:</strong> Seleccionar <code>Bold Statement</code></li>
+        <li><strong>Paso 5 - Audiencia:</strong> Elegir una existente o crear nueva con intereses (buscar "fashion" en targeting)</li>
+        <li><strong>Paso 6 - Presupuesto:</strong> Daily budget: <code>$5,000 CLP</code> (a nivel de ad set)</li>
+        <li><strong>Paso 7 - Creative:</strong> Subir imagen (JPG, min 1080x1080), escribir primary text, headline, CTA: <code>SHOP_NOW</code></li>
+        <li><strong>Paso 8 - Review:</strong> Revisar todo y click <strong>"Publicar"</strong></li>
+      </ol>
+      <table class="data-table">
+        <tr><th>Campo</th><th>Valor de prueba</th></tr>
+        <tr><td>Nombre</td><td>Test QA ABO - Bold Statement</td></tr>
+        <tr><td>Objetivo</td><td>CONVERSIONES</td></tr>
+        <tr><td>Budget type</td><td>ABO</td></tr>
+        <tr><td>Daily budget</td><td>5000 CLP</td></tr>
+        <tr><td>Angulo</td><td>Bold Statement</td></tr>
+        <tr><td>CTA</td><td>SHOP_NOW</td></tr>
+      </table>
+      <div class="expected"><strong>Verificar:</strong> Campana aparece en la lista con status ACTIVE o PAUSED. Ir a Meta Ads Manager (business.facebook.com) para confirmar que existe. El API <code>manage-meta-campaign action=create</code> retorna <code>campaign_id</code>.</div>
+      <div class="warn">Si Meta rechaza la campana: puede ser por imagen con >20% texto, copy con claims no permitidos, o billing issue en el ad account.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="hard" data-id="7">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#07</span>
+      <div class="test-content">
+        <div class="test-title">Crear campana con presupuesto CBO</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Mismo flujo que #06 pero en Paso 2 seleccionar tipo presupuesto: <code>CBO</code></li>
+        <li>Poner budget a nivel campana: <code>$10,000 CLP/dia</code></li>
+        <li>Crear 2 ad sets con diferentes audiencias (sin budget individual)</li>
+        <li>Meta distribuira el presupuesto automaticamente entre los ad sets</li>
+        <li>Publicar</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> En Meta Ads Manager, la campana tiene "Campaign Budget Optimization: On" y los ad sets no tienen daily_budget propio.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="hard" data-id="8">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#08</span>
+      <div class="test-content">
+        <div class="test-title">Framework 3:2:2 completo</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Meta Ads, buscar seccion <strong>"Testing 3:2:2"</strong> o ir al wizard 322</li>
+        <li><strong>Paso config:</strong> Nombre del test, seleccionar campana existente o crear nueva</li>
+        <li><strong>Paso images (3):</strong> Subir 3 imagenes diferentes:
+          <br>— Imagen 1: Product hero shot
+          <br>— Imagen 2: Lifestyle/candid
+          <br>— Imagen 3: Before/after o editorial</li>
+        <li><strong>Paso copies (2):</strong> Escribir 2 variaciones de primary text:
+          <br>— Copy A: Angulo Bold Statement
+          <br>— Copy B: Angulo Reviews</li>
+        <li><strong>Paso headlines (2):</strong> Escribir 2 headlines diferentes</li>
+        <li><strong>Paso combinations:</strong> Se generan automaticamente 12 combinaciones (3×2×2). Revisar cada una</li>
+        <li><strong>Paso budget:</strong> Asignar presupuesto total y split</li>
+        <li><strong>Review & Launch:</strong> Publicar las 12 variaciones</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> 12 ads creados en Meta. API <code>manage-meta-campaign action=create_322</code> usa objetivo <code>OUTCOME_SALES</code>. Cada ad set tiene nombre con formato "Test Name - Ad Set 1..12".</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="9">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#09</span>
+      <div class="test-content">
+        <div class="test-title">Campana con Custom Audience (Pixel)</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Primero ir a <strong>Audiencias</strong> y verificar que existe al menos una Custom Audience (ej: "A Rueda Remarkting 90 Dias")</li>
+        <li>Ir a Crear Campana > en el paso de Audiencia</li>
+        <li>En vez de crear audiencia nueva, seleccionar <strong>"Usar audiencia existente"</strong></li>
+        <li>Elegir la Custom Audience de pixel</li>
+        <li>Completar los demas pasos y publicar</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> En Meta Ads Manager, el ad set muestra la Custom Audience como targeting. El approximate_count debe coincidir.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="10">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#10</span>
+      <div class="test-content">
+        <div class="test-title">Campana con Lookalike Audience</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Si no existe Lookalike: ir a Audiencias > Crear Lookalike primero (ver test #26)</li>
+        <li>Crear nueva campana</li>
+        <li>En targeting, seleccionar el Lookalike Audience</li>
+        <li>Publicar</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Ad set targeting apunta al Lookalike con el % correcto.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="11">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#11</span>
+      <div class="test-content">
+        <div class="test-title">Campana con multiples placements</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Crear campana y llegar al paso de Placements</li>
+        <li>Cambiar de "Automatic" a <strong>"Manual"</strong></li>
+        <li>Seleccionar: Feed, Stories, Reels</li>
+        <li>Deseleccionar: Audience Network, Right Column</li>
+        <li>Publicar</li>
+        <li>Ir a Meta Ads Manager > Ad Set > Placements para verificar</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Solo Feed, Stories y Reels activos en el ad set.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="hard" data-id="12">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#12</span>
+      <div class="test-content">
+        <div class="test-title">Campana con catalogo de productos (DPA)</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Primero verificar que hay catalogo conectado:</li>
+      </ol>
+      <div class="url-box">POST /api/meta-catalogs
+Body: { "connection_id": "5295df6f-...", "action": "list" }</div>
+      <ol start="2">
+        <li>Si hay catalogo: seleccionar objetivo <code>CATALOG</code> en el wizard</li>
+        <li>Seleccionar el catalogo de Shopify</li>
+        <li>Configurar audiencia (retargeting: visitors ultimos 14 dias)</li>
+        <li>Publicar</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> DPA creada, anuncio muestra productos dinamicamente del catalogo.</div>
+      <div class="warn">Si meta-catalogs retorna error: el catalogo no esta vinculado en Meta Business Suite. Hay que hacerlo manualmente desde business.facebook.com.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="easy" data-id="13">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#13</span>
+      <div class="test-content">
+        <div class="test-title">Guardar borrador y retomar</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Empezar a crear campana — completar hasta el paso 3 (no terminar)</li>
+        <li>Click <strong>"Guardar como borrador"</strong></li>
+        <li>Navegar a otra seccion (ej: Audiencias)</li>
+        <li>Volver a Meta Ads > seccion <strong>"Borradores"</strong> (DraftsManager)</li>
+        <li>Verificar que aparece el borrador con status <code>borrador</code></li>
+        <li>Click en <strong>"Editar"</strong> — debe abrir el wizard con los datos precargados</li>
+        <li>Completar los pasos restantes y publicar</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Draft guardado con titulo, descripcion, formato. Al editar, los campos se precargan correctamente. Despues de publicar, el draft cambia status a <code>en_pauta</code>.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="hard" data-id="14">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#14</span>
+      <div class="test-content">
+        <div class="test-title">Creacion masiva de campanas (AI)</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge hard">Dificil</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Este se prueba via API directamente (o desde Steve Chat pidiendo "genera 5 campanas"):</li>
+      </ol>
+      <div class="url-box">POST /api/generate-mass-campaigns
+Headers: Authorization: Bearer {JWT}
+Body: {
+  "connection_id": "5295df6f-...",
+  "client_id": "9432e754-...",
+  "spec": {
+    "count": 3,
+    "objective": "CONVERSIONS",
+    "budget_per_campaign": 5000,
+    "angles": ["Bold Statement", "Reviews", "Ugly Ads"],
+    "funnel_stage": "TOFU"
+  }
+}</div>
+      <div class="expected"><strong>Verificar:</strong> Response con campaign IDs generados. Campanas visibles en lista.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="easy" data-id="15">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#15</span>
+      <div class="test-content">
+        <div class="test-title">Validacion de campos requeridos</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Abrir wizard de crear campana</li>
+        <li>Intentar avanzar al paso 2 sin escribir nombre → debe mostrar error</li>
+        <li>Poner nombre pero NO seleccionar objetivo → debe bloquear avance</li>
+        <li>Llegar al paso de creative sin subir imagen → boton "Publicar" deshabilitado</li>
+        <li>Subir imagen pero no escribir primary text → debe mostrar validacion</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Errores claros en rojo debajo de cada campo. Boton "Siguiente" o "Publicar" deshabilitado hasta que todo este completo.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION C ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--orange-bg);color:var(--orange);">C</div>
+    <h2>Gestion de Campanas</h2>
+    <span class="count">8 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="easy" data-id="16">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#16</span>
+      <div class="test-content">
+        <div class="test-title">Pausar campana activa</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge easy">Facil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > Campanas</li>
+        <li>Buscar una campana con status <strong>ACTIVE</strong> (punto verde)</li>
+        <li>Click en el icono de <strong>pausa</strong> (||) o menu ··· > "Pausar"</li>
+        <li>Confirmar en el dialogo</li>
+        <li>Verificar que el status cambia a <strong>PAUSED</strong> (punto amarillo/gris)</li>
+        <li>Abrir <a href="https://business.facebook.com/adsmanager" target="_blank" style="color:var(--accent-light)">Meta Ads Manager</a> y verificar que la campana esta pausada ahi tambien</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> UI muestra PAUSED inmediatamente. Meta Ads Manager confirma. API llama <code>manage-meta-campaign action=pause</code> con el campaign_id.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="easy" data-id="17">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#17</span>
+      <div class="test-content">
+        <div class="test-title">Reactivar campana pausada</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge easy">Facil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Buscar campana PAUSED (la que acabas de pausar en #16)</li>
+        <li>Click en boton <strong>play</strong> (▶) o menu ··· > "Reanudar"</li>
+        <li>Verificar que cambia a ACTIVE</li>
+        <li>Confirmar en Meta Ads Manager</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Status ACTIVE en UI y Meta. API: <code>action=resume</code>.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="easy" data-id="18">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#18</span>
+      <div class="test-content">
+        <div class="test-title">Modificar presupuesto</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge easy">Facil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Click en una campana > <strong>"Editar"</strong> o icono de lapiz</li>
+        <li>Buscar campo de presupuesto diario</li>
+        <li>Cambiar de $5,000 a <code>$10,000 CLP</code></li>
+        <li>Guardar</li>
+        <li>Verificar en Meta Ads Manager que el budget cambio</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> API <code>action=update_budget</code> retorna success. Meta muestra nuevo daily budget.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="easy" data-id="19">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#19</span>
+      <div class="test-content">
+        <div class="test-title">Archivar campana</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Seleccionar una campana PAUSED > menu ··· > <strong>"Archivar"</strong></li>
+        <li>Confirmar</li>
+        <li>Verificar que desaparece de la lista principal</li>
+        <li>Activar filtro <strong>"Archivadas"</strong> — debe aparecer ahi</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> API <code>action=archive</code>. Campana solo visible en filtro archivadas.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="20">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#20</span>
+      <div class="test-content">
+        <div class="test-title">Duplicar campana</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Seleccionar campana con metricas > menu ··· > <strong>"Duplicar"</strong></li>
+        <li>Verificar que aparece nueva campana con nombre <code>"[nombre original] (Copy)"</code></li>
+        <li>Verificar que la config (objetivo, audiencia, budget) es identica</li>
+        <li>Verificar que las metricas (spend, conversions) empiezan en <strong>0</strong></li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> API <code>action=duplicate</code>. Nueva campana con ID diferente, misma config, metricas en 0.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="easy" data-id="21">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#21</span>
+      <div class="test-content">
+        <div class="test-title">Vista arbol (Campaign > AdSet > Ad)</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Meta Ads, buscar boton/tab <strong>"Vista Arbol"</strong> o <strong>CampaignTreeView</strong></li>
+        <li>Click en el nombre de una campana para expandir → deben aparecer los ad sets</li>
+        <li>Click en un ad set para expandir → deben aparecer los ads individuales</li>
+        <li>Verificar que cada nivel muestra metricas: spend, impressions, CTR, conversions, ROAS</li>
+        <li>Verificar que las metricas del nivel campana = suma de sus ad sets</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Jerarquia correcta. Metricas coherentes entre niveles. Boton inline de pause/resume en cada nivel.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="low" data-difficulty="easy" data-id="22">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#22</span>
+      <div class="test-content">
+        <div class="test-title">Ordenar tabla de campanas</div>
+        <div class="test-meta"><span class="badge low">Baja</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En la tabla de campanas, click en header <strong>"Spend"</strong> → orden ascendente</li>
+        <li>Click de nuevo → orden descendente</li>
+        <li>Repetir con: <strong>ROAS</strong>, <strong>CPA</strong>, <strong>CTR</strong>, <strong>Nombre</strong></li>
+        <li>Verificar que los numeros se ordenan correctamente (no como strings)</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Orden numerico correcto. Iconos ↑↓ visibles en header activo.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="low" data-difficulty="easy" data-id="23">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#23</span>
+      <div class="test-content">
+        <div class="test-title">Filtrar por estado</div>
+        <div class="test-meta"><span class="badge low">Baja</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Click filtro <strong>"Activas"</strong> → contar cuantas aparecen</li>
+        <li>Click <strong>"Pausadas"</strong> → contar</li>
+        <li>Click <strong>"Todas"</strong> → verificar que total = activas + pausadas + archivadas</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Conteos correctos. El filtro se aplica instantaneamente.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION D ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--green-bg);color:var(--green);">D</div>
+    <h2>Gestion de Audiencias</h2>
+    <span class="count">8 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="hard" data-id="24">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#24</span>
+      <div class="test-content">
+        <div class="test-title">Crear Custom Audience (Website/Pixel)</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > seccion <strong>"Audiencias"</strong> (icono Users)</li>
+        <li>Click <strong>"+ Crear Audiencia"</strong> > <strong>"Custom Audience"</strong></li>
+        <li>Tipo: <strong>Website</strong></li>
+        <li>Pixel: seleccionar <code>Pixel Arueda's (1514248139987134)</code></li>
+        <li>Regla: URL <code>CONTAINS</code> → escribir <code>/products</code></li>
+        <li>Retencion: <code>90</code> dias</li>
+        <li>Nombre: <code>QA Test - Visitantes Productos 90d</code></li>
+        <li>Click <strong>"Crear"</strong></li>
+      </ol>
+      <div class="url-box">API equivalente:
+POST /api/manage-meta-audiences
+Body: {
+  "connection_id": "5295df6f-...",
+  "action": "create_custom",
+  "audience_type": "website",
+  "name": "QA Test - Visitantes Productos 90d",
+  "pixel_id": "1514248139987134",
+  "rule": { "url": { "operator": "CONTAINS", "value": "/products" } },
+  "retention_days": 90
+}</div>
+      <div class="expected"><strong>Verificar:</strong> Audiencia aparece en la lista con status <code>POPULATING</code>. Despues de unos minutos, cambia a <code>READY</code> con approximate_count > 0.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="25">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#25</span>
+      <div class="test-content">
+        <div class="test-title">Crear Custom Audience (Customer List / CSV)</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Audiencias > Crear > <strong>"Customer List"</strong></li>
+        <li>Preparar un CSV con columna <code>email</code> (minimo 100 emails reales)</li>
+        <li>Subir el archivo</li>
+        <li>Nombre: <code>QA Test - Lista Clientes</code></li>
+        <li>Click Crear</li>
+        <li>Esperar que Meta procese y muestre matching rate</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Audiencia creada, approximate_count refleja emails matcheados (tipicamente 30-60% del CSV).</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="26">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#26</span>
+      <div class="test-content">
+        <div class="test-title">Crear Lookalike Audience</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Audiencias > Crear > <strong>"Lookalike"</strong></li>
+        <li>Source: seleccionar audiencia existente (ej: "A Rueda Remarkting 90 Dias")</li>
+        <li>Pais: <code>Chile</code> (CL)</li>
+        <li>Porcentaje: <code>3%</code></li>
+        <li>Nombre: <code>QA Test - LAL 3% Chile</code></li>
+        <li>Crear</li>
+      </ol>
+      <div class="url-box">API: POST /api/manage-meta-audiences
+Body: {
+  "connection_id": "5295df6f-...",
+  "action": "create_lookalike",
+  "source_audience_id": "120246157283760569",
+  "country": "CL",
+  "ratio": 0.03,
+  "name": "QA Test - LAL 3% Chile"
+}</div>
+      <div class="expected"><strong>Verificar:</strong> Lookalike creado con subtype <code>LOOKALIKE</code>. Tamano esperado: ~300,000-500,000 (3% de Chile).</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="27">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#27</span>
+      <div class="test-content">
+        <div class="test-title">Deteccion de overlap de audiencias</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <div class="url-box">POST /api/detect-audience-overlap
+Body: {
+  "connection_id": "5295df6f-...",
+  "client_id": "9432e754-...",
+  "campaign_id": "{id_de_campana_con_2+_adsets}"
+}</div>
+      <ol>
+        <li>Necesitas una campana con 2+ ad sets que usen audiencias similares</li>
+        <li>Llamar al endpoint con el campaign_id</li>
+        <li>Revisar si detecta solapamiento >30%</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Response con <code>overlap_percentage</code> y recomendacion si es >30%.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="low" data-difficulty="easy" data-id="28">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#28</span>
+      <div class="test-content">
+        <div class="test-title">Duplicar audiencia</div>
+        <div class="test-meta"><span class="badge low">Baja</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En la lista de audiencias, seleccionar una > menu ··· > <strong>"Duplicar"</strong></li>
+        <li>Verificar nueva audiencia con nombre original + " (Copy)"</li>
+        <li>Verificar que es independiente de la original</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Nueva audiencia con ID diferente, mismo tipo y reglas.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="easy" data-id="29">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#29</span>
+      <div class="test-content">
+        <div class="test-title">Eliminar audiencia</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge easy">Facil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Seleccionar una audiencia de prueba (ej: la duplicada en #28)</li>
+        <li>Menu ··· > <strong>"Eliminar"</strong></li>
+        <li>Confirmar en dialogo</li>
+        <li>Verificar que desaparece de la lista</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> API <code>action=delete</code>. Audiencia eliminada de Meta API y de la UI.</div>
+      <div class="warn">NO eliminar audiencias que esten en uso por campanas activas — Meta lo bloqueara.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="30">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#30</span>
+      <div class="test-content">
+        <div class="test-title">Estado de salud de audiencia (POPULATING → READY)</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Crear una nueva Custom Audience (cualquier tipo)</li>
+        <li>Inmediatamente verificar status → debe ser <code>POPULATING</code></li>
+        <li>Esperar 5-15 minutos</li>
+        <li>Refrescar la lista de audiencias</li>
+        <li>Verificar que cambio a <code>READY</code> con <code>delivery_status.code = 200</code></li>
+        <li>Verificar <code>approximate_count_lower_bound</code> y <code>upper_bound</code></li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Transicion POPULATING → READY. Counts mayores a 0. delivery_status.description = "El publico ya se puede usar."</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="hard" data-id="31">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#31</span>
+      <div class="test-content">
+        <div class="test-title">Sync Klaviyo → Meta Audience</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge hard">Dificil</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Requisito: tener Klaviyo conectado con al menos 1 segmento con 100+ contactos</li>
+      </ol>
+      <div class="url-box">POST /api/sync-klaviyo-to-meta-audience
+Body: {
+  "connection_id": "5295df6f-...",
+  "klaviyo_segment_id": "{id_del_segmento}",
+  "audience_name": "QA Test - Klaviyo Sync"
+}</div>
+      <ol start="2">
+        <li>Verificar que se crea una Custom Audience en Meta</li>
+        <li>Comparar count del segmento Klaviyo vs approximate_count en Meta</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Audiencia creada, matching rate razonable (30-60% tipico). Puede tardar 24-48h en llegar al count final.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION E ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--red-bg);color:var(--red);">E</div>
+    <h2>Meta Pixel</h2>
+    <span class="count">4 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="easy" data-id="32">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#32</span>
+      <div class="test-content">
+        <div class="test-title">Listar pixels y obtener codigo de instalacion</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge easy">Facil</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > seccion <strong>"Pixel"</strong> (icono crosshair)</li>
+        <li>Verificar que se muestra: <code>Pixel Arueda's</code> (ID: 1514248139987134)</li>
+        <li>Verificar <strong>last_fired</strong>: debe ser fecha reciente (ultimas 24-48h)</li>
+        <li>Verificar <strong>is_unavailable</strong>: debe ser <code>false</code></li>
+        <li>Click en <strong>"Ver codigo"</strong> — copiar el snippet HTML</li>
+        <li>Verificar que el snippet incluye <code>fbq('init', '1514248139987134')</code></li>
+      </ol>
+      <div class="url-box">API test: POST /api/manage-meta-pixel
+Body: { "connection_id": "5295df6f-...", "action": "list" }
+
+Verificar response: pixels[0].name = "Pixel Arueda's"
+pixels[0].last_fired = fecha reciente
+pixels[0].code incluye script de Facebook Pixel</div>
+      <div class="expected"><strong>Verificar:</strong> Pixel visible con codigo HTML correcto. last_fired es reciente.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="hard" data-id="33">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#33</span>
+      <div class="test-content">
+        <div class="test-title">Verificar eventos del pixel disparando</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge hard">Dificil</span><span class="badge ui">UI + Meta</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Instalar extension <strong>"Meta Pixel Helper"</strong> en Chrome</li>
+        <li>Visitar la tienda Shopify del cliente (arueda.cl o similar)</li>
+        <li>Con Pixel Helper abierto, verificar que <code>PageView</code> se dispara</li>
+        <li>Navegar a un producto → verificar <code>ViewContent</code></li>
+        <li>Agregar al carrito → verificar <code>AddToCart</code></li>
+        <li>Iniciar checkout → verificar <code>InitiateCheckout</code></li>
+        <li>Completar compra (si posible) → verificar <code>Purchase</code></li>
+        <li>Confirmar en <a href="https://business.facebook.com/events_manager" target="_blank" style="color:var(--accent-light)">Meta Events Manager</a> que los eventos aparecen</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Pixel Helper muestra check verde para cada evento. Events Manager registra los eventos con timestamps recientes.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="34">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#34</span>
+      <div class="test-content">
+        <div class="test-title">Configurar eventos estandar y prioridades</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En la seccion Pixel, buscar <strong>PixelSetupWizard</strong></li>
+        <li>Verificar lista de eventos con sus prioridades:</li>
+      </ol>
+      <table class="data-table">
+        <tr><th>Prioridad</th><th>Eventos</th></tr>
+        <tr><td style="color:var(--red)">Critical</td><td>Purchase, AddToCart</td></tr>
+        <tr><td style="color:var(--orange)">Important</td><td>Lead, CompleteRegistration</td></tr>
+        <tr><td style="color:var(--blue)">Basic</td><td>PageView, ViewContent</td></tr>
+        <tr><td style="color:var(--text-muted)">Optional</td><td>Search, InitiateCheckout</td></tr>
+      </table>
+      <ol start="3">
+        <li>Verificar indicador de estado para cada evento (activo/inactivo)</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Eventos listados con prioridades correctas. Indicadores de estado reflejan la realidad (verde = disparando, gris = sin datos recientes).</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="35">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#35</span>
+      <div class="test-content">
+        <div class="test-title">Estadisticas de eventos del pixel</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <div class="url-box">POST /api/manage-meta-pixel
+Body: {
+  "connection_id": "5295df6f-...",
+  "action": "stats",
+  "pixel_id": "1514248139987134"
+}</div>
+      <ol>
+        <li>Llamar al endpoint</li>
+        <li>Verificar conteos por tipo de evento en los ultimos 7 dias</li>
+        <li>Comparar con los numeros en Meta Events Manager</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Stats con counts > 0 para PageView y AddToCart minimo. Numeros consistentes con Events Manager.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION F ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--yellow-bg);color:var(--yellow);">F</div>
+    <h2>Analytics y Metricas</h2>
+    <span class="count">7 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="moderate" data-id="36">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#36</span>
+      <div class="test-content">
+        <div class="test-title">Dashboard de analytics completo</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge moderate">Moderada</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > seccion <strong>"Analisis"</strong> (icono BarChart)</li>
+        <li>Verificar las <strong>KPI cards</strong> en la parte superior:
+          <br>— Spend total (en CLP, formato $XX.XXX)
+          <br>— Impressions
+          <br>— Clicks
+          <br>— CTR (%)
+          <br>— Conversions
+          <br>— ROAS (X.XX)</li>
+        <li>Verificar el <strong>grafico de tendencia</strong> (spend diario en barras o lineas)</li>
+        <li>Verificar la <strong>tabla comparativa</strong> de campanas con columnas ordenables</li>
+        <li>Verificar que todos los montos estan en <strong>CLP</strong> (no USD)</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Dashboard carga sin errores. Numeros son positivos y razonables. Spend en CLP. ROAS > 0 si hay conversiones.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="easy" data-id="37">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#37</span>
+      <div class="test-content">
+        <div class="test-title">Filtro por rango de fechas</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En el dashboard, buscar el selector de fechas</li>
+        <li>Seleccionar <strong>"Ultimos 7 dias"</strong> → anotar spend total</li>
+        <li>Cambiar a <strong>"Ultimos 30 dias"</strong> → anotar spend total</li>
+        <li>Spend de 30d debe ser <strong>≥</strong> spend de 7d</li>
+        <li>Probar <strong>"Rango personalizado"</strong>: elegir 2 fechas especificas</li>
+        <li>Verificar que el grafico se actualiza con el rango correcto</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Datos coherentes. 30d >= 7d. Grafico cambia al cambiar rango.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="moderate" data-id="38">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#38</span>
+      <div class="test-content">
+        <div class="test-title">Sync manual de metricas</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge moderate">Moderada</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Desde la UI: buscar boton <strong>"Sincronizar"</strong> (icono refresh) en el header de Meta Ads</li>
+        <li>Click → debe iniciar sync y mostrar spinner</li>
+        <li>Esperar 5-15 segundos</li>
+        <li>Verificar mensaje de exito con datos sincronizados</li>
+        <li>O probar directamente via API:</li>
+      </ol>
+      <div class="url-box">Test 1: POST /api/sync-meta-metrics
+Body: { "connection_id": "5295df6f-48eb-45b1-864f-43cd21fc76ca" }
+Esperado: { "success": true, "metrics_synced": 213, "days_processed": 31, "currency": "CLP" }
+
+Test 2: POST /api/sync-campaign-metrics
+Body: { "connection_id": "5295df6f-...", "platform": "meta", "sync_adsets": false }
+Esperado: { "success": true, "campaigns_synced": 3, "records_synced": 43, "currency": "CLP" }</div>
+      <div class="expected"><strong>Verificar:</strong> Ambos retornan success. metrics_synced > 0. days_processed = ~31 (30 dias). Moneda = CLP. last_sync_at se actualiza en platform_connections.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="39">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#39</span>
+      <div class="test-content">
+        <div class="test-title">Sync de metricas a nivel ad set</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <div class="url-box">POST /api/sync-campaign-metrics
+Body: {
+  "connection_id": "5295df6f-48eb-45b1-864f-43cd21fc76ca",
+  "platform": "meta",
+  "sync_adsets": true    ← IMPORTANTE: true para adsets
+}
+Esperado: { "success": true, "campaigns_synced": 3, "records_synced": 43, "adsets_synced": 3 }</div>
+      <ol>
+        <li>Llamar al endpoint con <code>sync_adsets: true</code></li>
+        <li>Verificar que <code>adsets_synced > 0</code> en la respuesta</li>
+        <li>Verificar en Supabase tabla <code>adset_metrics</code> que hay registros para este connection_id</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> adsets_synced > 0. Tabla adset_metrics tiene registros con adset_id, campaign_id, metricas diarias.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="40">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#40</span>
+      <div class="test-content">
+        <div class="test-title">Conversion de moneda a CLP</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Despues de sync-meta-metrics, revisar el campo <code>source_currency</code> en la respuesta</li>
+        <li>Si source_currency = <strong>"CLP"</strong>: no hay conversion (1:1), todos los valores son directos</li>
+        <li>Si source_currency = <strong>"USD"</strong>: verificar que spend CLP ≈ spend USD × 950 (tasa aprox)</li>
+        <li>Verificar en la tabla <code>platform_metrics</code> que <code>currency = "CLP"</code> en todos los registros</li>
+        <li>Verificar en la tabla <code>campaign_metrics</code> que <code>currency = "CLP"</code></li>
+      </ol>
+      <div class="url-box">Verificacion en Supabase:
+SELECT currency, count(*) FROM platform_metrics
+WHERE connection_id = '5295df6f-...'
+GROUP BY currency;
+→ Debe retornar SOLO "CLP"</div>
+      <div class="expected"><strong>Verificar:</strong> 100% de registros en CLP. Montos razonables (no multiplicados por 950 cuando source ya es CLP).</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="41">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#41</span>
+      <div class="test-content">
+        <div class="test-title">Performance tracker cron (48hrs)</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge cron">Cron</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <div class="url-box">POST /api/cron/performance-tracker-meta
+Headers: X-Cron-Secret: {cron_secret}
+
+O verificar en Supabase:
+SELECT * FROM creative_history
+WHERE channel = 'meta'
+ORDER BY created_at DESC LIMIT 5;</div>
+      <ol>
+        <li>Verificar que existe al menos 1 campana con >48 horas de antiguedad</li>
+        <li>Disparar el cron (o esperar que corra a las 8am)</li>
+        <li>Verificar en <code>creative_history</code> que hay registros con:
+          <br>— <code>performance_score</code> (0-100)
+          <br>— <code>performance_verdict</code> ("bueno" / "neutral" / "malo")</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Score asignado basado en CTR, ROAS, CPA. Verdict coherente con las metricas.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="42">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#42</span>
+      <div class="test-content">
+        <div class="test-title">Analisis de competencia (Ad Library)</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > seccion <strong>"Competencia"</strong></li>
+        <li>Agregar un competidor: Instagram handle o Facebook Page URL</li>
+        <li>Click <strong>"Buscar anuncios"</strong></li>
+        <li>Esperar (usa Apify para scraping de Meta Ad Library, puede tardar 30-60 segundos)</li>
+        <li>Verificar que aparecen anuncios con:
+          <br>— Texto del ad (primary text, headline)
+          <br>— Imagen/video
+          <br>— CTA (Shop Now, Learn More, etc.)
+          <br>— Status (active/inactive)
+          <br>— Rango de impresiones y spend estimado</li>
+      </ol>
+      <div class="url-box">API: POST /api/sync-competitor-ads
+Body: {
+  "connection_id": "5295df6f-...",
+  "client_id": "9432e754-...",
+  "competitor_handle": "jardindeeva"  ← o el handle del competidor
+}</div>
+      <div class="expected"><strong>Verificar:</strong> Anuncios del competidor visibles. Si el competidor no tiene ads activos, el resultado sera vacio (normal).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION G ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--pink-bg);color:var(--pink);">G</div>
+    <h2>Reglas Automatizadas</h2>
+    <span class="count">4 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="critical" data-difficulty="hard" data-id="43">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#43</span>
+      <div class="test-content">
+        <div class="test-title">Crear regla: Pausar si CPA alto</div>
+        <div class="test-meta"><span class="badge critical">Critica</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API + Cron</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > seccion <strong>"Reglas"</strong> (icono Zap/rayo)</li>
+        <li>Click <strong>"+ Crear Regla"</strong></li>
+        <li>Configurar:</li>
+      </ol>
+      <table class="data-table">
+        <tr><th>Campo</th><th>Valor</th></tr>
+        <tr><td>Nombre</td><td>QA Test - Pausar CPA Alto</td></tr>
+        <tr><td>Metrica</td><td>CPA</td></tr>
+        <tr><td>Operador</td><td>GREATER_THAN</td></tr>
+        <tr><td>Valor</td><td>10000 (CLP)</td></tr>
+        <tr><td>Ventana</td><td>LAST_7D</td></tr>
+        <tr><td>Accion</td><td>PAUSE_CAMPAIGN</td></tr>
+        <tr><td>Aplicar a</td><td>ACTIVE_ONLY</td></tr>
+      </table>
+      <ol start="4">
+        <li>Guardar y activar la regla</li>
+        <li>Verificar que aparece en la lista con toggle ON</li>
+        <li>Para probar ejecucion: click <strong>"Ejecutar ahora"</strong> o esperar al cron horario</li>
+        <li>Si alguna campana tiene CPA > 10,000: debe pausarse automaticamente</li>
+        <li>Verificar en <strong>Historial</strong> que aparece el log de ejecucion</li>
+      </ol>
+      <div class="url-box">API para crear: POST /api/manage-meta-rules
+Body: {
+  "connection_id": "5295df6f-...",
+  "client_id": "9432e754-...",
+  "action": "create",
+  "rule": {
+    "name": "QA Test - Pausar CPA Alto",
+    "condition": { "metric": "cpa", "operator": "GREATER_THAN", "value": 10000, "timeWindow": "LAST_7D" },
+    "action": { "type": "PAUSE_CAMPAIGN" },
+    "apply_to": "ACTIVE_ONLY",
+    "is_active": true
+  }
+}</div>
+      <div class="expected"><strong>Verificar:</strong> Regla creada en <code>meta_automated_rules</code>. Si cumple condicion: campana pausada, log en <code>meta_rule_execution_log</code>.</div>
+      <div class="warn">CUIDADO: Si pausas una campana real por error, reactivala manualmente en Meta Ads Manager.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="hard" data-id="44">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#44</span>
+      <div class="test-content">
+        <div class="test-title">Crear regla: Escalar budget si ROAS alto</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge hard">Dificil</span><span class="badge ui">UI + API + Cron</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Crear regla nueva:</li>
+      </ol>
+      <table class="data-table">
+        <tr><th>Campo</th><th>Valor</th></tr>
+        <tr><td>Metrica</td><td>ROAS</td></tr>
+        <tr><td>Operador</td><td>GREATER_THAN</td></tr>
+        <tr><td>Valor</td><td>3.0</td></tr>
+        <tr><td>Ventana</td><td>LAST_3D</td></tr>
+        <tr><td>Accion</td><td>INCREASE_BUDGET (20%)</td></tr>
+      </table>
+      <ol start="2">
+        <li>Activar y ejecutar</li>
+        <li>Si hay campana con ROAS > 3.0: verificar que el daily_budget de sus ad sets aumento 20%</li>
+        <li>Ejemplo: si budget era $5,000 → debe quedar en $6,000</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Budget actualizado en Meta. Log de ejecucion dice "Budget increased by 20%".</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="45">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#45</span>
+      <div class="test-content">
+        <div class="test-title">Ejecucion manual de regla</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En la lista de reglas, encontrar una regla activa</li>
+        <li>Click en menu ··· > <strong>"Ejecutar ahora"</strong></li>
+        <li>Verificar que se muestra resultado inmediato (cuantas campanas evaluadas, cuantas accionadas)</li>
+        <li>Ir a <strong>Historial</strong> de la regla y verificar el log</li>
+      </ol>
+      <div class="url-box">API: POST /api/manage-meta-rules
+Body: {
+  "connection_id": "5295df6f-...",
+  "action": "execute",
+  "rule_id": "{id_de_la_regla}"
+}</div>
+      <div class="expected"><strong>Verificar:</strong> Ejecucion inmediata. Resultado visible en historial.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="low" data-difficulty="easy" data-id="46">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#46</span>
+      <div class="test-content">
+        <div class="test-title">Historial de ejecucion de reglas</div>
+        <div class="test-meta"><span class="badge low">Baja</span><span class="badge easy">Facil</span><span class="badge ui">UI</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En la seccion Reglas, buscar tab/seccion <strong>"Historial"</strong></li>
+        <li>Verificar que cada entrada muestra:
+          <br>— Fecha/hora de ejecucion
+          <br>— Nombre de la regla
+          <br>— Campana afectada
+          <br>— Accion tomada (PAUSE, INCREASE_BUDGET, etc.)
+          <br>— Metrics snapshot (metrica, valor, umbral)</li>
+        <li>Click en un entry para ver detalles</li>
+      </ol>
+      <div class="url-box">Verificar en Supabase:
+SELECT * FROM meta_rule_execution_log
+ORDER BY executed_at DESC LIMIT 10;</div>
+      <div class="expected"><strong>Verificar:</strong> Logs con datos completos. Si no hay logs: es porque ninguna regla ha sido ejecutada aun.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= SECTION H ======================= -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--blue-bg);color:var(--blue);">H</div>
+    <h2>Social Inbox, Copy AI e Instagram</h2>
+    <span class="count">4 pruebas</span>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="47">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#47</span>
+      <div class="test-content">
+        <div class="test-title">Bandeja de Messenger e Instagram DMs</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Ir a Meta Ads > seccion <strong>"Social Inbox"</strong></li>
+        <li>Primero obtener las pages disponibles:</li>
+      </ol>
+      <div class="url-box">POST /api/meta-social-inbox
+Body: {
+  "connection_id": "5295df6f-...",
+  "action": "list_pages"
+}
+→ Retorna pages con page_id, name, picture</div>
+      <ol start="3">
+        <li>Seleccionar una page en el dropdown</li>
+        <li>Ver lista de conversaciones (Messenger + Instagram DMs)</li>
+        <li>Click en una conversacion para ver los mensajes</li>
+        <li>Escribir una respuesta de prueba y enviar</li>
+        <li>Verificar que el mensaje aparece en la conversacion de Facebook/Instagram</li>
+      </ol>
+      <div class="url-box">Para listar conversaciones:
+POST /api/meta-social-inbox
+Body: { "connection_id": "5295df6f-...", "action": "list_conversations", "page_id": "{page_id}" }
+
+Para responder:
+POST /api/meta-social-inbox
+Body: { "connection_id": "5295df6f-...", "action": "reply_message", "page_id": "{page_id}", "conversation_id": "{id}", "message": "Hola! Gracias por escribir" }</div>
+      <div class="expected"><strong>Verificar:</strong> Conversaciones listadas con timestamps. Respuesta enviada aparece en Facebook Messenger.</div>
+      <div class="warn">La cuenta de Facebook debe tener permisos de "pages_messaging" e "instagram_manage_messages".</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="moderate" data-id="48">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#48</span>
+      <div class="test-content">
+        <div class="test-title">Comentarios en posts y ads</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge moderate">Moderada</span><span class="badge ui">UI + API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>En Social Inbox, buscar filtro por tipo <strong>"Comentarios"</strong></li>
+        <li>Ver comentarios de posts de la pagina:</li>
+      </ol>
+      <div class="url-box">POST /api/meta-social-inbox
+Body: { "connection_id": "5295df6f-...", "action": "list_post_comments", "page_id": "{page_id}" }
+
+Para comentarios en ads:
+Body: { ..., "action": "list_ad_comments", "page_id": "{page_id}" }
+
+Para responder:
+Body: { ..., "action": "reply_comment", "comment_id": "{id}", "message": "Gracias por tu comentario!" }</div>
+      <ol start="3">
+        <li>Ver los comentarios con texto, usuario, fecha</li>
+        <li>Responder a un comentario</li>
+        <li>Verificar en Facebook que la respuesta aparece</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Comentarios visibles. Respuesta publicada correctamente como la Page.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="high" data-difficulty="moderate" data-id="49">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#49</span>
+      <div class="test-content">
+        <div class="test-title">Generar copy con AI para Meta Ads</div>
+        <div class="test-meta"><span class="badge high">Alta</span><span class="badge moderate">Moderada</span><span class="badge endpoint">API</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Opcion A — desde la UI: en el wizard de campana, click <strong>"Generar con Steve AI"</strong></li>
+        <li>Opcion B — via API directamente:</li>
+      </ol>
+      <div class="url-box">POST /api/generate-meta-copy
+Body: {
+  "client_id": "9432e754-...",
+  "connection_id": "5295df6f-...",
+  "angle": "Bold Statement",
+  "funnel_stage": "TOFU",
+  "product_name": "Crema hidratante natural",
+  "brand_brief": "Marca de cosmetica natural chilena, ingredientes locales"
+}
+
+Esperado:
+{
+  "headline": "Tu piel merece lo mejor de la naturaleza",
+  "primary_text": "Descubre la crema que esta revolucionando...",
+  "description": "100% natural, hecha en Chile",
+  "cta_options": ["SHOP_NOW", "LEARN_MORE"]
+}</div>
+      <ol start="3">
+        <li>Verificar que el copy retornado:
+          <br>— Tiene headline (max 40 chars ideal)
+          <br>— Tiene primary_text (125-250 chars)
+          <br>— Tiene description
+          <br>— El angulo se refleja en el tono del copy</li>
+        <li>Verificar que se guarda en <code>creative_history</code> con el angulo detectado</li>
+      </ol>
+      <div class="expected"><strong>Verificar:</strong> Copy generado con calidad, angulo correcto. Si CRITERIO esta activo, incluye quality score.</div>
+    </div>
+  </div>
+
+  <div class="test-card" data-severity="medium" data-difficulty="hard" data-id="50">
+    <div class="test-top" onclick="toggleSteps(this)">
+      <div class="test-checkbox" onclick="event.stopPropagation();toggleTest(this)"></div>
+      <span class="test-number">#50</span>
+      <div class="test-content">
+        <div class="test-title">Detector de fatiga creativa (cron)</div>
+        <div class="test-meta"><span class="badge medium">Media</span><span class="badge hard">Dificil</span><span class="badge cron">Cron</span></div>
+      </div>
+    </div>
+    <div class="test-steps">
+      <h4>Como probar:</h4>
+      <ol>
+        <li>Este cron corre automaticamente a las <strong>11am diario</strong></li>
+        <li>Para probar manualmente (necesita CRON_SECRET configurado en Cloud Run):</li>
+      </ol>
+      <div class="url-box">POST /api/cron/fatigue-detector
+Headers: X-Cron-Secret: {valor_del_secret}
+
+Esperado: {
+  "success": true,
+  "connections_checked": 2,
+  "fatigue_alerts": 0,
+  "alerts": []
+}</div>
+      <ol start="3">
+        <li>El detector busca campanas activas donde:
+          <br>— <strong>CTR bajo >20%</strong> desde el pico de los ultimos 7 dias (promedio ultimos 3 dias vs pico)
+          <br>— <strong>Frequency > 3</strong> (audiencia viendo el ad muchas veces)</li>
+        <li>Si detecta fatiga:
+          <br>— Crea <strong>tarea</strong> en tabla <code>tasks</code> con titulo "Fatiga creativa: [campana]"
+          <br>— Envia <strong>email de alerta</strong> al merchant
+          <br>— Loguea en <code>qa_log</code> con check_type = "creative_fatigue"
+          <br>— Sugiere angulo de rotacion basado en <code>creative_history</code></li>
+        <li>Para verificar si hubo alertas previas:</li>
+      </ol>
+      <div class="url-box">En Supabase:
+SELECT * FROM qa_log WHERE check_type = 'creative_fatigue' ORDER BY checked_at DESC LIMIT 5;
+
+SELECT * FROM tasks WHERE title LIKE '%Fatiga creativa%' ORDER BY created_at DESC LIMIT 5;</div>
+      <div class="expected"><strong>Verificar:</strong> Cron evalua todas las conexiones Meta activas. Si no hay fatiga: <code>fatigue_alerts: 0</code> (normal). Si hay: tarea creada, email enviado, qa_log con detalles (peak_ctr, recent_avg_ctr, ctr_drop_pct, frequency).</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- container -->
+
+<script>
+const STORAGE_KEY = 'steve-qa-meta-v2';
+function getState() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); } catch { return {}; } }
+function saveState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+
+function toggleTest(cb) {
+  const card = cb.closest('.test-card');
+  const id = card.dataset.id;
+  const state = getState();
+  if (cb.classList.contains('checked')) { cb.classList.remove('checked'); card.classList.remove('done'); delete state[id]; }
+  else { cb.classList.add('checked'); card.classList.add('done'); state[id] = true; }
+  saveState(state); updateStats();
+}
+
+function toggleSteps(top) {
+  const steps = top.closest('.test-card').querySelector('.test-steps');
+  if (steps) steps.classList.toggle('show');
+}
+
+function filterTests(f, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.test-card').forEach(c => {
+    const sev = c.dataset.severity, diff = c.dataset.difficulty, done = c.classList.contains('done');
+    let show = true;
+    if (f==='critical') show = sev==='critical';
+    else if (f==='high') show = sev==='high';
+    else if (f==='medium') show = sev==='medium';
+    else if (f==='low') show = sev==='low';
+    else if (f==='hard') show = diff==='hard';
+    else if (f==='pending') show = !done;
+    else if (f==='done') show = done;
+    c.style.display = show ? '' : 'none';
+  });
+}
+
+function updateStats() {
+  const state = getState();
+  const total = document.querySelectorAll('.test-card').length;
+  const passed = Object.keys(state).length;
+  const pct = total > 0 ? Math.round((passed/total)*100) : 0;
+  document.getElementById('passedTests').textContent = passed;
+  document.getElementById('progressPct').textContent = pct+'%';
+  document.getElementById('progressFill').style.width = pct+'%';
+}
+
+(function restore() {
+  const state = getState();
+  for (const [id] of Object.entries(state)) {
+    const c = document.querySelector(`.test-card[data-id="${id}"]`);
+    if (c) { c.classList.add('done'); c.querySelector('.test-checkbox').classList.add('checked'); }
+  }
+  updateStats();
+})();
+</script>
+</body>
+</html>

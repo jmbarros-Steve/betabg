@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Meta Ads — 40 Pasos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 2.2rem; color: #fff; margin-bottom: 8px; }
+  .header p { color: #94a3b8; font-size: 1rem; max-width: 600px; margin: 0 auto; }
+
+  /* HOW-TO BANNER */
+  .howto {
+    max-width: 900px; margin: 20px auto; background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 20px 24px; line-height: 1.7;
+  }
+  .howto h3 { color: #fbbf24; margin-bottom: 10px; font-size: 1rem; }
+  .howto ol { padding-left: 20px; }
+  .howto li { margin-bottom: 6px; font-size: 0.85rem; color: #cbd5e1; }
+  .howto code { background: #334155; color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+  .howto .warn { color: #f87171; font-weight: 700; }
+  .howto .ok { color: #4ade80; }
+  .howto a { color: #60a5fa; text-decoration: none; }
+  .howto a:hover { text-decoration: underline; }
+  .howto .nav-path {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0f172a; border: 1px solid #475569; border-radius: 6px;
+    padding: 2px 8px; font-size: 0.8rem; color: #60a5fa; white-space: nowrap;
+  }
+  .howto .nav-path .sep { color: #475569; }
+
+  .score-bar {
+    display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+    margin: 20px auto 30px; max-width: 900px;
+  }
+  .score-card {
+    background: #1e293b; border-radius: 12px; padding: 16px 24px; text-align: center; min-width: 120px;
+    border: 1px solid #334155;
+  }
+  .score-card .num { font-size: 2rem; font-weight: 700; }
+  .score-card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .score-card.green .num { color: #4ade80; }
+  .score-card.red .num { color: #f87171; }
+  .score-card.yellow .num { color: #fbbf24; }
+  .score-card.blue .num { color: #60a5fa; }
+
+  .progress-wrap { max-width: 900px; margin: 0 auto 30px; }
+  .progress-bg { background: #1e293b; border-radius: 99px; height: 12px; overflow: hidden; }
+  .progress-fill { background: linear-gradient(90deg, #4ade80, #22d3ee); height: 100%; border-radius: 99px; transition: width 0.5s; }
+  .progress-label { text-align: center; margin-top: 6px; font-size: 0.85rem; color: #94a3b8; }
+
+  .blocks { max-width: 900px; margin: 0 auto; }
+
+  .block { margin-bottom: 24px; }
+  .block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1e293b; border-radius: 12px 12px 0 0; padding: 14px 20px;
+    cursor: pointer; border: 1px solid #334155; border-bottom: none;
+    user-select: none;
+  }
+  .block-header:hover { background: #253347; }
+  .block-header h2 { font-size: 1rem; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .block-header .badge {
+    font-size: 0.7rem; background: #334155; color: #94a3b8; padding: 2px 8px;
+    border-radius: 99px; font-weight: 600;
+  }
+  .block-header .arrow { transition: transform 0.3s; font-size: 0.8rem; color: #64748b; }
+  .block-header.open .arrow { transform: rotate(180deg); }
+  .block-header .block-score { font-size: 0.85rem; }
+
+  .block-body {
+    border: 1px solid #334155; border-top: none; border-radius: 0 0 12px 12px;
+    overflow: hidden; max-height: 0; transition: max-height 0.4s ease;
+  }
+  .block-body.open { max-height: 8000px; }
+
+  /* NAV HINT above steps */
+  .nav-hint {
+    background: #0c1425; padding: 10px 20px; border-bottom: 1px solid #1e293b;
+    font-size: 0.8rem; color: #60a5fa; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-hint .icon { font-size: 1rem; }
+
+  .step {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 20px;
+    border-bottom: 1px solid #1e293b; background: #151f2e;
+    transition: background 0.2s;
+  }
+  .step:hover { background: #1a2740; }
+  .step:last-child { border-bottom: none; }
+
+  .step-info { flex: 1; }
+  .step-title { font-weight: 600; font-size: 0.9rem; color: #f1f5f9; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .step-title .critical { font-size: 0.6rem; background: #dc2626; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+
+  .step-instructions {
+    font-size: 0.82rem; color: #94a3b8; line-height: 1.7;
+    background: #0f172a; border-radius: 8px; padding: 10px 14px; margin-top: 6px;
+    border-left: 3px solid #334155;
+  }
+  .step-instructions .num-step { color: #fbbf24; font-weight: 700; }
+  .step-instructions .click { color: #60a5fa; font-weight: 600; }
+  .step-instructions .expect-ok { color: #4ade80; }
+  .step-instructions .expect-fail { color: #f87171; }
+
+  .step-actions { flex-shrink: 0; display: flex; gap: 4px; padding-top: 4px; }
+  .btn-pass, .btn-fail {
+    width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; font-weight: 700;
+  }
+  .btn-pass { background: #1a3a2a; color: #4ade80; }
+  .btn-pass:hover { background: #4ade80; color: #0f172a; }
+  .btn-fail { background: #3a1a1a; color: #f87171; }
+  .btn-fail:hover { background: #f87171; color: #0f172a; }
+
+  .step.passed { }
+  .step.passed .step-title { color: #4ade80; }
+  .step.passed .step-instructions { opacity: 0.4; }
+  .step.failed .step-title { color: #f87171; }
+
+  .note-input {
+    width: 100%; margin-top: 8px; background: #1e293b; border: 1px solid #334155;
+    border-radius: 6px; padding: 6px 10px; color: #e2e8f0; font-size: 0.78rem;
+    font-family: inherit; resize: none; display: none;
+  }
+  .step.failed .note-input { display: block; }
+
+  .legend { max-width: 900px; margin: 30px auto; display: flex; gap: 20px; justify-content: center; font-size: 0.8rem; color: #64748b; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .reset-btn {
+    display: block; margin: 10px auto 40px; background: #3a1a1a; color: #f87171; border: 1px solid #f87171;
+    padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+  }
+  .reset-btn:hover { background: #f87171; color: #0f172a; }
+
+  .footer { text-align: center; padding: 20px 20px 40px; color: #475569; font-size: 0.75rem; }
+
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    .header h1 { font-size: 1.5rem; }
+    .score-bar { gap: 8px; }
+    .score-card { min-width: 70px; padding: 10px 14px; }
+    .score-card .num { font-size: 1.4rem; }
+    .step { padding: 10px 14px; }
+    .howto { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QA Meta Ads</h1>
+  <p>40 pruebas con instrucciones paso a paso. Sigue las instrucciones exactas de cada paso. Al terminar, marca con ✓ o ✗.</p>
+</div>
+
+<!-- INSTRUCCIONES GENERALES -->
+<div class="howto">
+  <h3>ANTES DE EMPEZAR — Lee esto primero</h3>
+  <ol>
+    <li>Abre <a href="https://betabgnuevosupa.vercel.app" target="_blank">https://betabgnuevosupa.vercel.app</a> en Chrome</li>
+    <li>Haz login con tu cuenta</li>
+    <li>Vas a llegar al <strong>Portal del Cliente</strong>. Arriba hay tabs: Steve, Brief, Metricas, etc.</li>
+    <li>Para llegar a Meta Ads: busca el boton <code>Mas</code> en la barra de tabs (arriba a la derecha). Click ahi y selecciona <code>Meta Ads</code></li>
+    <li><strong>Requisito previo:</strong> Debes tener una conexion a Meta configurada. Si no la tienes, ve a la tab <code>Conexiones</code> y conecta tu cuenta de Meta primero.</li>
+    <li>Adentro de Meta Ads hay un <strong>sidebar izquierdo</strong> con 11 secciones:
+      <code>Resumen</code> · <code>Campanas</code> · <code>Crear</code> · <code>Borradores</code> · <code>Audiencias</code> · <code>Pixel</code> · <code>Biblioteca</code> · <code>Analisis</code> · <code>Bandeja Social</code> · <code>Reglas</code> · <code>Competencia</code></li>
+    <li>Arriba hay una barra que dice <strong>"Trabajando con: [Nombre Cuenta]"</strong> y un boton <code>Cambiar negocio</code></li>
+    <li class="warn">Si algo falla: apreta ✗ en rojo, escribe que paso en la nota que aparece, y sigue con el siguiente paso</li>
+    <li class="ok">Si funciona bien: apreta ✓ en verde y sigue</li>
+    <li>Tu progreso se guarda automaticamente en el navegador. Puedes cerrar y volver.</li>
+  </ol>
+</div>
+
+<div class="score-bar">
+  <div class="score-card blue"><div class="num" id="total">40</div><div class="label">Total</div></div>
+  <div class="score-card green"><div class="num" id="passed">0</div><div class="label">Pasaron</div></div>
+  <div class="score-card red"><div class="num" id="failed">0</div><div class="label">Fallaron</div></div>
+  <div class="score-card yellow"><div class="num" id="pending">40</div><div class="label">Pendientes</div></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-bg"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+  <div class="progress-label" id="progressLabel">0% completado</div>
+</div>
+
+<div class="blocks" id="blocks"></div>
+
+<div class="legend">
+  <span><div class="dot" style="background:#4ade80"></div> Pasa (boton verde ✓)</span>
+  <span><div class="dot" style="background:#f87171"></div> Falla (boton rojo ✗)</span>
+  <span><div class="dot" style="background:#fbbf24"></div> Pendiente</span>
+  <span><div class="dot" style="background:#dc2626"></div> Paso critico</span>
+</div>
+
+<button class="reset-btn" onclick="if(confirm('Borrar todo el progreso?')){localStorage.removeItem('steve-meta-qa-v2');location.reload();}">Borrar progreso y empezar de nuevo</button>
+
+<div class="footer">QA Meta Ads — 2026-03-22 — Generado por Claude Code</div>
+
+<script>
+const DATA = [
+  {
+    name: "Acceso y Dashboard",
+    icon: "📊",
+    nav: "Portal > Mas > Meta Ads > sidebar «Resumen»",
+    steps: [
+      {
+        id: 1, title: "Abrir Meta Ads", critical: true,
+        instructions: [
+          { type: 'do', text: 'En la barra de tabs del portal, haz click en el boton <span class="click">Mas</span> (arriba a la derecha)' },
+          { type: 'do', text: 'En el dropdown que se abre, haz click en <span class="click">Meta Ads</span>' },
+          { type: 'wait', text: 'Espera 2-4 segundos mientras carga el modulo' },
+          { type: 'ok', text: 'Se abre Meta Ads con un sidebar a la izquierda que tiene 11 opciones. Si no hay conexion a Meta, muestra un mensaje "Sin conexion a Meta Ads" con un link a Conexiones para conectar tu cuenta.' },
+          { type: 'fail', text: 'Pantalla blanca, error rojo, el circulito de carga gira para siempre, o el dropdown no muestra la opcion Meta Ads' },
+        ]
+      },
+      {
+        id: 2, title: "Ver sidebar completo", critical: false,
+        instructions: [
+          { type: 'do', text: 'Mira el panel lateral izquierdo (sidebar) de Meta Ads' },
+          { type: 'do', text: 'Verifica que estan las 11 secciones en orden: <span class="click">Resumen</span>, <span class="click">Campanas</span>, <span class="click">Crear</span>, <span class="click">Borradores</span>, <span class="click">Audiencias</span>, <span class="click">Pixel</span>, <span class="click">Biblioteca</span>, <span class="click">Analisis</span>, <span class="click">Bandeja Social</span>, <span class="click">Reglas</span>, <span class="click">Competencia</span>' },
+          { type: 'do', text: 'Haz click en cada una brevemente para verificar que cambian de seccion' },
+          { type: 'ok', text: 'Las 11 secciones estan presentes en el sidebar y al hacer click en cada una cambia el contenido de la pantalla principal' },
+          { type: 'fail', text: 'Faltan secciones en el sidebar, alguna no es clickeable, o al hacer click no cambia la vista' },
+        ]
+      },
+      {
+        id: 3, title: "Portfolio bar (barra superior)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Mira la barra superior dentro de Meta Ads (arriba del contenido principal)' },
+          { type: 'do', text: 'Debe mostrar el logo de Meta, el texto <span class="click">Trabajando con: [nombre de la cuenta]</span>, el nombre del Business y el Ad Account ID' },
+          { type: 'do', text: 'Busca el boton <span class="click">Cambiar negocio</span>' },
+          { type: 'ok', text: 'Se ve la barra con el nombre de la cuenta activa, Business name, Ad Account ID, y el boton "Cambiar negocio" esta presente' },
+          { type: 'fail', text: 'No se ve la barra, el nombre de la cuenta esta vacio, o no hay boton "Cambiar negocio"' },
+        ]
+      },
+      {
+        id: 4, title: "KPIs del dashboard Resumen", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Resumen</span> en el sidebar (deberia ser la vista por defecto)' },
+          { type: 'do', text: 'Busca las 5 tarjetas de KPIs en la parte superior del dashboard' },
+          { type: 'do', text: 'Verifica que estan: <strong>Gasto Total</strong> (en CLP), <strong>Ventas</strong>, <strong>ROAS</strong>, <strong>CPA</strong>, <strong>CTR</strong>' },
+          { type: 'do', text: 'El ROAS debe tener color segun su valor: verde si es mayor o igual a 3, amarillo si es mayor o igual a 2, rojo si es menor a 2' },
+          { type: 'ok', text: 'Se ven las 5 tarjetas con valores numericos (pueden ser 0 si no hay datos). El ROAS tiene el color correcto segun su valor.' },
+          { type: 'fail', text: 'Faltan tarjetas, muestran NaN, o el color del ROAS no cambia segun su valor' },
+        ]
+      },
+      {
+        id: 5, title: "Top Campanas por Gasto", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion Resumen, busca mas abajo una tabla titulada <strong>Top Campanas por Gasto</strong> o similar' },
+          { type: 'do', text: 'Debe mostrar las 5 campanas que mas han gastado' },
+          { type: 'do', text: 'Verifica las columnas: <strong>Campana</strong>, <strong>Gasto</strong>, <strong>ROAS</strong>, <strong>Conv.</strong> (conversiones), <strong>CTR</strong>' },
+          { type: 'ok', text: 'Se ve la tabla con al menos 1 campana (o un mensaje de "sin datos" si no hay campanas). Las columnas son las correctas.' },
+          { type: 'fail', text: 'No existe la tabla, error al cargar, o las columnas no coinciden' },
+        ]
+      },
+      {
+        id: 6, title: "Recomendaciones IA", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion Resumen, busca un panel de <strong>Recomendaciones IA</strong> o <strong>Recomendaciones de Steve</strong>' },
+          { type: 'do', text: 'Debe mostrar recomendaciones con badges de prioridad: <span class="click">Critico</span> (rojo), <span class="click">Alta</span> (naranja), <span class="click">Media</span> (amarillo), <span class="click">Baja</span> (azul/gris)' },
+          { type: 'ok', text: 'Se ven recomendaciones con sus badges de prioridad. Pueden ser recomendaciones genericas si no hay muchos datos.' },
+          { type: 'fail', text: 'No existe el panel de recomendaciones, o aparece vacio sin ningun contenido' },
+        ]
+      },
+      {
+        id: 7, title: "Boton Sincronizar", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la seccion Resumen, busca un boton <span class="click">Sincronizar</span> o un icono de refresh/recarga' },
+          { type: 'do', text: 'Haz click en el boton' },
+          { type: 'wait', text: 'Espera 5-15 segundos mientras se sincronizan los datos con Meta' },
+          { type: 'ok', text: 'El boton muestra un spinner o "Sincronizando..." y luego los datos se actualizan. Puede aparecer un toast de confirmacion.' },
+          { type: 'fail', text: 'Error al sincronizar, el boton no hace nada, o queda cargando infinitamente' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Gestor de Campanas",
+    icon: "📋",
+    nav: "Portal > Mas > Meta Ads > sidebar «Campanas»",
+    steps: [
+      {
+        id: 8, title: "Abrir Campanas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Campanas</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 2-3 segundos mientras carga la lista de campanas' },
+          { type: 'ok', text: 'Se abre la vista "Gestor de Campanas" con un conteo de campanas visible (ej: "15 campanas" o "0 campanas"). La pagina carga sin errores.' },
+          { type: 'fail', text: 'Pantalla blanca, error rojo, o carga infinita' },
+        ]
+      },
+      {
+        id: 9, title: "Resumen de presupuesto (5 tarjetas)", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la parte superior de Campanas, busca 5 tarjetas de resumen de presupuesto' },
+          { type: 'do', text: 'Verifica que estan: <strong>Presupuesto Diario Total</strong>, <strong>Gasto ultimos 30 dias</strong>, <strong>Presupuesto Mensual Est.</strong>, <strong>Ventas (30 dias)</strong>, <strong>Costo por Venta</strong>' },
+          { type: 'ok', text: 'Se ven las 5 tarjetas con valores numericos. Pueden ser $0 si no hay campanas activas.' },
+          { type: 'fail', text: 'Faltan tarjetas, valores NaN, o no se muestran las 5 cards' },
+        ]
+      },
+      {
+        id: 10, title: "Distribucion de presupuesto (grafico)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Debajo de las tarjetas de resumen, busca un grafico de barras horizontal que muestre la <strong>Distribucion de presupuesto</strong> entre campanas' },
+          { type: 'do', text: 'Cada barra debe representar una campana con su porcentaje del presupuesto total' },
+          { type: 'ok', text: 'Se ve un grafico de barras horizontales con las campanas y su distribucion de presupuesto. O un mensaje de "sin datos" si no hay campanas.' },
+          { type: 'fail', text: 'No hay grafico, se ve roto, o muestra datos incorrectos' },
+        ]
+      },
+      {
+        id: 11, title: "Filtros de campanas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca la barra de filtros encima de la tabla de campanas' },
+          { type: 'do', text: 'Verifica que hay: un campo de busqueda <span class="click">Buscar campana...</span>, un dropdown <span class="click">Estado</span> (con opciones Todos, Activa, Pausada, Completada, Archivada), date pickers <span class="click">Desde</span> y <span class="click">Hasta</span>, y un boton <span class="click">Limpiar</span>' },
+          { type: 'do', text: 'Escribe algo en el buscador y verifica que filtra la tabla' },
+          { type: 'do', text: 'Cambia el dropdown de Estado a "Activa" y verifica que filtra' },
+          { type: 'do', text: 'Haz click en <span class="click">Limpiar</span> para resetear filtros' },
+          { type: 'ok', text: 'Todos los filtros funcionan: la busqueda filtra por nombre, el dropdown filtra por estado, las fechas filtran por rango, y Limpiar resetea todo' },
+          { type: 'fail', text: 'Filtros no funcionan, no estan todos presentes, o Limpiar no resetea' },
+        ]
+      },
+      {
+        id: 12, title: "Tabla de campanas completa", critical: true,
+        instructions: [
+          { type: 'do', text: 'Verifica la tabla principal de campanas' },
+          { type: 'do', text: 'Debe tener las columnas: <strong>Campana</strong>, <strong>Estado</strong>, <strong>Presupuesto/Dia</strong>, <strong>Gasto 30d</strong>, <strong>ROAS</strong>, <strong>Costo/Venta</strong>, <strong>Tasa Clics</strong>, <strong>Ventas</strong>, <strong>Acciones</strong>' },
+          { type: 'do', text: 'Haz click en los headers de las columnas para verificar que son <strong>ordenables</strong> (sortable) — click en "ROAS" deberia ordenar de mayor a menor y viceversa' },
+          { type: 'do', text: 'En la columna Acciones, verifica que hay iconos de accion (Play/Pause, DollarSign, BarChart3)' },
+          { type: 'ok', text: 'La tabla muestra todas las columnas correctas, las columnas son ordenables al hacer click en el header, y hay iconos de accion en cada fila' },
+          { type: 'fail', text: 'Faltan columnas, no se puede ordenar, no hay iconos de accion, o la tabla no carga' },
+        ]
+      },
+      {
+        id: 13, title: "Pausar/Reanudar campana", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la tabla de campanas, busca una campana activa (estado verde "Activa")' },
+          { type: 'do', text: 'En la columna Acciones, haz click en el icono de <span class="click">Pause</span> (icono de pausa)' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'do', text: 'El estado de la campana deberia cambiar a "Pausada"' },
+          { type: 'do', text: 'Ahora haz click en el icono de <span class="click">Play</span> (icono de reproducir) para reanudarla' },
+          { type: 'ok', text: 'El estado cambia correctamente entre Activa y Pausada al hacer click en los iconos. Puede aparecer un toast de confirmacion.' },
+          { type: 'fail', text: 'El estado no cambia, sale error de API, o el icono no hace nada' },
+        ]
+      },
+      {
+        id: 14, title: "Ajustar presupuesto de campana", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la tabla de campanas, haz click en el icono de <span class="click">DollarSign</span> ($) en la columna Acciones de cualquier campana' },
+          { type: 'wait', text: 'Espera que se abra un dialogo "Ajustar Presupuesto"' },
+          { type: 'do', text: 'En el dialogo, verifica que hay opciones de <span class="click">+10%</span>, <span class="click">-10%</span>, y un campo para monto personalizado' },
+          { type: 'do', text: 'Haz click en <span class="click">+10%</span> y confirma' },
+          { type: 'ok', text: 'El dialogo se abre correctamente, muestra las opciones de ajuste, y al confirmar el presupuesto se actualiza en la tabla' },
+          { type: 'fail', text: 'El dialogo no se abre, faltan las opciones, o error al confirmar el ajuste' },
+        ]
+      },
+      {
+        id: 15, title: "Ver analitica de campana", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la tabla de campanas, haz click en el icono de <span class="click">BarChart3</span> (grafico de barras) en la columna Acciones de cualquier campana' },
+          { type: 'wait', text: 'Espera que se abra un dialogo "Analitica de Campana"' },
+          { type: 'do', text: 'Verifica que muestra metricas detalladas: gasto, impresiones, clicks, CTR, CPC, CPM, conversiones, revenue, ROAS, CPA' },
+          { type: 'ok', text: 'El dialogo se abre y muestra metricas detalladas de la campana seleccionada con valores numericos' },
+          { type: 'fail', text: 'El dialogo no se abre, esta vacio, o muestra valores NaN/undefined' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Crear Campana",
+    icon: "🚀",
+    nav: "Portal > Mas > Meta Ads > sidebar «Crear»",
+    steps: [
+      {
+        id: 16, title: "Abrir wizard de creacion", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Crear</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'do', text: 'Debe abrirse un wizard/formulario de creacion de campana' },
+          { type: 'do', text: 'Verifica los campos: <strong>Nombre de campana</strong> (input de texto), <strong>Objetivo</strong> (dropdown con opciones: CONVERSIONS, TRAFFIC, AWARENESS, ENGAGEMENT), <strong>Presupuesto diario</strong> (input numerico), <strong>Fecha inicio</strong> y <strong>Fecha fin</strong> (date pickers)' },
+          { type: 'do', text: 'Escribe nombre: <code>Test QA Meta 1</code>, selecciona objetivo: CONVERSIONS, presupuesto: <code>5000</code>' },
+          { type: 'ok', text: 'El wizard se abre con todos los campos visibles y editables. Los dropdowns muestran las opciones correctas.' },
+          { type: 'fail', text: 'El wizard no se abre, faltan campos, los dropdowns estan vacios, o error al ingresar datos' },
+        ]
+      },
+      {
+        id: 17, title: "Configurar ad set (segundo paso)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Avanza al siguiente paso del wizard (haz click en <span class="click">Siguiente</span> o el boton equivalente)' },
+          { type: 'do', text: 'Verifica que hay opciones de <strong>Placements</strong>: <span class="click">FEED</span>, <span class="click">STORIES</span>, <span class="click">REELS</span> (checkboxes o multi-select)' },
+          { type: 'do', text: 'Verifica que hay un campo de <strong>Optimization Goal</strong>' },
+          { type: 'do', text: 'Verifica que hay una seccion de <strong>Audiencia</strong> para seleccionar o crear' },
+          { type: 'do', text: 'Selecciona al menos FEED y STORIES como placements' },
+          { type: 'ok', text: 'El segundo paso muestra placements, optimization goal y audiencia. Se pueden seleccionar correctamente.' },
+          { type: 'fail', text: 'No hay segundo paso, faltan campos de placements u audiencia, o no se pueden seleccionar' },
+        ]
+      },
+      {
+        id: 18, title: "Publicar campana", critical: false,
+        instructions: [
+          { type: 'do', text: 'Completa todos los campos necesarios del wizard' },
+          { type: 'do', text: 'Haz click en <span class="click">Crear Campana</span>, <span class="click">Publicar</span>, o el boton de submit final' },
+          { type: 'wait', text: 'Espera 3-5 segundos' },
+          { type: 'ok', text: 'La campana se crea y aparece en la lista de campanas (o borradores). Puede aparecer un toast de exito. <strong>Nota:</strong> Si no hay una conexion real a Meta, puede mostrar un error de API — eso es aceptable para QA, marca como "pass" si el wizard funciono correctamente hasta el submit.' },
+          { type: 'fail', text: 'El boton de submit no funciona, el wizard queda colgado, o error de JavaScript en consola (no error de API de Meta)' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Borradores",
+    icon: "📝",
+    nav: "Portal > Mas > Meta Ads > sidebar «Borradores»",
+    steps: [
+      {
+        id: 19, title: "Ver lista de borradores", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Borradores</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'do', text: 'Debe mostrar una lista de campanas en estado borrador (draft) que aun no han sido publicadas' },
+          { type: 'ok', text: 'Se ve la lista de borradores con nombre, fecha de creacion, y estado. O un mensaje de "No hay borradores" si esta vacia. La pagina carga sin errores.' },
+          { type: 'fail', text: 'Error al cargar, pantalla blanca, o carga infinita' },
+        ]
+      },
+      {
+        id: 20, title: "Acciones en borrador (editar, eliminar, publicar)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Si hay borradores en la lista, selecciona uno' },
+          { type: 'do', text: 'Busca las opciones de accion: <span class="click">Editar</span> (icono de lapiz o boton), <span class="click">Eliminar</span> (icono de basura), <span class="click">Publicar</span> (icono de enviar o boton)' },
+          { type: 'do', text: 'Haz click en <span class="click">Editar</span> — debe abrir el wizard de edicion con los datos pre-llenados' },
+          { type: 'do', text: 'Cierra el editor y haz click en <span class="click">Eliminar</span> en otro borrador — debe pedir confirmacion' },
+          { type: 'ok', text: 'Las 3 acciones estan disponibles: Editar abre el wizard, Eliminar pide confirmacion y borra, Publicar intenta publicar la campana' },
+          { type: 'fail', text: 'No hay acciones disponibles, Editar no abre nada, o Eliminar no funciona' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Audiencias",
+    icon: "👥",
+    nav: "Portal > Mas > Meta Ads > sidebar «Audiencias»",
+    steps: [
+      {
+        id: 21, title: "Ver audiencias (3 tabs)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Audiencias</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'do', text: 'Verifica que hay 3 tabs: <span class="click">Custom</span>, <span class="click">Lookalike</span>, <span class="click">Saved</span>' },
+          { type: 'do', text: 'Haz click en cada tab y verifica que muestra una lista de audiencias con columnas: <strong>Name</strong>, <strong>Type</strong>, <strong>Size</strong> (approximate_count_lower_bound / upper_bound), <strong>Status</strong>' },
+          { type: 'ok', text: 'Los 3 tabs existen y cada uno muestra su lista de audiencias con las columnas correctas. O mensajes de "sin audiencias" si estan vacios.' },
+          { type: 'fail', text: 'Faltan tabs, la tabla no carga, o las columnas no son las correctas' },
+        ]
+      },
+      {
+        id: 22, title: "Crear audiencia custom", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el tab <span class="click">Custom</span>, busca un boton <span class="click">Crear Audiencia</span> o <span class="click">Nueva</span>' },
+          { type: 'do', text: 'Haz click y verifica que se abre un formulario o dialogo para crear una audiencia custom' },
+          { type: 'do', text: 'Debe ofrecer opciones de fuente: <strong>Website Pixel</strong>, <strong>Customer List</strong> (lista de clientes), <strong>Engagement</strong> (interaccion con pagina/IG)' },
+          { type: 'do', text: 'Selecciona una fuente y configura los parametros basicos' },
+          { type: 'ok', text: 'El formulario se abre con las opciones de fuente. Se puede seleccionar y configurar una fuente de audiencia.' },
+          { type: 'fail', text: 'No hay boton de crear, el formulario no se abre, o no hay opciones de fuente' },
+        ]
+      },
+      {
+        id: 23, title: "Crear audiencia lookalike", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el tab <span class="click">Lookalike</span>, busca un boton <span class="click">Crear Lookalike</span> o similar' },
+          { type: 'do', text: 'Haz click y verifica que se abre un formulario' },
+          { type: 'do', text: 'Debe pedir seleccionar una <strong>audiencia fuente</strong> (source audience) existente y un <strong>porcentaje de similitud</strong> (ej: 1%-10%)' },
+          { type: 'do', text: 'Selecciona una audiencia fuente y un porcentaje' },
+          { type: 'ok', text: 'El formulario se abre, muestra audiencias fuente disponibles, y permite configurar el porcentaje de similitud' },
+          { type: 'fail', text: 'No hay boton de crear lookalike, el formulario no muestra audiencias fuente, o no se puede configurar el porcentaje' },
+        ]
+      },
+      {
+        id: 24, title: "Status de audiencias (badges)", critical: false,
+        instructions: [
+          { type: 'do', text: 'En cualquiera de los tabs de audiencias, mira la columna <strong>Status</strong>' },
+          { type: 'do', text: 'Verifica que las audiencias tienen badges de estado: <span class="click">READY</span> (verde/activo), <span class="click">POPULATING</span> (amarillo/en proceso), <span class="click">ERROR</span> (rojo), <span class="click">TOO_SMALL</span> (gris/naranja)' },
+          { type: 'ok', text: 'Los badges de estado estan presentes y tienen colores distintos segun el estado. Al menos se ve uno de los estados posibles.' },
+          { type: 'fail', text: 'No hay badges de estado, todos dicen lo mismo, o no tienen colores diferenciados' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Pixel",
+    icon: "🔍",
+    nav: "Portal > Mas > Meta Ads > sidebar «Pixel»",
+    steps: [
+      {
+        id: 25, title: "Ver pixel activo", critical: true,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Pixel</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'do', text: 'Debe mostrar una lista de Meta Pixels asociados a la cuenta' },
+          { type: 'do', text: 'Verifica que cada pixel muestra: <strong>ID del pixel</strong>, <strong>Fecha de creacion</strong>, <strong>Ultima vez que disparo</strong> (last fired date)' },
+          { type: 'ok', text: 'Se ve al menos 1 pixel con su ID, fecha de creacion, y fecha de ultimo disparo. Si no hay pixel configurado, muestra un mensaje claro indicandolo.' },
+          { type: 'fail', text: 'Error al cargar, pantalla blanca, o no muestra informacion del pixel' },
+        ]
+      },
+      {
+        id: 26, title: "Eventos estandar del pixel", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de la seccion Pixel, busca una lista de <strong>eventos estandar</strong> que el pixel esta trackeando' },
+          { type: 'do', text: 'Verifica que muestra el estado de tracking de: <span class="click">PageView</span>, <span class="click">AddToCart</span>, <span class="click">InitiateCheckout</span>, <span class="click">Purchase</span>' },
+          { type: 'do', text: 'Cada evento debe tener un badge de importancia: <strong>Critico</strong> (rojo, para Purchase), <strong>Importante</strong> (naranja, para InitiateCheckout), <strong>Basico</strong> (amarillo, para AddToCart), <strong>Opcional</strong> (gris, para PageView)' },
+          { type: 'ok', text: 'Se ven los 4 eventos estandar con sus badges de importancia y estado de tracking (activo/inactivo)' },
+          { type: 'fail', text: 'No se muestran los eventos, faltan badges, o no se diferencia entre activo/inactivo' },
+        ]
+      },
+      {
+        id: 27, title: "Copiar codigo del pixel", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca un boton <span class="click">Copiar codigo</span> o un icono de copiar junto al pixel' },
+          { type: 'do', text: 'Haz click en el boton' },
+          { type: 'do', text: 'Abre un editor de texto (Notepad, TextEdit) y pega (Cmd+V / Ctrl+V)' },
+          { type: 'ok', text: 'Se copia al portapapeles el snippet de JavaScript del pixel de Meta. El codigo contiene el ID del pixel y la funcion fbq().' },
+          { type: 'fail', text: 'El boton no copia nada, o el contenido copiado esta vacio o corrupto' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Analisis",
+    icon: "📈",
+    nav: "Portal > Mas > Meta Ads > sidebar «Analisis»",
+    steps: [
+      {
+        id: 28, title: "Dashboard analitico y selector de fecha", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Analisis</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'do', text: 'Busca el selector de rango de fechas. Debe tener opciones: <span class="click">Hoy</span>, <span class="click">7 dias</span>, <span class="click">14 dias</span>, <span class="click">30 dias</span>, <span class="click">60 dias</span>, <span class="click">90 dias</span>' },
+          { type: 'do', text: 'Haz click en <span class="click">7 dias</span> y luego en <span class="click">30 dias</span> — los datos deben cambiar' },
+          { type: 'ok', text: 'El selector de fechas funciona, al cambiar el rango los datos del dashboard se actualizan (o al menos el componente recarga)' },
+          { type: 'fail', text: 'No hay selector de fechas, no cambian los datos al cambiar el rango, o error al cargar' },
+        ]
+      },
+      {
+        id: 29, title: "Metricas por campana (tabla)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de Analisis, busca una tabla de metricas desglosada por campana' },
+          { type: 'do', text: 'Verifica que las columnas incluyen: <strong>Spend</strong>, <strong>Impressions</strong>, <strong>Clicks</strong>, <strong>CTR</strong>, <strong>CPC</strong>, <strong>CPM</strong>, <strong>Conversions</strong>, <strong>Revenue</strong>, <strong>ROAS</strong>, <strong>CPA</strong>' },
+          { type: 'ok', text: 'Se ve una tabla con las metricas desglosadas por campana. Las columnas son correctas y muestran valores numericos.' },
+          { type: 'fail', text: 'No hay tabla de metricas, faltan columnas importantes, o los valores son NaN/undefined' },
+        ]
+      },
+      {
+        id: 30, title: "Graficos de tendencia", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de Analisis, busca graficos de tendencia (line charts y/o bar charts)' },
+          { type: 'do', text: 'Deben mostrar la evolucion del rendimiento en el tiempo: gasto, ROAS, conversiones, CTR, etc.' },
+          { type: 'do', text: 'Cambia el rango de fechas y verifica que los graficos se actualizan' },
+          { type: 'ok', text: 'Se ven graficos de lineas y/o barras mostrando tendencias. Los graficos se actualizan al cambiar el rango de fechas.' },
+          { type: 'fail', text: 'No hay graficos, estan vacios/rotos, o no se actualizan al cambiar fechas' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Bandeja Social",
+    icon: "💬",
+    nav: "Portal > Mas > Meta Ads > sidebar «Bandeja Social»",
+    steps: [
+      {
+        id: 31, title: "Ver conversaciones", critical: true,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Bandeja Social</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 3-5 segundos mientras cargan las conversaciones' },
+          { type: 'do', text: 'Debe mostrar una lista de conversaciones con: <strong>nombre del usuario</strong>, <strong>foto de perfil</strong>, <strong>plataforma</strong> (Messenger, Instagram, Facebook), <strong>preview del ultimo mensaje</strong>, <strong>conteo de mensajes no leidos</strong>' },
+          { type: 'ok', text: 'Se ve la lista de conversaciones con la informacion correcta. O un mensaje de "Sin conversaciones" si esta vacia. La pagina carga sin errores.' },
+          { type: 'fail', text: 'Error al cargar, pantalla blanca, la lista no muestra la informacion requerida, o carga infinita' },
+        ]
+      },
+      {
+        id: 32, title: "Filtrar mensajes por tipo", critical: false,
+        instructions: [
+          { type: 'do', text: 'Busca los tabs de filtro en la parte superior de la bandeja social' },
+          { type: 'do', text: 'Verifica que hay tabs: <span class="click">Todos</span> (all), <span class="click">Mensajes</span> (messages), <span class="click">Comentarios</span> (comments), <span class="click">Comentarios de Ads</span> (ad_comments)' },
+          { type: 'do', text: 'Haz click en cada tab y verifica que la lista se filtra correctamente' },
+          { type: 'ok', text: 'Los 4 tabs estan presentes y al hacer click en cada uno, la lista de conversaciones se filtra segun el tipo' },
+          { type: 'fail', text: 'Faltan tabs, no filtran al hacer click, o error al cambiar de tab' },
+        ]
+      },
+      {
+        id: 33, title: "Responder mensaje", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en una conversacion de la lista para abrirla' },
+          { type: 'do', text: 'Verifica que se abre el historial de la conversacion con los mensajes anteriores' },
+          { type: 'do', text: 'Busca el campo de texto para responder en la parte inferior' },
+          { type: 'do', text: 'Escribe: <code>Test QA respuesta</code> y haz click en <span class="click">Enviar</span>' },
+          { type: 'ok', text: 'El mensaje se envia y aparece en el historial de la conversacion. Puede aparecer un indicador de "enviado".' },
+          { type: 'fail', text: 'No se puede abrir la conversacion, no hay campo de respuesta, o error al enviar' },
+        ]
+      },
+      {
+        id: 34, title: "Respuesta IA (Sparkles)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Dentro de una conversacion abierta, busca un icono de <span class="click">Sparkles</span> (destellos/estrellas) o un boton de <span class="click">IA</span>' },
+          { type: 'do', text: 'Haz click en el icono' },
+          { type: 'wait', text: 'Espera 3-5 segundos mientras la IA genera una respuesta sugerida' },
+          { type: 'do', text: 'La IA debe generar un texto de respuesta sugerido que puedes editar antes de enviar' },
+          { type: 'ok', text: 'El icono de Sparkles existe, al hacer click genera una respuesta sugerida que se muestra en el campo de texto. Se puede editar y enviar.' },
+          { type: 'fail', text: 'No hay icono de IA, no genera respuesta, error al generar, o la respuesta es incoherente' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Reglas Automaticas",
+    icon: "🤖",
+    nav: "Portal > Mas > Meta Ads > sidebar «Reglas»",
+    steps: [
+      {
+        id: 35, title: "Ver reglas (3 tabs)", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Reglas</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 1-2 segundos' },
+          { type: 'do', text: 'Verifica que hay 3 tabs: <span class="click">Reglas</span> (rules — reglas activas), <span class="click">Presets</span> (templates de reglas), <span class="click">Historial</span> (execution log)' },
+          { type: 'do', text: 'Haz click en cada tab y verifica que cambia el contenido' },
+          { type: 'ok', text: 'Los 3 tabs existen y muestran contenido diferente: Reglas muestra reglas activas, Presets muestra templates, Historial muestra log de ejecucion' },
+          { type: 'fail', text: 'Faltan tabs, no cambian el contenido, o error al cargar' },
+        ]
+      },
+      {
+        id: 36, title: "Crear regla automatica", critical: false,
+        instructions: [
+          { type: 'do', text: 'En el tab <span class="click">Reglas</span>, busca un boton <span class="click">Crear Regla</span> o <span class="click">Nueva Regla</span>' },
+          { type: 'do', text: 'Haz click y verifica que se abre un constructor de condiciones (condition builder)' },
+          { type: 'do', text: 'Debe tener: <strong>Metrica</strong> (dropdown: CPA, ROAS, CTR, Spend, etc.), <strong>Operador</strong> (mayor que, menor que, igual a), <strong>Valor</strong> (input numerico), <strong>Ventana de tiempo</strong> (ultimos 3, 7, 14, 30 dias)' },
+          { type: 'do', text: 'Debe tener una seccion de <strong>Accion</strong>: PAUSE_CAMPAIGN, INCREASE_BUDGET, DECREASE_BUDGET, SEND_NOTIFICATION, etc.' },
+          { type: 'do', text: 'Configura: Si CPA > 5000 en los ultimos 7 dias -> PAUSE_CAMPAIGN' },
+          { type: 'do', text: 'Haz click en <span class="click">Guardar</span>' },
+          { type: 'ok', text: 'El constructor de condiciones funciona, se puede configurar metrica + operador + valor + ventana + accion, y la regla se guarda correctamente' },
+          { type: 'fail', text: 'No hay boton de crear, el constructor no funciona, faltan opciones de metrica/accion, o error al guardar' },
+        ]
+      },
+      {
+        id: 37, title: "Activar/Desactivar regla", critical: false,
+        instructions: [
+          { type: 'do', text: 'En la lista de reglas, busca un <span class="click">toggle switch</span> (interruptor) en cada regla' },
+          { type: 'do', text: 'Haz click en el toggle para desactivar una regla activa' },
+          { type: 'do', text: 'El toggle debe cambiar de estado (verde a gris o similar)' },
+          { type: 'do', text: 'Haz click de nuevo para reactivarla' },
+          { type: 'ok', text: 'El toggle funciona, cambia visualmente entre activo (verde) e inactivo (gris), y el estado se persiste' },
+          { type: 'fail', text: 'No hay toggle, no cambia de estado, o error al cambiar' },
+        ]
+      },
+      {
+        id: 38, title: "Historial de ejecucion de reglas", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en el tab <span class="click">Historial</span>' },
+          { type: 'do', text: 'Debe mostrar un log de cuando las reglas se activaron y que accion tomaron' },
+          { type: 'do', text: 'Cada entrada debe tener: <strong>Fecha/hora</strong>, <strong>Regla que se activo</strong>, <strong>Campana afectada</strong>, <strong>Accion tomada</strong>, <strong>Resultado</strong> (exito/error)' },
+          { type: 'ok', text: 'Se ve el historial con entradas que muestran cuando y como se ejecutaron las reglas. O un mensaje de "Sin historial" si nunca se ha ejecutado una regla.' },
+          { type: 'fail', text: 'El tab Historial no muestra nada, error al cargar, o falta informacion en las entradas' },
+        ]
+      },
+    ]
+  },
+  {
+    name: "Competencia y Biblioteca",
+    icon: "🎨",
+    nav: "Portal > Mas > Meta Ads > sidebar «Competencia» / «Biblioteca»",
+    steps: [
+      {
+        id: 39, title: "Biblioteca de creativos", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Biblioteca</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'do', text: 'Debe mostrar una galeria de creativos guardados (imagenes, videos, carruseles usados en anuncios)' },
+          { type: 'do', text: 'Busca filtros por tipo: <span class="click">Imagen</span> (image), <span class="click">Video</span> (video), <span class="click">Carrusel</span> (carousel)' },
+          { type: 'do', text: 'Haz click en un filtro y verifica que la galeria se filtra correctamente' },
+          { type: 'ok', text: 'Se ve la galeria de creativos con miniaturas/previews. Los filtros por tipo funcionan. O un mensaje de "Sin creativos" si esta vacia.' },
+          { type: 'fail', text: 'La biblioteca no carga, error al filtrar, o no hay filtros por tipo' },
+        ]
+      },
+      {
+        id: 40, title: "Analisis de competencia", critical: false,
+        instructions: [
+          { type: 'do', text: 'Haz click en <span class="click">Competencia</span> en el sidebar izquierdo' },
+          { type: 'wait', text: 'Espera 2-3 segundos' },
+          { type: 'do', text: 'Debe mostrar una seccion para buscar y analizar anuncios de competidores' },
+          { type: 'do', text: 'Busca un campo de busqueda para buscar competidores por nombre o pagina' },
+          { type: 'do', text: 'Escribe el nombre de una marca conocida y busca' },
+          { type: 'ok', text: 'Se ve la seccion de competencia con campo de busqueda. Al buscar, muestra resultados de anuncios de competidores (puede usar Meta Ad Library). O un mensaje de "Funcionalidad en desarrollo" si no esta completa.' },
+          { type: 'fail', text: 'La seccion no carga, error al buscar, o no hay campo de busqueda visible' },
+        ]
+      },
+    ]
+  },
+];
+
+// State
+const state = {};
+const notes = {};
+const STORAGE_KEY = 'steve-meta-qa-v2';
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    Object.assign(state, saved.state || {});
+    Object.assign(notes, saved.notes || {});
+  } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, notes }));
+}
+
+function updateScores() {
+  let passed = 0, failed = 0;
+  for (const k in state) {
+    if (state[k] === 'pass') passed++;
+    else if (state[k] === 'fail') failed++;
+  }
+  const total = 40;
+  const pending = total - passed - failed;
+  const pct = Math.round(((passed + failed) / total) * 100);
+
+  document.getElementById('passed').textContent = passed;
+  document.getElementById('failed').textContent = failed;
+  document.getElementById('pending').textContent = pending;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = pct + '% completado — ' + passed + ' pasaron, ' + failed + ' fallaron';
+
+  if (failed > 0) {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #fbbf24, #f87171)';
+  } else {
+    document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #4ade80, #22d3ee)';
+  }
+}
+
+function setResult(id, result) {
+  if (state[id] === result) {
+    delete state[id];
+  } else {
+    state[id] = result;
+  }
+  saveState();
+  renderStep(id);
+  updateScores();
+  updateBlockScores();
+}
+
+function saveNote(id) {
+  const el = document.getElementById('note-' + id);
+  if (el) {
+    notes[id] = el.value;
+    saveState();
+  }
+}
+
+function renderStep(id) {
+  const el = document.getElementById('step-' + id);
+  if (!el) return;
+  el.classList.remove('passed', 'failed');
+  if (state[id] === 'pass') el.classList.add('passed');
+  else if (state[id] === 'fail') el.classList.add('failed');
+
+  const passBtn = el.querySelector('.btn-pass');
+  const failBtn = el.querySelector('.btn-fail');
+  if (passBtn) {
+    passBtn.style.background = state[id] === 'pass' ? '#4ade80' : '#1a3a2a';
+    passBtn.style.color = state[id] === 'pass' ? '#0f172a' : '#4ade80';
+  }
+  if (failBtn) {
+    failBtn.style.background = state[id] === 'fail' ? '#f87171' : '#3a1a1a';
+    failBtn.style.color = state[id] === 'fail' ? '#0f172a' : '#f87171';
+  }
+}
+
+function updateBlockScores() {
+  DATA.forEach((block, bIdx) => {
+    const bp = block.steps.filter(s => state[s.id] === 'pass').length;
+    const bf = block.steps.filter(s => state[s.id] === 'fail').length;
+    const el = document.getElementById('bscore-' + bIdx);
+    if (el) {
+      let html = '';
+      if (bp) html += `<span style="color:#4ade80">${bp}✓</span> `;
+      if (bf) html += `<span style="color:#f87171">${bf}✗</span>`;
+      if (!bp && !bf) html = `<span style="color:#64748b">0/${block.steps.length}</span>`;
+      el.innerHTML = html;
+    }
+  });
+}
+
+function toggleBlock(idx) {
+  const header = document.getElementById('bh-' + idx);
+  const body = document.getElementById('bb-' + idx);
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+function formatInstruction(inst) {
+  if (inst.type === 'do') return `<span class="num-step">→</span> ${inst.text}`;
+  if (inst.type === 'wait') return `<span style="color:#fbbf24">⏳</span> ${inst.text}`;
+  if (inst.type === 'ok') return `<span class="expect-ok">✅ PASA SI:</span> ${inst.text}`;
+  if (inst.type === 'fail') return `<span class="expect-fail">❌ FALLA SI:</span> ${inst.text}`;
+  return inst.text;
+}
+
+function render() {
+  const container = document.getElementById('blocks');
+  let html = '';
+
+  DATA.forEach((block, bIdx) => {
+    const stepCount = block.steps.length;
+
+    html += `<div class="block">`;
+    html += `<div class="block-header" id="bh-${bIdx}" onclick="toggleBlock(${bIdx})">`;
+    html += `<h2>${block.icon} ${block.name} <span class="badge">${stepCount} pasos</span></h2>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;">`;
+    html += `<span id="bscore-${bIdx}" style="font-size:0.85rem;"></span>`;
+    html += `<span class="arrow">▼</span></div></div>`;
+
+    html += `<div class="block-body" id="bb-${bIdx}">`;
+
+    // Navigation hint
+    html += `<div class="nav-hint"><span class="icon">🧭</span> <strong>Como llegar:</strong>&nbsp; ${block.nav}</div>`;
+
+    block.steps.forEach(step => {
+      const cls = state[step.id] === 'pass' ? 'passed' : state[step.id] === 'fail' ? 'failed' : '';
+      html += `<div class="step ${cls}" id="step-${step.id}">`;
+      html += `<div style="color:#475569;font-size:0.85rem;font-weight:800;min-width:28px;margin-top:3px;text-align:center;">${step.id}</div>`;
+      html += `<div class="step-info">`;
+      html += `<div class="step-title">${step.title}`;
+      if (step.critical) html += ` <span class="critical">CRITICO</span>`;
+      html += `</div>`;
+
+      // Step-by-step instructions
+      html += `<div class="step-instructions">`;
+      step.instructions.forEach(inst => {
+        html += `<div style="margin-bottom:4px;">${formatInstruction(inst)}</div>`;
+      });
+      html += `</div>`;
+
+      // Notes textarea (visible on fail)
+      html += `<textarea class="note-input" id="note-${step.id}" placeholder="Escribe que fallo aqui..." onchange="saveNote(${step.id})">${notes[step.id] || ''}</textarea>`;
+
+      html += `</div>`; // step-info
+
+      html += `<div class="step-actions">`;
+      html += `<button class="btn-pass" onclick="setResult(${step.id},'pass')" title="Pasa">✓</button>`;
+      html += `<button class="btn-fail" onclick="setResult(${step.id},'fail')" title="Falla">✗</button>`;
+      html += `</div></div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+
+  DATA.forEach(block => block.steps.forEach(step => renderStep(step.id)));
+  updateBlockScores();
+}
+
+loadState();
+render();
+updateScores();
+</script>
+</body>
+</html>
