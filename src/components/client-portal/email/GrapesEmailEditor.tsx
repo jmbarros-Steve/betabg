@@ -245,9 +245,31 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       setHtml: (mjml: string) => {
         const editor = editorRef.current;
         if (!editor || !mjml) return;
-        // Load MJML content directly into the editor canvas
         try {
-          editor.setComponents(mjml);
+          const wrapper = editor.getWrapper();
+          if (!wrapper) return;
+
+          // Find the mj-body inside the editor's existing structure
+          const mjBody = wrapper.findType('mj-body')[0] || wrapper;
+
+          // Extract content between <mj-body ...> and </mj-body> from the AI MJML
+          const bodyMatch = mjml.match(/<mj-body[^>]*>([\s\S]*?)<\/mj-body>/i);
+          const bodyContent = bodyMatch ? bodyMatch[1].trim() : mjml;
+
+          if (!bodyContent) return;
+
+          // Clear existing content and load the AI-generated sections
+          mjBody.components().reset();
+          mjBody.append(bodyContent);
+
+          // Also extract mj-body attributes (like background-color) and apply them
+          const attrMatch = mjml.match(/<mj-body\s+([^>]*)>/i);
+          if (attrMatch) {
+            const bgMatch = attrMatch[1].match(/background-color="([^"]+)"/);
+            if (bgMatch) {
+              mjBody.addAttributes({ 'background-color': bgMatch[1] });
+            }
+          }
         } catch (err) {
           console.warn('[GrapesEditor] setHtml/MJML error:', err);
         }
