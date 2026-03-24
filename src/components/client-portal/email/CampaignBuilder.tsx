@@ -1016,10 +1016,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
-            {/* AI-generated HTML preview (when no design_json) */}
-            {editingCampaign?.html_content && !designJson && (
-              <div className="border-b bg-white">
-                <div className="flex items-center justify-between px-3 py-2 bg-green-50 border-b border-green-200">
+            {/* AI-generated HTML preview (when html_content exists without real GrapeJS design) */}
+            {editingCampaign?.html_content && (!designJson || (typeof designJson === 'object' && !designJson?.pages?.length)) && (
+              <div className="flex-1 min-h-0 flex flex-col bg-white">
+                <div className="flex items-center justify-between px-3 py-2 bg-green-50 border-b border-green-200 shrink-0">
                   <span className="text-xs font-medium text-green-800">Email generado con IA — vista previa</span>
                   <Button
                     size="sm"
@@ -1027,6 +1027,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     className="h-6 px-2 text-xs text-green-700"
                     onClick={() => {
                       setEditingCampaign(prev => ({ ...prev, html_content: '' }));
+                      setDesignJson(null);
                       toast.info('Preview eliminado. Usa el editor visual para diseñar desde cero.');
                     }}
                   >
@@ -1035,8 +1036,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                 </div>
                 <iframe
                   srcDoc={editingCampaign.html_content}
-                  className="w-full border-0"
-                  style={{ height: '500px' }}
+                  className="w-full flex-1 border-0"
+                  style={{ minHeight: '500px' }}
                   sandbox=""
                   title="Email preview"
                   referrerPolicy="no-referrer"
@@ -1044,8 +1045,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               </div>
             )}
 
-            {/* GrapeJS email editor */}
-            <div className={`flex-1 min-h-0 relative ${editingCampaign?.html_content && !designJson ? 'hidden' : ''}`}>
+            {/* GrapeJS email editor — hidden when showing AI preview */}
+            <div className={`flex-1 min-h-0 relative ${editingCampaign?.html_content && (!designJson || (typeof designJson === 'object' && !designJson?.pages?.length)) ? 'hidden' : ''}`}>
               <div className="absolute inset-0">
                 <GrapesEmailEditor
                   ref={emailEditorRef}
