@@ -1,1 +1,6 @@
-{"rewrites":[{"source":"/(.*)", "destination":"/index.html"}]}
+{
+  "redirects": [
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "www.steve.cl" }], "destination": "https://steve.cl/$1", "permanent": true }
+  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
