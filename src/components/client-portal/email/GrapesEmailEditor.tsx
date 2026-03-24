@@ -232,11 +232,9 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
         editor.loadProjectData(design);
       },
 
-      setHtml: (html: string) => {
-        const editor = editorRef.current;
-        if (!editor || !html) return;
-        // Load raw HTML into the editor by setting components directly
-        editor.setComponents(html);
+      setHtml: (_html: string) => {
+        // Raw HTML cannot be loaded into GrapeJS email mode (MJML parser).
+        // AI-generated HTML is shown via iframe preview instead.
       },
 
       insertHtml: (html: string) => {

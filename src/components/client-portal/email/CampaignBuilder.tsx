@@ -266,16 +266,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         html_content: html,
       }));
 
-      // Load generated content into the editor
+      // Load generated content into the editor if design_json available
       setDesignJson(generatedDesign);
-      if (editorReady) {
-        if (generatedDesign) {
-          emailEditorRef.current?.loadDesign(generatedDesign);
-        } else if (html) {
-          // AI returns raw HTML without design_json — load directly into GrapeJS
-          emailEditorRef.current?.setHtml(html);
-        }
+      if (editorReady && generatedDesign) {
+        emailEditorRef.current?.loadDesign(generatedDesign);
       }
+      // If AI generated raw HTML (no design_json), it's stored in html_content
+      // and shown as an iframe preview in the design step (GrapeJS can't parse raw HTML)
 
       toast.success('Email generado con Steve AI');
     } catch (err: any) {
@@ -1019,8 +1016,35 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
+            {/* AI-generated HTML preview (when no design_json) */}
+            {editingCampaign?.html_content && !designJson && (
+              <div className="border-b bg-white">
+                <div className="flex items-center justify-between px-3 py-2 bg-green-50 border-b border-green-200">
+                  <span className="text-xs font-medium text-green-800">Email generado con IA — vista previa</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs text-green-700"
+                    onClick={() => {
+                      setEditingCampaign(prev => ({ ...prev, html_content: '' }));
+                      toast.info('Preview eliminado. Usa el editor visual para diseñar desde cero.');
+                    }}
+                  >
+                    Usar editor visual
+                  </Button>
+                </div>
+                <iframe
+                  srcDoc={editingCampaign.html_content}
+                  className="w-full border-0"
+                  style={{ height: '500px' }}
+                  sandbox="allow-same-origin"
+                  title="Email preview"
+                />
+              </div>
+            )}
+
             {/* GrapeJS email editor */}
-            <div className="flex-1 min-h-0 relative">
+            <div className={`flex-1 min-h-0 relative ${editingCampaign?.html_content && !designJson ? 'hidden' : ''}`}>
               <div className="absolute inset-0">
                 <GrapesEmailEditor
                   ref={emailEditorRef}
