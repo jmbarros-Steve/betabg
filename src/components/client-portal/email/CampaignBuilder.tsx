@@ -1037,8 +1037,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   srcDoc={editingCampaign.html_content}
                   className="w-full border-0"
                   style={{ height: '500px' }}
-                  sandbox="allow-same-origin"
+                  sandbox=""
                   title="Email preview"
+                  referrerPolicy="no-referrer"
                 />
               </div>
             )}
