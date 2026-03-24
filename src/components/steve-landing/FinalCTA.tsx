@@ -25,12 +25,24 @@ export function FinalCTA({ onOpenAuth }: FinalCTAProps) {
           Únete a los equipos de e-commerce que ya usan Steve para crecer más rápido.
         </p>
 
-        <button
-          onClick={onOpenAuth}
-          className="px-8 py-3.5 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm shadow-lg shadow-blue-600/25"
-        >
-          Comenzar PRO &rarr;
-        </button>
+        <div className="flex flex-col items-center gap-4">
+          <a
+            href="https://meetings.hubspot.com/jose-manuel15"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-8 py-3.5 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm shadow-lg shadow-blue-600/25"
+          >
+            Agenda una reunión &rarr;
+          </a>
+          <a
+            href="https://wa.me/15559061514?text=Hola%20Steve%20%F0%9F%90%95"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-slate-400 hover:text-[#25D366] transition-colors flex items-center gap-1.5"
+          >
+            O escríbele directo por WhatsApp &rarr;
+          </a>
+        </div>
       </div>
     </section>
   );

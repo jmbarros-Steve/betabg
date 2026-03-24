@@ -45,7 +45,7 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
             {[
               { label: 'Funcionalidades', href: '#features' },
               { label: 'Integraciones', href: '#integraciones' },
-              { label: 'Precios', href: '#planes' },
+              { label: 'Plataforma', href: '#planes' },
             ].map((link) => (
               <a
                 key={link.href}
@@ -83,12 +83,14 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
                 >
                   Iniciar Sesion
                 </button>
-                <button
-                  onClick={onOpenAuth}
+                <a
+                  href="https://meetings.hubspot.com/jose-manuel15"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-sm font-medium px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
-                  Comenzar PRO
-                </button>
+                  Agenda una reunión
+                </a>
               </>
             )}
           </div>

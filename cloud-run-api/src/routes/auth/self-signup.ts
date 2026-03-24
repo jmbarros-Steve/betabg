@@ -58,12 +58,41 @@ export async function selfSignup(c: Context) {
   );
 
   // Create client record (user manages their own account)
-  await supabase.from('clients').insert({
+  const { data: newClient } = await supabase.from('clients').insert({
     user_id: userId,
     client_user_id: userId,
     name: email.split('@')[0],
     email,
-  });
+  }).select('id').single();
+
+  // Check if this email matches a WhatsApp prospect and convert them
+  if (newClient) {
+    const { data: prospect } = await supabase
+      .from('wa_prospects')
+      .select('id, phone')
+      .eq('email', email)
+      .neq('stage', 'converted')
+      .maybeSingle();
+
+    if (prospect) {
+      await supabase
+        .from('wa_prospects')
+        .update({
+          stage: 'converted',
+          converted_client_id: newClient.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', prospect.id);
+
+      // Set the prospect's WhatsApp phone on the new client
+      await supabase
+        .from('clients')
+        .update({ whatsapp_phone: prospect.phone })
+        .eq('id', newClient.id);
+
+      console.log('Prospect converted:', prospect.phone, '→ client', newClient.id);
+    }
+  }
 
   console.log('Self-signup complete for:', email);
 

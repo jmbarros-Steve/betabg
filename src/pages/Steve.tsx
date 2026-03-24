@@ -27,6 +27,7 @@ import { PricingSection } from '@/components/steve-landing/PricingSection';
 import { FinalCTA } from '@/components/steve-landing/FinalCTA';
 import { TestimonialsSection } from '@/components/steve-landing/TestimonialsSection';
 import { SteveFooter } from '@/components/steve-landing/SteveFooter';
+import { FloatingWhatsAppButton } from '@/components/steve-landing/FloatingWhatsAppButton';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Email inválido').max(255),
@@ -106,6 +107,7 @@ export default function Steve() {
       <PricingSection onOpenAuth={openAuth} />
       <FinalCTA onOpenAuth={openAuth} />
       <SteveFooter />
+      <FloatingWhatsAppButton />
 
       {/* Auth Modal */}
       {showAuth && (

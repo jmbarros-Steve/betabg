@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail, Unlink } from 'lucide-react';
+import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail, Unlink, Smartphone, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { MetaAdAccountSelector } from './MetaAdAccountSelector';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
@@ -82,6 +83,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [pendingDisconnect, setPendingDisconnect] = useState<Connection | null>(null);
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappSaved, setWhatsappSaved] = useState('');
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
   // Use Shopify auth fetch for embedded mode with Session Tokens
   const { callEdgeFunction, isEmbedded } = useShopifyAuthFetch();
@@ -91,7 +95,43 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
   useEffect(() => {
     fetchConnections();
+    fetchWhatsappPhone();
   }, [clientId]);
+
+  async function fetchWhatsappPhone() {
+    const { data } = await supabase
+      .from('clients')
+      .select('whatsapp_phone')
+      .eq('id', clientId)
+      .maybeSingle();
+    if (data?.whatsapp_phone) {
+      setWhatsappPhone(data.whatsapp_phone);
+      setWhatsappSaved(data.whatsapp_phone);
+    }
+  }
+
+  async function handleSaveWhatsapp() {
+    const cleaned = whatsappPhone.replace(/\s+/g, '').trim();
+    if (!cleaned) {
+      toast.error('Ingresa un número de WhatsApp');
+      return;
+    }
+    setSavingWhatsapp(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ whatsapp_phone: cleaned })
+        .eq('id', clientId);
+      if (error) throw error;
+      setWhatsappSaved(cleaned);
+      setWhatsappPhone(cleaned);
+      toast.success('WhatsApp conectado. Ahora puedes hablar con Steve desde tu celular');
+    } catch {
+      toast.error('Error al guardar WhatsApp');
+    } finally {
+      setSavingWhatsapp(false);
+    }
+  }
 
   async function fetchConnections() {
     try {
@@ -493,7 +533,92 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
             </div>
           )}
 
-          {hasMetaConnection && hasShopifyConnection && hasGoogleConnection && hasKlaviyoConnection && (
+          {/* WhatsApp Connection */}
+          {whatsappSaved ? (
+            <Card className="border-green-200 bg-green-50/50">
+              <CardContent className="py-6">
+                <div className="flex items-start gap-6">
+                  <div className="flex-shrink-0 bg-white rounded-xl p-3 shadow-sm border">
+                    <QRCodeSVG
+                      value="https://wa.me/15559061514?text=Hola%20Steve%20%F0%9F%90%95"
+                      size={120}
+                      level="M"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Smartphone className="w-5 h-5 text-green-600" />
+                      <p className="font-semibold text-green-900">WhatsApp Conectado</p>
+                      <Badge className="bg-emerald-100 text-emerald-700 rounded-full text-xs">
+                        <CheckCircle className="w-3 h-3 mr-1" /> {whatsappSaved}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-green-800 mb-3">
+                      Escanea el QR o toca el botón para hablar con Steve desde tu celular.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href="https://wa.me/15559061514?text=Hola%20Steve%20%F0%9F%90%95"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white text-sm font-medium rounded-lg hover:bg-[#1ebe57] transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                        </svg>
+                        Hablar con Steve
+                      </a>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setWhatsappSaved('')}
+                        className="text-green-700 hover:text-green-900"
+                      >
+                        Cambiar número
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex items-center justify-between p-6 border rounded-xl card-hover">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-green-100 text-green-800">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-medium">WhatsApp</p>
+                  <p className="text-sm text-muted-foreground">
+                    Conecta tu número para hablar con Steve desde tu celular
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="tel"
+                  placeholder="+56 9 1234 5678"
+                  value={whatsappPhone}
+                  onChange={(e) => setWhatsappPhone(e.target.value)}
+                  className="w-44 h-9 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSaveWhatsapp}
+                  disabled={savingWhatsapp || !whatsappPhone.trim()}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  {savingWhatsapp ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {hasMetaConnection && hasShopifyConnection && hasGoogleConnection && hasKlaviyoConnection && whatsappSaved && (
             <p className="text-sm text-muted-foreground text-center py-4">
               Todas las plataformas disponibles están conectadas
             </p>

@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { WA_SYSTEM_PROMPT, buildWAContext, getWAHistory } from '../../lib/steve-wa-brain.js';
+import { WA_SYSTEM_PROMPT, WA_SALES_PROMPT, buildWAContext, getWAHistory, buildProspectContext, getProspectHistory } from '../../lib/steve-wa-brain.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -41,9 +41,8 @@ export async function steveWAChat(c: Context) {
       .maybeSingle();
 
     if (!client) {
-      // Unknown number — reply with onboarding message
-      const twiml = `<Response><Message>Hola! Soy Steve 🐕 el asistente de marketing de Steve Ads. No tengo tu número registrado. Si ya eres cliente, agrega tu WhatsApp en tu perfil de steve.cl</Message></Response>`;
-      return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
+      // Unknown number — AI sales funnel for prospects
+      return handleProspect(c, supabase, phone, messageBody, profileName, messageSid);
     }
 
     // Save inbound message
@@ -165,6 +164,128 @@ export async function steveWAChat(c: Context) {
   } catch (error: any) {
     console.error('[steve-wa-chat] Unhandled error:', error);
     const twiml = `<Response><Message>Steve tuvo un error técnico 🐕 Intenta en un momento.</Message></Response>`;
+    return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
+  }
+}
+
+/**
+ * Handle messages from unknown numbers — AI sales funnel.
+ * Upserts prospect, saves messages, calls Claude Haiku for sales conversation.
+ */
+async function handleProspect(c: Context, supabase: any, phone: string, messageBody: string, profileName: string, messageSid: string) {
+  try {
+    // 1. Upsert prospect
+    const { data: prospect } = await supabase
+      .from('wa_prospects')
+      .upsert({
+        phone,
+        profile_name: profileName || null,
+        stage: 'talking',
+        source: 'whatsapp',
+      }, { onConflict: 'phone' })
+      .select()
+      .single();
+
+    // Increment message count
+    if (prospect) {
+      await supabase
+        .from('wa_prospects')
+        .update({
+          message_count: (prospect.message_count || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', prospect.id);
+    }
+
+    // 2. Save inbound message (client_id = null for prospects)
+    await supabase.from('wa_messages').insert({
+      client_id: null,
+      channel: 'prospect',
+      direction: 'inbound',
+      from_number: phone,
+      to_number: STEVE_WA_NUMBER,
+      body: messageBody,
+      message_sid: messageSid,
+      contact_name: profileName || phone,
+      contact_phone: phone,
+    });
+
+    // 3. Load prospect history
+    const history = await getProspectHistory(phone, 10);
+
+    // Build messages array
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
+    if (messages.length === 0 || messages[messages.length - 1].content !== messageBody) {
+      messages.push({ role: 'user', content: messageBody });
+    }
+    const sanitized = sanitizeForClaude(messages);
+
+    // 4. Call Claude Haiku for sales response
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+    if (!ANTHROPIC_API_KEY) {
+      const twiml = `<Response><Message>Woof, tuve un problema técnico 🐕 Intenta de nuevo en un momento.</Message></Response>`;
+      return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
+    }
+
+    const prospectContext = buildProspectContext(prospect || { stage: 'new', message_count: 0 });
+    const systemPrompt = `${WA_SALES_PROMPT}\n\n${prospectContext}`;
+
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: sanitized,
+      }),
+    });
+
+    let replyText: string;
+
+    if (!aiResponse.ok) {
+      console.error('[steve-wa-chat] Claude Haiku API error:', aiResponse.status);
+      replyText = 'Hola! Soy Steve 🐕 Tu asistente de marketing AI. ¿En qué te puedo ayudar? Escríbeme y te cuento todo sobre la plataforma.';
+    } else {
+      const aiData: any = await aiResponse.json();
+      const rawMsg = aiData.content?.[0]?.text || '';
+      replyText = rawMsg
+        .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
+        .trim() || 'Hola! Soy Steve 🐕 ¿Tienes una tienda online? Te puedo ayudar con tu marketing.';
+    }
+
+    if (replyText.length > 1500) {
+      replyText = replyText.slice(0, 1497) + '...';
+    }
+
+    // 5. Save outbound message
+    await supabase.from('wa_messages').insert({
+      client_id: null,
+      channel: 'prospect',
+      direction: 'outbound',
+      from_number: STEVE_WA_NUMBER,
+      to_number: phone,
+      body: replyText,
+      contact_name: profileName || phone,
+      contact_phone: phone,
+    });
+
+    // 6. Reply via TwiML
+    const escapedReply = replyText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const twiml = `<Response><Message>${escapedReply}</Message></Response>`;
+    return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
+
+  } catch (error: any) {
+    console.error('[steve-wa-chat] Prospect handler error:', error);
+    const twiml = `<Response><Message>Hola! Soy Steve 🐕 el asistente de marketing de Steve Ads. Visita steve.cl para conocer más!</Message></Response>`;
     return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
   }
 }
