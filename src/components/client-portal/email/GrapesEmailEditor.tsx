@@ -258,6 +258,20 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
       // Register Steve blocks with brand color
       registerSteveBlocks(editor, brandColor);
 
+      // Auto-select all text when starting to edit a text component
+      // so the user can just type to replace "Put your text here"
+      editor.on('rte:enable', () => {
+        try {
+          const rteEl = editor.RichTextEditor?.getContent?.();
+          if (rteEl) {
+            const sel = rteEl.ownerDocument?.defaultView?.getSelection?.() || window.getSelection();
+            if (sel) {
+              sel.selectAllChildren(rteEl);
+            }
+          }
+        } catch {}
+      });
+
       setReady(true);
 
       if (initialDesign && !initialDesignLoaded.current) {
