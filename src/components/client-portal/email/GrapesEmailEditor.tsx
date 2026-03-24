@@ -199,19 +199,29 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
         const editor = editorRef.current;
         if (!editor) return '';
         try {
-          const result = editor.runCommand('studio:projectFiles', { styles: 'inline' });
+          // studio:projectFiles compiles MJML → full HTML email (may return Promise)
+          let result = editor.runCommand('studio:projectFiles', { styles: 'inline' });
+          if (result instanceof Promise) result = await result;
           if (result?.files) {
             const htmlFile = result.files.find(
               (f: any) => f.mimeType === 'text/html' || f.filename?.endsWith('.html')
             );
             if (htmlFile?.content) {
-              return typeof htmlFile.content === 'string'
-                ? htmlFile.content
-                : await (htmlFile.content as Blob).text();
+              const content = htmlFile.content instanceof Blob
+                ? await htmlFile.content.text()
+                : String(htmlFile.content);
+              if (content && content.length > 50) return content;
             }
           }
-          return editor.getHtml({ cleanId: true }) || '';
-        } catch {
+          // Fallback: try getHtml with MJML inlined
+          const html = editor.getHtml({ cleanId: true }) || '';
+          // If it looks like raw MJML, wrap it minimally for rendering
+          if (html.includes('<mj-') && !html.includes('<html')) {
+            return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:0;padding:20px;}</style></head><body>${html.replace(/<mj-[^>]*>/g, '<div>').replace(/<\/mj-[^>]*>/g, '</div>')}</body></html>`;
+          }
+          return html;
+        } catch (err) {
+          console.error('[GrapesEditor] getHtml error:', err);
           return editor.getHtml({ cleanId: true }) || '';
         }
       },
