@@ -22,7 +22,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">1. Aceptación de los Términos</h2>
               <p>
-                Al acceder y utilizar los servicios de Consultoría BG, usted acepta estar sujeto a estos Términos de Servicio. 
+                Al acceder y utilizar los servicios de Steve, usted acepta estar sujeto a estos Términos de Servicio. 
                 Si no está de acuerdo con alguna parte de estos términos, no podrá acceder al servicio.
               </p>
             </section>
@@ -30,7 +30,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">2. Descripción del Servicio</h2>
               <p>
-                Consultoría BG proporciona servicios de consultoría en marketing digital, incluyendo pero no limitado a:
+                Steve proporciona servicios de consultoría en marketing digital, incluyendo pero no limitado a:
               </p>
               <ul className="list-disc pl-6 space-y-2 mt-4">
                 <li>Gestión y análisis de campañas publicitarias en Meta (Facebook/Instagram)</li>
@@ -70,7 +70,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">5. Propiedad Intelectual</h2>
               <p>
-                El servicio y su contenido original, características y funcionalidad son propiedad de Consultoría BG 
+                El servicio y su contenido original, características y funcionalidad son propiedad de Steve 
                 y están protegidos por leyes de propiedad intelectual.
               </p>
             </section>
@@ -78,7 +78,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold text-foreground mt-8 mb-4">6. Limitación de Responsabilidad</h2>
               <p>
-                Consultoría BG no será responsable por daños indirectos, incidentales, especiales, consecuentes o punitivos, 
+                Steve no será responsable por daños indirectos, incidentales, especiales, consecuentes o punitivos, 
                 incluyendo pérdida de beneficios, datos u otras pérdidas intangibles.
               </p>
             </section>

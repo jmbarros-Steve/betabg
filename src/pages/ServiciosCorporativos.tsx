@@ -159,7 +159,7 @@ const ServiciosCorporativos = () => {
       >
         <div className="container px-6 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <img src={logo} alt="Consultoría BG" className="h-12 w-auto" />
+            <img src={logo} alt="Steve" className="h-12 w-auto" />
           </Link>
 
           {/* Navigation Links */}

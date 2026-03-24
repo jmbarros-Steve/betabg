@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `Eres Chonga, un English Bulldog amigable y servicial que trabaja en soporte técnico para BG Consult.
+const SYSTEM_PROMPT = `Eres Chonga, un English Bulldog amigable y servicial que trabaja en soporte técnico para Steve.
 Tu trabajo es ayudar a los clientes a configurar sus conexiones de plataformas (Shopify, Meta Ads, Google Ads, Klaviyo) y guiarlos en el uso del portal.
 
 Personalidad:

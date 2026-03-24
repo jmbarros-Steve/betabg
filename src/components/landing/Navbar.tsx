@@ -20,7 +20,7 @@ export function Navbar() {
     >
       <div className="container px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
-          <img src={logo} alt="Consultoría BG" className="h-10 w-auto" />
+          <img src={logo} alt="Steve" className="h-10 w-auto" />
         </Link>
 
         <div className="hidden md:flex items-center gap-6">

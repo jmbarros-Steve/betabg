@@ -1663,7 +1663,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       doc.setFont('NotoSans', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
-      doc.text(`STEVE.IO — BG Consult | Confidencial | Pág ${pageNum}/${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      doc.text(`STEVE.IO | Confidencial | Pág ${pageNum}/${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
     };
 
     const stripEmojis = (text: string) => text
@@ -1918,7 +1918,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFontSize(9);
     doc.setTextColor(200, 200, 220);
     doc.text('Preparado por Dr. Steve Dogs, PhD Performance Marketing', pageWidth / 2, bandY + 60, { align: 'center' });
-    doc.text('BG Consult / STEVE.IO', pageWidth / 2, bandY + 66, { align: 'center' });
+    doc.text('Steve', pageWidth / 2, bandY + 66, { align: 'center' });
 
     // Footer of cover
     doc.setFontSize(8);
@@ -3259,7 +3259,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     doc.setFontSize(8.5);
     doc.setTextColor(100, 100, 100);
     doc.text('PhD Performance Marketing, Stanford Dog University', margin + 20, y + 10);
-    doc.text('Director de Estrategia, BG Consult / STEVE.IO', margin + 20, y + 15);
+    doc.text('Director de Estrategia, Steve', margin + 20, y + 15);
     y += 20;
 
     doc.setFont('NotoSans', 'normal');
@@ -4390,7 +4390,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   <img src={avatarSteve} alt="Steve Dogs" className="h-14 w-14 rounded-full mx-auto mb-2 border-2 border-primary shadow-lg" />
                   <p className="text-lg font-bold text-primary">Dr. Steve Dogs</p>
                   <p className="text-xs text-muted-foreground">PhD Performance Marketing — Stanford Dog University</p>
-                  <p className="text-xs text-muted-foreground">Director de Estrategia, BG Consult</p>
+                  <p className="text-xs text-muted-foreground">Director de Estrategia, Steve</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     Firmado: {new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>

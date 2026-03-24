@@ -49,7 +49,7 @@ export default function FAQ() {
           </Link>
 
           <h1 className="text-3xl font-bold mb-2">Preguntas Frecuentes</h1>
-          <p className="text-muted-foreground mb-8">Todo lo que necesitas saber sobre Steve y la plataforma de Consultoría BG.</p>
+          <p className="text-muted-foreground mb-8">Todo lo que necesitas saber sobre Steve y la plataforma.</p>
 
           <Accordion type="single" collapsible className="w-full">
             {faqs.map((faq, i) => (

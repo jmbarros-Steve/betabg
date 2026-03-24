@@ -87,7 +87,7 @@ export function SteveFooter() {
             &copy; {new Date().getFullYear()} Steve Ads. Todos los derechos reservados.
           </p>
           <p className="text-xs text-slate-600">
-            Hecho con AI por BG Consulting
+            Hecho con AI por Steve
           </p>
         </div>
       </div>

@@ -56,7 +56,7 @@ export default function GoogleAdsDesignDoc() {
     addTitle('Google Ads API Integration', 16);
     addTitle('Design Documentation', 14);
     addSpace(10);
-    addBody('Company: BG Consult');
+    addBody('Company: Steve');
     addBody('Product: Steve — AI Marketing Copilot');
     addBody('Website: https://betabg.lovable.app');
     addBody('Date: February 2026');

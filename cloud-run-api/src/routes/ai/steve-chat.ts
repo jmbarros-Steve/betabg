@@ -642,7 +642,7 @@ FORMATO (headers markdown ##):
 ---
 **Documento preparado por Dr. Steve Dogs**
 *PhD Performance Marketing — Stanford Dog University*
-*Director de Estrategia Digital, BG Consult*
+*Director de Estrategia Digital, Steve*
 *Confidencial — Documento estratégico de uso exclusivo del cliente*`;
 }
 

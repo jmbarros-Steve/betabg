@@ -163,7 +163,7 @@ export function InvoicesPanel({ userId }: Props) {
     const content = `
 ==============================================
               RECIBO DE SERVICIOS
-              BG CONSULT
+              STEVE
 ==============================================
 
 Número de Recibo: ${invoice.invoice_number}
@@ -184,7 +184,7 @@ Tarifa por Hora: €${invoice.clients?.hourly_rate.toFixed(2) || '0.00'}
 TOTAL: €${invoice.total_amount.toFixed(2)}
 ----------------------------------------------
 
-Gracias por confiar en BG Consult.
+Gracias por confiar en Steve.
 
 ==============================================
     `;

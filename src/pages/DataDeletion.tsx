@@ -21,7 +21,7 @@ export default function DataDeletion() {
             <h1 className="text-3xl font-bold">Solicitud de Eliminación de Datos</h1>
           </div>
           <p className="text-muted-foreground mb-8">
-            Steve Ads — Plataforma de Marketing AI por Consultoría BG
+            Steve Ads — Plataforma de Marketing AI
           </p>
 
           <div className="space-y-6 text-muted-foreground">

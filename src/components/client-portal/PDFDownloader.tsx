@@ -252,7 +252,7 @@ export function PDFDownloader({ type, title, content, variant = 'outline', size 
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
         doc.text(
-          `BG Consult | Página ${i} de ${pageCount}`,
+          `Steve | Página ${i} de ${pageCount}`,
           pageWidth / 2,
           pageHeight - 10,
           { align: 'center' }
@@ -262,7 +262,7 @@ export function PDFDownloader({ type, title, content, variant = 'outline', size 
       // Generate filename
       const timestamp = new Date().toISOString().split('T')[0];
       const sanitizedTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-      const filename = `BG_Consult_${type}_${sanitizedTitle}_${timestamp}.pdf`;
+      const filename = `Steve_${type}_${sanitizedTitle}_${timestamp}.pdf`;
 
       doc.save(filename);
       toast.success('PDF descargado correctamente');

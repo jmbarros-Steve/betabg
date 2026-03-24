@@ -54,7 +54,7 @@ export function HeroSection() {
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium mb-6 leading-tight tracking-tight text-foreground">
             Bienvenido a{' '}
-            <span className="text-primary">Consultoría BG</span>
+            <span className="text-primary">Steve</span>
           </h1>
 
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
