@@ -232,13 +232,31 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   }, [showEditor]);
 
-  // Load design when editor becomes ready or designJson changes
+  // Load design when designJson changes (e.g., template selected while editor is mounted)
+  // handleReady in GrapesEmailEditor already handles initial load, so we only watch designJson
   useEffect(() => {
-    if (!editorReady) return;
-    if (designJson && typeof designJson === 'object') {
-      emailEditorRef.current?.loadDesign(designJson);
+    if (!editorReady || !designJson || typeof designJson !== 'object') return;
+    emailEditorRef.current?.loadDesign(designJson);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designJson]);
+
+  // Reset editorReady when leaving design step so useEffects re-trigger on return
+  useEffect(() => {
+    if (editorStep !== 'design') {
+      setEditorReady(false);
     }
-  }, [editorReady, designJson]);
+  }, [editorStep]);
+
+  // Load stored AI MJML when editor becomes ready
+  useEffect(() => {
+    if (!editorReady || !emailEditorRef.current) return;
+    if (designJson) return; // design_json from existing campaign takes priority
+    const storedMjml = editingCampaign?.html_content;
+    if (storedMjml && storedMjml.includes('<mjml')) {
+      emailEditorRef.current.setHtml(storedMjml);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorReady]);
 
   const handleGenerateWithAI = async () => {
     setGenerating(true);
@@ -269,6 +287,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       // Load MJML directly into the GrapeJS editor so user can edit it
       if (editorReady && mjml && emailEditorRef.current) {
         emailEditorRef.current.setHtml(mjml);
+        // Also persist so downstream checks (send test, review) have content
+        setEditingCampaign(prev => ({ ...prev, html_content: mjml }));
         toast.success('Email generado con Steve AI — puedes editarlo en el editor');
       } else if (mjml) {
         // Editor not ready yet — store MJML and it will load when ready
@@ -470,16 +490,19 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const handleSendTest = async () => {
-    if (!editingCampaign?.html_content) { toast.error('Diseña el email primero'); return; }
     setSendingTest(true);
     try {
+      // Export fresh HTML from the editor instead of using stale state
+      const { html: freshHtml } = await exportEditorHtml();
+      const htmlToSend = freshHtml || editingCampaign?.html_content || '';
+      if (!htmlToSend) { toast.error('Diseña el email primero'); setSendingTest(false); return; }
       await handleSaveCampaign();
       const { error } = await callApi<any>('send-email', {
         body: {
           action: 'send-test',
           to: editingCampaign?.from_email || 'noreply@steve.cl',
           subject: `[TEST] ${editingCampaign?.subject || 'Sin asunto'}`,
-          html_content: editingCampaign.html_content,
+          html_content: htmlToSend,
           from_email: editingCampaign?.from_email || 'noreply@steve.cl',
           from_name: editingCampaign?.from_name || 'Steve',
           client_id: clientId,
@@ -555,15 +578,106 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     setEditorStep('audience');
   };
 
+  // Convert Unlayer design objects (body.rows) to MJML strings for GrapeJS
+  const unlayerToMjml = (design: any): string => {
+    const bgColor = design.body?.values?.backgroundColor || '#f4f4f5';
+    let out = `<mjml><mj-body background-color="${bgColor}">`;
+
+    for (const row of design.body?.rows || []) {
+      const sectionBg = row.values?.columnsBackgroundColor || '#ffffff';
+      const columns = row.columns || [];
+      const colCount = columns.length;
+
+      out += `<mj-section background-color="${sectionBg}" padding="0">`;
+
+      for (const col of columns) {
+        const w = colCount > 1 ? ` width="${Math.floor(100 / colCount)}%"` : '';
+        out += `<mj-column${w}>`;
+
+        for (const c of col.contents || []) {
+          const pad = c.values?.containerPadding || '16px';
+
+          switch (c.type) {
+            case 'heading': {
+              const fs = c.values?.fontSize || '28px';
+              const al = c.values?.textAlign || 'center';
+              const cl = c.values?.color || '#18181b';
+              out += `<mj-text padding="${pad}" font-size="${fs}" align="${al}" color="${cl}" font-weight="bold">${c.values?.text || ''}</mj-text>`;
+              break;
+            }
+            case 'text':
+              out += `<mj-text padding="${pad}">${c.values?.text || ''}</mj-text>`;
+              break;
+            case 'button': {
+              const bc = c.values?.buttonColors || {};
+              const href = c.values?.href?.values?.href || '#';
+              out += `<mj-button padding="${pad}" background-color="${bc.backgroundColor || '#18181b'}" color="${bc.color || '#ffffff'}" border-radius="${c.values?.borderRadius || '6px'}" href="${href}" font-size="14px" font-weight="bold" inner-padding="14px 28px">${c.values?.text || ''}</mj-button>`;
+              break;
+            }
+            case 'image': {
+              const src = typeof c.values?.src === 'string' ? c.values.src : c.values?.src?.url || '';
+              const alt = c.values?.altText || '';
+              out += `<mj-image src="${src}" alt="${alt}" padding="${pad}" />`;
+              break;
+            }
+            case 'divider': {
+              const b = c.values?.border || {};
+              out += `<mj-divider border-color="${b.borderTopColor || '#e4e4e7'}" border-width="${b.borderTopWidth || '1px'}" padding="${pad}" />`;
+              break;
+            }
+            case 'social': {
+              const icons = c.values?.icons?.icons || [];
+              const els = icons.map((ic: any) =>
+                `<mj-social-element name="${(ic.name || '').toLowerCase()}" href="${ic.url || '#'}">${ic.name || ''}</mj-social-element>`
+              ).join('');
+              out += `<mj-social padding="${pad}" mode="horizontal" icon-size="24px">${els}</mj-social>`;
+              break;
+            }
+          }
+        }
+
+        out += '</mj-column>';
+      }
+
+      out += '</mj-section>';
+    }
+
+    out += '</mj-body></mjml>';
+    return out;
+  };
+
   const handleTemplateSelect = (templateDesign: any) => {
     setShowTemplateGallery(false);
-    if (templateDesign) {
-      // Store in state - useEffect will load when editor is ready
-      setDesignJson(templateDesign);
-      // Also load immediately if editor is already ready
-      if (editorReady && emailEditorRef.current && typeof templateDesign === 'object') {
-        emailEditorRef.current.loadDesign(templateDesign);
+    if (!templateDesign) return;
+
+    // String template (HTML from emailTemplates.ts or MJML string)
+    if (typeof templateDesign === 'string') {
+      const mjml = templateDesign.includes('<mjml')
+        ? templateDesign
+        : `<mjml><mj-body><mj-section><mj-column><mj-raw>${templateDesign}</mj-raw></mj-column></mj-section></mj-body></mjml>`;
+      if (editorReady && emailEditorRef.current) {
+        emailEditorRef.current.setHtml(mjml);
+      } else {
+        setEditingCampaign(prev => ({ ...prev, html_content: mjml }));
       }
+      return;
+    }
+
+    // Unlayer format (system templates with body.rows) → convert to MJML
+    if (templateDesign?.body?.rows) {
+      const mjml = unlayerToMjml(templateDesign);
+      if (editorReady && emailEditorRef.current) {
+        emailEditorRef.current.setHtml(mjml);
+      } else {
+        setEditingCampaign(prev => ({ ...prev, html_content: mjml }));
+      }
+      return;
+    }
+
+    // GrapeJS project data (saved templates from getProjectData)
+    setDesignJson(templateDesign);
+    if (editorReady && emailEditorRef.current) {
+      emailEditorRef.current.loadDesign(templateDesign);
     }
   };
 

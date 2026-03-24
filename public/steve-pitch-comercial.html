@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve — Pitch Comercial 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: #0F172A; color: #fff; }
+
+  @media print {
+    body { background: #fff; color: #1e293b; }
+    .slide { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; min-height: auto; padding: 40px 0; }
+    .no-print { display: none !important; }
+    .gradient-text { -webkit-text-fill-color: #3B82F6; }
+    .problem-card, .feature-card, .metric-card, .pricing-card, .persona-card, .use-case-card, .timeline-card { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+    .badge-blue { background: #EFF6FF !important; color: #3B82F6 !important; }
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+  .gradient-text { background: linear-gradient(135deg, #3B82F6, #8B5CF6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .gradient-text-green { background: linear-gradient(135deg, #10B981, #3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 16px; border-radius: 100px; }
+  .badge-blue { background: rgba(59,130,246,.12); color: #60A5FA; border: 1px solid rgba(59,130,246,.2); }
+  .badge-orange { background: #F97316; color: #fff; }
+  .badge-emerald { background: rgba(16,185,129,.12); color: #34D399; border: 1px solid rgba(16,185,129,.2); }
+  .badge-purple { background: rgba(139,92,246,.12); color: #A78BFA; border: 1px solid rgba(139,92,246,.2); }
+  .badge-red { background: rgba(239,68,68,.12); color: #F87171; border: 1px solid rgba(239,68,68,.2); }
+  .cta-btn { display: inline-block; padding: 16px 40px; border-radius: 100px; background: linear-gradient(135deg, #3B82F6, #2563EB); color: #fff; font-weight: 700; font-size: 16px; text-decoration: none; transition: all .3s; box-shadow: 0 4px 24px rgba(59,130,246,.3); }
+  .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(59,130,246,.5); }
+  .cta-btn-outline { display: inline-block; padding: 14px 32px; border-radius: 100px; background: transparent; color: #60A5FA; font-weight: 600; font-size: 15px; text-decoration: none; border: 2px solid rgba(59,130,246,.3); transition: all .3s; }
+  .cta-btn-outline:hover { background: rgba(59,130,246,.1); border-color: #3B82F6; }
+  .section-tag { font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #60A5FA; margin-bottom: 12px; }
+
+  .slide { min-height: 100vh; display: flex; align-items: center; position: relative; overflow: hidden; padding: 80px 0; }
+  .slide-inner { width: 100%; }
+  .slide + .slide { border-top: 1px solid rgba(255,255,255,.06); }
+
+  /* Cards */
+  .problem-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 28px; transition: transform .2s; }
+  .problem-card:hover { transform: translateY(-2px); }
+  .feature-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 28px; transition: all .3s; }
+  .feature-card:hover { border-color: rgba(59,130,246,.3); background: rgba(59,130,246,.04); }
+  .metric-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 32px; text-align: center; }
+  .persona-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 32px; }
+  .use-case-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 24px; }
+  .timeline-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 24px; position: relative; }
+  .pricing-card { background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.1); border-radius: 20px; padding: 40px; text-align: center; }
+  .pricing-card.featured { border-color: #3B82F6; background: rgba(59,130,246,.06); }
+
+  /* Grids */
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  @media (max-width: 768px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* Download button */
+  .download-bar { position: fixed; bottom: 24px; right: 24px; z-index: 100; display: flex; gap: 12px; }
+  .download-btn { padding: 12px 24px; border-radius: 12px; background: #3B82F6; color: #fff; font-weight: 600; font-size: 14px; border: none; cursor: pointer; box-shadow: 0 8px 32px rgba(59,130,246,.4); display: flex; align-items: center; gap: 8px; }
+  .download-btn:hover { background: #2563EB; }
+
+  /* Highlight box */
+  .highlight-box { background: linear-gradient(135deg, rgba(59,130,246,.1), rgba(139,92,246,.1)); border: 1px solid rgba(59,130,246,.2); border-radius: 16px; padding: 32px; }
+
+  /* Comparison table */
+  .comp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .comp-table th, .comp-table td { padding: 14px 20px; }
+  .comp-table thead tr { background: rgba(255,255,255,.04); }
+  .comp-table tbody tr { border-top: 1px solid rgba(255,255,255,.04); }
+  .comp-table tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+
+  /* Progress bar */
+  .progress-bar { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+
+  /* Pill */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 600; }
+
+  /* Number highlight */
+  .big-number { font-size: 56px; font-weight: 900; line-height: 1; }
+  .huge-number { font-size: 80px; font-weight: 900; line-height: 1; }
+</style>
+</head>
+<body>
+
+<!-- Download Button -->
+<div class="download-bar no-print">
+  <button class="download-btn" onclick="window.print()">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    Guardar como PDF
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 1: COVER ═══ -->
+<div class="slide" style="text-align:center;">
+  <div class="container slide-inner">
+    <div style="width:100px;height:100px;border-radius:24px;background:linear-gradient(135deg,#3B82F6,#8B5CF6);margin:0 auto 40px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 80px rgba(59,130,246,.4);">
+      <svg width="48" height="48" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/><path d="M10 21h4"/></svg>
+    </div>
+
+    <span class="badge badge-blue" style="margin-bottom:24px;">Pitch Comercial 2026</span>
+
+    <h1 style="font-size:clamp(40px,6vw,72px);font-weight:900;line-height:1.05;margin-bottom:24px;">
+      <span class="gradient-text">Steve</span><br>
+      Tu Equipo de Marketing<br>
+      con Inteligencia Artificial
+    </h1>
+
+    <p style="font-size:20px;color:#94A3B8;max-width:700px;margin:0 auto 48px;line-height:1.7;">
+      La primera plataforma todo-en-uno que reemplaza agencias, freelancers y herramientas fragmentadas.
+      Un consultor AI que trabaja 24/7 por tu e-commerce.
+    </p>
+
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+      <a href="https://meetings.hubspot.com/jmbarros" class="cta-btn">Agenda una Demo &rarr;</a>
+      <a href="https://wa.me/56962069979" class="cta-btn-outline">WhatsApp Directo</a>
+    </div>
+
+    <div style="display:flex;gap:32px;justify-content:center;margin-top:48px;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <p style="font-size:32px;font-weight:800;color:#3B82F6;">14+</p>
+        <p style="font-size:13px;color:#94A3B8;">Módulos integrados</p>
+      </div>
+      <div style="text-align:center;">
+        <p style="font-size:32px;font-weight:800;color:#8B5CF6;">4</p>
+        <p style="font-size:13px;color:#94A3B8;">Plataformas conectadas</p>
+      </div>
+      <div style="text-align:center;">
+        <p style="font-size:32px;font-weight:800;color:#10B981;">24/7</p>
+        <p style="font-size:13px;color:#94A3B8;">Siempre disponible</p>
+      </div>
+      <div style="text-align:center;">
+        <p style="font-size:32px;font-weight:800;color:#F59E0B;">&lt;5 min</p>
+        <p style="font-size:13px;color:#94A3B8;">Setup completo</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 2: EL PROBLEMA ═══ -->
+<div class="slide">
+  <div class="container slide-inner">
+    <p class="section-tag">El problema que resolvemos</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">El marketing de e-commerce está roto</h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:640px;margin-bottom:48px;line-height:1.6;">
+      Las marcas pierden tiempo, dinero y oportunidades saltando entre herramientas desconectadas y agencias que cobran fortunas por hacer lo mínimo.
+    </p>
+
+    <div class="grid-3">
+      <div class="problem-card">
+        <div style="font-size:36px;margin-bottom:16px;">💸</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:8px;color:#F87171;">Agencias caras y lentas</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Pagar $2,000-8,000 USD/mes por una agencia que tarda semanas en entregar y no conoce tu marca como tú.
+        </p>
+        <div style="margin-top:16px;padding:12px;background:rgba(239,68,68,.08);border-radius:8px;">
+          <p style="font-size:24px;font-weight:800;color:#F87171;">$3,600-8,300</p>
+          <p style="font-size:12px;color:#94A3B8;">Costo mensual promedio agencia LATAM</p>
+        </div>
+      </div>
+
+      <div class="problem-card">
+        <div style="font-size:36px;margin-bottom:16px;">🔀</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:8px;color:#FBBF24;">Datos fragmentados</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Shopify por un lado, Meta Ads por otro, Google Ads, Klaviyo... cada plataforma con su propio dashboard, sin visión unificada.
+        </p>
+        <div style="margin-top:16px;padding:12px;background:rgba(245,158,11,.08);border-radius:8px;">
+          <p style="font-size:24px;font-weight:800;color:#FBBF24;">5+ horas/semana</p>
+          <p style="font-size:12px;color:#94A3B8;">Tiempo perdido consolidando reportes</p>
+        </div>
+      </div>
+
+      <div class="problem-card">
+        <div style="font-size:36px;margin-bottom:16px;">⏰</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:8px;color:#60A5FA;">Sin tiempo para optimizar</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Crear copies, diseñar emails, analizar competidores, ajustar campañas... todo manual, repetitivo y que nadie quiere hacer.
+        </p>
+        <div style="margin-top:16px;padding:12px;background:rgba(59,130,246,.08);border-radius:8px;">
+          <p style="font-size:24px;font-weight:800;color:#60A5FA;">72%</p>
+          <p style="font-size:12px;color:#94A3B8;">De e-commerce no optimizan sus ads</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="highlight-box" style="margin-top:40px;text-align:center;">
+      <p style="font-size:20px;font-weight:700;margin-bottom:8px;">
+        El dueño de e-commerce promedio gasta <span style="color:#F87171;">$48,000 USD/año</span> en marketing externo
+      </p>
+      <p style="font-size:15px;color:#94A3B8;">
+        Y aún así no tiene control total sobre sus campañas, copies ni estrategia.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 3: LA SOLUCIÓN ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">La solución</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">
+      Todo tu marketing en <span class="gradient-text">un solo lugar</span>
+    </h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:640px;margin:0 auto 56px;line-height:1.6;">
+      Steve combina IA de clase mundial con integraciones nativas para darte un equipo de marketing completo en una plataforma.
+    </p>
+
+    <div class="grid-2" style="text-align:left;max-width:900px;margin:0 auto;">
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">🤖</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Steve AI — Consultor 24/7</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Asesor de marketing que analiza tus datos reales, da recomendaciones accionables y responde cualquier pregunta de estrategia, posicionamiento, pricing o campañas.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(139,92,246,.1);color:#A78BFA;">Claude Opus 4.6</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">🚀</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Meta Ads Manager</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Crea campañas, ad sets y anuncios de Meta directamente desde Steve. Wizard de 7 pasos, reglas automáticas, tree view y Social Inbox incluidos.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(59,130,246,.1);color:#60A5FA;">Facebook + Instagram</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">✍️</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Generador de Copies AI</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Headlines, textos primarios y descripciones optimizadas para Meta Ads y Google Ads. Generados con Claude Sonnet 4.6, entrenado con tu brief de marca.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(16,185,129,.1);color:#34D399;">Meta + Google Ads</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">📧</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Steve Mail + Klaviyo Studio</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Editor drag & drop tipo Klaviyo para diseñar emails, importar templates, planificar flows y enviar campañas. Métricas por campaña y flujo.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(236,72,153,.1);color:#F472B6;">Klaviyo integrado</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">🎨</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Imágenes y Videos AI</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Google Imagen 4 para fotos de productos fotorrealistas y Kling AI v1.5 para videos de 5-10 segundos perfectos para Instagram Reels y TikTok.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(245,158,11,.1);color:#FBBF24;">Imagen 4 + Kling</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">📊</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Dashboard Unificado</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Métricas de Shopify, Meta Ads, Google Ads y Klaviyo en un solo lugar. Sync automático cada 6 horas, reportes semanales por email.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(14,165,233,.1);color:#38BDF8;">4 plataformas</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">🕵️</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Análisis de Competencia</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Espionaje de anuncios de competidores + Deep Dive con scraping AI de sus sitios web. Análisis de estrategias, posicionamiento y gaps del mercado.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(239,68,68,.1);color:#F87171;">Scraping + AI</span>
+      </div>
+
+      <div class="feature-card">
+        <div style="font-size:28px;margin-bottom:12px;">📋</div>
+        <h4 style="font-size:17px;font-weight:700;margin-bottom:6px;">Brand Brief Completo</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Análisis profundo de tu marca: buyer personas, tono, posicionamiento, competencia directa. Exportable a PDF profesional de 20+ páginas.
+        </p>
+        <span class="pill" style="margin-top:12px;background:rgba(139,92,246,.1);color:#A78BFA;">Research AI</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 4: INTEGRACIONES ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Integraciones nativas</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">Conecta lo que ya usas</h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:520px;margin:0 auto 48px;">OAuth seguro, sincronización automática. Sin copiar/pegar datos nunca más.</p>
+
+    <div class="grid-4" style="max-width:800px;margin:0 auto;">
+      <div class="metric-card">
+        <div style="font-size:40px;margin-bottom:12px;">🛍️</div>
+        <h4 style="font-weight:700;margin-bottom:4px;">Shopify</h4>
+        <p style="font-size:13px;color:#94A3B8;">Ventas, órdenes, productos, clientes, AOV</p>
+      </div>
+      <div class="metric-card">
+        <div style="font-size:40px;margin-bottom:12px;">📘</div>
+        <h4 style="font-weight:700;margin-bottom:4px;">Meta Ads</h4>
+        <p style="font-size:13px;color:#94A3B8;">Campañas, ads, audiencias, pixel, inbox</p>
+      </div>
+      <div class="metric-card">
+        <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+        <h4 style="font-weight:700;margin-bottom:4px;">Google Ads</h4>
+        <p style="font-size:13px;color:#94A3B8;">Keywords, campañas, métricas, copies</p>
+      </div>
+      <div class="metric-card">
+        <div style="font-size:40px;margin-bottom:12px;">💌</div>
+        <h4 style="font-weight:700;margin-bottom:4px;">Klaviyo</h4>
+        <p style="font-size:13px;color:#94A3B8;">Flows, campañas, templates, métricas</p>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:40px;max-width:700px;margin-left:auto;margin-right:auto;">
+      <div class="metric-card">
+        <p style="font-size:36px;font-weight:900;color:#3B82F6;">64+</p>
+        <p style="font-size:13px;color:#94A3B8;">API Endpoints</p>
+      </div>
+      <div class="metric-card">
+        <p style="font-size:36px;font-weight:900;color:#8B5CF6;">47</p>
+        <p style="font-size:13px;color:#94A3B8;">Edge Functions</p>
+      </div>
+      <div class="metric-card">
+        <p style="font-size:36px;font-weight:900;color:#10B981;">24/7</p>
+        <p style="font-size:13px;color:#94A3B8;">Sync Automático</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 5: AI STACK ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Tecnología</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">Stack de IA de clase mundial</h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:560px;margin:0 auto 48px;">Los mismos modelos que usan las empresas más avanzadas del mundo.</p>
+
+    <div class="grid-2" style="max-width:800px;margin:0 auto;text-align:left;">
+      <div class="feature-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center;font-size:20px;">⚡</div>
+          <div>
+            <h4 style="font-weight:700;">Claude Opus 4.6</h4>
+            <p style="font-size:12px;color:#94A3B8;">Anthropic — Modelo flagship</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Motor principal de Steve Chat. Análisis estratégico profundo, recomendaciones basadas en datos reales de tus campañas y métricas.</p>
+      </div>
+
+      <div class="feature-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:20px;">✍️</div>
+          <div>
+            <h4 style="font-weight:700;">Claude Sonnet 4.6</h4>
+            <p style="font-size:12px;color:#94A3B8;">Anthropic — Copies optimizados</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Generación de copies publicitarios para Meta y Google Ads. Headlines, textos primarios, descripciones — todo en tu tono de marca.</p>
+      </div>
+
+      <div class="feature-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center;font-size:20px;">🌄</div>
+          <div>
+            <h4 style="font-weight:700;">Google Imagen 4</h4>
+            <p style="font-size:12px;color:#94A3B8;">Google DeepMind</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Imágenes fotorrealistas de productos para campañas publicitarias. Calidad de estudio fotográfico en segundos.</p>
+      </div>
+
+      <div class="feature-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(236,72,153,.12);display:flex;align-items:center;justify-content:center;font-size:20px;">🎬</div>
+          <div>
+            <h4 style="font-weight:700;">Kling AI v1.5</h4>
+            <p style="font-size:12px;color:#94A3B8;">Videos AI</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Videos de 5-10 segundos perfectos para Instagram Reels y TikTok. De una foto de producto a un video profesional.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 6: PARA QUIÉN ═══ -->
+<div class="slide">
+  <div class="container slide-inner">
+    <p class="section-tag">¿Para quién es Steve?</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:48px;">Diseñado para e-commerce que quieren escalar</h2>
+
+    <div class="grid-3">
+      <div class="persona-card">
+        <div style="font-size:48px;margin-bottom:16px;">👩‍💼</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:4px;">Dueño de E-commerce</h4>
+        <p style="font-size:13px;color:#60A5FA;margin-bottom:12px;">$5K-100K ventas/mes</p>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Tiene tienda en Shopify, hace Meta Ads y quiere dejar de depender de una agencia costosa. Necesita control y velocidad.
+        </p>
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px;">
+          <p style="font-size:12px;color:#64748B;margin-bottom:8px;">PAIN POINTS:</p>
+          <p style="font-size:13px;color:#94A3B8;">• No sabe si sus ads rinden<br>• Paga agencia pero no entiende qué hacen<br>• Quiere escalar pero no sabe cómo</p>
+        </div>
+      </div>
+
+      <div class="persona-card">
+        <div style="font-size:48px;margin-bottom:16px;">👨‍💻</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:4px;">Growth Manager / CMO</h4>
+        <p style="font-size:13px;color:#8B5CF6;margin-bottom:12px;">Equipo de marketing 1-5 personas</p>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Maneja múltiples canales y necesita una herramienta que unifique datos, automatice tareas repetitivas y le permita enfocarse en estrategia.
+        </p>
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px;">
+          <p style="font-size:12px;color:#64748B;margin-bottom:8px;">PAIN POINTS:</p>
+          <p style="font-size:13px;color:#94A3B8;">• Salta entre 5+ plataformas/día<br>• Crea copies a mano (lento)<br>• No tiene tiempo para análisis competitivo</p>
+        </div>
+      </div>
+
+      <div class="persona-card">
+        <div style="font-size:48px;margin-bottom:16px;">🏢</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:4px;">Agencia de Marketing</h4>
+        <p style="font-size:13px;color:#10B981;margin-bottom:12px;">Maneja 5-50 clientes</p>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">
+          Necesita escalar operaciones sin contratar más gente. Steve automatiza copies, reportes y análisis para todos sus clientes.
+        </p>
+        <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px;">
+          <p style="font-size:12px;color:#64748B;margin-bottom:8px;">PAIN POINTS:</p>
+          <p style="font-size:13px;color:#94A3B8;">• Crear reportes manuales por cliente<br>• Rotar copies se vuelve tedioso<br>• Difícil mantener calidad a escala</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 7: COMPARACIÓN ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Comparación</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">Steve vs. el modelo tradicional</h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:520px;margin:0 auto 48px;">Lo que antes requería un equipo de 5+ personas, ahora lo tienes en una plataforma.</p>
+
+    <div style="max-width:800px;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.08);">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;color:#94A3B8;font-weight:500;">Servicio</th>
+            <th style="text-align:center;color:#F87171;font-weight:700;">🏢 Agencia</th>
+            <th style="text-align:center;color:#FBBF24;font-weight:700;">🧑 Freelancer</th>
+            <th style="text-align:center;color:#3B82F6;font-weight:700;">🤖 Steve PRO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:#CBD5E1;">Consultoría estratégica</td>
+            <td style="text-align:center;color:#94A3B8;">$1,500-3,000/mes</td>
+            <td style="text-align:center;color:#94A3B8;">$800-1,500/mes</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Gestión de campañas Meta</td>
+            <td style="text-align:center;color:#94A3B8;">$800-2,000/mes</td>
+            <td style="text-align:center;color:#94A3B8;">$500-1,200/mes</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Generación de copies</td>
+            <td style="text-align:center;color:#94A3B8;">$500-1,500/mes</td>
+            <td style="text-align:center;color:#94A3B8;">$300-800/mes</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Email marketing (Klaviyo)</td>
+            <td style="text-align:center;color:#94A3B8;">$500-1,000/mes</td>
+            <td style="text-align:center;color:#94A3B8;">$400-800/mes</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Análisis de competencia</td>
+            <td style="text-align:center;color:#94A3B8;">$300-800/mes</td>
+            <td style="text-align:center;color:#94A3B8;">$200-500/mes</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Imágenes + Videos AI</td>
+            <td style="text-align:center;color:#94A3B8;">$400-1,000/mes</td>
+            <td style="text-align:center;color:#94A3B8;">$300-600/mes</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Dashboard unificado</td>
+            <td style="text-align:center;color:#94A3B8;">No incluido</td>
+            <td style="text-align:center;color:#94A3B8;">No incluido</td>
+            <td style="text-align:center;color:#34D399;">✓ Incluido</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Disponibilidad</td>
+            <td style="text-align:center;color:#94A3B8;">Horario oficina</td>
+            <td style="text-align:center;color:#94A3B8;">Variable</td>
+            <td style="text-align:center;color:#34D399;">24/7</td>
+          </tr>
+          <tr>
+            <td style="color:#CBD5E1;">Velocidad de entrega</td>
+            <td style="text-align:center;color:#94A3B8;">1-2 semanas</td>
+            <td style="text-align:center;color:#94A3B8;">3-5 días</td>
+            <td style="text-align:center;color:#34D399;">Segundos</td>
+          </tr>
+          <tr style="background:rgba(59,130,246,.06);">
+            <td style="font-weight:700;color:#fff;padding:16px 20px;">💰 Total mensual</td>
+            <td style="text-align:center;font-weight:800;color:#F87171;font-size:18px;">$4,000-9,300</td>
+            <td style="text-align:center;font-weight:800;color:#FBBF24;font-size:18px;">$2,500-5,400</td>
+            <td style="text-align:center;font-weight:800;color:#3B82F6;font-size:18px;">$125</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="highlight-box" style="margin-top:40px;max-width:600px;margin-left:auto;margin-right:auto;">
+      <p class="huge-number gradient-text">98%</p>
+      <p style="font-size:18px;font-weight:600;margin-top:8px;">Ahorro vs. agencia tradicional</p>
+      <p style="font-size:14px;color:#94A3B8;margin-top:4px;">$125/mes vs. $4,000-9,300/mes promedio</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 8: CÓMO FUNCIONA ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Cómo funciona</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:48px;">De registro a resultados en 3 pasos</h2>
+
+    <div class="grid-3" style="max-width:900px;margin:0 auto;">
+      <div class="feature-card" style="text-align:center;position:relative;">
+        <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3B82F6,#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px;font-weight:800;">1</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:8px;">Crea tu cuenta</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Regístrate en menos de 1 minuto. Email + contraseña o Google. Sin tarjeta de crédito para empezar.</p>
+        <div style="margin-top:16px;">
+          <span class="pill" style="background:rgba(16,185,129,.1);color:#34D399;">⚡ 1 minuto</span>
+        </div>
+      </div>
+
+      <div class="feature-card" style="text-align:center;position:relative;">
+        <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3B82F6,#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px;font-weight:800;">2</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:8px;">Conecta tus plataformas</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Vincula Shopify, Meta Ads, Google Ads y Klaviyo con OAuth seguro. Steve sincroniza todo automáticamente.</p>
+        <div style="margin-top:16px;">
+          <span class="pill" style="background:rgba(59,130,246,.1);color:#60A5FA;">🔗 OAuth seguro</span>
+        </div>
+      </div>
+
+      <div class="feature-card" style="text-align:center;position:relative;">
+        <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3B82F6,#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px;font-weight:800;">3</div>
+        <h4 style="font-size:18px;font-weight:700;margin-bottom:8px;">Habla con Steve</h4>
+        <p style="font-size:14px;color:#94A3B8;line-height:1.6;">Pide estrategias, genera copies, crea campañas, analiza competidores. Steve tiene contexto completo de tu marca.</p>
+        <div style="margin-top:16px;">
+          <span class="pill" style="background:rgba(139,92,246,.1);color:#A78BFA;">🤖 AI listo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 9: MÓDULOS COMPLETOS ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">14 módulos incluidos</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:48px;">Todo lo que una agencia ofrece. <span class="gradient-text">En una plataforma.</span></h2>
+
+    <div class="grid-4" style="text-align:left;">
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">💬</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Steve Chat AI</h4>
+        <p style="font-size:12px;color:#94A3B8;">Consultor 24/7</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">📊</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Dashboard</h4>
+        <p style="font-size:12px;color:#94A3B8;">Métricas unificadas</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🚀</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Meta Ads Manager</h4>
+        <p style="font-size:12px;color:#94A3B8;">Campañas + Social Inbox</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">✍️</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Copy Generator</h4>
+        <p style="font-size:12px;color:#94A3B8;">Meta + Google Ads</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">📧</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Steve Mail</h4>
+        <p style="font-size:12px;color:#94A3B8;">Editor + envío</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🎵</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Klaviyo Studio</h4>
+        <p style="font-size:12px;color:#94A3B8;">Flows + campañas</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🛍️</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Shopify Analytics</h4>
+        <p style="font-size:12px;color:#94A3B8;">Ventas + productos</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🔍</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Google Ads</h4>
+        <p style="font-size:12px;color:#94A3B8;">Keywords + métricas</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🕵️</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Competencia</h4>
+        <p style="font-size:12px;color:#94A3B8;">Scraping + análisis AI</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">📋</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Brand Brief</h4>
+        <p style="font-size:12px;color:#94A3B8;">Research + PDF</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🎨</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Imágenes AI</h4>
+        <p style="font-size:12px;color:#94A3B8;">Google Imagen 4</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">🎬</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Videos AI</h4>
+        <p style="font-size:12px;color:#94A3B8;">Kling v1.5</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">📱</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Social Inbox</h4>
+        <p style="font-size:12px;color:#94A3B8;">Mensajes Meta</p>
+      </div>
+      <div class="use-case-card">
+        <div style="font-size:24px;margin-bottom:8px;">⚙️</div>
+        <h4 style="font-size:14px;font-weight:700;margin-bottom:4px;">Reglas Automáticas</h4>
+        <p style="font-size:12px;color:#94A3B8;">If/then campaigns</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 10: PRICING ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Precios</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">Un solo plan. Todo incluido.</h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:480px;margin:0 auto 48px;">Sin límites, sin sorpresas, sin planes confusos. Accede a toda la plataforma.</p>
+
+    <div class="pricing-card featured" style="max-width:560px;margin:0 auto;position:relative;">
+      <div style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);">
+        <span class="badge badge-orange">✨ OFERTA BETA — 50% OFF</span>
+      </div>
+
+      <h3 style="font-size:24px;font-weight:800;margin-top:8px;margin-bottom:4px;">Plataforma PRO</h3>
+      <p style="font-size:14px;color:#94A3B8;margin-bottom:28px;">Acceso completo a los 14 módulos + AI ilimitado</p>
+
+      <p style="font-size:18px;color:#64748B;text-decoration:line-through;">$250/mes</p>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0;">
+        <span style="font-size:20px;color:#64748B;text-decoration:line-through;">$200/mes</span>
+        <span class="badge badge-emerald" style="font-size:11px;">Plan Anual -20%</span>
+      </div>
+      <div style="margin:20px 0 8px;">
+        <span style="font-size:72px;font-weight:900;line-height:1;">$125</span>
+        <span style="font-size:24px;color:#94A3B8;font-weight:500;">/mes</span>
+      </div>
+      <p style="font-size:14px;color:#94A3B8;">Facturado anualmente — <strong style="color:#CBD5E1;">$1,500 USD/año</strong></p>
+
+      <div style="border-top:1px solid rgba(255,255,255,.08);margin:28px 0;"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;text-align:left;">
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Steve AI ilimitado (24/7)</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Dashboard métricas unificado</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Meta Ads Manager completo</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Shopify Dashboard completo</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Copies Meta + Google Ads</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Klaviyo Campaign Studio</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Steve Mail (diseño + envío)</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Brand Brief + Research AI</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Imágenes AI (Imagen 4)</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Videos AI (Kling v1.5)</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Análisis de competencia</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Social Inbox (Meta)</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> Reglas automáticas</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#CBD5E1;"><span style="color:#3B82F6;">✓</span> 4 integraciones + Soporte</div>
+      </div>
+
+      <div style="margin-top:32px;">
+        <a href="https://meetings.hubspot.com/jmbarros" class="cta-btn" style="width:100%;display:block;text-align:center;">Agenda tu Demo &rarr;</a>
+      </div>
+
+      <p style="font-size:12px;color:#64748B;margin-top:16px;">Suscripción anual. Precio regular $200/mes al terminar periodo beta.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 11: ROI ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Retorno de inversión</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:8px;">Los números hablan solos</h2>
+    <p style="font-size:18px;color:#94A3B8;max-width:520px;margin:0 auto 48px;">
+      Lo que pagas por Steve en un año es lo que una agencia cobra en <strong style="color:#fff;">2 semanas</strong>.
+    </p>
+
+    <div class="grid-4">
+      <div class="metric-card">
+        <p class="big-number gradient-text">98%</p>
+        <p style="font-size:14px;color:#94A3B8;margin-top:8px;">Ahorro vs. agencia</p>
+      </div>
+      <div class="metric-card">
+        <p class="big-number gradient-text-green">24/7</p>
+        <p style="font-size:14px;color:#94A3B8;margin-top:8px;">Disponibilidad</p>
+      </div>
+      <div class="metric-card">
+        <p class="big-number" style="color:#F59E0B;">5s</p>
+        <p style="font-size:14px;color:#94A3B8;margin-top:8px;">Tiempo de respuesta</p>
+      </div>
+      <div class="metric-card">
+        <p class="big-number" style="color:#10B981;">14</p>
+        <p style="font-size:14px;color:#94A3B8;margin-top:8px;">Módulos incluidos</p>
+      </div>
+    </div>
+
+    <div class="highlight-box" style="margin-top:48px;max-width:700px;margin-left:auto;margin-right:auto;">
+      <div class="grid-2" style="text-align:left;">
+        <div>
+          <p style="font-size:13px;color:#64748B;margin-bottom:8px;font-weight:600;">CON AGENCIA TRADICIONAL</p>
+          <p style="font-size:36px;font-weight:900;color:#F87171;">$48,000 - $111,600</p>
+          <p style="font-size:14px;color:#94A3B8;">Costo anual ($4K-9.3K × 12 meses)</p>
+          <div style="margin-top:12px;">
+            <p style="font-size:12px;color:#94A3B8;">• Horario oficina únicamente</p>
+            <p style="font-size:12px;color:#94A3B8;">• Entregas en 1-2 semanas</p>
+            <p style="font-size:12px;color:#94A3B8;">• Sin dashboard unificado</p>
+          </div>
+        </div>
+        <div>
+          <p style="font-size:13px;color:#64748B;margin-bottom:8px;font-weight:600;">CON STEVE PRO</p>
+          <p style="font-size:36px;font-weight:900;color:#3B82F6;">$1,500</p>
+          <p style="font-size:14px;color:#94A3B8;">Costo anual ($125 × 12 meses)</p>
+          <div style="margin-top:12px;">
+            <p style="font-size:12px;color:#34D399;">✓ Disponible 24/7/365</p>
+            <p style="font-size:12px;color:#34D399;">✓ Entregas en segundos</p>
+            <p style="font-size:12px;color:#34D399;">✓ 14 módulos + 4 integraciones</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 12: TESTIMONIOS ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <p class="section-tag">Testimonios</p>
+    <h2 style="font-size:clamp(28px,4vw,48px);font-weight:800;margin-bottom:48px;">Lo que dicen nuestros usuarios</h2>
+
+    <div class="grid-3">
+      <div class="persona-card" style="text-align:left;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#3B82F6,#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:20px;">👩</div>
+          <div>
+            <p style="font-weight:700;font-size:15px;">María González</p>
+            <p style="font-size:12px;color:#94A3B8;">Fundadora, Bloom Skincare</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#CBD5E1;line-height:1.7;font-style:italic;">
+          "Steve me ahorra horas cada semana en la gestión de campañas. El copy que genera convierte increíblemente bien."
+        </p>
+        <div style="margin-top:16px;padding:8px 12px;background:rgba(16,185,129,.08);border-radius:8px;display:inline-block;">
+          <p style="font-size:14px;font-weight:700;color:#34D399;">+45% ROAS en 2 meses</p>
+        </div>
+      </div>
+
+      <div class="persona-card" style="text-align:left;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#10B981,#3B82F6);display:flex;align-items:center;justify-content:center;font-size:20px;">👨</div>
+          <div>
+            <p style="font-weight:700;font-size:15px;">Carlos Méndez</p>
+            <p style="font-size:12px;color:#94A3B8;">CMO, FitWear Chile</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#CBD5E1;line-height:1.7;font-style:italic;">
+          "El análisis de competencia es brutal. Descubrimos gaps en el mercado que nos dieron ventaja competitiva real."
+        </p>
+        <div style="margin-top:16px;padding:8px 12px;background:rgba(59,130,246,.08);border-radius:8px;display:inline-block;">
+          <p style="font-size:14px;font-weight:700;color:#60A5FA;">3x más rápido en research</p>
+        </div>
+      </div>
+
+      <div class="persona-card" style="text-align:left;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#F59E0B,#F97316);display:flex;align-items:center;justify-content:center;font-size:20px;">👩‍💻</div>
+          <div>
+            <p style="font-weight:700;font-size:15px;">Ana Torres</p>
+            <p style="font-size:12px;color:#94A3B8;">Ecommerce Manager, PetStore</p>
+          </div>
+        </div>
+        <p style="font-size:14px;color:#CBD5E1;line-height:1.7;font-style:italic;">
+          "Tener Shopify, Meta y Klaviyo en un solo lugar cambió completamente nuestro workflow de marketing."
+        </p>
+        <div style="margin-top:16px;padding:8px 12px;background:rgba(245,158,11,.08);border-radius:8px;display:inline-block;">
+          <p style="font-size:14px;font-weight:700;color:#FBBF24;">-60% tiempo en reportes</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ SLIDE 13: CTA FINAL ═══ -->
+<div class="slide">
+  <div class="container slide-inner" style="text-align:center;">
+    <div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#3B82F6,#8B5CF6);margin:0 auto 40px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 80px rgba(59,130,246,.4);">
+      <svg width="44" height="44" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/><path d="M10 21h4"/></svg>
+    </div>
+
+    <h2 style="font-size:clamp(32px,5vw,56px);font-weight:900;margin-bottom:16px;">
+      Tu marketing merece ser<br><span class="gradient-text">inteligente</span>
+    </h2>
+
+    <p style="font-size:20px;color:#94A3B8;max-width:560px;margin:0 auto 48px;line-height:1.7;">
+      Deja de pagar fortunas por lo que Steve entrega en segundos.
+      Únete a los e-commerce que ya usan AI para crecer más rápido.
+    </p>
+
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;">
+      <a href="https://meetings.hubspot.com/jmbarros" class="cta-btn" style="font-size:18px;padding:18px 48px;">Agenda tu Demo Gratis &rarr;</a>
+      <a href="https://wa.me/56962069979" class="cta-btn-outline" style="font-size:18px;padding:16px 40px;">💬 WhatsApp Directo</a>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:40px;margin-bottom:32px;">
+      <div style="font-size:14px;color:#94A3B8;"><strong style="color:#fff;">Web:</strong> steve.cl</div>
+      <div style="font-size:14px;color:#94A3B8;"><strong style="color:#fff;">Email:</strong> jm@steve.cl</div>
+      <div style="font-size:14px;color:#94A3B8;"><strong style="color:#fff;">WhatsApp:</strong> +56 9 6206 9979</div>
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <span class="badge badge-blue">✓ Sin compromiso</span>
+      <span class="badge badge-emerald">✓ Setup en 5 min</span>
+      <span class="badge badge-purple">✓ Soporte 24/7</span>
+    </div>
+
+    <p style="font-size:12px;color:#475569;margin-top:48px;">© 2026 Steve Marketing AI</p>
+  </div>
+</div>
+
+</body>
+</html>
