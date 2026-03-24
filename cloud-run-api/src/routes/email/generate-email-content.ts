@@ -100,7 +100,7 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
 }
 
 function buildSystemPrompt(ctx: BrandContext): string {
-  return `Eres Steve, experto en email marketing. Generas emails HTML profesionales, persuasivos y optimizados para conversion. Mobile-first, subjects < 50 chars, preview text < 90 chars, 1 CTA principal.
+  return `Eres Steve, experto en email marketing. Generas emails en formato MJML (MailJet Markup Language) profesionales, persuasivos y optimizados para conversion. Mobile-first, subjects < 50 chars, preview text < 90 chars, 1 CTA principal.
 
 BRIEF DE MARCA:
 ${ctx.briefSection}
@@ -112,9 +112,10 @@ ${ctx.products.length > 0 ? `PRODUCTOS: ${truncateContext(ctx.products.slice(0, 
 REGLAS:
 - Siempre en espanol
 - USA merge tags: {{ first_name }}, {{ email }}, {{ cart_url }}, {{ cart_total }}
-- HTML debe tener inline styles, ser responsive
+- Genera MJML valido (NO HTML puro) usando componentes mj-section, mj-column, mj-text, mj-image, mj-button, mj-divider
 - Colores neutros profesionales (se puede customizar despues en el editor)
-- Incluye siempre un CTA claro con boton HTML`;
+- Incluye siempre un CTA claro con mj-button
+- El MJML se cargara en un editor visual GrapeJS donde el usuario puede editarlo`;
 }
 
 async function handleGenerateCampaignHtml(body: any, ctx: BrandContext) {
@@ -122,26 +123,40 @@ async function handleGenerateCampaignHtml(body: any, ctx: BrandContext) {
 
   const selectedProducts = products || ctx.products.slice(0, 5);
 
-  const prompt = `Genera un email HTML completo para una campana de tipo "${campaign_type || 'promotional'}" de "${ctx.brandName}".
+  const prompt = `Genera un email MJML completo para una campana de tipo "${campaign_type || 'promotional'}" de "${ctx.brandName}".
 ${subject ? `Subject: "${subject}"` : 'Genera tambien un subject line.'}
 ${instructions ? `Instrucciones: ${instructions}` : ''}
 ${selectedProducts.length > 0 ? `Productos a destacar: ${truncateContext(JSON.stringify(selectedProducts), 1500)}` : ''}
 
-Genera HTML completo (DOCTYPE, head con media queries, body con tabla responsive).
-El HTML debe:
-- Ser 600px max width centrado
-- Tener header con logo placeholder
+Genera MJML completo con esta estructura:
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, sans-serif" />
+      <mj-text font-size="16px" line-height="1.5" color="#333333" />
+      <mj-button background-color="#333333" color="#ffffff" border-radius="4px" font-size="16px" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f4f4f4">
+    <!-- Contenido aqui con mj-section, mj-column, mj-text, mj-image, mj-button, mj-divider -->
+  </mj-body>
+</mjml>
+
+El email MJML debe incluir:
+- Header section con nombre de marca
 - Saludo personalizado con {{ first_name }}
-- Contenido persuasivo (5-6 parrafos minimo)
-- Boton CTA con estilo inline
-- Footer con texto legal placeholder
-- Media queries para mobile
+- Contenido persuasivo (5-6 secciones minimo usando mj-section/mj-column/mj-text)
+- Boton CTA con mj-button
+- Dividers con mj-divider donde sea apropiado
+- Footer section con texto legal placeholder
+- NO uses mj-raw ni HTML puro dentro de los componentes MJML
+- Cada parrafo debe ser un mj-text separado dentro de su mj-section > mj-column
 
 Responde SOLO con JSON (sin markdown, sin backticks):
 {
   "subject": "...",
   "preview_text": "...",
-  "html": "<!DOCTYPE html>..."
+  "mjml": "<mjml>..."
 }`;
 
   return await callClaude(prompt, buildSystemPrompt(ctx));

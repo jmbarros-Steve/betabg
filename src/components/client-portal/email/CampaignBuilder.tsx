@@ -251,30 +251,33 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           subject: editingCampaign?.subject || undefined,
           instructions: aiInstructions || undefined,
         },
+        timeoutMs: 120000,
       });
       if (error) { toast.error(error); return; }
 
       const subject = data?.subject || editingCampaign?.subject || '';
       const previewText = data?.preview_text || '';
-      const html = data?.html || '';
-      const generatedDesign = data?.design_json || null;
+      // AI now returns MJML — use it to load into editor
+      const mjml = data?.mjml || data?.html || '';
 
       setEditingCampaign(prev => ({
         ...prev,
         subject: subject,
         preview_text: previewText,
-        html_content: html,
       }));
 
-      // Load generated content into the editor if design_json available
-      setDesignJson(generatedDesign);
-      if (editorReady && generatedDesign) {
-        emailEditorRef.current?.loadDesign(generatedDesign);
+      // Load MJML directly into the GrapeJS editor so user can edit it
+      if (editorReady && mjml && emailEditorRef.current) {
+        emailEditorRef.current.setHtml(mjml);
+        toast.success('Email generado con Steve AI — puedes editarlo en el editor');
+      } else if (mjml) {
+        // Editor not ready yet — store MJML and it will load when ready
+        setEditingCampaign(prev => ({
+          ...prev,
+          html_content: mjml,
+        }));
+        toast.success('Email generado con Steve AI');
       }
-      // If AI generated raw HTML (no design_json), it's stored in html_content
-      // and shown as an iframe preview in the design step (GrapeJS can't parse raw HTML)
-
-      toast.success('Email generado con Steve AI');
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         toast.error('El servidor tardó demasiado. Inténtalo de nuevo.');
@@ -1016,37 +1019,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
             </div>
 
-            {/* AI-generated HTML preview (when html_content exists without real GrapeJS design) */}
-            {editingCampaign?.html_content && (!designJson || (typeof designJson === 'object' && !designJson?.pages?.length)) && (
-              <div className="flex-1 min-h-0 flex flex-col bg-white">
-                <div className="flex items-center justify-between px-3 py-2 bg-green-50 border-b border-green-200 shrink-0">
-                  <span className="text-xs font-medium text-green-800">Email generado con IA — vista previa</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2 text-xs text-green-700"
-                    onClick={() => {
-                      setEditingCampaign(prev => ({ ...prev, html_content: '' }));
-                      setDesignJson(null);
-                      toast.info('Preview eliminado. Usa el editor visual para diseñar desde cero.');
-                    }}
-                  >
-                    Usar editor visual
-                  </Button>
-                </div>
-                <iframe
-                  srcDoc={editingCampaign.html_content}
-                  className="w-full flex-1 border-0"
-                  style={{ minHeight: '500px' }}
-                  sandbox=""
-                  title="Email preview"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            )}
-
-            {/* GrapeJS email editor — hidden when showing AI preview */}
-            <div className={`flex-1 min-h-0 relative ${editingCampaign?.html_content && (!designJson || (typeof designJson === 'object' && !designJson?.pages?.length)) ? 'hidden' : ''}`}>
+            {/* GrapeJS email editor */}
+            <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
                 <GrapesEmailEditor
                   ref={emailEditorRef}

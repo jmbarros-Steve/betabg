@@ -242,9 +242,15 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
         editor.loadProjectData(design);
       },
 
-      setHtml: (_html: string) => {
-        // Raw HTML cannot be loaded into GrapeJS email mode (MJML parser).
-        // AI-generated HTML is shown via iframe preview instead.
+      setHtml: (mjml: string) => {
+        const editor = editorRef.current;
+        if (!editor || !mjml) return;
+        // Load MJML content directly into the editor canvas
+        try {
+          editor.setComponents(mjml);
+        } catch (err) {
+          console.warn('[GrapesEditor] setHtml/MJML error:', err);
+        }
       },
 
       insertHtml: (html: string) => {
