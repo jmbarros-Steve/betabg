@@ -232,8 +232,11 @@ const GrapesEmailEditor = forwardRef<UnlayerEditorRef, GrapesEmailEditorProps>(
         editor.loadProjectData(design);
       },
 
-      setHtml: (_html: string) => {
-        // Legacy no-op
+      setHtml: (html: string) => {
+        const editor = editorRef.current;
+        if (!editor || !html) return;
+        // Load raw HTML into the editor by setting components directly
+        editor.setComponents(html);
       },
 
       insertHtml: (html: string) => {
