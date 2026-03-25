@@ -8,6 +8,8 @@ interface FunnelStage {
   value: number | null;
   icon: React.ElementType;
   color: string;
+  gradientFrom: string;
+  gradientTo: string;
   bgColor: string;
   benchmark: { low: number; avg: number; high: number; unit: string };
   tooltip: string;
@@ -26,8 +28,13 @@ function getBenchmarkStatus(actual: number, benchmark: { low: number; avg: numbe
   return 'bad';
 }
 
+const BENCHMARK_COLORS = {
+  good: { bar: '#10B981', barLight: '#34D399' },
+  ok: { bar: '#F59E0B', barLight: '#FBBF24' },
+  bad: { bar: '#EF4444', barLight: '#F87171' },
+} as const;
+
 export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated, purchases }: ConversionFunnelPanelProps) {
-  // Build funnel stages with conversion rates
   const stages: FunnelStage[] = [];
   const missingAnalytics = sessions === null && addToCarts === null;
 
@@ -37,6 +44,8 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       value: sessions,
       icon: Eye,
       color: 'text-blue-600',
+      gradientFrom: '#2563EB',
+      gradientTo: '#3B82F6',
       bgColor: 'bg-blue-100',
       benchmark: { low: 0, avg: 0, high: 0, unit: '' },
       tooltip: 'Sesiones totales en tu tienda online durante el periodo',
@@ -49,19 +58,22 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       value: addToCarts,
       icon: ShoppingCart,
       color: 'text-purple-600',
+      gradientFrom: '#8B5CF6',
+      gradientTo: '#A78BFA',
       bgColor: 'bg-purple-100',
       benchmark: { low: 3, avg: 8, high: 15, unit: '% de visitas' },
       tooltip: 'Visitantes que agregaron al menos un producto al carrito. Benchmark ecommerce: 5-15%',
     });
   }
 
-  // Always show checkout stage if we have any data
   if (checkoutsInitiated > 0 || purchases > 0) {
     stages.push({
       label: 'Checkout Iniciado',
       value: checkoutsInitiated,
       icon: CreditCard,
       color: 'text-amber-600',
+      gradientFrom: '#F59E0B',
+      gradientTo: '#FBBF24',
       bgColor: 'bg-amber-100',
       benchmark: { low: 25, avg: 45, high: 65, unit: '% de carritos' },
       tooltip: 'Personas que iniciaron el proceso de pago. Benchmark ecommerce: 30-60% de quienes agregan al carrito',
@@ -72,19 +84,18 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       value: purchases,
       icon: CheckCircle,
       color: 'text-green-600',
+      gradientFrom: '#10B981',
+      gradientTo: '#34D399',
       bgColor: 'bg-green-100',
       benchmark: { low: 35, avg: 50, high: 70, unit: '% de checkouts' },
       tooltip: 'Pedidos pagados exitosamente. Benchmark ecommerce: 40-65% de quienes inician checkout',
     });
   }
 
-  // Need at least 2 stages to render a funnel
   if (stages.length < 2) return null;
 
-  // Calculate conversion rates between stages
   const maxValue = stages[0].value || 1;
 
-  // Step-by-step conversion rates
   const stepRates: { from: string; to: string; rate: number; benchmark: FunnelStage['benchmark'] }[] = [];
 
   for (let i = 1; i < stages.length; i++) {
@@ -100,11 +111,10 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
     }
   }
 
-  // Overall conversion rate (sessions → purchase)
   const overallRate = sessions && sessions > 0 ? (purchases / sessions) * 100 : null;
 
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover chart-animate">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -143,7 +153,11 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
               : 8;
 
             return (
-              <div key={stage.label} className="space-y-1">
+              <div
+                key={stage.label}
+                className="space-y-1"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={cn('p-1.5 rounded-md', stage.bgColor)}>
@@ -161,7 +175,7 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <span className="text-sm font-bold tabular-nums">
+                  <span className="text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {stage.value !== null ? stage.value.toLocaleString('es-CL') : '—'}
                   </span>
                 </div>
@@ -169,12 +183,12 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
                 <div className="relative">
                   <div className="h-8 bg-muted/50 rounded-lg overflow-hidden">
                     <div
-                      className={cn(
-                        'h-full rounded-lg transition-all duration-500',
-                        stage.color.replace('text-', 'bg-').replace('-600', '-500'),
-                        i === stages.length - 1 ? 'opacity-90' : 'opacity-70'
-                      )}
-                      style={{ width: `${barWidth}%` }}
+                      className="h-full rounded-lg transition-all duration-700"
+                      style={{
+                        width: `${barWidth}%`,
+                        background: `linear-gradient(90deg, ${stage.gradientFrom}, ${stage.gradientTo})`,
+                        transitionDelay: `${i * 100}ms`,
+                      }}
                     />
                   </div>
                   {/* Percentage on bar */}
@@ -200,6 +214,7 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {stepRates.map((step) => {
                 const status = getBenchmarkStatus(step.rate, step.benchmark);
+                const colors = BENCHMARK_COLORS[status];
                 return (
                   <div key={`${step.from}-${step.to}`} className="p-3 rounded-lg bg-muted/30 border border-border/50">
                     <p className="text-[10px] text-muted-foreground mb-1">
@@ -207,15 +222,15 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
                     </p>
                     <div className="flex items-end gap-2">
                       <span className={cn(
-                        'text-lg font-bold tabular-nums',
+                        'text-lg font-bold',
                         status === 'good' ? 'text-emerald-600' :
                         status === 'ok' ? 'text-amber-600' :
                         'text-red-600'
-                      )}>
+                      )} style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {step.rate.toFixed(1)}%
                       </span>
                       <span className={cn(
-                        'text-[10px] font-medium px-1.5 py-0.5 rounded mb-0.5',
+                        'text-[10px] font-medium px-1.5 py-0.5 rounded-full mb-0.5',
                         status === 'good' ? 'bg-emerald-100 text-emerald-700' :
                         status === 'ok' ? 'bg-amber-100 text-amber-700' :
                         'bg-red-100 text-red-700'
@@ -225,7 +240,6 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
                     </div>
                     <div className="mt-2 flex items-center gap-1">
                       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden relative">
-                        {/* Benchmark range indicator */}
                         <div
                           className="absolute h-full bg-muted-foreground/20 rounded-full"
                           style={{
@@ -233,15 +247,12 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
                             width: `${Math.min(step.benchmark.high - step.benchmark.low, 100 - step.benchmark.low)}%`,
                           }}
                         />
-                        {/* Actual value indicator */}
                         <div
-                          className={cn(
-                            'h-full rounded-full',
-                            status === 'good' ? 'bg-emerald-500' :
-                            status === 'ok' ? 'bg-amber-500' :
-                            'bg-red-500'
-                          )}
-                          style={{ width: `${Math.min(step.rate, 100)}%` }}
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.min(step.rate, 100)}%`,
+                            background: `linear-gradient(90deg, ${colors.bar}, ${colors.barLight})`,
+                          }}
                         />
                       </div>
                     </div>

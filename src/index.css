@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Steve Ads Design System V2 — Blue-600 / Slate palette */
+/* Steve Ads Design System V2 — Navy #1E3A7B / Cyan #38BDF8 palette */
 
 @layer base {
   :root {
@@ -17,7 +17,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 60%;          /* blue-600  #2563EB */
+    --primary: 220 62% 30%;          /* navy  #1E3A7B */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;        /* slate-100 */
@@ -26,15 +26,15 @@
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%; /* slate-500 */
 
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 199 89% 60%;           /* cyan #38BDF8 */
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 32% 91%;           /* slate-200 */
     --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --ring: 220 62% 30%;             /* navy */
 
     --radius: 0.75rem;
 
@@ -45,12 +45,12 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 220 62% 30%;  /* navy */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 214 32% 91%;
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 220 62% 30%;     /* navy */
   }
 
   .dark {
@@ -63,7 +63,7 @@
     --popover: 217 33% 17%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
+    --primary: 220 62% 40%;          /* navy lighter for dark mode */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 217 33% 17%;
@@ -72,24 +72,24 @@
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 199 89% 60%;           /* cyan */
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --ring: 220 62% 40%;             /* navy */
 
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 220 62% 40%;  /* navy */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 33% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 220 62% 40%;     /* navy */
   }
 }
 
@@ -166,10 +166,19 @@
 
   /* Gradient text */
   .text-gradient {
-    background: linear-gradient(135deg, #2563EB, #38BDF8);
+    background: linear-gradient(135deg, #1E3A7B, #38BDF8);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  /* Chart entry animation */
+  @keyframes chart-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .chart-animate {
+    animation: chart-fade-in 0.6s ease-out both;
   }
 }
 

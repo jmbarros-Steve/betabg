@@ -18,18 +18,18 @@ interface CohortAnalysisPanelProps {
   cohorts: CohortData[];
 }
 
-function getRetentionColor(rate: number): string {
-  if (rate >= 50) return 'bg-primary text-primary-foreground';
-  if (rate >= 30) return 'bg-primary/70 text-primary-foreground';
-  if (rate >= 20) return 'bg-primary/50 text-primary-foreground';
-  if (rate >= 10) return 'bg-primary/30 text-foreground';
-  if (rate > 0) return 'bg-primary/15 text-foreground';
-  return 'bg-muted text-muted-foreground';
+function getRetentionColor(rate: number): { bg: string; text: string } {
+  if (rate >= 50) return { bg: '#059669', text: '#ffffff' };  // emerald-600
+  if (rate >= 31) return { bg: '#10B981', text: '#ffffff' };  // emerald-500
+  if (rate >= 21) return { bg: '#2563EB', text: '#ffffff' };  // blue-600
+  if (rate >= 11) return { bg: '#93C5FD', text: '#1E3A5F' };  // blue-300
+  if (rate > 0) return { bg: '#DBEAFE', text: '#1E40AF' };   // blue-100
+  return { bg: '#F1F5F9', text: '#94A3B8' };                  // slate-100
 }
 
 export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover chart-animate">
       <CardHeader>
         <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Users className="w-4 h-4" />
@@ -58,11 +58,11 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr>
-                <th className="text-left py-2 px-3 text-muted-foreground font-medium">Mes</th>
-                <th className="text-center py-2 px-3 text-muted-foreground font-medium">Nuevos</th>
+              <tr className="bg-muted/30">
+                <th className="text-left py-2.5 px-3 text-muted-foreground font-medium rounded-l-lg">Mes</th>
+                <th className="text-center py-2.5 px-3 text-muted-foreground font-medium">Nuevos</th>
                 {[1, 2, 3, 4, 5].map((m) => (
-                  <th key={m} className="text-center py-2 px-3 text-muted-foreground font-medium">
+                  <th key={m} className={cn('text-center py-2.5 px-3 text-muted-foreground font-medium', m === 5 && 'rounded-r-lg')}>
                     Mes {m}
                   </th>
                 ))}
@@ -70,10 +70,10 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
             </thead>
             <tbody>
               {cohorts.map((cohort) => (
-                <tr key={cohort.cohort} className="border-t border-border">
-                  <td className="py-2 px-3 font-medium whitespace-nowrap">{cohort.cohort}</td>
-                  <td className="py-2 px-3 text-center">
-                    <span className="px-2 py-1 rounded text-xs font-semibold bg-primary/10 text-primary">
+                <tr key={cohort.cohort} className="border-t border-border/50 hover:bg-muted/20 transition-colors">
+                  <td className="py-2.5 px-3 font-medium whitespace-nowrap">{cohort.cohort}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-primary/10 text-primary">
                       {cohort.month0}
                     </span>
                   </td>
@@ -82,20 +82,31 @@ export function CohortAnalysisPanel({ cohorts }: CohortAnalysisPanelProps) {
                     const rate = monthVal !== undefined && cohort.month0 > 0 && !isNaN(cohort.month0)
                       ? (monthVal / cohort.month0) * 100
                       : undefined;
-                    return (
-                      <td key={m} className="py-2 px-3 text-center">
-                        {rate !== undefined ? (
-                          <span
-                            className={cn(
-                              'px-2 py-1 rounded text-xs font-medium',
-                              getRetentionColor(rate)
-                            )}
-                          >
-                            {rate.toFixed(0)}%
-                          </span>
-                        ) : (
+                    if (rate === undefined) {
+                      return (
+                        <td key={m} className="py-2.5 px-3 text-center">
                           <span className="text-muted-foreground">—</span>
-                        )}
+                        </td>
+                      );
+                    }
+                    const colors = getRetentionColor(rate);
+                    return (
+                      <td key={m} className="py-2.5 px-3 text-center">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className="px-2.5 py-1 rounded-md text-xs font-medium cursor-default inline-block min-w-[3rem] transition-all hover:scale-105"
+                                style={{ backgroundColor: colors.bg, color: colors.text }}
+                              >
+                                {rate.toFixed(0)}%
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p>{monthVal} de {cohort.month0} clientes volvieron</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </td>
                     );
                   })}

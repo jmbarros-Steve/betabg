@@ -10,6 +10,12 @@ interface DayOfWeekChartProps {
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const DAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+const BAR_GRADIENTS = {
+  best: { from: '#10B981', to: '#34D399' },
+  worst: { from: '#EF4444', to: '#F87171' },
+  normal: { from: '#2563EB', to: '#3B82F6' },
+} as const;
+
 export function DayOfWeekChart({ dailyData }: DayOfWeekChartProps) {
   const dayStats = useMemo(() => {
     const buckets = Array.from({ length: 7 }, () => ({ revenue: 0, orders: 0, count: 0 }));
@@ -42,7 +48,7 @@ export function DayOfWeekChart({ dailyData }: DayOfWeekChartProps) {
   if (dailyData.length < 7 || dayStats.every(d => d.avgRevenue === 0)) return null;
 
   return (
-    <Card className="bg-card border border-border rounded-xl card-hover">
+    <Card className="bg-card border border-border rounded-xl card-hover chart-animate">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <CalendarDays className="w-4 h-4" />
@@ -59,37 +65,33 @@ export function DayOfWeekChart({ dailyData }: DayOfWeekChartProps) {
             const pct = maxRevenue > 0 ? (d.avgRevenue / maxRevenue) * 100 : 0;
             const isBest = d.day === bestDay.day && d.avgRevenue > 0;
             const isWorst = d.day === worstDay.day && d.avgRevenue > 0 && worstDay.day !== bestDay.day;
+            const gradient = isBest ? BAR_GRADIENTS.best : isWorst ? BAR_GRADIENTS.worst : BAR_GRADIENTS.normal;
 
             return (
-              <div key={d.day} className="flex items-center gap-3">
+              <div
+                key={d.day}
+                className="flex items-center gap-3 rounded-lg px-1 py-0.5 transition-all duration-200 hover:bg-muted/30"
+              >
                 <span className={cn(
                   'text-xs w-8 text-right font-medium shrink-0',
                   isBest ? 'text-emerald-600' : isWorst ? 'text-red-500' : 'text-muted-foreground'
                 )}>
                   {d.dayShort}
                 </span>
-                <div className="flex-1 h-7 bg-muted/50 rounded-md overflow-hidden relative">
+                <div className="flex-1 h-7 bg-muted/40 rounded-md overflow-hidden relative">
                   <div
-                    className={cn(
-                      'h-full rounded-md transition-all flex items-center',
-                      isBest ? 'bg-emerald-500/20' : isWorst ? 'bg-red-500/15' : 'bg-primary/15'
-                    )}
-                    style={{ width: `${Math.max(pct, 2)}%` }}
-                  >
-                    <div
-                      className={cn(
-                        'h-full rounded-md',
-                        isBest ? 'bg-emerald-500' : isWorst ? 'bg-red-400' : 'bg-primary'
-                      )}
-                      style={{ width: '4px' }}
-                    />
-                  </div>
+                    className="h-full rounded-md transition-all duration-700"
+                    style={{
+                      width: `${Math.max(pct, 2)}%`,
+                      background: `linear-gradient(90deg, ${gradient.from}, ${gradient.to})`,
+                    }}
+                  />
                   {d.avgRevenue > 0 && (
                     <div className="absolute inset-0 flex items-center px-3 justify-between">
-                      <span className="text-xs font-medium">
+                      <span className="text-xs font-medium" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         ${d.avgRevenue.toLocaleString('es-CL')}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[10px] text-muted-foreground" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {d.avgOrders} pedidos/día
                       </span>
                     </div>

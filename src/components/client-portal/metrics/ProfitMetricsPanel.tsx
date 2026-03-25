@@ -11,6 +11,8 @@ interface ProfitMetric {
   description: string;
   tooltip: string;
   icon: React.ElementType;
+  iconColor: string;
+  iconBg: string;
 }
 
 interface ProfitMetricsPanelProps {
@@ -28,7 +30,7 @@ interface ProfitMetricsPanelProps {
 function ChangeIndicator({ change }: { change?: number }) {
   if (change === undefined || change === 0) {
     return (
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground rounded-full px-2 py-0.5 bg-muted/50">
         <Minus className="w-3 h-3" />
         Sin cambio
       </span>
@@ -39,8 +41,8 @@ function ChangeIndicator({ change }: { change?: number }) {
   return (
     <span
       className={cn(
-        'flex items-center gap-1 text-xs font-medium',
-        isPositive ? 'text-primary' : 'text-destructive'
+        'inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5',
+        isPositive ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100'
       )}
     >
       {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -76,15 +78,19 @@ export function ProfitMetricsPanel({
       description: 'Profit on Ad Spend (Beneficio real por $ invertido)',
       tooltip: 'Profit Over Ad Spend — ganancia neta por cada $1 en publicidad. Sobre 1x significa que estás ganando dinero',
       icon: DollarSign,
+      iconColor: 'text-emerald-600',
+      iconBg: 'bg-emerald-100',
     },
     {
       label: 'CAC',
       value: `$${Math.round(cac).toLocaleString('es-CL')}`,
       previousValue: previousCac ? `$${Math.round(previousCac).toLocaleString('es-CL')}` : undefined,
-      changePercent: cacChange !== undefined ? -cacChange : undefined, // Invert because lower CAC is better
+      changePercent: cacChange !== undefined ? -cacChange : undefined,
       description: 'Costo por cada nuevo cliente',
       tooltip: 'Cuánto cuesta conseguir un nuevo cliente a través de publicidad. Mientras más bajo, mejor. El cambio % se muestra invertido: verde significa que bajó (bueno)',
       icon: Users,
+      iconColor: 'text-blue-600',
+      iconBg: 'bg-blue-100',
     },
     {
       label: 'MER',
@@ -94,6 +100,8 @@ export function ProfitMetricsPanel({
       description: 'Ratio de Eficiencia de Marketing (Ingresos / Inversión Total)',
       tooltip: 'Marketing Efficiency Ratio — ingresos totales dividido por gasto total en marketing. Sobre 3x es saludable',
       icon: BarChart3,
+      iconColor: 'text-purple-600',
+      iconBg: 'bg-purple-100',
     },
     {
       label: 'Break-even ROAS',
@@ -101,11 +109,13 @@ export function ProfitMetricsPanel({
       description: 'ROAS mínimo para no perder dinero',
       tooltip: 'ROAS mínimo necesario para no perder dinero, considerando tus costos y márgenes',
       icon: Target,
+      iconColor: 'text-amber-600',
+      iconBg: 'bg-amber-100',
     },
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 chart-animate">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
           <Percent className="w-5 h-5" />
@@ -132,14 +142,14 @@ export function ProfitMetricsPanel({
                     </Tooltip>
                   </TooltipProvider>
                 </CardTitle>
-                <metric.icon className="w-4 h-4 text-muted-foreground" />
+                <div className={cn('p-2 rounded-lg', metric.iconBg)}>
+                  <metric.icon className={cn('w-4 h-4', metric.iconColor)} />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-lg font-semibold tabular-nums">{metric.value}</p>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-muted-foreground line-clamp-1">{metric.description}</p>
-              </div>
+              <p className="text-2xl font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{metric.value}</p>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{metric.description}</p>
               {metric.changePercent !== undefined && (
                 <div className="mt-2">
                   <ChangeIndicator change={metric.changePercent} />
@@ -151,14 +161,28 @@ export function ProfitMetricsPanel({
       </div>
 
       {/* ROAS vs Break-even indicator */}
-      <Card className={cn('border-2', isRoasAboveBreakeven ? 'border-primary/50 bg-primary/5' : 'border-destructive/50 bg-destructive/5')}>
+      <Card
+        className="border-2 overflow-hidden"
+        style={{
+          borderImage: isRoasAboveBreakeven
+            ? 'linear-gradient(90deg, #2563EB, #10B981) 1'
+            : 'linear-gradient(90deg, #EF4444, #F59E0B) 1',
+          background: isRoasAboveBreakeven
+            ? 'linear-gradient(135deg, rgba(37,99,235,0.03), rgba(16,185,129,0.05))'
+            : 'linear-gradient(135deg, rgba(239,68,68,0.03), rgba(245,158,11,0.05))',
+        }}
+      >
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {isRoasAboveBreakeven ? (
-                <TrendingUp className="w-6 h-6 text-primary" />
+                <div className="p-2 rounded-lg bg-emerald-100">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                </div>
               ) : (
-                <TrendingDown className="w-6 h-6 text-destructive" />
+                <div className="p-2 rounded-lg bg-red-100">
+                  <TrendingDown className="w-5 h-5 text-red-600" />
+                </div>
               )}
               <div>
                 <p className="font-semibold flex items-center gap-1.5">
@@ -172,7 +196,8 @@ export function ProfitMetricsPanel({
               </div>
             </div>
             <div className="text-right">
-              <p className={cn('text-2xl font-bold tabular-nums', isRoasAboveBreakeven ? 'text-primary' : 'text-destructive')}>
+              <p className={cn('text-2xl font-bold', isRoasAboveBreakeven ? 'text-emerald-600' : 'text-red-600')}
+                style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {breakEvenRoas > 0
                   ? `${isRoasAboveBreakeven ? '+' : ''}${((currentRoas - breakEvenRoas) / breakEvenRoas * 100).toFixed(0)}%`
                   : '—'}

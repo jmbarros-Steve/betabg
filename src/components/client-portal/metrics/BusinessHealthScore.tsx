@@ -21,6 +21,12 @@ interface HealthFactor {
   detail: string;
 }
 
+const STATUS_COLORS = {
+  good: { bar: '#10B981', barLight: '#34D399' },
+  ok: { bar: '#F59E0B', barLight: '#FBBF24' },
+  bad: { bar: '#EF4444', barLight: '#F87171' },
+} as const;
+
 export function BusinessHealthScore({
   roas,
   breakEvenRoas,
@@ -29,7 +35,7 @@ export function BusinessHealthScore({
   repeatCustomerRate,
   aov,
 }: BusinessHealthScoreProps) {
-  const { score, factors, label, color, bgColor } = useMemo(() => {
+  const { score, factors, label, color, strokeColor } = useMemo(() => {
     const factors: HealthFactor[] = [];
 
     // ROAS vs breakeven (weight: 30%)
@@ -85,7 +91,6 @@ export function BusinessHealthScore({
 
     // AOV health (weight: 10%)
     if (aov > 0) {
-      // Scale: $50.000 CLP = 100 score, $20.000 = 40, $10.000 = 20
       const aovScore = Math.min(100, Math.max(0, (aov / 50000) * 100));
       factors.push({
         label: 'Ticket promedio',
@@ -104,30 +109,43 @@ export function BusinessHealthScore({
 
     const label = weightedScore >= 75 ? 'Excelente' : weightedScore >= 55 ? 'Bueno' : weightedScore >= 35 ? 'Regular' : 'Necesita atención';
     const color = weightedScore >= 75 ? 'text-emerald-600' : weightedScore >= 55 ? 'text-blue-600' : weightedScore >= 35 ? 'text-amber-600' : 'text-red-600';
-    const bgColor = weightedScore >= 75 ? 'bg-emerald-500' : weightedScore >= 55 ? 'bg-blue-500' : weightedScore >= 35 ? 'bg-amber-500' : 'bg-red-500';
+    const strokeColor = weightedScore >= 75 ? '#10B981' : weightedScore >= 55 ? '#2563EB' : weightedScore >= 35 ? '#F59E0B' : '#EF4444';
 
-    return { score: weightedScore, factors, label, color, bgColor };
+    return { score: weightedScore, factors, label, color, strokeColor };
   }, [roas, breakEvenRoas, netProfitMargin, conversionRate, repeatCustomerRate, aov]);
 
   if (factors.length === 0) return null;
 
   return (
-    <Card className="bg-card border border-border rounded-xl">
+    <Card className="bg-card border border-border rounded-xl chart-animate">
       <CardContent className="py-5">
         <div className="flex items-center gap-6">
-          {/* Score circle */}
+          {/* Score circle with glow */}
           <div className="relative shrink-0">
             <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="34" fill="none" stroke="currentColor" strokeWidth="6" className="text-muted/30" />
+              <defs>
+                <filter id="gauge-glow">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
               <circle
                 cx="40" cy="40" r="34" fill="none"
-                stroke="currentColor" strokeWidth="6" strokeLinecap="round"
-                className={bgColor}
+                stroke={strokeColor} strokeWidth="6"
+                opacity={0.1}
+              />
+              <circle
+                cx="40" cy="40" r="34" fill="none"
+                stroke={strokeColor} strokeWidth="6" strokeLinecap="round"
                 strokeDasharray={`${(score / 100) * 213.6} 213.6`}
+                filter="url(#gauge-glow)"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={cn('text-xl font-bold', color)}>{score}</span>
+              <span className={cn('text-xl font-bold', color)} style={{ fontVariantNumeric: 'tabular-nums' }}>{score}</span>
               <span className="text-[9px] text-muted-foreground">/ 100</span>
             </div>
           </div>
@@ -153,25 +171,29 @@ export function BusinessHealthScore({
               </TooltipProvider>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2">
-              {factors.map((f) => (
-                <div key={f.label} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground truncate">{f.label}</span>
-                    <span className={cn('w-2 h-2 rounded-full shrink-0 ml-1',
-                      f.status === 'good' ? 'bg-emerald-500' : f.status === 'ok' ? 'bg-amber-500' : 'bg-red-500'
-                    )} />
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all',
+              {factors.map((f) => {
+                const colors = STATUS_COLORS[f.status];
+                return (
+                  <div key={f.label} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground truncate">{f.label}</span>
+                      <span className={cn('w-2 h-2 rounded-full shrink-0 ml-1',
                         f.status === 'good' ? 'bg-emerald-500' : f.status === 'ok' ? 'bg-amber-500' : 'bg-red-500'
-                      )}
-                      style={{ width: `${f.score}%` }}
-                    />
+                      )} />
+                    </div>
+                    <div className="h-2 bg-muted/40 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${f.score}%`,
+                          background: `linear-gradient(90deg, ${colors.bar}, ${colors.barLight})`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground truncate">{f.detail}</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground truncate">{f.detail}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
