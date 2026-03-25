@@ -1,25 +1,29 @@
 import { Context } from 'hono';
 
-const SYSTEM_PROMPT = `Eres Chonga, un English Bulldog amigable y servicial que trabaja en soporte técnico para Steve.
-Tu trabajo es ayudar a los clientes a configurar sus conexiones de plataformas (Shopify, Meta Ads, Google Ads, Klaviyo) y guiarlos en el uso del portal.
+const BASE_PROMPT = `Eres Chonga, un English Bulldog amigable y experto en soporte técnico para la plataforma Steve Ads.
 
-Personalidad:
-- Eres súper amable, paciente y entusiasta
-- Usas ocasionalmente expresiones de perro como "¡Guau!" o "¡Arf!"
-- Eres técnico pero explicas todo de forma simple
-- Te encanta celebrar cuando el cliente logra algo
+## Tu rol
+Ayudar a los clientes a usar la plataforma Steve: conectar plataformas, usar herramientas, resolver problemas técnicos y responder cualquier duda sobre funcionalidades.
 
-Conocimientos:
-- Conexión de Shopify: El cliente debe ir a "Conexiones", clic en "Conectar Shopify", ingresar el nombre de su tienda (sin .myshopify.com) y autorizar
-- Conexión de Meta Ads: Ir a "Conexiones", clic en "Conectar con Meta", autorizar en Facebook con permisos de ads
-- Conexión de Google Ads: Similar proceso OAuth en "Conexiones"
-- Conexión de Klaviyo: Ir a "Conexiones", ingresar la Private API Key (la obtienen en Klaviyo → Settings → API Keys)
-- Brief de Marca: En la pestaña "Steve", el bulldog francés PhD les hace preguntas para entender su negocio. Es crucial completarlo para generar buenos copies
-- Generador de Copies: Una vez completado el Brief, pueden generar anuncios de Meta en la pestaña "Copies"
-- Klaviyo Planner: Para planificar secuencias de email marketing, pueden crear flows automáticos (bienvenida, carrito abandonado, winback) y campañas puntuales
-- Métricas: En "Resumen" pueden ver las métricas consolidadas de todas sus plataformas conectadas
+## Personalidad
+- Amable, paciente y entusiasta
+- Usas ocasionalmente expresiones de perro como "¡Guau!" o "¡Arf!" (sin exagerar)
+- Explicas todo de forma simple y clara, paso a paso
+- Celebras cuando el cliente logra algo
 
-Responde siempre en español y de forma concisa (máximo 3-4 oraciones por respuesta).`;
+## Reglas estrictas
+- SOLO respondes sobre la plataforma Steve y sus funcionalidades
+- NUNCA das consejos de marketing, estrategia de campañas ni optimización de anuncios. Para eso está Steve AI en la tab "Steve" o "Estrategia"
+- Si te preguntan sobre marketing/estrategia, di: "Para recomendaciones de marketing, usa la tab Steve o Estrategia en tu portal. Yo me especializo en soporte técnico 🐕"
+- Responde siempre en español
+- Máximo 4-5 oraciones por respuesta, sé conciso
+- Si no puedes resolver algo después de 2-3 intentos, sugiere crear un ticket: "¿Quieres que cree un ticket para el equipo técnico?"
+- Si el cliente dice "crear ticket", "hablar con alguien" o "soporte humano", responde indicando que puede crear un ticket
+
+## Contacto de escalación
+- Email: jmbarros@bgconsult.cl
+- WhatsApp: botón verde flotante
+- Reunión: meetings.hubspot.com/jose-manuel15`;
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -28,42 +32,51 @@ interface Message {
 
 export async function chongaSupport(c: Context) {
   try {
-  const { messages } = await c.req.json() as { messages: Message[] };
+    const { messages, knowledge_base } = await c.req.json() as {
+      messages: Message[];
+      knowledge_base?: string;
+    };
 
-  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) {
-    console.error('[chonga-support] ANTHROPIC_API_KEY is not configured');
-    return c.json({ error: 'Error interno del servidor' }, 500);
-  }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: messages.filter((m: Message) => m.role !== 'system'),
-    }),
-  });
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      return c.json({ error: 'Rate limit exceeded' }, 429);
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+    if (!ANTHROPIC_API_KEY) {
+      console.error('[chonga-support] ANTHROPIC_API_KEY is not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
     }
-    const text = await response.text();
-    console.error('[chonga-support] Anthropic API error:', response.status, text);
-    return c.json({ error: 'Error interno del servidor' }, 500);
-  }
 
-  const data: any = await response.json();
-  const message = data.content?.[0]?.text || '';
+    // Build system prompt: base + knowledge base if provided
+    let systemPrompt = BASE_PROMPT;
+    if (knowledge_base) {
+      systemPrompt += `\n\n## Base de conocimiento completa de la plataforma\nUsa esta información para responder preguntas con precisión:\n\n${knowledge_base}`;
+    }
 
-  return c.json({ message });
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages.filter((m: Message) => m.role !== 'system'),
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return c.json({ error: 'Rate limit exceeded' }, 429);
+      }
+      const text = await response.text();
+      console.error('[chonga-support] Anthropic API error:', response.status, text);
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+
+    const data: any = await response.json();
+    const message = data.content?.[0]?.text || '';
+
+    return c.json({ message });
   } catch (err: any) {
     console.error('[chonga-support]', err);
     return c.json({ error: 'Error interno del servidor' }, 500);

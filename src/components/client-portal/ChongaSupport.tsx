@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, HelpCircle } from 'lucide-react';
+import { MessageCircle, X, Send, HelpCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -22,30 +22,26 @@ const QUICK_QUESTIONS = [
   { label: '¿Cómo conecto Meta Ads?', message: '¿Cómo conecto mi cuenta de Meta Ads?' },
   { label: '¿Qué es el Brief?', message: '¿Qué es el Brief de Marca y para qué sirve?' },
   { label: '¿Cómo uso Klaviyo?', message: '¿Cómo funciona el planificador de Klaviyo?' },
+  { label: 'No veo mis datos', message: 'No veo datos en mis métricas, ¿qué hago?' },
+  { label: 'Crear ticket', message: 'Quiero crear un ticket de soporte' },
 ];
-
-const SYSTEM_PROMPT = `Eres Chonga, un English Bulldog amigable y servicial que trabaja en soporte técnico para Steve.
-Tu trabajo es ayudar a los clientes a configurar sus conexiones de plataformas (Shopify, Meta Ads, Google Ads, Klaviyo) y guiarlos en el uso del portal.
-
-Personalidad:
-- Eres súper amable, paciente y entusiasta
-- Usas ocasionalmente expresiones de perro como "¡Guau!" o "¡Arf!"
-- Eres técnico pero explicas todo de forma simple
-- Te encanta celebrar cuando el cliente logra algo
-
-Conocimientos:
-- Conexión de Shopify: El cliente debe ir a "Conexiones", clic en "Conectar Shopify", ingresar el nombre de su tienda (sin .myshopify.com) y autorizar
-- Conexión de Meta Ads: Ir a "Conexiones", clic en "Conectar con Meta", autorizar en Facebook con permisos de ads
-- Conexión de Google Ads: Similar proceso OAuth en "Conexiones"
-- Conexión de Klaviyo: Ir a "Conexiones", ingresar la Private API Key (la obtienen en Klaviyo → Settings → API Keys)
-- Brief de Marca: En la pestaña "Steve", el bulldog francés PhD les hace preguntas para entender su negocio. Es crucial completarlo para generar buenos copies
-- Generador de Copies: Una vez completado el Brief, pueden generar anuncios de Meta en la pestaña "Copies"
-- Klaviyo Planner: Para planificar secuencias de email marketing
-
-Responde siempre en español y de forma concisa (máximo 3-4 oraciones por respuesta).`;
 
 interface ChongaSupportProps {
   clientId: string;
+}
+
+// Load knowledge base once
+let _kbCache: string | null = null;
+async function loadKnowledgeBase(): Promise<string> {
+  if (_kbCache) return _kbCache;
+  try {
+    const res = await fetch('/steve-soporte.md');
+    if (res.ok) {
+      _kbCache = await res.text();
+      return _kbCache;
+    }
+  } catch {}
+  return '';
 }
 
 export function ChongaSupport({ clientId }: ChongaSupportProps) {
@@ -54,11 +50,13 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
     {
       id: '1',
       role: 'assistant',
-      content: '¡Guau! 🐕 Hola, soy Chonga, tu asistente de soporte. ¿En qué puedo ayudarte hoy? Puedo guiarte para conectar tus plataformas o usar cualquier herramienta del portal.',
+      content: '¡Guau! 🐕 Hola, soy Chonga, tu asistente de soporte. ¿En qué puedo ayudarte hoy?\n\nPuedo guiarte para conectar plataformas, usar cualquier herramienta del portal o resolver problemas técnicos.\n\nSi no puedo resolver algo, puedo crear un ticket para el equipo.',
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [ticketMode, setTicketMode] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -74,8 +72,63 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
     }
   }, [isOpen]);
 
+  // Preload KB when chat opens
+  useEffect(() => {
+    if (isOpen) loadKnowledgeBase();
+  }, [isOpen]);
+
+  async function createTicket(subject: string) {
+    try {
+      const conversationSummary = messages
+        .slice(1) // skip greeting
+        .map(m => `${m.role === 'user' ? 'Cliente' : 'Chonga'}: ${m.content}`)
+        .join('\n');
+
+      const { error } = await supabase.from('support_tickets' as any).insert({
+        client_id: clientId,
+        subject,
+        conversation: conversationSummary,
+        status: 'open',
+        priority: 'medium',
+      });
+
+      if (error) {
+        // If table doesn't exist, try tasks table as fallback
+        await supabase.from('tasks' as any).insert({
+          title: `[Soporte] ${subject}`,
+          description: `Ticket de soporte creado desde Chonga.\n\nConversación:\n${conversationSummary}`,
+          status: 'open',
+          priority: 'medium',
+          assigned_to: null,
+          metadata: { type: 'support', client_id: clientId },
+        });
+      }
+
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `✅ ¡Ticket creado! El equipo lo revisará pronto.\n\n📋 **Asunto:** ${subject}\n\nTambién puedes contactar directamente:\n• 📧 jmbarros@bgconsult.cl\n• 💬 WhatsApp (botón verde abajo)\n\n¡Arf! No te preocupes, lo resolveremos 🐕`,
+      }]);
+      setTicketMode(false);
+      setTicketSubject('');
+    } catch {
+      toast.error('Error al crear ticket. Intenta de nuevo.');
+    }
+  }
+
   async function sendMessage(messageText: string) {
     if (!messageText.trim() || isLoading) return;
+
+    // Detect ticket intent
+    const lowerMsg = messageText.toLowerCase();
+    if (lowerMsg.includes('ticket') || lowerMsg.includes('hablar con alguien') || lowerMsg.includes('soporte humano')) {
+      setTicketMode(true);
+      setMessages(prev => [...prev,
+        { id: crypto.randomUUID(), role: 'user', content: messageText.trim() },
+        { id: crypto.randomUUID(), role: 'assistant', content: '🎫 ¡Claro! Voy a crear un ticket para el equipo.\n\nDescribe brevemente tu problema en el campo de abajo y lo envío.' },
+      ]);
+      return;
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -88,25 +141,39 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
     setIsLoading(true);
 
     try {
+      const kb = await loadKnowledgeBase();
+
       const { data, error } = await callApi('chonga-support', {
         body: {
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
           client_id: clientId,
+          knowledge_base: kb,
         },
       });
 
       if (error) throw error;
 
+      const reply = data?.message || '¡Arf! Disculpa, tuve un problemita. ¿Puedes repetir tu pregunta?';
+
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data?.message || '¡Arf! Disculpa, tuve un problemita. ¿Puedes repetir tu pregunta?',
+        content: reply,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // If bot suggests escalation, offer ticket
+      if (reply.toLowerCase().includes('ticket') || reply.toLowerCase().includes('equipo técnico')) {
+        setTimeout(() => {
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '¿Quieres que cree un ticket para el equipo? Escribe "crear ticket" o sigue preguntándome 🐕',
+          }]);
+        }, 1000);
+      }
     } catch (error: unknown) {
-      // Error handled by toast/state below
-      
       const errorObj = error as { status?: number };
       if (errorObj?.status === 429) {
         toast.error('Demasiadas solicitudes. Espera un momento.');
@@ -118,7 +185,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
           {
             id: crypto.randomUUID(),
             role: 'assistant',
-            content: '¡Ups! 🐕 Tuve un problemita técnico. ¿Puedes intentar de nuevo?',
+            content: '¡Ups! 🐕 Tuve un problemita técnico. ¿Puedes intentar de nuevo?\n\nSi el error persiste, puedo crear un ticket para el equipo. Escribe "crear ticket".',
           },
         ]);
       }
@@ -129,7 +196,13 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    sendMessage(input);
+    if (ticketMode) {
+      if (input.trim()) {
+        createTicket(input.trim());
+      }
+    } else {
+      sendMessage(input);
+    }
   }
 
   return (
@@ -167,7 +240,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-6 right-6 z-50 w-96 max-h-[500px] bg-card border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            className="fixed bottom-6 right-6 z-50 w-96 max-h-[540px] bg-card border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-orange-500/10 to-teal-500/10">
@@ -177,8 +250,8 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
                   <AvatarFallback>🐕</AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold text-sm">Chonga</h3>
-                  <p className="text-xs text-muted-foreground">Soporte Técnico • En línea</p>
+                  <h3 className="font-semibold text-sm">Chonga — Soporte</h3>
+                  <p className="text-xs text-muted-foreground">Conozco toda la plataforma</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
@@ -235,7 +308,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
             </ScrollArea>
 
             {/* Quick Questions */}
-            {messages.length <= 2 && (
+            {messages.length <= 2 && !ticketMode && (
               <div className="px-4 pb-2">
                 <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                   <HelpCircle className="h-3 w-3" />
@@ -258,18 +331,28 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
               </div>
             )}
 
+            {/* Ticket mode banner */}
+            {ticketMode && (
+              <div className="px-4 pb-2">
+                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  Describe tu problema para crear el ticket
+                </div>
+              </div>
+            )}
+
             {/* Input */}
             <form onSubmit={handleSubmit} className="p-3 border-t flex gap-2">
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Escribe tu pregunta..."
+                placeholder={ticketMode ? 'Describe tu problema...' : 'Escribe tu pregunta...'}
                 disabled={isLoading}
                 className="flex-1 h-9 text-sm"
               />
-              <Button type="submit" size="icon" className="h-9 w-9" disabled={!input.trim() || isLoading} aria-label="Enviar mensaje">
-                <Send className="h-4 w-4" />
+              <Button type="submit" size="icon" className="h-9 w-9" disabled={!input.trim() || isLoading} aria-label={ticketMode ? 'Crear ticket' : 'Enviar mensaje'}>
+                {ticketMode ? <AlertTriangle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
               </Button>
             </form>
           </motion.div>
