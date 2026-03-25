@@ -26,6 +26,7 @@ import SteveAppInfo from "./pages/SteveAppInfo";
 import ShopifyApp from "./pages/ShopifyApp";
 import ConnectShopify from "./pages/ConnectShopify";
 import GoogleAdsDesignDoc from "./pages/GoogleAdsDesignDoc";
+import Funcionalidades from "./pages/Funcionalidades";
 import AdminCerebro from "./pages/AdminCerebro";
 import AdminSkyvern from "./pages/AdminSkyvern";
 import NotFound from "./pages/NotFound";
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/shopify" element={<ShopifyApp />} />
             <Route path="/connect-shopify" element={<ConnectShopify />} />
             <Route path="/google-ads-design-doc" element={<GoogleAdsDesignDoc />} />
+            <Route path="/funcionalidades" element={<Funcionalidades />} />
             <Route path="/admin" element={<Navigate to="/admin/cerebro" replace />} />
             <Route path="/admin/cerebro" element={<AdminCerebro />} />
             <Route path="/admin/skyvern" element={<AdminSkyvern />} />

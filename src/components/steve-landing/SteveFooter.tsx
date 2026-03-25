@@ -5,6 +5,7 @@ const columns = [
   {
     title: 'Producto',
     links: [
+      { label: 'Funcionalidades', href: '/funcionalidades' },
       { label: 'Chat AI', href: '#features' },
       { label: 'Copies Ads', href: '#features' },
       { label: 'Analytics', href: '#features' },
