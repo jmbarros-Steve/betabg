@@ -50,7 +50,7 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
               <a
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+                className={`text-sm font-medium transition-colors hover:text-[#1E3A7B] ${
                   scrolled ? 'text-slate-600' : 'text-slate-300 hover:text-white'
                 }`}
               >
@@ -64,7 +64,7 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
               <>
                 <button
                   onClick={() => onNavigate(isAdmin ? '/dashboard' : '/portal')}
-                  className="text-sm font-medium px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  className="text-sm font-medium px-4 py-2 rounded-full bg-[#1E3A7B] text-white hover:bg-[#162D5F] transition-colors"
                 >
                   Ir al Panel
                 </button>
@@ -87,7 +87,7 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
                   href="https://meetings.hubspot.com/jose-manuel15"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-medium px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  className="text-sm font-medium px-4 py-2 rounded-full bg-[#1E3A7B] text-white hover:bg-[#162D5F] transition-colors"
                 >
                   Agenda una reunión
                 </a>

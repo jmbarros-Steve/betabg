@@ -212,7 +212,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
 
   const shopifyKpis = [
     { title: 'Ingresos del Período', value: `$${Math.round(shopifyTotalRevenue).toLocaleString('es-CL')}`, icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-100', tooltip: 'Ingresos totales de tu tienda Shopify en el período seleccionado' },
-    { title: 'Pedidos', value: shopifyTotalOrders.toLocaleString('es-CL'), icon: Package, color: 'text-blue-600', bgColor: 'bg-blue-100', tooltip: 'Cantidad de pedidos completados en el período' },
+    { title: 'Pedidos', value: shopifyTotalOrders.toLocaleString('es-CL'), icon: Package, color: 'text-[#1E3A7B]', bgColor: 'bg-[#D6E0F0]', tooltip: 'Cantidad de pedidos completados en el período' },
     { title: 'Ticket Promedio', value: shopifyTotalOrders > 0 ? `$${Math.round(shopifyAov).toLocaleString('es-CL')}` : '—', icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-100', tooltip: 'Valor promedio de cada pedido. Aumentarlo es clave para crecer sin necesitar más clientes' },
     { title: 'Dinero en Carritos', value: `$${Math.round(abandonedValue).toLocaleString('es-CL')}`, subtitle: `${abandonedCarts.length} carritos abandonados`, icon: AlertTriangle, color: 'text-amber-600', bgColor: 'bg-amber-100', tooltip: 'Valor total de carritos abandonados. Contacta a estos clientes por WhatsApp o email para recuperar ventas' },
   ] as const;

@@ -24,7 +24,7 @@ interface ClientAssetsGalleryProps {
 }
 
 const TIPO_LABELS: Record<string, { label: string; color: string }> = {
-  producto: { label: 'Producto', color: 'bg-blue-100 text-blue-700' },
+  producto: { label: 'Producto', color: 'bg-[#D6E0F0] text-[#162D5F]' },
   lifestyle: { label: 'Lifestyle', color: 'bg-purple-100 text-purple-700' },
   logo: { label: 'Logo', color: 'bg-amber-100 text-amber-700' },
   otro: { label: 'Otro', color: 'bg-gray-100 text-gray-600' },

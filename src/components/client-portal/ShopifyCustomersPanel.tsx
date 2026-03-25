@@ -45,7 +45,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
   refunded: { label: 'Reembolsado', color: 'bg-red-100 text-red-700' },
   partially_refunded: { label: 'Reembolso parcial', color: 'bg-orange-100 text-orange-700' },
-  authorized: { label: 'Autorizado', color: 'bg-blue-100 text-blue-700' },
+  authorized: { label: 'Autorizado', color: 'bg-[#D6E0F0] text-[#162D5F]' },
 };
 
 export function ShopifyCustomersPanel({ clientId }: { clientId: string }) {

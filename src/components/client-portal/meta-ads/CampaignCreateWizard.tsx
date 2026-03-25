@@ -340,7 +340,7 @@ function CampaignForm({
                 budgetType === t.key ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
-              <Badge className={`text-xs font-bold ${t.key === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}><JargonTooltip term={t.key} /></Badge>
+              <Badge className={`text-xs font-bold ${t.key === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30'}`}><JargonTooltip term={t.key} /></Badge>
               <span className={`text-xs font-semibold ${budgetType === t.key ? 'text-foreground' : 'text-muted-foreground'}`}>{t.name}</span>
               <span className="text-[10px] text-muted-foreground text-center">{t.desc}</span>
             </button>
@@ -675,7 +675,7 @@ function LocationSearch({
           {selectedLocations.map((loc) => (
             <span
               key={loc.key}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/30"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#1E3A7B]/10 text-[#162D5F] border border-[#2A4F9E]/30"
             >
               <MapPin className="w-2.5 h-2.5" />
               {loc.name}{loc.country_name ? `, ${loc.country_name}` : ''}
@@ -836,7 +836,7 @@ function AdSetForm({
                   : aud.type === 'lookalike' ? 'Similar'
                   : 'Guardada';
                 const typeBg = aud.type === 'custom' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30'
-                  : aud.type === 'lookalike' ? 'bg-blue-500/15 text-blue-700 border-blue-500/30'
+                  : aud.type === 'lookalike' ? 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30'
                   : 'bg-gray-500/15 text-gray-600 border-gray-500/30';
                 return (
                   <button
@@ -1126,7 +1126,7 @@ function FunnelStageSelector({
   setFunnelStage: (v: 'tofu' | 'mofu' | 'bofu') => void;
 }) {
   const stages = [
-    { key: 'tofu' as const, label: 'TOFU', name: 'Captar atención', desc: 'Gente que NO te conoce. Quieres que te vean por primera vez.', example: 'Ej: "¿Sabías que...?", contenido viral, educativo', color: 'text-blue-600 border-blue-500/30 bg-blue-500/10' },
+    { key: 'tofu' as const, label: 'TOFU', name: 'Captar atención', desc: 'Gente que NO te conoce. Quieres que te vean por primera vez.', example: 'Ej: "¿Sabías que...?", contenido viral, educativo', color: 'text-[#1E3A7B] border-[#2A4F9E]/30 bg-[#1E3A7B]/10' },
     { key: 'mofu' as const, label: 'MOFU', name: 'Generar interés', desc: 'Gente que ya te vio. Quieres que confíen en ti.', example: 'Ej: Testimonios, comparaciones, beneficios', color: 'text-yellow-600 border-yellow-500/30 bg-yellow-500/10' },
     { key: 'bofu' as const, label: 'BOFU', name: 'Vender', desc: 'Gente lista para comprar. Quieres que hagan clic y compren.', example: 'Ej: Descuentos, urgencia, ofertas limitadas', color: 'text-green-600 border-green-500/30 bg-green-500/10' },
   ];
@@ -1557,9 +1557,9 @@ function AdFormMultiSlot({
           </Button>
         </div>
         {adSetFormat === 'flexible' && (
-          <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-            <Sparkles className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
-            <p className="text-[11px] text-blue-700 dark:text-blue-300 leading-relaxed">
+          <div className="flex items-start gap-2 p-2.5 rounded-md bg-[#F0F4FA] dark:bg-[#0A1628]/20 border border-[#B5C8E0] dark:border-[#132448]">
+            <Sparkles className="w-3.5 h-3.5 text-[#2A4F9E] mt-0.5 shrink-0" />
+            <p className="text-[11px] text-[#162D5F] dark:text-[#7B9BCF] leading-relaxed">
               <strong>Metodología 3:2:2:</strong> 3 imágenes x 2 textos x 2 títulos. Meta optimiza automáticamente las combinaciones ganadoras.
             </p>
           </div>

@@ -213,7 +213,7 @@ export function FlowContentStep({ template, clientId, state, updateState, onNext
                       </Badge>
                     )}
                     {template.productStrategy !== 'none' && idx === 0 && (
-                      <Badge variant="outline" className="text-[10px] py-0 bg-blue-50 text-blue-700 border-blue-200">
+                      <Badge variant="outline" className="text-[10px] py-0 bg-[#F0F4FA] text-[#162D5F] border-[#B5C8E0]">
                         <Package className="w-2.5 h-2.5 mr-0.5" />Productos
                       </Badge>
                     )}

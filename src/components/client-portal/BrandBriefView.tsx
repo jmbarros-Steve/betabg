@@ -199,8 +199,8 @@ function ExpandableAccionables({ blocks }: { blocks: string[] }) {
             {isExpanded && (
               <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
                 {scr.S && (
-                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
-                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">Situación (S)</p>
+                  <div className="bg-[#F0F4FA] dark:bg-[#0A1628]/20 rounded-lg p-3 border-l-4 border-[#38BDF8]">
+                    <p className="text-sm font-medium text-[#1E3A7B] dark:text-[#38BDF8] mb-1">Situación (S)</p>
                     <p className="text-xs text-foreground leading-relaxed">{scr.S}</p>
                   </div>
                 )}
@@ -261,8 +261,8 @@ function StructuredAccionables({ items }: { items: any[] }) {
             {isExpanded && hasSCR && (
               <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
                 {item.situation && (
-                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-400">
-                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">Situación (S)</p>
+                  <div className="bg-[#F0F4FA] dark:bg-[#0A1628]/20 rounded-lg p-3 border-l-4 border-[#38BDF8]">
+                    <p className="text-sm font-medium text-[#1E3A7B] dark:text-[#38BDF8] mb-1">Situación (S)</p>
                     <p className="text-xs text-foreground leading-relaxed">{item.situation}</p>
                   </div>
                 )}
@@ -302,7 +302,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
   if (phaseKeys.length === 0) return null;
 
   const phaseConfig = [
-    { bg: 'bg-blue-500', light: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-400', text: 'text-blue-700 dark:text-blue-300', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', icon: <Zap className="h-4 w-4" /> },
+    { bg: 'bg-[#2A4F9E]', light: 'bg-[#F0F4FA] dark:bg-[#0A1628]/30', border: 'border-[#38BDF8]', text: 'text-[#162D5F] dark:text-[#7B9BCF]', badge: 'bg-[#D6E0F0] text-[#162D5F] dark:bg-[#0F1F3D]/50 dark:text-[#7B9BCF]', icon: <Zap className="h-4 w-4" /> },
     { bg: 'bg-violet-500', light: 'bg-violet-50 dark:bg-violet-950/30', border: 'border-violet-400', text: 'text-violet-700 dark:text-violet-300', badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300', icon: <TrendingUp className="h-4 w-4" /> },
     { bg: 'bg-emerald-500', light: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', icon: <Rocket className="h-4 w-4" /> },
   ];
@@ -316,7 +316,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
       <CardContent className="p-4">
         <div className="relative">
           {phaseKeys.length > 1 && (
-            <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gradient-to-b from-blue-400 via-violet-400 to-emerald-500 opacity-40" />
+            <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gradient-to-b from-[#38BDF8] via-violet-400 to-emerald-500 opacity-40" />
           )}
           <div className="space-y-4">
             {phaseKeys.map((key, i) => {
@@ -3738,7 +3738,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
               const journey = (research as any).consumer_profile?.journey_compra;
               if (!journey || typeof journey !== 'object') return null;
               const phases = [
-                { key: 'descubrimiento', label: 'Descubrimiento', icon: '🔍', color: 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800', textColor: 'text-blue-700 dark:text-blue-400' },
+                { key: 'descubrimiento', label: 'Descubrimiento', icon: '🔍', color: 'bg-[#F0F4FA] dark:bg-[#0A1628]/20 border-[#B5C8E0] dark:border-[#132448]', textColor: 'text-[#162D5F] dark:text-[#38BDF8]' },
                 { key: 'consideracion', label: 'Consideracion', icon: '🤔', color: 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800', textColor: 'text-amber-700 dark:text-amber-400' },
                 { key: 'decision', label: 'Decision', icon: '✅', color: 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800', textColor: 'text-green-700 dark:text-green-400' },
                 { key: 'post_compra', label: 'Post-Compra', icon: '🔄', color: 'bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800', textColor: 'text-purple-700 dark:text-purple-400' },
@@ -4135,15 +4135,15 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       </div>
                     )}
                     {execSummary.posicion_competitiva && (
-                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                        <h3 className="text-sm font-bold text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">🏆 Posición Competitiva</h3>
+                      <div className="bg-[#F0F4FA] dark:bg-[#0A1628]/20 rounded-lg p-4 border border-[#B5C8E0] dark:border-[#132448]">
+                        <h3 className="text-sm font-bold text-[#162D5F] dark:text-[#38BDF8] mb-2 flex items-center gap-2">🏆 Posición Competitiva</h3>
                         {typeof execSummary.posicion_competitiva === 'string' ? (
                           <p className="text-sm leading-relaxed">{execSummary.posicion_competitiva}</p>
                         ) : typeof execSummary.posicion_competitiva === 'object' ? (
                           <div className="space-y-2">
                             {Object.entries(execSummary.posicion_competitiva).map(([k, v]: [string, any]) => (
                               <div key={k}>
-                                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-0.5">{k.replace(/_/g, ' ')}</p>
+                                <p className="text-sm font-medium text-[#1E3A7B] dark:text-[#38BDF8] mb-0.5">{k.replace(/_/g, ' ')}</p>
                                 {Array.isArray(v) ? (
                                   <ul className="text-xs space-y-0.5 list-disc list-inside">{v.map((item: any, j: number) => <li key={j}>{safeText(item)}</li>)}</ul>
                                 ) : <p className="text-xs">{safeText(v)}</p>}

@@ -199,7 +199,7 @@ export function FlowPublishStep({ template, clientId, state, flowCreated, onFlow
 
               {template.productStrategy !== 'none' && (
                 <div className="flex items-start gap-2">
-                  <Package className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                  <Package className="w-4 h-4 text-[#2A4F9E] shrink-0 mt-0.5" />
                   <p>
                     {template.productStrategy === 'cart_items'
                       ? 'Productos del carrito (dinamico)'

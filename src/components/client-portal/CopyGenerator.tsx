@@ -91,7 +91,7 @@ const renderBriefField = (key: string, val: unknown): React.ReactNode => {
 };
 
 const FUNNEL_INFO = {
-  tofu: { emoji: '🎯', label: 'TOFU', subtitle: 'Audiencia Fría', desc: 'No te conocen. Hay que educar y generar curiosidad.', border: 'border-blue-400', bg: 'bg-blue-50 hover:bg-blue-100', activeBg: 'bg-blue-500 text-white border-blue-500', recomienda: ['Call Out', 'Bold Statement', 'Ugly Ads', 'Memes'] },
+  tofu: { emoji: '🎯', label: 'TOFU', subtitle: 'Audiencia Fría', desc: 'No te conocen. Hay que educar y generar curiosidad.', border: 'border-[#38BDF8]', bg: 'bg-[#F0F4FA] hover:bg-[#D6E0F0]', activeBg: 'bg-[#2A4F9E] text-white border-[#2A4F9E]', recomienda: ['Call Out', 'Bold Statement', 'Ugly Ads', 'Memes'] },
   mofu: { emoji: '🔥', label: 'MOFU', subtitle: 'Audiencia Tibia', desc: 'Te consideran. Hay que construir confianza.', border: 'border-amber-400', bg: 'bg-amber-50 hover:bg-amber-100', activeBg: 'bg-amber-500 text-white border-amber-500', recomienda: ['Reviews', 'Us vs Them', 'Credenciales en Medios', 'Reviews + Beneficios'] },
   bofu: { emoji: '💰', label: 'BOFU', subtitle: 'Audiencia Caliente', desc: 'Listos para comprar. Hay que cerrar la venta.', border: 'border-green-400', bg: 'bg-green-50 hover:bg-green-100', activeBg: 'bg-green-500 text-white border-green-500', recomienda: ['Descuentos/Ofertas', 'Resultados', 'Paquetes', 'Reviews + Beneficios'] },
 };
@@ -828,8 +828,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
                                   </div>
 
                                   {generatedScript.body.map((scene, i) => (
-                                    <div key={i} className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                                      <p className="text-xs font-bold text-blue-700 uppercase mb-1">Escena {i + 1} ({scene.duracion_segundos}s)</p>
+                                    <div key={i} className="p-3 rounded-lg bg-[#F0F4FA] border border-[#B5C8E0]">
+                                      <p className="text-xs font-bold text-[#162D5F] uppercase mb-1">Escena {i + 1} ({scene.duracion_segundos}s)</p>
                                       <p className="text-sm">{scene.texto}</p>
                                       <p className="text-xs text-muted-foreground mt-1">{scene.visual}</p>
                                     </div>

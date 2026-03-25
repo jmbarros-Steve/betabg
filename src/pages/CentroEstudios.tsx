@@ -26,7 +26,7 @@ const typeIcons: Record<string, React.ElementType> = {
 };
 
 const typeColors: Record<string, string> = {
-  video: 'bg-blue-500/10 text-blue-600',
+  video: 'bg-[#1E3A7B]/10 text-[#1E3A7B]',
   guide: 'bg-green-500/10 text-green-600',
   article: 'bg-purple-500/10 text-purple-600',
   template: 'bg-orange-500/10 text-orange-600',

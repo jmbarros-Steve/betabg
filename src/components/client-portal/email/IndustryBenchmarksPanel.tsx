@@ -243,7 +243,7 @@ export function IndustryBenchmarksPanel({ clientId }: IndustryBenchmarksPanelPro
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-500" />
+              <Target className="w-5 h-5 text-[#2A4F9E]" />
               Recomendaciones para mejorar
             </CardTitle>
           </CardHeader>

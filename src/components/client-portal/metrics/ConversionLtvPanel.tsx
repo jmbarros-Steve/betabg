@@ -25,8 +25,8 @@ export function ConversionLtvPanel({
       description: 'Checkouts → Compras completadas',
       tooltip: 'Porcentaje de sesiones que terminan en compra. 1-3% es normal para ecommerce',
       icon: Percent,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-[#1E3A7B]',
+      bgColor: 'bg-[#D6E0F0]',
     },
     {
       title: 'LTV Promedio',

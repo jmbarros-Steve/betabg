@@ -471,7 +471,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                 {/* FB URL - Primary */}
                 <div className="space-y-1">
                   <div className="relative">
-                    <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-600" />
+                    <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#1E3A7B]" />
                     <Input
                       value={comp.fbUrl}
                       onChange={(e) => {
@@ -741,7 +741,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                     href={`https://www.facebook.com/ads/library/?id=${ad.ad_library_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 transition-colors flex flex-col items-center justify-center text-muted-foreground hover:text-foreground group"
+                    className="block h-32 bg-gradient-to-br from-[#2A4F9E]/10 to-purple-500/10 hover:from-[#F0F4FA]0/20 hover:to-purple-500/20 transition-colors flex flex-col items-center justify-center text-muted-foreground hover:text-foreground group"
                   >
                     <ExternalLink className="h-6 w-6 mb-1 group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-medium">Ver en Ad Library</span>
@@ -786,7 +786,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                         </Badge>
                       )}
                       {ad.reach_lower != null && ad.reach_upper != null && (
-                        <Badge variant="outline" className="text-[10px] gap-1 font-normal text-blue-600 border-blue-200">
+                        <Badge variant="outline" className="text-[10px] gap-1 font-normal text-[#1E3A7B] border-[#B5C8E0]">
                           <Users className="h-2.5 w-2.5" />
                           {formatNumber(ad.reach_lower)}-{formatNumber(ad.reach_upper)}
                         </Badge>

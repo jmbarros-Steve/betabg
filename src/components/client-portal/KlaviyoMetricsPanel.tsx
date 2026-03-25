@@ -493,9 +493,9 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
             </Tabs>
 
             {/* Steve tip about approximate counts */}
-            <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl">
+            <div className="flex items-start gap-3 p-4 bg-[#F0F4FA] dark:bg-[#0A1628]/30 border border-[#B5C8E0] dark:border-[#132448] rounded-xl">
               <span className="text-lg shrink-0 mt-0.5">💡</span>
-              <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
+              <p className="text-sm text-[#162D5F] dark:text-[#7B9BCF] leading-relaxed">
                 <span className="font-semibold">Steve tip:</span> Los conteos que ves aquí son aproximados (máximo 100 por lista/segmento y hasta 1,000 perfiles totales).
                 Para ver los números exactos de cada lista y segmento, revísalos directo en tu cuenta de Klaviyo → Audience → Lists &amp; Segments. ¡Ahí están todos los detalles! 🎯
               </p>

@@ -7,7 +7,7 @@ const steps = [
     icon: UserPlus,
     title: 'Crea tu cuenta',
     description: 'Registrate en menos de 1 minuto y accede al plan PRO.',
-    color: 'bg-blue-50 text-blue-600 border-blue-200',
+    color: 'bg-[#F0F4FA] text-[#1E3A7B] border-[#B5C8E0]',
   },
   {
     number: '02',

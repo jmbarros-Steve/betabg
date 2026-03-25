@@ -50,7 +50,7 @@ export default function Blog() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-[#1E3A7B] transition-colors mb-8">
               <ArrowLeft className="w-4 h-4" />
               Volver
             </Link>
@@ -62,7 +62,7 @@ export default function Blog() {
             transition={{ delay: 0.1 }}
             className="text-center mb-16"
           >
-            <p className="text-sm font-medium text-blue-600 mb-4">Recursos</p>
+            <p className="text-sm font-medium text-[#1E3A7B] mb-4">Recursos</p>
             <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
               Blog
             </h1>
@@ -94,7 +94,7 @@ export default function Blog() {
                 >
                   <div className="flex items-center gap-4 mb-4">
                     {post.category && (
-                      <span className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
+                      <span className="px-3 py-1 text-xs font-medium bg-[#F0F4FA] text-[#162D5F] rounded-full">
                         {post.category}
                       </span>
                     )}

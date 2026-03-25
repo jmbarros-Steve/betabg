@@ -32,7 +32,7 @@ const TYPE_ICONS: Record<string, { icon: typeof ArrowUp; color: string }> = {
   purchase: { icon: ShoppingCart, color: 'text-green-600' },
   usage: { icon: ArrowDown, color: 'text-red-500' },
   bonus: { icon: Gift, color: 'text-purple-600' },
-  refund: { icon: ArrowUp, color: 'text-blue-600' },
+  refund: { icon: ArrowUp, color: 'text-[#1E3A7B]' },
 };
 
 export function WACredits({ clientId, credits, onRefresh }: Props) {

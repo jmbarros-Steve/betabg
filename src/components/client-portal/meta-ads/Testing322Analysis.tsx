@@ -448,7 +448,7 @@ export default function Testing322Analysis({ clientId }: Testing322AnalysisProps
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold text-blue-600">
+            <p className="text-xl font-bold text-[#1E3A7B]">
               {summary.bestCpa > 0 ? fmtCLP(summary.bestCpa) : '—'}
             </p>
           </CardContent>

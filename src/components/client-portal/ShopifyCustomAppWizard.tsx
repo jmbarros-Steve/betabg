@@ -230,7 +230,7 @@ export function ShopifyCustomAppWizard({
           <code className="text-xs block text-green-600 break-all">{redirectUrl}</code>
         </div>
 
-        <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+        <div className="flex items-start gap-2 p-2 bg-[#F0F4FA] border border-[#B5C8E0] rounded text-[#132448] text-xs">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>Si Shopify no te pide estas URLs, ignóralas y sigue adelante.</span>
         </div>
@@ -320,7 +320,7 @@ export function ShopifyCustomAppWizard({
           <li>Copia el <strong>Client Secret</strong> y pégalo abajo</li>
         </ol>
 
-        <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+        <div className="flex items-start gap-2 p-2 bg-[#F0F4FA] border border-[#B5C8E0] rounded text-[#132448] text-xs">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             Estos NO son el Access Token. Son las credenciales de la app que aparecen en la pestaña <strong>"API credentials"</strong>, arriba de todo.
@@ -410,7 +410,7 @@ export function ShopifyCustomAppWizard({
           </div>
         )}
 
-        <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+        <div className="flex items-start gap-2 p-2 bg-[#F0F4FA] border border-[#B5C8E0] rounded text-[#132448] text-xs">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>Debes estar logueado como <strong>administrador</strong> de {cleanDomain}.myshopify.com</span>
         </div>

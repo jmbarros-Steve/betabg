@@ -268,7 +268,7 @@ export function AIContentAssistant({
       case 'error':
         return <XCircle className="w-4 h-4 text-red-500 shrink-0" />;
       default:
-        return <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />;
+        return <CheckCircle2 className="w-4 h-4 text-[#2A4F9E] shrink-0" />;
     }
   };
 

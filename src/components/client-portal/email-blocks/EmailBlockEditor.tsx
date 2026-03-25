@@ -539,7 +539,7 @@ function ProductBlockPreview({ block, previewProducts = [], blockIndex = 0 }: { 
                 <div className={isFixedWithVars ? 'flex-1' : ''}>
                   <p className={`font-${isFixedWithVars ? 'bold' : 'medium'} text-${isFixedWithVars ? 'sm' : 'xs'} ${isFixedWithVars ? '' : 'text-purple-600'}`}>{realProduct.title}</p>
                   {p.showPrice !== false && (
-                    <p className={`font-bold text-${isFixedWithVars ? 'blue-600' : 'xs text-purple-500'}`}>
+                    <p className={`font-bold ${isFixedWithVars ? 'text-sm text-[#1E3A7B]' : 'text-xs text-purple-500'}`}>
                       ${Number(realProduct.price || 0).toLocaleString('es-CL')}
                     </p>
                   )}
@@ -615,7 +615,7 @@ function ProductBlockPreview({ block, previewProducts = [], blockIndex = 0 }: { 
       )}
       <div className="flex-1">
         <p className="font-bold">{p.name || 'Nombre del producto'}</p>
-        <p className="text-blue-600 font-bold">{p.price || '$0'}</p>
+        <p className="text-[#1E3A7B] font-bold">{p.price || '$0'}</p>
         {p.showDescription !== false && p.description && (
           <p className="text-sm text-gray-500 mt-1">{p.description.substring(0, 80)}</p>
         )}

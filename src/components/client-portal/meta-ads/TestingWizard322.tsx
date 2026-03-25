@@ -717,7 +717,7 @@ export default function TestingWizard322({ clientId, onBack, onComplete }: Testi
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Campaña:</span><span className="font-medium">{campaignName || 'Testing 3:2:2'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Tipo:</span><Badge className="text-xs bg-blue-500/15 text-blue-700 border-blue-500/30">ABO</Badge></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Tipo:</span><Badge className="text-xs bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30">ABO</Badge></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Máximo por venta:</span><span className="font-medium">{Number(cpaTarget) > 0 ? fmtCLP(Number(cpaTarget)) : 'No definido'}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Presupuesto total/día:</span><span className="font-medium">{fmtCLP(Math.round((Number(cpaTarget) || 15000) * 50 / 7) * 12)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Duración:</span><span className="font-medium">7 días sin tocar</span></div>

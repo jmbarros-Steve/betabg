@@ -119,7 +119,7 @@ export function FlowConfigStep({ template, clientId, state, updateState, onNext 
 
   const productStrategyIcon = {
     cart_items: <ShoppingCart className="w-5 h-5 text-orange-500" />,
-    most_viewed: <Eye className="w-5 h-5 text-blue-500" />,
+    most_viewed: <Eye className="w-5 h-5 text-[#2A4F9E]" />,
     best_sellers: <TrendingUp className="w-5 h-5 text-green-500" />,
     none: null,
   };
@@ -161,7 +161,7 @@ export function FlowConfigStep({ template, clientId, state, updateState, onNext 
                       </Badge>
                     )}
                     {template.productStrategy !== 'none' && idx === 0 && (
-                      <Badge variant="outline" className="ml-1 text-[10px] py-0 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                      <Badge variant="outline" className="ml-1 text-[10px] py-0 px-1 bg-[#F0F4FA] text-[#162D5F] border-[#B5C8E0]">
                         <Package className="w-2.5 h-2.5 mr-0.5" />Productos
                       </Badge>
                     )}

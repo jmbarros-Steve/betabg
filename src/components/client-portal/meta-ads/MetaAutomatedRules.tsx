@@ -220,7 +220,7 @@ const PRESET_RULES: PresetRule[] = [
     condition: { metric: 'SPEND', operator: 'GREATER_THAN', value: 50000, timeWindow: 'LAST_3_DAYS' },
     action: { type: 'SEND_NOTIFICATION', notificationType: 'IN_APP' },
     icon: Bell,
-    color: 'text-blue-500',
+    color: 'text-[#2A4F9E]',
   },
   {
     name: 'Reducir presupuesto si CTR < 1%',
@@ -322,7 +322,7 @@ const getActionDotColor = (actionType: RuleAction): string => {
     case 'DECREASE_BUDGET':
       return 'bg-orange-500';
     case 'SEND_NOTIFICATION':
-      return 'bg-blue-500';
+      return 'bg-[#2A4F9E]';
     default:
       return 'bg-gray-500';
   }
@@ -418,7 +418,7 @@ function buildSuggestedRules(brief: BriefData): (PresetRule & { briefBased: bool
       condition: { metric: 'SPEND' as RuleMetric, operator: 'GREATER_THAN' as RuleOperator, value: dailyBudget, timeWindow: 'LAST_3_DAYS' as TimeWindow },
       action: { type: 'SEND_NOTIFICATION' as RuleAction, notificationType: 'IN_APP' as NotificationType },
       icon: Bell,
-      color: 'text-blue-500',
+      color: 'text-[#2A4F9E]',
       briefBased: brief.hasBrief && brief.budgetMonthly !== null,
     },
     {
@@ -1054,7 +1054,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     {/* Condition & Action summary */}
                     <div className="space-y-1.5 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <span className="font-medium text-foreground bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full text-xs">
+                        <span className="font-medium text-foreground bg-[#1E3A7B]/10 text-[#1E3A7B] px-2 py-0.5 rounded-full text-xs">
                           SI
                         </span>
                         {formatConditionSummary(rule.condition)}
@@ -1255,10 +1255,10 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             </div>
 
             {/* CONDITION BLOCK */}
-            <Card className="border-blue-200 bg-blue-50/30 dark:border-blue-900 dark:bg-blue-950/20">
+            <Card className="border-[#B5C8E0] bg-[#F0F4FA]/30 dark:border-[#0F1F3D] dark:bg-[#0A1628]/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <span className="bg-blue-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                  <span className="bg-[#2A4F9E] text-white px-2 py-0.5 rounded-full text-xs font-medium">
                     SI
                   </span>
                   Condición de activación
@@ -1517,7 +1517,7 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     <span className="font-semibold">{form.name}</span>
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    <span className="bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full text-xs font-medium mr-1">
+                    <span className="bg-[#1E3A7B]/10 text-[#1E3A7B] px-2 py-0.5 rounded-full text-xs font-medium mr-1">
                       SI
                     </span>
                     {formatConditionSummary({
@@ -1670,8 +1670,8 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-blue-500/10 p-2">
-              <History className="h-4 w-4 text-blue-500" />
+            <div className="rounded-lg bg-[#1E3A7B]/10 p-2">
+              <History className="h-4 w-4 text-[#2A4F9E]" />
             </div>
             <div>
               <p className="text-2xl font-bold">{logEntries.length}</p>

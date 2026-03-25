@@ -392,7 +392,7 @@ export default function MetaConnectionWizard({
                 onClick={() => handleSelectPage(page)}
                 className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-left group"
               >
-                <Facebook className="w-6 h-6 text-blue-600 group-hover:text-blue-700 shrink-0" />
+                <Facebook className="w-6 h-6 text-[#1E3A7B] group-hover:text-[#162D5F] shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{page.name}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -453,8 +453,8 @@ export default function MetaConnectionWizard({
 
               {/* Ad Account */}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                  <Megaphone className="w-4 h-4 text-blue-500" />
+                <div className="w-8 h-8 rounded-full bg-[#1E3A7B]/10 flex items-center justify-center">
+                  <Megaphone className="w-4 h-4 text-[#2A4F9E]" />
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground">Cuenta Publicitaria</p>
@@ -470,8 +470,8 @@ export default function MetaConnectionWizard({
 
               {/* Page */}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-600/10 flex items-center justify-center">
-                  <Facebook className="w-4 h-4 text-blue-600" />
+                <div className="w-8 h-8 rounded-full bg-[#1E3A7B]/10 flex items-center justify-center">
+                  <Facebook className="w-4 h-4 text-[#1E3A7B]" />
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground">Página de Facebook</p>

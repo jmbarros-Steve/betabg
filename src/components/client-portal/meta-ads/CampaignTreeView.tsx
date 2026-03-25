@@ -141,7 +141,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function BudgetTypeBadge({ type }: { type: 'ABO' | 'CBO' }) {
   return (
-    <Badge variant="outline" className={`text-[10px] font-bold ${type === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-blue-500/15 text-blue-700 border-blue-500/30'}`}>
+    <Badge variant="outline" className={`text-[10px] font-bold ${type === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30'}`}>
       <JargonTooltip term={type} />
     </Badge>
   );
@@ -165,7 +165,7 @@ type CharlieVerdict = 'ESCALAR' | 'MANTENER' | 'OBSERVAR' | 'APAGAR' | 'SIN DATO
 function getCharlieAdvice(roas: number, ctr: number, hasData: boolean): { verdict: CharlieVerdict; emoji: string; color: string; bg: string } {
   if (!hasData || (roas === 0 && ctr === 0)) return { verdict: 'SIN DATOS', emoji: '🔍', color: 'text-slate-500', bg: 'bg-slate-100' };
   if (roas > 3 && ctr > 1.5) return { verdict: 'ESCALAR', emoji: '🚀', color: 'text-green-700', bg: 'bg-green-100' };
-  if (roas > 2) return { verdict: 'MANTENER', emoji: '✅', color: 'text-blue-700', bg: 'bg-blue-100' };
+  if (roas > 2) return { verdict: 'MANTENER', emoji: '✅', color: 'text-[#162D5F]', bg: 'bg-[#D6E0F0]' };
   if (roas > 1) return { verdict: 'OBSERVAR', emoji: '⚠️', color: 'text-yellow-700', bg: 'bg-yellow-100' };
   return { verdict: 'APAGAR', emoji: '🛑', color: 'text-red-700', bg: 'bg-red-100' };
 }
@@ -183,7 +183,7 @@ function CharlieSummaryPanel({ campaigns }: { campaigns: CampaignNode[] }) {
 
   const items: Array<{ verdict: CharlieVerdict; emoji: string; color: string; bg: string; count: number }> = [
     { verdict: 'ESCALAR', emoji: '🚀', color: 'text-green-700', bg: 'bg-green-100', count: counts.ESCALAR },
-    { verdict: 'MANTENER', emoji: '✅', color: 'text-blue-700', bg: 'bg-blue-100', count: counts.MANTENER },
+    { verdict: 'MANTENER', emoji: '✅', color: 'text-[#162D5F]', bg: 'bg-[#D6E0F0]', count: counts.MANTENER },
     { verdict: 'OBSERVAR', emoji: '⚠️', color: 'text-yellow-700', bg: 'bg-yellow-100', count: counts.OBSERVAR },
     { verdict: 'APAGAR', emoji: '🛑', color: 'text-red-700', bg: 'bg-red-100', count: counts.APAGAR },
   ].filter(i => i.count > 0);
@@ -727,7 +727,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
           <CardContent className="py-3 px-4">
             <p className="text-sm font-medium text-muted-foreground">Conversiones</p>
             <p className="text-xl font-bold mt-0.5">{fmtNum(campaigns.reduce((s, c) => s + c.conversions, 0))}</p>
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#F0F4FA]0/40 to-[#F0F4FA]0/10" />
           </CardContent>
         </Card>
       </div>

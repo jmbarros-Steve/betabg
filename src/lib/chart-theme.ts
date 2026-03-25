@@ -2,9 +2,9 @@
 // Colores de marca como hex (Recharts no usa CSS vars directamente)
 
 export const CHART_COLORS = {
-  primary: '#2563EB',       // blue-600
-  primaryLight: '#3B82F6',  // blue-500
-  primaryDark: '#1D4ED8',   // blue-700
+  primary: '#1E3A7B',       // navy
+  primaryLight: '#2A4F9E',  // navy-light
+  primaryDark: '#162D5F',   // navy-dark
   success: '#10B981',       // emerald-500
   successLight: '#34D399',  // emerald-400
   warning: '#F59E0B',       // amber-500

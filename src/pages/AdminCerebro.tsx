@@ -55,7 +55,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700',
-  in_progress: 'bg-blue-100 text-blue-700',
+  in_progress: 'bg-[#D6E0F0] text-[#162D5F]',
   completed: 'bg-green-100 text-green-700',
   failed: 'bg-red-100 text-red-700',
   blocked: 'bg-slate-100 text-slate-600',
@@ -378,7 +378,7 @@ export default function AdminCerebro() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-600" /> Agentes Activos ({activeAgents.length})
+                <Activity className="w-4 h-4 text-[#1E3A7B]" /> Agentes Activos ({activeAgents.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -388,7 +388,7 @@ export default function AdminCerebro() {
                 <div className="flex flex-wrap gap-2">
                   {activeAgents.map((a) => (
                     <Badge key={a.squad} variant="outline" className="text-sm">
-                      {a.squad} <span className="ml-1 font-bold text-blue-600">{a.count}</span>
+                      {a.squad} <span className="ml-1 font-bold text-[#1E3A7B]">{a.count}</span>
                     </Badge>
                   ))}
                 </div>
@@ -407,7 +407,7 @@ export default function AdminCerebro() {
             >
               <CardContent className="pt-4 flex items-center gap-3">
                 {s === 'pending' && <Clock className="w-5 h-5 text-yellow-600" />}
-                {s === 'in_progress' && <Activity className="w-5 h-5 text-blue-600" />}
+                {s === 'in_progress' && <Activity className="w-5 h-5 text-[#1E3A7B]" />}
                 {s === 'completed' && <CheckCircle2 className="w-5 h-5 text-green-600" />}
                 {s === 'failed' && <AlertTriangle className="w-5 h-5 text-red-600" />}
                 {s === 'blocked' && <Clock className="w-5 h-5 text-slate-400" />}

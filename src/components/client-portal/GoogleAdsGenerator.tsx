@@ -50,8 +50,8 @@ const CAMPAIGN_INFO = {
     subtitle: 'Search Ads',
     description: 'Para usuarios que buscan activamente tu producto o servicio',
     icon: Search,
-    gradient: 'from-blue-500 to-cyan-500',
-    bgColor: 'bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30',
+    gradient: 'from-[#F0F4FA]0 to-cyan-500',
+    bgColor: 'bg-[#1E3A7B]/10 hover:bg-[#2A4F9E]/20 border-[#2A4F9E]/30',
   },
   display: {
     name: 'Display',

@@ -43,10 +43,10 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
       label: 'Visitas',
       value: sessions,
       icon: Eye,
-      color: 'text-blue-600',
+      color: 'text-[#1E3A7B]',
       gradientFrom: '#2563EB',
       gradientTo: '#3B82F6',
-      bgColor: 'bg-blue-100',
+      bgColor: 'bg-[#D6E0F0]',
       benchmark: { low: 0, avg: 0, high: 0, unit: '' },
       tooltip: 'Sesiones totales en tu tienda online durante el periodo',
     });
@@ -297,9 +297,9 @@ export function ConversionFunnelPanel({ sessions, addToCarts, checkoutsInitiated
 
         {/* Note when session/cart data is missing */}
         {missingAnalytics && (
-          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 flex items-start gap-2">
-            <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-            <p className="text-xs text-blue-700">
+          <div className="mt-4 p-3 rounded-lg bg-[#F0F4FA] border border-[#B5C8E0] flex items-start gap-2">
+            <Info className="w-4 h-4 text-[#2A4F9E] mt-0.5 shrink-0" />
+            <p className="text-xs text-[#162D5F]">
               Las etapas de Visitas y Carrito requieren acceso a Shopify Analytics (ShopifyQL). Actualmente mostramos Checkout y Compras basados en datos de pedidos y checkouts abandonados.
             </p>
           </div>

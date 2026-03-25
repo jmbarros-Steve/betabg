@@ -67,7 +67,7 @@ const flowTypeConfig = {
     label: 'Serie de Bienvenida',
     icon: Mail,
     description: 'Emails automáticos para nuevos suscriptores',
-    color: 'bg-blue-500/10 text-blue-600',
+    color: 'bg-[#1E3A7B]/10 text-[#1E3A7B]',
     emailSuggestions: [
       { count: 3, label: '3 emails (Recomendado)', description: 'Bienvenida + Productos + Descuento' },
       { count: 4, label: '4 emails', description: 'Más tiempo para generar confianza' },

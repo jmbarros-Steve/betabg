@@ -31,7 +31,7 @@ type SourceTab = 'youtube' | 'document' | 'url' | 'text';
 type ProcessingPhase = 'idle' | 'extracting' | 'analyzing' | 'done' | 'error';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  brief: 'bg-blue-500/15 text-blue-700 border-blue-300',
+  brief: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#7B9BCF]',
   seo: 'bg-green-500/15 text-green-700 border-green-300',
   meta_ads: 'bg-purple-500/15 text-purple-700 border-purple-300',
   meta: 'bg-indigo-500/15 text-indigo-700 border-indigo-300',
@@ -480,7 +480,7 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
                   <div key={item.id} className="flex items-center justify-between gap-2 text-xs p-2 rounded bg-background border border-border">
                     <div className="flex items-center gap-2 min-w-0">
                       {item.sourceType === 'youtube' && <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                      {item.sourceType === 'document' && <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+                      {item.sourceType === 'document' && <FileText className="w-3.5 h-3.5 text-[#2A4F9E] shrink-0" />}
                       {item.sourceType === 'url' && <Globe className="w-3.5 h-3.5 text-green-500 shrink-0" />}
                       {item.sourceType === 'text' && <Type className="w-3.5 h-3.5 text-gray-500 shrink-0" />}
                       <span className="truncate">{item.title}</span>

@@ -17,7 +17,7 @@ export function StevePersonality() {
           {/* Avatar */}
           <div className="flex justify-center">
             <div className="relative">
-              <div className="w-64 h-64 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-blue-100 to-orange-50 flex items-center justify-center overflow-hidden shadow-xl">
+              <div className="w-64 h-64 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-[#D6E0F0] to-orange-50 flex items-center justify-center overflow-hidden shadow-xl">
                 <img src={avatarSteve} alt="Steve" className="w-56 h-56 md:w-72 md:h-72 object-cover rounded-full" />
               </div>
               <div className="absolute -bottom-2 -right-2 bg-white rounded-full px-3 py-1.5 shadow-lg border border-slate-200">
@@ -47,7 +47,7 @@ export function StevePersonality() {
                 {sampleQuestions.map((q) => (
                   <span
                     key={q}
-                    className="inline-block px-3 py-1.5 rounded-full bg-white border border-slate-200 text-sm text-slate-600 hover:border-blue-300 hover:text-blue-600 transition-colors cursor-default"
+                    className="inline-block px-3 py-1.5 rounded-full bg-white border border-slate-200 text-sm text-slate-600 hover:border-[#7B9BCF] hover:text-[#1E3A7B] transition-colors cursor-default"
                   >
                     "{q}"
                   </span>
@@ -62,7 +62,7 @@ export function StevePersonality() {
                 { emoji: '✍️', label: 'Copywriting' },
                 { emoji: '🔍', label: 'Competencia' },
               ].map((badge) => (
-                <span key={badge.label} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
+                <span key={badge.label} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F0F4FA] text-[#162D5F] text-sm font-medium">
                   {badge.emoji} {badge.label}
                 </span>
               ))}

@@ -30,7 +30,7 @@ export function FinalCTA({ onOpenAuth }: FinalCTAProps) {
             href="https://meetings.hubspot.com/jose-manuel15"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-8 py-3.5 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm shadow-lg shadow-blue-600/25"
+            className="px-8 py-3.5 rounded-full bg-[#1E3A7B] text-white font-semibold hover:bg-[#162D5F] transition-colors text-sm shadow-lg shadow-[#1E3A7B]/25"
           >
             Agenda una reunión &rarr;
           </a>

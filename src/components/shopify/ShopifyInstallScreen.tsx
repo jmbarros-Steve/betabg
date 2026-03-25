@@ -104,7 +104,7 @@ export function ShopifyInstallScreen({ storeName, onConfirmInstall }: ShopifyIns
           {/* CTA */}
           <Button
             onClick={handleConfirm}
-            className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 rounded-lg"
+            className="w-full h-12 text-base bg-[#1E3A7B] hover:bg-[#162D5F] rounded-lg"
             disabled={isRedirecting}
           >
             {isRedirecting ? (

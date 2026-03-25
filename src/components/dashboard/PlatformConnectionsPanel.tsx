@@ -44,7 +44,7 @@ const platformConfig: Record<string, { name: string; icon: string | null; color:
   meta: {
     name: 'Meta Ads',
     icon: logoMeta,
-    color: 'bg-blue-500/10 text-blue-600',
+    color: 'bg-[#1E3A7B]/10 text-[#1E3A7B]',
     fields: ['account_id', 'access_token'],
   },
   google: {

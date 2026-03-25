@@ -152,7 +152,7 @@ function VariantCard({
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                 variant === 'A'
-                  ? 'bg-blue-100 text-blue-700'
+                  ? 'bg-[#D6E0F0] text-[#162D5F]'
                   : 'bg-purple-100 text-purple-700'
               }`}
             >

@@ -47,7 +47,7 @@ const typeStyles: Record<InsightType, { bg: string; border: string; iconColor: s
   success: { bg: 'bg-emerald-50', border: 'border-emerald-200', iconColor: 'text-emerald-600' },
   warning: { bg: 'bg-amber-50', border: 'border-amber-200', iconColor: 'text-amber-600' },
   danger: { bg: 'bg-red-50', border: 'border-red-200', iconColor: 'text-red-600' },
-  tip: { bg: 'bg-blue-50', border: 'border-blue-200', iconColor: 'text-blue-600' },
+  tip: { bg: 'bg-[#F0F4FA]', border: 'border-[#B5C8E0]', iconColor: 'text-[#1E3A7B]' },
 };
 
 function fmt(n: number): string {

@@ -238,14 +238,14 @@ function EmailNode({
   return (
     <div className="flex justify-center">
       <Card
-        className={`transition-all hover:shadow-md ${hasContent ? 'border-blue-300 bg-blue-50/30' : 'border-dashed'}`}
+        className={`transition-all hover:shadow-md ${hasContent ? 'border-[#7B9BCF] bg-[#F0F4FA]/30' : 'border-dashed'}`}
         style={{ width: compact ? 220 : NODE_W }}
       >
         <CardContent className={compact ? 'py-2 px-3 space-y-2' : 'py-3 px-4 space-y-2.5'}>
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Mail className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-blue-600`} />
+              <Mail className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-[#1E3A7B]`} />
               <span className={`font-medium ${compact ? 'text-[10px]' : 'text-xs'}`}>Email {index + 1}</span>
               {hasContent && (
                 <Badge variant="outline" className="text-[9px] h-4 bg-green-50 text-green-700 border-green-200">
@@ -587,7 +587,7 @@ function AddStepButton({ onAdd }: { onAdd: (type: 'email' | 'delay' | 'condition
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 text-xs gap-1.5 hover:bg-blue-50 hover:text-blue-700"
+          className="h-8 text-xs gap-1.5 hover:bg-[#F0F4FA] hover:text-[#162D5F]"
           onClick={() => onAdd('email')}
         >
           <Mail className="w-3.5 h-3.5" /> Email

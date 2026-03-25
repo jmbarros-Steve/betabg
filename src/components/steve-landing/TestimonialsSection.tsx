@@ -7,7 +7,7 @@ const testimonials = [
     avatar: 'MG',
     quote: 'Steve me ahorra horas cada semana en la gestion de campanas. El copy que genera convierte increiblemente bien.',
     metric: '+45% ROAS en 2 meses',
-    color: 'bg-blue-100 text-blue-700',
+    color: 'bg-[#D6E0F0] text-[#162D5F]',
   },
   {
     name: 'Carlos Mendez',

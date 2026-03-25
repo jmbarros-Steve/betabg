@@ -35,14 +35,14 @@ type DateFilter = 'week' | 'month' | 'all';
 
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
   youtube: <Youtube className="w-4 h-4 text-red-500" />,
-  pdf: <FileText className="w-4 h-4 text-blue-500" />,
+  pdf: <FileText className="w-4 h-4 text-[#2A4F9E]" />,
   url: <Globe className="w-4 h-4 text-green-500" />,
   text: <Type className="w-4 h-4 text-muted-foreground" />,
-  document: <FileText className="w-4 h-4 text-blue-500" />,
+  document: <FileText className="w-4 h-4 text-[#2A4F9E]" />,
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  brief: 'bg-blue-500/15 text-blue-700 border-blue-300',
+  brief: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#7B9BCF]',
   seo: 'bg-green-500/15 text-green-700 border-green-300',
   meta_ads: 'bg-purple-500/15 text-purple-700 border-purple-300',
   meta: 'bg-indigo-500/15 text-indigo-700 border-indigo-300',

@@ -62,7 +62,7 @@ const flowTypeConfig = {
     label: 'Serie de Bienvenida',
     icon: Mail,
     description: 'Emails automáticos para nuevos suscriptores',
-    color: 'bg-blue-500/10 text-blue-600 border-blue-200',
+    color: 'bg-[#1E3A7B]/10 text-[#1E3A7B] border-[#B5C8E0]',
     defaultEmails: [
       { subject: 'Bienvenido a [Marca]', delayDays: 0, delayHours: 0 },
       { subject: 'Conoce nuestros productos', delayDays: 1, delayHours: 0 },
@@ -103,7 +103,7 @@ const flowTypeConfig = {
 const statusConfig = {
   draft: { label: 'Borrador', color: 'bg-muted text-muted-foreground' },
   pending_review: { label: 'En Revisión', color: 'bg-yellow-100 text-yellow-800' },
-  approved: { label: 'Aprobado', color: 'bg-blue-100 text-blue-800' },
+  approved: { label: 'Aprobado', color: 'bg-[#D6E0F0] text-[#132448]' },
   implemented: { label: 'Implementado', color: 'bg-green-100 text-green-800' },
 };
 

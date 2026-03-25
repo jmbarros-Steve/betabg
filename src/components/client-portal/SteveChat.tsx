@@ -744,7 +744,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
             <div key={message.id}>
               {message.role === 'user' ? (
                 <div className={cn("flex gap-3 justify-end", message.rejected && "opacity-50")}>
-                  <div className="max-w-[75%] px-4 py-3 text-sm bg-blue-600 text-white rounded-xl rounded-tr-sm shadow-sm">
+                  <div className="max-w-[75%] px-4 py-3 text-sm bg-[#1E3A7B] text-white rounded-xl rounded-tr-sm shadow-sm">
                     <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     {message.rejected && (
                       <span className="text-xs text-destructive block mt-1">&#10005; Respuesta no aceptada</span>
@@ -947,16 +947,16 @@ export function SteveChat({ clientId }: SteveChatProps) {
         {isComplete ? (
           <div className="text-center py-2 space-y-3">
             {isAnalyzing && analysisPhase && analysisPhase !== 'done' && (
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mx-2 animate-in fade-in duration-500">
+              <div className="bg-[#F0F4FA] dark:bg-[#0A1628]/30 border border-[#B5C8E0] dark:border-[#132448] rounded-xl p-3 mx-2 animate-in fade-in duration-500">
                 <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#1E3A7B] dark:text-[#38BDF8]" />
+                  <span className="text-sm font-medium text-[#162D5F] dark:text-[#7B9BCF]">
                     {analysisPhase === 'research'
                       ? 'Investigando tu sitio web y competidores...'
                       : 'Generando estrategia con equipo de Marketing Steve...'}
                   </span>
                 </div>
-                <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                <p className="text-xs text-[#1E3A7B]/70 dark:text-[#38BDF8]/70 mt-1">
                   {analysisPhase === 'research'
                     ? 'Escaneando sitios web, detectando competidores y recopilando datos (2-3 min)'
                     : 'Análisis profundo de SEO, keywords, competencia y estrategia publicitaria (5-8 min)'}
@@ -994,7 +994,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
               disabled={isLoading}
               className="flex-1"
             />
-            <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-blue-600 rounded-full" aria-label="Enviar mensaje">
+            <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-[#1E3A7B] rounded-full" aria-label="Enviar mensaje">
               <Send className="h-4 w-4" />
             </Button>
           </form>

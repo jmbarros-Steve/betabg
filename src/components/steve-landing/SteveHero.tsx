@@ -8,7 +8,7 @@ interface SteveHeroProps {
 export function SteveHero({ onOpenAuth }: SteveHeroProps) {
   return (
     <section className="relative bg-[#0F172A] overflow-hidden pt-24 pb-20 md:pt-32 md:pb-28">
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#1E3A7B]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -36,7 +36,7 @@ export function SteveHero({ onOpenAuth }: SteveHeroProps) {
                 href="https://meetings.hubspot.com/jose-manuel15"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors text-sm"
+                className="px-6 py-3 rounded-full bg-[#1E3A7B] text-white font-semibold hover:bg-[#162D5F] transition-colors text-sm"
               >
                 Agenda una reunión &rarr;
               </a>
@@ -91,7 +91,7 @@ export function SteveHero({ onOpenAuth }: SteveHeroProps) {
                   <div className="bg-slate-50 rounded-xl rounded-tl-sm px-4 py-2.5 text-slate-700 max-w-[85%]">
                     Hola! Soy Steve. Analice tus campanas y tengo 3 recomendaciones para mejorar tu ROAS.
                   </div>
-                  <div className="bg-blue-600 rounded-xl rounded-tr-sm px-4 py-2.5 text-white max-w-[85%] ml-auto">
+                  <div className="bg-[#1E3A7B] rounded-xl rounded-tr-sm px-4 py-2.5 text-white max-w-[85%] ml-auto">
                     Que recomiendas?
                   </div>
                   <div className="bg-slate-50 rounded-xl rounded-tl-sm px-4 py-2.5 text-slate-700 max-w-[85%]">

@@ -311,8 +311,8 @@ export default function AdminSkyvern() {
                           </div>
                           {(log.steve_value || log.real_value) && (
                             <div className="mt-3 grid grid-cols-2 gap-4 text-xs">
-                              <div className="bg-blue-50 p-2 rounded">
-                                <p className="font-semibold text-blue-700 mb-1">Steve</p>
+                              <div className="bg-[#F0F4FA] p-2 rounded">
+                                <p className="font-semibold text-[#162D5F] mb-1">Steve</p>
                                 <pre className="whitespace-pre-wrap">{JSON.stringify(log.steve_value, null, 2)}</pre>
                               </div>
                               <div className="bg-orange-50 p-2 rounded">
@@ -354,7 +354,7 @@ export default function AdminSkyvern() {
                           </div>
                           <Badge className={
                             job.status === 'completed' ? 'bg-green-100 text-green-700' :
-                            job.status === 'running' ? 'bg-blue-100 text-blue-700' :
+                            job.status === 'running' ? 'bg-[#D6E0F0] text-[#162D5F]' :
                             'bg-red-100 text-red-700'
                           }>
                             {job.status}

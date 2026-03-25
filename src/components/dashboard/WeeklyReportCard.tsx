@@ -92,10 +92,10 @@ export function WeeklyReportCard({ clientId }: { clientId: string }) {
 
         {/* Top Campaign */}
         {report.top_campaign && (
-          <div className="flex items-start gap-2 bg-blue-50 rounded-lg p-3">
-            <Target className="w-4 h-4 text-blue-600 mt-0.5" />
+          <div className="flex items-start gap-2 bg-[#F0F4FA] rounded-lg p-3">
+            <Target className="w-4 h-4 text-[#1E3A7B] mt-0.5" />
             <div>
-              <p className="text-xs text-blue-600 font-medium">Top Campaña</p>
+              <p className="text-xs text-[#1E3A7B] font-medium">Top Campaña</p>
               <p className="text-sm font-medium">{report.top_campaign}</p>
             </div>
           </div>

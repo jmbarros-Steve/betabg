@@ -123,7 +123,7 @@ const STATUS_CONFIG: Record<AudienceStatus, { label: string; className: string }
   },
   POPULATING: {
     label: 'Creando',
-    className: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+    className: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30',
   },
   ERROR: {
     label: 'Error',
@@ -261,7 +261,7 @@ function StatusBadge({ status }: { status: AudienceStatus }) {
 function TypeBadge({ type }: { type: AudienceTab }) {
   const labels: Record<AudienceTab, { label: string; className: string }> = {
     custom: { label: 'Personalizada', className: 'bg-purple-500/15 text-purple-700 border-purple-500/30' },
-    lookalike: { label: 'Similar', className: 'bg-blue-500/15 text-blue-700 border-blue-500/30' },
+    lookalike: { label: 'Similar', className: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30' },
     saved: { label: 'Guardada', className: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },
   };
   const config = labels[type];
@@ -696,9 +696,9 @@ function CreateCustomAudienceDialog({
                   </div>
                 )}
                 {formData.customer_list_source === 'KLAVIYO' && (
-                  <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                    <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-700">
+                  <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-[#1E3A7B]/5 border border-[#2A4F9E]/20">
+                    <Info className="w-4 h-4 text-[#2A4F9E] shrink-0 mt-0.5" />
+                    <p className="text-xs text-[#162D5F]">
                       Se sincronizarán automáticamente los suscriptores activos de tu
                       cuenta de Klaviyo conectada. La audiencia se actualizará
                       periódicamente.
@@ -975,9 +975,9 @@ function CreateLookalikeDialog({
           </div>
 
           {/* Info note */}
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
-            <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-700">
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-[#1E3A7B]/5 border border-[#2A4F9E]/20">
+            <Info className="w-4 h-4 text-[#2A4F9E] shrink-0 mt-0.5" />
+            <p className="text-xs text-[#162D5F]">
               Un porcentaje menor (1-3%) genera una audiencia más parecida a tu
               audiencia de origen. Un porcentaje mayor (4-10%) genera un alcance
               más amplio pero con menor similitud.

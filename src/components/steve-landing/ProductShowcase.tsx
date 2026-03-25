@@ -20,7 +20,7 @@ const tabs = [
         <div className="bg-slate-100 rounded-lg px-3 py-2 text-sm text-slate-700 max-w-[80%]">
           Tu campana "Summer Sale" tiene un CTR del 2.4%. Te sugiero probar estos headlines...
         </div>
-        <div className="bg-blue-600 rounded-lg px-3 py-2 text-sm text-white max-w-[70%] ml-auto">
+        <div className="bg-[#1E3A7B] rounded-lg px-3 py-2 text-sm text-white max-w-[70%] ml-auto">
           Genera 3 variaciones
         </div>
         <div className="bg-slate-100 rounded-lg px-3 py-2 text-sm text-slate-700 max-w-[80%]">
@@ -42,7 +42,7 @@ const tabs = [
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <h3 className="font-semibold text-sm text-slate-800">Generador de Copies</h3>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Meta Ads</span>
+          <span className="text-xs bg-[#D6E0F0] text-[#162D5F] px-2 py-0.5 rounded">Meta Ads</span>
         </div>
         {['Headline', 'Texto principal', 'Descripcion'].map((field) => (
           <div key={field} className="space-y-1">
@@ -53,7 +53,7 @@ const tabs = [
           </div>
         ))}
         <div className="flex gap-2">
-          <div className="flex-1 h-9 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-medium">Generar con AI</div>
+          <div className="flex-1 h-9 bg-[#1E3A7B] rounded flex items-center justify-center text-white text-xs font-medium">Generar con AI</div>
           <div className="h-9 px-3 border border-slate-200 rounded flex items-center text-xs text-slate-500">Copiar</div>
         </div>
       </div>
@@ -82,9 +82,9 @@ const tabs = [
             </div>
           ))}
         </div>
-        <div className="h-24 bg-gradient-to-t from-blue-50 to-transparent rounded-lg border border-slate-100 flex items-end p-3 gap-1">
+        <div className="h-24 bg-gradient-to-t from-[#F0F4FA] to-transparent rounded-lg border border-slate-100 flex items-end p-3 gap-1">
           {[30, 45, 35, 55, 50, 65, 60, 75, 70, 85, 80, 90].map((h, i) => (
-            <div key={i} className="flex-1 bg-blue-400 rounded-t opacity-70" style={{ height: `${h}%` }} />
+            <div key={i} className="flex-1 bg-[#38BDF8] rounded-t opacity-70" style={{ height: `${h}%` }} />
           ))}
         </div>
       </div>
@@ -133,7 +133,7 @@ const tabs = [
           {[
             { label: 'Ad Spend', value: '$3,200', color: 'text-red-600' },
             { label: 'Revenue', value: '$18,750', color: 'text-emerald-600' },
-            { label: 'ROAS', value: '5.86x', color: 'text-blue-600' },
+            { label: 'ROAS', value: '5.86x', color: 'text-[#1E3A7B]' },
             { label: 'Profit', value: '$15,550', color: 'text-emerald-600' },
           ].map((stat) => (
             <div key={stat.label} className="bg-slate-50 rounded-lg p-3">
@@ -173,7 +173,7 @@ export function ProductShowcase() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   activeTab === tab.id
-                    ? 'bg-blue-600 text-white shadow-md'
+                    ? 'bg-[#1E3A7B] text-white shadow-md'
                     : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                 }`}
               >

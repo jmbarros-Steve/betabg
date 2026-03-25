@@ -164,7 +164,7 @@ function KpiCard({
   invertColors?: boolean;
 }) {
   const accentMap: Record<string, string> = {
-    blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
+    blue: 'from-[#2A4F9E]/10 to-[#2A4F9E]/5 border-[#2A4F9E]/20',
     green: 'from-green-500/10 to-green-500/5 border-green-500/20',
     purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
     red: 'from-red-500/10 to-red-500/5 border-red-500/20',
@@ -172,7 +172,7 @@ function KpiCard({
     cyan: 'from-cyan-500/10 to-cyan-500/5 border-cyan-500/20',
   };
   const iconColorMap: Record<string, string> = {
-    blue: 'text-blue-500 bg-blue-500/10',
+    blue: 'text-[#2A4F9E] bg-[#1E3A7B]/10',
     green: 'text-green-500 bg-green-500/10',
     purple: 'text-purple-500 bg-purple-500/10',
     red: 'text-red-500 bg-red-500/10',
@@ -918,10 +918,10 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
 
               {/* Budget recommendation */}
               {insights.budgetRec && (
-                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
+                <div className="rounded-lg border border-[#2A4F9E]/20 bg-[#1E3A7B]/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm font-medium text-blue-600">
+                    <DollarSign className="w-4 h-4 text-[#2A4F9E]" />
+                    <span className="text-sm font-medium text-[#1E3A7B]">
                       Recomendación de presupuesto
                     </span>
                   </div>

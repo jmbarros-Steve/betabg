@@ -72,21 +72,21 @@ const BORDER_COLORS: Record<Insight['type'], string> = {
   success: 'border-l-green-500',
   warning: 'border-l-yellow-500',
   critical: 'border-l-red-500',
-  info: 'border-l-blue-500',
+  info: 'border-l-[#2A4F9E]',
 };
 
 const BG_COLORS: Record<Insight['type'], string> = {
   success: 'bg-green-50 dark:bg-green-950/20',
   warning: 'bg-yellow-50 dark:bg-yellow-950/20',
   critical: 'bg-red-50 dark:bg-red-950/20',
-  info: 'bg-blue-50 dark:bg-blue-950/20',
+  info: 'bg-[#F0F4FA] dark:bg-[#0A1628]/20',
 };
 
 const ICON_COLORS: Record<Insight['type'], string> = {
   success: 'text-green-600 dark:text-green-400',
   warning: 'text-yellow-600 dark:text-yellow-400',
   critical: 'text-red-600 dark:text-red-400',
-  info: 'text-blue-600 dark:text-blue-400',
+  info: 'text-[#1E3A7B] dark:text-[#38BDF8]',
 };
 
 const ICON_MAP: Record<string, React.ElementType> = {

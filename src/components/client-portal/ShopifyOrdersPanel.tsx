@@ -40,12 +40,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   refunded: { label: 'Reembolsado', color: 'bg-red-100 text-red-700' },
   partially_refunded: { label: 'Reembolso parcial', color: 'bg-orange-100 text-orange-700' },
   voided: { label: 'Anulado', color: 'bg-slate-100 text-slate-600' },
-  authorized: { label: 'Autorizado', color: 'bg-blue-100 text-blue-700' },
+  authorized: { label: 'Autorizado', color: 'bg-[#D6E0F0] text-[#162D5F]' },
 };
 
 const FULFILLMENT_LABELS: Record<string, { label: string; color: string }> = {
   fulfilled: { label: 'Enviado', color: 'bg-green-100 text-green-700' },
-  partial: { label: 'Parcial', color: 'bg-blue-100 text-blue-700' },
+  partial: { label: 'Parcial', color: 'bg-[#D6E0F0] text-[#162D5F]' },
   unfulfilled: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
   restocked: { label: 'Restocked', color: 'bg-slate-100 text-slate-600' },
 };
@@ -287,7 +287,7 @@ export function ShopifyOrdersPanel({ clientId, connectionId: externalConnectionI
               {/* Fulfillment KPIs */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="p-3 rounded-lg border bg-muted/30 text-center">
-                  <Clock className="w-5 h-5 mx-auto mb-1 text-blue-500" />
+                  <Clock className="w-5 h-5 mx-auto mb-1 text-[#2A4F9E]" />
                   <p className="text-lg font-bold">
                     {fulfillmentMetrics?.avgFulfillmentHours
                       ? `${Math.round(fulfillmentMetrics.avgFulfillmentHours)}h`

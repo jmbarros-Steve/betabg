@@ -48,10 +48,10 @@ export function DashboardStats({ userId }: Props) {
   };
 
   const statCards = [
-    { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Horas Totales', value: stats.totalHours.toFixed(1), icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'text-[#1E3A7B]', bg: 'bg-[#F0F4FA]' },
+    { label: 'Horas Totales', value: stats.totalHours.toFixed(1), icon: Clock, color: 'text-[#1E3A7B]', bg: 'bg-[#F0F4FA]' },
     { label: 'Horas Este Mes', value: stats.monthlyHours.toFixed(1), icon: Clock, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Recibos Generados', value: stats.totalInvoices, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Recibos Generados', value: stats.totalInvoices, icon: FileText, color: 'text-[#1E3A7B]', bg: 'bg-[#F0F4FA]' },
     { label: 'Ingresos Totales', value: `€${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
   ];
 

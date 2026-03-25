@@ -118,7 +118,7 @@ const ANGLE_LABELS: Record<ContentItem['emailAngle'], string> = {
 };
 
 const TYPE_BADGE_COLORS: Record<ContentItem['type'], string> = {
-  producto: 'bg-blue-100 text-blue-700',
+  producto: 'bg-[#D6E0F0] text-[#162D5F]',
   promocion: 'bg-orange-100 text-orange-700',
   evento: 'bg-purple-100 text-purple-700',
   noticia: 'bg-green-100 text-green-700',

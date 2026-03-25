@@ -16,8 +16,8 @@ describe("cn", () => {
   });
 
   it("resolves conflicting text colors", () => {
-    const result = cn("text-red-500", "text-blue-500");
-    expect(result).toBe("text-blue-500");
+    const result = cn("text-red-500", "text-[#2A4F9E]");
+    expect(result).toBe("text-[#2A4F9E]");
   });
 
   it("handles conditional classes", () => {

@@ -24,7 +24,7 @@ interface KnowledgeRule {
 type CategoryFilter = string | 'all';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  brief: 'bg-blue-500/15 text-blue-700 border-blue-300',
+  brief: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#7B9BCF]',
   seo: 'bg-green-500/15 text-green-700 border-green-300',
   meta_ads: 'bg-purple-500/15 text-purple-700 border-purple-300',
   meta: 'bg-indigo-500/15 text-indigo-700 border-indigo-300',

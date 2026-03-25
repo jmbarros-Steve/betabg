@@ -241,7 +241,7 @@ function BudgetAllocationChart({
   }
 
   const COLORS = [
-    'bg-blue-500',
+    'bg-[#2A4F9E]',
     'bg-green-500',
     'bg-purple-500',
     'bg-orange-500',
@@ -927,14 +927,14 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       {/* Budget Summary Cards */}
       {/* ----------------------------------------------------------------- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-        <Card className="border bg-gradient-to-br from-blue-500/8 to-transparent border-blue-500/15">
+        <Card className="border bg-gradient-to-br from-[#F0F4FA]0/8 to-transparent border-[#2A4F9E]/15">
           <CardContent className="pt-6 pb-5 px-6">
             <div className="flex items-start justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">
                 Presupuesto Diario Total
               </span>
-              <div className="p-2.5 rounded-xl bg-blue-500/10">
-                <DollarSign className="w-5 h-5 text-blue-500" />
+              <div className="p-2.5 rounded-xl bg-[#1E3A7B]/10">
+                <DollarSign className="w-5 h-5 text-[#2A4F9E]" />
               </div>
             </div>
             <p className="text-3xl font-bold tracking-tight mb-1">

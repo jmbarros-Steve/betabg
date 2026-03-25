@@ -42,7 +42,7 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
 
         {/* Features Card */}
         <div className="max-w-xl mx-auto relative">
-          <div className="border-2 border-blue-600 rounded-2xl bg-white p-8 md:p-10 shadow-xl shadow-blue-50">
+          <div className="border-2 border-[#1E3A7B] rounded-2xl bg-white p-8 md:p-10 shadow-xl shadow-[#F0F4FA]">
             {/* Header */}
             <div className="text-center mb-6">
               <h3 className="text-lg font-bold text-slate-900 mb-1">Plataforma PRO</h3>
@@ -54,7 +54,7 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
               <div className="space-y-3">
                 {featuresLeft.map((f) => (
                   <div key={f} className="flex items-start gap-2 text-sm text-slate-600">
-                    <Check className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-[#1E3A7B] mt-0.5 flex-shrink-0" />
                     {f}
                   </div>
                 ))}
@@ -62,7 +62,7 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
               <div className="space-y-3">
                 {featuresRight.map((f) => (
                   <div key={f} className="flex items-start gap-2 text-sm text-slate-600">
-                    <Check className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-[#1E3A7B] mt-0.5 flex-shrink-0" />
                     {f}
                   </div>
                 ))}
@@ -74,7 +74,7 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
               href="https://meetings.hubspot.com/jose-manuel15"
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full bg-blue-600 text-white py-3.5 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors text-center"
+              className="block w-full bg-[#1E3A7B] text-white py-3.5 rounded-lg font-semibold text-lg hover:bg-[#162D5F] transition-colors text-center"
             >
               Agenda una reunión
             </a>

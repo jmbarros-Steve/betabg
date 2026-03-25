@@ -142,7 +142,7 @@ export function ProductAlerts({ clientId }: ProductAlertsProps) {
   const alertTypeBadge = (type: string) => {
     if (type === 'back_in_stock') {
       return (
-        <Badge className="bg-blue-100 text-blue-800">
+        <Badge className="bg-[#D6E0F0] text-[#132448]">
           <PackageSearch className="w-3 h-3 mr-1" />
           Volver en stock
         </Badge>
@@ -186,10 +186,10 @@ export function ProductAlerts({ clientId }: ProductAlertsProps) {
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1">
-              <PackageSearch className="w-4 h-4 text-blue-500" />
+              <PackageSearch className="w-4 h-4 text-[#2A4F9E]" />
               <span className="text-xs text-muted-foreground">Volver en stock</span>
             </div>
-            <div className="text-2xl font-bold text-blue-600">{stats.back_in_stock}</div>
+            <div className="text-2xl font-bold text-[#1E3A7B]">{stats.back_in_stock}</div>
           </CardContent>
         </Card>
         <Card>

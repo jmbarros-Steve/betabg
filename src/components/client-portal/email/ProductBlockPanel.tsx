@@ -54,7 +54,7 @@ const DYNAMIC_FEEDS: DynamicFeed[] = [
     id: 'recently_viewed',
     label: 'Últimos Vistos',
     description: 'Productos que cada contacto ha visto recientemente. Personalizado por suscriptor.',
-    icon: <Eye className="w-5 h-5 text-blue-600" />,
+    icon: <Eye className="w-5 h-5 text-[#1E3A7B]" />,
     productType: 'recently_viewed',
   },
   {

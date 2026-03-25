@@ -775,7 +775,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
   const statusConfig: Record<string, { label: string; color: string }> = {
     draft: { label: 'Borrador', color: 'bg-gray-100 text-gray-800' },
-    scheduled: { label: 'Programada', color: 'bg-blue-100 text-blue-800' },
+    scheduled: { label: 'Programada', color: 'bg-[#D6E0F0] text-[#132448]' },
     sending: { label: 'Enviando', color: 'bg-yellow-100 text-yellow-800' },
     sent: { label: 'Enviada', color: 'bg-green-100 text-green-800' },
     cancelled: { label: 'Cancelada', color: 'bg-red-100 text-red-800' },
@@ -1024,7 +1024,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                   <Button
                     onClick={handleGenerateWithAI}
                     disabled={generating}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="w-full bg-gradient-to-r from-purple-600 to-[#1E3A7B] hover:from-purple-700 hover:to-[#162D5F]"
                   >
                     {generating ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando email...</>
@@ -1223,8 +1223,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${audienceType === 'specific' ? 'border-primary' : 'border-muted-foreground/40'}`}>
                         {audienceType === 'specific' && <div className="w-2 h-2 rounded-full bg-primary" />}
                       </div>
-                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                        <Filter className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 rounded-full bg-[#F0F4FA] flex items-center justify-center">
+                        <Filter className="w-5 h-5 text-[#1E3A7B]" />
                       </div>
                       <div>
                         <p className="font-medium">Lista o segmento específico</p>
@@ -1274,7 +1274,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   {list.type === 'segment' ? (
-                                    <Filter className="w-4 h-4 text-blue-500" />
+                                    <Filter className="w-4 h-4 text-[#2A4F9E]" />
                                   ) : (
                                     <List className="w-4 h-4 text-muted-foreground" />
                                   )}
@@ -1535,11 +1535,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             <div className="space-y-4 py-2">
               {/* CRITERIO evaluation status */}
               {criterioLoading && (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-[#F0F4FA] border border-[#B5C8E0]">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#1E3A7B]" />
                   <div>
-                    <p className="font-medium text-blue-900">CRITERIO evaluando...</p>
-                    <p className="text-sm text-blue-700">Verificando reglas de calidad del email</p>
+                    <p className="font-medium text-[#0F1F3D]">CRITERIO evaluando...</p>
+                    <p className="text-sm text-[#162D5F]">Verificando reglas de calidad del email</p>
                   </div>
                 </div>
               )}

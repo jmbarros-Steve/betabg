@@ -16,7 +16,7 @@ interface WaCreditRow {
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   topup: { label: 'Recarga', color: 'bg-green-100 text-green-700' },
-  message_sent: { label: 'Mensaje', color: 'bg-blue-100 text-blue-700' },
+  message_sent: { label: 'Mensaje', color: 'bg-[#D6E0F0] text-[#162D5F]' },
   adjustment: { label: 'Ajuste', color: 'bg-yellow-100 text-yellow-700' },
   refund: { label: 'Reembolso', color: 'bg-purple-100 text-purple-700' },
 };
@@ -94,7 +94,7 @@ export function WaCreditsPanel({ clientId }: { clientId: string }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-              <ArrowDownCircle className="w-4 h-4 text-blue-600" /> Mensajes Enviados
+              <ArrowDownCircle className="w-4 h-4 text-[#1E3A7B]" /> Mensajes Enviados
             </CardTitle>
           </CardHeader>
           <CardContent>

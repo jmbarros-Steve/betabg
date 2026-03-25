@@ -31,7 +31,7 @@ interface ScheduledPost {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: 'Borrador', color: 'bg-slate-100 text-slate-700', icon: ImagePlus },
-  scheduled: { label: 'Programado', color: 'bg-blue-100 text-blue-700', icon: Clock },
+  scheduled: { label: 'Programado', color: 'bg-[#D6E0F0] text-[#162D5F]', icon: Clock },
   publishing: { label: 'Publicando', color: 'bg-yellow-100 text-yellow-700', icon: Loader2 },
   published: { label: 'Publicado', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   failed: { label: 'Error', color: 'bg-red-100 text-red-700', icon: AlertTriangle },

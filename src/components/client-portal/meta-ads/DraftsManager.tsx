@@ -96,7 +96,7 @@ interface DraftItem {
 
 const STATUS_CONFIG: Record<DraftStatus, { label: string; color: string; icon: React.ElementType }> = {
   borrador: { label: 'Borrador', color: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30', icon: Clock },
-  aprobado: { label: 'Aprobado', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30', icon: CheckCircle },
+  aprobado: { label: 'Aprobado', color: 'bg-[#1E3A7B]/15 text-[#1E3A7B] border-[#2A4F9E]/30', icon: CheckCircle },
   en_pauta: { label: 'Publicado', color: 'bg-green-500/15 text-green-600 border-green-500/30', icon: Megaphone },
   generando: { label: 'Generando', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30', icon: Loader2 },
 };
@@ -458,7 +458,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                     {/* Segmentation */}
                     {(bv?.audience_description || bv?.dolor) && (
                       <div className="flex items-start gap-2">
-                        <Users className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                        <Users className="w-4 h-4 text-[#2A4F9E] shrink-0 mt-0.5" />
                         <div className="text-sm">
                           <p className="font-medium">Segmentación</p>
                           {bv?.dolor && bv.dolor !== 'Sin definir' && (
@@ -651,8 +651,8 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
           <DialogHeader>
             <DialogTitle>Publicar en Meta</DialogTitle>
           </DialogHeader>
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
-            <Send className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-[#1E3A7B]/5 border border-[#2A4F9E]/20">
+            <Send className="w-5 h-5 text-[#2A4F9E] shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium">Tu campaña se publicará en Meta como PAUSADA.</p>
               <p className="text-xs text-muted-foreground mt-1">Podrás activarla cuando estés listo.</p>

@@ -76,7 +76,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   prestashop: 'bg-muted text-muted-foreground border-border',
   tiendanube: 'bg-secondary text-secondary-foreground border-secondary',
   jumpseller: 'bg-accent/10 text-accent-foreground border-accent/30',
-  wix: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700',
+  wix: 'bg-[#D6E0F0] text-[#132448] border-[#7B9BCF] dark:bg-[#0A1628] dark:text-[#7B9BCF] dark:border-[#162D5F]',
   squarespace: 'bg-neutral-100 text-neutral-800 border-neutral-300 dark:bg-neutral-900 dark:text-neutral-300 dark:border-neutral-600',
   bigcommerce: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-700',
   webflow: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-700',
@@ -533,7 +533,7 @@ export function CompetitorDeepDivePanel({ clientId }: CompetitorDeepDivePanelPro
                         {/* Recommendations */}
                         {dd.ai_insights.recommendations.length > 0 && (
                           <div className="space-y-1">
-                            <p className="text-xs font-semibold flex items-center gap-1 text-blue-700 dark:text-blue-400">
+                            <p className="text-xs font-semibold flex items-center gap-1 text-[#162D5F] dark:text-[#38BDF8]">
                               <Lightbulb className="h-3 w-3" /> Qué hacer nosotros
                             </p>
                             <ul className="space-y-0.5">

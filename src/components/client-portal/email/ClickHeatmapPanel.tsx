@@ -43,7 +43,7 @@ const heatColors: Record<HeatLevel, { bg: string; border: string; text: string; 
   hot:  { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-700', badge: 'bg-red-500 text-white', overlay: 'rgba(239, 68, 68, 0.35)' },
   warm: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700', badge: 'bg-orange-500 text-white', overlay: 'rgba(249, 115, 22, 0.30)' },
   mild: { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700', badge: 'bg-yellow-500 text-white', overlay: 'rgba(234, 179, 8, 0.25)' },
-  cold: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', badge: 'bg-blue-500 text-white', overlay: 'rgba(59, 130, 246, 0.20)' },
+  cold: { bg: 'bg-[#F0F4FA]', border: 'border-[#7B9BCF]', text: 'text-[#162D5F]', badge: 'bg-[#2A4F9E] text-white', overlay: 'rgba(59, 130, 246, 0.20)' },
 };
 
 const heatLabels: Record<HeatLevel, string> = {

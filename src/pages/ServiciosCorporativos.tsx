@@ -383,7 +383,7 @@ const ServiciosCorporativos = () => {
                           onClick={() => handleNeedSelect('leads')}
                           className="p-6 rounded-lg border-2 hover:border-primary transition-colors text-left group"
                         >
-                          <Users className="w-8 h-8 text-blue-600 mb-3" />
+                          <Users className="w-8 h-8 text-[#1E3A7B] mb-3" />
                           <h4 className="font-semibold mb-1">Escalar en Leads</h4>
                           <p className="text-sm text-muted-foreground">Conseguir más prospectos</p>
                         </button>

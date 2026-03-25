@@ -108,7 +108,7 @@ export function BusinessHealthScore({
       : 0;
 
     const label = weightedScore >= 75 ? 'Excelente' : weightedScore >= 55 ? 'Bueno' : weightedScore >= 35 ? 'Regular' : 'Necesita atención';
-    const color = weightedScore >= 75 ? 'text-emerald-600' : weightedScore >= 55 ? 'text-blue-600' : weightedScore >= 35 ? 'text-amber-600' : 'text-red-600';
+    const color = weightedScore >= 75 ? 'text-emerald-600' : weightedScore >= 55 ? 'text-[#1E3A7B]' : weightedScore >= 35 ? 'text-amber-600' : 'text-red-600';
     const strokeColor = weightedScore >= 75 ? '#10B981' : weightedScore >= 55 ? '#2563EB' : weightedScore >= 35 ? '#F59E0B' : '#EF4444';
 
     return { score: weightedScore, factors, label, color, strokeColor };
@@ -155,7 +155,7 @@ export function BusinessHealthScore({
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-bold text-lg">Salud del Negocio</h3>
               <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', color,
-                score >= 75 ? 'bg-emerald-100' : score >= 55 ? 'bg-blue-100' : score >= 35 ? 'bg-amber-100' : 'bg-red-100'
+                score >= 75 ? 'bg-emerald-100' : score >= 55 ? 'bg-[#D6E0F0]' : score >= 35 ? 'bg-amber-100' : 'bg-red-100'
               )}>
                 {label}
               </span>

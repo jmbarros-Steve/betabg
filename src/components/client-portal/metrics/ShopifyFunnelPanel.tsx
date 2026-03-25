@@ -35,7 +35,7 @@ export function ShopifyFunnelPanel({ funnelData }: ShopifyFunnelPanelProps) {
     if (sessions === 0 && purchases === 0) return [];
 
     return [
-      { label: 'Visitas', value: sessions, icon: Eye, color: 'text-blue-600', bgColor: 'bg-blue-100', barColor: 'bg-blue-500', estimated: funnelData.sessions === null },
+      { label: 'Visitas', value: sessions, icon: Eye, color: 'text-[#1E3A7B]', bgColor: 'bg-[#D6E0F0]', barColor: 'bg-[#2A4F9E]', estimated: funnelData.sessions === null },
       { label: 'Agregar al Carro', value: addToCarts, icon: ShoppingCart, color: 'text-purple-600', bgColor: 'bg-purple-100', barColor: 'bg-purple-500', estimated: funnelData.addToCarts === null },
       { label: 'Checkout', value: checkouts, icon: CreditCard, color: 'text-amber-600', bgColor: 'bg-amber-100', barColor: 'bg-amber-500', estimated: false },
       { label: 'Compras', value: purchases, icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', barColor: 'bg-green-500', estimated: false },

@@ -89,8 +89,8 @@ export function ProfitMetricsPanel({
       description: 'Costo por cada nuevo cliente',
       tooltip: 'Cuánto cuesta conseguir un nuevo cliente a través de publicidad. Mientras más bajo, mejor. El cambio % se muestra invertido: verde significa que bajó (bueno)',
       icon: Users,
-      iconColor: 'text-blue-600',
-      iconBg: 'bg-blue-100',
+      iconColor: 'text-[#1E3A7B]',
+      iconBg: 'bg-[#D6E0F0]',
     },
     {
       label: 'MER',

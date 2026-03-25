@@ -56,7 +56,7 @@ const platformConfig: Record<string, { name: string; logo: string | null; color:
   meta: {
     name: 'Meta Ads',
     logo: logoMeta,
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-[#D6E0F0] text-[#132448]',
   },
   google: {
     name: 'Google Ads',

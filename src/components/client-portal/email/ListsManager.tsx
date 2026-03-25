@@ -57,7 +57,7 @@ const SEGMENT_TEMPLATES = [
     name: 'Nuevos clientes',
     description: 'Registrados en los últimos 30 días',
     icon: UserPlus,
-    color: 'text-blue-600 bg-blue-50',
+    color: 'text-[#1E3A7B] bg-[#F0F4FA]',
     filters: [{ field: 'subscribed_at', operator: 'gte', value: 'relative:30d' }],
   },
   {
@@ -514,7 +514,7 @@ export function ListsManager({ clientId }: ListsManagerProps) {
                   <Card key={list.id} className="cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => handleOpenList(list)}>
                     <CardContent className="py-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Filter className="w-4 h-4 text-blue-500" />
+                        <Filter className="w-4 h-4 text-[#2A4F9E]" />
                         <div>
                           <p className="text-sm font-medium">{list.name}</p>
                           {list.description && (
@@ -622,7 +622,7 @@ export function ListsManager({ clientId }: ListsManagerProps) {
                     className="h-auto py-4 flex flex-col items-center gap-2"
                     onClick={() => { setNewType('segment'); setShowCustomCreate(true); }}
                   >
-                    <Filter className="w-5 h-5 text-blue-500" />
+                    <Filter className="w-5 h-5 text-[#2A4F9E]" />
                     <span className="text-sm font-medium">Segmento con filtros</span>
                     <span className="text-xs text-muted-foreground">Define reglas para segmentar automáticamente</span>
                   </Button>

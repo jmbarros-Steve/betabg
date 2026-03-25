@@ -36,7 +36,7 @@ interface MatrixProduct {
 
 const QUADRANTS = [
   { key: 'star', label: 'Estrella', desc: 'Alto margen + alta velocidad', tip: 'Invertir más en publicidad de estos productos', icon: Star, color: 'text-green-600', bgColor: 'bg-green-50 border-green-200', badgeColor: 'bg-green-100 text-green-700' },
-  { key: 'cow', label: 'Vaca', desc: 'Alto margen + baja velocidad', tip: 'Aumentar visibilidad con campañas de remarketing', icon: Milk, color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', badgeColor: 'bg-blue-100 text-blue-700' },
+  { key: 'cow', label: 'Vaca', desc: 'Alto margen + baja velocidad', tip: 'Aumentar visibilidad con campañas de remarketing', icon: Milk, color: 'text-[#1E3A7B]', bgColor: 'bg-[#F0F4FA] border-[#B5C8E0]', badgeColor: 'bg-[#D6E0F0] text-[#162D5F]' },
   { key: 'opportunity', label: 'Oportunidad', desc: 'Bajo margen + alta velocidad', tip: 'Subir precio o reducir costo para mejorar margen', icon: Lightbulb, color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200', badgeColor: 'bg-amber-100 text-amber-700' },
   { key: 'zombie', label: 'Zombi', desc: 'Bajo margen + baja velocidad', tip: 'Evaluar descontinuar o hacer liquidación', icon: Ghost, color: 'text-red-600', bgColor: 'bg-red-50 border-red-200', badgeColor: 'bg-red-100 text-red-700' },
 ] as const;

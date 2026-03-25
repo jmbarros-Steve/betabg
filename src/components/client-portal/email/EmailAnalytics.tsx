@@ -293,8 +293,8 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>
           <CardContent className="pt-5 pb-4 text-center">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-2">
-              <Mail className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-full bg-[#F0F4FA] flex items-center justify-center mx-auto mb-2">
+              <Mail className="w-5 h-5 text-[#1E3A7B]" />
             </div>
             <p className="text-2xl font-bold">{aggregate.total_sent?.toLocaleString() ?? 0}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Enviados</p>

@@ -96,7 +96,7 @@ const priorityConfig = {
   critical: { color: 'bg-red-500/10 text-red-500 border-red-500/30', icon: AlertTriangle },
   high: { color: 'bg-orange-500/10 text-orange-500 border-orange-500/30', icon: TrendingDown },
   medium: { color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30', icon: Target },
-  low: { color: 'bg-blue-500/10 text-blue-500 border-blue-500/30', icon: Sparkles },
+  low: { color: 'bg-[#1E3A7B]/10 text-[#2A4F9E] border-[#2A4F9E]/30', icon: Sparkles },
 };
 
 const formatCurrency = (value: number, currency: string = 'CLP') => {

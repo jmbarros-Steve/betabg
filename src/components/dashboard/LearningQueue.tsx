@@ -30,10 +30,10 @@ interface QueueRow {
 
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
   youtube: <Youtube className="w-4 h-4 text-red-500" />,
-  pdf: <FileText className="w-4 h-4 text-blue-500" />,
+  pdf: <FileText className="w-4 h-4 text-[#2A4F9E]" />,
   url: <Globe className="w-4 h-4 text-green-500" />,
   text: <Type className="w-4 h-4 text-muted-foreground" />,
-  document: <FileText className="w-4 h-4 text-blue-500" />,
+  document: <FileText className="w-4 h-4 text-[#2A4F9E]" />,
 };
 
 function isYouTubeUrl(url: string): boolean {
@@ -305,7 +305,7 @@ export function LearningQueue() {
     }
     if (s === 'processing') {
       return (
-        <Badge variant="outline" className="text-xs bg-blue-500/15 text-blue-700 border-blue-300">
+        <Badge variant="outline" className="text-xs bg-[#1E3A7B]/15 text-[#162D5F] border-[#7B9BCF]">
           <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Procesando
         </Badge>
       );

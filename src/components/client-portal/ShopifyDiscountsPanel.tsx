@@ -43,7 +43,7 @@ interface ShopifyDiscountsPanelProps {
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
   expired: 'bg-red-100 text-red-700',
-  scheduled: 'bg-blue-100 text-blue-700',
+  scheduled: 'bg-[#D6E0F0] text-[#162D5F]',
 };
 
 function formatValue(type: string, value: string) {
@@ -162,7 +162,7 @@ export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerforma
               <p className="text-xs text-muted-foreground">Descuento otorgado</p>
             </div>
             <div className="p-3 rounded-lg border bg-muted/30 text-center">
-              <TrendingUp className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+              <TrendingUp className="w-4 h-4 mx-auto mb-1 text-[#2A4F9E]" />
               <p className={`text-lg font-bold ${overallROI >= 200 ? 'text-green-600' : overallROI >= 100 ? 'text-yellow-600' : 'text-red-600'}`}>
                 {overallROI.toFixed(0)}%
               </p>

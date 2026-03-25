@@ -934,7 +934,7 @@ function CouponConfig({ p, set }: { p: any; set: (k: string, v: any) => void }) 
             <Label className="text-xs font-medium">Dias de validez (opcional)</Label>
             <Input type="number" value={p.expirationDays || ''} onChange={e => set('expirationDays', e.target.value)} className="h-9 text-sm mt-1.5" placeholder="7" />
           </div>
-          <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-[11px] text-blue-700 dark:text-blue-300">
+          <div className="flex items-start gap-2 p-2.5 bg-[#F0F4FA] dark:bg-[#0A1628]/30 rounded-lg text-[11px] text-[#162D5F] dark:text-[#7B9BCF]">
             <span>🔄</span>
             <span>Steve creará un código único por suscriptor en Shopify al enviar el email. Cada persona recibe un código diferente.</span>
           </div>

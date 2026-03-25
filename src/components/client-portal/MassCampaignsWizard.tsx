@@ -976,9 +976,9 @@ export function MassCampaignsWizard({ clientId, onClose }: MassCampaignsWizardPr
 
                 {uploadDone && (
                   <div className="space-y-4 pt-4">
-                    <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl">
+                    <div className="flex items-start gap-3 p-4 bg-[#F0F4FA] dark:bg-[#0A1628]/30 border border-[#B5C8E0] dark:border-[#132448] rounded-xl">
                       <span className="text-lg shrink-0">💡</span>
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <p className="text-sm text-[#162D5F] dark:text-[#7B9BCF]">
                         Tus borradores están en Klaviyo. Revísalos ahí y programa el envío cuando estés listo.
                       </p>
                     </div>

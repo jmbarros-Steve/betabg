@@ -53,7 +53,7 @@ const OBJECTIVE_LABELS: Record<string, string> = {
 };
 
 const FUNNEL_LABELS: Record<string, { label: string; color: string }> = {
-  tofu: { label: 'TOFU — Awareness', color: 'bg-blue-500/15 text-blue-700 border-blue-500/30' },
+  tofu: { label: 'TOFU — Awareness', color: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30' },
   mofu: { label: 'MOFU — Consideración', color: 'bg-yellow-500/15 text-yellow-700 border-yellow-500/30' },
   bofu: { label: 'BOFU — Conversión', color: 'bg-green-500/15 text-green-700 border-green-500/30' },
 };
@@ -141,10 +141,10 @@ export default function ReviewStep(props: ReviewStepProps) {
       )}
 
       {/* PAUSA notice */}
-      <Card className="border-blue-300 bg-blue-50">
+      <Card className="border-[#7B9BCF] bg-[#F0F4FA]">
         <CardContent className="py-3 flex items-start gap-3">
-          <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-          <div className="text-sm text-blue-800">
+          <Info className="w-5 h-5 text-[#1E3A7B] mt-0.5 shrink-0" />
+          <div className="text-sm text-[#132448]">
             <span className="font-semibold">Tu campana se creara en PAUSA en Meta.</span>{' '}
             Esto te permite revisarla antes de activarla. No se gastara dinero hasta que la actives manualmente.
           </div>
@@ -225,7 +225,7 @@ export default function ReviewStep(props: ReviewStepProps) {
                 <span className="text-muted-foreground">Objetivo:</span>
                 <span className="font-medium">{OBJECTIVE_LABELS[objective] || objective}</span>
                 <span className="text-muted-foreground">Tipo:</span>
-                <Badge className={`text-[10px] w-fit ${budgetType === 'CBO' ? 'bg-purple-500/15 text-purple-700' : 'bg-blue-500/15 text-blue-700'}`}><JargonTooltip term={budgetType} /></Badge>
+                <Badge className={`text-[10px] w-fit ${budgetType === 'CBO' ? 'bg-purple-500/15 text-purple-700' : 'bg-[#1E3A7B]/15 text-[#162D5F]'}`}><JargonTooltip term={budgetType} /></Badge>
               </>
             )}
           </div>
@@ -258,7 +258,7 @@ export default function ReviewStep(props: ReviewStepProps) {
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="py-3 flex items-center gap-2">
-            <Target className="w-4 h-4 text-blue-500" />
+            <Target className="w-4 h-4 text-[#2A4F9E]" />
             <Badge className={`text-[10px] ${funnel.color}`}>{funnel.label}</Badge>
           </CardContent>
         </Card>

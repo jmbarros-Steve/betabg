@@ -436,12 +436,12 @@ function DashboardSection({ clientId }: { clientId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border bg-gradient-to-br from-blue-500/8 to-transparent border-blue-500/15">
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-[#F0F4FA]0/8 to-transparent border-[#2A4F9E]/15">
           <CardContent className="pt-6 pb-5 px-6">
             <div className="flex items-start justify-between mb-3">
               <JargonTooltip term="CPA" className="text-sm font-medium text-muted-foreground" />
-              <div className="p-2.5 rounded-xl bg-blue-500/10">
-                <Target className="w-5 h-5 text-blue-500" />
+              <div className="p-2.5 rounded-xl bg-[#1E3A7B]/10">
+                <Target className="w-5 h-5 text-[#2A4F9E]" />
               </div>
             </div>
             <p className="text-3xl font-bold tracking-tight mb-1">
@@ -1044,11 +1044,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                       group flex items-center gap-2.5 rounded-lg px-2.5 py-2
                       text-sm font-medium transition-colors duration-150
                       outline-none focus-visible:ring-2 focus-visible:ring-ring
-                      ${isActive ? 'bg-blue-50 text-blue-700' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                      ${isActive ? 'bg-[#F0F4FA] text-[#162D5F]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
                       ${sidebarCollapsed ? 'justify-center' : ''}
                     `}
                   >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-700' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#162D5F]' : 'text-muted-foreground group-hover:text-foreground'}`} />
                     {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                   </button>
                 );

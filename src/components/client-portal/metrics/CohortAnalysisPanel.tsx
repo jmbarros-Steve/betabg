@@ -21,9 +21,9 @@ interface CohortAnalysisPanelProps {
 function getRetentionColor(rate: number): { bg: string; text: string } {
   if (rate >= 50) return { bg: '#059669', text: '#ffffff' };  // emerald-600
   if (rate >= 31) return { bg: '#10B981', text: '#ffffff' };  // emerald-500
-  if (rate >= 21) return { bg: '#2563EB', text: '#ffffff' };  // blue-600
-  if (rate >= 11) return { bg: '#93C5FD', text: '#1E3A5F' };  // blue-300
-  if (rate > 0) return { bg: '#DBEAFE', text: '#1E40AF' };   // blue-100
+  if (rate >= 21) return { bg: '#1E3A7B', text: '#ffffff' };  // navy
+  if (rate >= 11) return { bg: '#7B9BCF', text: '#0F1F3D' };  // navy-300
+  if (rate > 0) return { bg: '#D6E0F0', text: '#1E3A7B' };   // navy-100
   return { bg: '#F1F5F9', text: '#94A3B8' };                  // slate-100
 }
 

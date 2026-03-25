@@ -26,9 +26,9 @@ export default function StepIndicator({ steps, currentIndex, onStepClick }: Step
             disabled={!isPast && !isCurrent}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
               isCurrent
-                ? 'bg-blue-600 text-white'
+                ? 'bg-[#1E3A7B] text-white'
                 : isPast
-                ? 'bg-blue-600 text-white cursor-pointer hover:bg-blue-700'
+                ? 'bg-[#1E3A7B] text-white cursor-pointer hover:bg-[#162D5F]'
                 : 'bg-slate-200 text-muted-foreground cursor-default'
             }`}
           >

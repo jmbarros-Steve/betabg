@@ -49,7 +49,7 @@ const features = [
     icon: Mail,
     title: 'Email Marketing',
     description: 'Planifica secuencias de Welcome, Abandoned Cart y Winback listas para Klaviyo.',
-    color: 'from-blue-500 to-cyan-600'
+    color: 'from-[#F0F4FA]0 to-cyan-600'
   },
   {
     icon: BarChart3,
@@ -67,7 +67,7 @@ const features = [
     icon: Zap,
     title: 'Integraciones',
     description: 'Conecta Meta Ads, Google Ads y Klaviyo para una visión 360° de tu marketing.',
-    color: 'from-indigo-500 to-blue-600'
+    color: 'from-indigo-500 to-[#1E3A7B]'
   }
 ];
 

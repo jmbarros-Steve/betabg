@@ -74,8 +74,8 @@ function formatHourShort(h: number): string {
 
 function scoreToColor(score: number): string {
   if (score === 0) return '#f3f4f6'; // gray-100
-  if (score < 20) return '#dbeafe'; // blue-100
-  if (score < 40) return '#bfdbfe'; // blue-200
+  if (score < 20) return '#D6E0F0'; // navy-100
+  if (score < 40) return '#B5C8E0'; // navy-200
   if (score < 50) return '#fef3c7'; // amber-100
   if (score < 60) return '#fde68a'; // amber-200
   if (score < 70) return '#fcd34d'; // amber-300
@@ -97,19 +97,19 @@ function formatPercent(n: number): string {
 const INSIGHT_BORDER: Record<HeatmapInsight['type'], string> = {
   success: 'border-l-green-500',
   warning: 'border-l-yellow-500',
-  info: 'border-l-blue-500',
+  info: 'border-l-[#2A4F9E]',
 };
 
 const INSIGHT_BG: Record<HeatmapInsight['type'], string> = {
   success: 'bg-green-50 dark:bg-green-950/20',
   warning: 'bg-yellow-50 dark:bg-yellow-950/20',
-  info: 'bg-blue-50 dark:bg-blue-950/20',
+  info: 'bg-[#F0F4FA] dark:bg-[#0A1628]/20',
 };
 
 const INSIGHT_ICON_COLOR: Record<HeatmapInsight['type'], string> = {
   success: 'text-green-600 dark:text-green-400',
   warning: 'text-yellow-600 dark:text-yellow-400',
-  info: 'text-blue-600 dark:text-blue-400',
+  info: 'text-[#1E3A7B] dark:text-[#38BDF8]',
 };
 
 const INSIGHT_ICON: Record<HeatmapInsight['type'], React.ElementType> = {
@@ -393,7 +393,7 @@ export function SendTimeHeatmap({ clientId }: SendTimeHeatmapProps) {
     return (
       <Card className="card-hover">
         <CardContent className="py-8 text-center">
-          <Info className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+          <Info className="w-8 h-8 mx-auto text-[#2A4F9E] mb-2" />
           <p className="text-sm font-medium mb-1">Datos insuficientes</p>
           <p className="text-muted-foreground text-sm">
             Se necesitan al menos 5 campanas enviadas para analizar horarios

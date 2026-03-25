@@ -6,7 +6,7 @@ const features = [
     icon: MessageSquare,
     title: 'Chat con Steve AI',
     description: 'Tu consultor de marketing 24/7. Pregunta sobre estrategia, análisis y optimización.',
-    color: 'bg-blue-50 text-blue-600',
+    color: 'bg-[#F0F4FA] text-[#1E3A7B]',
     span: false,
   },
   {

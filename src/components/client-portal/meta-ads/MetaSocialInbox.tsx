@@ -529,11 +529,11 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                 </p>
                 <p className="text-xl font-bold mt-0.5">{conversations.length}</p>
               </div>
-              <div className="p-2 rounded-md bg-blue-500/10">
-                <MessageSquare className="w-4 h-4 text-blue-500" />
+              <div className="p-2 rounded-md bg-[#1E3A7B]/10">
+                <MessageSquare className="w-4 h-4 text-[#2A4F9E]" />
               </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500/40 to-blue-500/10" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#F0F4FA]0/40 to-[#F0F4FA]0/10" />
           </CardContent>
         </Card>
         <Card className="relative overflow-hidden">
@@ -589,7 +589,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
       {/* Page info bar */}
       {selectedPage && (
         <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border/50 bg-muted/30">
-          <Facebook className="w-4 h-4 text-blue-600 shrink-0" />
+          <Facebook className="w-4 h-4 text-[#1E3A7B] shrink-0" />
           <span className="text-sm font-medium">{selectedPage.name}</span>
           {selectedPage.instagram && (
             <>
@@ -709,7 +709,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                             </AvatarFallback>
                           </Avatar>
                           {isUnread && (
-                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-background" aria-label="No leído" role="status" />
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#2A4F9E] rounded-full border-2 border-background" aria-label="No leído" role="status" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -736,7 +736,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                               className={`text-[10px] px-1.5 py-0 h-[18px] ${
                                 conv.platform === 'instagram'
                                   ? 'bg-pink-500/10 text-pink-600 border-pink-500/20'
-                                  : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                  : 'bg-[#1E3A7B]/10 text-[#1E3A7B] border-[#2A4F9E]/20'
                               }`}
                             >
                               {conv.platform === 'instagram' ? 'IG' : 'FB'}
@@ -807,7 +807,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                         className={`text-[10px] px-1.5 py-0 h-[18px] ${
                           selectedConversation.platform === 'instagram'
                             ? 'bg-pink-500/10 text-pink-600'
-                            : 'bg-blue-500/10 text-blue-600'
+                            : 'bg-[#1E3A7B]/10 text-[#1E3A7B]'
                         }`}
                       >
                         {selectedConversation.platform === 'instagram' ? 'Instagram' : 'Facebook'}

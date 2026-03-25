@@ -161,10 +161,10 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
               Agregar dominio
             </Button>
           </div>
-          <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3">
+          <div className="rounded-lg bg-[#F0F4FA] dark:bg-[#0A1628]/20 border border-[#B5C8E0] dark:border-[#0F1F3D] p-3">
             <div className="flex gap-2">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <div className="text-xs text-blue-800 dark:text-blue-300 space-y-1">
+              <Info className="w-4 h-4 text-[#1E3A7B] shrink-0 mt-0.5" />
+              <div className="text-xs text-[#132448] dark:text-[#7B9BCF] space-y-1">
                 <p className="font-medium">Para enviar emails necesitas configurar:</p>
                 <ul className="list-disc list-inside space-y-0.5">
                   <li><strong>SPF</strong> — Autoriza nuestros servidores a enviar emails en tu nombre</li>

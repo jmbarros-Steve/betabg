@@ -28,7 +28,7 @@ interface AdCreativesLibraryProps { clientId: string; }
 const ESTADO_CONFIG: Record<string, { label: string; className: string; next: string }> = {
   borrador: { label: 'Borrador', className: 'bg-gray-100 text-gray-700 border-gray-200', next: 'aprobado' },
   aprobado: { label: 'Aprobado ✅', className: 'bg-green-100 text-green-700 border-green-200', next: 'en_pauta' },
-  en_pauta: { label: 'En Pauta 📢', className: 'bg-blue-100 text-blue-700 border-blue-200', next: 'borrador' },
+  en_pauta: { label: 'En Pauta 📢', className: 'bg-[#D6E0F0] text-[#162D5F] border-[#B5C8E0]', next: 'borrador' },
   generando: { label: 'Generando...', className: 'bg-amber-100 text-amber-700 border-amber-200', next: 'borrador' },
 };
 
@@ -334,9 +334,9 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
 
                         {/* Plan de Acción DCT */}
                         {isDct && hasDctImages && (
-                          <div className="rounded-lg border-l-[3px] border-l-blue-500 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-2">
-                            <p className="text-[13px] font-bold text-blue-900 dark:text-blue-300">Plan de Accion <JargonTooltip term="DCT" /> — Metodo Charlie</p>
-                            <div className="space-y-1.5 text-[13px] text-blue-800 dark:text-blue-200">
+                          <div className="rounded-lg border-l-[3px] border-l-[#2A4F9E] bg-[#F0F4FA] dark:bg-[#0A1628]/20 p-4 space-y-2">
+                            <p className="text-[13px] font-bold text-[#0F1F3D] dark:text-[#7B9BCF]">Plan de Accion <JargonTooltip term="DCT" /> — Metodo Charlie</p>
+                            <div className="space-y-1.5 text-[13px] text-[#132448] dark:text-[#B5C8E0]">
                               <p>• <strong>Tipo de campaña:</strong> Testing DCT — Advantage+ Shopping</p>
                               <p>• <strong>Presupuesto diario sugerido:</strong> {cpaMaximo ? `$${(cpaMaximo * 2).toLocaleString('es-CL')} CLP` : <span className="text-amber-600">Completar brief para calcular</span>}</p>
                               <p>• <strong>Duración del test:</strong> 5-7 días</p>
