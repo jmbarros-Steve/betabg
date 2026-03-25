@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2 } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -17,9 +17,10 @@ import { SteveKnowledgePanel } from '@/components/dashboard/SteveKnowledgePanel'
 import { SteveTrainingPanel } from '@/components/dashboard/SteveTrainingPanel';
 import { SteveTrainingChat } from '@/components/dashboard/SteveTrainingChat';
 import { KnowledgeRulesExplorer } from '@/components/dashboard/KnowledgeRulesExplorer';
+import { AdminSupportPanel } from '@/components/dashboard/AdminSupportPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training';
+type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support';
 
 export default function Dashboard() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -71,6 +72,7 @@ export default function Dashboard() {
     { id: 'invoices', label: 'Recibos', icon: FileText },
     { id: 'platforms', label: 'Plataformas', icon: Link2 },
     { id: 'training', label: 'Steve IA', icon: Brain },
+    { id: 'support', label: 'Soporte', icon: MessageSquare },
     { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'estudios', label: 'Centro Estudios', icon: GraduationCap },
   ] as const;
@@ -130,6 +132,7 @@ export default function Dashboard() {
               <SteveKnowledgePanel />
             </div>
           )}
+          {activeTab === 'support' && <AdminSupportPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
           {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}
         </motion.div>
