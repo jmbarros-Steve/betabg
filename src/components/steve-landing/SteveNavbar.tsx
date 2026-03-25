@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
+import { Link } from 'react-router-dom';
 import logoSteve from '@/assets/logo-steve.png';
 
 interface SteveNavbarProps {
@@ -42,14 +43,14 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
           </button>
 
           <div className="hidden md:flex items-center gap-8">
-            <button
-              onClick={() => onNavigate('/funcionalidades')}
+            <Link
+              to="/funcionalidades"
               className={`text-sm font-medium transition-colors hover:text-[#1E3A7B] ${
                 scrolled ? 'text-slate-600' : 'text-slate-300 hover:text-white'
               }`}
             >
               Funcionalidades
-            </button>
+            </Link>
             {[
               { label: 'Integraciones', href: '#integraciones' },
               { label: 'Plataforma', href: '#planes' },
