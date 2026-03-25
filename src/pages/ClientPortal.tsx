@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram, GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -40,14 +40,17 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
+import { TabCoachmark } from '@/components/client-portal/TabCoachmark';
+import { KeyboardShortcutsDialog, useShortcutsDialog } from '@/components/client-portal/KeyboardShortcutsDialog';
 import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
 import { IGMetricsDashboard } from '@/components/client-portal/instagram/IGMetricsDashboard';
 import { InstagramHub } from '@/components/client-portal/InstagramHub';
+import { SteveAcademy } from '@/components/client-portal/SteveAcademy';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'instagram' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'instagram' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
 interface ClientInfo {
   id: string;
   name: string;
@@ -68,6 +71,7 @@ export default function ClientPortal() {
   const [clientLogoUrl, setClientLogoUrl] = useState<string | null>(null);
   const [defaultTabResolved, setDefaultTabResolved] = useState(false);
   const userNavigatedRef = useRef(false);
+  const shortcutsDialog = useShortcutsDialog();
 
   // Wrapper for user-initiated tab navigation — prevents resolveDefaultTab from overriding
   const handleUserNavigate = (tab: TabType) => {
@@ -91,6 +95,19 @@ export default function ClientPortal() {
     };
     window.addEventListener('steve:navigate-tab', handler);
     return () => window.removeEventListener('steve:navigate-tab', handler);
+  }, []);
+
+  // Keyboard shortcuts: 1-5 for primary tabs
+  useEffect(() => {
+    const tabMap: Record<string, TabType> = { '1': 'steve', '2': 'brief', '3': 'metrics', '4': 'connections', '5': 'config' };
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const tab = tabMap[e.key];
+      if (tab) handleUserNavigate(tab);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   // SECURITY: Only super admins can view other clients' portals
@@ -288,6 +305,7 @@ export default function ClientPortal() {
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
     { id: 'email', label: 'Steve Mail', icon: MailCheck },
     { id: 'wa_credits', label: 'WhatsApp', icon: MessageSquare },
+    { id: 'academy', label: 'Academy', icon: GraduationCap },
   ] as const;
 
   const tabs = [...primaryTabs, ...secondaryTabs] as const;
@@ -416,6 +434,9 @@ export default function ClientPortal() {
           <SetupProgressTracker clientId={effectiveClientId} onNavigate={(tab) => handleUserNavigate(tab as TabType)} />
         )}
 
+        {/* Tab-specific coachmark */}
+        <TabCoachmark tabId={activeTab} />
+
         {/* Content — tabs stay mounted once visited so in-flight requests complete */}
         <div>
           {visitedTabs.has('metrics') && effectiveClientId && (
@@ -540,6 +561,15 @@ export default function ClientPortal() {
               </TabErrorBoundary>
             </div>
           )}
+          {visitedTabs.has('academy') && effectiveClientId && (
+            <div className={activeTab !== 'academy' ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="Academy">
+                <div className="max-w-5xl mx-auto">
+                  <SteveAcademy clientId={effectiveClientId} />
+                </div>
+              </TabErrorBoundary>
+            </div>
+          )}
         </div>
       </div>
 
@@ -557,6 +587,9 @@ export default function ClientPortal() {
 
       {/* Cmd+K Command Palette */}
       <CommandPalette onNavigate={(tab) => handleUserNavigate(tab as TabType)} />
+
+      {/* Keyboard Shortcuts Dialog */}
+      <KeyboardShortcutsDialog open={shortcutsDialog.open} onOpenChange={shortcutsDialog.setOpen} />
 
       {/* Onboarding removed */}
 
