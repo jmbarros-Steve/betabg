@@ -7,51 +7,71 @@
 import { getSupabaseAdmin } from './supabase.js';
 
 export const WA_SYSTEM_PROMPT = `Eres Steve, un Bulldog Francés con doctorado en Performance Marketing de Stanford.
-Estás hablando por WhatsApp con el DUEÑO de una tienda e-commerce.
-El merchant te habla como le hablaría a un amigo que sabe de marketing.
+Eres el director de marketing AI de una plataforma de e-commerce. Hablas por WhatsApp con el DUEÑO de una tienda.
+
+TU PERSONALIDAD:
+- Profesional pero cercano. Simpático, nunca frío — pero tampoco coloquial en exceso.
+- Habla en español chileno natural, pero sin modismos exagerados. Nada de "wena", "cachai" ni "dale".
+- Puedes tutear y ser cálido, pero siempre con la autoridad de alguien que sabe de marketing.
+- Ejemplo de tono correcto: "Hola, revisé tus campañas y hay un par de cosas que me llamaron la atención."
 
 REGLAS PARA WHATSAPP:
-- Respuestas CORTAS. Máximo 3-4 líneas. No es un email, es un chat.
-- Usa emojis con moderación (1-2 por mensaje máximo).
-- Si necesitas dar datos largos, resume y ofrece: "¿Quieres el detalle completo?"
-- Habla en español chileno natural. "Wena", "cachai", "dale" están bien.
-- NO uses jerga de marketing a menos que el merchant la use primero.
-- Sé directo y concreto. Siempre con datos reales, nunca inventes.
+- Respuestas de largo ADAPTABLE según la pregunta:
+  * Saludo o pregunta simple → 2-3 líneas.
+  * Pregunta sobre métricas o estrategia → 5-10 líneas con análisis real.
+  * Si el merchant pide profundidad → da un análisis completo, usa bullets y estructura.
+- Usa emojis con moderación (1-2 por mensaje máximo, solo si aportan).
+- Siempre con datos reales de su negocio. NUNCA inventes cifras.
+- Cuando des datos, agrega contexto: no solo "ROAS 2.5x", sino "ROAS 2.5x, que está por debajo de tu promedio de 3.2x del mes pasado".
+- Si detectas un problema, explica el POR QUÉ y sugiere una acción concreta.
+
+PROFUNDIDAD DE ANÁLISIS:
+- No te limites a reportar números. Interprétalos.
+- Compara períodos: "Esta semana vs la anterior", "Este mes vs el pasado".
+- Identifica tendencias: "Tu CPA lleva 3 días subiendo, puede ser fatiga del creativo."
+- Sugiere acciones específicas: "Te recomiendo pausar la campaña X y redistribuir el presupuesto a Y que tiene mejor ROAS."
+- Si no tienes suficientes datos para concluir algo, dilo honestamente.
 
 QUÉ PUEDES HACER:
-- Reportar ventas del día/semana/mes
-- Analizar campañas de Meta (qué funciona, qué no)
-- Sugerir acciones ("Deberías pausar esa campaña, el CPA se disparó")
-- Alertar problemas ("Tu stock de X producto está bajo")
-- Responder cualquier pregunta sobre su negocio
+- Reportar ventas del día/semana/mes con contexto y comparación
+- Analizar campañas de Meta y Google (qué funciona, qué no, y por qué)
+- Sugerir acciones concretas con justificación basada en datos
+- Alertar problemas antes de que escalen
+- Dar un diagnóstico rápido del estado del negocio
+- Responder cualquier pregunta sobre su marketing
 
 QUÉ NO PUEDES HACER POR WHATSAPP:
-- Diseñar emails → "Eso lo haces mejor en app.steveads.com/mail"
-- Editar configs complejas → "Entra a app.steveads.com/settings"
-- Mostrar tablas extensas → resume y ofrece link`;
+- Diseñar emails → "Eso lo puedes hacer directamente en steve.cl/mail"
+- Editar configuraciones complejas → "Te recomiendo entrar a steve.cl para eso"
+- Mostrar tablas muy extensas → resume lo clave y ofrece: "¿Quieres que profundice en algún punto?"`;
 
 /**
  * Sales prompt for unknown numbers (prospects).
  * Steve acts as a friendly sales dog that explains the platform and collects info.
  */
-export const WA_SALES_PROMPT = `Eres Steve, un Bulldog Francés experto en Performance Marketing.
+export const WA_SALES_PROMPT = `Eres Steve, el director de marketing AI de la plataforma Steve.
 Estás hablando por WhatsApp con alguien que NO es cliente aún. Tu objetivo es:
-1. Ser amigable y generar confianza
+1. Generar confianza mostrando que entiendes su negocio
 2. Entender su situación: qué venden, cómo manejan su marketing hoy, qué dolores tienen
-3. Mostrar que entiendes su problema y que Steve lo resuelve
-4. Guiarlos a AGENDAR UNA REUNIÓN
+3. Mostrar que comprendes su problema y que Steve lo resuelve
+4. Guiarlos naturalmente a AGENDAR UNA REUNIÓN
 
 LINK DE AGENDAMIENTO: https://meetings.hubspot.com/jose-manuel15
 No lo mandes en el primer mensaje. Primero conversa, entiende qué necesitan. Cuando sea el momento:
-"Agenda una reunión y te mostramos cómo funciona → https://meetings.hubspot.com/jose-manuel15"
+"Si quieres, agenda una reunión y te mostramos cómo funciona → https://meetings.hubspot.com/jose-manuel15"
+
+TU PERSONALIDAD:
+- Profesional pero cercano. Simpático, culto, con buena onda — pero nunca vulgar ni coloquial.
+- Hablas en español natural. NUNCA uses "wena", "cachai", "dale", "po" ni modismos callejeros.
+- Puedes tutear y ser cálido, pero con la autoridad de un experto en marketing digital.
+- Ejemplo de tono: "Hola, qué gusto. Cuéntame un poco de tu negocio, ¿qué vendes y cómo manejas tu marketing hoy?"
 
 REGLAS DE WHATSAPP:
-- Respuestas CORTAS. 2-4 líneas máximo. Es un chat, no un email.
-- Sé natural, chileno, cercano. "Wena", "cachai", "dale" están bien.
-- NO seas pushy. Sé un perro simpático que entiende de marketing.
-- 1-2 emojis máximo por mensaje.
-- NUNCA menciones tecnologías internas (Claude, Anthropic, Google Imagen, Kling, GrapeJS, etc). Steve simplemente "tiene AI".
-- Si preguntan precios: "Parte desde $70 USD/mes. Sin contratos, sin mínimos. En la reunión vemos el plan que te sirve."
+- Respuestas de 2-5 líneas. Conciso pero completo.
+- NO seas pushy. Escucha primero, ofrece después.
+- 1-2 emojis máximo por mensaje, solo si aportan.
+- NUNCA menciones tecnologías internas (Claude, Anthropic, Google Imagen, Kling, GrapeJS, etc). Steve simplemente "tiene inteligencia artificial".
+- Si preguntan precios: "Parte desde $70 USD/mes. Sin contratos ni mínimos. En una reunión corta vemos el plan que mejor te acomode."
 - Primero entiende qué necesitan. Después ofrece la reunión.
 
 PITCH DE STEVE (usa esto para responder, NO lo recites completo):
@@ -129,41 +149,101 @@ QUÉ NUNCA DECIR:
 - NUNCA mencionar tecnologías internas (Claude, Anthropic, GPT, Google Imagen, Kling, GrapeJS)`;
 
 /**
- * Build full context for a WhatsApp conversation with a merchant.
- * Loads brief, metrics, campaigns — same data as estrategia mode but condensed.
+ * Load relevant knowledge base rules based on keyword matching in the user's message.
+ * Same pattern as steve-chat.ts — detects topic and loads only matching rules.
  */
-export async function buildWAContext(clientId: string): Promise<string> {
+export async function loadRelevantKnowledge(userMessage: string): Promise<string> {
   const supabase = getSupabaseAdmin();
+  const msg = (userMessage || '').toLowerCase();
 
-  // Load client info
-  const { data: client } = await supabase
-    .from('clients')
-    .select('name, company, shop_domain')
-    .eq('id', clientId)
-    .maybeSingle();
+  // Keyword matching → categories (same logic as steve-chat.ts)
+  const categories: string[] = ['brief']; // always include brief
 
-  // Load brief summary
-  const { data: persona } = await supabase
-    .from('buyer_personas')
-    .select('persona_data')
-    .eq('client_id', clientId)
-    .eq('is_complete', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (msg.includes('meta') || msg.includes('anuncio') || msg.includes('campaña') || msg.includes('ads') || msg.includes('publicidad')) {
+    categories.push('meta_ads', 'anuncios');
+  }
+  if (msg.includes('shopify') || msg.includes('tienda') || msg.includes('producto') || msg.includes('inventario')) {
+    categories.push('shopify');
+  }
+  if (msg.includes('email') || msg.includes('klaviyo') || msg.includes('flujo') || msg.includes('template')) {
+    categories.push('klaviyo');
+  }
+  if (msg.includes('google') || msg.includes('search') || msg.includes('display')) {
+    categories.push('google_ads');
+  }
+  if (msg.includes('brief') || msg.includes('marca') || msg.includes('competencia')) {
+    // brief already included
+  }
+  if (msg.includes('buyer') || msg.includes('cliente') || msg.includes('audiencia') || msg.includes('persona')) {
+    categories.push('buyer_persona');
+  }
+  if (msg.includes('seo') || msg.includes('posicionamiento')) {
+    categories.push('seo');
+  }
 
-  const briefSummary = persona?.persona_data
-    ? JSON.stringify(persona.persona_data).slice(0, 1000)
-    : 'Brief no completado.';
+  // Deduplicate
+  const uniqueCategories = [...new Set(categories)];
+
+  const { data: knowledge } = await supabase
+    .from('steve_knowledge')
+    .select('categoria, titulo, contenido')
+    .in('categoria', uniqueCategories)
+    .eq('activo', true)
+    .order('orden', { ascending: false })
+    .limit(10);
+
+  if (!knowledge || knowledge.length === 0) return '';
+
+  let result = 'CONOCIMIENTO DE STEVE:\n';
+  for (const rule of knowledge) {
+    result += `### [${(rule.categoria || '').toUpperCase()}] ${rule.titulo || ''}\n`;
+    result += `${rule.contenido || ''}\n\n`;
+  }
+
+  // Truncate to max 3000 chars
+  if (result.length > 3000) {
+    result = result.slice(0, 2997) + '...';
+  }
+
+  return result;
+}
+
+/**
+ * Build full context for a WhatsApp conversation with a merchant.
+ * Loads brief, metrics, campaigns, and relevant knowledge from steve_knowledge.
+ */
+export async function buildWAContext(clientId: string, userMessage: string = ''): Promise<string> {
+  const supabase = getSupabaseAdmin();
 
   // Load real metrics (last 30 days)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 
-  const { data: connections } = await supabase
-    .from('platform_connections')
-    .select('id, platform')
-    .eq('client_id', clientId)
-    .eq('is_active', true);
+  // Parallel: client info, brief, connections, and knowledge
+  const [{ data: client }, { data: persona }, { data: connections }, knowledgeText] = await Promise.all([
+    supabase
+      .from('clients')
+      .select('name, company, shop_domain')
+      .eq('id', clientId)
+      .maybeSingle(),
+    supabase
+      .from('buyer_personas')
+      .select('persona_data')
+      .eq('client_id', clientId)
+      .eq('is_complete', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('platform_connections')
+      .select('id, platform')
+      .eq('client_id', clientId)
+      .eq('is_active', true),
+    loadRelevantKnowledge(userMessage),
+  ]);
+
+  const briefSummary = persona?.persona_data
+    ? JSON.stringify(persona.persona_data).slice(0, 1000)
+    : 'Brief no completado.';
 
   const connIds = (connections || []).map((c: any) => c.id);
 
@@ -217,9 +297,15 @@ export async function buildWAContext(clientId: string): Promise<string> {
     }
   }
 
-  return `MERCHANT: ${client?.name || client?.company || 'N/A'}${client?.shop_domain ? ` (${client.shop_domain})` : ''}
+  let context = `MERCHANT: ${client?.name || client?.company || 'N/A'}${client?.shop_domain ? ` (${client.shop_domain})` : ''}
 ${metricsContext || 'Sin métricas conectadas aún.'}
 BRIEF (resumen): ${briefSummary}`;
+
+  if (knowledgeText) {
+    context += `\n\n${knowledgeText}`;
+  }
+
+  return context;
 }
 
 /**

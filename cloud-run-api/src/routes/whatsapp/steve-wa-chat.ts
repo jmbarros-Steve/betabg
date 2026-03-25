@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { WA_SYSTEM_PROMPT, WA_SALES_PROMPT, buildWAContext, getWAHistory, buildProspectContext, getProspectHistory } from '../../lib/steve-wa-brain.js';
+import { WA_SYSTEM_PROMPT, WA_SALES_PROMPT, buildWAContext, getWAHistory, buildProspectContext, getProspectHistory, loadRelevantKnowledge } from '../../lib/steve-wa-brain.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -69,9 +69,9 @@ export async function steveWAChat(c: Context) {
       last_message_preview: messageBody.substring(0, 100),
     }, { onConflict: 'client_id,channel,contact_phone' });
 
-    // Build Steve's context with real business data
+    // Build Steve's context with real business data + relevant knowledge
     const [merchantContext, history] = await Promise.all([
-      buildWAContext(client.id),
+      buildWAContext(client.id, messageBody),
       getWAHistory(client.id, phone, 10),
     ]);
 
@@ -106,8 +106,8 @@ export async function steveWAChat(c: Context) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 500, // Short for WA
-        system: systemPrompt.slice(0, 8000),
+        max_tokens: 1024,
+        system: systemPrompt.slice(0, 12000),
         messages: sanitized,
       }),
     });
@@ -210,8 +210,11 @@ async function handleProspect(c: Context, supabase: any, phone: string, messageB
       contact_phone: phone,
     });
 
-    // 3. Load prospect history
-    const history = await getProspectHistory(phone, 10);
+    // 3. Load prospect history + relevant knowledge in parallel
+    const [history, knowledgeText] = await Promise.all([
+      getProspectHistory(phone, 10),
+      loadRelevantKnowledge(messageBody),
+    ]);
 
     // Build messages array
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
@@ -228,7 +231,10 @@ async function handleProspect(c: Context, supabase: any, phone: string, messageB
     }
 
     const prospectContext = buildProspectContext(prospect || { stage: 'new', message_count: 0 });
-    const systemPrompt = `${WA_SALES_PROMPT}\n\n${prospectContext}`;
+    let systemPrompt = `${WA_SALES_PROMPT}\n\n${prospectContext}`;
+    if (knowledgeText) {
+      systemPrompt += `\n\n${knowledgeText}`;
+    }
 
     const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
