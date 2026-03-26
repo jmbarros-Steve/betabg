@@ -287,18 +287,20 @@ BRIEF (resumen): ${briefSummary}`;
 export async function getWAHistory(clientId: string, phone: string, limit = 10): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
   const supabase = getSupabaseAdmin();
 
+  // Get the MOST RECENT messages (descending), then reverse for chronological order
   const { data: messages } = await supabase
     .from('wa_messages')
     .select('direction, body')
     .eq('client_id', clientId)
     .eq('channel', 'steve_chat')
     .eq('contact_phone', phone)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (!messages || messages.length === 0) return [];
 
   return messages
+    .reverse() // Back to chronological order for Claude
     .filter((m: any) => m.body)
     .map((m: any) => ({
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
@@ -306,21 +308,23 @@ export async function getWAHistory(clientId: string, phone: string, limit = 10):
     }));
 }
 
-export async function getProspectHistory(phone: string, limit = 20): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+export async function getProspectHistory(phone: string, limit = 10): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
   const supabase = getSupabaseAdmin();
 
+  // Get the MOST RECENT messages (descending), then reverse for chronological order
   const { data: messages } = await supabase
     .from('wa_messages')
     .select('direction, body')
     .eq('channel', 'prospect')
     .eq('contact_phone', phone)
     .is('client_id', null)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (!messages || messages.length === 0) return [];
 
   return messages
+    .reverse() // Back to chronological order for Claude
     .filter((m: any) => m.body)
     .map((m: any) => ({
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
