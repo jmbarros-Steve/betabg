@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2, MessageSquare } from 'lucide-react';
+import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2, MessageSquare, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -18,9 +18,10 @@ import { SteveTrainingPanel } from '@/components/dashboard/SteveTrainingPanel';
 import { SteveTrainingChat } from '@/components/dashboard/SteveTrainingChat';
 import { KnowledgeRulesExplorer } from '@/components/dashboard/KnowledgeRulesExplorer';
 import { AdminSupportPanel } from '@/components/dashboard/AdminSupportPanel';
+import { AcademyAdminPanel } from '@/components/dashboard/AcademyAdminPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support';
+type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support' | 'academy';
 
 export default function Dashboard() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -75,6 +76,7 @@ export default function Dashboard() {
     { id: 'support', label: 'Soporte', icon: MessageSquare },
     { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'estudios', label: 'Centro Estudios', icon: GraduationCap },
+    { id: 'academy', label: 'Academy', icon: Library },
   ] as const;
 
   return (
@@ -135,6 +137,7 @@ export default function Dashboard() {
           {activeTab === 'support' && <AdminSupportPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
           {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}
+          {activeTab === 'academy' && <AcademyAdminPanel />}
         </motion.div>
       </div>
     </div>

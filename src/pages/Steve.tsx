@@ -25,6 +25,7 @@ import { StatsSection } from '@/components/steve-landing/StatsSection';
 import { StevePersonality } from '@/components/steve-landing/StevePersonality';
 import { PricingSection } from '@/components/steve-landing/PricingSection';
 import { FinalCTA } from '@/components/steve-landing/FinalCTA';
+import { ClientLogosSection } from '@/components/steve-landing/ClientLogosSection';
 import { TestimonialsSection } from '@/components/steve-landing/TestimonialsSection';
 import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 import { FloatingWhatsAppButton } from '@/components/steve-landing/FloatingWhatsAppButton';
@@ -103,6 +104,7 @@ export default function Steve() {
       <HowItWorks />
       <StatsSection />
       <StevePersonality />
+      <ClientLogosSection />
       <TestimonialsSection />
       <PricingSection onOpenAuth={openAuth} />
       <FinalCTA onOpenAuth={openAuth} />
